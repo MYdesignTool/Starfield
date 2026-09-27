@@ -6,6 +6,7 @@ add_library(starfield_core STATIC
     src/core/CpuRenderer.cpp
     src/core/Geometry.cpp
     src/core/Graph.cpp
+    src/core/GraphEvaluation.cpp
     src/core/ParticleSimulation.cpp
     src/core/Random.cpp
     src/core/Render.cpp

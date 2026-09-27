@@ -8,6 +8,7 @@
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/Geometry.hpp"
 #include "starfield/core/Graph.hpp"
+#include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Random.hpp"
 #include "starfield/core/Render.hpp"
@@ -1113,9 +1114,134 @@ void test_renderer_formats_and_limits() {
     CHECK(cancelled_output.error().code == ErrorCode::cancelled);
 }
 
+void test_graph_evaluation() {
+    using namespace graph_keys;
+    const NeverCancelled never;
+    const CpuParticleRenderer renderer;
+    const NodeId emitter{test_uuid(9)};
+    const NodeId output{test_uuid(1)}; // dependency order must beat UUID order
+    const EdgeId edge{test_uuid(7)};
+
+    for (const auto shape : {EmitterShape::point, EmitterShape::box, EmitterShape::sphere, EmitterShape::disc}) {
+        for (const auto format : {PixelFormat::rgba8, PixelFormat::rgba16, PixelFormat::rgba32f}) {
+            Scene scene;
+            scene.settings.emitter_shape = shape;
+            scene.settings.opacity = 0.37;
+            scene.settings.seed = 197;
+            scene.settings.emitter_size = 0.3;
+            scene.settings.velocity = Vec3{0.1, -0.05, 0.3};
+            scene.settings.emitter_origin = Vec3{0.1, 0.05, 0.2};
+            scene.format = format;
+            scene.pixel_aspect = 1.2;
+            auto made = make_emitter_output_graph(scene.settings, emitter, output, edge);
+            CHECK(made.has_value());
+            if (!made.has_value()) continue;
+            auto graph = made.take_value();
+            // Parked emitters validate but do not execute or change the stream.
+            graph.nodes.push_back(make_test_emitter(22));
+            std::reverse(graph.nodes.begin(), graph.nodes.end());
+            for (auto& node : graph.nodes) std::reverse(node.parameters.begin(), node.parameters.end());
+            auto snapshot = std::make_shared<const Graph>(graph);
+            const auto serialized = serialize_graph(graph, particle_node_registry());
+            CHECK(serialized.has_value());
+            // Repeated, reverse, negative, birth-boundary and NTSC subframe time.
+            for (const auto time : {RationalTime{3, 2}, RationalTime{1001, 30000}, RationalTime{-1, 24},
+                                    RationalTime{0, 1}, RationalTime{1, 1}, RationalTime{3, 2}}) {
+                auto flat = build_request(scene);
+                flat.frame.time = time;
+                auto request = flat;
+                request.graph = snapshot;
+                request.settings.value.opacity = 0.0;
+                request.settings.value.particle_count = 0; // graph must take precedence
+                const auto expected = renderer.render(flat, never);
+                const auto actual = renderer.render(request, never);
+                CHECK(expected.has_value() && actual.has_value());
+                if (expected.has_value() && actual.has_value()) {
+                    CHECK(expected.value().pixels == actual.value().pixels);
+                    CHECK(expected.value().row_bytes == actual.value().row_bytes);
+                }
+                const auto evaluated = evaluate_particle_graph(graph, time, never);
+                CHECK(evaluated.has_value());
+                if (evaluated.has_value()) CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, output}));
+                // Half-resolution cropped output follows the same graph boundary.
+                flat.frame.frame_width = request.frame.frame_width = 32;
+                flat.frame.frame_height = request.frame.frame_height = 32;
+                flat.frame.region_of_interest = request.frame.region_of_interest = RectI{5, 4, 29, 27};
+                const auto small_expected = renderer.render(flat, never);
+                const auto small_actual = renderer.render(request, never);
+                CHECK(small_expected.has_value() && small_actual.has_value());
+                if (small_expected.has_value() && small_actual.has_value()) CHECK(small_expected.value().pixels == small_actual.value().pixels);
+            }
+            const auto after = serialize_graph(graph, particle_node_registry());
+            CHECK(after.has_value());
+            if (serialized.has_value() && after.has_value()) CHECK(serialized.value() == after.value());
+        }
+    }
+
+    auto made = make_emitter_output_graph(Settings{}, emitter, output, edge);
+    CHECK(made.has_value());
+    if (!made.has_value()) return;
+    const Graph graph = made.take_value();
+    const auto rejects = [&](const Graph& bad, ErrorCode code = ErrorCode::invalid_request) {
+        const auto result = evaluate_particle_graph(bad, RationalTime{1, 1}, never);
+        CHECK(!result.has_value());
+        if (!result.has_value()) CHECK(result.error().code == code);
+        auto request = build_request(Scene{});
+        request.graph = std::make_shared<const Graph>(bad);
+        const auto pixels = renderer.render(request, never);
+        CHECK(!pixels.has_value()); // invalid graph must never fall back to flat settings
+    };
+    rejects(Graph{});
+    auto bad = graph;
+    bad.edges.clear();
+    rejects(bad);
+    bad = graph;
+    bad.nodes[0].parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
+    rejects(bad);
+    bad = graph;
+    bad.nodes[0].parameters[4].value = std::uint32_t{256}; // must not wrap uint8 enum
+    rejects(bad);
+    bad = graph;
+    bad.nodes[0].parameters[8].value = -0.5;
+    rejects(bad);
+    bad = graph;
+    bad.nodes[0].parameters[1].value = std::numeric_limits<double>::infinity();
+    rejects(bad);
+    bad = graph;
+    bad.nodes.push_back(GraphNode{NodeId{test_uuid(3)}, kOutputNode, 1, {}});
+    bad.edges.push_back(GraphEdge{EdgeId{test_uuid(8)}, emitter, kEmitterParticles, bad.nodes.back().id, kOutputParticles});
+    CHECK(validate_graph(bad, particle_node_registry()).ok());
+    rejects(bad); // structurally legal, but ambiguous output selection
+    bad = graph;
+    bad.nodes.push_back(make_test_emitter(22));
+    bad.nodes.back().parameters[8].value = -1.0;
+    rejects(bad); // disconnected semantic errors are still reported
+
+    const auto time_error = evaluate_particle_graph(graph, RationalTime{1, 0}, never);
+    CHECK(!time_error.has_value());
+    if (!time_error.has_value()) CHECK(time_error.error().code == ErrorCode::invalid_time);
+    struct CancelAtPoll final : Cancellation {
+        mutable unsigned polls{0};
+        unsigned limit{0};
+        bool is_cancelled() const noexcept override { return ++polls >= limit; }
+    };
+    for (unsigned limit : {1u, 3u, 8u, 10u}) {
+        CancelAtPoll cancelled;
+        cancelled.limit = limit;
+        const auto result = evaluate_particle_graph(graph, RationalTime{1, 1}, cancelled);
+        CHECK(!result.has_value());
+        if (!result.has_value()) CHECK(result.error().code == ErrorCode::cancelled);
+    }
+    CHECK(!make_emitter_output_graph(Settings{}, emitter, emitter, edge).has_value());
+    Settings invalid;
+    invalid.opacity = 1.5;
+    CHECK(!make_emitter_output_graph(invalid, emitter, output, edge).has_value());
+}
+
 } // namespace
 
 int main() {
+    test_graph_evaluation();
     test_rational_time();
     test_graph_contract();
     test_sequence_codec();

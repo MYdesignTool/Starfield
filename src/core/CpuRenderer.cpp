@@ -1,4 +1,5 @@
 #include "starfield/core/CpuRenderer.hpp"
+#include "starfield/core/GraphEvaluation.hpp"
 
 #include "starfield/core/ParticleSimulation.hpp"
 
@@ -245,13 +246,19 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
 
     compose_source_into_accumulation(source, roi, roi_width, roi_height, accumulation);
 
-    const auto particles = simulate_particles(request.settings, to_seconds(frame.time), cancellation);
+    const auto particles = [&]() -> Result<std::vector<ParticleInstance>> {
+        if (request.graph) {
+            auto evaluated = evaluate_particle_graph(*request.graph, frame.time, cancellation);
+            if (!evaluated.has_value()) return Result<std::vector<ParticleInstance>>::failure(evaluated.error());
+            return Result<std::vector<ParticleInstance>>::success(std::move(evaluated.take_value().particles));
+        }
+        return simulate_particles(request.settings, to_seconds(frame.time), cancellation);
+    }();
     if (!particles.has_value()) {
         return OutputResult::failure(particles.error());
     }
 
     const PixelGrid grid = make_grid(frame);
-    const double opacity = request.settings.value.opacity;
     std::uint64_t sprite_pixels = 0;
 
     for (std::size_t index = 0; index < particles.value().size(); ++index) {
@@ -312,7 +319,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                     continue;
                 }
 
-                const auto alpha = static_cast<float>(coverage * opacity);
+                const auto alpha = static_cast<float>(coverage * particle.opacity);
                 if (!(alpha > 0.0f)) {
                     continue;
                 }

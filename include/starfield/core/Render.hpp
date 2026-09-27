@@ -17,6 +17,8 @@
 
 namespace starfield::core {
 
+struct Graph;
+
 // Byte order in memory is always r, g, b, a with 1/2/4 bytes per channel. The AE
 // adapter converts to and from the host's a, r, g, b pixel structs.
 enum class PixelFormat : std::uint8_t {
@@ -151,7 +153,11 @@ struct PixelBuffer {
 struct RenderRequest {
     ValidatedSettings settings;
     FrameSpec frame;
-    // Reserved for the graph revision of later milestones; 0 in the M2 slice.
+    // When present, the graph is validated/evaluated at frame.time and takes
+    // precedence over `settings`. An absent graph preserves the flat-settings
+    // compatibility path while AE sequence persistence is integrated.
+    std::shared_ptr<const Graph> graph;
+    // Stable caller-owned revision key reserved for derived render caches.
     std::uint64_t graph_revision{0};
     // Absent means "no input layer": particles composite over transparent black.
     std::shared_ptr<const PixelBuffer> source;

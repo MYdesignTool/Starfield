@@ -544,4 +544,11 @@ NodeRegistry make_particle_node_registry() {
     return registry;
 }
 
+const NodeRegistry& particle_node_registry() {
+    // The built-in schemas are immutable after initialization and contain no AE
+    // state; sharing this registry does not add mutable render-global state.
+    static const NodeRegistry registry = make_particle_node_registry();
+    return registry;
+}
+
 } // namespace starfield::core

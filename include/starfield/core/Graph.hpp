@@ -200,5 +200,6 @@ inline constexpr ParameterKey kVelocitySpread{11};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();
+[[nodiscard]] const NodeRegistry& particle_node_registry();
 
 } // namespace starfield::core
