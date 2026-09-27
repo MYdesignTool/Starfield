@@ -1,0 +1,24 @@
+{
+  "manifestVersion": 1,
+  "schemaVersion": 1,
+  "effect": {
+    "displayName": "Starfield Particle",
+    "matchName": "org.starfieldfx.particle",
+    "category": "Starfield FX"
+  },
+  "parameters": [
+    { "id": 1, "key": "particle_count", "label": "Particle Count", "type": "float_slider", "default": 1000, "min": 0, "max": 2000000, "decimals": 0 },
+    { "id": 2, "key": "birth_rate", "label": "Birth Rate", "type": "float_slider", "default": 30, "min": 0, "max": 1000000, "decimals": 2 },
+    { "id": 3, "key": "seed", "label": "Random Seed", "type": "float_slider", "default": 1, "min": 0, "max": 2147483647, "decimals": 0 },
+    { "id": 4, "key": "particle_lifetime", "label": "Particle Lifetime", "type": "float_slider", "unit": "seconds", "default": 2, "min": 0, "max": 1000000, "decimals": 3 },
+    { "id": 5, "key": "emitter_shape", "label": "Emitter Shape", "type": "popup", "default": 1, "choices": ["Point", "Box", "Sphere", "Disc"] },
+    { "id": 6, "key": "velocity", "label": "Velocity", "type": "point3d", "default": [0, 0, 0], "unit": "comp_height" },
+    { "id": 7, "key": "particle_size", "label": "Particle Size", "type": "float_slider", "default": 8, "min": 0, "max": 100000, "decimals": 2 },
+    { "id": 8, "key": "opacity", "label": "Opacity", "type": "float_slider", "default": 1, "min": 0, "max": 1, "decimals": 3 }
+  ],
+  "compatibility": {
+    "idPolicy": "Released numeric IDs are permanent; never renumber or reuse.",
+    "migrationPolicy": "Add IDs for new controls. Removed controls become hidden compatibility parameters when old project data needs them.",
+    "hostInputIndex": 0
+  }
+}

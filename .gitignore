@@ -1,0 +1,8 @@
+/AdobeSDK/
+/artifacts/
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.pdb
