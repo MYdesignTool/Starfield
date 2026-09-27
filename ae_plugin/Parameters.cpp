@@ -266,16 +266,20 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_FLOAT_SLIDERX("Emitter Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
 
+    // Velocity, not Speed: the reference emitter has a single scalar Speed plus a direction
+    // model (Direction/Angle/Direction Span), and its "Speed X/Y/Z" are per-particle rotation
+    // speeds in the Particle module. Naming our axes Speed would claim a meaning they do not
+    // have. docs/reference-parameter-map.md records the model difference and the planned fix.
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Speed X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Velocity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedXDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Speed Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Velocity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedYDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Speed Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Velocity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedZDiskId);
 
     AEFX_CLR_STRUCT(def);
@@ -288,12 +292,13 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_FLOAT_SLIDERX("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
 
+    // Default 10 px matches the reference's observed "Size (Pixels): 10".
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 10.0f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100000.0f, 0.0f, 100000.0f, 10.0f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
 
     AEFX_CLR_STRUCT(def);

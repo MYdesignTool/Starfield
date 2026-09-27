@@ -69,7 +69,7 @@ struct Settings {
     Vec3 emitter_origin{};
     // Layer heights per second; the default keeps a fresh instance visibly alive.
     Vec3 velocity{0.0, 0.3, 0.0};
-    double particle_size{8.0};
+    double particle_size{10.0};
     double opacity{1.0};
     // Extent of the box/sphere/disc emitters: cube edge length resp. diameter, in
     // layer heights. Ignored by the point emitter.
@@ -87,7 +87,7 @@ struct Settings {
     // as three working-space channel values; alpha is controlled by opacity.
     Vec3 color_start{1.0, 1.0, 1.0};
     Vec3 color_end{1.0, 1.0, 1.0};
-    double particle_size_end{8.0};
+    double particle_size_end{10.0};
     double opacity_end{1.0};
     bool appearance_enabled{false};
 };
