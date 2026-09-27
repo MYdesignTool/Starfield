@@ -52,6 +52,7 @@ Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid
 topology/values, output ambiguity, explicit identity rejection, and cancellation.
 Assertion totals include repeated parameter combinations, not independent features.
 
-AE arbitrary-data persistence and snapshot transport are implemented under G-04;
-the editor protocol and panel remain P-01/P-02. No AE host qualification is implied
+AE arbitrary-data persistence and snapshot transport are implemented under G-04.
+The CEP-to-ExtendScript bridge is specified in ADR 0009; panel implementation
+and AE host qualification remain P-02 work. No AE host qualification is implied
 by the core tests or this ADR.

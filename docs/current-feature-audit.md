@@ -25,4 +25,4 @@ The current compositing default (particles over the optional source) is an expli
 
 1. Install the build-2 effect in AE 2023; exercise fresh add, build-1 project load, graph selection, explicit capture, save/reopen, duplication and undo/redo.
 2. Implement particle size/opacity/color curves and common forces as graph nodes, each tied to observed reference cases and rendered fixtures.
-3. Build the dockable node panel against the serialized graph protocol; edits must reach AE's graph parameter and redraw the effect.
+3. Implement the dockable CEP panel using ADR 0009's ExtendScript/supervised-parameter bridge; edits must update the canonical graph parameter and redraw the effect. The v1 protocol displays a fixed single-emitter chain.

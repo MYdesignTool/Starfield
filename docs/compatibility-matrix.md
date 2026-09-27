@@ -45,7 +45,7 @@ The effect's `Options` button prints a read-only diagnostic summary: frame time,
 | Per-particle variation | A steady emitter animates on playback instead of looking frozen | Implemented in core (M3-01): per-particle birth offsets plus per-axis velocity spread from `core::Random`, covered by core tests. Host playback confirmation pending |
 | Random Seed | Changing the seed changes the rendered pixels | Implemented (M3-01): the seed now keys every per-particle stream. Host confirmation pending |
 | Forces | Each force has isolated enable/disable and stable parameter semantics | Not started |
-| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Not started |
+| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → output graph. Force/appearance kernels and the four-stage chain are not implemented; the interactive editor is not started. |
 | Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Implemented for 8/16/32-bpc, ROI, rowbytes, and premultiplied alpha. Downsampling no longer depends on the ambiguous SDK factor: geometry comes from observed worlds. Preview-resolution rendering still needs host confirmation |
 | Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Core test covers a half-resolution frame grid; host confirmation pending |
 | Compositing | Particles composite over the input instead of replacing it | Chosen default recorded in ADR 0005; not yet confirmed against the reference effect |

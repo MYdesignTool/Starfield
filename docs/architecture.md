@@ -21,7 +21,7 @@ After Effects
             └─ cache/ stable keys and AE Compute Cache integration
 ```
 
-Keep UI and preset compatibility as separate adapter modules. A future panel can use a documented, versioned message protocol; it must not share C++ object layouts with the effect or depend on undocumented process-local behavior.
+Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. It edits supervised, script-visible AE parameter streams; the effect turns those changes into the canonical arbitrary-data graph during `PF_Cmd_USER_CHANGED_PARAM`. The panel never shares C++ object layouts with the effect, and render code never queries panel or AEGP state.
 
 ## Render contract
 
@@ -84,7 +84,7 @@ The CMake build compiles only the portable core. The AE module is built by the W
 3. **Complete in code, host qualification open:** SmartFX checkout, ROI, pixel-format adapters, and a deterministic CPU point-emitter renderer. See the M2-06 checklist in `compatibility-matrix.md`.
 4. Add remaining emitters and particle controls as independent behavior tasks.
 5. Add graph types, bounded sequence migration, and presets.
-6. Add Compute Cache, MFR, and an optional GPU backend only after the serial CPU contract is stable. Defer a panel until a validated workflow needs one.
+6. Add the dockable panel after its fixed node parameter bindings exist. Add Compute Cache, MFR, and an optional GPU backend only after the serial CPU contract is stable and each feature has an observed need.
 
 ## Current scope
 
