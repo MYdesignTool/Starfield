@@ -16,6 +16,6 @@
 
 ## Consequences
 
-Validation is independent of node and edge vector order and does not evaluate node behavior. G-02 implements the schema-1 core codec against these types; G-03 evaluates immutable emitter/output snapshots (ADR 0007). G-04 still owns AE sequence persistence and current-control migration. The editor remains P-01/P-02 work.
+Validation is independent of node and edge vector order and does not evaluate node behavior. G-02 implements the schema-1 core codec against these types; G-03 evaluates immutable emitter/output snapshots (ADR 0007). G-04 stores snapshots in an AE arbitrary-data parameter and supports explicit capture of current legacy controls (ADR 0008). The editor remains P-01/P-02 work.
 
 The error result identifies the affected node, edge, port, or parameter where one exists. Allocation failure is reported as a typed validation failure. Traversals are iterative and size-bounded so a project-controlled graph cannot create unbounded recursion or work.

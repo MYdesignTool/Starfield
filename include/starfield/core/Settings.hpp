@@ -22,6 +22,9 @@ enum class ParameterId : std::uint32_t {
     opacity = 11,
     emitter_size = 12,
     velocity_spread = 13,
+    graph_data = 14,
+    control_source = 15,
+    capture_controls = 16,
 };
 
 enum class EmitterShape : std::uint8_t {

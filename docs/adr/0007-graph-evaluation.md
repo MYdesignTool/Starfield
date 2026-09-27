@@ -8,8 +8,9 @@
 
 `RenderRequest::graph` owns an immutable, host-independent graph snapshot. If
 present, it supplies the particle stream instead of `settings`. A malformed graph
-returns an error; it never silently falls back to the old settings. An absent graph
-retains the existing AE parameter path until G-04 supplies persisted snapshots.
+returns an error; it never silently falls back to another source. G-04 supplies a
+graph snapshot from Node Graph mode or constructs one from time-sampled AE controls
+in legacy mode (ADR 0008).
 An empty render ROI remains an allocation-free no-op, without evaluating particles.
 
 The evaluator validates every node/edge against the immutable built-in registry.
@@ -51,6 +52,6 @@ Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid
 topology/values, output ambiguity, explicit identity rejection, and cancellation.
 Assertion totals include repeated parameter combinations, not independent features.
 
-G-04 still owns AE persistence/migration and passing snapshots into the adapter.
-P-01/P-02 still own editor protocol and panel. No AE host qualification is implied
+AE arbitrary-data persistence and snapshot transport are implemented under G-04;
+the editor protocol and panel remain P-01/P-02. No AE host qualification is implied
 by the core tests or this ADR.

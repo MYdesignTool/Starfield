@@ -8,6 +8,7 @@
 #include "AE_Effect.h"
 
 #include "starfield/core/Settings.hpp"
+#include "GraphParameter.hpp"
 
 #include <cstddef>
 
@@ -18,6 +19,15 @@ namespace starfield::adapter {
 // New controls are appended with new IDs; ID order is preserved even when the UI
 // grouping is still pending (M3-03 adds AE parameter groups).
 inline constexpr std::size_t kEffectParameterCount = 13;
+inline constexpr std::size_t kTotalEffectParameterCount = 16;
+
+// Pre-render records dependencies by checking out the selected parameter source.
+// The returned immutable graph owns no AE handles or parameter pointers.
+[[nodiscard]] PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
+                                          std::shared_ptr<const core::Graph>& graph,
+                                          A_long* control_source = nullptr) noexcept;
+[[nodiscard]] PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data,
+                                      PF_ParamDef* params[], PF_UserChangedParamExtra* extra) noexcept;
 
 // Registers every manifest row with stable IDs, labels, ranges, and defaults, and
 // reports the resulting parameter count. Returns the host error unchanged.

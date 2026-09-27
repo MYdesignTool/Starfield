@@ -6,16 +6,16 @@
 
 - M0/M1 contracts and the native shell are in place. M2 adds SmartFX transport, an 8/16/32-bpc CPU sprite renderer, deterministic time evaluation, and source compositing.
 - M3-01 adds seeded Point/Box/Sphere/Disc birth distributions, emitter position, per-particle velocity spread, and deterministic random streams.
-- G-01/G-02/G-03 provide typed graph validation, bounded sequence serialization, and emitter/output evaluation through the CPU renderer. AE graph persistence and editor integration remain open.
+- G-01 through G-04 provide typed graph validation/serialization/evaluation and an AE arbitrary-data parameter path. The editor is still open; save/reopen and undo need AE host qualification.
 - Core self-tests pass (4,418 assertions); the G-03 Windows x64 plug-in builds with the May 2023 SDK. Current work targets AE 2023 only. Its current control revision still needs host qualification; evidence is tracked in [行为清单](docs/compatibility-matrix.md).
-- This remains a render slice, not Stardust parity. The current look is white 2D sprites with constant size/opacity; forces, age curves, color/texture sources, depth, mesh/volume rendering, presets, AE graph persistence, and the dockable editor remain unfinished. See the [current feature audit](docs/current-feature-audit.md).
+- This remains a render slice, not Stardust parity. The current look is white 2D sprites with constant size/opacity; force/appearance nodes, texture sources, depth, mesh/volume rendering, presets, and the dockable editor remain unfinished. AE 2023 host qualification remains open. See the [current feature audit](docs/current-feature-audit.md).
 
 ## 当前架构
 
 - 纯 C++ 核心不依赖 AE SDK；宿主指针和 suite 只出现在 `ae_plugin/` 适配层。
 - 渲染以不可变参数快照和绝对时间求值为基础，便于乱序帧请求与后续 MFR。
 - `Settings` 验证器在进入渲染前限制资源上界并替换非有限值。
-- 图模型以独立 UUID 和强类型端口/参数 key 表示；核心已接入发射器 → 输出求值，AE 尚未提供或持久化节点快照。
+- 图模型以独立 UUID 和强类型端口/参数 key 表示；AE 任意数据参数路径已接入，SmartFX 预渲染创建不可变节点快照。
 - SmartFX、序列化、Compute Cache、CPU 参考渲染器和 GPU 后端的边界见 [架构说明](docs/architecture.md)。
 - 行为覆盖按独立验收场景推进，见 [行为清单](docs/compatibility-matrix.md)。
 - 当前构建和验收仅针对 AE 2023，暂不进行新版本适配；分阶段交付见 [开发路线图](docs/roadmap.md)。

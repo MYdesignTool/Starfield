@@ -8,6 +8,7 @@
 #include "entry.h"
 
 #include "Diagnostics.hpp"
+#include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "PluginFlags.h"
 #include "PluginVersion.h"
@@ -24,7 +25,7 @@ static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
 // PluginFlags.h is the single source for the global out-flags; these assertions
 // are what keeps the PiPL resource from drifting away from the runtime values.
 static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT |
-                                      PF_OutFlag_USE_OUTPUT_EXTENT | PF_OutFlag_I_DO_DIALOG),
+                                      PF_OutFlag_USE_OUTPUT_EXTENT | PF_OutFlag_I_DO_DIALOG | PF_OutFlag_NON_PARAM_VARY),
               "PiPL AE_Effect_Global_OutFlags must match the runtime declaration");
 static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_FLOAT_COLOR_AWARE),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
@@ -66,7 +67,7 @@ PF_Err dispatch(PF_Cmd cmd,
                 PF_OutData* out_data,
                 PF_ParamDef* params[],
                 PF_LayerDef* output,
-                void* extra) noexcept {
+                void* extra) {
     switch (cmd) {
         case PF_Cmd_ABOUT:
             return about(in_data, out_data);
@@ -75,7 +76,7 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_PARAMS_SETUP:
             return starfield::adapter::setup_parameters(in_data, out_data);
         case PF_Cmd_SEQUENCE_SETUP:
-            // M2 owns no sequence state. Bounded graph parsing arrives in M4.
+            // Persistent graph state is an AE arbitrary parameter (ADR 0008).
             out_data->sequence_data = nullptr;
             return PF_Err_NONE;
         case PF_Cmd_SEQUENCE_RESETUP:
@@ -87,6 +88,10 @@ PF_Err dispatch(PF_Cmd cmd,
             return starfield::adapter::pre_render(in_data, out_data, static_cast<PF_PreRenderExtra*>(extra));
         case PF_Cmd_SMART_RENDER:
             return starfield::adapter::smart_render(in_data, out_data, static_cast<PF_SmartRenderExtra*>(extra));
+        case PF_Cmd_ARBITRARY_CALLBACK:
+            return starfield::adapter::graph_arbitrary_callback(in_data, static_cast<PF_ArbParamsExtra*>(extra));
+        case PF_Cmd_USER_CHANGED_PARAM:
+            return starfield::adapter::capture_controls(in_data, out_data, params, static_cast<PF_UserChangedParamExtra*>(extra));
         case PF_Cmd_DO_DIALOG:
             // Diagnostic readout behind the effect's Options button. Read-only.
             return starfield::adapter::report_diagnostics(in_data, out_data);

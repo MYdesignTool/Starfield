@@ -109,6 +109,7 @@ private:
 // Pre-render facts handed to the render phase. AE takes ownership after pre-render
 // returns and frees the block through the callback below.
 struct PreRenderState {
+    std::shared_ptr<const core::Graph> graph;
     PF_LRect result_rect{};
     PF_LRect max_result_rect{};
     A_long ref_width{0};
@@ -159,8 +160,7 @@ std::int32_t scaled_origin(A_long rect_origin, double pixel_per_rect) noexcept {
 }
 
 PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth, const PreRenderState& state,
-                    PF_EffectWorld* input_world, PF_EffectWorld* output_world,
-                    const core::Settings& settings) noexcept {
+                    PF_EffectWorld* input_world, PF_EffectWorld* output_world) noexcept {
     WorldLayout output_layout{};
     if (!describe_world(*output_world, output_layout)) {
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
@@ -204,7 +204,7 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
     frame.quality = in_data->quality == PF_Quality_HI ? core::Quality::full : core::Quality::draft;
 
     core::RenderRequest request;
-    request.settings = core::validate_settings(settings);
+    request.graph = state.graph;
     request.frame = frame;
     request.graph_revision = 0;
 
@@ -234,6 +234,8 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
         }
     } catch (const std::bad_alloc&) {
         return PF_Err_OUT_OF_MEMORY;
+    } catch (...) {
+        return PF_Err_INTERNAL_STRUCT_DAMAGED;
     }
 
     return PF_Err_NONE;
@@ -242,7 +244,6 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
 } // namespace
 
 PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept {
-    (void)out_data;
     if (in_data == nullptr || extra == nullptr || extra->input == nullptr || extra->output == nullptr ||
         extra->cb == nullptr || extra->cb->checkout_layer == nullptr) {
         return PF_Err_BAD_CALLBACK_PARAM;
@@ -250,12 +251,17 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
 
     const PF_RenderRequest request = extra->input->output_request;
 
-    // A failed input checkout is not fatal: particles render over transparent and
-    // smart_render simply runs without a source.
+    std::shared_ptr<const core::Graph> graph;
+    const auto graph_err = checkout_render_graph(in_data, out_data, graph);
+    if (graph_err != PF_Err_NONE) return graph_err;
+
+    // A successful checkout may have empty pixels, but host errors (including
+    // cancellation) must not be converted into a successful transparent render.
     PF_CheckoutResult input_result{};
     AEFX_CLR_STRUCT(input_result);
-    (void)extra->cb->checkout_layer(in_data->effect_ref, kInputParameterIndex, kInputCheckoutId, &request,
+    const auto input_err = extra->cb->checkout_layer(in_data->effect_ref, kInputParameterIndex, kInputCheckoutId, &request,
                                     in_data->current_time, in_data->time_step, in_data->time_scale, &input_result);
+    if (input_err != PF_Err_NONE) return input_err;
 
     // Layer extent in host rect units. AE documents this as independent of the
     // request, which is what max_result_rect must be.
@@ -274,6 +280,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     if (state == nullptr) {
         return PF_Err_OUT_OF_MEMORY;
     }
+    state->graph = std::move(graph);
     state->result_rect = result;
     state->max_result_rect = layer_rect;
     state->ref_width = input_result.ref_width > 0 ? input_result.ref_width : (in_data->width > 0 ? in_data->width : 1);
@@ -304,7 +311,7 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
     }
 
     const auto* state = static_cast<const PreRenderState*>(extra->input->pre_render_data);
-    if (state == nullptr) {
+    if (state == nullptr || !state->graph) {
         // Render without a matching pre-render cannot know the layer geometry; fail
         // loudly instead of guessing coordinates.
         report_failure(out_data, core::make_error(core::ErrorCode::internal_failure, "pre-render state missing"));
@@ -316,12 +323,18 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         return PF_Err_UNRECOGNIZED_PARAM_TYPE;
     }
 
-    // Input pixels first: AE does not allow the output to be checked out before at
-    // least one input. A missing input means "composite over transparent".
+    // Check in a successful input checkout on output-checkout/render failures too.
     PF_EffectWorld* input_world = nullptr;
-    if (extra->cb->checkout_layer_pixels(in_data->effect_ref, kInputCheckoutId, &input_world) != PF_Err_NONE) {
-        input_world = nullptr;
-    }
+    const auto input_err = extra->cb->checkout_layer_pixels(in_data->effect_ref, kInputCheckoutId, &input_world);
+    if (input_err != PF_Err_NONE) return input_err;
+    struct InputCheckin {
+        PF_InData* in;
+        PF_SmartRenderExtra* extra;
+        ~InputCheckin() {
+            if (extra->cb->checkin_layer_pixels)
+                (void)extra->cb->checkin_layer_pixels(in->effect_ref, kInputCheckoutId);
+        }
+    } input_checkin{in_data, extra};
 
     PF_EffectWorld* output_world = nullptr;
     const PF_Err output_err = extra->cb->checkout_output(in_data->effect_ref, &output_world);
@@ -332,17 +345,8 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         return PF_Err_BAD_CALLBACK_PARAM;
     }
 
-    ScopedParameterCheckin parameters(in_data);
-    PF_Err err = parameters.snapshot().checkout(in_data);
-    if (err == PF_Err_NONE) {
-        err = render_frame(in_data, out_data, depth, *state, input_world, output_world,
-                           parameters.snapshot().settings());
-    }
+    const PF_Err err = render_frame(in_data, out_data, depth, *state, input_world, output_world);
 
-    // Optional, but frees the host's input pixels as early as possible.
-    if (input_world != nullptr) {
-        (void)extra->cb->checkin_layer_pixels(in_data->effect_ref, kInputCheckoutId);
-    }
     return err;
 }
 

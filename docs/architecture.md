@@ -13,7 +13,7 @@ The native effect is the product boundary. The AE SDK adapter translates selecto
 ```text
 After Effects
   └─ ae_plugin/       PiPL, selector dispatch, suites, parameter checkout,
-                      SmartFX pre-render/render, sequence serialization
+                      SmartFX snapshots/render, arbitrary-data persistence
        └─ core/       typed graph/settings, deterministic simulation,
                       coordinate/color conversion, renderer interfaces
             ├─ cpu/   reference renderer; first production backend
@@ -34,7 +34,7 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 ## State and concurrency
 
 - Global setup owns immutable plug-in metadata and acquired suite references. Global teardown releases them.
-- Sequence data is versioned serialized user state only. Implement setup, resetup, flatten, and setdown; never mutate it while rendering.
+- The graph is a versioned serialized arbitrary parameter owned by AE; never mutate it while rendering. Sequence data remains unused in the current graph design.
 - Render requests and graph snapshots are immutable. No mutable global/static render state.
 - Advertise threaded rendering only after every selector and every dependency is audited for concurrent calls. No host suite or checkout calls while holding a lock.
 - Shared expensive derived data belongs in AE Compute Cache with a complete content key, not in mutable sequence data. Cache keys include schema version, graph revision, time, quality, dimensions, format, and every checked-out input dependency.
@@ -67,7 +67,7 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 - `docs/compatibility-matrix.md`: behavior inventory and independently derived acceptance criteria.
 - `docs/adr/`: decisions that affect saved projects or rendering semantics.
 
-The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements the SmartFX selectors and advertises SmartFX and float-color awareness; current host qualification is incomplete. MFR is not advertised and remains gated on a later thread-safety audit. G-03 now evaluates immutable emitter/output graphs through the core renderer (ADR 0007); G-04 still owns supplying those snapshots from AE.
+The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements the SmartFX selectors and advertises SmartFX and float-color awareness; current host qualification is incomplete. MFR is not advertised and remains gated on a later thread-safety audit. G-03 evaluates immutable emitter/output graphs through the core renderer (ADR 0007); G-04 adds AE arbitrary-parameter persistence and supplies pre-render snapshots (ADR 0008).
 
 ## SDK guidance used
 
@@ -88,4 +88,4 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Current scope
 
-M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitter distributions, and the G-01/G-02 typed graph model/validator/codec are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. Graph evaluation and AE graph persistence, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, the editor panel, MFR, and GPU remain future milestones.
+M0 contracts, M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitters, and G-01–G-04 graph model/codec/evaluation/AE parameter integration are implemented. The current build registers 16 user parameters: 13 legacy values, graph data, source mode and capture action. Core parity/native callback checks and the May 2023 SDK build pass. AE 2023 playback, save/reopen, effect copy and undo/redo remain unqualified. Force/appearance nodes, panel, MFR and GPU remain future work.

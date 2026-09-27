@@ -1,4 +1,5 @@
 param(
+    [switch]$Adapter,
     [string]$MSVCVarsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 )
 
@@ -20,8 +21,9 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $buildDirectory = Join-Path $aliasRoot 'artifacts\core-tests'
-    $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot 'artifacts\core-tests')
+    $testFolder = if ($Adapter) { 'adapter-tests' } else { 'core-tests' }
+    $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
     $sources = @(
         'tests\core_tests.cpp',
@@ -37,6 +39,11 @@ try {
         'src\core\CpuRenderer.cpp'
     )
 
+    if ($Adapter) {
+        $sources[0] = 'tests\graph_parameter_tests.cpp'
+        $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
+    }
+
     $responseLines = @(
         '/nologo',
         '/std:c++20',
@@ -49,6 +56,12 @@ try {
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
     )
+    if ($Adapter) {
+        $sdkHeaders = "$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Headers"
+        $responseLines += @('/DMSWindows', '/DWIN32', '/D_WINDOWS', '/D_CRT_SECURE_NO_WARNINGS',
+            "/I `"$aliasRoot\ae_plugin`"", "/I `"$sdkHeaders`"", "/I `"$sdkHeaders\SP`"",
+            "/I `"$sdkHeaders\Win`"", "/I `"$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Util`"")
+    }
     $responseLines += $sources | ForEach-Object { "`"$aliasRoot\$_`"" }
 
     $responsePath = Join-Path $buildDirectory 'core-tests.rsp'
@@ -73,4 +86,4 @@ finally {
 }
 
 if ($exitCode -ne 0) { throw "Core self-tests failed with exit code $exitCode" }
-Write-Host 'Core self-tests passed.'
+Write-Host "$testFolder passed."

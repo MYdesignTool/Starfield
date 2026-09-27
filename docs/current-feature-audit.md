@@ -1,12 +1,12 @@
 # Current feature audit
 
-Review baseline: `0cee6c5` plus G-01/G-02 foundation and G-03 emitter/output evaluation, 2026-09-27.
+Review baseline: `070c33e` plus G-04 host arbitrary parameter bridge, 2026-09-27.
 
 ## What the implementation currently does
 
 - The AE adapter uses SmartFX and converts host parameters/worlds into a host-independent CPU render request.
 - The core evaluates a deterministic birth/lifetime schedule at an absolute time, supports seeded Point/Box/Sphere/Disc birth positions and per-particle velocity spread, and renders white soft-edged 2D discs over the optional input.
-- G-01/G-02 define stable graph identities, typed nodes/ports/parameters, built-in emitter/output schemas, bounded validation, and the version-1 sequence codec. G-03 evaluates an emitter/output snapshot through the CPU renderer; it matches the flat path in core regression cases. AE does not yet supply or persist graph snapshots.
+- G-01/G-02/G-03 define the graph schema, bounded codec and validation, plus emitter/output CPU evaluation. G-04 adds an AE arbitrary-data graph parameter, render-time snapshots and explicit legacy-control capture. The dockable editor and further node kernels are not implemented.
 
 ## Why the current result feels far from Stardust
 
@@ -16,14 +16,13 @@ The current compositing default (particles over the optional source) is an expli
 
 ## Verification gaps
 
-- The 13-control build has not been reloaded and rendered in AE 2023. Existing host evidence covers an earlier eight-control revision only; the exact AE build is also unrecorded.
+- The 16-parameter build has not been loaded in AE 2023. Existing host evidence covers an earlier eight-control revision only; the exact AE build is also unrecorded. Save/reopen, effect copy, old-project default selection and undo/redo remain unverified in the host.
 - AE playback, Full/Half/Quarter preview, 8/16/32-bpc, cancellation, and project lifecycle remain unqualified for the current build.
 - The point-control normalization shim is still provisional until the current AE 2023 Options readout records the delivered origin values.
-- G-01/G-02/G-03 are core-only. G-04 must persist the graph and migrate the current AE controls before the graph can replace the flat parameter surface. Constant schema-1 values are supported; graph animation tracks/history are not implemented.
+- G-01 through G-04 have core/native code and fake-host coverage. Host persistence and undo claims remain unqualified until exercised in AE 2023. Capturing controls stores current-time constants; it does not transform historical animation into node tracks.
 
 ## Next product steps
 
-1. G-03 emitter/output core runtime is implemented; keep its graph/flat parity cases as regression coverage while adding node kernels.
-2. G-04: add AE sequence persistence and migrate the pre-graph controls without changing released parameter IDs.
-3. Implement particle size/opacity/color curves and common forces as graph nodes, each tied to observed reference cases and rendered fixtures.
-4. Requalify the current binary in AE 2023 while core work proceeds; record exact host build and Options output.
+1. Install the build-2 effect in AE 2023; exercise fresh add, build-1 project load, graph selection, explicit capture, save/reopen, duplication and undo/redo.
+2. Implement particle size/opacity/color curves and common forces as graph nodes, each tied to observed reference cases and rendered fixtures.
+3. Build the dockable node panel against the serialized graph protocol; edits must reach AE's graph parameter and redraw the effect.

@@ -39,6 +39,7 @@
   <ItemGroup>
     <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="EffectMain.cpp" />
+    <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />
     <ClCompile Include="WorldBridge.cpp" />

@@ -9,6 +9,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <new>
 
 namespace starfield::adapter {
 namespace {
@@ -150,7 +152,40 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_FLOAT_SLIDERX("Velocity Spread", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kVelocitySpreadDiskId);
 
-    out_data->num_params = static_cast<A_long>(kEffectParameterCount) + 1;
+    // The graph's default handle becomes host-owned only after successful ADD_PARAM.
+    PF_ArbitraryH default_graph = nullptr;
+    PF_ArbParamsExtra create{};
+    create.id = kGraphParameterId;
+    create.which_function = PF_Arbitrary_NEW_FUNC;
+    create.u.new_func_params.arbPH = &default_graph;
+    PF_Err err = graph_arbitrary_callback(in_data, &create);
+    if (err != PF_Err_NONE) return err;
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_ARBITRARY_DATA;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+    std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
+    def.uu.id = def.u.arb_d.id = kGraphParameterId;
+    def.u.arb_d.dephault = default_graph;
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
+
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_POPUP;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
+    std::snprintf(def.name, sizeof(def.name), "Control Source");
+    def.uu.id = kControlSourceId;
+    def.u.pd.num_choices = 2;
+    def.u.pd.dephault = kNodeControlSource;
+    def.u.pd.value = kLegacyControlSource;
+    def.u.pd.u.namesptr = "AE Controls|Node Graph";
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
+
+    PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NONE,
+                  PF_ParamFlag_SUPERVISE, kCaptureControlsId);
+
+    out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
 
@@ -238,6 +273,93 @@ void ParameterSnapshot::checkin(PF_InData* in_data) noexcept {
         }
     }
     valid_ = false;
+}
+
+namespace {
+class CheckedParameter {
+public:
+    explicit CheckedParameter(PF_InData* data) : data_(data) {}
+    ~CheckedParameter() { if (checked_) PF_CHECKIN_PARAM(data_, &value); }
+    CheckedParameter(const CheckedParameter&) = delete;
+    CheckedParameter& operator=(const CheckedParameter&) = delete;
+    PF_Err checkout(A_long index) {
+        const auto err = PF_CHECKOUT_PARAM(data_, index, data_->current_time, data_->time_step, data_->time_scale, &value);
+        checked_ = err == PF_Err_NONE;
+        return err;
+    }
+    PF_ParamDef value{};
+private:
+    PF_InData* data_;
+    bool checked_{false};
+};
+
+PF_Err graph_error(PF_OutData* out, const core::CoreError& error) noexcept {
+    if (out) std::snprintf(out->return_msg, sizeof(out->return_msg), "Starfield graph: %s", error.detail);
+    return error.code == core::ErrorCode::allocation_failed ? PF_Err_OUT_OF_MEMORY : PF_Err_BAD_CALLBACK_PARAM;
+}
+} // namespace
+
+PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
+                             std::shared_ptr<const core::Graph>& graph,
+                             A_long* control_source) noexcept {
+    graph.reset();
+    if (control_source) *control_source = -1;
+    if (!in_data || !in_data->inter.checkout_param || !in_data->inter.checkin_param) return PF_Err_BAD_CALLBACK_PARAM;
+    try {
+        CheckedParameter source(in_data);
+        PF_Err err = source.checkout(kControlSourceId);
+        if (err != PF_Err_NONE) return err;
+        if (source.value.param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
+        if (source.value.u.pd.value == kLegacyControlSource) {
+            ScopedParameterCheckin legacy(in_data);
+            err = legacy.snapshot().checkout(in_data);
+            if (err != PF_Err_NONE) return err;
+            auto converted = graph_from_controls(core::validate_settings(legacy.snapshot().settings()).value);
+            if (!converted.has_value()) return graph_error(out_data, converted.error());
+            graph = std::make_shared<const core::Graph>(converted.take_value());
+        } else if (source.value.u.pd.value == kNodeControlSource) {
+            CheckedParameter stored(in_data);
+            err = stored.checkout(kGraphParameterId);
+            if (err != PF_Err_NONE) return err;
+            if (stored.value.param_type != PF_Param_ARBITRARY_DATA) return PF_Err_BAD_CALLBACK_PARAM;
+            auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value);
+            if (!decoded.has_value()) return graph_error(out_data, decoded.error());
+            graph = std::make_shared<const core::Graph>(decoded.take_value());
+        } else return PF_Err_BAD_CALLBACK_PARAM;
+        if (control_source) *control_source = source.value.u.pd.value;
+        return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
+}
+
+PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
+                         PF_UserChangedParamExtra* extra) noexcept {
+    if (!in_data || !params || !extra) return PF_Err_BAD_CALLBACK_PARAM;
+    if (extra->param_index != kCaptureControlsId) return PF_Err_NONE;
+    if (!params[kGraphParameterId] || !params[kControlSourceId] ||
+        params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
+        params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
+    try {
+        ScopedParameterCheckin current(in_data);
+        const auto err = current.snapshot().checkout(in_data);
+        if (err != PF_Err_NONE) return err;
+        auto graph = graph_from_controls(core::validate_settings(current.snapshot().settings()).value);
+        if (!graph.has_value()) return graph_error(out_data, graph.error());
+        PF_ArbitraryH replacement = nullptr;
+        const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
+        if (created != PF_Err_NONE) return created;
+        // All fallible work precedes mutation. The editable parameter value is a
+        // host-provided copy; its old handle is replaced, never a render checkout.
+        auto& target = *params[kGraphParameterId];
+        const auto old = target.u.arb_d.value;
+        target.u.arb_d.value = replacement;
+        target.uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+        params[kControlSourceId]->u.pd.value = kNodeControlSource;
+        params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+        if (old) in_data->utils->host_dispose_handle(old);
+        return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
 } // namespace starfield::adapter

@@ -8,9 +8,9 @@ G-03 emitter/output runtime passed 4,418 core assertions and the explicit May 20
 SDK build. Newer SDK/host adaptation is deferred. The older dual-SDK evidence below
 is historical and does not qualify the current binary on newer hosts.
 
-Status: M0/M1 Windows x64 build compiles against both the supplied May 2023 SDK and the 26.5 SDK. The user confirmed the corrected M1 shell loads in AE 2023; the exact AE build is not recorded. The initial 8001 version mismatch was caused by PiPL stage bits and is fixed in both artifacts. Render/lifecycle and current-AE qualification remain open.
+Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
-M2/G-01/G-02 status: the SmartFX particle build compiles clean against both SDKs (`artifacts/plugin/x64/Release/StarfieldParticle.aex` and `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`), exports exactly `EffectMain` and `PluginDataEntryFunction2`, and the host-independent core passes 3,828 self-test checks. AE 2023 load/render evidence applies to an earlier eight-control build only; the current 13-control M3-01 build still needs host confirmation, including the Options readout, playback, and preview-resolution geometry.
+Current G-04 artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. G-03 core suite: 4,418 assertions; G-04 adapter simulation: 192 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 16-parameter build still needs an AE 2023 host pass.
 
 ## PiPL and runtime flags must be regenerated together
 

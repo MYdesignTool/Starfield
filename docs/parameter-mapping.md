@@ -41,7 +41,7 @@ project saved with revision 1 must be re-authored rather than migrated.
 
 IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13)
 sit after Opacity until M3-03 adds AE parameter groups. Parameter index 0 is AE's implicit input
-layer, so the effect registers 14 parameters: one input plus the thirteen manifest rows.
+layer, so the effect registers 17 AE parameters: one input, thirteen legacy manifest controls, graph data, source mode and capture action. Node Graph Data is hidden from the Effect Controls panel.
 
 ## Emitter distributions and per-particle variation (M3-01)
 
