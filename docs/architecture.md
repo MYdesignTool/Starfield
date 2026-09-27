@@ -50,9 +50,10 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 - Convert host pixel formats at the boundary. Respect rowbytes, channel order, alpha mode, pixel aspect, downsample, ROI, and 8/16/32-bit worlds.
 - Export only the SDK-required C entry points (`PluginDataEntryFunction2` and `EffectMain`). Hide other symbols to avoid collisions with AE and other plug-ins.
 
-## Initial source layout
+## Source layout
 
 - `include/starfield/core/Settings.hpp`: stable internal IDs, manifest bounds, and validated settings types.
+- `include/starfield/core/Graph.hpp`: host-independent node, port, edge, parameter, registry, and graph-validation contracts.
 - `include/starfield/core/Error.hpp`: typed error codes and the `Result` primitive shared by the core.
 - `include/starfield/core/Time.hpp`: normalized signed rational time with checked arithmetic.
 - `include/starfield/core/Render.hpp`: host-independent frame/request/output/backend contract and the cancellation interface.
@@ -86,4 +87,4 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Current scope
 
-M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, and M3-01 seeded emitter distributions are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. The node graph, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, panel, MFR, and GPU remain future milestones.
+M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitter distributions, and the G-01 typed graph model/validator are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. Graph serialization, graph evaluation, AE graph persistence, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, the editor panel, MFR, and GPU remain future milestones.

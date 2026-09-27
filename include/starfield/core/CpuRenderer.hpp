@@ -13,10 +13,10 @@ struct RenderLimits {
     std::uint64_t max_sprite_pixel_ops{1ull << 28}; // 268M sprite pixels
 };
 
-// Deterministic CPU reference backend for the M2 vertical slice: the point emitter
-// is rasterized as soft-edged discs and composited over the optional source with
-// premultiplied "over" (ADR 0005). M2 renders no shape distributions; every
-// particle in a frame shares the emitter position and velocity.
+// Deterministic CPU reference backend for the current particle slice: particles
+// are rasterized as white soft-edged discs and composited over the optional source
+// with premultiplied "over" (ADR 0005). Shape sampling and velocity variation are
+// in the simulation; this renderer still ignores depth, color, and age curves.
 class CpuParticleRenderer final : public Renderer {
 public:
     CpuParticleRenderer() = default;

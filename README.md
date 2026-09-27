@@ -6,14 +6,16 @@
 
 - M0/M1 contracts and the native shell are in place. M2 adds SmartFX transport, an 8/16/32-bpc CPU sprite renderer, deterministic time evaluation, and source compositing.
 - M3-01 adds seeded Point/Box/Sphere/Disc birth distributions, emitter position, per-particle velocity spread, and deterministic random streams.
-- Core self-tests pass (3,757 checks), and the Windows x64 plug-in builds against both the May 2023 and AE 26.5 SDKs. The most recent M3-01 control layout has not yet been re-tested in AE; host evidence is tracked in [行为清单](docs/compatibility-matrix.md).
-- This remains a render slice, not Stardust parity. Node graphs, forces, size/opacity curves, color and texture sources, depth, mesh/volume rendering, presets, and the dockable editor are still on the roadmap.
+- G-01 adds a typed graph model and bounded validator with stable node/edge identities. It is core-only: graphs are not persisted in AE or used by rendering yet.
+- Core self-tests pass (3,787 checks), and the Windows x64 plug-in builds against both the May 2023 and AE 26.5 SDKs. The most recent M3-01 control layout has not yet been re-tested in AE; host evidence is tracked in [行为清单](docs/compatibility-matrix.md).
+- This remains a render slice, not Stardust parity. The current look is white 2D sprites with constant size/opacity; forces, age curves, color/texture sources, depth, mesh/volume rendering, presets, graph persistence/evaluation, and the dockable editor remain unfinished. See the [current feature audit](docs/current-feature-audit.md).
 
 ## 当前架构
 
 - 纯 C++ 核心不依赖 AE SDK；宿主指针和 suite 只出现在 `ae_plugin/` 适配层。
 - 渲染以不可变参数快照和绝对时间求值为基础，便于乱序帧请求与后续 MFR。
 - `Settings` 验证器在进入渲染前限制资源上界并替换非有限值。
+- 图模型以独立 UUID 和强类型端口/参数 key 表示；核心验证完成，但序列持久化和渲染求值尚未接入。
 - SmartFX、序列化、Compute Cache、CPU 参考渲染器和 GPU 后端的边界见 [架构说明](docs/architecture.md)。
 - 行为覆盖按独立验收场景推进，见 [行为清单](docs/compatibility-matrix.md)。
 - 目标宿主为 AE 2023 及之后版本，分阶段交付与 SDK/工具链版本策略见 [开发路线图](docs/roadmap.md)。

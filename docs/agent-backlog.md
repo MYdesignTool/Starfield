@@ -6,7 +6,7 @@ This backlog is the task source for staged implementation work. Assign one task 
 
 - M0 architecture contracts and M1 SDK shell are in the source tree.
 - The user confirmed the empty M1 shell loads in AE 2023. An earlier M2 build also showed controls and a center sprite; the current thirteen-control M3-01 revision still needs host qualification.
-- **M2 and M3-01 core/adapter code builds:** the Windows x64 module builds with both supplied SDKs, and `tests/RunCoreTests.ps1` reports 3,757 passing checks for the host-independent core.
+- **M2 and M3-01 core/adapter code builds:** the Windows x64 module builds with both supplied SDKs, and `tests/RunCoreTests.ps1` reports 3,787 passing checks for the host-independent core, including G-01 validation.
 - **M2-06 is partial:** host load/render evidence is from older parameter revisions. A later emitter-origin revision rendered nothing; the conversion path has since been rewritten. Re-test the current build, then complete bit depth, preview resolution, lifecycle, source compositing, and cancellation checks. The Options readout (`ae_plugin/Diagnostics.cpp`) helps identify host values; see `docs/compatibility-matrix.md`.
 - **Product direction recorded (owner, 2026-09-27):** node-based editing is the essence of the reference product, so the graph foundation is promoted ahead of the M3 feature families; those families will be implemented as node types. See `Wave G` below and the raised `docs/roadmap.md` policy.
 - **Static review carried out by the owner (2026-09-27):** the adapter geometry was rewritten to derive render-space scale from observed host worlds. M3-01 added Box/Sphere/Disc and seeded per-particle variation. The current build needs host playback and preview-resolution confirmation.
@@ -114,7 +114,7 @@ The owner confirmed that node-based editing is the product's essence. Wave A/B b
 
 | ID | Owner | Work | Dependencies | Done when |
 |---|---|---|---|---|
-| G-01 | Core graph agent | Typed node/port/edge/parameter model with stable identity domains and a validator (unknown node type, type mismatch, missing input, cycle, duplicate id) | ADR 0001 identity rules | Invalid graphs return typed errors and can never hang or crash the renderer; identity survives node reordering |
+| G-01 | Core graph agent | Typed node/port/edge/parameter model with stable identity domains and a validator (unknown node type, type mismatch, missing input, cycle, duplicate id) | ADR 0001 identity rules, ADR 0006 | **Implemented:** `Graph.hpp/.cpp` defines UUID node/edge IDs, typed port and parameter keys/values, bounded validation, two built-in schemas, and typed failures. 3,787 core checks pass, including reorder stability, cardinality, cycles, and explicit feedback boundaries. Not serialized or used by rendering yet |
 | G-02 | Core serialization agent | Bounded binary serializer/parser with magic, schema version, counts, CRC, and migrations for the existing `schema/sequence-format.md`, wired into the AE sequence lifecycle (setup/resetup/flatten/query-flattened-setdown) | G-01 | Truncated, oversized, or future-version blobs fail safely with a readable message; save/reopen preserves graph identity |
 | G-03 | Core evaluation agent | Graph evaluation into the existing `RenderRequest`: topological order, per-node parameter sampling at the requested rational time, cancellation polling, and a single-emitter graph that reproduces today's output bit-identically | G-01, M2-01/03/04 | Single-node parity is a regression test; multi-node evaluation stays deterministic across frame order |
 | G-04 | AE adapter agent | Persist the graph in sequence data, expose only the surviving top-level controls, and keep the ADR 0004 version/PiPL contract intact (a graph/schema version lives in the blob, not in the plug-in version) | G-02, G-03 | New instances get a default graph; existing M2 parameter values migrate into it; no released ID is renumbered |
@@ -133,7 +133,7 @@ The owner confirmed that node-based editing is the product's essence. Wave A/B b
 
 ## Wave D — feature parity by observable family
 
-Use `docs/reference-inventory.md` to choose one independently reviewable family per task: common forces/manipulators; texture/layer sources; mesh/material/light rendering; volumetrics; master switches and presets. Before implementation, add an observable reference case to `compatibility-matrix.md`. Static RTTI names alone are not acceptance criteria. Defer the separate panel protocol until the native effect is complete and there is a confirmed workflow that needs a panel.
+Use `docs/reference-inventory.md` to choose one independently reviewable family per task: common forces/manipulators; texture/layer sources; mesh/material/light rendering; volumetrics; master switches and presets. Before implementation, add an observable reference case to `compatibility-matrix.md`. Static RTTI names alone are not acceptance criteria. The owner has selected a dockable node editor over a versioned protocol; P-01/P-02 remain after graph persistence and evaluation are stable.
 
 ## Wave E — qualification and shipping
 

@@ -34,8 +34,8 @@ namespace {
 PF_Err about(PF_InData* in_data, PF_OutData* out_data) noexcept {
     (void)in_data;
     PF_SPRINTF(out_data->return_msg,
-               "Starfield Particle 0.1.0\rM2 vertical slice: deterministic CPU point emitter "
-               "composited over the input.\rClick Options for a parameter/geometry readout.");
+               "Starfield Particle 0.1.0\rDeterministic CPU particles with Point, Box, Sphere, and Disc emitters. "
+               "\rClick Options for a parameter/geometry readout.");
     return PF_Err_NONE;
 }
 

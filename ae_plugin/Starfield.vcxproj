@@ -44,6 +44,7 @@
     <ClCompile Include="WorldBridge.cpp" />
     <ClCompile Include="..\src\core\CpuRenderer.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
+    <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
     <ClCompile Include="..\src\core\Random.cpp" />
     <ClCompile Include="..\src\core\Render.cpp" />

@@ -2,7 +2,7 @@
 
 Status: M0/M1 Windows x64 build compiles against both the supplied May 2023 SDK and the 26.5 SDK. The user confirmed the corrected M1 shell loads in AE 2023; the exact AE build is not recorded. The initial 8001 version mismatch was caused by PiPL stage bits and is fixed in both artifacts. Render/lifecycle and current-AE qualification remain open.
 
-M2 status: the SmartFX particle build compiles clean against both SDKs (`artifacts/plugin/x64/Release/StarfieldParticle.aex` and `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`), exports exactly `EffectMain` and `PluginDataEntryFunction2`, and the host-independent core passes 3757 self-test checks (most of them per-particle assertions over the seeded distributions). The host has confirmed load, controls, and the default render; the velocity-trail row and preview-resolution geometry still need host confirmation.
+M2/G-01 status: the SmartFX particle build compiles clean against both SDKs (`artifacts/plugin/x64/Release/StarfieldParticle.aex` and `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`), exports exactly `EffectMain` and `PluginDataEntryFunction2`, and the host-independent core passes 3,787 self-test checks. AE 2023 load/render evidence applies to an earlier eight-control build only; the current 13-control M3-01 build still needs host confirmation, including the Options readout, playback, and preview-resolution geometry.
 
 ## PiPL and runtime flags must be regenerated together
 
@@ -20,7 +20,7 @@ inside the `.aex`. Two guards now make that failure impossible to ship silently:
 
 ## Core self-test
 
-`tests/core_tests.cpp` covers rational-time normalization and overflow, settings validation, simulation determinism and boundaries, ROI equality against full-frame rendering, world-to-pixel mapping at a downsampled frame grid, source compositing and placement, bit-depth output, and the bounded-work/cancellation paths.
+`tests/core_tests.cpp` covers rational-time normalization and overflow, settings validation, simulation determinism and boundaries, graph identities/schema/type/cardinality/cycle validation, ROI equality against full-frame rendering, world-to-pixel mapping at a downsampled frame grid, source compositing and placement, bit-depth output, and the bounded-work/cancellation paths.
 
 - With CMake available: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 - On the current Windows machine CMake is not installed, so use `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`, which compiles the same sources with the locked MSVC toolset behind a mapped drive letter and runs the executable. Output lands in `artifacts/core-tests/`.

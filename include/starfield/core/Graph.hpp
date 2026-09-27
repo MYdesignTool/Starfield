@@ -1,0 +1,204 @@
+#pragma once
+
+#include "starfield/core/Settings.hpp"
+
+#include <array>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <variant>
+#include <vector>
+
+namespace starfield::core {
+
+// Graph identities are UUIDs with distinct C++ types. They are never derived
+// from AE parameter IDs, array positions, or editor widget IDs.
+struct Uuid128 {
+    std::array<std::uint8_t, 16> bytes{};
+    [[nodiscard]] constexpr bool is_zero() const noexcept {
+        for (const auto byte : bytes) {
+            if (byte != 0) return false;
+        }
+        return true;
+    }
+    auto operator<=>(const Uuid128&) const = default;
+};
+
+struct NodeId {
+    Uuid128 value{};
+    auto operator<=>(const NodeId&) const = default;
+};
+
+struct EdgeId {
+    Uuid128 value{};
+    auto operator<=>(const EdgeId&) const = default;
+};
+
+struct PortKey {
+    std::uint64_t value{};
+    auto operator<=>(const PortKey&) const = default;
+};
+
+struct ParameterKey {
+    std::uint64_t value{};
+    auto operator<=>(const ParameterKey&) const = default;
+};
+
+enum class PortDirection : std::uint8_t { input, output };
+
+// Value kinds are deliberately independent of AE parameter types. Port type
+// keys are extensible reverse-DNS strings so later feature families can add
+// particle, texture, mesh, volume, and event streams without renumbering enums.
+enum class ParameterKind : std::uint8_t {
+    boolean,
+    int32,
+    uint32,
+    float64,
+    vector3_float64,
+    utf8,
+    opaque_bytes,
+};
+
+using OpaqueBytes = std::vector<std::byte>;
+using ParameterValue = std::variant<bool, std::int32_t, std::uint32_t, double, Vec3, std::string, OpaqueBytes>;
+
+struct NodeParameter {
+    ParameterKey key{};
+    ParameterValue value{};
+};
+
+struct GraphNode {
+    NodeId id{};
+    std::string type_key;
+    std::uint16_t schema_version{1};
+    std::vector<NodeParameter> parameters;
+};
+
+struct GraphEdge {
+    EdgeId id{};
+    NodeId source_node{};
+    PortKey source_port{};
+    NodeId destination_node{};
+    PortKey destination_port{};
+};
+
+struct Graph {
+    std::vector<GraphNode> nodes;
+    std::vector<GraphEdge> edges;
+};
+
+struct PortDescriptor {
+    PortKey key{};
+    PortDirection direction{PortDirection::input};
+    std::string type_key;
+    bool required{false};
+    // Zero means unbounded. Inputs default to one connection; outputs default
+    // to fan-out. Cardinality is part of the node schema, not the edge order.
+    std::uint32_t max_connections{1};
+};
+
+struct ParameterDescriptor {
+    ParameterKey key{};
+    ParameterKind kind{ParameterKind::float64};
+    bool required{false};
+};
+
+struct NodeTypeDescriptor {
+    std::string type_key;
+    std::uint16_t schema_version{1};
+    std::vector<PortDescriptor> ports;
+    std::vector<ParameterDescriptor> parameters;
+    // Edges entering these inputs are state updates and do not create a
+    // same-frame dependency. This is the explicit boundary for future feedback
+    // nodes; ordinary cycles are rejected.
+    std::vector<PortKey> cycle_breaking_inputs;
+};
+
+struct NodeRegistry {
+    std::vector<NodeTypeDescriptor> types;
+};
+
+inline constexpr std::size_t kMaxGraphNodes = 4096;
+inline constexpr std::size_t kMaxGraphEdges = 16384;
+inline constexpr std::size_t kMaxNodeParameters = 512;
+inline constexpr std::size_t kMaxNodeTypes = 256;
+inline constexpr std::size_t kMaxNodePorts = 128;
+inline constexpr std::size_t kMaxGraphTypeKeyBytes = 128;
+inline constexpr std::uint64_t kMaxGraphPayloadBytes = 64ull * 1024ull * 1024ull;
+
+enum class GraphErrorCode : std::uint8_t {
+    none,
+    graph_too_large,
+    invalid_registry,
+    invalid_identifier,
+    duplicate_node_id,
+    duplicate_edge_id,
+    unknown_node_type,
+    unsupported_node_version,
+    duplicate_parameter_key,
+    unknown_parameter,
+    missing_required_parameter,
+    parameter_type_mismatch,
+    invalid_parameter_value,
+    unknown_source_node,
+    unknown_destination_node,
+    unknown_source_port,
+    unknown_destination_port,
+    port_direction_mismatch,
+    port_type_mismatch,
+    duplicate_input_connection,
+    too_many_connections,
+    missing_required_input,
+    cycle_detected,
+    allocation_failed,
+    internal_failure,
+};
+
+struct GraphError {
+    GraphErrorCode code{GraphErrorCode::none};
+    NodeId node_id{};
+    EdgeId edge_id{};
+    PortKey port_key{};
+    ParameterKey parameter_key{};
+    const char* detail{"valid graph"};
+};
+
+struct GraphValidationResult {
+    GraphError error{};
+    [[nodiscard]] constexpr bool ok() const noexcept { return error.code == GraphErrorCode::none; }
+    [[nodiscard]] constexpr explicit operator bool() const noexcept { return ok(); }
+};
+
+[[nodiscard]] const char* describe(GraphErrorCode code) noexcept;
+
+// The registry defines the currently supported node schemas. Validation is
+// independent of vector order and bounded by the same graph limits as the
+// sequence format. All failures are typed; invalid user graphs are never
+// traversed by the renderer.
+[[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
+
+// Stable built-in schemas used by the default emitter -> output graph. Keys in
+// this namespace are graph ParameterKeys and are not AE parameter IDs.
+namespace graph_keys {
+inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-stream";
+inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
+inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
+inline constexpr PortKey kEmitterParticles{1};
+inline constexpr PortKey kOutputParticles{1};
+inline constexpr ParameterKey kParticleCount{1};
+inline constexpr ParameterKey kBirthRate{2};
+inline constexpr ParameterKey kSeed{3};
+inline constexpr ParameterKey kLifetimeSeconds{4};
+inline constexpr ParameterKey kEmitterShape{5};
+inline constexpr ParameterKey kEmitterOrigin{6};
+inline constexpr ParameterKey kVelocity{7};
+inline constexpr ParameterKey kParticleSize{8};
+inline constexpr ParameterKey kOpacity{9};
+inline constexpr ParameterKey kEmitterSize{10};
+inline constexpr ParameterKey kVelocitySpread{11};
+} // namespace graph_keys
+
+[[nodiscard]] NodeRegistry make_particle_node_registry();
+
+} // namespace starfield::core

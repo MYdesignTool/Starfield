@@ -5,6 +5,7 @@ project(StarfieldCore VERSION 0.1.0 LANGUAGES CXX)
 add_library(starfield_core STATIC
     src/core/CpuRenderer.cpp
     src/core/Geometry.cpp
+    src/core/Graph.cpp
     src/core/ParticleSimulation.cpp
     src/core/Random.cpp
     src/core/Render.cpp

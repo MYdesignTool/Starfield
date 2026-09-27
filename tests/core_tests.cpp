@@ -7,6 +7,7 @@
 
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/Geometry.hpp"
+#include "starfield/core/Graph.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Random.hpp"
 #include "starfield/core/Render.hpp"
@@ -168,6 +169,215 @@ void test_rational_time() {
     CHECK(is_zero(*make_rational(0, 7)));
     CHECK(std::abs(to_seconds(*make_rational(1, 2)) - 0.5) < 1e-12);
     CHECK(std::abs(to_seconds(*make_rational(3, 8)) - 0.375) < 1e-12);
+}
+
+Uuid128 test_uuid(std::uint8_t tail) {
+    Uuid128 value;
+    value.bytes[15] = tail;
+    return value;
+}
+
+GraphNode make_test_emitter(std::uint8_t id) {
+    using namespace graph_keys;
+    GraphNode node;
+    node.id = NodeId{test_uuid(id)};
+    node.type_key = kEmitterNode;
+    node.schema_version = 1;
+    node.parameters = {
+        {kParticleCount, std::uint32_t{100}},
+        {kBirthRate, 30.0},
+        {kSeed, std::uint32_t{1}},
+        {kLifetimeSeconds, 2.0},
+        {kEmitterShape, std::uint32_t{0}},
+        {kEmitterOrigin, Vec3{}},
+        {kVelocity, Vec3{0.0, 0.3, 0.0}},
+        {kParticleSize, 8.0},
+        {kOpacity, 1.0},
+        {kEmitterSize, 0.05},
+        {kVelocitySpread, 0.15},
+    };
+    return node;
+}
+
+Graph make_basic_graph() {
+    using namespace graph_keys;
+    Graph graph;
+    graph.nodes.push_back(make_test_emitter(1));
+    GraphNode output;
+    output.id = NodeId{test_uuid(2)};
+    output.type_key = kOutputNode;
+    output.schema_version = 1;
+    graph.nodes.push_back(std::move(output));
+    graph.edges.push_back(GraphEdge{EdgeId{test_uuid(1)}, NodeId{test_uuid(1)}, kEmitterParticles,
+                                    NodeId{test_uuid(2)}, kOutputParticles});
+    return graph;
+}
+
+NodeTypeDescriptor make_test_pass_node(std::string type_key, bool cycle_breaking = false) {
+    NodeTypeDescriptor type;
+    type.type_key = std::move(type_key);
+    type.schema_version = 1;
+    type.ports = {
+        PortDescriptor{PortKey{1}, PortDirection::input, graph_keys::kParticleStream, false, 0},
+        PortDescriptor{PortKey{2}, PortDirection::output, graph_keys::kParticleStream, false, 0},
+    };
+    if (cycle_breaking) type.cycle_breaking_inputs.push_back(PortKey{1});
+    return type;
+}
+
+GraphValidationResult validate_test_graph(const Graph& graph) {
+    return validate_graph(graph, make_particle_node_registry());
+}
+
+void test_graph_contract() {
+    using namespace graph_keys;
+    Graph graph = make_basic_graph();
+    CHECK(validate_test_graph(graph).ok());
+
+    // Stable graph identities do not depend on editor/vector ordering.
+    Graph reordered = graph;
+    std::reverse(reordered.nodes.begin(), reordered.nodes.end());
+    std::reverse(reordered.edges.begin(), reordered.edges.end());
+    CHECK(validate_test_graph(reordered).ok());
+    CHECK(reordered.edges[0].source_node == graph.edges[0].source_node);
+    CHECK(reordered.edges[0].destination_node == graph.edges[0].destination_node);
+
+    Graph bad = graph;
+    bad.nodes[0].id = NodeId{};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::invalid_identifier);
+
+    bad = graph;
+    bad.nodes[1].id = bad.nodes[0].id;
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::duplicate_node_id);
+
+    bad = graph;
+    bad.nodes[0].type_key = "org.starfieldfx.nodes.not-registered";
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_node_type);
+
+    bad = graph;
+    bad.nodes[0].schema_version = 2;
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unsupported_node_version);
+
+    bad = graph;
+    bad.nodes[0].parameters[1].key = bad.nodes[0].parameters[0].key;
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::duplicate_parameter_key);
+
+    bad = graph;
+    bad.nodes[0].parameters[0].key = ParameterKey{999};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_parameter);
+
+    bad = graph;
+    bad.nodes[0].parameters.pop_back();
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::missing_required_parameter);
+
+    bad = graph;
+    bad.nodes[0].parameters[0].value = 100.0;
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::parameter_type_mismatch);
+
+    bad = graph;
+    bad.nodes[0].parameters[1].value = std::numeric_limits<double>::infinity();
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::invalid_parameter_value);
+
+    bad = graph;
+    bad.edges.clear();
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::missing_required_input);
+
+    bad = graph;
+    bad.edges[0].id = EdgeId{};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::invalid_identifier);
+
+    bad = graph;
+    bad.edges.push_back(bad.edges[0]);
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::duplicate_edge_id);
+
+    bad = graph;
+    bad.edges[0].source_node = NodeId{test_uuid(77)};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_source_node);
+
+    bad = graph;
+    bad.edges[0].destination_node = NodeId{test_uuid(77)};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_destination_node);
+
+    bad = graph;
+    bad.edges[0].source_port = PortKey{999};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_source_port);
+
+    bad = graph;
+    bad.edges[0].destination_port = PortKey{999};
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_destination_port);
+
+    NodeRegistry wrong_direction_registry = make_particle_node_registry();
+    wrong_direction_registry.types[0].ports[0].direction = PortDirection::input;
+    CHECK(validate_graph(graph, wrong_direction_registry).error.code == GraphErrorCode::port_direction_mismatch);
+
+    NodeRegistry mismatched_registry = make_particle_node_registry();
+    mismatched_registry.types[1].ports[0].type_key = "org.starfieldfx.types.texture";
+    CHECK(validate_graph(graph, mismatched_registry).error.code == GraphErrorCode::port_type_mismatch);
+
+    Graph two_emitters = graph;
+    two_emitters.nodes.insert(two_emitters.nodes.begin(), make_test_emitter(3));
+    two_emitters.edges.push_back(GraphEdge{EdgeId{test_uuid(2)}, NodeId{test_uuid(3)}, kEmitterParticles,
+                                           NodeId{test_uuid(2)}, kOutputParticles});
+    CHECK(validate_test_graph(two_emitters).error.code == GraphErrorCode::duplicate_input_connection);
+
+    NodeRegistry pass_registry;
+    pass_registry.types.push_back(make_test_pass_node("org.starfieldfx.nodes.pass"));
+    Graph cycle;
+    GraphNode first;
+    first.id = NodeId{test_uuid(10)};
+    first.type_key = "org.starfieldfx.nodes.pass";
+    GraphNode second = first;
+    second.id = NodeId{test_uuid(11)};
+    cycle.nodes = {first, second};
+    cycle.edges = {
+        GraphEdge{EdgeId{test_uuid(10)}, first.id, PortKey{2}, second.id, PortKey{1}},
+        GraphEdge{EdgeId{test_uuid(11)}, second.id, PortKey{2}, first.id, PortKey{1}},
+    };
+    CHECK(validate_graph(cycle, pass_registry).error.code == GraphErrorCode::cycle_detected);
+
+    NodeRegistry feedback_registry;
+    feedback_registry.types.push_back(make_test_pass_node("org.starfieldfx.nodes.pass"));
+    feedback_registry.types.push_back(make_test_pass_node("org.starfieldfx.nodes.delay", true));
+    Graph feedback;
+    GraphNode pass = first;
+    GraphNode delay = first;
+    delay.id = NodeId{test_uuid(11)};
+    delay.type_key = "org.starfieldfx.nodes.delay";
+    feedback.nodes = {pass, delay};
+    feedback.edges = {
+        GraphEdge{EdgeId{test_uuid(10)}, pass.id, PortKey{2}, delay.id, PortKey{1}},
+        GraphEdge{EdgeId{test_uuid(11)}, delay.id, PortKey{2}, pass.id, PortKey{1}},
+    };
+    CHECK(validate_graph(feedback, feedback_registry).ok());
+
+    NodeRegistry duplicate_registry = make_particle_node_registry();
+    duplicate_registry.types.push_back(duplicate_registry.types.front());
+    CHECK(validate_graph(graph, duplicate_registry).error.code == GraphErrorCode::invalid_registry);
+
+    NodeRegistry invalid_cycle_break = pass_registry;
+    invalid_cycle_break.types[0].cycle_breaking_inputs.push_back(PortKey{99});
+    CHECK(validate_graph(cycle, invalid_cycle_break).error.code == GraphErrorCode::invalid_registry);
+
+    NodeRegistry text_registry;
+    NodeTypeDescriptor text_type;
+    text_type.type_key = "org.starfieldfx.nodes.text";
+    text_type.parameters.push_back(ParameterDescriptor{ParameterKey{1}, ParameterKind::utf8, true});
+    text_registry.types.push_back(std::move(text_type));
+    Graph text_graph;
+    GraphNode text_node;
+    text_node.id = NodeId{test_uuid(12)};
+    text_node.type_key = "org.starfieldfx.nodes.text";
+    text_node.parameters.push_back(NodeParameter{ParameterKey{1}, std::string("bad\xc0\xaf", 5)});
+    text_graph.nodes.push_back(std::move(text_node));
+    CHECK(validate_graph(text_graph, text_registry).error.code == GraphErrorCode::invalid_parameter_value);
+
+    bad = graph;
+    bad.nodes[0].type_key = "Org.starfieldfx.nodes.emitter";
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::invalid_identifier);
+
+    bad = graph;
+    bad.nodes.resize(kMaxGraphNodes + 1);
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::graph_too_large);
 }
 
 void test_layer_point_conversion() {
@@ -696,6 +906,7 @@ void test_renderer_formats_and_limits() {
 
 int main() {
     test_rational_time();
+    test_graph_contract();
     test_layer_point_conversion();
     test_settings_validation();
     test_random_streams();

@@ -4,7 +4,7 @@ This is a planning index distilled from the existing Stardust binary-analysis re
 
 | Candidate family | Evidence in the existing report | Confidence | Planning action |
 |---|---|---:|---|
-| Particle emitters and lifecycle | Particle subsystem types; current parameter inventory includes count, birth rate, lifetime, seed | Medium | Build the deterministic point-emitter slice first; observe exact birth ordering and lifetime behavior |
+| Particle emitters and lifecycle | Particle subsystem types; current parameter inventory includes count, birth rate, lifetime, seed | Medium | Compare the existing deterministic emitter behavior against repeatable reference cases before adding graph-node features |
 | Shape emitters | Core plan includes point/box/sphere/disc | Low until visually confirmed | Capture repeatable reference cases before implementing non-point shapes |
 | Particle forces and surface modifiers | RTTI names include bend, duplicate, maps, path, sphere, stretch, transform, turbulence, and twist manipulators | Medium for existence, low for semantics | Group by visible behavior; implement each as a separate node/feature task |
 | Mesh and depth rendering | Renderer and shader symbols include mesh, depth, normals, preview, and shadow-map programs | Medium | Defer until the 2D CPU renderer is stable; verify whether each is exposed in the UI |
@@ -16,11 +16,10 @@ This is a planning index distilled from the existing Stardust binary-analysis re
 
 ## Feature order
 
-1. A stable point emitter and CPU sprite compositor.
-2. Common controls and deterministic behavior: count, rate, lifetime, seed, velocity, size, opacity.
-3. Shape emitters and common forces/modifiers, one isolated feature per task.
-4. Node graph, presets, textures/layers, and project migration.
-5. Mesh/material/light and volumetric families, each gated by a concrete user-visible scenario and performance target.
-6. MFR and GPU only after the serial CPU renderer is correct and the host APIs are qualified.
+1. Finish graph schemas, bounded persistence, and evaluation parity for the current deterministic emitter.
+2. Add particle appearance and common behavior as graph nodes: size/opacity/color over life, gravity, drag, and common forces.
+3. Add texture/layer sources, presets, and migration through repeatable AE cases.
+4. Add mesh/material/light and volumetric families, each gated by a concrete user-visible scenario and performance target.
+5. Qualify MFR and GPU only after serial graph rendering is correct and the host APIs are qualified.
 
 The existing reverse-analysis report remains outside this Git root. This checked-in summary is the portable, reviewable feature index; do not add raw SDK payloads, plug-in binaries, or copied decompilation output to the source repository.

@@ -29,6 +29,7 @@ try {
         'src\core\Render.cpp',
         'src\core\Settings.cpp',
         'src\core\Geometry.cpp',
+        'src\core\Graph.cpp',
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',
         'src\core\CpuRenderer.cpp'
