@@ -39,11 +39,11 @@ Adobe's SDK guide recommends using the latest headers and checking compatibility
 
 ## M0 architecture decisions now locked
 
-1. Product identity: choose a new stable effect match name, display name, vendor ID, and version scheme. Never use the old plug-in's match name or vendor identity.
-2. Parameter contract: reserve explicit stable AE parameter IDs; separately define UUID-like `NodeId`, `EdgeId`, and persistent `ParamKey` types inside the graph schema.
-3. Sequence storage: define a bounded, versioned binary representation with magic, schema version, lengths, and integrity checks; migrations are pure functions from one schema version to the next. Treat malformed/truncated data as a recoverable project error.
-4. Time model: represent comp time and frame duration as signed integer rationals. Define negative time, subframe sampling, shutter samples, seed derivation, and particle birth ordering before implementing simulation.
-5. Render semantics: specify coordinate spaces, pixel aspect/downsample, ROI, 8/16/32-bpc conversion, color space, alpha convention, and behavior when no source layer is needed.
+1. Product identity: `Starfield Particle`, category `Starfield FX`, match name `org.starfieldfx.particle`, and package ID `org.starfieldfx.aftereffects`; never reuse the old plug-in identity.
+2. Parameter contract: IDs 1–8 are reserved in `schema/parameters.json`; graph `NodeId`, `EdgeId`, and `ParamKey` remain separate identity domains.
+3. Sequence storage: schema 1 defines a bounded binary representation with magic, lengths, counts, CRC, and migration rules in `schema/sequence-format.md`.
+4. Time model: comp time and frame duration remain signed integer rationals; negative time, subframes, shutter samples, seed derivation, and particle ordering must stay deterministic.
+5. Render semantics: canonical coordinates, pixel aspect/downsample, ROI, 8/16/32-bpc conversion, color space, and premultiplied-alpha handling are recorded in ADR 0003. Behavior for source-independent output remains to be confirmed against the reference.
 6. Failure model: map core errors to stable AE errors/messages. Every checkout, handle, suite acquisition, lock, and staging buffer has one clearly owned cleanup path.
 
 ## Milestones

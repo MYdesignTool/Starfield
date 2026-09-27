@@ -14,4 +14,4 @@
 
 ## 构建
 
-用 CMake 构建不依赖 AE 的核心库。Windows AE 插件使用当前锁定的 MSVC v145 工具集与本地 Adobe SDK；从仓库根目录运行 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`，产物写入 `artifacts/m1/x64/Release/`。传入 `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK'` 可切换到 2023 SDK。详细工具链版本和构建状态见 [构建矩阵](docs/build-matrix.md)。
+用 CMake 构建不依赖 AE 的核心库。Windows AE 插件使用当前锁定的 MSVC v145 工具集与本地 Adobe SDK；从仓库根目录运行 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`，产物写入 `artifacts/m1/x64/Release/`。单独构建 2023 SDK 对照版本时，传入 `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023`，避免覆盖主产物。详细工具链版本和构建状态见 [构建矩阵](docs/build-matrix.md)。

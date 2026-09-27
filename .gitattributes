@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.aex binary
+*.dll binary
+*.lib binary
+*.pdb binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary

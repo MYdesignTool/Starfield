@@ -6,3 +6,7 @@
 *.user
 *.suo
 *.pdb
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake-build-*/

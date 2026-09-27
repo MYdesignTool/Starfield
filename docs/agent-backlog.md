@@ -46,14 +46,14 @@ These are host-operated checks; code agents can prepare a concise checklist but 
 - **Do not do:** add graph controls, custom panels, or render algorithms.
 - **Acceptance:** each schema row maps to one AE control and one core field; bounds/defaults match `Settings.cpp`; seed validation respects the manifest's `2147483647` maximum; parameter IDs and match name remain unchanged.
 
-These two tasks own disjoint code surfaces and can run at the same time. M2-03 and M2-04 start after M2-01's interface is reviewed.
+These two tasks can run at the same time: M2-01 owns render/time contracts; M2-02 owns parameter registration and settings mapping. M2-03 waits for M2-02's settings mapping, while M2-04 waits for the M2-01 buffer contract and M2-03's particle type.
 
 ## Wave B — deterministic CPU vertical slice
 
 ### M2-03 — Implement deterministic point-emitter simulation
 
 - **Owner:** simulation agent.
-- **Dependencies:** M2-01; `Settings` validation.
+- **Dependencies:** M2-01 and M2-02; `Settings` validation.
 - **Owned files:** new `include/starfield/core/ParticleSimulation.hpp` and `src/core/ParticleSimulation.cpp`; avoid AE adapter and pixel-buffer files.
 - **Scope:** generate point-emitter particles from seed and absolute rational time. Define stable particle IDs, birth ordering, lifetime boundary, velocity integration, and cancellation polling. Each render request must stand alone; do not advance process-global state.
 - **Acceptance:** same request yields the same ordered particle list; out-of-order frame requests agree with chronological requests; invalid settings are bounded before allocation.

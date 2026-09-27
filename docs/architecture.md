@@ -71,12 +71,12 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Delivery sequence
 
-1. Select SDK and baseline AE versions; build a minimal effect that loads and survives every lifecycle selector.
-2. Implement parameter registration with a versioned manifest and stable IDs.
-3. Add SmartFX checkout, ROI, pixel-format adapters, and a CPU particle renderer.
-4. Validate determinism, out-of-order frames, cancellation, project save/reopen, and MFR before advertising threading.
-5. Add node types and forces in independently reviewable modules, with behavior acceptance cases derived from documented user-visible requirements.
-6. Add Compute Cache, preset migration, panel protocol, and an optional GPU backend after the CPU contract is stable.
+1. **Complete:** select AE 2023 as the minimum, pin the local SDK/toolchain pair, and build/load the M1 shell.
+2. Register parameters from the stable manifest and finalize the time/render request contract.
+3. Add SmartFX checkout, ROI, pixel-format adapters, and a deterministic CPU point-emitter renderer.
+4. Add remaining emitters and particle controls as independent behavior tasks.
+5. Add graph types, bounded sequence migration, and presets.
+6. Add Compute Cache, MFR, and an optional GPU backend only after the serial CPU contract is stable. Defer a panel until a validated workflow needs one.
 
 ## Current scope
 
