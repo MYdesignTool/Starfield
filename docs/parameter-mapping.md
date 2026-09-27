@@ -188,33 +188,57 @@ The effect sets `PF_OutFlag_I_DO_DIALOG`, so AE shows an `Options` button. Click
 read-only readout (`ae_plugin/Diagnostics.cpp`) that prints exactly what the code receives:
 
 ```text
-Starfield 0.1.0 graph readout
-graph nodes 4 edges 3 live 59
-AE Controls (driving render)
-layer 1920x1080 ds 1/1 par 1/1
-t 1.000s live 59
-cnt 1000 rate 30.00 seed 1 life 2.000
-shape 0 esize 0.050 vspread 0.15
-size 8.00 notices 0
-origin host 960,540,540 px 960,540,540
-origin world 0.000,0.000,0.000 vel 0.00,0.30,0.00
-grav 0.00,0.00,0.00 drag 0.000
-color 1.00,1.00,1.00 -> 1.00,1.00,1.00 size 8.00->8.00 op 1.00->1.00
+SF 0.1.0 src AE g4n3e live 59
+layer 3840x2160 ds 1/1 ref 3840x2160 grid 3840x2160
+org host 1920,1080,1080 px 1920,1080,1080
+org wld l 0.000,0.000,0.000 r 0.000,0.000,0.000
+t 1.000s vel 0.00,0.30,0.00
+cnt 1000 rate 100.00 seed 1 life 2.000
 ```
 
-- `t`: comp time in seconds at the playhead; `live`: particles the simulation produces for it.
-- `origin host` / `px`: the raw host value and the layer pixels it was interpreted as. In this
-  example AE delivered the center in pixels. If raw values are 50/50/50, the current shim keeps
-  them as pixels; that would not be a centered emitter on a 1920×1080 layer, so record the
-  Options output and resolve the unit behavior before changing the shim.
-- `ds` is reported for context only; render geometry never uses it (ADR 0005).
+- `src`: `AE` when the flat controls drive the render, `NG` when the stored graph does. `gn`/`ge` are
+  the evaluated node and edge counts; `live` is the particle count that evaluation produced.
+- `layer` / `ds`: what the host reports for this call, with the preview downsample factor.
+- `ref` / `grid`: what the **last rendered frame** actually used. `ref` is the reference the point
+  conversion divided by; `grid` is the pixel grid the core mapped world space onto. The render phase
+  records both (`record_render_geometry`), because this readout cannot call `checkout_layer` itself.
+  This pair is the evidence D-05 was missing: with it, one click at Full and one at Quarter settle
+  whether a point control is delivered in full-resolution or preview-sized pixels.
+- `org host` / `px`: the raw host value and the layer pixels it was interpreted as.
+- `org wld l … r …`: the world position this readout computed from the sizes above (`l`) next to the
+  one the last frame computed from its reference (`r`). At Full resolution they agree; at a reduced
+  preview resolution the frame used `r`.
+- `grav`/`col` lines appear only when those values differ from their defaults, and `shape`/`size`/
+  `not` can fall off the end: `PF_OutData::return_msg` holds 255 characters and the writer drops what
+  does not fit. Those controls are visible in the Effect Controls window; the geometry above is not.
+
+### Resolving the point-unit question (D-05)
+
+1. Put the playhead at t ≥ 1 s, render a frame with the Composition panel at **Full**, press `Options`,
+   and keep the text.
+2. Switch to **Quarter**, let one frame render, press `Options` again.
+3. Compare the two readouts:
+
+| What the second readout shows | What it means | What to do |
+|---|---|---|
+| `ref` still equals the layer size, `grid` shrinks, `org host` unchanged | The host delivers point controls in **full-resolution pixels**; the frame divides by `ref` and `org wld r` is the position that was rendered. The `l` value is the fallback path and may differ. | Record it, retire the fallback path, and reduce the ladder below to this delivery |
+| `ref 0x0`, or `org host` shrinks with the preview | No usable reference was handed over, or the host delivered preview-sized values; the conversion fell back to `layer` and the origin moves with the preview resolution | Record it, then decide the divisor rule from the numbers instead of the SDK note |
+
+The old readout could not answer this: its origin lines came after longer lines and were cut off by the
+255-character buffer, so every earlier "the fix works" statement about the emitter origin was a code
+reading, never a measurement.
+
+- `ds` is reported for context only; render geometry comes from the observed worlds (ADR 0005) and the
+  reference above.
 
 ## Motion or position looks wrong: triage
 
 | Readout | Meaning | Next step |
 |---|---|---|
-| `t 0.000s live 1` | Comp start. Only slot 0 exists by construction | Scrub to t ≥ 1 s, or raise Birth Rate |
-| `origin px` far outside the layer | Point-unit mismatch | Compare `host` and `px` from the readout against the ladder above and record the host's real delivery in `docs/compatibility-matrix.md` |
+| `t 0.000s … live 1` | Comp start. Only slot 0 exists by construction | Scrub to t ≥ 1 s, or raise Birth Rate |
+| `org px` far outside the layer | Point-unit mismatch | Compare `host` and `px` against the ladder above and record the host's real delivery in `docs/compatibility-matrix.md` |
+| `org wld l` differs from `org wld r` at reduced resolution | The readout's fallback path disagrees with the frame's reference-based conversion; the frame used `r` | Expected until the fallback path is retired (D-05); always read `ref`/`grid` before believing `org wld l` |
+| `ref 0x0` | The host handed over no full-resolution reference, so the conversion fell back to `layer` | Record the two-click readout from the section above; the origin then depends on the preview resolution |
 | `vel` non-zero but the picture is static | Mapping or compositing ignored the position | Reproduce in `tests/core_tests.cpp`, which pins the origin offset, the point conversion, and the half-resolution mapping |
 | `layer 0x0` | Host geometry was not available | The render phase refuses to guess and reports `internal_failure` |
 

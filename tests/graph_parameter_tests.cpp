@@ -279,6 +279,39 @@ void test_parameters(PF_InData& host) {
     dispose(registered[kGraphParameterId - 1].u.arb_d.dephault);
 }
 
+// Capture has no render context, so at a reduced preview resolution it can only convert
+// the emitter point with the preview-sized in_data->width/height. That would bake a scaled
+// origin into the stored graph, where it renders wrong at every resolution afterwards, so
+// the action must refuse instead of storing it.
+void test_capture_refuses_reduced_preview(PF_InData& host) {
+    PF_OutData output{};
+    parameters[kGraphParameterId].u.arb_d.value = new_value(host);
+    parameters[kGraphParameterId].uu.change_flags = 0;
+    parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
+    std::array<PF_ParamDef*, 33> pointers{};
+    for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
+    PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
+
+    const auto previous = parameters[kGraphParameterId].u.arb_d.value;
+    const PF_RationalScale saved = host.downsample_x;
+    host.downsample_x = PF_RationalScale{4, 1};
+    output.return_msg[0] = '\0';
+    CHECK(capture_controls(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
+    CHECK(parameters[kGraphParameterId].u.arb_d.value == previous);
+    CHECK(parameters[kControlSourceId].u.pd.value == kLegacyControlSource);
+    CHECK(checked_out.empty());
+    CHECK(output.return_msg[0] != '\0');
+    CHECK(std::strstr(output.return_msg, "Full preview resolution") != nullptr);
+    host.downsample_x = saved;
+
+    // At full preview resolution the same call still captures.
+    CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
+    CHECK(parameters[kControlSourceId].u.pd.value == kNodeControlSource);
+    dispose(parameters[kGraphParameterId].u.arb_d.value);
+    dispose(previous); // replaced by the successful capture; in AE the host frees it
+    parameters[kGraphParameterId].u.arb_d.value = nullptr;
+}
+
 // The supervised edit surface the dockable panel drives (ADR 0009): in Node Graph
 // mode a control change rewrites the canonical graph from the delivered values; in
 // AE Controls mode the stored graph is never touched.
@@ -360,6 +393,7 @@ int main() {
     test_callbacks(host);
     test_parameters(host);
     test_supervision(host);
+    test_capture_refuses_reduced_preview(host);
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

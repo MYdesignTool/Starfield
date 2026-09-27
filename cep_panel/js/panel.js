@@ -83,44 +83,92 @@
         return "r" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
     }
 
+    function snippet(text) {
+        var value = String(text);
+        if (value.length === 0) return "(empty reply)";
+        return value.length > 140 ? value.slice(0, 140) + "..." : value;
+    }
+
+    function extensionRoot() {
+        try {
+            if (window.__adobe_cep__ && typeof window.__adobe_cep__.getSystemPath === "function") {
+                var path = window.__adobe_cep__.getSystemPath("extension");
+                if (path) return path.replace(/\\/g, "/");
+            }
+        } catch (ignored) { /* fall back to whatever the host already loaded */ }
+        return null;
+    }
+
+    // The manifest registers the gateway as this extension's ScriptPath, so CEP normally
+    // evaluates it into the host engine when the extension loads. Depending on that alone
+    // means a panel opened in a session where the script was not evaluated - or an
+    // installed copy that lags the panel - can only report an unreadable reply. Loading
+    // the gateway by path on the first call removes both cases, and it is why a panel
+    // edit needs no After Effects restart, only a panel reload.
+    var gatewayReady = false;
+
+    function ensureGateway(callback) {
+        if (gatewayReady) { callback(true); return; }
+        evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (probe) {
+            if (String(probe).indexOf("org.starfieldfx.panel") === 0) { gatewayReady = true; callback(true); return; }
+            var root = extensionRoot();
+            if (!root) { callback(false); return; }
+            evalScript("$.evalFile(" + quote(root + "/jsx/starfield_gateway.jsx") + ")", function () {
+                evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (second) {
+                    gatewayReady = String(second).indexOf("org.starfieldfx.panel") === 0;
+                    callback(gatewayReady);
+                });
+            });
+        });
+    }
+
     function call(operation, extra, callback) {
-        var envelope = {
-            protocol: "org.starfieldfx.panel",
-            version: 1,
-            requestId: requestId(),
-            operation: operation,
-            target: {},
-            baseRevision: state.revision,
-            changes: []
-        };
-        if (extra) {
-            for (var key in extra) {
-                if (Object.prototype.hasOwnProperty.call(extra, key)) envelope[key] = extra[key];
-            }
-        }
-        var script = "SFLD_" + operation + "(" + quote(JSON.stringify(envelope)) + ")";
-        var settled = false;
-        var timer = window.setTimeout(function () {
-            if (settled) return;
-            settled = true;
-            showError("host_timeout", "The host did not answer within " + (REQUEST_TIMEOUT_MS / 1000) + "s.");
-        }, REQUEST_TIMEOUT_MS);
-        evalScript(script, function (raw) {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timer);
-            var response = null;
-            try {
-                response = JSON.parse(raw);
-            } catch (error) {
-                showError("bad_response", "The gateway returned unreadable data.");
+        ensureGateway(function (ready) {
+            if (!ready) {
+                showError("gateway_missing",
+                          "The ExtendScript gateway is not loaded. Check the install steps in cep_panel/README.md.");
                 return;
             }
-            if (!response || response.protocol !== "org.starfieldfx.panel") {
-                showError("bad_response", "Unexpected response envelope.");
-                return;
+            var envelope = {
+                protocol: "org.starfieldfx.panel",
+                version: 1,
+                requestId: requestId(),
+                operation: operation,
+                target: {},
+                baseRevision: state.revision,
+                changes: []
+            };
+            if (extra) {
+                for (var key in extra) {
+                    if (Object.prototype.hasOwnProperty.call(extra, key)) envelope[key] = extra[key];
+                }
             }
-            callback(response);
+            var script = "SFLD_" + operation + "(" + quote(JSON.stringify(envelope)) + ")";
+            var settled = false;
+            var timer = window.setTimeout(function () {
+                if (settled) return;
+                settled = true;
+                showError("host_timeout", "The host did not answer within " + (REQUEST_TIMEOUT_MS / 1000) + "s.");
+            }, REQUEST_TIMEOUT_MS);
+            evalScript(script, function (raw) {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timer);
+                var response = null;
+                try {
+                    response = JSON.parse(raw);
+                } catch (error) {
+                    // The raw reply is the whole diagnosis: "EvalScript error." means the
+                    // gateway threw, "undefined" means the entry point is not global.
+                    showError("bad_response", "The gateway returned unreadable data: " + snippet(raw));
+                    return;
+                }
+                if (!response || response.protocol !== "org.starfieldfx.panel") {
+                    showError("bad_response", "Unexpected response envelope: " + snippet(raw));
+                    return;
+                }
+                callback(response);
+            });
         });
     }
 

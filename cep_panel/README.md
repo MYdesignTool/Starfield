@@ -53,20 +53,50 @@ To get a clean host back, in this order:
 
    AE 2023 ships CEP 11; if the panel does not appear, repeat the key for `CSXS.12`.
 
-3. Link or copy this folder into the user CEP extensions directory:
+3. Put this folder where CEP scans for extensions. Both roots work; the owner's current install is the
+   system-wide one, as a plain copy:
 
-   ```
-   %APPDATA%\Adobe\CEP\extensions\org.starfieldfx.panel
-   ```
+   | Root | Path | Needs admin |
+   |---|---|---|
+   | user | `%APPDATA%\Adobe\CEP\extensions\<name>` | no |
+   | system | `C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\<name>` | yes |
 
-   The directory name must equal the bundle id. A directory junction avoids copying:
+   The folder name is the extension's identity in the menu; `cep_panel` and
+   `org.starfieldfx.panel` (the bundle id) both work. Two copies under two names would appear twice.
 
-   ```
-   mklink /J "%APPDATA%\Adobe\CEP\extensions\org.starfieldfx.panel" "<repo>\cep_panel"
-   ```
-
-4. Restart After Effects. Open the panel from **Window > Extensions > Starfield Node
+4. Restart After Effects. Open the panel from **Window > Extensions**, entry **Starfield Node
    Editor**.
+
+### Updating an installed copy
+
+A copy does not follow the repository, and the panel is plain HTML/JS/JSX, so an update is a file copy
+and a panel reload — After Effects itself does not have to restart. The panel evaluates
+`jsx/starfield_gateway.jsx` by itself on the first host call, so the JSX does not need the app-start
+ScriptPath pass either.
+
+```
+robocopy "<repo>\cep_panel" "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" /MIR
+```
+
+Then close and reopen the panel window (`Window > Extensions > Starfield Node Editor`). If the JSX ever
+looks stale, the panel reload is enough; a full restart is only needed when the manifest itself changed.
+
+A junction avoids the copy step entirely when the repository can be the source of truth:
+
+```
+rmdir "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel"
+mklink /J "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" "<repo>\cep_panel"
+```
+
+## Troubleshooting
+
+| Panel shows | Cause | What to do |
+|---|---|---|
+| `bad_response: … unreadable data: EvalScript error.` | The gateway threw before it could answer. The first host run hit this because the entry points were private to the file's IIFE, so `SFLD_getState(...)` was a `ReferenceError`. | Fixed: the gateway publishes `SFLD_getState`/`SFLD_setParameters`/`SFLD_ready` on the ExtendScript global object and the panel loads it by path if the host has not. Update the installed copy (above) and reload the panel. |
+| `bad_response: … unreadable data: undefined` | The gateway is not loaded in this session. | Same as above; the panel's self-loading path covers it. If it persists, confirm `jsx/starfield_gateway.jsx` exists in the installed copy. |
+| `gateway_missing` | Neither the ScriptPath pass nor the self-loading path produced the gateway. | Check the installed copy for `jsx/starfield_gateway.jsx`, then reload the panel. |
+| `no_target` | No selected layer carries the effect. | Select exactly one layer carrying Starfield Particle and press **Refresh**. |
+| `missing_parameter` | The installed `.aex` build and the panel's binding table disagree (a parameter was renamed or removed). | Rebuild/install the current `.aex`; the bindings list the names the gateway resolves. |
 
 ## Use
 

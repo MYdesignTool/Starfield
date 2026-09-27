@@ -4,14 +4,31 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The four-stage chain (G-03/M3-02) passed 4,735 core assertions, the adapter suite
-passed 249 fake-host assertions, and the explicit May 2023 SDK build succeeds.
+The four-stage chain (G-03/M3-02) passed 6,184 core assertions, the adapter suite
+passed 287 fake-host assertions, and the explicit May 2023 SDK build succeeds.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
-Current artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. Core suite: 4,735 assertions; adapter simulation: 249 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 24-parameter build (21 controls plus graph, control source and capture) still needs an AE 2023 host pass, and the CEP panel in `cep_panel/` has never been loaded.
+Current artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. Core suite: 6,184 assertions; adapter simulation: 287 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 24-parameter build (21 controls plus graph, control source and capture) still needs an AE 2023 host pass.
+
+## Artifact layout
+
+`artifacts/` is Git-ignored and holds only generated files. Every entry is either reproducible from a
+command in this file or an externally produced input that must not be edited.
+
+| Path | Contents | Reproduce with |
+|---|---|---|
+| `plugin/2023/` | Current AE 2023 build: `x64/Release/StarfieldParticle.aex` plus `x64/Release/StarfieldParticle.pdb` and the intermediates under `obj/` | `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1` |
+| `disabled/` | Rollback binaries, renamed with a timestamp, for example `20260927-232930-StarfieldParticle.aex` (build before the force/appearance controls shipped) | Previous build, kept on purpose |
+| `core-tests/`, `adapter-tests/` | Test executables and their object files, so the suites link incrementally: `artifacts/core-tests/core_tests.exe` (core) and `artifacts/adapter-tests/core_tests.exe` (`-Adapter`, fake host) | `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 [-Adapter]` |
+| `reports/` | Captured readouts and parameter dumps, for example `dump_report.txt` from the scripting-DOM dump | `tools/dump_effect_parameters.jsx` inside After Effects |
+| `crash/` | Windows minidumps kept for triage; the analysis tools are `tools/scan_dump.ps1`, `tools/scan2.ps1`, `tools/dump_strings.ps1` | After Effects crash |
+| `reference/` | Externally produced reference data, for example `stardust_effect_parameters.txt` from the installed reference product | Reference product, not this repository |
+
+Obsolete build trees (the M1 `m1/` label and the pre-2023 `plugin/x64`, `plugin/obj` targets) were
+removed on 2026-09-27; nothing referenced them and the current script always writes `plugin/2023/`.
 
 ## PiPL and runtime flags must be regenerated together
 

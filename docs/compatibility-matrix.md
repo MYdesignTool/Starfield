@@ -16,7 +16,8 @@ Use this file to turn observed behavior into requirements before implementing ea
 | P-02 dockable panel | AE 2023; exact build not recorded | Not checked | Panel appears under Window > Extensions, `Lookup: name` resolves, an edit updates the comp, one undo/redo restores it, and a stale edit is rejected. See `cep_panel/README.md`. |
 | Delivery examples | AE 2023; exact build not recorded | Not checked | Apply Spark, Snow and Floating Light from `docs/examples.md` and record a still frame at t ≥ 1 s for each |
 | M2 point-control units | Any host | Fixed in code, corroborated by observation, still unverified for our own control | Documented delivery is absolute layer pixels; the adapter normalizes through a ladder (pixels / legacy percentage / fixed-point) and the Options readout prints host values, interpreted pixels, and world position so the real delivery can be recorded. **Corroboration:** the reference product's own `Origin XY` parameter reads `[1920, 1080]` in a 3840×2160 composition (`docs/reference-parameter-map.md`), i.e. point-style parameters carry layer pixels in this host. Our Options readout is still the only way to close D-05 for our control |
-| M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping |
+| M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping. The readout now records the reference and grid each frame used, so the next host pass can confirm both at once |
+| M2 preview-resolution emitter origin | AE 2023, installed build `0x8002` | **Reported still wrong; measurement was impossible before this pass** | The owner re-reported the offset with the fix installed (binary hash matches the fix build). The readout was truncating exactly the origin lines and never showed the reference the conversion divides by; both are fixed. Owner action: the two-click Full/Quarter readout in `docs/parameter-mapping.md` |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
 
 ### Fixed suspect: the plug-in freed a host-owned handle
@@ -43,10 +44,36 @@ Fix: pre-render now performs the input checkout **first** and passes `PF_Checkou
 ref_height` into the parameter conversion, so both sides use the same reference. At Full resolution
 `ref_*` equals `in_data->width/height`, so nothing changes there.
 
-**Known remaining gap:** the Capture action has no render context, so it still converts with
-`in_data->width/height`; capturing while a reduced-resolution preview is active can bake an offset
-origin into the stored graph. The fix belongs with the manifest-revision-7 work: store the raw
-control values (or the observed reference size) instead of a resolution-dependent world position.
+**Capture was the one path that could store a wrong origin:** it has no render context, so it converts
+with `in_data->width/height`, and at a reduced preview resolution that would bake an origin scaled by
+the downsample factor into the stored graph — wrong at every resolution afterwards. It now **refuses**
+when the host reports a non-trivial downsample factor (`capture needs Full preview resolution`,
+`PF_Cmd_USER_CHANGED_PARAM` with a displayed message), and the adapter suite pins both the refusal and
+the normal capture. The Node Graph sync path cannot refuse a control edit — the graph has to keep
+following the controls — so it still converts with `in_data->width/height`; the real fix belongs with
+the manifest-revision-7 work: store raw control values (or the observed reference size) instead of a
+resolution-dependent world position.
+
+### Verification pass (2026-09-27, after the owner re-reported the offset)
+
+The owner reports the offset **still present** in the installed binary. That binary is
+`artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` byte for byte (SHA-256 `7D1BCC10…`), i.e. the
+build produced with the fix above — so "the fix works" was never a measurement. Two facts explain why
+no measurement existed:
+
+- **The Options readout truncated the origin lines.** `PF_OutData::return_msg` holds 255 characters and
+  the writer drops what does not fit; the origin lines came after longer lines, so the numbers that
+  would have answered the question were cut off. The readout was reordered by diagnostic value and
+  compacted, and it now prints `layer/ds/ref/grid`, `org host/px` and both world interpretations.
+- **The reference the render divides by was invisible.** The readout cannot call `checkout_layer`, so
+  `PF_CheckoutResult::ref_width/ref_height` never appeared anywhere. The render phase now records them
+  (`record_render_geometry` in `ae_plugin/Diagnostics.hpp`), so a readout taken after a Quarter-preview
+  frame shows whether `ref` is a real full-resolution size or a fallback to the preview size.
+
+Owner action, two clicks, procedure in `docs/parameter-mapping.md` ("Resolving the point-unit question"):
+render one frame at Full, press `Options`, switch to Quarter, press `Options`, send both readouts. That
+decides the divisor rule; the ladder in `docs/parameter-mapping.md` is then reduced to the confirmed
+delivery instead of three tolerated conventions.
 
 ## Crash triage (apply-time fatal exit, 2026-09-27)
 
@@ -76,7 +103,7 @@ Load the current build once, then record host, build, and result per row:
 1. **Load** — "Starfield Particle" appears under `Starfield FX` and applies without an error dialog.
 2. **Controls** — the effect shows the implicit input, the thirteen original controls, Control Source, Capture Current Controls, then Gravity X/Y/Z, Linear Drag, Color Start, Color End, Size End and Opacity End. Node Graph Data remains hidden.
 3. **First pixels** — defaults render the seeded emitter; at t ≥ 1 s, changing Velocity Y from `0.3` to `0.5` layer heights/s produces a visibly faster upward trail.
-4. **Options readout** — click the effect's `Options` button and record the whole text. It reports the frame time, the live particle count, the layer/frame grid, the velocity as both read and converted, and the gravity/drag and color/size/opacity curve values. This is the fastest way to classify a rendering surprise; see `docs/parameter-mapping.md`.
+4. **Options readout** — click the effect's `Options` button and record the whole text. It reports the graph/control source and live count, the layer size with the downsample factor, the reference and grid the last rendered frame used, the raw emitter point with both world interpretations, time and velocity, then the counts. `grav`/`col` appear only when they differ from the defaults, and the tail can be dropped by the 255-character buffer. This is the fastest way to classify a rendering surprise, and step 1 of the D-05 measurement; see `docs/parameter-mapping.md`.
 5. **Force and appearance** — with default values the picture must be identical to the previous build. Then set Gravity Y = `-2`, Linear Drag = `0.5`, Color End to red, and Size End = `1`: the trail must fall, slow down, warm toward red, and shrink along its age.
 6. **Determinism** — scrubbing forward and backward over the same frames renders identical frames.
 7. **Rate and lifetime** — Birth Rate and Particle Lifetime change the trail length; Particle Count caps how many sprites can be alive.
@@ -90,7 +117,14 @@ Load the current build once, then record host, build, and result per row:
 
 ## Options readout
 
-The effect's `Options` button prints a read-only diagnostic summary: frame time, live particle count, layer size, the raw downsample factor and pixel aspect ratio, every parameter as read by the code, and the emitter origin both raw (percent) and converted (world). It changes no pixels and no settings. It exists so a host-side surprise can be classified without a debugger; the interpretation table is in `docs/parameter-mapping.md`.
+The effect's `Options` button prints a read-only diagnostic summary in the order that matters when
+something looks wrong: graph/control source with the live count, the layer size and downsample factor,
+the reference and pixel grid of the **last rendered frame**, the raw emitter point with both world
+interpretations (the readout's fallback and the frame's reference-based one), time and velocity, then
+the remaining counts. `grav`/`col` are printed only when they differ from their defaults, because
+`PF_OutData::return_msg` holds 255 characters and lines past the end are dropped — the earlier layout
+put the origin lines there and silently lost them. It changes no pixels and no settings; the
+interpretation table and the two-click D-05 measurement are in `docs/parameter-mapping.md`.
 
 ## Behavior status
 

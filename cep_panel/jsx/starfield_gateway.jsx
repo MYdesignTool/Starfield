@@ -100,8 +100,11 @@
         for (var i = 1; i <= comp.numLayers; i++) {
             var candidate = comp.layer(i);
             if (!candidate.selected) continue;
-            if (candidate.matchName !== "ADBE Text Layer" && effectCount(candidate) > 0) {
-                layer = candidate;
+            // Any selected layer carrying the effect counts, whatever its kind. Text
+            // layers were skipped here before, which made a selected text layer with the
+            // effect read as "no target".
+            if (effectCount(candidate) > 0) {
+                if (count === 0) layer = candidate;
                 count++;
             }
         }
@@ -282,6 +285,13 @@
 
     // Public entry points. Both take and return JSON strings, so the panel never
     // depends on ExtendScript object marshalling.
+    //
+    // They are published on the ExtendScript global object below. This matters: CEP
+    // evaluates this file from the manifest's ScriptPath into the host's scripting
+    // engine, and everything in this file lives inside this IIFE. Without the export the
+    // panel's evalScript("SFLD_getState(...)") is a ReferenceError, CEP hands back the
+    // string "EvalScript error.", and the panel can only report that its reply was
+    // unreadable - which is exactly the failure the first host run produced.
     function SFLD_getState(requestJson) {
         var request = parseRequest(requestJson);
         if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
@@ -303,4 +313,12 @@
             return fail("host_error", error.toString());
         }
     }
+
+    // Publish the entry points on the ExtendScript global object; everything above is
+    // private to this IIFE (see the note next to the entry points).
+    var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
+    host.SFLD_getState = SFLD_getState;
+    host.SFLD_setParameters = SFLD_setParameters;
+    // Readiness probe for the panel's self-loading path: cheap, side-effect free.
+    host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION; };
 })();

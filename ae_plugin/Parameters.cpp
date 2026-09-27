@@ -544,6 +544,24 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
         params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
     try {
+        // Capture is the one path that can bake a resolution-dependent origin into stored
+        // data: it has no render context, so it converts the emitter point with
+        // in_data->width/height, and at a reduced preview resolution that stores an origin
+        // scaled by the downsample factor - which then renders wrong at every resolution
+        // afterwards. Refuse instead of storing it. The guard only fires when the host
+        // actually reports a non-trivial factor, so a host that reports 1/1 (or nothing at
+        // all) is unaffected. The render path needs no guard: it has the full-resolution
+        // reference from its input checkout.
+        if (in_data->downsample_x.num > 0 && in_data->downsample_x.den > 0 &&
+            in_data->downsample_x.num != static_cast<A_long>(in_data->downsample_x.den)) {
+            std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                          "Starfield: capture needs Full preview resolution (downsample %ld/%lu)",
+                          static_cast<long>(in_data->downsample_x.num),
+                          static_cast<unsigned long>(in_data->downsample_x.den));
+            out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
+            return PF_Err_BAD_CALLBACK_PARAM;
+        }
+
         ScopedParameterCheckin current(in_data);
         const auto err = current.snapshot().checkout(in_data);
         if (err != PF_Err_NONE) return err;
@@ -575,6 +593,13 @@ namespace {
 // PF_CHECKOUT_PARAM during a user change can still return the pre-edit value, so
 // the delivered array is the authoritative source here. All fallible work happens
 // before the graph parameter is replaced.
+//
+// Like capture, this path has no input checkout and therefore no full-resolution
+// reference, so at a reduced preview resolution it converts the emitter point with
+// in_data->width/height. Unlike capture it is not refused: the graph has to keep tracking
+// the controls. Editing a control while a reduced-resolution preview is active can
+// therefore store a scaled origin until the point-unit rule is settled (see
+// docs/parameter-mapping.md, D-05).
 PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[]) noexcept {
     if (!params[kGraphParameterId] || !params[kControlSourceId]) return PF_Err_NONE;
     if (params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||

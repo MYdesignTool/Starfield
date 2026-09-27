@@ -53,7 +53,7 @@ construction primitives, not an AE migration or persistence implementation.
 
 ## Evidence and remaining work
 
-Core regression run on 2026-09-27: 4,735 assertions, zero failures. Added cases
+Core regression run on 2026-09-27: 6,184 assertions, zero failures. Added cases
 compare graph/flat pixels across four emitter shapes, 8/16/32-bit formats, repeated
 and reverse times, negative/subframe time, and reduced-resolution cropped output.
 Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid

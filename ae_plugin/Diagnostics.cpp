@@ -6,6 +6,7 @@
 #include "starfield/core/Geometry.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
 
+#include <atomic>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -45,7 +46,50 @@ private:
     std::size_t used_{0};
 };
 
+// Atomics rather than plain fields: AE can render effect instances on different threads,
+// and a diagnostic that tears would be worse than no diagnostic.
+struct RenderGeometryStore {
+    std::atomic<long> layer_width{0};
+    std::atomic<long> layer_height{0};
+    std::atomic<long> ref_width{0};
+    std::atomic<long> ref_height{0};
+    std::atomic<long> grid_width{0};
+    std::atomic<long> grid_height{0};
+    std::atomic<long> par_num{0};
+    std::atomic<long> par_den{0};
+    std::atomic<bool> valid{false};
+};
+
+RenderGeometryStore g_last_render;
+
 } // namespace
+
+void record_render_geometry(A_long layer_width, A_long layer_height, A_long ref_width, A_long ref_height,
+                            A_long grid_width, A_long grid_height, A_long par_num, A_long par_den) noexcept {
+    g_last_render.layer_width.store(layer_width, std::memory_order_relaxed);
+    g_last_render.layer_height.store(layer_height, std::memory_order_relaxed);
+    g_last_render.ref_width.store(ref_width, std::memory_order_relaxed);
+    g_last_render.ref_height.store(ref_height, std::memory_order_relaxed);
+    g_last_render.grid_width.store(grid_width, std::memory_order_relaxed);
+    g_last_render.grid_height.store(grid_height, std::memory_order_relaxed);
+    g_last_render.par_num.store(par_num, std::memory_order_relaxed);
+    g_last_render.par_den.store(par_den, std::memory_order_relaxed);
+    g_last_render.valid.store(true, std::memory_order_release);
+}
+
+RenderGeometry last_render_geometry() noexcept {
+    RenderGeometry geometry;
+    geometry.valid = g_last_render.valid.load(std::memory_order_acquire);
+    geometry.layer_width = g_last_render.layer_width.load(std::memory_order_relaxed);
+    geometry.layer_height = g_last_render.layer_height.load(std::memory_order_relaxed);
+    geometry.ref_width = g_last_render.ref_width.load(std::memory_order_relaxed);
+    geometry.ref_height = g_last_render.ref_height.load(std::memory_order_relaxed);
+    geometry.grid_width = g_last_render.grid_width.load(std::memory_order_relaxed);
+    geometry.grid_height = g_last_render.grid_height.load(std::memory_order_relaxed);
+    geometry.par_num = g_last_render.par_num.load(std::memory_order_relaxed);
+    geometry.par_den = g_last_render.par_den.load(std::memory_order_relaxed);
+    return geometry;
+}
 
 PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (in_data == nullptr || out_data == nullptr) {
@@ -68,8 +112,12 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
-    writer.line("Starfield 0.1.0 graph readout\n");
-
+    // PF_OutData::return_msg holds 255 characters (PF_MAX_EFFECT_MSG_LEN) and the writer
+    // silently drops whatever no longer fits. The lines are therefore ordered by
+    // diagnostic value: the render geometry and the emitter origin - the two facts that
+    // decide how a point control's units must be read - come first, and the control
+    // summary that the Effect Controls window shows anyway comes last. At reduced preview
+    // resolution the tail can be cut off; read those controls in the ECW then.
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;
@@ -79,30 +127,38 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         const auto evaluated = core::evaluate_particle_graph(*graph,
             core::RationalTime{in_data->current_time, in_data->time_scale}, never);
         if (!evaluated.has_value()) {
-            writer.line("graph evaluation failed: %s\n", evaluated.error().detail);
+            writer.line("SF 0.1.0 graph evaluation failed: %s\n", evaluated.error().detail);
             return PF_Err_NONE;
         }
-        writer.line("graph nodes %llu edges %llu live %llu\n",
-            static_cast<unsigned long long>(graph->nodes.size()), static_cast<unsigned long long>(graph->edges.size()),
-            static_cast<unsigned long long>(evaluated.value().particles.size()));
+        writer.line("SF 0.1.0 src %s g%llun %llue live %llu\n",
+                    control_source == kLegacyControlSource ? "AE" : "NG",
+                    static_cast<unsigned long long>(graph->nodes.size()),
+                    static_cast<unsigned long long>(graph->edges.size()),
+                    static_cast<unsigned long long>(evaluated.value().particles.size()));
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
-    writer.line(control_source == kLegacyControlSource
-        ? "AE Controls (driving render)\n" : "AE Controls (inactive in Node Graph mode)\n");
     if (graph_parameter_disabled()) {
-        writer.line("STARFIELD_NO_GRAPH_PARAM probe: no arbitrary data registered, flat render\n");
+        writer.line("SF probe: STARFIELD_NO_GRAPH_PARAM, no arbitrary data\n");
     } else if (flat_render_override_active()) {
-        writer.line("STARFIELD_FLAT_RENDER override: rendering flat controls\n");
+        writer.line("SF override: STARFIELD_FLAT_RENDER, flat controls\n");
     }
 
-    // Raw host fields. The render grid is derived in the render phase from the world
-    // the host hands over (ADR 0005); the downsample factor is reported for context
-    // only, because the SDK documents it inconsistently.
-    writer.line("layer %ldx%ld ds %ld/%lu par %ld/%lu\n",
+    // `layer` and `ds` are what the host reports for this call. `ref` and `grid` are what
+    // the last rendered frame actually used: the point conversion divides by `ref`, and
+    // the core maps world space onto `grid`. When `ref` is larger than the preview size,
+    // point controls are full-resolution pixels divided by the full-resolution reference
+    // and the origin is preview-independent; when `ref` is zero or equals the preview
+    // size, the conversion fell back to the preview size and the origin moves with the
+    // preview resolution. That is the measurement D-05 in docs/parameter-mapping.md asks
+    // for, and the readout could not report it before the render path recorded it.
+    const RenderGeometry last = last_render_geometry();
+    writer.line("layer %ldx%ld ds %ld/%lu ref %ldx%ld grid %ldx%ld\n",
                 static_cast<long>(in_data->width), static_cast<long>(in_data->height),
                 static_cast<long>(in_data->downsample_x.num), static_cast<unsigned long>(in_data->downsample_x.den),
-                static_cast<long>(in_data->pixel_aspect_ratio.num),
-                static_cast<unsigned long>(in_data->pixel_aspect_ratio.den));
+                static_cast<long>(last.valid ? last.ref_width : 0),
+                static_cast<long>(last.valid ? last.ref_height : 0),
+                static_cast<long>(last.valid ? last.grid_width : 0),
+                static_cast<long>(last.valid ? last.grid_height : 0));
 
     ScopedParameterCheckin parameters(in_data);
     const PF_Err checkout_error = parameters.snapshot().checkout(in_data);
@@ -117,41 +173,58 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     const core::ValidatedSettings validated = core::validate_settings(settings);
     const core::Vec3& raw_origin = parameters.snapshot().raw_origin();
 
-    const double scale = static_cast<double>(in_data->time_scale);
-    const double seconds = scale > 0.0 ? static_cast<double>(in_data->current_time) / scale : 0.0;
-
-    const core::NeverCancelled never;
-    const auto particles = core::simulate_particles(validated, seconds, never);
-    if (particles.has_value()) {
-        writer.line("t %.3fs live %llu\n", seconds, static_cast<unsigned long long>(particles.value().size()));
-    } else {
-        writer.line("t %.3fs simulate failed: %s\n", seconds, core::describe(particles.error().code));
-    }
-
-    writer.line("cnt %u rate %.2f seed %u life %.3f\n", settings.particle_count, settings.birth_rate, settings.seed,
-                settings.particle_lifetime_seconds);
-    writer.line("shape %u esize %.3f vspread %.2f\n", static_cast<unsigned>(settings.emitter_shape),
-                settings.emitter_size, settings.velocity_spread);
-    writer.line("size %.2f notices %llu\n", settings.particle_size,
-                static_cast<unsigned long long>(validated.notices.size()));
-
-    // Shows the raw host point values next to the layer pixels they were interpreted
-    // as, which is what identifies a unit mismatch in the host delivery.
+    // The raw host point next to the layer pixels it was read as, which is what
+    // identifies a unit mismatch in the host delivery. The first world triple is the one
+    // this call computed from the sizes above (the fallback path); the second is what the
+    // last rendered frame computed from its full-resolution reference.
     const double layer_width = static_cast<double>(in_data->width > 0 ? in_data->width : 1);
     const double layer_height = static_cast<double>(in_data->height > 0 ? in_data->height : 1);
-    writer.line("origin host %.0f,%.0f,%.0f px %.0f,%.0f,%.0f\n", raw_origin.x, raw_origin.y, raw_origin.z,
+    writer.line("org host %.0f,%.0f,%.0f px %.0f,%.0f,%.0f\n", raw_origin.x, raw_origin.y, raw_origin.z,
                 core::host_point_component_to_layer_pixels(raw_origin.x, layer_width),
                 core::host_point_component_to_layer_pixels(raw_origin.y, layer_height),
                 core::host_point_component_to_layer_pixels(raw_origin.z, layer_height));
-    writer.line("origin world %.3f,%.3f,%.3f vel %.2f,%.2f,%.2f\n", settings.emitter_origin.x,
-                settings.emitter_origin.y, settings.emitter_origin.z, settings.velocity.x, settings.velocity.y,
+    if (last.valid && last.ref_width > 0 && last.ref_height > 0) {
+        core::LayerUnits ref_units;
+        ref_units.layer_width = static_cast<double>(last.ref_width);
+        ref_units.layer_height = static_cast<double>(last.ref_height);
+        ref_units.pixel_aspect_ratio = (last.par_num > 0 && last.par_den > 0)
+            ? static_cast<double>(last.par_num) / static_cast<double>(last.par_den) : 1.0;
+        const core::Vec3 ref_world = core::layer_point_to_world(
+            core::host_point_component_to_layer_pixels(raw_origin.x, ref_units.layer_width),
+            core::host_point_component_to_layer_pixels(raw_origin.y, ref_units.layer_height),
+            core::host_point_component_to_layer_pixels(raw_origin.z, ref_units.layer_height), ref_units);
+        writer.line("org wld l %.3f,%.3f,%.3f r %.3f,%.3f,%.3f\n", settings.emitter_origin.x,
+                    settings.emitter_origin.y, settings.emitter_origin.z, ref_world.x, ref_world.y, ref_world.z);
+    } else {
+        writer.line("org wld l %.3f,%.3f,%.3f r no-frame\n", settings.emitter_origin.x, settings.emitter_origin.y,
+                    settings.emitter_origin.z);
+    }
+
+    // Printed only when they differ from the defaults, so the geometry above keeps its
+    // place in the 255-character budget while the controls are still the default.
+    if (settings.gravity.x != 0.0 || settings.gravity.y != 0.0 || settings.gravity.z != 0.0 ||
+        settings.linear_drag != 0.0) {
+        writer.line("grav %.2f,%.2f,%.2f drag %.3f\n", settings.gravity.x, settings.gravity.y, settings.gravity.z,
+                    settings.linear_drag);
+    }
+    if (settings.color_start.x != settings.color_end.x || settings.color_start.y != settings.color_end.y ||
+        settings.color_start.z != settings.color_end.z || settings.particle_size != settings.particle_size_end ||
+        settings.opacity != settings.opacity_end) {
+        writer.line("col %.2f,%.2f,%.2f>%.2f,%.2f,%.2f sz %.2f>%.2f op %.2f>%.2f\n",
+                    settings.color_start.x, settings.color_start.y, settings.color_start.z,
+                    settings.color_end.x, settings.color_end.y, settings.color_end.z,
+                    settings.particle_size, settings.particle_size_end, settings.opacity, settings.opacity_end);
+    }
+
+    const double scale = static_cast<double>(in_data->time_scale);
+    const double seconds = scale > 0.0 ? static_cast<double>(in_data->current_time) / scale : 0.0;
+    writer.line("t %.3fs vel %.2f,%.2f,%.2f\n", seconds, settings.velocity.x, settings.velocity.y,
                 settings.velocity.z);
-    writer.line("grav %.2f,%.2f,%.2f drag %.3f\n", settings.gravity.x, settings.gravity.y, settings.gravity.z,
-                settings.linear_drag);
-    writer.line("color %.2f,%.2f,%.2f -> %.2f,%.2f,%.2f size %.2f->%.2f op %.2f->%.2f\n",
-                settings.color_start.x, settings.color_start.y, settings.color_start.z,
-                settings.color_end.x, settings.color_end.y, settings.color_end.z,
-                settings.particle_size, settings.particle_size_end, settings.opacity, settings.opacity_end);
+    writer.line("cnt %u rate %.2f seed %u life %.3f\n", settings.particle_count, settings.birth_rate, settings.seed,
+                settings.particle_lifetime_seconds);
+    writer.line("shape %u esz %.3f vspr %.2f size %.2f not %llu\n", static_cast<unsigned>(settings.emitter_shape),
+                settings.emitter_size, settings.velocity_spread, settings.particle_size,
+                static_cast<unsigned long long>(validated.notices.size()));
     return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }

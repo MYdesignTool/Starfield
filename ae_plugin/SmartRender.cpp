@@ -1,6 +1,7 @@
 #include "SmartRender.hpp"
 
 #include "AE_Macros.h"
+#include "Diagnostics.hpp"
 #include "Parameters.hpp"
 #include "WorldBridge.hpp"
 
@@ -177,6 +178,13 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
     const std::uint32_t grid_height = grid_dimension(
         scaled_extent(state.max_result_rect.bottom - state.max_result_rect.top, geometry.pixel_per_rect_y),
         state.ref_height);
+
+    // Hand the geometry of this frame to the Options readout. The readout cannot call
+    // checkout_layer itself, so without this it cannot say which sizes the point-control
+    // conversion actually used at a reduced preview resolution.
+    record_render_geometry(in_data->width, in_data->height, state.ref_width, state.ref_height,
+                           static_cast<A_long>(grid_width), static_cast<A_long>(grid_height), state.par.num,
+                           state.par.den);
 
     // The world origin is reported in host rect units, so it takes the same scale as
     // the extents to land in the frame grid.
