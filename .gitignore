@@ -6,6 +6,7 @@
 *.user
 *.suo
 *.pdb
+*.dmp
 CMakeCache.txt
 CMakeFiles/
 CMakeUserPresets.json
