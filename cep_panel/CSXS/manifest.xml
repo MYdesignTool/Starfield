@@ -30,10 +30,10 @@
         <Resources>
           <MainPath>./index.html</MainPath>
           <ScriptPath>./jsx/starfield_gateway.jsx</ScriptPath>
-          <CEFCommandLine>
-            <Parameter>--allow-file-access</Parameter>
-            <Parameter>--allow-file-access-from-files</Parameter>
-          </CEFCommandLine>
+          <!-- No CEFCommandLine block on purpose. CEP appends those switches to the SHARED
+               CEF command line of the host, so an extension can change how every other CEP
+               panel in the same host starts up. The panel does not need file-access
+               switches, and a host-wide side effect is not worth the convenience. -->
         </Resources>
         <Lifecycle>
           <AutoVisible>true</AutoVisible>

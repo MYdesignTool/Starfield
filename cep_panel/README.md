@@ -19,6 +19,29 @@ No third-party JavaScript is bundled. `js/panel.js` contains a ~10-line CEP brid
 shim around `window.__adobe_cep__.evalScript`; Adobe's full `CSInterface.js` can be
 dropped in later without changing the protocol code.
 
+## If other extension panels stop opening
+
+This extension must never be able to affect anyone else's panel. Two things it touches are
+host-wide, so both are handled carefully:
+
+- The manifest carries **no `CEFCommandLine` block**: CEP appends those switches to the shared
+  CEF command line, which changes how *every* CEP panel in the host starts.
+- `Install.ps1` writes the per-user `PlayerDebugMode` key, which is what lets an unsigned
+  extension load at all. `Install.ps1 -Uninstall` removes it again.
+
+To get a clean host back, in this order:
+
+1. Quit After Effects completely.
+2. `powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -Uninstall`
+   (removes the extension link and clears `PlayerDebugMode` for CSXS.11 and CSXS.12).
+3. Start After Effects and check that the other extension panels open again.
+4. If they do, reinstall **one step at a time** to find what the host dislikes:
+   `Install.ps1 -RegistryOnly` (registers the debug key, installs nothing), restart, test;
+   then `Install.ps1 -PanelOnly` (links the extension, touches no registry), restart, test.
+   Whichever step breaks the other panels is the one to report.
+5. Keep `%TEMP%\cep_cache\` and `%LOCALAPPDATA%\Temp\Adobe\CEP*` logs from the failing run:
+   CEP records why an extension failed to initialise.
+
 ## Install for development
 
 1. Close the previous panel in After Effects (if open).
