@@ -1,5 +1,6 @@
 /AdobeSDK/
 /artifacts/
+/dist/
 .vs/
 **/bin/
 **/obj/

@@ -32,6 +32,24 @@ try {
     $arguments += '/v:minimal'
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
+
+    # Publish a plainly named copy where a person can find it. MSBuild's OutDir is
+    # artifacts/plugin/<label>/<platform>/<configuration>/, which is the right place to keep
+    # one directory per SDK target but a tedious place to fetch an installable file from.
+    if ($ArtifactLabel) {
+        $publishedDir = Join-Path $repositoryRoot 'dist'
+        $builtAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\StarfieldParticle.aex"
+        if (-not (Test-Path -LiteralPath $builtAex)) { throw "Build reported success but $builtAex is missing." }
+        New-Item -ItemType Directory -Force -Path $publishedDir | Out-Null
+        Copy-Item -LiteralPath $builtAex -Destination (Join-Path $publishedDir 'StarfieldParticle.aex') -Force
+        $builtPdb = [IO.Path]::ChangeExtension($builtAex, '.pdb')
+        if (Test-Path -LiteralPath $builtPdb) {
+            Copy-Item -LiteralPath $builtPdb -Destination (Join-Path $publishedDir 'StarfieldParticle.pdb') -Force
+        }
+        Write-Host ''
+        Write-Host "Installable build: $(Join-Path $publishedDir 'StarfieldParticle.aex')" -ForegroundColor Green
+        Write-Host 'Install or roll back with: powershell -ExecutionPolicy Bypass -File tools\Install-Plugin.ps1 [-Uninstall]'
+    }
 }
 finally {
     & $env:ComSpec /d /c "subst $drive /d" | Out-Null

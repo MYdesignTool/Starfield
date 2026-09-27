@@ -33,6 +33,16 @@
 
 用 CMake 构建不依赖 AE 的核心库。Windows AE 插件使用锁定的 MSVC v145 和本地 May 2023 SDK；从仓库根目录运行 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`，默认产物写入 `artifacts/plugin/2023/x64/Release/`。显式传入 `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023` 得到同一目标。详细工具链和构建状态见 [构建矩阵](docs/build-matrix.md)。
 
+每次构建还会在根目录 `dist\` 放一份同名可安装副本：
+
+```
+dist\StarfieldParticle.aex      <- 直接拖进 AE 的 Support Files\Plug-ins，或：
+powershell -ExecutionPolicy Bypass -File tools\Install-Plugin.ps1     # 安装/更新（备份旧版）
+powershell -ExecutionPolicy Bypass -File tools\Install-Plugin.ps1 -Uninstall   # 回滚
+```
+
+安装脚本只在 Adobe 注册表记录的插件目录里放/取这一个文件，替换下来的旧文件留在 `artifacts\disabled\`，需要管理员权限并在 AE 关闭时运行。
+
 ## 许可
 
 本项目采用 MIT 许可，全文见 [LICENSE](LICENSE)。

@@ -21,6 +21,7 @@ command in this file or an externally produced input that must not be edited.
 | Path | Contents | Reproduce with |
 |---|---|---|
 | `plugin/2023/` | Current AE 2023 build: `x64/Release/StarfieldParticle.aex` plus `x64/Release/StarfieldParticle.pdb` and the intermediates under `obj/` | `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1` |
+| `../dist/` | One plainly named installable copy of the current build: `dist/StarfieldParticle.aex` (+ `.pdb`). MSBuild has to keep one directory per SDK target, this is the file a person picks up | Same build; the script publishes it automatically |
 | `disabled/` | Rollback binaries, renamed with a timestamp, for example `20260927-232930-StarfieldParticle.aex` (build before the force/appearance controls shipped) | Previous build, kept on purpose |
 | `core-tests/`, `adapter-tests/` | Test executables and their object files, so the suites link incrementally: `artifacts/core-tests/core_tests.exe` (core) and `artifacts/adapter-tests/core_tests.exe` (`-Adapter`, fake host) | `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 [-Adapter]` |
 | `reports/` | Captured readouts and parameter dumps, for example `dump_report.txt` from the scripting-DOM dump | `tools/dump_effect_parameters.jsx` inside After Effects |
@@ -29,6 +30,12 @@ command in this file or an externally produced input that must not be edited.
 
 Obsolete build trees (the M1 `m1/` label and the pre-2023 `plugin/x64`, `plugin/obj` targets) were
 removed on 2026-09-27; nothing referenced them and the current script always writes `plugin/2023/`.
+
+Installing and rolling back is one command, and it is the owner's to run: `tools/Install-Plugin.ps1`
+copies `dist/StarfieldParticle.aex` into the plug-ins folder recorded by Adobe's
+`PluginInstallPath` registry value (or `-PluginDir`), renames whatever it replaces into
+`artifacts/disabled/` with a timestamp, refuses while After Effects is running, and moves the file
+back out with `-Uninstall`. It never edits the registry and never deletes anything.
 
 ## PiPL and runtime flags must be regenerated together
 
