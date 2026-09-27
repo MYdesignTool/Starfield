@@ -50,12 +50,19 @@ inline constexpr double kMaxVelocitySpread = 100.0;
 inline constexpr double kMaxGravityMagnitude = 1'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
 inline constexpr double kMaxParticleColor = 64.0;
+inline constexpr double kMaxEmissionSpeed = 1'000.0;
+inline constexpr double kMaxEmissionAngleDegrees = 100'000.0;
+inline constexpr double kMaxDirectionSpanDegrees = 180.0;
 
 struct Vec3 {
     double x{};
     double y{};
     double z{};
 };
+
+// How the emission direction is sampled. `directional` uses the Euler angles and the
+// cone span; `uniform` samples the whole sphere and ignores both.
+enum class DirectionMode : std::uint8_t { directional = 0, uniform = 1 };
 
 struct Settings {
     std::uint32_t particle_count{1000};
@@ -90,6 +97,17 @@ struct Settings {
     double particle_size_end{10.0};
     double opacity_end{1.0};
     bool appearance_enabled{false};
+    // Emission direction model, aligned with the reference emitter's controls: particles
+    // leave at `emission_speed` along an axis built from the Euler angles, sampled inside
+    // a cone of `direction_span_degrees`. Angles are degrees, applied as rotations of +Y
+    // about X, then Y, then Z, so 0/0/0 points straight up (the reference's default look).
+    // `uniform` ignores the axis and samples the whole sphere; a span of 180 or more does
+    // the same. `emission_speed_random` jitters the speed per particle in the same unit.
+    double emission_speed{0.0};
+    double emission_speed_random{0.0};
+    Vec3 emission_angles_degrees{};
+    DirectionMode direction_mode{DirectionMode::directional};
+    double direction_span_degrees{60.0};
 };
 
 // Host popup controls are one-based while the core enum is zero-based. Out-of-range
@@ -113,6 +131,11 @@ enum class ValidationCode : std::uint8_t {
     color_clamped,
     end_size_clamped,
     end_opacity_clamped,
+    emission_speed_clamped,
+    emission_speed_random_clamped,
+    emission_angle_clamped,
+    direction_span_clamped,
+    direction_mode_replaced,
     non_finite_replaced,
 };
 

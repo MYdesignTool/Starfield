@@ -51,6 +51,29 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
             }
             case kEmitterOrigin.value: settings.emitter_origin = std::get<Vec3>(parameter.value); break;
             case kVelocity.value: settings.velocity = std::get<Vec3>(parameter.value); break;
+            case kEmissionSpeed.value: settings.emission_speed = std::get<double>(parameter.value); break;
+            case kEmissionSpeedRandom.value:
+                settings.emission_speed_random = std::get<double>(parameter.value);
+                break;
+            case kEmissionAngleX.value:
+                settings.emission_angles_degrees.x = std::get<double>(parameter.value);
+                break;
+            case kEmissionAngleY.value:
+                settings.emission_angles_degrees.y = std::get<double>(parameter.value);
+                break;
+            case kEmissionAngleZ.value:
+                settings.emission_angles_degrees.z = std::get<double>(parameter.value);
+                break;
+            case kDirectionMode.value: {
+                const auto mode = std::get<std::uint32_t>(parameter.value);
+                if (mode > static_cast<std::uint32_t>(DirectionMode::uniform)) {
+                    return Result<ValidatedSettings>::failure(ErrorCode::invalid_request,
+                                                              "invalid graph direction mode");
+                }
+                settings.direction_mode = static_cast<DirectionMode>(mode);
+                break;
+            }
+            case kDirectionSpan.value: settings.direction_span_degrees = std::get<double>(parameter.value); break;
             case kParticleSize.value:
                 settings.particle_size = std::get<double>(parameter.value);
                 settings.particle_size_end = settings.particle_size;
@@ -119,7 +142,14 @@ GraphNode make_emitter_node(const Settings& settings, NodeId id) {
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},
         {kEmitterOrigin, settings.emitter_origin}, {kVelocity, settings.velocity},
         {kParticleSize, settings.particle_size}, {kOpacity, settings.opacity},
-        {kEmitterSize, settings.emitter_size}, {kVelocitySpread, settings.velocity_spread}}};
+        {kEmitterSize, settings.emitter_size}, {kVelocitySpread, settings.velocity_spread},
+        {kEmissionSpeed, settings.emission_speed},
+        {kEmissionSpeedRandom, settings.emission_speed_random},
+        {kEmissionAngleX, settings.emission_angles_degrees.x},
+        {kEmissionAngleY, settings.emission_angles_degrees.y},
+        {kEmissionAngleZ, settings.emission_angles_degrees.z},
+        {kDirectionMode, static_cast<std::uint32_t>(settings.direction_mode)},
+        {kDirectionSpan, settings.direction_span_degrees}}};
 }
 
 Result<Graph> validate_constructed_graph(Graph graph, const char* failure_detail) {

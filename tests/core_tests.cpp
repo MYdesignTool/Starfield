@@ -1433,9 +1433,132 @@ void test_force_and_appearance() {
                                                       emitter_to_force, force_to_appearance, appearance_to_output).has_value());
 }
 
+// Emission direction model (M3-04): the reference emitter's Speed plus a direction axis,
+// a cone span and a whole-sphere mode. Checks that the cone is bounded, that `uniform`
+// really covers the sphere, that speed jitter varies the magnitude, and that everything
+// stays a pure function of (settings, seed, slot).
+void test_emission_direction() {
+    const NeverCancelled never;
+    const auto particle_velocity = [&never](const Settings& settings, double seconds, std::uint64_t id) {
+        auto validated = validate_settings(settings);
+        const auto particles = simulate_particles(validated, seconds, never);
+        for (const auto& particle : particles.value()) {
+            if (particle.id == id) return particle.position;
+        }
+        return Vec3{};
+    };
+    const auto speed_of = [&never](const Settings& settings, double seconds) {
+        auto validated = validate_settings(settings);
+        const auto particles = simulate_particles(validated, seconds, never);
+        std::vector<double> speeds;
+        for (const auto& particle : particles.value()) {
+            if (particle.age_seconds <= 0.0) continue; // position is speed * age
+            const Vec3 per_second{particle.position.x / particle.age_seconds,
+                                  particle.position.y / particle.age_seconds,
+                                  particle.position.z / particle.age_seconds};
+            speeds.push_back(std::sqrt(per_second.x * per_second.x + per_second.y * per_second.y +
+                                       per_second.z * per_second.z));
+        }
+        return speeds;
+    };
+
+    Settings base;
+    base.velocity = Vec3{};
+    base.velocity_spread = 0.0;
+    base.gravity = Vec3{};
+    base.linear_drag = 0.0;
+    base.emitter_size = 0.0;
+    base.particle_count = 512;
+    base.birth_rate = 240.0;
+    base.particle_lifetime_seconds = 4.0;
+
+    // Span 0 is a straight line along the axis: 0/0/0 means straight up at the given speed.
+    Settings straight = base;
+    straight.emission_speed = 0.5;
+    straight.direction_span_degrees = 0.0;
+    for (const double speed : speed_of(straight, 1.0)) {
+        CHECK(std::abs(speed - 0.5) < 1e-12);
+    }
+    const Vec3 first = particle_velocity(straight, 1.0, 24);
+    const Vec3 again = particle_velocity(straight, 1.0, 24);
+    CHECK(first.y > 0.0 && std::abs(first.x) < 1e-12 && std::abs(first.z) < 1e-12);
+    CHECK(again.x == first.x && again.y == first.y && again.z == first.z);
+
+    // A 60 degree span keeps every emitted direction inside 30 degrees of the axis.
+    Settings cone = base;
+    cone.emission_speed = 1.0;
+    cone.direction_span_degrees = 60.0;
+    const double cone_limit = std::cos(30.0 * 3.14159265358979323846 / 180.0);
+    auto validated_cone = validate_settings(cone);
+    const auto cone_particles = simulate_particles(validated_cone, 1.0, never);
+    CHECK(cone_particles.has_value());
+    for (const auto& particle : cone_particles.value()) {
+        if (particle.age_seconds <= 0.0) continue;
+        const double length = std::sqrt(particle.position.x * particle.position.x +
+                                        particle.position.y * particle.position.y +
+                                        particle.position.z * particle.position.z);
+        CHECK(length > 0.0);
+        const double cos_angle = particle.position.y / length; // axis is +Y
+        CHECK(cos_angle >= cone_limit - 1e-9);
+    }
+
+    // Uniform mode covers the whole sphere: some particles must travel downward, and the
+    // mean direction stays near zero because the sampling is even over the solid angle.
+    Settings sphere = base;
+    sphere.emission_speed = 1.0;
+    sphere.direction_mode = DirectionMode::uniform;
+    auto validated_sphere = validate_settings(sphere);
+    const auto sphere_particles = simulate_particles(validated_sphere, 1.0, never);
+    CHECK(sphere_particles.has_value());
+    double sum_y = 0.0;
+    int counted = 0;
+    bool saw_downward = false;
+    for (const auto& particle : sphere_particles.value()) {
+        if (particle.age_seconds <= 0.0) continue;
+        const double length = std::sqrt(particle.position.x * particle.position.x +
+                                        particle.position.y * particle.position.y +
+                                        particle.position.z * particle.position.z);
+        if (length <= 0.0) continue;
+        sum_y += particle.position.y / length;
+        saw_downward = saw_downward || particle.position.y < 0.0;
+        ++counted;
+    }
+    CHECK(counted > 100);
+    CHECK(saw_downward);
+    CHECK(std::abs(sum_y / static_cast<double>(counted)) < 0.2);
+
+    // Speed jitter varies the magnitude but never makes it negative or zero on average.
+    Settings jittered = base;
+    jittered.emission_speed = 1.0;
+    jittered.emission_speed_random = 0.25;
+    double previous = -1.0;
+    bool saw_different = false;
+    for (const double speed : speed_of(jittered, 1.0)) {
+        CHECK(speed >= 0.0);
+        if (previous >= 0.0 && std::abs(speed - previous) > 1e-9) saw_different = true;
+        previous = speed;
+    }
+    CHECK(saw_different);
+
+    // Angles rotate the axis: a right-handed 90 degree rotation about Z maps up (+Y) to -X.
+    Settings rotated = base;
+    rotated.emission_speed = 1.0;
+    rotated.direction_span_degrees = 0.0;
+    rotated.emission_angles_degrees = Vec3{0.0, 0.0, 90.0};
+    auto validated_rotated = validate_settings(rotated);
+    const auto rotated_particles = simulate_particles(validated_rotated, 1.0, never);
+    CHECK(rotated_particles.has_value());
+    for (const auto& particle : rotated_particles.value()) {
+        if (particle.age_seconds <= 0.0) continue;
+        CHECK(std::abs(particle.position.x + particle.age_seconds) < 1e-9);
+        CHECK(std::abs(particle.position.y) < 1e-9);
+    }
+}
+
 } // namespace
 
 int main() {
+    test_emission_direction();
     test_force_and_appearance();
     test_graph_evaluation();
     test_rational_time();

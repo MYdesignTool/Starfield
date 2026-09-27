@@ -21,6 +21,11 @@ enum class RandomPurpose : std::uint64_t {
     velocity_z = 6,
     size = 7,
     opacity = 8,
+    // Emission direction sampling: two stream values place a direction inside a cone
+    // (or on the sphere), one jitters the emitted speed.
+    direction_u1 = 9,
+    direction_u2 = 10,
+    emission_speed = 11,
 };
 
 // splitmix64 finalizer: cheap, well distributed, and identical on every platform.

@@ -204,6 +204,15 @@ inline constexpr ParameterKey kParticleSize{8};
 inline constexpr ParameterKey kOpacity{9};
 inline constexpr ParameterKey kEmitterSize{10};
 inline constexpr ParameterKey kVelocitySpread{11};
+// Emission direction model (reference-aligned, added with the M3-04 slice). Appended,
+// never renumbered: stored graphs keep their existing keys.
+inline constexpr ParameterKey kEmissionSpeed{12};
+inline constexpr ParameterKey kEmissionSpeedRandom{13};
+inline constexpr ParameterKey kEmissionAngleX{14};
+inline constexpr ParameterKey kEmissionAngleY{15};
+inline constexpr ParameterKey kEmissionAngleZ{16};
+inline constexpr ParameterKey kDirectionMode{17};
+inline constexpr ParameterKey kDirectionSpan{18};
 // Parameter keys are scoped to their node type; force and appearance nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};

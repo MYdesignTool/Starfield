@@ -141,6 +141,41 @@ ValidatedSettings validate_settings(Settings settings) {
     value.opacity_end = clamp(value.opacity_end, 0.0, 1.0,
                               ValidationCode::end_opacity_clamped, "opacity_end", notices);
 
+    // Emission direction model (M3-04). Speed is a magnitude, so it clamps to [0, max];
+    // angles wrap into a normal range instead of being clamped away, and the span is a
+    // half-cone that saturates at 180 degrees (a full sphere).
+    value.emission_speed = finite_or(value.emission_speed, 0.0, "emission_speed", notices);
+    value.emission_speed = clamp(value.emission_speed, 0.0, kMaxEmissionSpeed,
+                                 ValidationCode::emission_speed_clamped, "emission_speed", notices);
+    value.emission_speed_random = finite_or(value.emission_speed_random, 0.0,
+                                            "emission_speed_random", notices);
+    value.emission_speed_random = clamp(value.emission_speed_random, 0.0, kMaxEmissionSpeed,
+                                        ValidationCode::emission_speed_random_clamped,
+                                        "emission_speed_random", notices);
+    value.emission_angles_degrees.x = finite_or(value.emission_angles_degrees.x, 0.0,
+                                                "emission_angle_x", notices);
+    value.emission_angles_degrees.y = finite_or(value.emission_angles_degrees.y, 0.0,
+                                                "emission_angle_y", notices);
+    value.emission_angles_degrees.z = finite_or(value.emission_angles_degrees.z, 0.0,
+                                                "emission_angle_z", notices);
+    value.emission_angles_degrees.x = clamp(value.emission_angles_degrees.x,
+                                            -kMaxEmissionAngleDegrees, kMaxEmissionAngleDegrees,
+                                            ValidationCode::emission_angle_clamped, "emission_angle_x", notices);
+    value.emission_angles_degrees.y = clamp(value.emission_angles_degrees.y,
+                                            -kMaxEmissionAngleDegrees, kMaxEmissionAngleDegrees,
+                                            ValidationCode::emission_angle_clamped, "emission_angle_y", notices);
+    value.emission_angles_degrees.z = clamp(value.emission_angles_degrees.z,
+                                            -kMaxEmissionAngleDegrees, kMaxEmissionAngleDegrees,
+                                            ValidationCode::emission_angle_clamped, "emission_angle_z", notices);
+    value.direction_span_degrees = finite_or(value.direction_span_degrees, 60.0,
+                                             "direction_span", notices);
+    value.direction_span_degrees = clamp(value.direction_span_degrees, 0.0, kMaxDirectionSpanDegrees,
+                                         ValidationCode::direction_span_clamped, "direction_span", notices);
+    if (static_cast<unsigned>(value.direction_mode) > static_cast<unsigned>(DirectionMode::uniform)) {
+        value.direction_mode = DirectionMode::directional;
+        notices.push_back({ValidationCode::direction_mode_replaced, "direction_mode"});
+    }
+
     if (static_cast<unsigned>(value.emitter_shape) > static_cast<unsigned>(EmitterShape::disc)) {
         value.emitter_shape = EmitterShape::point;
         notices.push_back({ValidationCode::emitter_shape_replaced, "emitter_shape"});

@@ -532,6 +532,16 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacity, ParameterKind::float64, true},
         ParameterDescriptor{kEmitterSize, ParameterKind::float64, true},
         ParameterDescriptor{kVelocitySpread, ParameterKind::float64, true},
+        // The direction model is optional so that graphs written before it existed stay
+        // valid: a missing key keeps the Settings default in read_emitter, which is the
+        // old straight-line behaviour.
+        ParameterDescriptor{kEmissionSpeed, ParameterKind::float64, false},
+        ParameterDescriptor{kEmissionSpeedRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kEmissionAngleX, ParameterKind::float64, false},
+        ParameterDescriptor{kEmissionAngleY, ParameterKind::float64, false},
+        ParameterDescriptor{kEmissionAngleZ, ParameterKind::float64, false},
+        ParameterDescriptor{kDirectionMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kDirectionSpan, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor output;

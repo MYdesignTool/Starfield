@@ -79,6 +79,65 @@ DragIntegrals drag_integrals(double drag, double age) noexcept {
     return DragIntegrals{velocity_factor, acceleration_factor};
 }
 
+// --- Emission direction model (M3-04) ---------------------------------------
+constexpr double kEmissionPi = 3.14159265358979323846;
+
+Vec3 normalize_direction(Vec3 value) noexcept {
+    const double length = std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
+    if (!(length > 0.0)) return Vec3{0.0, 1.0, 0.0};
+    return Vec3{value.x / length, value.y / length, value.z / length};
+}
+
+Vec3 cross_direction(const Vec3& a, const Vec3& b) noexcept {
+    return Vec3{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+}
+
+// Rotate +Y (straight up) about X, then Y, then Z, so 0/0/0 points up, which is the
+// reference emitter's default look. The rotation order is part of our documented
+// convention (docs/reference-parameter-map.md), not an observation of the reference.
+Vec3 rotate_emission_axis(const Vec3& degrees) noexcept {
+    const double to_radians = kEmissionPi / 180.0;
+    const double cx = std::cos(degrees.x * to_radians), sx = std::sin(degrees.x * to_radians);
+    const double cy = std::cos(degrees.y * to_radians), sy = std::sin(degrees.y * to_radians);
+    const double cz = std::cos(degrees.z * to_radians), sz = std::sin(degrees.z * to_radians);
+    Vec3 axis{0.0, 1.0, 0.0};
+    axis = Vec3{axis.x, axis.y * cx - axis.z * sx, axis.y * sx + axis.z * cx};
+    axis = Vec3{axis.x * cy + axis.z * sy, axis.y, -axis.x * sy + axis.z * cy};
+    axis = Vec3{axis.x * cz - axis.y * sz, axis.x * sz + axis.y * cz, axis.z};
+    return axis;
+}
+
+// Uniform over the cone's solid angle: cos(theta) is uniform between cos(half) and 1, so
+// the density is even across the cap instead of clustering at the axis. A span of 180
+// degenerates to a whole-sphere sample, which is what `uniform` mode uses, and a span of
+// 0 collapses to the axis itself.
+Vec3 direction_in_cone(const Vec3& axis, double span_degrees, double u1, double u2) noexcept {
+    const double half = std::clamp(span_degrees, 0.0, 180.0) * 0.5;
+    // A half-angle of 90 degrees is only a hemisphere, so a full sphere is its own case:
+    // cos(theta) then spans [-1, 1] instead of [0, 1].
+    const double cos_min = span_degrees >= 180.0 ? -1.0 : std::cos(half * kEmissionPi / 180.0);
+    const double cos_theta = 1.0 - u1 * (1.0 - cos_min);
+    const double sin_theta = std::sqrt(std::max(0.0, 1.0 - cos_theta * cos_theta));
+    const double phi = u2 * 2.0 * kEmissionPi;
+    const Vec3 reference = std::abs(axis.y) < 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0};
+    const Vec3 right = normalize_direction(cross_direction(reference, axis));
+    const Vec3 up = cross_direction(axis, right);
+    const double ring_x = right.x * std::cos(phi) + up.x * std::sin(phi);
+    const double ring_y = right.y * std::cos(phi) + up.y * std::sin(phi);
+    const double ring_z = right.z * std::cos(phi) + up.z * std::sin(phi);
+    return Vec3{axis.x * cos_theta + ring_x * sin_theta,
+                axis.y * cos_theta + ring_y * sin_theta,
+                axis.z * cos_theta + ring_z * sin_theta};
+}
+
+Vec3 emission_direction(const Settings& values, std::uint64_t slot) noexcept {
+    const double span =
+        values.direction_mode == DirectionMode::uniform ? 180.0 : values.direction_span_degrees;
+    const double u1 = unit_value(values.seed, slot, RandomPurpose::direction_u1);
+    const double u2 = unit_value(values.seed, slot, RandomPurpose::direction_u2);
+    return direction_in_cone(rotate_emission_axis(values.emission_angles_degrees), span, u1, u2);
+}
+
 struct SlotRange {
     std::uint64_t first{0};
     std::uint64_t last{0};
@@ -192,6 +251,19 @@ Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings
         // leave, so a correctly computed sequence still looks frozen on playback.
         const Vec3 birth = birth_offset(values.emitter_shape, values.emitter_size, values.seed, slot);
         Vec3 particle_velocity = values.velocity;
+        // Emission direction model (M3-04): a per-particle direction on the cone (or the
+        // sphere) times the emitted speed. Independent streams keep every frame identical
+        // for the same requested time, like the rest of the random variation.
+        const double speed_jitter = values.emission_speed_random > 0.0
+            ? symmetric_value(values.seed, slot, RandomPurpose::emission_speed) * values.emission_speed_random
+            : 0.0;
+        const double particle_speed = values.emission_speed + speed_jitter;
+        if (particle_speed != 0.0) {
+            const Vec3 direction = emission_direction(values, slot);
+            particle_velocity.x += direction.x * particle_speed;
+            particle_velocity.y += direction.y * particle_speed;
+            particle_velocity.z += direction.z * particle_speed;
+        }
         if (values.velocity_spread > 0.0) {
             particle_velocity.x +=
                 symmetric_value(values.seed, slot, RandomPurpose::velocity_x) * values.velocity_spread;
