@@ -20,14 +20,16 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <OutDir>$(ProjectDir)..\artifacts\m1\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)..\artifacts\m1\obj\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)..\artifacts\plugin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\artifacts\plugin\obj\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>StarfieldParticle</TargetName><TargetExt>.aex</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level4</WarningLevel><TreatWarningAsError>false</TreatWarningAsError><SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- _CRT_SECURE_NO_WARNINGS: the May 2023 SDK's Param_Utils.h still uses strncpy,
+           which /sdl (SDLCheck) escalates to an error. Owned code does not use it. -->
+      <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\Win;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary><ExceptionHandling>Sync</ExceptionHandling>
     </ClCompile>
@@ -35,12 +37,28 @@
     <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><ImportLibrary>$(IntDir)StarfieldParticle.lib</ImportLibrary><TargetMachine>MachineX64</TargetMachine></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="EffectMain.cpp" />
+    <ClCompile Include="Parameters.cpp" />
+    <ClCompile Include="SmartRender.cpp" />
+    <ClCompile Include="WorldBridge.cpp" />
+    <ClCompile Include="..\src\core\CpuRenderer.cpp" />
+    <ClCompile Include="..\src\core\Geometry.cpp" />
+    <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
+    <ClCompile Include="..\src\core\Random.cpp" />
+    <ClCompile Include="..\src\core\Render.cpp" />
     <ClCompile Include="..\src\core\Settings.cpp" />
+    <ClCompile Include="..\src\core\Time.cpp" />
+    <!-- Outputs is required: without it MSBuild skips the custom build (MSB8018). The
+         incremental check only looks at the .r file unless the headers it includes are
+         declared through AdditionalInputs, which is exactly how a stale PiPL used to
+         reach the .aex and made AE reject it with "global outflags mismatch". BuildPiPL.ps1
+         additionally verifies the generated resource against the header values. -->
     <CustomBuild Include="StarfieldPiPL.r">
       <Message>Generating AE PiPL resource</Message>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\StarfieldPiPL.r"</Command>
       <Outputs>$(IntDir)StarfieldPiPL.rr;$(IntDir)StarfieldPiPL.rrc;$(IntDir)StarfieldPiPL.rc</Outputs>
+      <AdditionalInputs>$(MSBuildProjectDirectory)\PluginFlags.h;$(MSBuildProjectDirectory)\PluginVersion.h</AdditionalInputs>
     </CustomBuild>
     <ResourceCompile Include="$(IntDir)StarfieldPiPL.rc" />
   </ItemGroup>

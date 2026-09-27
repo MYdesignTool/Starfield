@@ -1,6 +1,6 @@
 # Contributing
 
-This repository is being prepared for Git-based parallel work. Keep each agent assignment on its own branch or worktree once Git is initialized, and use the task ID from `docs/agent-backlog.md` in the branch and commit subject.
+This repository uses Git for staged development. Keep each independent task on its own branch or worktree, and use the task ID from `docs/agent-backlog.md` in the branch and commit subject.
 
 ## Before editing
 
@@ -19,8 +19,14 @@ This repository is being prepared for Git-based parallel work. Keep each agent a
 
 - Build the AE module with `ae_plugin/BuildWindows.ps1`; local SDK files and all generated files are excluded by `.gitignore`.
 - CMake builds only the host-independent core.
-- Record host load/render/lifecycle evidence separately from compile results. The confirmed host result so far is that the M1 shell loads in AE 2023; the exact AE build and lifecycle behavior are still to be recorded.
+- Record host load/render/lifecycle evidence separately from compile results. AE 2023 confirmed load, controls, and rendering on an earlier M2 parameter revision; the current 13-control M3-01 build and lifecycle still need host qualification.
 
 ## Review
 
 Every change should name its task ID, summarize the contract affected, and list build or host evidence actually collected. Do not mark a roadmap gate complete based only on code being present.
+
+## License
+
+This project is released under the MIT license; the full text is in `LICENSE`. Contributions are accepted under the same terms (inbound = outbound), so do not contribute code you cannot license that way.
+
+The Adobe After Effects SDK is a local build input and is not redistributed here. Do not commit SDK headers, sample sources, PiPL binaries, plug-in binaries, or generated build artifacts. Any new runtime dependency must still record its exact version and license as required by the contracts section above.

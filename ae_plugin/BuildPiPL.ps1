@@ -28,3 +28,35 @@ finally {
     Pop-Location
 }
 if ($toolExitCode -ne 0) { throw "Adobe PiPL resource pipeline failed with exit code $toolExitCode" }
+
+# Guard against a stale PiPL resource. The custom build step tracks the .r file, not
+# the headers it includes, so a flags/version edit can silently leave an old PiPL in
+# the .aex; AE then rejects the plug-in with "global outflags mismatch". Compare the
+# generated resource against the single-source headers and fail loudly instead.
+$generatedRc = Join-Path $IntermediateDir 'StarfieldPiPL.rc'
+if (-not (Test-Path -LiteralPath $generatedRc)) { throw "PiPL pipeline did not produce $generatedRc" }
+
+$headerDir = Split-Path -Parent $ResourceSource
+$flagText = [System.IO.File]::ReadAllText((Join-Path $headerDir 'PluginFlags.h'))
+$versionText = [System.IO.File]::ReadAllText((Join-Path $headerDir 'PluginVersion.h'))
+$resourceText = [System.IO.File]::ReadAllText($generatedRc)
+
+foreach ($entry in @(
+        @{ Name = 'STARFIELD_OUT_FLAGS'; Text = $flagText; Source = 'PluginFlags.h' },
+        @{ Name = 'STARFIELD_OUT_FLAGS2'; Text = $flagText; Source = 'PluginFlags.h' },
+        @{ Name = 'STARFIELD_VERSION_PACKED'; Text = $versionText; Source = 'PluginVersion.h' })) {
+    $match = [regex]::Match($entry.Text, "#define\s+$($entry.Name)\s+(0x[0-9A-Fa-f]+|\d+)")
+    if (-not $match.Success) { throw "Could not read $($entry.Name) from $($entry.Source)" }
+
+    $literal = $match.Groups[1].Value
+    $value = if ($literal.StartsWith('0x')) {
+        [System.Convert]::ToUInt32($literal, 16)
+    }
+    else {
+        [System.Convert]::ToUInt32($literal)
+    }
+
+    if ($resourceText -notmatch "(?<![\d])$value\s*L") {
+        throw "Generated PiPL does not declare $($entry.Name) = $value ($literal). The PiPL resource is stale: delete the intermediate directory and rebuild."
+    }
+}

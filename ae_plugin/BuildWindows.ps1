@@ -23,7 +23,7 @@ try {
     $projectPath = Join-Path $drive 'ae_plugin\Starfield.vcxproj'
     $arguments = @($projectPath, '/t:Build', '/m', "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath")
     if ($ArtifactLabel) {
-        $artifactRoot = Join-Path $drive "artifacts\m1\$ArtifactLabel"
+        $artifactRoot = Join-Path $drive "artifacts\plugin\$ArtifactLabel"
         $outputDir = Join-Path $artifactRoot "$Platform\$Configuration"
         $intermediateDir = Join-Path $artifactRoot "obj\$Platform\$Configuration"
         $arguments += "/p:OutDir=$outputDir\"

@@ -2,12 +2,20 @@
 
 Planning baseline: 2026-09-27.
 
-## Current M0/M1 status
+## Current M0/M1/M2/M3-01 status
 
 - **M0 contract work is in place:** parameter manifest, sequence-format specification, build matrix, and ADRs for product identity, time, and pixels/alpha are checked in. The M1 shell uses the selected internal identity `org.starfieldfx.particle`.
-- **M1 implementation is in place:** native entry-point source, official PiPL pipeline, lifecycle dispatch, and legacy pass-through render are present. MFR, SmartFX, and float-color flags are not declared.
+- **M1 implementation is in place:** native entry-point source, official PiPL pipeline, lifecycle dispatch, and legacy pass-through render are present.
 - **M1 SDK builds succeed:** the same Windows x64 target builds with the supplied May 2023 SDK and current 26.5 SDK. Both builds export `EffectMain` and `PluginDataEntryFunction2`.
 - **M1 load smoke check passed:** the user confirmed the shell loads in AE 2023 after correcting PiPL stage encoding. The precise AE build is not recorded. Render pass-through, save/reopen, duplicate, undo/redo, and current-AE load remain unqualified.
+- **M2 code is complete and builds:** SmartFX transport, the parameter bridge, the deterministic point emitter, and the CPU sprite compositor are implemented; `docs/parameter-mapping.md` and ADR 0005 record the parameter and render contracts. The out-flags now advertise SmartFX and float-color awareness, and both SDK builds stay clean.
+- **M2 host qualification is partial (M2-06):** AE 2023 loaded an earlier eight-control build and showed a center sprite. A later eleven-control revision rendered nothing because of the emitter-origin conversion; that path was changed. The current thirteen-control M3-01 build has not yet been reloaded in AE. Exact host build, Options readout, bit depths, downsample, lifecycle, and cancellation remain unqualified. See `docs/compatibility-matrix.md`.
+- **M3-01 core implementation is complete:** seeded Point/Box/Sphere/Disc birth distributions and per-particle velocity spread are implemented and covered by the 3,757-check core suite. The current parameters remain flat AE controls pending graph persistence/evaluation; M3-01 host playback has not been confirmed.
+- **Known renderer gaps:** output is still white 2D sprites with constant size and opacity. Z does not affect projection, depth, or occlusion. Age curves, forces, color/texture sources, motion blur, mesh/volume rendering, and graph editing remain open. ROI narrowing is deferred to profiling.
+- **Static-review geometry finding resolved in code:** the old `host_render_layer_rect` helper assumed the SDK's downsample factor is a divisor, which the SDK documents inconsistently (the header says 1–999+, the `Resizer`/`PathMaster` samples treat it as a scale). That helper is gone; render geometry now comes from observed checked-out worlds plus `max_result_rect`, `ref_width/ref_height`, and `par`, carried through `pre_render_data` (ADR 0005), with a core test pinning the half-resolution mapping. Reduced-resolution renders still need host confirmation before being called supported.
+- **Default look updated (D-02, owner delegated):** velocity Y now defaults to 0.3 layer heights per second so a freshly applied instance shows a rising trail instead of one static dot. Defaults affect new instances only.
+- **Control surface reshaped by manifest revisions 2–3 (D-03/M3-01):** Velocity is three scalar sliders, `Emitter Origin` is a 3D point, and `Emitter Size`/`Velocity Spread` were appended. The current layout has thirteen user controls plus the implicit input. IDs remain pre-release and will freeze at the first shared release.
+- **PiPL/runtime flag drift fixed (D-04):** the build now declares `PluginFlags.h`/`PluginVersion.h` as `AdditionalInputs` for the PiPL step and fails when the generated resource disagrees with them. The earlier AE "global outflags mismatch" came from exactly that drift.
 
 ## Support and toolchain policy
 
@@ -31,16 +39,20 @@ Adobe's SDK guide recommends using the latest headers and checking compatibility
 - First-party core has no third-party runtime dependencies. Add a library only for a concrete feature, use a maintained release, pin its version/commit and license metadata, hide its symbols, and test interaction with AE's process-wide dependencies.
 - No private OpenGL context and no private thread pool in the first renderer. CPU is the deterministic reference; later GPU work must use documented AE GPU selectors/device APIs and have an explicit CPU fallback.
 
-### UI and panel policy
+### UI and panel policy (revised 2026-09-27 after owner direction)
 
-- MVP controls live in the native effect parameter UI. Implement the particle graph as parameters and effect-owned graph data before building a dockable panel.
-- Keep any future panel on a versioned message/data contract; it may not share in-process C++ object layouts with the renderer.
-- Do not start a new CEP panel. Adobe announced a phased CEP-to-UXP transition and an After Effects UXP public beta target of November 2026. Revisit a UXP panel after the AE beta/API is actually available and its capabilities are verified. Until then, the effect remains fully operable without a panel.
+The owner's product statement: **node-based editing is the essence of the reference product**. A flat parameter list with emitters and forces bolted on is not the product, and implementing the M3 feature families as flat parameters first would mean building them twice once the graph exists. That changes the sequencing, not the contracts.
+
+- **The graph is the parameter layer.** Nodes own ports, edges, and per-node parameters; the AE effect keeps a small number of top-level controls (for example enable/quality/preset) and stores the graph in sequence data. ADR 0005's `RenderRequest`, time, pixel, and error contracts stay as they are: the graph feeds the same host-independent boundary.
+- **Graph foundation comes before feature families.** Model, validation, bounded serialization, and evaluation order are host-independent and testable without AE, so they land first (`Wave G` in `docs/agent-backlog.md`). After that, emitters/forces/modifiers are implemented as node types rather than as new flat settings.
+- **The node editor must be a dockable panel; in-effect UI cannot host it.** Confirmed in the SDK: `PF_EffectCustomUISuite2` only hands out a Drawbot drawing reference (`PF_GetDrawingReference`) plus an overlay theme suite for stroking/filling paths and vertices. There is no widget toolkit, no text layout, no scrolling surface, so a graph editor there would mean hand-rolling text rendering and hit-testing. In-effect Drawbot UI stays reserved for *on-screen gizmos* (dragging the emitter, drawing velocity/force overlays in the comp window), which is exactly what the suite is designed for.
+- **Panel risk and mitigation.** Adobe is phasing CEP out in favour of UXP with an AE UXP public beta target of November 2026. The panel therefore stays a thin client over a **versioned message/data protocol** that never shares in-process C++ layouts with the renderer, exactly as the architecture already requires. If CEP must be replaced by UXP later, the protocol and the graph stay; only the view layer is rewritten.
+- **No silent scope change.** Building the panel now contradicts the earlier "do not start a CEP panel" line; that line is superseded by this section and the tradeoff (a possible future UXP port) is accepted deliberately.
 
 ## M0 architecture decisions now locked
 
 1. Product identity: `Starfield Particle`, category `Starfield FX`, match name `org.starfieldfx.particle`, and package ID `org.starfieldfx.aftereffects`; never reuse the old plug-in identity.
-2. Parameter contract: IDs 1–8 are reserved in `schema/parameters.json`; graph `NodeId`, `EdgeId`, and `ParamKey` remain separate identity domains.
+2. Parameter contract: the pre-release manifest currently assigns IDs 1–13; freeze them at the first shared release. Graph `NodeId`, `EdgeId`, and `ParamKey` remain separate identity domains.
 3. Sequence storage: schema 1 defines a bounded binary representation with magic, lengths, counts, CRC, and migration rules in `schema/sequence-format.md`.
 4. Time model: comp time and frame duration remain signed integer rationals; negative time, subframes, shutter samples, seed derivation, and particle ordering must stay deterministic.
 5. Render semantics: canonical coordinates, pixel aspect/downsample, ROI, 8/16/32-bpc conversion, color space, and premultiplied-alpha handling are recorded in ADR 0003. Behavior for source-independent output remains to be confirmed against the reference.
@@ -70,7 +82,7 @@ Implement and review the smallest lifecycle surface first:
 4. `RENDER`: pass through the source using AE's documented copy callback. Replace this transitional path with SmartFX in M2 after the SDK sample build and resource ownership pattern are confirmed.
 5. `GLOBAL_SETDOWN`, error boundary: release all global resources, catch all C++ exceptions at the entry point, and map unknown exceptions to a controlled AE error.
 
-M1 uses legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 replaces it with SmartFX. Do not add `PF_OutFlag2_SUPPORTS_THREADED_RENDERING` until M6 passes.
+M1 used legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 has replaced it with SmartFX: the effect now declares `PF_OutFlag2_SUPPORTS_SMART_RENDER` and `PF_OutFlag2_FLOAT_COLOR_AWARE` and implements `PF_Cmd_SMART_PRE_RENDER`/`PF_Cmd_SMART_RENDER`. The legacy render entry point remains only as a documented non-smart-host fallback. Do not add `PF_OutFlag2_SUPPORTS_THREADED_RENDERING` until M6 passes.
 
 ## Compatibility and quality gates
 
@@ -84,7 +96,15 @@ M1 uses legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 rep
 
 ## Immediate next work
 
-The first agent wave is M2 contract hardening plus AE parameter registration; these work on separate files. Deterministic point simulation and the CPU compositor follow the render contract. SmartFX integration follows once those interfaces are stable. See the task cards in `agent-backlog.md`.
+1. **Requalify the current M3-01 build in AE 2023.** The existing host evidence is from older control revisions; use the Options readout at t ≥ 1 s, then test playback and Full/Half/Quarter resolution.
+2. **Continue Wave G (graph foundation)** from `docs/agent-backlog.md`: identity/validation contract, bounded sequence serialization, and evaluation parity with today's seeded emitters. This is ahead of the remaining feature families because the graph is the product's editing model.
+3. **Finish M2-06 host checks** (bit depths, lifecycle, cancellation, source compositing) against the current build and record what was actually exercised.
+4. **Move remaining behaviors onto nodes** once Wave G exists: age curves, size/opacity, forces, textures, depth, and rendering families; build the editor as a thin client over the versioned protocol.
+5. **Deferred deliberately:** analytic ROI narrowing, Compute Cache, MFR, and GPU stay on their milestone cards.
+
+## Sequencing note (owner direction, 2026-09-27)
+
+The milestone table above was written before the owner restated that node-based editing is the product's core value. M3 and M4 swap priority: the graph model, serialization, and evaluation (**M4-01/02/03**, extended into **Wave G**) come before the M3 feature families, which are then implemented as node types. M5 feature families, M6 MFR, M7 GPU, and M8 packaging are unchanged. Nothing in the M0 contracts (IDs, time, pixels, version, match name) is invalidated by this re-ordering.
 
 ## Sources checked on 2026-09-27
 

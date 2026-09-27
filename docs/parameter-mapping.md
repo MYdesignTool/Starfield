@@ -1,0 +1,164 @@
+# Parameter bridge: schema → AE control → core settings
+
+Task: M2-02, revised by manifest revision 3. `schema/parameters.json` owns the IDs,
+labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
+the conversion; the core only ever sees `starfield::core::Settings` after
+`validate_settings`.
+
+## Manifest revisions 2–3 (pre-release, 2026-09-27)
+
+Revision 2 reshaped the controls after host feedback:
+
+- The single 3D-point **Velocity** row is gone. Velocity is three scalar sliders, because a
+  point control is a *position* control in AE (it draws a coordinate/pick widget, which is
+  wrong for a direction and rate).
+- **Emitter Origin** was added as a 3D point control, which is what AE point controls are
+  for: it is a position, and AE provides on-screen picking for it.
+- Emitter and velocity units are layer heights and layer heights per second.
+- Revision 3 added `Emitter Size` and `Velocity Spread`, allowing seeded shape sampling and per-particle velocity variation.
+
+No release has been published, so IDs are still being shaped here; they freeze at the first
+shared release (ADR 0001). The old 3D-point Velocity stored a different value type, so a
+project saved with revision 1 must be re-authored rather than migrated.
+
+## Mapping table
+
+| ID | key | AE control | core field | units and notes |
+|---|---|---|---|---|
+| 1 | `particle_count` | Float Slider, INTEGER, 0…2000000, default 1000 | `Settings::particle_count` | Maximum simultaneously live particles. Rounded, then bounded by `kMaxParticleCount`. |
+| 2 | `birth_rate` | Float Slider, HUNDREDTHS, 0…1000000, default 30 | `Settings::birth_rate` | Births per second on the effect clock. |
+| 3 | `seed` | Float Slider, INTEGER, 0…2147483647, default 1 | `Settings::seed` | Seeds each particle's independent shape and velocity streams. |
+| 4 | `particle_lifetime` | Float Slider, THOUSANDTHS, 0…1000000, default 2 | `Settings::particle_lifetime_seconds` | Seconds, half-open: a particle is gone once `age == lifetime`. |
+| 5 | `emitter_shape` | Popup, 4 choices, default Point (AE value 1) | `Settings::emitter_shape` | AE popup values are one-based; index = value − 1 → 0-based `EmitterShape`. Point, Box, Sphere, and Disc have distinct seeded birth distributions. |
+| 6 | `emitter_origin` | 3D Point, default (50, 50, 50) | `Settings::emitter_origin` | Position control with comp-view picking. Host value conversion is documented under "Emitter Origin semantics" below. |
+| 7 | `velocity_x` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0 | `Settings::velocity.x` | Layer heights per second, positive right. |
+| 8 | `velocity_y` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0.3 | `Settings::velocity.y` | Layer heights per second, positive up. The non-zero default keeps a fresh instance visibly alive. |
+| 9 | `velocity_z` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0 | `Settings::velocity.z` | Layer heights per second, positive toward the viewer. Reserved for depth; the 2D compositor ignores it. |
+| 10 | `particle_size` | Float Slider, HUNDREDTHS, 0…100000, default 8 | `Settings::particle_size` | Sprite diameter in full-resolution layer pixels. 0 renders nothing. |
+| 11 | `opacity` | Float Slider, THOUSANDTHS, 0…1, default 1 | `Settings::opacity` | Peak alpha at the sprite centre. |
+| 12 | `emitter_size` | Float Slider, THOUSANDTHS, 0…10 (slider 0…1), default 0.05 | `Settings::emitter_size` | Cube edge for Box, diameter for Sphere/Disc, in layer heights. Ignored by Point. |
+| 13 | `velocity_spread` | Float Slider, HUNDREDTHS, 0…100 (slider 0…1), default 0.15 | `Settings::velocity_spread` | Per-axis uniform jitter added to each particle's velocity, in layer heights per second. This is what makes a steady emitter animate (see below) and what gives `seed` a visible effect. |
+
+IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13)
+sit after Opacity until M3-03 adds AE parameter groups. Parameter index 0 is AE's implicit input
+layer, so the effect registers 14 parameters: one input plus the thirteen manifest rows.
+
+## Emitter distributions and per-particle variation (M3-01)
+
+Each particle's birth offset is drawn from `emitter_shape` within `emitter_size`
+(`core::Random.hpp`, stream purposes `position_x/y/z`):
+
+| Shape | Distribution |
+|---|---|
+| Point | exactly at `emitter_origin` |
+| Box | uniform inside a cube of `emitter_size` edge length, centred on the origin |
+| Sphere | uniform inside a sphere of `emitter_size` diameter (cube-root radius, isotropic direction) |
+| Disc | uniform over a disc of `emitter_size` diameter in the emitter plane (square-root radius) |
+
+Each particle also gets an independent velocity jitter of ±`velocity_spread` per axis (purposes
+`velocity_x/y/z`), applied once at birth and kept for the particle's whole life. M3-01 remains a
+2D sprite renderer: Z affects the evaluated particle state but does not yet affect depth or
+occlusion.
+
+**Why this exists — the frozen steady state.** With identical particles, a continuously emitting
+trail looks motionless on playback even though every frame is computed correctly: births keep
+replacing the particles that leave, so the covered span and spacing stay constant. The internal
+particles do move, but the picture does not. Per-particle variation breaks that symmetry, and the
+same mechanism finally makes `seed` observable: a different seed re-rolls the offsets, velocities,
+and therefore the pixels.
+
+## Emitter Origin semantics
+
+AE point controls deliver **absolute layer pixels** in destination-layer space: the origin is the
+layer's top-left, x grows right and y grows down (AE C++ SDK guide, "Parameters"; the same source
+notes AE corrects the value for origin shifts introduced by upstream effects). Only the *default*
+follows the older percentage convention — the `PF_Point3DDef` header comment says to "use 50 for
+halfway" — so the registered default (50, 50, 50) means "layer centre".
+
+Revision 1 of this bridge treated the delivered value as a percentage, which pushed the emitter
+several layer heights off-canvas at the default "centre" and made the effect render nothing at
+all. The conversion now normalizes to layer pixels first and then to the canonical world space
+(ADR 0003):
+
+```text
+px      = host_point_component_to_layer_pixels(raw, layer_extent)
+world.x = (px.x / layer_width - 0.5) * (layer_width * par / layer_height)
+world.y = 0.5 - px.y / layer_height
+world.z = px.z / layer_height - 0.5
+```
+
+The normalization ladder exists because the SDK describes point values inconsistently; it prefers
+the documented reading and only falls back when a value cannot be a pixel position:
+
+| Raw magnitude | Interpretation | Why |
+|---|---|---|
+| ≤ 4 × layer extent | layer pixels (documented delivery) | Plausible pixel positions, including the converted default |
+| > 4 × layer extent | legacy percentage: `raw / 100 × layer_extent` | On a small layer a "50" cannot be a pixel position |
+| > 1e5 | fixed-point scaled: `raw / 65536` first | Percent × 65536, i.e. what a `PF_Fixed` delivery looks like |
+
+The Options readout prints the raw host value, the interpreted pixels, and the resulting world
+position, so the host's real behaviour can be recorded rather than guessed. **The ladder is a
+compatibility shim:** once a host pass confirms which delivery AE actually uses, delete the unused
+branches and reduce this section to the confirmed fact.
+
+`emitter_origin` is clamped to ±`kMaxEmitterOffset` (100 layer heights) by `validate_settings`, and
+velocities are clamped to ±`kMaxVelocity` (1000 layer heights per second); both raise a
+`ValidationNotice`.
+
+## Popup reconciliation
+
+`PF_ADD_POPUP` values run 1…num_choices while `EmitterShape` is zero-based, so the adapter maps
+`EmitterShape = value - 1` through `core::emitter_shape_from_index()`, which also collapses
+out-of-range values onto `point`. The manifest's `default: 1` means "Point, the first entry".
+
+## Deterministic emission rules (M2)
+
+- The particle clock is anchored at host time 0: negative comp time renders nothing, and at
+  exactly t = 0 only slot 0 exists. A "no visible motion" report at comp start is expected
+  behaviour, not a defect.
+- Slot `k` is born at `k / birth_rate` seconds; a slot whose age equals the lifetime is gone.
+- At most `particle_count` slots are alive at once. When the cap is exceeded the **newest**
+  slots survive, so ids stay ascending and the ordering is reproducible.
+- Position is closed form: `origin + velocity * age`. Any absolute time can be evaluated
+  without stepping, so out-of-order and repeated requests agree (ADR 0002).
+
+## Options readout (diagnostic)
+
+The effect sets `PF_OutFlag_I_DO_DIALOG`, so AE shows an `Options` button. Clicking it runs a
+read-only readout (`ae_plugin/Diagnostics.cpp`) that prints exactly what the code receives:
+
+```text
+Starfield 0.1.0 M3-01 readout
+layer 1920x1080 ds 1/1 par 1/1
+t 1.000s live 59
+cnt 1000 rate 30.00 seed 1 life 2.000
+shape 0 esize 0.050 vspread 0.15
+size 8.00 notices 0
+origin host 960,540,540 px 960,540,540
+origin world 0.000,0.000,0.000 vel 0.00,0.30,0.00
+```
+
+- `t`: comp time in seconds at the playhead; `live`: particles the simulation produces for it.
+- `origin host` / `px`: the raw host value and the layer pixels it was interpreted as. In this
+  example AE delivered the center in pixels. If raw values are 50/50/50, the current shim keeps
+  them as pixels; that would not be a centered emitter on a 1920×1080 layer, so record the
+  Options output and resolve the unit behavior before changing the shim.
+- `ds` is reported for context only; render geometry never uses it (ADR 0005).
+
+## Motion or position looks wrong: triage
+
+| Readout | Meaning | Next step |
+|---|---|---|
+| `t 0.000s live 1` | Comp start. Only slot 0 exists by construction | Scrub to t ≥ 1 s, or raise Birth Rate |
+| `origin px` far outside the layer | Point-unit mismatch | Compare `host` and `px` from the readout against the ladder above and record the host's real delivery in `docs/compatibility-matrix.md` |
+| `vel` non-zero but the picture is static | Mapping or compositing ignored the position | Reproduce in `tests/core_tests.cpp`, which pins the origin offset, the point conversion, and the half-resolution mapping |
+| `layer 0x0` | Host geometry was not available | The render phase refuses to guess and reports `internal_failure` |
+
+## Validation chain
+
+1. The adapter converts host doubles without clamping, so non-finite host values reach the
+   validator; counts and seeds are integral and are bounded in the adapter itself.
+2. `core::validate_settings` replaces non-finite values with documented defaults and clamps
+   every field to the manifest range, recording `ValidationNotice` entries.
+3. The renderer enforces frame geometry, allocation, and bounded-work limits and returns typed
+   errors instead of blocking the host.

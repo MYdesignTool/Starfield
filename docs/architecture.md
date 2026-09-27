@@ -52,14 +52,20 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 
 ## Initial source layout
 
-- `include/starfield/core/Settings.hpp`: stable internal IDs and validated settings types.
-- `include/starfield/core/Render.hpp`: host-independent time/frame/render request and backend contract.
-- `src/core/Settings.cpp`: bounded, finite-value validation.
-- `ae_plugin/`: native SDK adapter, PiPL resource, Windows MSBuild project, and reproducible PiPL build scripts.
+- `include/starfield/core/Settings.hpp`: stable internal IDs, manifest bounds, and validated settings types.
+- `include/starfield/core/Error.hpp`: typed error codes and the `Result` primitive shared by the core.
+- `include/starfield/core/Time.hpp`: normalized signed rational time with checked arithmetic.
+- `include/starfield/core/Render.hpp`: host-independent frame/request/output/backend contract and the cancellation interface.
+- `include/starfield/core/ParticleSimulation.hpp`: deterministic point-emitter evaluation for one absolute time.
+- `include/starfield/core/CpuRenderer.hpp`: the CPU reference backend and its bounded-work limits.
+- `src/core/`: implementations of the above plus bounded, finite-value settings validation.
+- `tests/core_tests.cpp`: host-independent self-tests for the M2 contracts.
+- `ae_plugin/`: native SDK adapter, PiPL resource, Windows MSBuild project, and reproducible PiPL build scripts (see `ae_plugin/README.md`).
+- `docs/parameter-mapping.md`: schema row → AE control → core field table and the emission rules.
 - `docs/compatibility-matrix.md`: behavior inventory and independently derived acceptance criteria.
 - `docs/adr/`: decisions that affect saved projects or rendering semantics.
 
-The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against local SDK 26.5 by default; the supplied May 2023 SDK is retained as an API compatibility build. The M1 shell does not claim SmartFX, floating-point color, or MFR support. Do not set those flags in PiPL or the adapter before implementing and qualifying the corresponding selector paths.
+The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against local SDK 26.5 by default; the supplied May 2023 SDK is retained as an API compatibility build. M2 now implements the SmartFX selectors and advertises SmartFX and float-color awareness; neither host behavior has completed qualification. MFR is not advertised and remains gated on a later thread-safety audit.
 
 ## SDK guidance used
 
@@ -72,12 +78,12 @@ The CMake build compiles only the portable core. The AE module is built by the W
 ## Delivery sequence
 
 1. **Complete:** select AE 2023 as the minimum, pin the local SDK/toolchain pair, and build/load the M1 shell.
-2. Register parameters from the stable manifest and finalize the time/render request contract.
-3. Add SmartFX checkout, ROI, pixel-format adapters, and a deterministic CPU point-emitter renderer.
+2. **Complete:** register parameters from the stable manifest and finalize the time/render request contract.
+3. **Complete in code, host qualification open:** SmartFX checkout, ROI, pixel-format adapters, and a deterministic CPU point-emitter renderer. See the M2-06 checklist in `compatibility-matrix.md`.
 4. Add remaining emitters and particle controls as independent behavior tasks.
 5. Add graph types, bounded sequence migration, and presets.
 6. Add Compute Cache, MFR, and an optional GPU backend only after the serial CPU contract is stable. Defer a panel until a validated workflow needs one.
 
 ## Current scope
 
-M0 contracts and the M1 loadable shell are present. The user confirmed that the shell loads in AE 2023; it currently exposes no particle controls and only passes the source through. AE SDK 26.5 is the primary build input, with the supplied May 2023 SDK as a baseline compile. The implementation roadmap begins with the M2 render contract, parameter bridge, and deterministic CPU vertical slice.
+M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, and M3-01 seeded emitter distributions are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. The node graph, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, panel, MFR, and GPU remain future milestones.

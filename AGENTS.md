@@ -14,7 +14,7 @@
 - AE SDK types, suites, handles, and pixel-world pointers stay inside `ae_plugin/`. Core code must not depend on AE headers or host lifetime.
 - Do not change a released AE parameter ID, effect match name, packed plug-in version contract, or sequence schema without an explicit migration plan and an ADR update.
 - PiPL declarations and values returned by `PF_Cmd_GLOBAL_SETUP` must agree. `PluginVersion.h` has a compile-time check for code/PiPL version packing.
-- Do not advertise SmartFX, float-color, GPU, or MFR support until the matching selector path is implemented and qualified. The current M1 shell only passes through its input.
+- Implement every advertised selector before setting its PiPL/runtime flag; do not claim a host supported until the selector and format have been exercised in that AE build. SmartFX and float-color paths are implemented in M2; MFR, GPU, and Compute Cache remain disabled.
 
 ## Agent workflow
 
@@ -26,6 +26,6 @@
 
 ## Current checkpoint
 
-- M0 architecture/schema contracts are recorded.
-- M1 `.aex` builds with the May 2023 SDK and AE SDK 26.5; the user has confirmed the shell loads in AE 2023. It still has no particle controls or particle rendering.
-- Next work starts with the M2 cards in `docs/agent-backlog.md`.
+- M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, and M3-01 seeded emitter distributions are in the tree.
+- Core self-tests pass; Windows x64 builds pass with the May 2023 SDK and AE SDK 26.5. AE 2023 load/render evidence applies to an earlier M2 parameter revision; the current 13-control M3-01 build still needs host qualification.
+- The graph foundation is the next product milestone; see Wave G in `docs/agent-backlog.md`.
