@@ -19,6 +19,17 @@ Use this file to turn observed behavior into requirements before implementing ea
 | M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
 
+### Fixed suspect: the plug-in freed a host-owned handle
+
+`capture_controls` and the Node Graph sync path replaced the graph parameter's value and then
+disposed the handle they replaced. Parameter values belong to the host: AE frees the value it
+replaced once the change is committed, so freeing it a second time corrupts the handle table and
+makes AE abort later — on a thread that no longer holds any plug-in frame, which is exactly what the
+dump shows (`0x40000015`, crash handler thread, no `StarfieldParticle.aex` return address). Both paths
+now hand the new handle to the parameter and leave the old one to the host, and the sync path refuses
+to touch a parameter array that is not fully registered and type-correct (apply/undo can deliver a
+partially built array). The adapter suite pins the new ownership rule.
+
 ## Crash triage (apply-time fatal exit, 2026-09-27)
 
 Ordered experiments; record each result here before moving on. Do not "fix" anything before the

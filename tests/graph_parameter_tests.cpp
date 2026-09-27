@@ -254,7 +254,10 @@ void test_parameters(PF_InData& host) {
     CHECK(parameters[14].u.arb_d.value == previous && parameters[15].u.pd.value == kLegacyControlSource);
     CHECK(checked_out.empty());
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
-    CHECK(!handles.contains(previous)); CHECK(parameters[15].u.pd.value == kNodeControlSource);
+    // The replaced handle must stay alive: it belongs to the host, which disposes the
+    // value it replaced once the parameter change is committed. Disposing it here as
+    // well frees a host-owned handle and makes AE abort later.
+    CHECK(handles.contains(previous)); CHECK(parameters[15].u.pd.value == kNodeControlSource);
     CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
     CHECK((parameters[15].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
     CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == legacy.value());
@@ -268,6 +271,7 @@ void test_parameters(PF_InData& host) {
     CHECK(checkout_render_graph(&host, &output, snapshot) != PF_Err_NONE);
     CHECK(!snapshot && checked_out.empty()); fail_checkout = -1;
     dispose(parameters[14].u.arb_d.value);
+    dispose(previous); // replaced by capture; in AE the host owns and frees it
     dispose(registered[13].u.arb_d.dephault);
 }
 
@@ -292,7 +296,7 @@ void test_supervision(PF_InData& host) {
     parameters[kGravityYId].u.fs_d.value = -0.5;
     CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
     CHECK(parameters[14].u.arb_d.value != previous);
-    CHECK(!handles.contains(previous));
+    CHECK(handles.contains(previous)); // host-owned replaced value, not ours to free
     CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
     const auto after = handles.at(parameters[14].u.arb_d.value)->bytes;
     CHECK(after != before);
@@ -335,6 +339,7 @@ void test_supervision(PF_InData& host) {
     CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
 
     dispose(parameters[14].u.arb_d.value);
+    dispose(previous); // replaced by the supervised rewrite
     parameters[14].u.arb_d.value = nullptr;
 }
 } // namespace

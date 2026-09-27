@@ -477,12 +477,14 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         // All fallible work precedes mutation. The editable parameter value is a
         // host-provided copy; its old handle is replaced, never a render checkout.
         auto& target = *params[kGraphParameterId];
-        const auto old = target.u.arb_d.value;
         target.u.arb_d.value = replacement;
         target.uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
         params[kControlSourceId]->u.pd.value = kNodeControlSource;
         params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
-        if (old) in_data->utils->host_dispose_handle(old);
+        // The replaced handle is NOT disposed here: parameter state belongs to the host,
+        // which disposes the value it replaced once the change is committed. Disposing it
+        // ourselves frees a host-owned handle, corrupts the handle table and makes AE
+        // abort later, on a thread that no longer has any of our frames.
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
@@ -496,15 +498,23 @@ namespace {
 // the delivered array is the authoritative source here. All fallible work happens
 // before the graph parameter is replaced.
 PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[]) noexcept {
-    if (!params[kGraphParameterId] || !params[kControlSourceId]) return PF_Err_BAD_CALLBACK_PARAM;
+    if (!params[kGraphParameterId] || !params[kControlSourceId]) return PF_Err_NONE;
     if (params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
-        params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
+        params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_NONE;
     if (params[kControlSourceId]->u.pd.value != kNodeControlSource) return PF_Err_NONE; // AE Controls mode
+    if (params[kGraphParameterId]->u.arb_d.value == nullptr) return PF_Err_NONE; // not created yet
+
+    // The delivered array is only trusted as far as the registered parameter count and
+    // each entry's declared type agree. A partially built array (apply, undo, panic
+    // restore) must be skipped, not dereferenced: reading a stale pointer here is what
+    // turns a host-side callback into an access violation inside the plug-in.
+    const A_long registered = static_cast<A_long>(kTotalEffectParameterCount) + 1;
+    if (in_data->num_params > 0 && in_data->num_params < registered) return PF_Err_NONE;
 
     const PF_ParamDef* defs[kEffectParameterCount]{};
     for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
         const PF_ParamDef* def = params[kParameterIndices[i]];
-        if (!def) return PF_Err_BAD_CALLBACK_PARAM;
+        if (!def || def->param_type != kParameterTypes[i]) return PF_Err_NONE;
         defs[i] = def;
     }
 
@@ -514,11 +524,9 @@ PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_Par
     PF_ArbitraryH replacement = nullptr;
     const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
     if (created != PF_Err_NONE) return created;
-    auto& target = *params[kGraphParameterId];
-    const auto old = target.u.arb_d.value;
-    target.u.arb_d.value = replacement;
-    target.uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
-    if (old) in_data->utils->host_dispose_handle(old);
+    // Same ownership rule as capture_controls: the host disposes the value we replaced.
+    params[kGraphParameterId]->u.arb_d.value = replacement;
+    params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
     return PF_Err_NONE;
 }
 
