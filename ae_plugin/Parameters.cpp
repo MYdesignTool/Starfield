@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <new>
 
 namespace starfield::adapter {
@@ -414,6 +415,16 @@ PF_Err graph_error(PF_OutData* out, const core::CoreError& error) noexcept {
 }
 } // namespace
 
+bool flat_render_override_active() noexcept {
+    // Diagnostic escape hatch for host triage. With STARFIELD_FLAT_RENDER=1 the render
+    // samples the flat AE controls instead of the stored graph, so a host-side surprise
+    // can be bisected between the graph path and the flat path without a rebuild.
+    // Normal runs are unaffected, the value is never persisted, and the Options readout
+    // prints whether the override is active.
+    const char* value = std::getenv("STARFIELD_FLAT_RENDER");
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+}
+
 PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                              std::shared_ptr<const core::Graph>& graph,
                              A_long* control_source) noexcept {
@@ -425,7 +436,7 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
         PF_Err err = source.checkout(kControlSourceId);
         if (err != PF_Err_NONE) return err;
         if (source.value.param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
-        if (source.value.u.pd.value == kLegacyControlSource) {
+        if (source.value.u.pd.value == kLegacyControlSource || flat_render_override_active()) {
             ScopedParameterCheckin legacy(in_data);
             err = legacy.snapshot().checkout(in_data);
             if (err != PF_Err_NONE) return err;

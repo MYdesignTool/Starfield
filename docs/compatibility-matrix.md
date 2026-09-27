@@ -9,6 +9,7 @@ Use this file to turn observed behavior into requirements before implementing ea
 | M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass | Effect loads; render pass-through, add/remove, save/reopen, duplicate, and undo/redo still unrecorded |
 | M1 discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Current build must be qualified separately |
 | Build-2 graph render/persistence | AE 2023, exact build not recorded | Not checked | Current AE 2023 target binary has not been loaded; test graph source, save/reopen, duplication and undo/redo |
+| Apply-time crash | AE 2023 installed at `D:\Software\Adobe\Adobe After Effects 2023`; plug-in build `0x8002` (24 parameters, `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, 21:19) | **Open: crashed once while applying the effect** | Dump `5f8321e1-3dac-4b7e-b3b7-4fa60b9b283b.dmp` (2026-09-27 21:35). Exception `0x40000015` (fatal app exit, not an access violation), raised on a thread whose stack carries `sentry_crashpad.dll` (Adobe crash handler) and NVIDIA OpenGL/D3D12 frames; scanning the captured stacks found no return address inside `StarfieldParticle.aex`, so the fatal exit did not happen under our own frame. The dump also shows the reference `Stardust_panel.aex` and Adobe plug-ins loaded, and our PDB path. Mitigations in the same commit: the Options readout now refuses to check out parameters without a render context, and `STARFIELD_FLAT_RENDER=1` bisects the graph render path against the flat path. Next steps are listed under "Crash triage" below. |
 | M2 particle render | AE 2023; exact build not recorded | Partial, old revision only | The eight-control build loaded and rendered a center sprite. A later eleven-control revision rendered nothing after adding Emitter Origin. The conversion was rewritten; the current 24-parameter build has not been checked in AE. |
 | M3-01 shapes and playback | AE 2023; exact build not recorded | Core implementation only | Install the current build and confirm at t ≥ 1 s with the graph-aware Options readout |
 | M3-02 force/appearance | AE 2023; exact build not recorded | Core implementation only | Gravity, drag, color and the size/opacity age curves have core + control coverage (IDs 17-24). Confirm visible change: with defaults the picture must be unchanged, then set Gravity Y = -2 and Size End = 1 and re-render. |
@@ -17,6 +18,27 @@ Use this file to turn observed behavior into requirements before implementing ea
 | M2 point-control units | Any host | Fixed in code, unverified in a host | Documented delivery is absolute layer pixels; the adapter normalizes through a ladder (pixels / legacy percentage / fixed-point) and the Options readout prints host values, interpreted pixels, and world position so the real delivery can be recorded |
 | M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
+
+## Crash triage (apply-time fatal exit, 2026-09-27)
+
+Ordered experiments; record each result here before moving on. Do not "fix" anything before the
+bisection says which layer is involved.
+
+1. **Renderer and depth:** Project Settings > Video Rendering and Effects > **Mercury Software Only**,
+   and an **8-bpc** composition. Apply the effect. A crash that disappears here points at AE's
+   GPU/float compositing path, not at our renderer.
+2. **Graph vs flat:** set the environment variable `STARFIELD_FLAT_RENDER=1` (close AE first;
+   `setx STARFIELD_FLAT_RENDER 1`), restart AE, apply again. The Options readout prints
+   `STARFIELD_FLAT_RENDER override: rendering flat controls` when it is active. This bypasses the
+   stored graph and the arbitrary-data parameter during rendering.
+3. **Isolate the plug-in:** move `StarfieldParticle.aex` out of the plug-ins folder and confirm AE
+   applies other effects normally. Then put it back and apply it to a **new comp with one solid
+   layer** (no other effects, 8-bpc, software-only).
+4. **Record what AE says:** any error dialog text, and whether the crash happens on *apply*, on the
+   *first preview frame*, or only when the ECW is opened.
+5. **Capture:** with `STARFIELD_FLAT_RENDER=1` still set, reproduce and keep the new `.dmp` plus the
+   exact AE build from Help > About. Our `.pdb` ships next to the `.aex` in `artifacts/`, so the next
+   dump that contains a plug-in frame can be symbolized.
 
 ## M2-06 host smoke checklist
 

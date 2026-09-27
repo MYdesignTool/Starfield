@@ -52,8 +52,22 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         return PF_Err_BAD_CALLBACK_PARAM;
     }
 
-    out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
     MessageWriter writer(out_data);
+
+    // PF_Cmd_DO_DIALOG can arrive without a render context: the SDK documents it as
+    // "after SEQUENCE_SETUP", and PF_OutFlag_SEND_DO_DIALOG can request it once when
+    // the effect is applied. Parameter checkouts and the graph are only meaningful
+    // while a frame is being rendered, so a weak context reports the always-valid
+    // host fields and never touches parameter handles.
+    const bool render_context = in_data->width > 0 && in_data->height > 0 && in_data->time_scale > 0 &&
+                                in_data->inter.checkout_param != nullptr && in_data->inter.checkin_param != nullptr;
+    if (!render_context) {
+        writer.line("Starfield 0.1.0: no render context yet (apply/sequence setup); open a comp and render a frame, "
+                    "then press Options\n");
+        return PF_Err_NONE;
+    }
+
+    out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
     writer.line("Starfield 0.1.0 graph readout\n");
 
     A_long control_source = -1;
@@ -75,6 +89,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
     writer.line(control_source == kLegacyControlSource
         ? "AE Controls (driving render)\n" : "AE Controls (inactive in Node Graph mode)\n");
+    if (flat_render_override_active()) {
+        writer.line("STARFIELD_FLAT_RENDER override: rendering flat controls\n");
+    }
 
     // Raw host fields. The render grid is derived in the render phase from the world
     // the host hands over (ADR 0005); the downsample factor is reported for context

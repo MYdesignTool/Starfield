@@ -54,6 +54,12 @@ inline constexpr A_long kLastEffectParameterId = kOpacityEndId;
 // reports the resulting parameter count. Returns the host error unchanged.
 [[nodiscard]] PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept;
 
+// Diagnostic only: true when STARFIELD_FLAT_RENDER=1 (non-zero) is set in the host
+// environment, which makes the render sample the flat AE controls instead of the stored
+// graph. Used to bisect a host-side surprise between the graph and flat render paths;
+// it never persists and the Options readout reports it.
+[[nodiscard]] bool flat_render_override_active() noexcept;
+
 // Host-scoped parameter snapshot. Values are checked out with PF_CHECKOUT_PARAM,
 // converted into core units, and never outlive checkin(). The snapshot is
 // copy-disabled so a checkout cannot be duplicated without a matching checkin.
