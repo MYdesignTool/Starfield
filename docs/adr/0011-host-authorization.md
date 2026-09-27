@@ -45,9 +45,26 @@ ERROR Signature verification failed for extension Atom
 Unsigned extensions load only while `PlayerDebugMode=1` is set, so removing it silently disabled every
 unsigned panel the owner used. The recovery was to restore the key and the renamed folder.
 
+## Rule for the repository's own scripts
+
+Owner instruction, 2026-09-28: *"写命令可以，但绝对不可以在命令里面改什么奇怪的注册表."*
+
+- **No script in this repository writes the registry**, in any direction, for any reason. Reading a
+  value for a report is allowed and must be labelled read-only.
+- The scripts that used to do it were fixed: `cep_panel/Install.ps1` no longer sets or clears
+  `PlayerDebugMode` (the switch that did it is gone), and `tools/cleanup_host_traces.ps1` is a
+  report by default whose every action needs an explicit switch.
+- Host-wide switches in general are the owner's to set by hand. A script that sets one for them is how
+  the owner's other panels stopped loading in the first place.
+- Scripts here default to reporting. When they do act, they take one explicit switch per action, they
+  name the exact file they touch, and they keep what they replace (`artifacts/disabled/`) rather than
+  deleting it.
+
 ## Consequence for this project's work
 
 Panel and host-integration work stays **frozen** until the owner asks for it. Plugin work inside the
 repository (core, adapter, schema, docs, tests) continues normally and needs no host authorization,
 because it changes no host state. When host qualification is needed, the agent writes the checklist and
-lets the owner run it.
+lets the owner run it. Installing or updating the plug-in and the panel is authorized per action, with
+the exact commands listed first; the install scripts resolve their own paths and print what they
+replaced.

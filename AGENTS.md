@@ -7,6 +7,7 @@
 - Recreate user-visible behavior through independent implementations. Do not copy decompiled implementation code, old plug-in binaries, resources, or private identities into this project.
 - The Adobe SDK is a local build input under `AdobeSDK/` and is intentionally Git-ignored. Do not vendor SDK headers, PiPL tools, sample sources, or build outputs.
 - **Nothing outside this checkout changes without explicit, per-action authorization** (ADR 0011): Windows registry keys, Adobe per-user folders and caches, the After Effects and plug-in folders, environment variables a host process reads, starting or stopping processes, and anything under `Program Files` or the user profile. List the exact commands and paths, get approval for that list, prefer renames over deletes, and hand back a one-step undo. A host-wide change must say so in the request: CEP's `PlayerDebugMode` and a manifest `CEFCommandLine` block both affect every other extension, not just this one.
+- **No script in this repository writes the registry.** Reading a value for a report is allowed and must be labelled as read-only; creating, changing, or deleting a key is not. The same rule covers host-wide switches in general: the owner makes those changes by hand, deliberately, and a script that "helpfully" does it for them is how the owner's other extension panels stopped loading once. Scripts here also default to reporting rather than acting, and every action is an explicit switch.
 
 ## Contracts and ownership
 

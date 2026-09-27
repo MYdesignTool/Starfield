@@ -21,37 +21,45 @@ dropped in later without changing the protocol code.
 
 ## If other extension panels stop opening
 
-This extension must never be able to affect anyone else's panel. Two things it touches are
-host-wide, so both are handled carefully:
+This extension must never be able to affect anyone else's panel. Two things are host-wide,
+and both are handled without ever writing host state:
 
 - The manifest carries **no `CEFCommandLine` block**: CEP appends those switches to the shared
   CEF command line, which changes how *every* CEP panel in the host starts.
-- `Install.ps1` writes the per-user `PlayerDebugMode` key, which is what lets an unsigned
-  extension load at all. `Install.ps1 -Uninstall` removes it again.
+- `PlayerDebugMode` in `HKCU\Software\Adobe\CSXS.<n>` is what lets an unsigned extension load at
+  all, and **every** other unsigned panel in the host depends on it. `Install.ps1` only links or
+  unlinks the extension folder and never writes that key; the old `-RegistryOnly` switch that set
+  and cleared it is gone. Clearing it once is exactly what made the owner's other panels stop
+  opening, with no way back short of restoring the key by hand.
 
-To get a clean host back, in this order:
+If panels go missing after an update:
 
 1. Quit After Effects completely.
-2. `powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -Uninstall`
-   (removes the extension link and clears `PlayerDebugMode` for CSXS.11 and CSXS.12).
-3. Start After Effects and check that the other extension panels open again.
-4. If they do, reinstall **one step at a time** to find what the host dislikes:
-   `Install.ps1 -RegistryOnly` (registers the debug key, installs nothing), restart, test;
-   then `Install.ps1 -PanelOnly` (links the extension, touches no registry), restart, test.
-   Whichever step breaks the other panels is the one to report.
-5. Keep `%TEMP%\cep_cache\` and `%LOCALAPPDATA%\Temp\Adobe\CEP*` logs from the failing run:
-   CEP records why an extension failed to initialise.
+2. Run `powershell -ExecutionPolicy Bypass -File tools\cleanup_host_traces.ps1` — it reports by
+   default and changes nothing unless you pass a switch. It prints the current `PlayerDebugMode`
+   values (read-only).
+3. If that value is not `1`, set it **by hand** (`reg query` to check, `reg add` only if you decide
+   to). That is a deliberate host change, not a step in installing a panel.
+4. Start After Effects. If the panels are still missing, run
+   `Window > Workspace > Reset to Saved Layout` once; it rebuilds the panel layout without touching
+   preferences or the registry.
+5. Keep `%TEMP%\cep_cache\` and `%LOCALAPPDATA%\Temp\Adobe\CEP*` logs from the failing run: CEP
+   records why an extension failed to initialise.
 
 ## Install for development
 
 1. Close the previous panel in After Effects (if open).
-2. Enable unsigned extensions (once):
+2. Unsigned extensions must be enabled once. This is a **manual owner action**, not part of the
+   install: the key is host-wide and every other unsigned panel depends on it, so no script in this
+   repository sets it or clears it (ADR 0011).
 
    ```
-   reg add "HKCU\Software\Adobe\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f
+   reg query "HKCU\Software\Adobe\CSXS.11" /v PlayerDebugMode
    ```
 
-   AE 2023 ships CEP 11; if the panel does not appear, repeat the key for `CSXS.12`.
+   AE 2023 ships CEP 11, so that is the key that matters; check `CSXS.12` too if the panel does not
+   appear. On this machine it is already `1` and other panels rely on it staying that way. `Install.ps1`
+   prints the value it finds, read-only, and leaves it alone.
 
 3. Put this folder where CEP scans for extensions. Both roots work; the owner's current install is the
    system-wide one, as a plain copy:

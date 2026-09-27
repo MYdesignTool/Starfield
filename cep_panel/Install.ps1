@@ -1,23 +1,19 @@
-# Installs or removes the Starfield node editor panel as a per-user CEP extension.
+# Links this folder into the user CEP extensions directory, or removes the link again.
 #
-#   install everything:  powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1
-#   remove everything:   powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -Uninstall
-#   isolate the registry:powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -RegistryOnly
-#   isolate the panel:   powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -PanelOnly
+#   install: powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1
+#   remove : powershell -ExecutionPolicy Bypass -File cep_panel\Install.ps1 -Uninstall
 #
-# Two pieces, deliberately separable, because both touch the host beyond this extension:
+# Registry: this script NEVER writes it, in either direction.
 #
-#   * the per-user PlayerDebugMode key, which is what lets an UNSIGNED extension load at all
-#     (it applies to every CEP extension in the host while it is set);
-#   * the extension link itself.
-#
-# If other extension panels stop opening, run -Uninstall first, restart After Effects, then
-# reinstall one piece at a time so the failing half is identified. See README.md.
+# Unsigned extensions only load while HKCU\Software\Adobe\CSXS.<n>\PlayerDebugMode is "1",
+# and that key is host-wide: every other unsigned panel in the same host depends on it.
+# Clearing it once silently disabled all of the owner's panels, and a restart could not
+# bring them back because host state is not a cache. So installing or removing one panel
+# must not have that side effect, and this script only reports the value (read-only).
+# Setting it, if it is ever missing, is a deliberate manual owner action - see README.md.
 
 param(
-    [switch]$Uninstall,
-    [switch]$RegistryOnly,
-    [switch]$PanelOnly
+    [switch]$Uninstall
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,7 +22,19 @@ $bundleId = 'org.starfieldfx.panel'
 $source = $PSScriptRoot
 $extensionsRoot = Join-Path $env:APPDATA 'Adobe\CEP\extensions'
 $target = Join-Path $extensionsRoot $bundleId
-$cepVersions = @('CSXS.11', 'CSXS.12')
+
+function Show-DebugKeyStatus {
+    Write-Host 'read-only registry check (this script changes nothing):'
+    foreach ($version in 'CSXS.11', 'CSXS.12') {
+        $key = "HKCU:\Software\Adobe\$version"
+        if (Test-Path $key) {
+            $value = (Get-ItemProperty -Path $key -Name PlayerDebugMode -ErrorAction SilentlyContinue).PlayerDebugMode
+            Write-Host ("  {0}\PlayerDebugMode = '{1}'" -f $version, $value)
+        } else {
+            Write-Host ("  {0}: key absent" -f $version)
+        }
+    }
+}
 
 function Remove-ExtensionLink {
     if (Test-Path -LiteralPath $target) {
@@ -42,51 +50,34 @@ function Remove-ExtensionLink {
     }
 }
 
-function Remove-DebugKey {
-    foreach ($version in $cepVersions) {
-        $key = "HKCU:\Software\Adobe\$version"
-        if (Test-Path $key) {
-            Remove-ItemProperty -Path $key -Name PlayerDebugMode -ErrorAction SilentlyContinue
-            Write-Host "Cleared PlayerDebugMode for $version"
-        }
-    }
-}
-
-function Add-DebugKey {
-    foreach ($version in $cepVersions) {
-        $key = "HKCU:\Software\Adobe\$version"
-        New-Item -Path $key -Force | Out-Null
-        New-ItemProperty -Path $key -Name PlayerDebugMode -PropertyType String -Value 1 -Force | Out-Null
-        Write-Host "Enabled unsigned extensions for $version"
-    }
-}
-
-function Add-ExtensionLink {
-    if (-not (Test-Path (Join-Path $source 'CSXS\manifest.xml'))) {
-        throw 'manifest.xml not found next to this script; run it from the cep_panel folder.'
-    }
-    New-Item -ItemType Directory -Force -Path $extensionsRoot | Out-Null
-    Remove-ExtensionLink | Out-Null
-    $result = & cmd /c "mklink /J `"$target`" `"$source`"" 2>&1
-    if (-not (Test-Path (Join-Path $target 'CSXS\manifest.xml'))) {
-        throw "Could not link the extension: $result"
-    }
-    Write-Host "Linked: $target -> $source"
-}
-
 if ($Uninstall) {
     Remove-ExtensionLink
-    Remove-DebugKey
-} elseif ($RegistryOnly) {
-    Add-DebugKey
-} elseif ($PanelOnly) {
-    Add-ExtensionLink
-} else {
-    Add-DebugKey
-    Add-ExtensionLink
-    Write-Host ''
-    Write-Host 'Next: restart After Effects, then Window > Extensions > Starfield Node Editor.'
-    Write-Host 'Qualification steps are in cep_panel/README.md.'
+    Write-Host 'PlayerDebugMode is left exactly as it is.'
+    Show-DebugKeyStatus
+    exit 0
 }
 
-Write-Host 'Restart After Effects if it is running.'
+if (-not (Test-Path (Join-Path $source 'CSXS\manifest.xml'))) {
+    throw 'manifest.xml not found next to this script; run it from the cep_panel folder.'
+}
+
+New-Item -ItemType Directory -Force -Path $extensionsRoot | Out-Null
+if (Test-Path -LiteralPath $target) {
+    $item = Get-Item -LiteralPath $target -Force
+    if (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        Write-Host "A real folder is already at $target, so it is left alone." -ForegroundColor Yellow
+        Write-Host 'Rename or remove it yourself if you want this script to link the repository instead.'
+        exit 1
+    }
+    Remove-ExtensionLink | Out-Null
+}
+
+$result = & cmd /c "mklink /J `"$target`" `"$source`"" 2>&1
+if (-not (Test-Path (Join-Path $target 'CSXS\manifest.xml'))) {
+    throw "Could not link the extension: $result"
+}
+Write-Host "Linked: $target -> $source"
+Show-DebugKeyStatus
+Write-Host ''
+Write-Host 'Next: restart After Effects, then Window > Extensions > Starfield Node Editor.'
+Write-Host 'Qualification steps are in cep_panel/README.md.'
