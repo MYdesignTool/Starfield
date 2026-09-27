@@ -53,6 +53,20 @@
         }
     };
 
+    // Surface load-time failures instead of showing a blank panel: a syntax error or an
+    // exception during startup is exactly what "the panel is recognised but will not open"
+    // looks like from the outside.
+    window.onerror = function (message, source, line) {
+        try {
+            var banner = document.getElementById("banner");
+            if (banner) {
+                banner.className = "banner error";
+                banner.textContent = "Panel script error: " + message + " (" + source + ":" + line + ")";
+            }
+        } catch (ignored) { /* nothing else we can do */ }
+        return false;
+    };
+
     var state = { revision: null, nodes: [], values: {}, pending: false };
     var elements = {
         banner: document.getElementById("banner"),
@@ -264,6 +278,10 @@
             adoptState(response);
         });
     }
+
+    // Prove the panel body executed, even when the host bridge is unavailable.
+    elements.banner.className = "banner";
+    elements.banner.textContent = "Panel script loaded; asking the host for the selected effect...";
 
     elements.refresh.addEventListener("click", refresh);
     elements.preset.addEventListener("change", function () {

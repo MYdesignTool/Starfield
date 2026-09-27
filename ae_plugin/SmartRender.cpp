@@ -251,10 +251,10 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
 
     const PF_RenderRequest request = extra->input->output_request;
 
-    std::shared_ptr<const core::Graph> graph;
-    const auto graph_err = checkout_render_graph(in_data, out_data, graph);
-    if (graph_err != PF_Err_NONE) return graph_err;
-
+    // The input checkout comes first because its ref_width/ref_height are the
+    // full-resolution reference the parameter conversion needs: point controls are
+    // delivered in full-resolution layer pixels, and dividing them by the preview-sized
+    // in_data->width/height moved the emitter origin with the preview resolution.
     // A successful checkout may have empty pixels, but host errors (including
     // cancellation) must not be converted into a successful transparent render.
     PF_CheckoutResult input_result{};
@@ -262,6 +262,16 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     const auto input_err = extra->cb->checkout_layer(in_data->effect_ref, kInputParameterIndex, kInputCheckoutId, &request,
                                     in_data->current_time, in_data->time_step, in_data->time_scale, &input_result);
     if (input_err != PF_Err_NONE) return input_err;
+
+    std::shared_ptr<const core::Graph> graph;
+    const auto graph_err = checkout_render_graph(in_data, out_data, graph, nullptr,
+                                                 input_result.ref_width, input_result.ref_height);
+    if (graph_err != PF_Err_NONE) {
+        // Failing here is safe resource-wise: pre-render checkouts belong to the frame,
+        // only the smart-render phase checks them in, and AE tears the frame down when
+        // pre-render reports an error. (PF_PreRenderCallbacks has no checkin callback.)
+        return graph_err;
+    }
 
     // Layer extent in host rect units. AE documents this as independent of the
     // request, which is what max_result_rect must be.

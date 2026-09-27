@@ -30,6 +30,24 @@ now hand the new handle to the parameter and leave the old one to the host, and 
 to touch a parameter array that is not fully registered and type-correct (apply/undo can deliver a
 partially built array). The adapter suite pins the new ownership rule.
 
+## Fixed: emitter offset at reduced preview resolution (2026-09-27)
+
+Symptom reported from the host: at Half/Quarter preview the emitter sits far from where it sits at
+Full resolution. Cause: point controls are delivered in **full-resolution** layer pixels, but the
+parameter bridge divided them by `in_data->width/height`, which shrink with the preview resolution —
+at quarter resolution the conversion scaled the emitter origin by four. The renderer's world-to-pixel
+mapping was already correct: it maps world units through the preview-sized frame grid and the
+full-resolution `ref_width/ref_height`.
+
+Fix: pre-render now performs the input checkout **first** and passes `PF_CheckoutResult::ref_width/
+ref_height` into the parameter conversion, so both sides use the same reference. At Full resolution
+`ref_*` equals `in_data->width/height`, so nothing changes there.
+
+**Known remaining gap:** the Capture action has no render context, so it still converts with
+`in_data->width/height`; capturing while a reduced-resolution preview is active can bake an offset
+origin into the stored graph. The fix belongs with the manifest-revision-7 work: store the raw
+control values (or the observed reference size) instead of a resolution-dependent world position.
+
 ## Crash triage (apply-time fatal exit, 2026-09-27)
 
 Ordered experiments; record each result here before moving on. Do not "fix" anything before the

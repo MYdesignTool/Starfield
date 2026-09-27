@@ -160,7 +160,8 @@ bool is_bound_control(A_long index) noexcept {
 // panel edit share this path so both see identical conversions. Values are not
 // clamped here: validate_settings owns every bound.
 core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData& in_data,
-                                      core::Vec3* raw_origin) noexcept {
+                                      core::Vec3* raw_origin, A_long reference_width = 0,
+                                      A_long reference_height = 0) noexcept {
     core::Settings settings;
 
     settings.particle_count = to_particle_count(*defs[0]);
@@ -180,8 +181,14 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
                          static_cast<double>(origin.z_value)};
     if (raw_origin) *raw_origin = raw;
 
-    const double layer_width = static_cast<double>(in_data.width > 0 ? in_data.width : 1);
-    const double layer_height = static_cast<double>(in_data.height > 0 ? in_data.height : 1);
+    // Point controls carry full-resolution layer pixels, so the conversion divides by the
+    // full-resolution reference when the render phase provides one. Using the preview-sized
+    // in_data->width/height here made the emitter origin scale with the preview resolution
+    // (a quarter-resolution preview moved it four times as far from the layer centre).
+    const A_long effective_width = reference_width > 0 ? reference_width : in_data.width;
+    const A_long effective_height = reference_height > 0 ? reference_height : in_data.height;
+    const double layer_width = static_cast<double>(effective_width > 0 ? effective_width : 1);
+    const double layer_height = static_cast<double>(effective_height > 0 ? effective_height : 1);
     core::LayerUnits units;
     units.layer_width = layer_width;
     units.layer_height = layer_height;
@@ -399,7 +406,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return PF_Err_NONE;
 }
 
-PF_Err ParameterSnapshot::checkout(PF_InData* in_data) noexcept {
+PF_Err ParameterSnapshot::checkout(PF_InData* in_data, A_long reference_width,
+                                   A_long reference_height) noexcept {
     valid_ = false;
     settings_ = core::Settings{};
     raw_origin_ = core::Vec3{};
@@ -431,7 +439,7 @@ PF_Err ParameterSnapshot::checkout(PF_InData* in_data) noexcept {
     for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
         controls[i] = &defs_[i];
     }
-    settings_ = settings_from_controls(controls, *in_data, &raw_origin_);
+    settings_ = settings_from_controls(controls, *in_data, &raw_origin_, reference_width, reference_height);
 
     valid_ = true;
     return PF_Err_NONE;
@@ -497,7 +505,7 @@ bool flat_render_override_active() noexcept {
 
 PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                              std::shared_ptr<const core::Graph>& graph,
-                             A_long* control_source) noexcept {
+                             A_long* control_source, A_long reference_width, A_long reference_height) noexcept {
     graph.reset();
     if (control_source) *control_source = -1;
     if (!in_data || !in_data->inter.checkout_param || !in_data->inter.checkin_param) return PF_Err_BAD_CALLBACK_PARAM;
@@ -508,7 +516,7 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
         if (source.value.param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
         if (source.value.u.pd.value == kLegacyControlSource || flat_render_override_active()) {
             ScopedParameterCheckin legacy(in_data);
-            err = legacy.snapshot().checkout(in_data);
+            err = legacy.snapshot().checkout(in_data, reference_width, reference_height);
             if (err != PF_Err_NONE) return err;
             auto converted = graph_from_controls(core::validate_settings(legacy.snapshot().settings()).value);
             if (!converted.has_value()) return graph_error(out_data, converted.error());

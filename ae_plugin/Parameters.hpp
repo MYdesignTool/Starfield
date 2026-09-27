@@ -52,9 +52,15 @@ inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is co
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.
+// `reference_width`/`reference_height` are the full-resolution layer size observed in the
+// pre-render input checkout (PF_CheckoutResult::ref_width/ref_height). Point controls are
+// delivered in full-resolution layer pixels, so the conversion must not divide by the
+// preview-sized in_data->width/height: at quarter preview that scaled the emitter origin
+// by four and threw it far off canvas. Zero means "no render context, use in_data".
 [[nodiscard]] PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                                           std::shared_ptr<const core::Graph>& graph,
-                                          A_long* control_source = nullptr) noexcept;
+                                          A_long* control_source = nullptr,
+                                          A_long reference_width = 0, A_long reference_height = 0) noexcept;
 [[nodiscard]] PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data,
                                       PF_ParamDef* params[], PF_UserChangedParamExtra* extra) noexcept;
 
@@ -94,7 +100,10 @@ public:
     ~ParameterSnapshot() = default;
 
     // Returns the first host error and checks in whatever was already checked out.
-    [[nodiscard]] PF_Err checkout(PF_InData* in_data) noexcept;
+    // reference_width/height are the full-resolution layer size when a render context
+    // provides one (see checkout_render_graph); zero falls back to in_data.
+    [[nodiscard]] PF_Err checkout(PF_InData* in_data, A_long reference_width = 0,
+                                  A_long reference_height = 0) noexcept;
     void checkin(PF_InData* in_data) noexcept;
 
     [[nodiscard]] bool valid() const noexcept { return valid_; }
