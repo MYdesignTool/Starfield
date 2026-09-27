@@ -26,15 +26,19 @@ Copies own separate AE handles. No callback requires a non-null effect instance.
 
 ## Parameters and migration
 
-IDs/disk IDs of the existing thirteen controls remain unchanged. Append:
+Manifest revision 6 regrouped the Effect Controls Window into Emitter / Particle /
+Physics / Render topics, which renumbered every parameter: the hidden graph data is now
+index 31, Control Source 29 and Capture Current Controls 30 (topic markers occupy
+indices, see `docs/parameter-mapping.md`). Disk IDs are unchanged.
 
-- 14: hidden graph data, arbitrary callback ID 14, no keyframes.
-- 15: Control Source, popup `AE Controls | Node Graph`, no keyframes. New/reset
-  effects default to Node Graph. Old projects missing this parameter receive
-  AE Controls via `PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS`.
-- 16: Capture Current Controls, supervised action button. Capture explicitly
-  replaces the stored graph with an emitter/output graph of current control values
-  and switches to Node Graph in the same user-change transaction.
+- 31: hidden graph data, arbitrary callback ID 31, no keyframes.
+- 29: Control Source, popup `AE Controls | Node Graph`, no keyframes. **Defaults to
+  AE Controls** (revision 6): a freshly applied effect must drive the visible controls,
+  and Node Graph is opt-in through capture or the panel. Old projects receive AE
+  Controls via `PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS`.
+- 30: Capture Current Controls, supervised action button. Capture explicitly
+  replaces the stored graph with an emitter/force/appearance/output graph of current
+  control values and switches to Node Graph in the same user-change transaction.
 
 Old animated controls remain stored and are still sampled in AE Controls mode.
 Capturing creates a constant snapshot, not a conversion of historical keyframes.

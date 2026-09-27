@@ -6,9 +6,11 @@
 
 namespace starfield::adapter {
 
-inline constexpr A_short kGraphParameterId = 14;
-inline constexpr A_long kControlSourceId = 15;
-inline constexpr A_long kCaptureControlsId = 16;
+// Registration-order indices after manifest revision 6 (topic grouping). See
+// ae_plugin/Parameters.hpp for the control indices they sit next to.
+inline constexpr A_short kGraphParameterId = 31;
+inline constexpr A_long kControlSourceId = 29;
+inline constexpr A_long kCaptureControlsId = 30;
 inline constexpr A_long kLegacyControlSource = 1;
 inline constexpr A_long kNodeControlSource = 2;
 

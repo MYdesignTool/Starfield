@@ -24,27 +24,27 @@
     // resolution. `min`/`max` mirror the manifest bounds so the panel cannot send a
     // value the effect would have to clamp.
     var BINDINGS = [
-        { key: "particle_count", index: 1, name: "Particle Count", kind: "slider", min: 0, max: 2000000 },
-        { key: "birth_rate", index: 2, name: "Birth Rate", kind: "slider", min: 0, max: 1000000 },
-        { key: "seed", index: 3, name: "Random Seed", kind: "slider", min: 0, max: 2147483647 },
-        { key: "particle_lifetime", index: 4, name: "Particle Lifetime", kind: "slider", min: 0, max: 1000000 },
-        { key: "emitter_shape", index: 5, name: "Emitter Shape", kind: "popup" },
-        { key: "emitter_origin", index: 6, name: "Emitter Origin", kind: "point3d" },
-        { key: "velocity_x", index: 7, name: "Velocity X", kind: "slider", min: -1000, max: 1000 },
-        { key: "velocity_y", index: 8, name: "Velocity Y", kind: "slider", min: -1000, max: 1000 },
-        { key: "velocity_z", index: 9, name: "Velocity Z", kind: "slider", min: -1000, max: 1000 },
-        { key: "particle_size", index: 10, name: "Particle Size", kind: "slider", min: 0, max: 100000 },
-        { key: "opacity", index: 11, name: "Opacity", kind: "slider", min: 0, max: 1 },
-        { key: "emitter_size", index: 12, name: "Emitter Size", kind: "slider", min: 0, max: 10 },
-        { key: "velocity_spread", index: 13, name: "Velocity Spread", kind: "slider", min: 0, max: 100 },
-        { key: "gravity_x", index: 17, name: "Gravity X", kind: "slider", min: -1000, max: 1000 },
-        { key: "gravity_y", index: 18, name: "Gravity Y", kind: "slider", min: -1000, max: 1000 },
-        { key: "gravity_z", index: 19, name: "Gravity Z", kind: "slider", min: -1000, max: 1000 },
-        { key: "linear_drag", index: 20, name: "Linear Drag", kind: "slider", min: 0, max: 100 },
-        { key: "color_start", index: 21, name: "Color Start", kind: "color" },
-        { key: "color_end", index: 22, name: "Color End", kind: "color" },
-        { key: "particle_size_end", index: 23, name: "Size End", kind: "slider", min: 0, max: 100000 },
-        { key: "opacity_end", index: 24, name: "Opacity End", kind: "slider", min: 0, max: 1 }
+        { key: "particle_count", index: 27, name: "Max Particles", kind: "slider", min: 0, max: 2000000 },
+        { key: "birth_rate", index: 3, name: "Particles Per Second", kind: "slider", min: 0, max: 1000000 },
+        { key: "seed", index: 28, name: "Random Seed", kind: "slider", min: 0, max: 2147483647 },
+        { key: "particle_lifetime", index: 12, name: "Lifetime", kind: "slider", min: 0, max: 1000000 },
+        { key: "emitter_shape", index: 2, name: "Type", kind: "popup" },
+        { key: "emitter_origin", index: 4, name: "Origin", kind: "point3d" },
+        { key: "velocity_x", index: 6, name: "Speed X", kind: "slider", min: -1000, max: 1000 },
+        { key: "velocity_y", index: 7, name: "Speed Y", kind: "slider", min: -1000, max: 1000 },
+        { key: "velocity_z", index: 8, name: "Speed Z", kind: "slider", min: -1000, max: 1000 },
+        { key: "particle_size", index: 13, name: "Size", kind: "slider", min: 0, max: 100000 },
+        { key: "opacity", index: 15, name: "Opacity", kind: "slider", min: 0, max: 1 },
+        { key: "emitter_size", index: 5, name: "Emitter Size", kind: "slider", min: 0, max: 10 },
+        { key: "velocity_spread", index: 9, name: "Speed Random", kind: "slider", min: 0, max: 100 },
+        { key: "gravity_x", index: 21, name: "Gravity X", kind: "slider", min: -1000, max: 1000 },
+        { key: "gravity_y", index: 22, name: "Gravity Y", kind: "slider", min: -1000, max: 1000 },
+        { key: "gravity_z", index: 23, name: "Gravity Z", kind: "slider", min: -1000, max: 1000 },
+        { key: "linear_drag", index: 24, name: "Linear Drag", kind: "slider", min: 0, max: 100 },
+        { key: "color_start", index: 17, name: "Color Start", kind: "color" },
+        { key: "color_end", index: 18, name: "Color End", kind: "color" },
+        { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000 },
+        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1 }
     ];
 
     // The Alpha chain is fixed in protocol v1: display order, not a hidden graph.

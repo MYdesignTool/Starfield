@@ -14,25 +14,41 @@
 
 namespace starfield::adapter {
 
-// User-visible controls defined by the manifest. IDs 1..13 are the original
-// render controls; 17..24 append the force and appearance controls of the
-// emitter -> force -> appearance -> output chain. 14..16 stay reserved for the
-// graph parameter, the control source and the capture action (ADR 0008), so the
-// manifest only ever appends. AE's implicit input layer occupies parameter index
-// 0, so the effect registers one more parameter than the count below.
-inline constexpr std::size_t kEffectParameterCount = 21;
-inline constexpr std::size_t kTotalEffectParameterCount = 24;
+// User-visible controls and their registration-order indices. The ECW is grouped
+// into Emitter / Particle / Physics / Render topics so the control layout follows the
+// reference product's structure; group markers are parameters too, which is why the
+// indices below are not contiguous. AE's implicit input layer occupies parameter index
+// 0, so the effect registers one more parameter than kTotalEffectParameterCount.
+// Manifest revision 6 renumbered everything for the grouping: pre-release projects
+// saved with revision 5 read the new positions (see docs/parameter-mapping.md).
+inline constexpr std::size_t kEffectParameterCount = 21;      // controls that feed Settings
+inline constexpr std::size_t kTotalEffectParameterCount = 32; // controls + topics + system
 
-inline constexpr A_long kGravityXId = 17;
-inline constexpr A_long kGravityYId = 18;
-inline constexpr A_long kGravityZId = 19;
-inline constexpr A_long kLinearDragId = 20;
-inline constexpr A_long kColorStartId = 21;
-inline constexpr A_long kColorEndId = 22;
-inline constexpr A_long kParticleSizeEndId = 23;
-inline constexpr A_long kOpacityEndId = 24;
+inline constexpr A_long kTypeId = 2;
+inline constexpr A_long kParticlesPerSecondId = 3;
+inline constexpr A_long kOriginId = 4;
+inline constexpr A_long kEmitterSizeId = 5;
+inline constexpr A_long kSpeedXId = 6;
+inline constexpr A_long kSpeedYId = 7;
+inline constexpr A_long kSpeedZId = 8;
+inline constexpr A_long kSpeedRandomId = 9;
+inline constexpr A_long kLifetimeId = 12;
+inline constexpr A_long kSizeId = 13;
+inline constexpr A_long kParticleSizeEndId = 14;
+inline constexpr A_long kOpacityId = 15;
+inline constexpr A_long kOpacityEndId = 16;
+inline constexpr A_long kColorStartId = 17;
+inline constexpr A_long kColorEndId = 18;
+inline constexpr A_long kGravityXId = 21;
+inline constexpr A_long kGravityYId = 22;
+inline constexpr A_long kGravityZId = 23;
+inline constexpr A_long kLinearDragId = 24;
+inline constexpr A_long kMaxParticlesId = 27;
+inline constexpr A_long kSeedId = 28;
+// 29/30/31 are the control source, capture action and hidden graph parameter; their
+// indices live next to the arbitrary-data contract in GraphParameter.hpp.
 inline constexpr A_long kFirstEffectParameterId = 1;
-inline constexpr A_long kLastEffectParameterId = kOpacityEndId;
+inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is control source)
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

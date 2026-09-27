@@ -27,7 +27,8 @@ static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
 static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT |
                                       PF_OutFlag_USE_OUTPUT_EXTENT | PF_OutFlag_I_DO_DIALOG | PF_OutFlag_NON_PARAM_VARY),
               "PiPL AE_Effect_Global_OutFlags must match the runtime declaration");
-static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_FLOAT_COLOR_AWARE),
+static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_FLOAT_COLOR_AWARE |
+                                       PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
 
 namespace {

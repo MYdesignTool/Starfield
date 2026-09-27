@@ -1,10 +1,44 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 5. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 6. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
 render checkout and the supervised panel edit, so the two cannot drift apart.
+
+## Manifest revision 6: topic grouping and renumbering (current)
+
+The ECW now follows the reference product's structure. Topic markers (`PF_Param_GROUP_START` /
+`GROUP_END`) are parameters, so every index moved. Global out-flags carry
+`PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG`; without it AE collapses every group regardless of
+the per-topic `PF_ParamFlag_START_COLLAPSED`.
+
+| Topic | Index | Control (label) | Core field |
+|---|---|---|---|
+| Emitter | 2 | Type (popup Point/Box/Sphere/Disc) | `emitter_shape` |
+| Emitter | 3 | Particles Per Second (default 100) | `birth_rate` |
+| Emitter | 4 | Origin (3D point, 50/50/50 = layer centre) | `emitter_origin` |
+| Emitter | 5 | Emitter Size | `emitter_size` |
+| Emitter | 6/7/8 | Speed X / Speed Y / Speed Z | `velocity.x/y/z` |
+| Emitter | 9 | Speed Random | `velocity_spread` |
+| Particle | 12 | Lifetime | `particle_lifetime_seconds` |
+| Particle | 13 | Size | `particle_size` |
+| Particle | 14 | Size Over Life | `particle_size_end` |
+| Particle | 15 | Opacity | `opacity` |
+| Particle | 16 | Opacity Over Life | `opacity_end` |
+| Particle | 17/18 | Color Start / Color End | `color_start` / `color_end` |
+| Physics (collapsed) | 21/22/23 | Gravity X / Y / Z | `gravity.x/y/z` |
+| Physics (collapsed) | 24 | Linear Drag | `linear_drag` |
+| Render (collapsed) | 27 | Max Particles | `particle_count` |
+| Render (collapsed) | 28 | Random Seed | `seed` |
+| Render (collapsed) | 29 | Control Source (default **AE Controls**) | render source selector |
+| Render (collapsed) | 30 | Capture Current Controls (button) | graph capture |
+| Render (collapsed) | 31 | Node Graph Data (hidden arbitrary data) | canonical graph bytes |
+
+The tables below describe the revision 2–5 layout and are kept for history: their index columns are
+superseded by the table above. Labels in the reference vocabulary (Type, Particles Per Second, Origin,
+Speed, Speed Random, Size Over Life, Opacity Over Life, Max Particles) replace the earlier working
+names; semantics are unchanged except where a note says otherwise.
 
 ## Manifest revisions 2–3 (pre-release, 2026-09-27)
 

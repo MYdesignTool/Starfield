@@ -21,7 +21,7 @@ int checks = 0, failures = 0;
 struct Memory { core::OpaqueBytes bytes; unsigned locks{0}; };
 std::unordered_map<PF_Handle, std::unique_ptr<Memory>> handles;
 bool fail_allocation = false, fail_lock = false;
-std::array<PF_ParamDef, 25> parameters{};
+std::array<PF_ParamDef, 33> parameters{};
 std::vector<PF_ParamDef> registered;
 std::unordered_map<PF_ParamDef*, A_long> checked_out;
 std::vector<A_long> checked_indices;
@@ -55,7 +55,7 @@ PF_Err checkout(PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, 
     last_time = time;
     checked_indices.push_back(index);
     if (index == fail_checkout) return PF_Err_OUT_OF_MEMORY;
-    if (index < 1 || index > 24 || !value) return PF_Err_BAD_CALLBACK_PARAM;
+    if (index < 1 || index > 32 || !value) return PF_Err_BAD_CALLBACK_PARAM;
     *value = parameters[static_cast<std::size_t>(index)];
     checked_out[value] = index;
     return PF_Err_NONE;
@@ -169,40 +169,42 @@ void test_callbacks(PF_InData& host) {
 void test_parameters(PF_InData& host) {
     PF_OutData output{};
     CHECK(setup_parameters(&host, &output) == PF_Err_NONE);
-    CHECK(output.num_params == 25 && registered.size() == 24);
-    const auto& source = registered[14];
-    CHECK(source.u.pd.dephault == kNodeControlSource && source.u.pd.value == kLegacyControlSource);
+    CHECK(output.num_params == 33 && registered.size() == 32);
+    const auto& source = registered[kControlSourceId - 1];
+    // Manifest revision 6: a fresh effect must drive the visible controls, so both the
+    // default and the old-project value select AE Controls. Node Graph is opt-in.
+    CHECK(source.u.pd.dephault == kLegacyControlSource && source.u.pd.value == kLegacyControlSource);
     CHECK((source.flags & PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS) != 0);
     // The SDK's own PF_ADD_ARBITRARY2 passes no PF_ParamFlags; arbitrary data cannot be
     // animated, and the two flags this used to carry were never part of the contract.
-    CHECK(registered[13].flags == 0);
-    CHECK(registered[13].u.arb_d.value == nullptr);
-    for (std::size_t i = 1; i <= 24; ++i) {
+    CHECK(registered[kGraphParameterId - 1].flags == 0);
+    CHECK(registered[kGraphParameterId - 1].u.arb_d.value == nullptr);
+    for (std::size_t i = 1; i <= 32; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;
     }
-    parameters[14].u.arb_d.value = new_value(host);
-    parameters[15].u.pd.value = kNodeControlSource;
+    parameters[kGraphParameterId].u.arb_d.value = new_value(host);
+    parameters[kControlSourceId].u.pd.value = kNodeControlSource;
     std::shared_ptr<const core::Graph> snapshot;
     A_long active_source = -1;
     checked_indices.clear();
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(snapshot && checked_out.empty() && active_source == kNodeControlSource);
-    CHECK(checked_indices == std::vector<A_long>({15, 14}));
+    CHECK(checked_indices == std::vector<A_long>({kControlSourceId, kGraphParameterId}));
     const auto frozen = core::serialize_graph(*snapshot, core::particle_node_registry());
     CHECK(frozen.has_value());
-    const auto previous = parameters[14].u.arb_d.value;
+    const auto previous = parameters[kGraphParameterId].u.arb_d.value;
     // Set actual host-style slider values, independently of registration defaults.
-    parameters[1].u.fs_d.value = 20;
-    parameters[2].u.fs_d.value = 12;
-    parameters[3].u.fs_d.value = 99;
-    parameters[4].u.fs_d.value = 3;
-    parameters[5].u.pd.value = 3;
-    parameters[6].u.point3d_d.x_value = 32;
-    parameters[6].u.point3d_d.y_value = 32;
-    parameters[6].u.point3d_d.z_value = 32;
-    parameters[10].u.fs_d.value = 4;
-    parameters[11].u.fs_d.value = 0.5;
+    parameters[kMaxParticlesId].u.fs_d.value = 20;
+    parameters[kParticlesPerSecondId].u.fs_d.value = 12;
+    parameters[kSeedId].u.fs_d.value = 99;
+    parameters[kLifetimeId].u.fs_d.value = 3;
+    parameters[kTypeId].u.pd.value = 3;
+    parameters[kOriginId].u.point3d_d.x_value = 32;
+    parameters[kOriginId].u.point3d_d.y_value = 32;
+    parameters[kOriginId].u.point3d_d.z_value = 32;
+    parameters[kSizeId].u.fs_d.value = 4;
+    parameters[kOpacityId].u.fs_d.value = 0.5;
     // Force and appearance controls (IDs 17..24) feed the same legacy snapshot.
     parameters[kGravityYId].u.fs_d.value = -0.5;
     parameters[kLinearDragId].u.fs_d.value = 0.25;
@@ -211,7 +213,7 @@ void test_parameters(PF_InData& host) {
     parameters[kColorStartId].u.cd.value.blue = 0;
     parameters[kParticleSizeEndId].u.fs_d.value = 2.0;
     parameters[kOpacityEndId].u.fs_d.value = 0.25;
-    parameters[15].u.pd.value = kLegacyControlSource;
+    parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(checked_out.empty() && last_time == host.current_time && active_source == kLegacyControlSource);
     const auto legacy = core::serialize_graph(*snapshot, core::particle_node_registry());
@@ -248,33 +250,33 @@ void test_parameters(PF_InData& host) {
         CHECK(size_end != nullptr && std::get<double>(*size_end) == 2.0);
         CHECK(opacity_end != nullptr && std::get<double>(*opacity_end) == 0.25);
     }
-    std::array<PF_ParamDef*, 25> pointers{};
+    std::array<PF_ParamDef*, 33> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
     fail_allocation = true;
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_OUT_OF_MEMORY);
-    CHECK(parameters[14].u.arb_d.value == previous && parameters[15].u.pd.value == kLegacyControlSource);
+    CHECK(parameters[kGraphParameterId].u.arb_d.value == previous && parameters[kControlSourceId].u.pd.value == kLegacyControlSource);
     CHECK(checked_out.empty());
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
     // The replaced handle must stay alive: it belongs to the host, which disposes the
     // value it replaced once the parameter change is committed. Disposing it here as
     // well frees a host-owned handle and makes AE abort later.
-    CHECK(handles.contains(previous)); CHECK(parameters[15].u.pd.value == kNodeControlSource);
-    CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
-    CHECK((parameters[15].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
-    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == legacy.value());
+    CHECK(handles.contains(previous)); CHECK(parameters[kControlSourceId].u.pd.value == kNodeControlSource);
+    CHECK((parameters[kGraphParameterId].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
+    CHECK((parameters[kControlSourceId].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
+    CHECK(handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes == legacy.value());
     CHECK(checkout_render_graph(&host, &output, snapshot) == PF_Err_NONE);
     CHECK(core::serialize_graph(*snapshot, core::particle_node_registry()).value() == legacy.value());
-    fail_checkout = 14;
+    fail_checkout = kGraphParameterId;
     CHECK(checkout_render_graph(&host, &output, snapshot) != PF_Err_NONE);
     CHECK(!snapshot && checked_out.empty()); fail_checkout = -1;
-    parameters[15].u.pd.value = kLegacyControlSource;
+    parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
     fail_checkout = 8;
     CHECK(checkout_render_graph(&host, &output, snapshot) != PF_Err_NONE);
     CHECK(!snapshot && checked_out.empty()); fail_checkout = -1;
-    dispose(parameters[14].u.arb_d.value);
+    dispose(parameters[kGraphParameterId].u.arb_d.value);
     dispose(previous); // replaced by capture; in AE the host owns and frees it
-    dispose(registered[13].u.arb_d.dephault);
+    dispose(registered[kGraphParameterId - 1].u.arb_d.dephault);
 }
 
 // The supervised edit surface the dockable panel drives (ADR 0009): in Node Graph
@@ -282,27 +284,27 @@ void test_parameters(PF_InData& host) {
 // AE Controls mode the stored graph is never touched.
 void test_supervision(PF_InData& host) {
     PF_OutData output{};
-    parameters[14].u.arb_d.value = new_value(host);
-    parameters[14].uu.change_flags = 0;
-    parameters[15].u.pd.value = kNodeControlSource;
+    parameters[kGraphParameterId].u.arb_d.value = new_value(host);
+    parameters[kGraphParameterId].uu.change_flags = 0;
+    parameters[kControlSourceId].u.pd.value = kNodeControlSource;
     parameters[kGravityYId].u.fs_d.value = 0.0;
     parameters[kGravityYId].uu.change_flags = 0;
-    std::array<PF_ParamDef*, 25> pointers{};
+    std::array<PF_ParamDef*, 33> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{};
     extra.param_index = kGravityYId;
 
-    const auto previous = parameters[14].u.arb_d.value;
+    const auto previous = parameters[kGraphParameterId].u.arb_d.value;
     const auto before = handles.at(previous)->bytes;
     // The delivered array carries the accepted new value; the graph must follow it.
     parameters[kGravityYId].u.fs_d.value = -0.5;
     CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
-    CHECK(parameters[14].u.arb_d.value != previous);
+    CHECK(parameters[kGraphParameterId].u.arb_d.value != previous);
     CHECK(handles.contains(previous)); // host-owned replaced value, not ours to free
-    CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
-    const auto after = handles.at(parameters[14].u.arb_d.value)->bytes;
+    CHECK((parameters[kGraphParameterId].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
+    const auto after = handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes;
     CHECK(after != before);
-    const auto graph = read_graph_parameter(&host, parameters[14].u.arb_d.value);
+    const auto graph = read_graph_parameter(&host, parameters[kGraphParameterId].u.arb_d.value);
     CHECK(graph.has_value());
     if (graph.has_value()) {
         const auto force_node = std::find_if(graph.value().nodes.begin(), graph.value().nodes.end(),
@@ -320,29 +322,29 @@ void test_supervision(PF_InData& host) {
     }
 
     // AE Controls mode: the stored graph is left alone.
-    parameters[15].u.pd.value = kLegacyControlSource;
+    parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
     parameters[kGravityYId].u.fs_d.value = 0.9;
-    parameters[14].uu.change_flags = 0;
-    const auto kept = handles.at(parameters[14].u.arb_d.value)->bytes;
+    parameters[kGraphParameterId].uu.change_flags = 0;
+    const auto kept = handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes;
     CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
-    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
-    CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) == 0);
+    CHECK(handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes == kept);
+    CHECK((parameters[kGraphParameterId].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) == 0);
 
     // Bookkeeping parameters never rewrite the graph.
-    parameters[15].u.pd.value = kNodeControlSource;
+    parameters[kControlSourceId].u.pd.value = kNodeControlSource;
     extra.param_index = kControlSourceId;
     CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
-    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
+    CHECK(handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes == kept);
 
     // A failed host allocation leaves the stored graph untouched.
     extra.param_index = kGravityYId;
     fail_allocation = true;
     CHECK(user_changed_param(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
-    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
+    CHECK(handles.at(parameters[kGraphParameterId].u.arb_d.value)->bytes == kept);
 
-    dispose(parameters[14].u.arb_d.value);
+    dispose(parameters[kGraphParameterId].u.arb_d.value);
     dispose(previous); // replaced by the supervised rewrite
-    parameters[14].u.arb_d.value = nullptr;
+    parameters[kGraphParameterId].u.arb_d.value = nullptr;
 }
 } // namespace
 

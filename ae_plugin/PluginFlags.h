@@ -14,11 +14,15 @@
  *   PF_OutFlag_NON_PARAM_VARY         = 1 << 2   (0x00000004)  absolute-time particles
  *   PF_OutFlag2_SUPPORTS_SMART_RENDER = 1 << 10  (0x00000400)
  *   PF_OutFlag2_FLOAT_COLOR_AWARE     = 1 << 12  (0x00001000)
+ *   PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG = 1 << 3 (0x00000008)
  *
+ * The group-collapsed flag is required for the topic layout: without it AE collapses
+ * every parameter group, and with it each topic honours PF_ParamFlag_START_COLLAPSED,
+ * so Physics and Render can start folded while Emitter and Particle stay open.
  * MFR (PF_OutFlag2_SUPPORTS_THREADED_RENDERING), GPU, and Compute Cache flags stay
  * unset until their milestones are implemented and qualified.
  */
 #define STARFIELD_OUT_FLAGS 0x02000464L  /* DEEP_COLOR_AWARE | PIX_INDEPENDENT | USE_OUTPUT_EXTENT | I_DO_DIALOG | NON_PARAM_VARY */
-#define STARFIELD_OUT_FLAGS2 0x00001400L /* SUPPORTS_SMART_RENDER | FLOAT_COLOR_AWARE */
+#define STARFIELD_OUT_FLAGS2 0x00001408L /* SUPPORTS_SMART_RENDER | FLOAT_COLOR_AWARE | PARAM_GROUP_START_COLLAPSED */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

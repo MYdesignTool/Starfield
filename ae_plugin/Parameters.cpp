@@ -20,19 +20,19 @@ namespace core = starfield::core;
 
 // Parameter IDs come from schema/parameters.json and are project-file
 // compatibility keys. Disk IDs only have to be unique inside this effect.
-constexpr A_long kParticleCountDiskId = 'pcnt';
-constexpr A_long kBirthRateDiskId = 'brth';
+constexpr A_long kMaxParticlesDiskId = 'pcnt';
+constexpr A_long kParticlesPerSecondDiskId = 'brth';
 constexpr A_long kSeedDiskId = 'seed';
 constexpr A_long kLifetimeDiskId = 'life';
-constexpr A_long kEmitterShapeDiskId = 'esha';
-constexpr A_long kEmitterOriginDiskId = 'epos';
-constexpr A_long kVelocityXDiskId = 'velx';
-constexpr A_long kVelocityYDiskId = 'vely';
-constexpr A_long kVelocityZDiskId = 'velz';
+constexpr A_long kEmitterTypeDiskId = 'esha';
+constexpr A_long kOriginDiskId = 'epos';
+constexpr A_long kSpeedXDiskId = 'velx';
+constexpr A_long kSpeedYDiskId = 'vely';
+constexpr A_long kSpeedZDiskId = 'velz';
 constexpr A_long kSizeDiskId = 'size';
 constexpr A_long kOpacityDiskId = 'opac';
 constexpr A_long kEmitterSizeDiskId = 'esiz';
-constexpr A_long kVelocitySpreadDiskId = 'vspd';
+constexpr A_long kSpeedRandomDiskId = 'vspd';
 constexpr A_long kGravityXDiskId = 'grvx';
 constexpr A_long kGravityYDiskId = 'grvy';
 constexpr A_long kGravityZDiskId = 'grvz';
@@ -41,37 +41,61 @@ constexpr A_long kColorStartDiskId = 'clrs';
 constexpr A_long kColorEndDiskId = 'clre';
 constexpr A_long kParticleSizeEndDiskId = 'szen';
 constexpr A_long kOpacityEndDiskId = 'open';
+// Topic markers are parameters too; their ids only have to be unique.
+constexpr A_long kEmitterTopicDiskId = 'topE';
+constexpr A_long kParticleTopicDiskId = 'topP';
+constexpr A_long kPhysicsTopicDiskId = 'topH';
+constexpr A_long kRenderTopicDiskId = 'topR';
 
 // Parameter types and host indices in binding order: slot 0..20 map to the manifest
 // controls. Types are stamped into the checked-out PF_ParamDef before
 // PF_CHECKOUT_PARAM so the host cannot be confused about how to fill the value
 // union. Hosts that fill by index are unaffected.
 constexpr A_long kParameterIndices[kEffectParameterCount] = {
-    1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, // Particle Count .. Velocity Spread
-    17, 18, 19, 20, 21, 22, 23, 24,                     // Gravity X .. Opacity End
+    kMaxParticlesId,        // Max Particles
+    kParticlesPerSecondId,  // Particles Per Second
+    kSeedId,                // Random Seed
+    kLifetimeId,            // Lifetime
+    kTypeId,                // Type (popup)
+    kOriginId,              // Origin (3D point)
+    kSpeedXId,              // Speed X
+    kSpeedYId,              // Speed Y
+    kSpeedZId,              // Speed Z
+    kSizeId,                // Size
+    kOpacityId,             // Opacity
+    kEmitterSizeId,         // Emitter Size
+    kSpeedRandomId,         // Speed Random
+    kGravityXId,            // Gravity X
+    kGravityYId,            // Gravity Y
+    kGravityZId,            // Gravity Z
+    kLinearDragId,          // Linear Drag
+    kColorStartId,          // Color Start
+    kColorEndId,            // Color End
+    kParticleSizeEndId,     // Size Over Life
+    kOpacityEndId,          // Opacity Over Life
 };
 constexpr A_long kParameterTypes[kEffectParameterCount] = {
-    PF_Param_FLOAT_SLIDER, /* 1  Particle Count    */
-    PF_Param_FLOAT_SLIDER, /* 2  Birth Rate        */
-    PF_Param_FLOAT_SLIDER, /* 3  Random Seed       */
-    PF_Param_FLOAT_SLIDER, /* 4  Particle Lifetime */
-    PF_Param_POPUP,        /* 5  Emitter Shape     */
-    PF_Param_POINT_3D,     /* 6  Emitter Origin    */
-    PF_Param_FLOAT_SLIDER, /* 7  Velocity X        */
-    PF_Param_FLOAT_SLIDER, /* 8  Velocity Y        */
-    PF_Param_FLOAT_SLIDER, /* 9  Velocity Z        */
-    PF_Param_FLOAT_SLIDER, /* 10 Particle Size     */
-    PF_Param_FLOAT_SLIDER, /* 11 Opacity           */
-    PF_Param_FLOAT_SLIDER, /* 12 Emitter Size      */
-    PF_Param_FLOAT_SLIDER, /* 13 Velocity Spread   */
-    PF_Param_FLOAT_SLIDER, /* 17 Gravity X         */
-    PF_Param_FLOAT_SLIDER, /* 18 Gravity Y         */
-    PF_Param_FLOAT_SLIDER, /* 19 Gravity Z         */
-    PF_Param_FLOAT_SLIDER, /* 20 Linear Drag       */
-    PF_Param_COLOR,        /* 21 Color Start       */
-    PF_Param_COLOR,        /* 22 Color End         */
-    PF_Param_FLOAT_SLIDER, /* 23 Size End          */
-    PF_Param_FLOAT_SLIDER, /* 24 Opacity End       */
+    PF_Param_FLOAT_SLIDER, /* Max Particles       */
+    PF_Param_FLOAT_SLIDER, /* Particles Per Second*/
+    PF_Param_FLOAT_SLIDER, /* Random Seed         */
+    PF_Param_FLOAT_SLIDER, /* Lifetime            */
+    PF_Param_POPUP,        /* Type                */
+    PF_Param_POINT_3D,     /* Origin              */
+    PF_Param_FLOAT_SLIDER, /* Speed X             */
+    PF_Param_FLOAT_SLIDER, /* Speed Y             */
+    PF_Param_FLOAT_SLIDER, /* Speed Z             */
+    PF_Param_FLOAT_SLIDER, /* Size                */
+    PF_Param_FLOAT_SLIDER, /* Opacity             */
+    PF_Param_FLOAT_SLIDER, /* Emitter Size        */
+    PF_Param_FLOAT_SLIDER, /* Speed Random        */
+    PF_Param_FLOAT_SLIDER, /* Gravity X           */
+    PF_Param_FLOAT_SLIDER, /* Gravity Y           */
+    PF_Param_FLOAT_SLIDER, /* Gravity Z           */
+    PF_Param_FLOAT_SLIDER, /* Linear Drag         */
+    PF_Param_COLOR,        /* Color Start         */
+    PF_Param_COLOR,        /* Color End           */
+    PF_Param_FLOAT_SLIDER, /* Size Over Life      */
+    PF_Param_FLOAT_SLIDER, /* Opacity Over Life   */
 };
 
 std::uint32_t to_particle_count(const PF_ParamDef& def) noexcept {
@@ -122,10 +146,13 @@ core::Vec3 to_color(const PF_ParamDef& def) noexcept {
 }
 
 // True when the parameter index is one of the manifest controls; every bound
-// control feeds the canonical graph in Node Graph mode.
-constexpr bool is_bound_control(A_long index) noexcept {
-    return (index >= kFirstEffectParameterId && index <= 13) ||
-           (index >= kGravityXId && index <= kLastEffectParameterId);
+// control feeds the canonical graph in Node Graph mode. Looked up in the binding
+// table so regrouping the ECW cannot silently invalidate the check.
+bool is_bound_control(A_long index) noexcept {
+    for (const A_long bound : kParameterIndices) {
+        if (bound == index) return true;
+    }
+    return false;
 }
 
 // Maps one delivered value per manifest control (binding order, see
@@ -200,31 +227,18 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // Labels, ranges, precision, and defaults mirror schema/parameters.json exactly.
     // Float literals match PF_FpShort so no narrowing warning is emitted at /W4.
     // Every bound control is supervised: an edit in Node Graph mode rewrites the
-    // canonical graph in the same user-change transaction (ADR 0009).
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Particle Count", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleCountDiskId);
-
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Birth Rate", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 30.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kBirthRateDiskId);
-
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
-
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Particle Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
-
-    // Emitter Shape and Emitter Origin are registered by hand instead of through
-    // PF_ADD_POPUP/PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and
-    // never set def.flags, and both controls must be supervised for the panel path.
+    // canonical graph in the same user-change transaction (ADR 0009). Topics reproduce
+    // the reference product's grouping; Physics and Render start folded, which needs
+    // PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG in the global flags.
+    PF_ADD_TOPICX("Emitter", 0, kEmitterTopicDiskId);
+    // Type and Origin are registered by hand instead of through PF_ADD_POPUP or
+    // PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and never set
+    // def.flags, and both controls must be supervised for the panel path.
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = PF_ParamFlag_SUPERVISE;
-    std::snprintf(def.name, sizeof(def.name), "Emitter Shape");
-    def.uu.id = kEmitterShapeDiskId;
+    std::snprintf(def.name, sizeof(def.name), "Type");
+    def.uu.id = kEmitterTypeDiskId;
     def.u.pd.num_choices = 4;
     def.u.pd.dephault = 1; // AE popup values are one-based: 1 is Point
     def.u.pd.value = def.u.pd.dephault;
@@ -232,12 +246,16 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     err = PF_ADD_PARAM(in_data, -1, &def);
     if (err != PF_Err_NONE) return err;
 
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Particles Per Second", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 100.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticlesPerSecondDiskId);
+
     // Position control: AE owns the on-screen picking behavior for point params.
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POINT_3D;
     def.flags = PF_ParamFlag_SUPERVISE;
-    std::snprintf(def.name, sizeof(def.name), "Emitter Origin");
-    def.uu.id = kEmitterOriginDiskId;
+    std::snprintf(def.name, sizeof(def.name), "Origin");
+    def.uu.id = kOriginDiskId;
     def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = 50.0;
     def.u.point3d_d.y_value = def.u.point3d_d.y_dephault = 50.0;
     def.u.point3d_d.z_value = def.u.point3d_d.z_dephault = 50.0;
@@ -245,32 +263,97 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (err != PF_Err_NONE) return err;
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityXDiskId);
+    PF_ADD_FLOAT_SLIDERX("Emitter Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityYDiskId);
+    PF_ADD_FLOAT_SLIDERX("Speed X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedXDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityZDiskId);
+    PF_ADD_FLOAT_SLIDERX("Speed Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedYDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Particle Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Speed Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedZDiskId);
+
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Speed Random", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedRandomDiskId);
+    PF_END_TOPIC(kEmitterTopicDiskId);
+
+    PF_ADD_TOPICX("Particle", 0, kParticleTopicDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
+
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
+
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Opacity", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Emitter Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
+    PF_ADD_FLOAT_SLIDERX("Opacity Over Life", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
+
+    // PF_ADD_COLOR does not clear the struct or touch flags; set them explicitly.
+    AEFX_CLR_STRUCT(def);
+    def.flags = PF_ParamFlag_SUPERVISE;
+    PF_ADD_COLOR("Color Start", 255, 255, 255, kColorStartDiskId);
+    AEFX_CLR_STRUCT(def);
+    def.flags = PF_ParamFlag_SUPERVISE;
+    PF_ADD_COLOR("Color End", 255, 255, 255, kColorEndDiskId);
+    PF_END_TOPIC(kParticleTopicDiskId);
+
+    PF_ADD_TOPICX("Physics", PF_ParamFlag_START_COLLAPSED, kPhysicsTopicDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityYDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityZDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
+    PF_END_TOPIC(kPhysicsTopicDiskId);
+
+    PF_ADD_TOPICX("Render", PF_ParamFlag_START_COLLAPSED, kRenderTopicDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kMaxParticlesDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity Spread", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocitySpreadDiskId);
+    PF_ADD_FLOAT_SLIDERX("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
+
+    // Control Source defaults to AE Controls (manifest revision 6): a freshly applied
+    // effect must drive the visible controls, not sit in Node Graph mode where the
+    // controls look inert. Node Graph is opt-in through capture or the panel.
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_POPUP;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
+    std::snprintf(def.name, sizeof(def.name), "Control Source");
+    def.uu.id = kControlSourceId;
+    def.u.pd.num_choices = 2;
+    def.u.pd.dephault = kLegacyControlSource;
+    def.u.pd.value = kLegacyControlSource;
+    def.u.pd.u.namesptr = "AE Controls|Node Graph";
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
+
+    PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NONE,
+                  PF_ParamFlag_SUPERVISE, kCaptureControlsId);
 
     // The graph's default handle becomes host-owned only after successful ADD_PARAM.
     if (graph_parameter_disabled()) {
@@ -305,52 +388,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         err = PF_ADD_PARAM(in_data, -1, &def);
         if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
     }
-
-    AEFX_CLR_STRUCT(def);
-    def.param_type = PF_Param_POPUP;
-    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
-    std::snprintf(def.name, sizeof(def.name), "Control Source");
-    def.uu.id = kControlSourceId;
-    def.u.pd.num_choices = 2;
-    def.u.pd.dephault = kNodeControlSource;
-    def.u.pd.value = kLegacyControlSource;
-    def.u.pd.u.namesptr = "AE Controls|Node Graph";
-    err = PF_ADD_PARAM(in_data, -1, &def);
-    if (err != PF_Err_NONE) return err;
-
-    PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NONE,
-                  PF_ParamFlag_SUPERVISE, kCaptureControlsId);
-
-    // Force and appearance controls (IDs 17..24). They are appended after the
-    // graph/system parameters because parameter IDs are registration order and
-    // 14..16 are already stored in existing projects. Defaults reproduce the M2 look
-    // (no gravity, no drag, white sprites, constant size/opacity), so a fresh
-    // instance renders exactly as before until one of these controls is changed.
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityYDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityZDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
-    // PF_ADD_COLOR does not clear the struct or touch flags; set them explicitly.
-    AEFX_CLR_STRUCT(def);
-    def.flags = PF_ParamFlag_SUPERVISE;
-    PF_ADD_COLOR("Color Start", 255, 255, 255, kColorStartDiskId);
-    AEFX_CLR_STRUCT(def);
-    def.flags = PF_ParamFlag_SUPERVISE;
-    PF_ADD_COLOR("Color End", 255, 255, 255, kColorEndDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size End", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Opacity End", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
+    PF_END_TOPIC(kRenderTopicDiskId);
 
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
