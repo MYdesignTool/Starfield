@@ -31,14 +31,16 @@ not implemented. The earlier eight-control M2 build loaded and rendered in AE 20
 current thirteen-control M3-01 build still needs host qualification. See
 `docs/compatibility-matrix.md` for the exact evidence boundary.
 
-The Windows x64 MSBuild project uses the local Adobe SDK 26.5 by default and follows
+The Windows x64 MSBuild project uses the local May 2023 Adobe SDK by default and follows
 Adobe's PiPL resource conversion pipeline. It writes build outputs under `artifacts/plugin/`;
 override `STARFIELD_AE_SDK_ROOT` to build against another local SDK.
 
 From the repository root, build with `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`.
 The script maps the workspace to a temporary drive letter because Adobe's legacy PiPL
 toolchain does not reliably parse paths containing spaces or non-ASCII characters. To
-create a separate 2023 SDK build, pass `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023`.
+spell out the defaults, pass `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023`.
+Both commands write `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`.
+Current qualification targets AE 2023 only; newer-host adaptation is deferred.
 
 CMake builds only the host-independent core plus its self-tests
 (`tests/core_tests.cpp`; on a machine without CMake use

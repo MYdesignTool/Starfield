@@ -1,6 +1,6 @@
 # Starfield plug-in architecture
 
-Target host baseline: After Effects 23.0 (2023). Use the newest Adobe AE SDK at each release cut, while runtime-gating optional suites and keeping the minimum-host selector path compatible. See [the detailed roadmap](roadmap.md) for the support matrix and milestone gates.
+Current target: After Effects 2023 on Windows x64, built with the supplied May 2023 SDK. Owner direction on 2026-09-27 defers newer-host adaptation and qualification. See [the detailed roadmap](roadmap.md) for the support matrix and milestone gates.
 
 ## Goal and boundary
 
@@ -67,7 +67,7 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 - `docs/compatibility-matrix.md`: behavior inventory and independently derived acceptance criteria.
 - `docs/adr/`: decisions that affect saved projects or rendering semantics.
 
-The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against local SDK 26.5 by default; the supplied May 2023 SDK is retained as an API compatibility build. M2 now implements the SmartFX selectors and advertises SmartFX and float-color awareness; neither host behavior has completed qualification. MFR is not advertised and remains gated on a later thread-safety audit.
+The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements the SmartFX selectors and advertises SmartFX and float-color awareness; current host qualification is incomplete. MFR is not advertised and remains gated on a later thread-safety audit. G-03 now evaluates immutable emitter/output graphs through the core renderer (ADR 0007); G-04 still owns supplying those snapshots from AE.
 
 ## SDK guidance used
 

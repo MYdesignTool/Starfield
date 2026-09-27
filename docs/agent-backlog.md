@@ -4,6 +4,9 @@ This backlog is the task source for staged implementation work. Assign one task 
 
 ## Current checkpoint
 
+- **BUILD-23 (integration lead):** owner scope is now AE 2023 only. Script/MSBuild defaults and primary docs use the May 2023 SDK and `artifacts/plugin/2023/`; newer-host tasks are deferred. Owns build defaults and policy documentation only.
+- **G-03:** emitter/output core runtime and graph/flat parity implemented in `070c33e`; 4,418 assertions passed and the May 2023 SDK build succeeded. G-04/P-01/P-02 and force/appearance nodes remain open.
+
 - M0 architecture contracts and M1 SDK shell are in the source tree.
 - The user confirmed the empty M1 shell loads in AE 2023. An earlier M2 build also showed controls and a center sprite; the current thirteen-control M3-01 revision still needs host qualification.
 - **M2 and M3-01 core/adapter code builds:** the Windows x64 module builds with both supplied SDKs, and `tests/RunCoreTests.ps1` reports 3,828 passing checks for the host-independent core, including G-01/G-02.
@@ -28,7 +31,7 @@ No worker should create a branch/worktree from an uncommitted moving baseline. A
 | ID | Owner | Work | Depends on | Done when |
 |---|---|---|---|---|
 | HOST-01 | User / host operator | Finish the M1 host smoke pass in AE 2023 and record exact AE build, OS, and result. | M1 shell already loads | Effect can be added/removed, renders the input unchanged, duplicates, undo/redo works, and a saved project reopens. Record each result in `compatibility-matrix.md`. |
-| HOST-02 | User / host operator | Check the shell in the current AE 26.x release. | HOST-01 | Record exact host build and load/render result; do not infer support from the 26.5 SDK compile. |
+| HOST-02 | User / host operator | Newer-host qualification, deferred by owner direction. | Owner reopens scope | Do not infer support from historical SDK builds. |
 
 These are host-operated checks; code agents can prepare a concise checklist but cannot mark the results without host evidence.
 

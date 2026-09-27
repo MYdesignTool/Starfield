@@ -1,8 +1,8 @@
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('x64')][string]$Platform = 'x64',
-    [string]$SdkPath = 'AdobeSDK\AfterEffectsSDK_26.5_win',
-    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '',
+    [string]$SdkPath = 'AdobeSDK\May2023_AfterEffectsSDK',
+    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '2023',
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 

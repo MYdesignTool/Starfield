@@ -1,6 +1,13 @@
-# Development plan: AE 2023 and newer
+# Development plan: AE 2023 particle Alpha
 
 Planning baseline: 2026-09-27.
+
+Current owner scope supersedes the earlier multi-host plan: build and qualify AE
+2023 only. The current Alpha must deliver emitter -> force -> appearance -> output,
+a minimal dockable editor, four emitter shapes, gravity/drag, color and life curves,
+project persistence/copy/undo behavior, and spark/snow/floating-light examples.
+Full observed Stardust functionality and architecture/performance improvements
+remain the long-term goal; this Alpha does not complete that goal.
 
 ## Current M0/M1/M2/M3-01 status
 
@@ -11,7 +18,7 @@ Planning baseline: 2026-09-27.
 - **M2 render-slice code is present and builds:** SmartFX transport, the parameter bridge, deterministic simulation, and the CPU white-disc compositor are implemented; this deliberately minimal look is not feature parity. `docs/current-feature-audit.md` records the visible gaps. Both supplied SDK builds include the core target.
 - **M2 host qualification is partial (M2-06):** AE 2023 loaded an earlier eight-control build and showed a center sprite. A later eleven-control revision rendered nothing because of the emitter-origin conversion; that path was changed. The current thirteen-control M3-01 build has not yet been reloaded in AE. Exact host build, Options readout, bit depths, downsample, lifecycle, and cancellation remain unqualified. See `docs/compatibility-matrix.md`.
 - **M3-01 core implementation is complete:** seeded Point/Box/Sphere/Disc birth distributions and per-particle velocity spread are implemented and covered by the 3,828-check core suite. The current parameters remain flat AE controls pending graph persistence/evaluation; M3-01 host playback has not been confirmed.
-- **G-01/G-02 graph foundation is implemented in the core:** UUID node/edge IDs, typed port/parameter identities, registry-owned schemas, bounded validation, and the schema-1 binary codec are covered by the 3,828-check core suite. Graphs are not yet evaluated or connected to AE sequence data.
+- **G-01/G-02/G-03 core graph foundation:** model, validator, codec, and emitter/output evaluation are implemented. The core suite now passes 4,418 assertions; graph/flat pixels match in the covered cases. AE sequence integration remains G-04 work; schema-1 parameters are constants (ADR 0007).
 - **Known renderer gaps:** output is still white 2D sprites with constant size and opacity. Z does not affect projection, depth, or occlusion. Age curves, forces, color/texture sources, motion blur, mesh/volume rendering, and graph editing remain open. ROI narrowing is deferred to profiling.
 - **Static-review geometry finding resolved in code:** the old `host_render_layer_rect` helper assumed the SDK's downsample factor is a divisor, which the SDK documents inconsistently (the header says 1–999+, the `Resizer`/`PathMaster` samples treat it as a scale). That helper is gone; render geometry now comes from observed checked-out worlds plus `max_result_rect`, `ref_width/ref_height`, and `par`, carried through `pre_render_data` (ADR 0005), with a core test pinning the half-resolution mapping. Reduced-resolution renders still need host confirmation before being called supported.
 - **Default look updated (D-02, owner delegated):** velocity Y now defaults to 0.3 layer heights per second so a freshly applied instance shows a rising trail instead of one static dot. Defaults affect new instances only.
@@ -22,14 +29,13 @@ Planning baseline: 2026-09-27.
 
 ### Host versions
 
-- Minimum host: After Effects 23.0 (2023).
-- Rolling maximum: the newest stable AE release available at each release cut.
-- Release qualification matrix: AE 23.0 as the minimum compatibility gate, the latest patch of each major family still claimed, and the newest stable host. At minimum this means 23.x, 24.x, 25.x, and 26.x while those families remain in scope.
-- Beta hosts are smoke-tested when useful but are not release-qualified until stable. Record exact host build numbers in release evidence.
-- Compile against the newest Adobe AE SDK available at the release cut, currently the 26.5 SDK guide. Runtime code must only call APIs and suites available in the running host; obtain optional suites defensively and provide CPU/no-suite fallbacks.
+- Current host target: After Effects 2023, Windows x64. Record the exact tested 23.x build before claiming host support.
+- Build with `AdobeSDK/May2023_AfterEffectsSDK`; both the PowerShell entry point and direct MSBuild default to it.
+- Newer AE families, betas and other platforms are deferred. Historical 26.5 SDK builds are evidence for those older revisions only and are not current deliverables.
+- Runtime code must only call APIs and suites available in AE 2023; obtain suites defensively and provide defined failures when unavailable.
 - Do not copy SDK headers, samples, PiPL tools, or binaries into the repository. Keep the SDK as a local build input from Adobe Developer Console and record SDK version/toolchain metadata in build artifacts.
 
-Adobe's SDK guide recommends using the latest headers and checking compatibility in each host version. Its 26.5 additions include APIs/features explicitly marked as Premiere Pro beta only; these are not prerequisites for the AE effect. The supported AE range includes MFR-capable hosts, but compatibility with MFR does not itself prove this plug-in is thread-safe.
+An MFR-capable host does not itself prove this plug-in is thread-safe; the threaded-rendering flag remains disabled.
 
 ### Build and dependency policy
 
@@ -64,7 +70,7 @@ The owner's product statement: **node-based editing is the essence of the refere
 | Milestone | Scope | Exit criteria |
 |---|---|---|
 | M0 — contracts | Lock IDs, support policy, parameter schema, time/render semantics, and supported platforms | Architecture decisions reviewed; data-format and parameter manifests checked into source control |
-| M1 — loadable shell | One native effect, PiPL, one effect entry point plus SDK registration entry, About/global/sequence lifecycle, pass-through render, implicit input only | Loads in AE 23.0 and current stable AE; add/remove/save/reopen/copy/undo works; no MFR flag; graph storage and controls follow in M2/M4 |
+| M1 — loadable shell | One native effect, PiPL, one effect entry point plus SDK registration entry, About/global/sequence lifecycle, pass-through render, implicit input only | Loads in the recorded AE 2023 build; add/remove/save/reopen/copy/undo works; no MFR flag; graph storage and controls follow in M2/M4 |
 | M2 — render vertical slice | SmartFX pre-render/render, bounded ROI, CPU-only point emitter/sprite, time/seed determinism, 8/16/32-bpc and correct rowbytes/alpha | Same request gives bit-identical output; out-of-order and repeated requests match; cancellation and allocation errors release all host resources |
 | M3 — particle MVP | Point/box/sphere/disc emitters, birth/lifetime, velocity, gravity, drag, size/opacity curves, seed controls | Golden cases cover frame rate changes, non-integer frame rates, negative/subframe time, shutter sampling, and project reopen |
 | M4 — graph and presets | Node/edge model, graph validation, schema migrations, preset import/export, native UI organization | Invalid graphs cannot hang/crash; stable identifiers survive node reordering and schema migration |
@@ -87,7 +93,7 @@ M1 used legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 has
 
 ## Compatibility and quality gates
 
-- Every release tests the minimum host (AE 23.0), each still-supported major family, and the latest stable host. For each, record OS, exact AE build, SDK header/resource version, compiler, architecture, and result.
+- Each current release qualifies the recorded AE 2023 build. Record OS, exact AE build, SDK header/resource version, compiler, architecture, and result. Newer-host work is deferred by owner direction.
 - Project lifecycle: fresh add, duplicate effect, undo/redo, copy/paste, save/reopen, render-only instance, missing/older/newer sequence schema.
 - Render correctness: full frame and ROI, input-independent and input-dependent cases, 8/16/32-bpc, odd rowbytes, premultiplied/straight alpha, pixel aspect, downsample, color-space change, negative/subframe time, cancellation.
 - Determinism: random-seed fixed and changing, repeated frames, reverse frame order, multiple comp rates, motion blur samples.
@@ -98,7 +104,7 @@ M1 used legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 has
 ## Immediate next work
 
 1. **Requalify the current M3-01 build in AE 2023.** The existing host evidence is from older control revisions; use the Options readout at t ≥ 1 s, then test playback and Full/Half/Quarter resolution.
-2. **G-03: graph evaluation** into `RenderRequest`, with bit-identical output to the existing settings path for the built-in emitter → output graph.
+2. **G-03 emitter/output evaluation implemented:** preserve graph/flat pixel parity while adding the force and appearance kernels. Constant snapshots only; animation contracts remain open.
 3. **G-04: AE persistence and migration** so new instances create a graph and current parameter values can migrate without changing AE IDs.
 4. **Move remaining behaviors onto nodes** after graph evaluation: age curves, appearance, forces, textures, depth, and rendering families; implement the editor as a thin client over a versioned protocol.
 5. **Deferred deliberately:** analytic ROI narrowing, Compute Cache, MFR, and GPU stay on their milestone cards.
