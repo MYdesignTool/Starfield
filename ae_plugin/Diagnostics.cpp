@@ -89,7 +89,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
     writer.line(control_source == kLegacyControlSource
         ? "AE Controls (driving render)\n" : "AE Controls (inactive in Node Graph mode)\n");
-    if (flat_render_override_active()) {
+    if (graph_parameter_disabled()) {
+        writer.line("STARFIELD_NO_GRAPH_PARAM probe: no arbitrary data registered, flat render\n");
+    } else if (flat_render_override_active()) {
         writer.line("STARFIELD_FLAT_RENDER override: rendering flat controls\n");
     }
 

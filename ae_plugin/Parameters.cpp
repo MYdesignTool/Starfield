@@ -273,22 +273,38 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocitySpreadDiskId);
 
     // The graph's default handle becomes host-owned only after successful ADD_PARAM.
-    PF_ArbitraryH default_graph = nullptr;
-    PF_ArbParamsExtra create{};
-    create.id = kGraphParameterId;
-    create.which_function = PF_Arbitrary_NEW_FUNC;
-    create.u.new_func_params.arbPH = &default_graph;
-    err = graph_arbitrary_callback(in_data, &create);
-    if (err != PF_Err_NONE) return err;
-    AEFX_CLR_STRUCT(def);
-    def.param_type = PF_Param_ARBITRARY_DATA;
-    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
-    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
-    std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
-    def.uu.id = def.u.arb_d.id = kGraphParameterId;
-    def.u.arb_d.dephault = default_graph;
-    err = PF_ADD_PARAM(in_data, -1, &def);
-    if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
+    if (graph_parameter_disabled()) {
+        // Diagnostic build probe: same index, same count, no arbitrary data at all.
+        AEFX_CLR_STRUCT(def);
+        def.param_type = PF_Param_FLOAT_SLIDER;
+        def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+        std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
+        def.uu.id = kGraphParameterId; // same project identity, different parameter kind
+        def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
+        err = PF_ADD_PARAM(in_data, -1, &def);
+        if (err != PF_Err_NONE) return err;
+    } else {
+        PF_ArbitraryH default_graph = nullptr;
+        PF_ArbParamsExtra create{};
+        create.id = kGraphParameterId;
+        create.which_function = PF_Arbitrary_NEW_FUNC;
+        create.u.new_func_params.arbPH = &default_graph;
+        err = graph_arbitrary_callback(in_data, &create);
+        if (err != PF_Err_NONE) return err;
+        AEFX_CLR_STRUCT(def);
+        def.param_type = PF_Param_ARBITRARY_DATA;
+        // Arbitrary data cannot be animated, and the SDK's own PF_ADD_ARBITRARY2 passes
+        // no PF_ParamFlags at all; the two flags this used to carry were never part of
+        // the documented arbitrary-data contract.
+        def.flags = PF_ParamFlag_NONE;
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+        std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
+        def.uu.id = def.u.arb_d.id = kGraphParameterId;
+        def.u.arb_d.dephault = default_graph;
+        err = PF_ADD_PARAM(in_data, -1, &def);
+        if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
+    }
 
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
@@ -415,6 +431,16 @@ PF_Err graph_error(PF_OutData* out, const core::CoreError& error) noexcept {
 }
 } // namespace
 
+bool graph_parameter_disabled() noexcept {
+    // Diagnostic escape hatch for host triage. With STARFIELD_NO_GRAPH_PARAM=1 the
+    // arbitrary-data parameter is replaced at registration time by a hidden float slider
+    // that keeps the same index and count, and rendering always samples the flat
+    // controls. It answers exactly one question: does the arbitrary-data parameter
+    // itself break the host? Normal runs are unaffected and the value is never persisted.
+    const char* value = std::getenv("STARFIELD_NO_GRAPH_PARAM");
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+}
+
 bool flat_render_override_active() noexcept {
     // Diagnostic escape hatch for host triage. With STARFIELD_FLAT_RENDER=1 the render
     // samples the flat AE controls instead of the stored graph, so a host-side surprise
@@ -422,7 +448,8 @@ bool flat_render_override_active() noexcept {
     // Normal runs are unaffected, the value is never persisted, and the Options readout
     // prints whether the override is active.
     const char* value = std::getenv("STARFIELD_FLAT_RENDER");
-    return value != nullptr && value[0] != '\0' && value[0] != '0';
+    if (value != nullptr && value[0] != '\0' && value[0] != '0') return true;
+    return graph_parameter_disabled();
 }
 
 PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,

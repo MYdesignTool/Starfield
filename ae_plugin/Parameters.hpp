@@ -60,6 +60,11 @@ inline constexpr A_long kLastEffectParameterId = kOpacityEndId;
 // it never persists and the Options readout reports it.
 [[nodiscard]] bool flat_render_override_active() noexcept;
 
+// Diagnostic only: true when STARFIELD_NO_GRAPH_PARAM=1. Registration then swaps the
+// arbitrary-data parameter for a hidden float slider with the same index and count, and
+// rendering stays on the flat path, so the host can be tested without arbitrary data.
+[[nodiscard]] bool graph_parameter_disabled() noexcept;
+
 // Host-scoped parameter snapshot. Values are checked out with PF_CHECKOUT_PARAM,
 // converted into core units, and never outlive checkin(). The snapshot is
 // copy-disabled so a checkout cannot be duplicated without a matching checkin.

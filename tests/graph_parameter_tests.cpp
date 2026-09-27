@@ -173,7 +173,9 @@ void test_parameters(PF_InData& host) {
     const auto& source = registered[14];
     CHECK(source.u.pd.dephault == kNodeControlSource && source.u.pd.value == kLegacyControlSource);
     CHECK((source.flags & PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS) != 0);
-    CHECK((registered[13].flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    // The SDK's own PF_ADD_ARBITRARY2 passes no PF_ParamFlags; arbitrary data cannot be
+    // animated, and the two flags this used to carry were never part of the contract.
+    CHECK(registered[13].flags == 0);
     CHECK(registered[13].u.arb_d.value == nullptr);
     for (std::size_t i = 1; i <= 24; ++i) {
         parameters[i] = registered[i - 1];
