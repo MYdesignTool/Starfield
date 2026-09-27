@@ -47,6 +47,9 @@ inline constexpr double kMaxEmitterOffset = 100.0;
 inline constexpr double kMaxVelocity = 1'000.0;
 inline constexpr double kMaxEmitterSize = 10.0;
 inline constexpr double kMaxVelocitySpread = 100.0;
+inline constexpr double kMaxGravityMagnitude = 1'000.0;
+inline constexpr double kMaxLinearDrag = 100.0;
+inline constexpr double kMaxParticleColor = 64.0;
 
 struct Vec3 {
     double x{};
@@ -75,6 +78,18 @@ struct Settings {
     // per second. This is what makes a steady emitter animate: identical particles
     // produce a stationary pattern, varied ones produce visible motion.
     double velocity_spread{0.15};
+    // Constant acceleration in layer-heights per second squared and linear drag
+    // rate in inverse seconds. Zero preserves the M2 straight-line trajectory.
+    Vec3 gravity{};
+    double linear_drag{0.0};
+    // Linear age curves. `particle_size` and `opacity` are the birth values;
+    // these end values are reached as age approaches lifetime. Color is stored
+    // as three working-space channel values; alpha is controlled by opacity.
+    Vec3 color_start{1.0, 1.0, 1.0};
+    Vec3 color_end{1.0, 1.0, 1.0};
+    double particle_size_end{8.0};
+    double opacity_end{1.0};
+    bool appearance_enabled{false};
 };
 
 // Host popup controls are one-based while the core enum is zero-based. Out-of-range
@@ -93,6 +108,11 @@ enum class ValidationCode : std::uint8_t {
     velocity_clamped,
     emitter_size_clamped,
     velocity_spread_clamped,
+    gravity_clamped,
+    linear_drag_clamped,
+    color_clamped,
+    end_size_clamped,
+    end_opacity_clamped,
     non_finite_replaced,
 };
 

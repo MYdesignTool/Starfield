@@ -103,6 +103,44 @@ ValidatedSettings validate_settings(Settings settings) {
     value.velocity_spread = clamp(value.velocity_spread, 0.0, kMaxVelocitySpread,
                                   ValidationCode::velocity_spread_clamped, "velocity_spread", notices);
 
+    value.gravity.x = finite_or(value.gravity.x, 0.0, "gravity.x", notices);
+    value.gravity.y = finite_or(value.gravity.y, 0.0, "gravity.y", notices);
+    value.gravity.z = finite_or(value.gravity.z, 0.0, "gravity.z", notices);
+    value.gravity.x = clamp(value.gravity.x, -kMaxGravityMagnitude, kMaxGravityMagnitude,
+                            ValidationCode::gravity_clamped, "gravity.x", notices);
+    value.gravity.y = clamp(value.gravity.y, -kMaxGravityMagnitude, kMaxGravityMagnitude,
+                            ValidationCode::gravity_clamped, "gravity.y", notices);
+    value.gravity.z = clamp(value.gravity.z, -kMaxGravityMagnitude, kMaxGravityMagnitude,
+                            ValidationCode::gravity_clamped, "gravity.z", notices);
+
+    value.linear_drag = finite_or(value.linear_drag, 0.0, "linear_drag", notices);
+    value.linear_drag = clamp(value.linear_drag, 0.0, kMaxLinearDrag,
+                              ValidationCode::linear_drag_clamped, "linear_drag", notices);
+
+    const auto validate_color = [&notices](Vec3& color, const char* field) {
+        const auto validate_channel = [&notices, field](double& channel, const char* suffix) {
+            std::string name(field);
+            name += suffix;
+            channel = finite_or(channel, 1.0, name.c_str(), notices);
+            channel = clamp(channel, 0.0, kMaxParticleColor,
+                            ValidationCode::color_clamped, name.c_str(), notices);
+        };
+        validate_channel(color.x, ".r");
+        validate_channel(color.y, ".g");
+        validate_channel(color.z, ".b");
+    };
+    validate_color(value.color_start, "color_start");
+    validate_color(value.color_end, "color_end");
+
+    value.particle_size_end = finite_or(value.particle_size_end, value.particle_size,
+                                        "particle_size_end", notices);
+    value.particle_size_end = clamp(value.particle_size_end, 0.0, kMaxParticleSize,
+                                    ValidationCode::end_size_clamped, "particle_size_end", notices);
+    value.opacity_end = finite_or(value.opacity_end, value.opacity,
+                                  "opacity_end", notices);
+    value.opacity_end = clamp(value.opacity_end, 0.0, 1.0,
+                              ValidationCode::end_opacity_clamped, "opacity_end", notices);
+
     if (static_cast<unsigned>(value.emitter_shape) > static_cast<unsigned>(EmitterShape::disc)) {
         value.emitter_shape = EmitterShape::point;
         notices.push_back({ValidationCode::emitter_shape_replaced, "emitter_shape"});

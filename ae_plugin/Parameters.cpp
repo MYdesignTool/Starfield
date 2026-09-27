@@ -32,10 +32,23 @@ constexpr A_long kSizeDiskId = 'size';
 constexpr A_long kOpacityDiskId = 'opac';
 constexpr A_long kEmitterSizeDiskId = 'esiz';
 constexpr A_long kVelocitySpreadDiskId = 'vspd';
+constexpr A_long kGravityXDiskId = 'grvx';
+constexpr A_long kGravityYDiskId = 'grvy';
+constexpr A_long kGravityZDiskId = 'grvz';
+constexpr A_long kLinearDragDiskId = 'drag';
+constexpr A_long kColorStartDiskId = 'clrs';
+constexpr A_long kColorEndDiskId = 'clre';
+constexpr A_long kParticleSizeEndDiskId = 'szen';
+constexpr A_long kOpacityEndDiskId = 'open';
 
-// Parameter types in ID order. They are stamped into the checked-out PF_ParamDef
-// before PF_CHECKOUT_PARAM so the host cannot be confused about how to fill the
-// value union. Hosts that fill by index are unaffected.
+// Parameter types and host indices in binding order: slot 0..20 map to the manifest
+// controls. Types are stamped into the checked-out PF_ParamDef before
+// PF_CHECKOUT_PARAM so the host cannot be confused about how to fill the value
+// union. Hosts that fill by index are unaffected.
+constexpr A_long kParameterIndices[kEffectParameterCount] = {
+    1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, // Particle Count .. Velocity Spread
+    17, 18, 19, 20, 21, 22, 23, 24,                     // Gravity X .. Opacity End
+};
 constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_FLOAT_SLIDER, /* 1  Particle Count    */
     PF_Param_FLOAT_SLIDER, /* 2  Birth Rate        */
@@ -50,6 +63,14 @@ constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_FLOAT_SLIDER, /* 11 Opacity           */
     PF_Param_FLOAT_SLIDER, /* 12 Emitter Size      */
     PF_Param_FLOAT_SLIDER, /* 13 Velocity Spread   */
+    PF_Param_FLOAT_SLIDER, /* 17 Gravity X         */
+    PF_Param_FLOAT_SLIDER, /* 18 Gravity Y         */
+    PF_Param_FLOAT_SLIDER, /* 19 Gravity Z         */
+    PF_Param_FLOAT_SLIDER, /* 20 Linear Drag       */
+    PF_Param_COLOR,        /* 21 Color Start       */
+    PF_Param_COLOR,        /* 22 Color End         */
+    PF_Param_FLOAT_SLIDER, /* 23 Size End          */
+    PF_Param_FLOAT_SLIDER, /* 24 Opacity End       */
 };
 
 std::uint32_t to_particle_count(const PF_ParamDef& def) noexcept {
@@ -90,6 +111,81 @@ std::uint32_t popup_index(const PF_ParamDef& def) noexcept {
     return static_cast<std::uint32_t>(value - 1);
 }
 
+// Color controls deliver 8-bit channels (PF_ColorDef). The core stores
+// working-space 0..1 channel values and M2 performs no color-space conversion
+// (ADR 0005); the alpha channel is owned by the opacity controls.
+core::Vec3 to_color(const PF_ParamDef& def) noexcept {
+    const PF_Pixel& pixel = def.u.cd.value;
+    return core::Vec3{static_cast<double>(pixel.red) / 255.0, static_cast<double>(pixel.green) / 255.0,
+                      static_cast<double>(pixel.blue) / 255.0};
+}
+
+// True when the parameter index is one of the manifest controls; every bound
+// control feeds the canonical graph in Node Graph mode.
+constexpr bool is_bound_control(A_long index) noexcept {
+    return (index >= kFirstEffectParameterId && index <= 13) ||
+           (index >= kGravityXId && index <= kLastEffectParameterId);
+}
+
+// Maps one delivered value per manifest control (binding order, see
+// kParameterIndices) into core settings. The render checkout and the supervised
+// panel edit share this path so both see identical conversions. Values are not
+// clamped here: validate_settings owns every bound.
+core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData& in_data,
+                                      core::Vec3* raw_origin) noexcept {
+    core::Settings settings;
+
+    settings.particle_count = to_particle_count(*defs[0]);
+    settings.birth_rate = to_double(*defs[1]);
+    settings.seed = to_seed(*defs[2]);
+    settings.particle_lifetime_seconds = to_double(*defs[3]);
+    settings.emitter_shape = core::emitter_shape_from_index(popup_index(*defs[4]));
+
+    // Emitter Origin is an AE point control. AE delivers *absolute layer pixels* with
+    // the origin at the layer's top-left, x growing right and y growing down; the
+    // control's default is a percentage where 50 means "halfway" (SDK header note for
+    // PF_Point3DDef). The core wants layer heights with the origin at the layer centre
+    // and +Y up, so the conversion happens in testable core helpers (ADR 0003,
+    // docs/parameter-mapping.md).
+    const PF_Point3DDef& origin = defs[5]->u.point3d_d;
+    const core::Vec3 raw{static_cast<double>(origin.x_value), static_cast<double>(origin.y_value),
+                         static_cast<double>(origin.z_value)};
+    if (raw_origin) *raw_origin = raw;
+
+    const double layer_width = static_cast<double>(in_data.width > 0 ? in_data.width : 1);
+    const double layer_height = static_cast<double>(in_data.height > 0 ? in_data.height : 1);
+    core::LayerUnits units;
+    units.layer_width = layer_width;
+    units.layer_height = layer_height;
+    units.pixel_aspect_ratio = host_pixel_aspect_ratio(in_data);
+    settings.emitter_origin = core::layer_point_to_world(
+        core::host_point_component_to_layer_pixels(raw.x, layer_width),
+        core::host_point_component_to_layer_pixels(raw.y, layer_height),
+        core::host_point_component_to_layer_pixels(raw.z, layer_height), units);
+
+    // The velocity sliders are already in layer heights per second, which is the
+    // core's world unit, so they need no conversion.
+    settings.velocity.x = to_double(*defs[6]);
+    settings.velocity.y = to_double(*defs[7]);
+    settings.velocity.z = to_double(*defs[8]);
+
+    settings.particle_size = to_double(*defs[9]);
+    settings.opacity = to_double(*defs[10]);
+
+    // Emitter extent (cube edge for Box, diameter for Sphere/Disc), per-axis velocity
+    // jitter, gravity (layer heights per second squared), linear drag (inverse
+    // seconds) and the age-curve endpoints all share the core's world units.
+    settings.emitter_size = to_double(*defs[11]);
+    settings.velocity_spread = to_double(*defs[12]);
+    settings.gravity = core::Vec3{to_double(*defs[13]), to_double(*defs[14]), to_double(*defs[15])};
+    settings.linear_drag = to_double(*defs[16]);
+    settings.color_start = to_color(*defs[17]);
+    settings.color_end = to_color(*defs[18]);
+    settings.particle_size_end = to_double(*defs[19]);
+    settings.opacity_end = to_double(*defs[20]);
+    return settings;
+}
+
 } // namespace
 
 PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
@@ -98,59 +194,82 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     PF_ParamDef def;
+    PF_Err err = PF_Err_NONE;
 
     // Labels, ranges, precision, and defaults mirror schema/parameters.json exactly.
     // Float literals match PF_FpShort so no narrowing warning is emitted at /W4.
+    // Every bound control is supervised: an edit in Node Graph mode rewrites the
+    // canonical graph in the same user-change transaction (ADR 0009).
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Particle Count", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kParticleCountDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleCountDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Birth Rate", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 30.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kBirthRateDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kBirthRateDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kSeedDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Particle Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kLifetimeDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
 
+    // Emitter Shape and Emitter Origin are registered by hand instead of through
+    // PF_ADD_POPUP/PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and
+    // never set def.flags, and both controls must be supervised for the panel path.
     AEFX_CLR_STRUCT(def);
-    PF_ADD_POPUP("Emitter Shape", 4, 1, "Point|Box|Sphere|Disc", kEmitterShapeDiskId);
+    def.param_type = PF_Param_POPUP;
+    def.flags = PF_ParamFlag_SUPERVISE;
+    std::snprintf(def.name, sizeof(def.name), "Emitter Shape");
+    def.uu.id = kEmitterShapeDiskId;
+    def.u.pd.num_choices = 4;
+    def.u.pd.dephault = 1; // AE popup values are one-based: 1 is Point
+    def.u.pd.value = def.u.pd.dephault;
+    def.u.pd.u.namesptr = "Point|Box|Sphere|Disc";
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
 
     // Position control: AE owns the on-screen picking behavior for point params.
     AEFX_CLR_STRUCT(def);
-    PF_ADD_POINT_3D("Emitter Origin", 50.0, 50.0, 50.0, kEmitterOriginDiskId);
+    def.param_type = PF_Param_POINT_3D;
+    def.flags = PF_ParamFlag_SUPERVISE;
+    std::snprintf(def.name, sizeof(def.name), "Emitter Origin");
+    def.uu.id = kEmitterOriginDiskId;
+    def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = 50.0;
+    def.u.point3d_d.y_value = def.u.point3d_d.y_dephault = 50.0;
+    def.u.point3d_d.z_value = def.u.point3d_d.z_dephault = 50.0;
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Velocity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kVelocityXDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityXDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Velocity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kVelocityYDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityYDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Velocity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kVelocityZDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocityZDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Particle Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kSizeDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Opacity", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kOpacityDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Emitter Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kEmitterSizeDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Velocity Spread", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_NONE, kVelocitySpreadDiskId);
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kVelocitySpreadDiskId);
 
     // The graph's default handle becomes host-owned only after successful ADD_PARAM.
     PF_ArbitraryH default_graph = nullptr;
@@ -158,7 +277,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     create.id = kGraphParameterId;
     create.which_function = PF_Arbitrary_NEW_FUNC;
     create.u.new_func_params.arbPH = &default_graph;
-    PF_Err err = graph_arbitrary_callback(in_data, &create);
+    err = graph_arbitrary_callback(in_data, &create);
     if (err != PF_Err_NONE) return err;
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_ARBITRARY_DATA;
@@ -185,6 +304,37 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NONE,
                   PF_ParamFlag_SUPERVISE, kCaptureControlsId);
 
+    // Force and appearance controls (IDs 17..24). They are appended after the
+    // graph/system parameters because parameter IDs are registration order and
+    // 14..16 are already stored in existing projects. Defaults reproduce the M2 look
+    // (no gravity, no drag, white sprites, constant size/opacity), so a fresh
+    // instance renders exactly as before until one of these controls is changed.
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityYDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Gravity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityZDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
+    // PF_ADD_COLOR does not clear the struct or touch flags; set them explicitly.
+    AEFX_CLR_STRUCT(def);
+    def.flags = PF_ParamFlag_SUPERVISE;
+    PF_ADD_COLOR("Color Start", 255, 255, 255, kColorStartDiskId);
+    AEFX_CLR_STRUCT(def);
+    def.flags = PF_ParamFlag_SUPERVISE;
+    PF_ADD_COLOR("Color End", 255, 255, 255, kColorEndDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size End", 0.0f, 100000.0f, 0.0f, 100000.0f, 8.0f, PF_Precision_HUNDREDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Opacity End", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
+                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
+
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -205,7 +355,7 @@ PF_Err ParameterSnapshot::checkout(PF_InData* in_data) noexcept {
     }
 
     for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
-        const A_long index = static_cast<A_long>(i) + 1;
+        const A_long index = kParameterIndices[i];
         const PF_Err err = PF_CHECKOUT_PARAM(in_data, index, in_data->current_time, in_data->time_step,
                                             in_data->time_scale, &defs_[i]);
         if (err != PF_Err_NONE) {
@@ -215,48 +365,13 @@ PF_Err ParameterSnapshot::checkout(PF_InData* in_data) noexcept {
         checked_out_[i] = true;
     }
 
-    const double layer_width = static_cast<double>(in_data->width > 0 ? in_data->width : 1);
-    const double layer_height = static_cast<double>(in_data->height > 0 ? in_data->height : 1);
-
-    settings_.particle_count = to_particle_count(defs_[0]);
-    settings_.birth_rate = to_double(defs_[1]);
-    settings_.seed = to_seed(defs_[2]);
-    settings_.particle_lifetime_seconds = to_double(defs_[3]);
-    settings_.emitter_shape = core::emitter_shape_from_index(popup_index(defs_[4]));
-
-    // Emitter Origin is an AE point control. AE delivers *absolute layer pixels* with
-    // the origin at the layer's top-left, x growing right and y growing down; the
-    // control's default is a percentage where 50 means "halfway" (SDK header note for
-    // PF_Point3DDef). The core wants layer heights with the origin at the layer centre
-    // and +Y up, so the conversion happens in testable core helpers (ADR 0003,
-    // docs/parameter-mapping.md).
-    const PF_Point3DDef& origin = defs_[5].u.point3d_d;
-    raw_origin_ = core::Vec3{static_cast<double>(origin.x_value), static_cast<double>(origin.y_value),
-                             static_cast<double>(origin.z_value)};
-
-    core::LayerUnits units;
-    units.layer_width = layer_width;
-    units.layer_height = layer_height;
-    units.pixel_aspect_ratio = host_pixel_aspect_ratio(*in_data);
-    settings_.emitter_origin = core::layer_point_to_world(
-        core::host_point_component_to_layer_pixels(raw_origin_.x, layer_width),
-        core::host_point_component_to_layer_pixels(raw_origin_.y, layer_height),
-        core::host_point_component_to_layer_pixels(raw_origin_.z, layer_height), units);
-
-    // The velocity sliders are already in layer heights per second, which is the
-    // core's world unit, so they need no conversion.
-    settings_.velocity.x = to_double(defs_[6]);
-    settings_.velocity.y = to_double(defs_[7]);
-    settings_.velocity.z = to_double(defs_[8]);
-
-    settings_.particle_size = to_double(defs_[9]);
-    settings_.opacity = to_double(defs_[10]);
-
-    // Emitter extent (cube edge for Box, diameter for Sphere/Disc) and the per-axis
-    // velocity jitter are already in core units: layer heights and layer heights per
-    // second.
-    settings_.emitter_size = to_double(defs_[11]);
-    settings_.velocity_spread = to_double(defs_[12]);
+    // One conversion path for the render checkout and the supervised panel edit;
+    // the emitter-origin unit ladder lives in the shared helper.
+    const PF_ParamDef* controls[kEffectParameterCount]{};
+    for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
+        controls[i] = &defs_[i];
+    }
+    settings_ = settings_from_controls(controls, *in_data, &raw_origin_);
 
     valid_ = true;
     return PF_Err_NONE;
@@ -358,6 +473,53 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
         if (old) in_data->utils->host_dispose_handle(old);
         return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
+}
+
+namespace {
+
+// Rebuilds the canonical graph from the delivered control values. Only called from
+// PF_Cmd_USER_CHANGED_PARAM, where params[] carries the accepted new values: a
+// PF_CHECKOUT_PARAM during a user change can still return the pre-edit value, so
+// the delivered array is the authoritative source here. All fallible work happens
+// before the graph parameter is replaced.
+PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[]) noexcept {
+    if (!params[kGraphParameterId] || !params[kControlSourceId]) return PF_Err_BAD_CALLBACK_PARAM;
+    if (params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
+        params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
+    if (params[kControlSourceId]->u.pd.value != kNodeControlSource) return PF_Err_NONE; // AE Controls mode
+
+    const PF_ParamDef* defs[kEffectParameterCount]{};
+    for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
+        const PF_ParamDef* def = params[kParameterIndices[i]];
+        if (!def) return PF_Err_BAD_CALLBACK_PARAM;
+        defs[i] = def;
+    }
+
+    const auto settings = core::validate_settings(settings_from_controls(defs, *in_data, nullptr));
+    auto graph = graph_from_controls(settings.value);
+    if (!graph.has_value()) return graph_error(out_data, graph.error());
+    PF_ArbitraryH replacement = nullptr;
+    const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
+    if (created != PF_Err_NONE) return created;
+    auto& target = *params[kGraphParameterId];
+    const auto old = target.u.arb_d.value;
+    target.u.arb_d.value = replacement;
+    target.uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+    if (old) in_data->utils->host_dispose_handle(old);
+    return PF_Err_NONE;
+}
+
+} // namespace
+
+PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
+                          PF_UserChangedParamExtra* extra) noexcept {
+    if (!in_data || !params || !extra) return PF_Err_BAD_CALLBACK_PARAM;
+    try {
+        if (extra->param_index == kCaptureControlsId) return capture_controls(in_data, out_data, params, extra);
+        if (!is_bound_control(extra->param_index)) return PF_Err_NONE;
+        return sync_graph_from_controls(in_data, out_data, params);
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }

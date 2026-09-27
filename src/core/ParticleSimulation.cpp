@@ -52,6 +52,33 @@ constexpr double kMaxExactSlot = 9007199254740992.0; // 2^53
 
 constexpr std::uint64_t kCancellationCheckInterval = 4096;
 
+struct DragIntegrals {
+    double velocity_displacement{0.0};
+    double acceleration_displacement{0.0};
+};
+
+// For dv/dt = gravity - drag * velocity, return the exact displacement factors
+// multiplying initial velocity and gravity over `age`. The series avoids
+// cancellation in (t - (1-exp(-kt))/k) when k*t is close to zero.
+DragIntegrals drag_integrals(double drag, double age) noexcept {
+    if (!(drag > 0.0)) return DragIntegrals{age, 0.5 * age * age};
+
+    const double z = drag * age;
+    if (z < 1.0e-4) {
+        const double z2 = z * z;
+        const double z3 = z2 * z;
+        const double z4 = z3 * z;
+        const double velocity_factor = age * (1.0 - z / 2.0 + z2 / 6.0 - z3 / 24.0 + z4 / 120.0);
+        const double acceleration_factor = age * age *
+            (0.5 - z / 6.0 + z2 / 24.0 - z3 / 120.0 + z4 / 720.0);
+        return DragIntegrals{velocity_factor, acceleration_factor};
+    }
+
+    const double velocity_factor = -std::expm1(-z) / drag;
+    const double acceleration_factor = (age - velocity_factor) / drag;
+    return DragIntegrals{velocity_factor, acceleration_factor};
+}
+
 struct SlotRange {
     std::uint64_t first{0};
     std::uint64_t last{0};
@@ -144,8 +171,21 @@ Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings
         particle.id = slot;
         particle.age_seconds = age;
         particle.lifetime_seconds = values.particle_lifetime_seconds;
-        particle.size_pixels = values.particle_size;
-        particle.opacity = values.opacity;
+        const double age_fraction = values.particle_lifetime_seconds > 0.0
+            ? std::clamp(age / values.particle_lifetime_seconds, 0.0, 1.0) : 0.0;
+        if (values.appearance_enabled) {
+            particle.size_pixels = values.particle_size +
+                (values.particle_size_end - values.particle_size) * age_fraction;
+            particle.opacity = values.opacity + (values.opacity_end - values.opacity) * age_fraction;
+            particle.color = Vec3{
+                values.color_start.x + (values.color_end.x - values.color_start.x) * age_fraction,
+                values.color_start.y + (values.color_end.y - values.color_start.y) * age_fraction,
+                values.color_start.z + (values.color_end.z - values.color_start.z) * age_fraction};
+        } else {
+            particle.size_pixels = values.particle_size;
+            particle.opacity = values.opacity;
+            particle.color = Vec3{1.0, 1.0, 1.0};
+        }
         // Per-particle birth offset and velocity come from deterministic streams keyed
         // by (seed, id, purpose). This variation is what makes a steady emitter move:
         // with identical particles, births continuously replace the particles that
@@ -161,12 +201,15 @@ Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings
                 symmetric_value(values.seed, slot, RandomPurpose::velocity_z) * values.velocity_spread;
         }
 
-        // Straight-line integration: any absolute time can be evaluated without
-        // stepping, so frame order cannot matter. Gravity, drag, and curves arrive as
-        // graph nodes in M3-02.
-        particle.position.x = origin.x + birth.x + particle_velocity.x * age;
-        particle.position.y = origin.y + birth.y + particle_velocity.y * age;
-        particle.position.z = origin.z + birth.z + particle_velocity.z * age;
+        // Closed-form integration for each particle age makes arbitrary-time,
+        // out-of-order rendering independent of frame stepping and render history.
+        const DragIntegrals factors = drag_integrals(values.linear_drag, age);
+        particle.position.x = origin.x + birth.x + particle_velocity.x * factors.velocity_displacement +
+                              values.gravity.x * factors.acceleration_displacement;
+        particle.position.y = origin.y + birth.y + particle_velocity.y * factors.velocity_displacement +
+                              values.gravity.y * factors.acceleration_displacement;
+        particle.position.z = origin.z + birth.z + particle_velocity.z * factors.velocity_displacement +
+                              values.gravity.z * factors.acceleration_displacement;
     }
 
     return Result<std::vector<ParticleInstance>>::success(std::move(particles));

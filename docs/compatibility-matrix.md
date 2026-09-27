@@ -9,8 +9,11 @@ Use this file to turn observed behavior into requirements before implementing ea
 | M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass | Effect loads; render pass-through, add/remove, save/reopen, duplicate, and undo/redo still unrecorded |
 | M1 discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Current build must be qualified separately |
 | Build-2 graph render/persistence | AE 2023, exact build not recorded | Not checked | Current AE 2023 target binary has not been loaded; test graph source, save/reopen, duplication and undo/redo |
-| M2 particle render | AE 2023; exact build not recorded | Partial, old revision only | The eight-control build loaded and rendered a center sprite. A later eleven-control revision rendered nothing after adding Emitter Origin. The conversion was rewritten; current 16-parameter build-2 has not been checked in AE. |
-| M3-01 shapes and playback | AE 2023; exact build not recorded | Core implementation only | Install build-2 and confirm at t ≥ 1 s with the graph-aware Options readout |
+| M2 particle render | AE 2023; exact build not recorded | Partial, old revision only | The eight-control build loaded and rendered a center sprite. A later eleven-control revision rendered nothing after adding Emitter Origin. The conversion was rewritten; the current 24-parameter build has not been checked in AE. |
+| M3-01 shapes and playback | AE 2023; exact build not recorded | Core implementation only | Install the current build and confirm at t ≥ 1 s with the graph-aware Options readout |
+| M3-02 force/appearance | AE 2023; exact build not recorded | Core implementation only | Gravity, drag, color and the size/opacity age curves have core + control coverage (IDs 17-24). Confirm visible change: with defaults the picture must be unchanged, then set Gravity Y = -2 and Size End = 1 and re-render. |
+| P-02 dockable panel | AE 2023; exact build not recorded | Not checked | Panel appears under Window > Extensions, `Lookup: name` resolves, an edit updates the comp, one undo/redo restores it, and a stale edit is rejected. See `cep_panel/README.md`. |
+| Delivery examples | AE 2023; exact build not recorded | Not checked | Apply Spark, Snow and Floating Light from `docs/examples.md` and record a still frame at t ≥ 1 s for each |
 | M2 point-control units | Any host | Fixed in code, unverified in a host | Documented delivery is absolute layer pixels; the adapter normalizes through a ladder (pixels / legacy percentage / fixed-point) and the Options readout prints host values, interpreted pixels, and world position so the real delivery can be recorded |
 | M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
@@ -20,16 +23,19 @@ Use this file to turn observed behavior into requirements before implementing ea
 Load the current build once, then record host, build, and result per row:
 
 1. **Load** — "Starfield Particle" appears under `Starfield FX` and applies without an error dialog.
-2. **Controls** — the effect shows the implicit input, thirteen legacy controls, Control Source, and Capture Current Controls. Node Graph Data remains hidden.
+2. **Controls** — the effect shows the implicit input, the thirteen original controls, Control Source, Capture Current Controls, then Gravity X/Y/Z, Linear Drag, Color Start, Color End, Size End and Opacity End. Node Graph Data remains hidden.
 3. **First pixels** — defaults render the seeded emitter; at t ≥ 1 s, changing Velocity Y from `0.3` to `0.5` layer heights/s produces a visibly faster upward trail.
-4. **Options readout** — click the effect's `Options` button and record the whole text. It reports the frame time, the live particle count, the layer/frame grid, and the velocity as both read and converted. This is the fastest way to classify a rendering surprise; see `docs/parameter-mapping.md`.
-5. **Determinism** — scrubbing forward and backward over the same frames renders identical frames.
-6. **Rate and lifetime** — Birth Rate and Particle Lifetime change the trail length; Particle Count caps how many sprites can be alive.
-7. **Size and opacity** — both visibly change the sprite; size `0` renders nothing.
-8. **Source compositing** — the layer content stays visible under the particles rather than being replaced.
-9. **Bit depth** — repeat rows 3–7 in 8-bpc, 16-bpc, and 32-bpc comps and record any difference.
-10. **Lifecycle** — duplicate the effect, undo/redo, copy/paste, save, reopen, and render through the Render Queue.
-11. **Cancellation** — start a RAM preview on a heavy setting and stop it; the effect must abort without an error dialog.
+4. **Options readout** — click the effect's `Options` button and record the whole text. It reports the frame time, the live particle count, the layer/frame grid, the velocity as both read and converted, and the gravity/drag and color/size/opacity curve values. This is the fastest way to classify a rendering surprise; see `docs/parameter-mapping.md`.
+5. **Force and appearance** — with default values the picture must be identical to the previous build. Then set Gravity Y = `-2`, Linear Drag = `0.5`, Color End to red, and Size End = `1`: the trail must fall, slow down, warm toward red, and shrink along its age.
+6. **Determinism** — scrubbing forward and backward over the same frames renders identical frames.
+7. **Rate and lifetime** — Birth Rate and Particle Lifetime change the trail length; Particle Count caps how many sprites can be alive.
+8. **Size and opacity** — both visibly change the sprite; size `0` renders nothing.
+9. **Source compositing** — the layer content stays visible under the particles rather than being replaced.
+10. **Bit depth** — repeat rows 3–8 in 8-bpc, 16-bpc, and 32-bpc comps and record any difference.
+11. **Lifecycle** — duplicate the effect, undo/redo, copy/paste, save, reopen, and render through the Render Queue.
+12. **Cancellation** — start a RAM preview on a heavy setting and stop it; the effect must abort without an error dialog.
+13. **Panel** — install `cep_panel/` per its README, confirm the chain renders, edit one value, undo/redo it, then re-open the panel and confirm the values are current.
+14. **Examples** — apply the three recipes from `docs/examples.md` and capture one still frame each at t ≥ 1 s.
 
 ## Options readout
 
@@ -44,8 +50,9 @@ The effect's `Options` button prints a read-only diagnostic summary: frame time,
 | Emitter shapes | Box/sphere/disc distributions produce deterministic positions | Implemented in core (M3-01): seeded uniform sampling inside the requested extent, bounded and reproducible; see `docs/parameter-mapping.md`. AE confirmation pending |
 | Per-particle variation | A steady emitter animates on playback instead of looking frozen | Implemented in core (M3-01): per-particle birth offsets plus per-axis velocity spread from `core::Random`, covered by core tests. Host playback confirmation pending |
 | Random Seed | Changing the seed changes the rendered pixels | Implemented (M3-01): the seed now keys every per-particle stream. Host confirmation pending |
-| Forces | Each force has isolated enable/disable and stable parameter semantics | Not started |
-| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → output graph. Force/appearance kernels and the four-stage chain are not implemented; the interactive editor is not started. |
+| Forces | Each force has isolated enable/disable and stable parameter semantics | Implemented in core (M3-02): gravity and linear drag are force-node values with closed-form integration, authored by controls 17-20. Per-force enable/disable is not implemented: the Alpha chain has one force stage, whose effect is zero at default values. AE confirmation pending |
+| Ages and appearance | Size, opacity, and color follow particle age | Implemented in core (M3-02): linear age curves from the appearance node and the Color Start/End, Size End and Opacity End controls; the rasterizer uses per-particle RGB/opacity/size. Covered by `tests/core_tests.cpp`; AE confirmation pending |
+| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. The editor displays the fixed v1 chain; dynamic node creation, deletion, and rewiring are not implemented. |
 | Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Implemented for 8/16/32-bpc, ROI, rowbytes, and premultiplied alpha. Downsampling no longer depends on the ambiguous SDK factor: geometry comes from observed worlds. Preview-resolution rendering still needs host confirmation |
 | Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Core test covers a half-resolution frame grid; host confirmation pending |
 | Compositing | Particles composite over the input instead of replacing it | Chosen default recorded in ADR 0005; not yet confirmed against the reference effect |
@@ -57,5 +64,5 @@ The effect's `Options` button prints a read-only diagnostic summary: frame time,
 | Concurrency | Repeated concurrent renders return identical pixels and never mutate shared state | Not advertised (no MFR flag); the core render is a pure function of one request, which M6 must audit before claiming support |
 | Cancellation | A host abort stops a long render predictably | Implemented through `PF_ABORT` polling in the simulation and rasterizer; unverified in a host |
 | Bounded work | Extreme settings fail with a typed error instead of hanging the host | Implemented (`work_limit_exceeded` + manifest caps); the specific budget is a provisional constant pending M6 profiling |
-| Presets | Import/export validates version and rejects malformed or oversized data | Not started |
-| Panel | UI state synchronizes through a versioned protocol and tolerates disconnect/restart | Deferred until a validated workflow needs one |
+| Presets | Import/export validates version and rejects malformed or oversized data | Not started as file import/export (M4-03). The three delivery examples ship as documented recipes and panel presets; the graph codec already provides the bounded, versioned container a preset will use |
+| Panel | UI state synchronizes through a versioned protocol and tolerates disconnect/restart | Protocol v1 implemented in `cep_panel/` with bounded requests, typed errors and stale-state rejection; reads/writes go through supervised parameter streams (ADR 0009). Host qualification is the open gate; file import/export presets remain M4-03 |

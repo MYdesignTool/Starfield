@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
-  "schemaVersion": 4,
-  "revisionNote": "Pre-release revision 4 (2026-09-27). Appended AE arbitrary graph data (ID 14), Control Source (ID 15), and Capture Current Controls (ID 16) for G-04/ADR 0008. Prior revision 3 added Emitter Size and Velocity Spread; revision 2 split Velocity into scalar sliders and added 3D Emitter Origin. Released IDs are never renumbered. Capture samples current time into a graph and does not convert legacy keyframe tracks.",
+  "schemaVersion": 5,
+  "revisionNote": "Pre-release revision 5 (2026-09-27). Appended Gravity X/Y/Z (17-19), Linear Drag (20), Color Start (21), Color End (22), Size End (23) and Opacity End (24) so the emitter -> force -> appearance -> output chain is authorable from the effect controls as well as from the dockable panel. Defaults reproduce the previous look (no gravity, no drag, white, constant size/opacity). Prior revision 4 appended AE arbitrary graph data (14), Control Source (15) and Capture Current Controls (16) for ADR 0008; revision 3 added Emitter Size and Velocity Spread; revision 2 split Velocity into scalar sliders and added 3D Emitter Origin. Released IDs are never renumbered. Capture samples current time into a graph and does not convert legacy keyframe tracks.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -21,13 +21,22 @@
     { "id": 11, "key": "opacity", "label": "Opacity", "type": "float_slider", "default": 1, "min": 0, "max": 1, "decimals": 3 },
     { "id": 12, "key": "emitter_size", "label": "Emitter Size", "type": "float_slider", "default": 0.05, "min": 0, "max": 10, "slider_min": 0, "slider_max": 1, "decimals": 3, "unit": "layer_heights", "note": "Cube edge length for Box, diameter for Sphere and Disc. Ignored by the Point emitter." },
     { "id": 13, "key": "velocity_spread", "label": "Velocity Spread", "type": "float_slider", "default": 0.15, "min": 0, "max": 100, "slider_min": 0, "slider_max": 1, "decimals": 2, "unit": "layer_heights_per_second", "note": "Independent uniform jitter applied to each particle's velocity per axis. Without it every particle behaves identically and a steady emitter looks frozen, because births keep replacing the particles that leave; this is also what makes Random Seed visible." },
-    { "id": 14, "key": "graph_data", "label": "Node Graph Data", "type": "arbitrary", "diskId": 14, "callbackId": 14, "hidden": true, "animated": false, "default": "emitter_output_graph", "note": "Canonical schema-1 graph bytes; AE owns copy, persistence and undo. ADR 0008." },
+    { "id": 14, "key": "graph_data", "label": "Node Graph Data", "type": "arbitrary", "diskId": 14, "callbackId": 14, "hidden": true, "animated": false, "default": "emitter_force_appearance_output_graph", "note": "Canonical schema-1 graph bytes; AE owns copy, persistence and undo. The default and every capture contain the single-emitter emitter -> force -> appearance -> output chain (ADR 0008)." },
     { "id": 15, "key": "control_source", "label": "Control Source", "type": "popup", "diskId": 15, "default": 2, "oldProjectValue": 1, "animated": false, "choices": ["AE Controls", "Node Graph"], "note": "USE_VALUE_FOR_OLD_PROJECTS preserves existing animated controls; switching alone never replaces the graph." },
-    { "id": 16, "key": "capture_controls", "label": "Capture Current Controls", "type": "button", "diskId": 16, "buttonLabel": "Capture at Current Time", "note": "Explicitly replaces stored graph with current control values and selects Node Graph in one undoable transaction. Does not convert animation tracks." }
+    { "id": 16, "key": "capture_controls", "label": "Capture Current Controls", "type": "button", "diskId": 16, "buttonLabel": "Capture at Current Time", "note": "Explicitly replaces stored graph with current control values and selects Node Graph in one undoable transaction. Does not convert animation tracks." },
+    { "id": 17, "key": "gravity_x", "label": "Gravity X", "type": "float_slider", "default": 0, "min": -1000, "max": 1000, "slider_min": -20, "slider_max": 20, "decimals": 2, "unit": "layer_heights_per_second_squared", "note": "Force-node input. Positive moves right. Zero keeps the M2 straight-line trajectory." },
+    { "id": 18, "key": "gravity_y", "label": "Gravity Y", "type": "float_slider", "default": 0, "min": -1000, "max": 1000, "slider_min": -20, "slider_max": 20, "decimals": 2, "unit": "layer_heights_per_second_squared", "note": "Force-node input. Negative pulls particles down." },
+    { "id": 19, "key": "gravity_z", "label": "Gravity Z", "type": "float_slider", "default": 0, "min": -1000, "max": 1000, "slider_min": -20, "slider_max": 20, "decimals": 2, "unit": "layer_heights_per_second_squared", "note": "Force-node input. Reserved for depth; the 2D compositor ignores Z." },
+    { "id": 20, "key": "linear_drag", "label": "Linear Drag", "type": "float_slider", "default": 0, "min": 0, "max": 100, "slider_min": 0, "slider_max": 10, "decimals": 3, "unit": "inverse_seconds", "note": "Force-node input. Integrated in closed form as dv/dt = gravity - drag*v, so frame order and subframes stay exact." },
+    { "id": 21, "key": "color_start", "label": "Color Start", "type": "color", "default": [255, 255, 255], "note": "Appearance-node birth color. 8-bit channels are mapped to working-space 0..1 with no color-space conversion (ADR 0005); alpha comes from Opacity." },
+    { "id": 22, "key": "color_end", "label": "Color End", "type": "color", "default": [255, 255, 255], "note": "Appearance-node color reached as particle age approaches lifetime. Equal to Color Start by default." },
+    { "id": 23, "key": "particle_size_end", "label": "Size End", "type": "float_slider", "default": 8, "min": 0, "max": 100000, "decimals": 2, "unit": "layer_pixels", "note": "Appearance-node size reached as age approaches lifetime; Particle Size is the birth value. Equal by default." },
+    { "id": 24, "key": "opacity_end", "label": "Opacity End", "type": "float_slider", "default": 1, "min": 0, "max": 1, "decimals": 3, "note": "Appearance-node opacity reached as age approaches lifetime; Opacity is the birth value. Equal by default." }
   ],
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
     "migrationPolicy": "Add IDs for new controls. Removed controls become hidden compatibility parameters when old project data needs them.",
-    "hostInputIndex": 0
+    "hostInputIndex": 0,
+    "controlSupervision": "All bound controls (1-13 and 17-24) are registered supervised. While Control Source is Node Graph, an edit to any bound control rewrites the canonical arbitrary graph from the delivered values in the same undoable user-change transaction (ADR 0009); in AE Controls mode the stored graph is never touched."
   }
 }

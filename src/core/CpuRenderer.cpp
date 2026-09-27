@@ -325,9 +325,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 }
                 float* pixel = row + static_cast<std::size_t>(x) * 4;
                 const float remaining = 1.0f - alpha;
-                pixel[0] = alpha + pixel[0] * remaining; // premultiplied source colour is white
-                pixel[1] = alpha + pixel[1] * remaining;
-                pixel[2] = alpha + pixel[2] * remaining;
+                pixel[0] = static_cast<float>(particle.color.x) * alpha + pixel[0] * remaining;
+                pixel[1] = static_cast<float>(particle.color.y) * alpha + pixel[1] * remaining;
+                pixel[2] = static_cast<float>(particle.color.z) * alpha + pixel[2] * remaining;
                 pixel[3] = alpha + pixel[3] * remaining;
             }
         }

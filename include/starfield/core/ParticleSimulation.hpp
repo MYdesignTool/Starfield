@@ -15,6 +15,7 @@ struct ParticleInstance {
     double lifetime_seconds{0.0};
     double size_pixels{0.0};
     double opacity{0.0};
+    Vec3 color{1.0, 1.0, 1.0};
     Vec3 position{};
 };
 
@@ -29,8 +30,10 @@ struct ParticleInstance {
 //
 // Per-particle birth offsets follow `emitter_shape` within `emitter_size`, and each
 // particle gets an independent velocity jitter of +/- `velocity_spread` per axis.
-// Both are pure functions of (seed, slot, purpose) via `Random.hpp`, so the same
-// request always yields the same particles and `seed` becomes observable.
+// Gravity and linear drag use closed-form integration, so no frame stepping or
+// render history is required. Size, opacity, and RGB color interpolate linearly
+// over normalized particle age. All results are pure functions of settings, seed,
+// particle slot, and absolute time.
 //
 // `time_seconds` is the only lossy conversion allowed across this boundary.
 [[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings,

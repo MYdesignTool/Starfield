@@ -178,13 +178,20 @@ struct GraphValidationResult {
 // traversed by the renderer.
 [[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
 
-// Stable built-in schemas used by the default emitter -> output graph. Keys in
-// this namespace are graph ParameterKeys and are not AE parameter IDs.
+// Stable built-in schemas used by the emitter -> force -> appearance -> output
+// graph (and the legacy emitter -> output subset). Keys in this namespace are
+// graph ParameterKeys and are not AE parameter IDs.
 namespace graph_keys {
 inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-stream";
 inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
+inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
+inline constexpr const char* kAppearanceNode = "org.starfieldfx.nodes.appearance";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
 inline constexpr PortKey kEmitterParticles{1};
+inline constexpr PortKey kForceParticlesIn{1};
+inline constexpr PortKey kForceParticlesOut{2};
+inline constexpr PortKey kAppearanceParticlesIn{1};
+inline constexpr PortKey kAppearanceParticlesOut{2};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};
@@ -197,6 +204,16 @@ inline constexpr ParameterKey kParticleSize{8};
 inline constexpr ParameterKey kOpacity{9};
 inline constexpr ParameterKey kEmitterSize{10};
 inline constexpr ParameterKey kVelocitySpread{11};
+// Parameter keys are scoped to their node type; force and appearance nodes may
+// therefore use compact local key ranges without aliasing emitter parameters.
+inline constexpr ParameterKey kGravity{1};
+inline constexpr ParameterKey kLinearDrag{2};
+inline constexpr ParameterKey kColorStart{1};
+inline constexpr ParameterKey kColorEnd{2};
+inline constexpr ParameterKey kSizeStart{3};
+inline constexpr ParameterKey kSizeEnd{4};
+inline constexpr ParameterKey kOpacityStart{5};
+inline constexpr ParameterKey kOpacityEnd{6};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

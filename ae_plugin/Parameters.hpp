@@ -14,12 +14,25 @@
 
 namespace starfield::adapter {
 
-// User-visible controls defined by the manifest (IDs 1..13). AE's implicit input
-// layer occupies parameter index 0, so the effect registers one more parameter.
-// New controls are appended with new IDs; ID order is preserved even when the UI
-// grouping is still pending (M3-03 adds AE parameter groups).
-inline constexpr std::size_t kEffectParameterCount = 13;
-inline constexpr std::size_t kTotalEffectParameterCount = 16;
+// User-visible controls defined by the manifest. IDs 1..13 are the original
+// render controls; 17..24 append the force and appearance controls of the
+// emitter -> force -> appearance -> output chain. 14..16 stay reserved for the
+// graph parameter, the control source and the capture action (ADR 0008), so the
+// manifest only ever appends. AE's implicit input layer occupies parameter index
+// 0, so the effect registers one more parameter than the count below.
+inline constexpr std::size_t kEffectParameterCount = 21;
+inline constexpr std::size_t kTotalEffectParameterCount = 24;
+
+inline constexpr A_long kGravityXId = 17;
+inline constexpr A_long kGravityYId = 18;
+inline constexpr A_long kGravityZId = 19;
+inline constexpr A_long kLinearDragId = 20;
+inline constexpr A_long kColorStartId = 21;
+inline constexpr A_long kColorEndId = 22;
+inline constexpr A_long kParticleSizeEndId = 23;
+inline constexpr A_long kOpacityEndId = 24;
+inline constexpr A_long kFirstEffectParameterId = 1;
+inline constexpr A_long kLastEffectParameterId = kOpacityEndId;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.
@@ -28,6 +41,14 @@ inline constexpr std::size_t kTotalEffectParameterCount = 16;
                                           A_long* control_source = nullptr) noexcept;
 [[nodiscard]] PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data,
                                       PF_ParamDef* params[], PF_UserChangedParamExtra* extra) noexcept;
+
+// PF_Cmd_USER_CHANGED_PARAM entry point. The capture button replaces the stored
+// graph; a change to any bound control while Node Graph is selected rewrites the
+// canonical graph from the delivered control values in the same undo step. This is
+// the supervised edit surface the dockable panel drives (ADR 0009). AE Controls
+// mode never touches the stored graph.
+[[nodiscard]] PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
+                                        PF_UserChangedParamExtra* extra) noexcept;
 
 // Registers every manifest row with stable IDs, labels, ranges, and defaults, and
 // reports the resulting parameter count. Returns the host error unchanged.

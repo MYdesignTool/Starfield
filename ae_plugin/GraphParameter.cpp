@@ -190,10 +190,21 @@ PF_Err dispatch_arbitrary(PF_InData* data, PF_ArbParamsExtra& extra) {
 } // namespace
 
 core::Result<core::Graph> graph_from_controls(const core::Settings& settings) {
+    // The single-emitter Alpha chain is emitter -> force -> appearance -> output
+    // (current version goal 1). Identities are scoped to one graph and only have to
+    // be stable inside it; the last byte distinguishes nodes and edges. The legacy
+    // two-stage constructor stays available for tests and for stored graphs that
+    // predate the force/appearance stages.
     core::Uuid128 emitter{{0x81,0xcb,0x8b,0xb1,0xf3,0x20,0x41,0x14,0x98,0xf5,0xd2,0x5b,0x54,0x91,0x2c,0x01}};
     auto output = emitter; output.bytes[15] = 2;
-    auto edge = emitter; edge.bytes[15] = 3;
-    return core::make_emitter_output_graph(settings, core::NodeId{emitter}, core::NodeId{output}, core::EdgeId{edge});
+    auto force = emitter; force.bytes[15] = 4;
+    auto appearance = emitter; appearance.bytes[15] = 5;
+    auto emitter_to_force = emitter; emitter_to_force.bytes[15] = 6;
+    auto force_to_appearance = emitter; force_to_appearance.bytes[15] = 7;
+    auto appearance_to_output = emitter; appearance_to_output.bytes[15] = 8;
+    return core::make_emitter_force_appearance_output_graph(
+        settings, core::NodeId{emitter}, core::NodeId{force}, core::NodeId{appearance}, core::NodeId{output},
+        core::EdgeId{emitter_to_force}, core::EdgeId{force_to_appearance}, core::EdgeId{appearance_to_output});
 }
 
 core::Result<core::Graph> read_graph_parameter(PF_InData* data, PF_ArbitraryH handle) {

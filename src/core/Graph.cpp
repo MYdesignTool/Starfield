@@ -539,7 +539,37 @@ NodeRegistry make_particle_node_registry() {
     output.schema_version = 1;
     output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 1});
 
+    NodeTypeDescriptor force;
+    force.type_key = kForceNode;
+    force.schema_version = 1;
+    force.ports = {
+        PortDescriptor{kForceParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kForceParticlesOut, PortDirection::output, kParticleStream, false, 0},
+    };
+    force.parameters = {
+        ParameterDescriptor{kGravity, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kLinearDrag, ParameterKind::float64, true},
+    };
+
+    NodeTypeDescriptor appearance;
+    appearance.type_key = kAppearanceNode;
+    appearance.schema_version = 1;
+    appearance.ports = {
+        PortDescriptor{kAppearanceParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kAppearanceParticlesOut, PortDirection::output, kParticleStream, false, 0},
+    };
+    appearance.parameters = {
+        ParameterDescriptor{kColorStart, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kColorEnd, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kSizeStart, ParameterKind::float64, true},
+        ParameterDescriptor{kSizeEnd, ParameterKind::float64, true},
+        ParameterDescriptor{kOpacityStart, ParameterKind::float64, true},
+        ParameterDescriptor{kOpacityEnd, ParameterKind::float64, true},
+    };
+
     registry.types.push_back(std::move(emitter));
+    registry.types.push_back(std::move(force));
+    registry.types.push_back(std::move(appearance));
     registry.types.push_back(std::move(output));
     return registry;
 }

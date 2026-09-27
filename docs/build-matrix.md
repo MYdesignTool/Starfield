@@ -4,13 +4,14 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-G-03 emitter/output runtime passed 4,418 core assertions and the explicit May 2023
-SDK build. Newer SDK/host adaptation is deferred. The older dual-SDK evidence below
-is historical and does not qualify the current binary on newer hosts.
+The four-stage chain (G-03/M3-02) passed 4,735 core assertions, the adapter suite
+passed 249 fake-host assertions, and the explicit May 2023 SDK build succeeds.
+Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
+historical and does not qualify the current binary on newer hosts.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
-Current G-04 artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. G-03 core suite: 4,418 assertions; G-04 adapter simulation: 192 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 16-parameter build still needs an AE 2023 host pass.
+Current artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. Core suite: 4,735 assertions; adapter simulation: 249 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 24-parameter build (21 controls plus graph, control source and capture) still needs an AE 2023 host pass, and the CEP panel in `cep_panel/` has never been loaded.
 
 ## PiPL and runtime flags must be regenerated together
 
@@ -28,7 +29,9 @@ inside the `.aex`. Two guards now make that failure impossible to ship silently:
 
 ## Core self-test
 
-`tests/core_tests.cpp` covers rational-time normalization and overflow, settings validation, simulation determinism and boundaries, graph identities/schema/type/cardinality/cycle validation, sequence codec round-trips and malformed-input rejection, ROI equality against full-frame rendering, world-to-pixel mapping at a downsampled frame grid, source compositing and placement, bit-depth output, and the bounded-work/cancellation paths.
+`tests/core_tests.cpp` covers rational-time normalization and overflow, settings validation, simulation determinism and boundaries, graph identities/schema/type/cardinality/cycle validation, sequence codec round-trips and malformed-input rejection, ROI equality against full-frame rendering, world-to-pixel mapping at a downsampled frame grid, source compositing and placement, bit-depth output, the force/appearance chain (closed-form gravity/drag against the analytic solution, age curves, stage-order and single-appearance enforcement, codec round-trip of a four-stage graph), and the bounded-work/cancellation paths.
+
+`tests/graph_parameter_tests.cpp` (`-Adapter`) covers the arbitrary-data callbacks, parameter registration and mapping, the four-stage chain built from the controls, the supervised edit path (Node Graph rewrite, AE Controls isolation, allocation failure), and checkout/checkin bookkeeping.
 
 - With CMake available: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 - On the current Windows machine CMake is not installed, so use `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`, which compiles the same sources with the locked MSVC toolset behind a mapped drive letter and runs the executable. Output lands in `artifacts/core-tests/`.

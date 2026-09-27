@@ -127,6 +127,12 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     writer.line("origin world %.3f,%.3f,%.3f vel %.2f,%.2f,%.2f\n", settings.emitter_origin.x,
                 settings.emitter_origin.y, settings.emitter_origin.z, settings.velocity.x, settings.velocity.y,
                 settings.velocity.z);
+    writer.line("grav %.2f,%.2f,%.2f drag %.3f\n", settings.gravity.x, settings.gravity.y, settings.gravity.z,
+                settings.linear_drag);
+    writer.line("color %.2f,%.2f,%.2f -> %.2f,%.2f,%.2f size %.2f->%.2f op %.2f->%.2f\n",
+                settings.color_start.x, settings.color_start.y, settings.color_start.z,
+                settings.color_end.x, settings.color_end.y, settings.color_end.z,
+                settings.particle_size, settings.particle_size_end, settings.opacity, settings.opacity_end);
     return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }

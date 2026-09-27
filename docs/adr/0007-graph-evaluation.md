@@ -1,6 +1,6 @@
 # ADR 0007: deterministic evaluation of graph snapshots
 
-- Status: accepted for G-03's emitter/output runtime.
+- Status: accepted for G-03's runtime; extended by M3-02 with the force and appearance stages.
 - Date: 2026-09-27.
 - Depends on ADR 0005 (render boundary) and ADR 0006 (graph validation).
 
@@ -20,11 +20,15 @@ This differs intentionally from the legacy host adapter's value-clamping behavio
 
 Exactly one output is required. Only its ancestors execute. A stable Kahn traversal
 orders dependencies before consumers and independent nodes by UUID, without
-reordering or modifying the graph. Disconnected valid emitters remain editable but
-do not allocate particle streams. Current schemas permit emitter -> output only;
-the current evaluator supports one active stream. Future force/appearance kernels
-must explicitly implement their behavior, and merge/multiple-output semantics need
-a contract before they can be enabled.
+reordering or modifying the graph. Disconnected valid nodes remain editable but do
+not allocate particle streams. The current schemas cover the single-emitter Alpha
+chain emitter -> force -> appearance -> output (the legacy emitter -> output subset
+still evaluates). One active stream is supported: a second active emitter or a second
+active appearance stage is rejected at runtime, and the active stages must appear in
+chain order, so a rewired appearance-before-force graph fails instead of rendering a
+guess. Force values accumulate into the render settings; appearance values override
+the emitter's size/opacity and supply the age-curve endpoints. Merge, branching, and
+multiple-output semantics still need a contract before they can be enabled.
 
 Time enters as a signed rational, is normalized, and converts to seconds only at
 the simulation boundary. Schema-1 node parameters are constant values: this work
@@ -39,20 +43,29 @@ settings' opacity. This preserves flat-path pixels and allows later appearance
 nodes to modify per-particle opacity without changing the rasterizer contract.
 
 `make_emitter_output_graph` maps all eleven settings fields to stable graph keys.
-Callers supply the node/edge identities; the helper does not derive them from AE
-parameter IDs. It validates inputs and rejects duplicate or zero identities.
-It is a construction primitive, not an AE migration or persistence implementation.
+`make_emitter_force_appearance_output_graph` does the same for the full chain, writing
+the gravity/drag fields to the force node and the color/size/opacity curves to the
+appearance node (not to the emitter). Callers supply the node/edge identities; neither
+helper derives them from AE parameter IDs, and duplicate or zero identities are
+rejected. The graph parameter keys are scoped per node type, so force and appearance
+reuse small local key ranges without aliasing emitter parameters. These are
+construction primitives, not an AE migration or persistence implementation.
 
 ## Evidence and remaining work
 
-Core regression run on 2026-09-27: 4,418 assertions, zero failures. Added cases
+Core regression run on 2026-09-27: 4,735 assertions, zero failures. Added cases
 compare graph/flat pixels across four emitter shapes, 8/16/32-bit formats, repeated
 and reverse times, negative/subframe time, and reduced-resolution cropped output.
 Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid
 topology/values, output ambiguity, explicit identity rejection, and cancellation.
-Assertion totals include repeated parameter combinations, not independent features.
+M3-02 added the force/appearance cases: the closed-form trajectory is compared against
+the analytic solution particle by particle, age curves are checked against their
+interpolation, stage order and the single-appearance rule are enforced, a
+four-stage graph is round-tripped through the codec, graph/flat pixels must still be
+identical, and a tiny drag value exercises the series branch. Assertion totals include
+repeated parameter combinations, not independent features.
 
 AE arbitrary-data persistence and snapshot transport are implemented under G-04.
-The CEP-to-ExtendScript bridge is specified in ADR 0009; panel implementation
-and AE host qualification remain P-02 work. No AE host qualification is implied
-by the core tests or this ADR.
+The CEP-to-ExtendScript bridge is specified in ADR 0009 and implemented in
+`cep_panel/` (P-02). No AE host qualification is implied by the core tests, the
+adapter suite, or this ADR: panel behaviour, persistence and undo remain host gates.

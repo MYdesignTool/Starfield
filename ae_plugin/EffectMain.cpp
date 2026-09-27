@@ -91,7 +91,8 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_ARBITRARY_CALLBACK:
             return starfield::adapter::graph_arbitrary_callback(in_data, static_cast<PF_ArbParamsExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
-            return starfield::adapter::capture_controls(in_data, out_data, params, static_cast<PF_UserChangedParamExtra*>(extra));
+            return starfield::adapter::user_changed_param(in_data, out_data, params,
+                                                          static_cast<PF_UserChangedParamExtra*>(extra));
         case PF_Cmd_DO_DIALOG:
             // Diagnostic readout behind the effect's Options button. Read-only.
             return starfield::adapter::report_diagnostics(in_data, out_data);

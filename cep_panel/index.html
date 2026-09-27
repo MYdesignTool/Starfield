@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Starfield Node Editor</title>
+  <link rel="stylesheet" href="css/panel.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="title">Starfield Node Editor</div>
+    <div class="sub" id="targetLine">No target</div>
+  </header>
+
+  <div id="banner" class="banner hidden" role="status"></div>
+
+  <section class="toolbar">
+    <label for="preset">Example</label>
+    <select id="preset">
+      <option value="">Custom</option>
+      <option value="spark">Spark</option>
+      <option value="snow">Snow</option>
+      <option value="floating_light">Floating Light</option>
+      <option value="defaults">Reset Defaults</option>
+    </select>
+    <button id="refresh" type="button">Refresh</button>
+  </section>
+
+  <main id="chain" class="chain" aria-label="Emitter to force to appearance to output chain">
+    <p class="hint">Select one layer carrying Starfield Particle, then press Refresh.</p>
+  </main>
+
+  <footer class="bar footer">
+    <span id="modeLine">Mode: -</span>
+    <span id="revisionLine">Revision: -</span>
+    <span id="resolutionLine" title="How effect parameters were resolved on the host">Lookup: -</span>
+  </footer>
+
+  <script src="js/panel.js"></script>
+</body>
+</html>

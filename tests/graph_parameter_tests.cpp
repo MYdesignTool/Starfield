@@ -4,11 +4,13 @@
 #include "AE_EffectCB.h"
 #include "starfield/core/SequenceCodec.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 using namespace starfield;
@@ -19,7 +21,7 @@ int checks = 0, failures = 0;
 struct Memory { core::OpaqueBytes bytes; unsigned locks{0}; };
 std::unordered_map<PF_Handle, std::unique_ptr<Memory>> handles;
 bool fail_allocation = false, fail_lock = false;
-std::array<PF_ParamDef, 17> parameters{};
+std::array<PF_ParamDef, 25> parameters{};
 std::vector<PF_ParamDef> registered;
 std::unordered_map<PF_ParamDef*, A_long> checked_out;
 std::vector<A_long> checked_indices;
@@ -53,7 +55,7 @@ PF_Err checkout(PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, 
     last_time = time;
     checked_indices.push_back(index);
     if (index == fail_checkout) return PF_Err_OUT_OF_MEMORY;
-    if (index < 1 || index > 16 || !value) return PF_Err_BAD_CALLBACK_PARAM;
+    if (index < 1 || index > 24 || !value) return PF_Err_BAD_CALLBACK_PARAM;
     *value = parameters[static_cast<std::size_t>(index)];
     checked_out[value] = index;
     return PF_Err_NONE;
@@ -167,13 +169,13 @@ void test_callbacks(PF_InData& host) {
 void test_parameters(PF_InData& host) {
     PF_OutData output{};
     CHECK(setup_parameters(&host, &output) == PF_Err_NONE);
-    CHECK(output.num_params == 17 && registered.size() == 16);
+    CHECK(output.num_params == 25 && registered.size() == 24);
     const auto& source = registered[14];
     CHECK(source.u.pd.dephault == kNodeControlSource && source.u.pd.value == kLegacyControlSource);
     CHECK((source.flags & PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS) != 0);
     CHECK((registered[13].flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
     CHECK(registered[13].u.arb_d.value == nullptr);
-    for (std::size_t i = 1; i <= 16; ++i) {
+    for (std::size_t i = 1; i <= 24; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;
     }
@@ -199,12 +201,52 @@ void test_parameters(PF_InData& host) {
     parameters[6].u.point3d_d.z_value = 32;
     parameters[10].u.fs_d.value = 4;
     parameters[11].u.fs_d.value = 0.5;
+    // Force and appearance controls (IDs 17..24) feed the same legacy snapshot.
+    parameters[kGravityYId].u.fs_d.value = -0.5;
+    parameters[kLinearDragId].u.fs_d.value = 0.25;
+    parameters[kColorStartId].u.cd.value.red = 255;
+    parameters[kColorStartId].u.cd.value.green = 0;
+    parameters[kColorStartId].u.cd.value.blue = 0;
+    parameters[kParticleSizeEndId].u.fs_d.value = 2.0;
+    parameters[kOpacityEndId].u.fs_d.value = 0.25;
     parameters[15].u.pd.value = kLegacyControlSource;
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(checked_out.empty() && last_time == host.current_time && active_source == kLegacyControlSource);
     const auto legacy = core::serialize_graph(*snapshot, core::particle_node_registry());
     CHECK(legacy.has_value() && legacy.value() != frozen.value());
-    std::array<PF_ParamDef*, 17> pointers{};
+
+    // The single-emitter chain is emitter -> force -> appearance -> output, and the
+    // delivered control values reach the force and appearance nodes.
+    const auto find_node = [](const core::Graph& graph, const char* key) {
+        return std::find_if(graph.nodes.begin(), graph.nodes.end(),
+                            [key](const core::GraphNode& node) { return node.type_key == key; });
+    };
+    const auto find_value = [](const core::GraphNode& node, core::ParameterKey key) -> const core::ParameterValue* {
+        for (const auto& parameter : node.parameters) {
+            if (parameter.key == key) return &parameter.value;
+        }
+        return nullptr;
+    };
+    CHECK(snapshot->nodes.size() == 4 && snapshot->edges.size() == 3);
+    const auto force_node = find_node(*snapshot, core::graph_keys::kForceNode);
+    const auto appearance_node = find_node(*snapshot, core::graph_keys::kAppearanceNode);
+    CHECK(force_node != snapshot->nodes.end() && appearance_node != snapshot->nodes.end());
+    if (force_node != snapshot->nodes.end()) {
+        const auto* gravity = find_value(*force_node, core::graph_keys::kGravity);
+        const auto* drag = find_value(*force_node, core::graph_keys::kLinearDrag);
+        CHECK(gravity != nullptr && std::get<core::Vec3>(*gravity).y == -0.5);
+        CHECK(drag != nullptr && std::get<double>(*drag) == 0.25);
+    }
+    if (appearance_node != snapshot->nodes.end()) {
+        const auto* color_start = find_value(*appearance_node, core::graph_keys::kColorStart);
+        const auto* size_end = find_value(*appearance_node, core::graph_keys::kSizeEnd);
+        const auto* opacity_end = find_value(*appearance_node, core::graph_keys::kOpacityEnd);
+        CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).x == 1.0);
+        CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).y == 0.0);
+        CHECK(size_end != nullptr && std::get<double>(*size_end) == 2.0);
+        CHECK(opacity_end != nullptr && std::get<double>(*opacity_end) == 0.25);
+    }
+    std::array<PF_ParamDef*, 25> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
     fail_allocation = true;
@@ -228,6 +270,73 @@ void test_parameters(PF_InData& host) {
     dispose(parameters[14].u.arb_d.value);
     dispose(registered[13].u.arb_d.dephault);
 }
+
+// The supervised edit surface the dockable panel drives (ADR 0009): in Node Graph
+// mode a control change rewrites the canonical graph from the delivered values; in
+// AE Controls mode the stored graph is never touched.
+void test_supervision(PF_InData& host) {
+    PF_OutData output{};
+    parameters[14].u.arb_d.value = new_value(host);
+    parameters[14].uu.change_flags = 0;
+    parameters[15].u.pd.value = kNodeControlSource;
+    parameters[kGravityYId].u.fs_d.value = 0.0;
+    parameters[kGravityYId].uu.change_flags = 0;
+    std::array<PF_ParamDef*, 25> pointers{};
+    for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
+    PF_UserChangedParamExtra extra{};
+    extra.param_index = kGravityYId;
+
+    const auto previous = parameters[14].u.arb_d.value;
+    const auto before = handles.at(previous)->bytes;
+    // The delivered array carries the accepted new value; the graph must follow it.
+    parameters[kGravityYId].u.fs_d.value = -0.5;
+    CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
+    CHECK(parameters[14].u.arb_d.value != previous);
+    CHECK(!handles.contains(previous));
+    CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
+    const auto after = handles.at(parameters[14].u.arb_d.value)->bytes;
+    CHECK(after != before);
+    const auto graph = read_graph_parameter(&host, parameters[14].u.arb_d.value);
+    CHECK(graph.has_value());
+    if (graph.has_value()) {
+        const auto force_node = std::find_if(graph.value().nodes.begin(), graph.value().nodes.end(),
+            [](const core::GraphNode& node) { return node.type_key == core::graph_keys::kForceNode; });
+        CHECK(force_node != graph.value().nodes.end());
+        if (force_node != graph.value().nodes.end()) {
+            bool found = false;
+            for (const auto& parameter : force_node->parameters) {
+                if (parameter.key != core::graph_keys::kGravity) continue;
+                found = true;
+                CHECK(std::get<core::Vec3>(parameter.value).y == -0.5);
+            }
+            CHECK(found);
+        }
+    }
+
+    // AE Controls mode: the stored graph is left alone.
+    parameters[15].u.pd.value = kLegacyControlSource;
+    parameters[kGravityYId].u.fs_d.value = 0.9;
+    parameters[14].uu.change_flags = 0;
+    const auto kept = handles.at(parameters[14].u.arb_d.value)->bytes;
+    CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
+    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
+    CHECK((parameters[14].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) == 0);
+
+    // Bookkeeping parameters never rewrite the graph.
+    parameters[15].u.pd.value = kNodeControlSource;
+    extra.param_index = kControlSourceId;
+    CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
+    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
+
+    // A failed host allocation leaves the stored graph untouched.
+    extra.param_index = kGravityYId;
+    fail_allocation = true;
+    CHECK(user_changed_param(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
+    CHECK(handles.at(parameters[14].u.arb_d.value)->bytes == kept);
+
+    dispose(parameters[14].u.arb_d.value);
+    parameters[14].u.arb_d.value = nullptr;
+}
 } // namespace
 
 int main() {
@@ -241,6 +350,7 @@ int main() {
     // effect_ref intentionally null: arbitrary callbacks must work without one.
     test_callbacks(host);
     test_parameters(host);
+    test_supervision(host);
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

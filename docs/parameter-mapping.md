@@ -1,9 +1,10 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 3. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 5. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
-`validate_settings`.
+`validate_settings`. One conversion path (`settings_from_controls`) serves both the
+render checkout and the supervised panel edit, so the two cannot drift apart.
 
 ## Manifest revisions 2–3 (pre-release, 2026-09-27)
 
@@ -39,9 +40,28 @@ project saved with revision 1 must be re-authored rather than migrated.
 | 12 | `emitter_size` | Float Slider, THOUSANDTHS, 0…10 (slider 0…1), default 0.05 | `Settings::emitter_size` | Cube edge for Box, diameter for Sphere/Disc, in layer heights. Ignored by Point. |
 | 13 | `velocity_spread` | Float Slider, HUNDREDTHS, 0…100 (slider 0…1), default 0.15 | `Settings::velocity_spread` | Per-axis uniform jitter added to each particle's velocity, in layer heights per second. This is what makes a steady emitter animate (see below) and what gives `seed` a visible effect. |
 
-IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13)
-sit after Opacity until M3-03 adds AE parameter groups. Parameter index 0 is AE's implicit input
-layer, so the effect registers 17 AE parameters: one input, thirteen legacy manifest controls, graph data, source mode and capture action. Node Graph Data is hidden from the Effect Controls panel.
+| 17 | `gravity_x` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0 | `Settings::gravity.x` | Force node. Layer heights per second squared, positive right. |
+| 18 | `gravity_y` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0 | `Settings::gravity.y` | Force node. Negative pulls down. |
+| 19 | `gravity_z` | Float Slider, HUNDREDTHS, ±1000 (slider ±20), default 0 | `Settings::gravity.z` | Force node. Reserved for depth; the 2D compositor ignores Z. |
+| 20 | `linear_drag` | Float Slider, THOUSANDTHS, 0…100 (slider 0…10), default 0 | `Settings::linear_drag` | Force node. Inverse seconds, solved in closed form with gravity. |
+| 21 | `color_start` | Color, default white | `Settings::color_start` | Appearance node birth color. AE delivers 8-bit channels; the adapter maps `channel / 255` to working-space 0..1 (no color-space conversion, ADR 0005). Alpha comes from Opacity. |
+| 22 | `color_end` | Color, default white | `Settings::color_end` | Appearance node color as age approaches lifetime. Equal to Color Start by default, so defaults change nothing. |
+| 23 | `particle_size_end` | Float Slider, HUNDREDTHS, 0…100000, default 8 | `Settings::particle_size_end` | Appearance node size reached at the end of life; `particle_size` is the birth value. Equal by default. |
+| 24 | `opacity_end` | Float Slider, THOUSANDTHS, 0…1, default 1 | `Settings::opacity_end` | Appearance node opacity reached at the end of life; `opacity` is the birth value. Equal by default. |
+
+IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13) and the
+force/appearance controls (17-24) sit after the graph/system parameters until M3-03 adds AE parameter
+groups. Parameter index 0 is AE's implicit input layer, so the effect registers 25 AE parameters: one
+input, twenty-one manifest controls, graph data (14), source mode (15) and capture action (16). Node
+Graph Data is hidden from the Effect Controls panel.
+
+All bound controls are registered with `PF_ParamFlag_SUPERVISE`. In `AE Controls` mode a change is
+ignored by the graph path and the render simply samples the new value. In `Node Graph` mode the effect
+rebuilds the canonical graph from the delivered values in the same user-change transaction
+(`user_changed_param` → `sync_graph_from_controls`), which is also the surface the CEP panel writes to
+(ADR 0009). The delivered `params[]` array is the authoritative source during that callback: a
+`PF_CHECKOUT_PARAM` can still return the pre-edit value, so the sync path never uses it for the edited
+control.
 
 ## Emitter distributions and per-particle variation (M3-01)
 
@@ -119,8 +139,14 @@ out-of-range values onto `point`. The manifest's `default: 1` means "Point, the 
 - Slot `k` is born at `k / birth_rate` seconds; a slot whose age equals the lifetime is gone.
 - At most `particle_count` slots are alive at once. When the cap is exceeded the **newest**
   slots survive, so ids stay ascending and the ordering is reproducible.
-- Position is closed form: `origin + velocity * age`. Any absolute time can be evaluated
-  without stepping, so out-of-order and repeated requests agree (ADR 0002).
+- Position is closed form: with `k = linear_drag`, `g = gravity`, `v0 = velocity` and age `a`,
+  `displacement = v0 * (1 - exp(-k a)) / k + g * (a - (1 - exp(-k a)) / k) / k`, and `k = 0`
+  degenerates to `v0 * a + g * a² / 2`. Any absolute time can be evaluated without stepping, so
+  out-of-order and repeated requests agree (ADR 0002). The small-`k a` branch uses a series so the
+  `a - (1 - exp(-k a)) / k` term does not lose precision by cancellation.
+- Size, opacity, and color interpolate linearly over `age / lifetime` when the appearance stage is
+  active. `age == lifetime` is never visible, so the end values are approached, not reached, by a
+  live particle.
 
 ## Options readout (diagnostic)
 
@@ -128,7 +154,9 @@ The effect sets `PF_OutFlag_I_DO_DIALOG`, so AE shows an `Options` button. Click
 read-only readout (`ae_plugin/Diagnostics.cpp`) that prints exactly what the code receives:
 
 ```text
-Starfield 0.1.0 M3-01 readout
+Starfield 0.1.0 graph readout
+graph nodes 4 edges 3 live 59
+AE Controls (driving render)
 layer 1920x1080 ds 1/1 par 1/1
 t 1.000s live 59
 cnt 1000 rate 30.00 seed 1 life 2.000
@@ -136,6 +164,8 @@ shape 0 esize 0.050 vspread 0.15
 size 8.00 notices 0
 origin host 960,540,540 px 960,540,540
 origin world 0.000,0.000,0.000 vel 0.00,0.30,0.00
+grav 0.00,0.00,0.00 drag 0.000
+color 1.00,1.00,1.00 -> 1.00,1.00,1.00 size 8.00->8.00 op 1.00->1.00
 ```
 
 - `t`: comp time in seconds at the playhead; `live`: particles the simulation produces for it.

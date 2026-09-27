@@ -14,9 +14,9 @@ struct RenderLimits {
 };
 
 // Deterministic CPU reference backend for the current particle slice: particles
-// are rasterized as white soft-edged discs and composited over the optional source
-// with premultiplied "over" (ADR 0005). Shape sampling and velocity variation are
-// in the simulation; this renderer still ignores depth, color, and age curves.
+// are rasterized as soft-edged discs using evaluated per-particle RGB/opacity/size
+// and composited over the optional source with premultiplied "over" (ADR 0005).
+// Depth and motion blur remain future work.
 class CpuParticleRenderer final : public Renderer {
 public:
     CpuParticleRenderer() = default;
