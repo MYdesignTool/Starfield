@@ -70,3 +70,20 @@ Revisit the carrier only when one of these is true:
 
 Adobe's UXP direction for AE is a further reason not to invest in a bespoke `.aex` UI now:
 the protocol in ADR 0009 is carrier independent, so a later UXP panel is a port, not a rewrite.
+
+## Amendment (owner follow-up, 2026-09-27)
+
+The repository may be made private while the work matures. That lowers *distribution* risk but
+does not move the derivative-work boundary: code translated out of a decompiler is still a
+derivative of the original, so this project stays an independent implementation of observed
+behavior, and no reference-product binary enters the tree, private or public. Two consequences
+worth writing down:
+
+- **Parameter discovery does not need decompilation.** AE exposes every effect parameter,
+  including hidden and non-animated ones, to the public scripting DOM.
+  `tools/dump_effect_parameters.jsx` dumps names, match names, values, keyframe state and nesting
+  for every effect on the selected layers in seconds. Compared with analysing a binary it is also
+  more accurate: it reports the installed version's real behavior, not an older build's metadata.
+- The reference panel shipping as a `.aex` remains an observation about its architecture, not a
+  route to copy: how it attaches itself to AE is an implementation detail we would have to
+  reverse, and §3 documents the supported alternatives we can build ourselves.
