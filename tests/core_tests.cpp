@@ -11,10 +11,12 @@
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Random.hpp"
 #include "starfield/core/Render.hpp"
+#include "starfield/core/SequenceCodec.hpp"
 #include "starfield/core/Settings.hpp"
 #include "starfield/core/Time.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -378,6 +380,215 @@ void test_graph_contract() {
     bad = graph;
     bad.nodes.resize(kMaxGraphNodes + 1);
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::graph_too_large);
+}
+
+void test_put_u16(OpaqueBytes& bytes, std::size_t offset, std::uint16_t value) {
+    bytes[offset] = static_cast<std::byte>(value & 0xffu);
+    bytes[offset + 1] = static_cast<std::byte>((value >> 8u) & 0xffu);
+}
+
+void test_put_u32(OpaqueBytes& bytes, std::size_t offset, std::uint32_t value) {
+    for (unsigned shift = 0; shift < 32; shift += 8) {
+        bytes[offset + shift / 8] = static_cast<std::byte>((value >> shift) & 0xffu);
+    }
+}
+
+std::uint16_t test_read_u16(const OpaqueBytes& bytes, std::size_t offset) {
+    return static_cast<std::uint16_t>(std::to_integer<std::uint8_t>(bytes[offset])) |
+           static_cast<std::uint16_t>(static_cast<std::uint16_t>(std::to_integer<std::uint8_t>(bytes[offset + 1])) << 8u);
+}
+
+std::uint32_t test_read_u32(const OpaqueBytes& bytes, std::size_t offset) {
+    std::uint32_t value = 0;
+    for (unsigned shift = 0; shift < 32; shift += 8) {
+        value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[offset + shift / 8])) << shift;
+    }
+    return value;
+}
+
+std::uint32_t test_crc32(std::span<const std::byte> bytes) {
+    std::uint32_t crc = 0xffffffffu;
+    for (const auto byte : bytes) {
+        crc ^= std::to_integer<std::uint8_t>(byte);
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            crc = (crc >> 1u) ^ ((0u - (crc & 1u)) & 0xedb88320u);
+        }
+    }
+    return crc ^ 0xffffffffu;
+}
+
+void test_refresh_crc(OpaqueBytes& bytes) {
+    test_put_u32(bytes, 24, test_crc32(std::span<const std::byte>(bytes).subspan(kSequenceHeaderSize)));
+}
+
+void test_append_u16(OpaqueBytes& bytes, std::uint16_t value) {
+    bytes.push_back(static_cast<std::byte>(value & 0xffu));
+    bytes.push_back(static_cast<std::byte>((value >> 8u) & 0xffu));
+}
+
+void test_append_u32(OpaqueBytes& bytes, std::uint32_t value) {
+    for (unsigned shift = 0; shift < 32; shift += 8) {
+        bytes.push_back(static_cast<std::byte>((value >> shift) & 0xffu));
+    }
+}
+
+void append_unknown_record(OpaqueBytes& bytes, std::uint16_t kind, std::uint16_t version) {
+    test_append_u16(bytes, kind);
+    test_append_u16(bytes, version);
+    test_append_u32(bytes, 8); // record prefix only
+    test_put_u32(bytes, 12, static_cast<std::uint32_t>(bytes.size() - kSequenceHeaderSize));
+    test_refresh_crc(bytes);
+}
+
+void test_sequence_codec() {
+    NodeRegistry registry = make_particle_node_registry();
+    Graph graph = make_basic_graph();
+    const auto encoded = serialize_graph(graph, registry);
+    CHECK(encoded.has_value());
+    if (!encoded.has_value()) return;
+    CHECK(encoded.value().size() > kSequenceHeaderSize);
+    CHECK(test_read_u16(encoded.value(), 8) == kSequenceFormatVersion);
+    CHECK(test_read_u16(encoded.value(), 10) == kSequenceHeaderSize);
+    CHECK(test_read_u32(encoded.value(), 24) ==
+          test_crc32(std::span<const std::byte>(encoded.value()).subspan(kSequenceHeaderSize)));
+    CHECK(test_crc32(std::span<const std::byte>{}) == 0u);
+    const std::array<std::byte, 9> crc_sample{
+        std::byte{0x31}, std::byte{0x32}, std::byte{0x33}, std::byte{0x34}, std::byte{0x35},
+        std::byte{0x36}, std::byte{0x37}, std::byte{0x38}, std::byte{0x39},
+    };
+    CHECK(test_crc32(crc_sample) == 0xcbf43926u);
+
+    const auto decoded = deserialize_graph(encoded.value(), registry);
+    CHECK(decoded.has_value());
+    if (decoded.has_value()) {
+        CHECK(decoded.value().nodes.size() == graph.nodes.size());
+        CHECK(decoded.value().edges.size() == graph.edges.size());
+        CHECK(decoded.value().nodes[0].id == graph.nodes[0].id);
+        CHECK(decoded.value().nodes[0].parameters.size() == graph.nodes[0].parameters.size());
+        CHECK(decoded.value().edges[0].source_node == graph.edges[0].source_node);
+        CHECK(decoded.value().edges[0].destination_port == graph.edges[0].destination_port);
+    }
+
+    Graph reordered = graph;
+    std::reverse(reordered.nodes.begin(), reordered.nodes.end());
+    std::reverse(reordered.edges.begin(), reordered.edges.end());
+    const auto canonical_reordered = serialize_graph(reordered, registry);
+    CHECK(canonical_reordered.has_value());
+    if (canonical_reordered.has_value()) CHECK(canonical_reordered.value() == encoded.value());
+
+    NodeRegistry value_registry;
+    NodeTypeDescriptor value_type;
+    value_type.type_key = "org.starfieldfx.nodes.values";
+    value_type.parameters = {
+        {ParameterKey{1}, ParameterKind::boolean, true},
+        {ParameterKey{2}, ParameterKind::int32, true},
+        {ParameterKey{3}, ParameterKind::uint32, true},
+        {ParameterKey{4}, ParameterKind::float64, true},
+        {ParameterKey{5}, ParameterKind::vector3_float64, true},
+        {ParameterKey{6}, ParameterKind::utf8, true},
+        {ParameterKey{7}, ParameterKind::opaque_bytes, true},
+    };
+    value_registry.types.push_back(value_type);
+    Graph value_graph;
+    GraphNode value_node;
+    value_node.id = NodeId{test_uuid(22)};
+    value_node.type_key = value_type.type_key;
+    value_node.parameters = {
+        {ParameterKey{1}, true},
+        {ParameterKey{2}, std::int32_t{-123456}},
+        {ParameterKey{3}, std::uint32_t{345678}},
+        {ParameterKey{4}, 3.125},
+        {ParameterKey{5}, Vec3{-1.25, 2.5, 0.125}},
+        {ParameterKey{6}, std::string("\xe7\xb2\x92\xe5\xad\x90\xe2\x9c\xa8")},
+        {ParameterKey{7}, OpaqueBytes{std::byte{0x00}, std::byte{0x7f}, std::byte{0xff}}},
+    };
+    value_graph.nodes.push_back(value_node);
+    const auto values_encoded = serialize_graph(value_graph, value_registry);
+    CHECK(values_encoded.has_value());
+    if (!values_encoded.has_value()) return;
+    const auto values_decoded = deserialize_graph(values_encoded.value(), value_registry);
+    CHECK(values_decoded.has_value());
+    if (values_decoded.has_value()) {
+        const auto& values = values_decoded.value().nodes[0].parameters;
+        CHECK(std::get<bool>(values[0].value));
+        CHECK(std::get<std::int32_t>(values[1].value) == -123456);
+        CHECK(std::get<std::uint32_t>(values[2].value) == 345678u);
+        CHECK(std::abs(std::get<double>(values[3].value) - 3.125) < 1e-12);
+        CHECK(std::get<Vec3>(values[4].value).x == -1.25);
+        CHECK(std::get<std::string>(values[5].value) == std::string("\xe7\xb2\x92\xe5\xad\x90\xe2\x9c\xa8"));
+        CHECK(std::get<OpaqueBytes>(values[6].value) == std::get<OpaqueBytes>(value_node.parameters[6].value));
+    }
+
+    auto malformed = encoded.value();
+    malformed.pop_back();
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::length_mismatch);
+
+    malformed = encoded.value();
+    malformed[0] = std::byte{0};
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::invalid_header);
+
+    malformed = encoded.value();
+    test_put_u16(malformed, 8, 2);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_format_version);
+
+    malformed = encoded.value();
+    test_put_u16(malformed, 10, 31);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::invalid_header);
+
+    malformed = encoded.value();
+    test_put_u32(malformed, 12, static_cast<std::uint32_t>(malformed.size()));
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::length_mismatch);
+
+    malformed = encoded.value();
+    test_put_u32(malformed, 28, 1);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_flags);
+
+    malformed = encoded.value();
+    test_put_u32(malformed, 16, static_cast<std::uint32_t>(kMaxGraphNodes + 1));
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::size_limit_exceeded);
+
+    malformed = encoded.value();
+    malformed.back() ^= std::byte{1};
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::checksum_mismatch);
+
+    malformed = encoded.value();
+    test_put_u32(malformed, 36, 4); // first record size is smaller than its prefix
+    test_refresh_crc(malformed);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::malformed_record);
+
+    malformed = encoded.value();
+    test_put_u16(malformed, 34, 2); // unsupported node-record schema
+    test_refresh_crc(malformed);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_record_version);
+
+    malformed = encoded.value();
+    append_unknown_record(malformed, 0x8001, 99); // optional unknown record is skipped
+    const auto optional_decode = deserialize_graph(malformed, registry);
+    CHECK(optional_decode.has_value());
+
+    malformed = encoded.value();
+    append_unknown_record(malformed, 3, 1); // required unknown record fails
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_record);
+
+    malformed = encoded.value();
+    const auto key_length = test_read_u16(malformed, 56);
+    const std::size_t first_parameter_type_offset = 62u + key_length + 8u;
+    test_put_u16(malformed, first_parameter_type_offset, 99);
+    test_refresh_crc(malformed);
+    CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_value_type);
+
+    malformed = values_encoded.value();
+    const auto values_key_length = test_read_u16(malformed, 56);
+    const std::size_t first_value_offset = 62u + values_key_length + 8u + 2u + 4u;
+    malformed[first_value_offset] = std::byte{2}; // bool values are exactly 0 or 1
+    test_refresh_crc(malformed);
+    CHECK(deserialize_graph(malformed, value_registry).error().code == SequenceErrorCode::invalid_value);
+
+    Graph invalid_graph = graph;
+    invalid_graph.nodes[0].type_key = "org.starfieldfx.nodes.not-registered";
+    const auto invalid_encoded = serialize_graph(invalid_graph, registry);
+    CHECK(!invalid_encoded.has_value());
+    if (!invalid_encoded.has_value()) CHECK(invalid_encoded.error().code == SequenceErrorCode::invalid_graph);
 }
 
 void test_layer_point_conversion() {
@@ -907,6 +1118,7 @@ void test_renderer_formats_and_limits() {
 int main() {
     test_rational_time();
     test_graph_contract();
+    test_sequence_codec();
     test_layer_point_conversion();
     test_settings_validation();
     test_random_streams();

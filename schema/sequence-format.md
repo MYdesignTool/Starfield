@@ -49,4 +49,4 @@ Reject duplicate edge IDs, missing endpoint nodes, duplicate input connections w
 
 ## Migration and AE lifecycle
 
-Migrations operate on parsed owned values (`vN -> vN+1`) and never mutate raw input bytes. Unknown future versions return a controlled compatibility error; do not reset user data to defaults silently. AE `SEQUENCE_SETUP/RESETUP/FLATTEN/GET_FLATTENED_SEQUENCE_DATA/SETDOWN` handlers own allocation and disposal. M1 deliberately has no custom sequence payload; implement and qualify this graph format together with graph persistence in M4.
+Migrations operate on parsed owned values (`vN -> vN+1`) and never mutate raw input bytes. Unknown future versions return a controlled compatibility error; do not reset user data to defaults silently. The core schema-1 codec rejects unsupported format versions; there is no earlier graph schema to migrate. AE `SEQUENCE_SETUP/RESETUP/FLATTEN/GET_FLATTENED_SEQUENCE_DATA/SETDOWN` handlers own allocation and disposal and are integrated under G-04 together with graph persistence and migration from the current AE controls.

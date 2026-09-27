@@ -48,6 +48,7 @@
     <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
     <ClCompile Include="..\src\core\Random.cpp" />
     <ClCompile Include="..\src\core\Render.cpp" />
+    <ClCompile Include="..\src\core\SequenceCodec.cpp" />
     <ClCompile Include="..\src\core\Settings.cpp" />
     <ClCompile Include="..\src\core\Time.cpp" />
     <!-- Outputs is required: without it MSBuild skips the custom build (MSB8018). The

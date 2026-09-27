@@ -28,4 +28,4 @@
 
 - M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, and M3-01 seeded emitter distributions are in the tree.
 - Core self-tests pass; Windows x64 builds pass with the May 2023 SDK and AE SDK 26.5. AE 2023 load/render evidence applies to an earlier M2 parameter revision; the current 13-control M3-01 build still needs host qualification.
-- G-01's typed graph model and validator are implemented in `include/starfield/core/Graph.hpp` / `src/core/Graph.cpp`. The graph is not yet serialized, evaluated, or connected to AE; continue with G-02/G-03/G-04 in `docs/agent-backlog.md`.
+- G-01's typed graph model/validator and G-02's bounded sequence codec are implemented in `include/starfield/core/Graph.hpp`, `src/core/Graph.cpp`, and `src/core/SequenceCodec.cpp`. Graphs are not yet evaluated or connected to AE sequence persistence; continue with G-03/G-04 in `docs/agent-backlog.md`.

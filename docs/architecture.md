@@ -54,6 +54,7 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 
 - `include/starfield/core/Settings.hpp`: stable internal IDs, manifest bounds, and validated settings types.
 - `include/starfield/core/Graph.hpp`: host-independent node, port, edge, parameter, registry, and graph-validation contracts.
+- `include/starfield/core/SequenceCodec.hpp`: bounded schema-1 graph serialization and parsing with CRC-32.
 - `include/starfield/core/Error.hpp`: typed error codes and the `Result` primitive shared by the core.
 - `include/starfield/core/Time.hpp`: normalized signed rational time with checked arithmetic.
 - `include/starfield/core/Render.hpp`: host-independent frame/request/output/backend contract and the cancellation interface.
@@ -87,4 +88,4 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Current scope
 
-M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitter distributions, and the G-01 typed graph model/validator are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. Graph serialization, graph evaluation, AE graph persistence, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, the editor panel, MFR, and GPU remain future milestones.
+M0 contracts, the M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitter distributions, and the G-01/G-02 typed graph model/validator/codec are in the tree. The effect registers thirteen controls and renders Point/Box/Sphere/Disc particles with deterministic per-particle variation. Core tests and both SDK builds pass; the current control revision still needs AE 2023 host playback, preview-scale, and lifecycle qualification. Graph evaluation and AE graph persistence, life curves, forces, particle appearance controls, depth, mesh/volume features, presets, the editor panel, MFR, and GPU remain future milestones.

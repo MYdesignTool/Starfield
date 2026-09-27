@@ -6,8 +6,8 @@
 
 - M0/M1 contracts and the native shell are in place. M2 adds SmartFX transport, an 8/16/32-bpc CPU sprite renderer, deterministic time evaluation, and source compositing.
 - M3-01 adds seeded Point/Box/Sphere/Disc birth distributions, emitter position, per-particle velocity spread, and deterministic random streams.
-- G-01 adds a typed graph model and bounded validator with stable node/edge identities. It is core-only: graphs are not persisted in AE or used by rendering yet.
-- Core self-tests pass (3,787 checks), and the Windows x64 plug-in builds against both the May 2023 and AE 26.5 SDKs. The most recent M3-01 control layout has not yet been re-tested in AE; host evidence is tracked in [行为清单](docs/compatibility-matrix.md).
+- G-01/G-02 provide typed graph validation plus bounded, versioned sequence serialization. The codec is core-only: graphs are not persisted in AE or used by rendering yet.
+- Core self-tests pass (3,828 checks), and the Windows x64 plug-in builds against both the May 2023 and AE 26.5 SDKs. The most recent M3-01 control layout has not yet been re-tested in AE; host evidence is tracked in [行为清单](docs/compatibility-matrix.md).
 - This remains a render slice, not Stardust parity. The current look is white 2D sprites with constant size/opacity; forces, age curves, color/texture sources, depth, mesh/volume rendering, presets, graph persistence/evaluation, and the dockable editor remain unfinished. See the [current feature audit](docs/current-feature-audit.md).
 
 ## 当前架构

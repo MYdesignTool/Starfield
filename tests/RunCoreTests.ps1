@@ -27,6 +27,7 @@ try {
         'tests\core_tests.cpp',
         'src\core\Time.cpp',
         'src\core\Render.cpp',
+        'src\core\SequenceCodec.cpp',
         'src\core\Settings.cpp',
         'src\core\Geometry.cpp',
         'src\core\Graph.cpp',
