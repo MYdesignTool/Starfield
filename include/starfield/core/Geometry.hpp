@@ -21,13 +21,9 @@ struct LayerUnits {
 [[nodiscard]] Vec3 layer_point_to_world(double x_pixels, double y_pixels, double z_pixels,
                                        const LayerUnits& units) noexcept;
 
-// Interprets one raw point component that a host delivered, tolerating the three
-// unit conventions seen in AE documentation and samples:
-//   * layer pixels (documented behaviour, e.g. 960 on a 1920-wide layer),
-//   * a fixed-point scaled value (percent x 65536, i.e. far above any pixel value),
-//   * a legacy percentage (a small value that cannot be a plausible pixel position).
-// The result is layer pixels. The branch that fired is reported by the diagnostics
-// readout, so the actual host behaviour can be recorded instead of guessed.
-[[nodiscard]] double host_point_component_to_layer_pixels(double raw_component, double layer_extent) noexcept;
+// Validates one already-normalized point component from the host adapter. The adapter
+// removes AE's preview scaling first; for AE 2023.5 Build 52, observed values are pixel
+// coordinates, including valid off-layer positions. Non-finite values become zero.
+[[nodiscard]] double host_point_component_to_layer_pixels(double pixel_component) noexcept;
 
 } // namespace starfield::core

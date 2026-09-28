@@ -8,17 +8,17 @@ Use this file to turn observed behavior into requirements before implementing ea
 |---|---|---|---|
 | M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass | Effect loads; render pass-through, add/remove, save/reopen, duplicate, and undo/redo still unrecorded |
 | M1 discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Current build must be qualified separately |
-| Current candidate artifact | AE 2023; `AfterFX.exe` file version 23.5, exact Help > About build not recorded | Built; not installed or loaded | May 2023 SDK rebuild on 2026-09-28; `dist/StarfieldParticle.aex`, packed version `0x8002`, SHA-256 `8135BB08CB0F614C9A999C7C86C040FB5DF6164F0E0173C0B1BB623008DCCECC`. Read-only preflight found `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex` is still an earlier 188,928-byte build (SHA-256 `192E7FA0F2EF20F5504601A13AEA65535403A991F8363E8745759ACFED328CCF`); AE was not running. The current candidate is not qualified until the owner loads this exact file and records the Help > About build and result. |
-| Build-2 graph render/persistence | AE 2023, exact build not recorded | Not checked | Current candidate has not been loaded; test graph source, save/reopen, duplication and undo/redo |
+| Corrected coordinate candidate | AE 2023.5.0 Build 52 (owner readout) | **Built; AE retest pending** | May 2023 SDK build on 2026-09-28. Installable file `dist/StarfieldParticle.aex`, 189,440 bytes, packed version `0x8002`, SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`; PDB SHA-256 `B0EB472A139D151424E87CF789E7A72B9E4220F94E1CC6FE1452EA016330B075`. `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` matches the installable copy. This build was not installed by the agent; load this exact file and verify Full/Quarter `px 1920,1080,1080` and world `(0,0,0)` before claiming the origin fix. |
+| Build-2 graph render/persistence | AE 2023.5.0 Build 52 | Not checked on corrected candidate | Test graph source, save/reopen, duplication and undo/redo after loading the exact artifact above |
 | Apply-time crash | AE 2023 installed at `D:\Software\Adobe\Adobe After Effects 2023`; plug-in build `0x8002` (24 parameters, `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, 21:19) | **Open: crashed once while applying the effect** | Dump `5f8321e1-3dac-4b7e-b3b7-4fa60b9b283b.dmp` (2026-09-27 21:35). Exception `0x40000015` (fatal app exit, not an access violation), raised on a thread whose stack carries `sentry_crashpad.dll` (Adobe crash handler) and NVIDIA OpenGL/D3D12 frames; scanning the captured stacks found no return address inside `StarfieldParticle.aex`, so the fatal exit did not happen under our own frame. The dump also shows the reference `Stardust_panel.aex` and Adobe plug-ins loaded, and our PDB path. Mitigations in the same commit: the Options readout now refuses to check out parameters without a render context, and `STARFIELD_FLAT_RENDER=1` bisects the graph render path against the flat path. Next steps are listed under "Crash triage" below. |
-| M2 particle render | AE 2023; exact build not recorded | Partial, old revision only | The eight-control build loaded and rendered a center sprite. A later eleven-control revision rendered nothing after adding Emitter Origin. The conversion was rewritten; the current 24-parameter build has not been checked in AE. |
-| M3-01 shapes and playback | AE 2023; exact build not recorded | Core implementation only | Install the current build and confirm at t ≥ 1 s with the graph-aware Options readout |
-| M3-02 force/appearance | AE 2023; exact build not recorded | Core implementation only | Gravity, drag, color and the size/opacity age curves have core + control coverage (IDs 17-24). Confirm visible change: with defaults the picture must be unchanged, then set Gravity Y = -2 and Size End = 1 and re-render. |
-| P-02 dockable panel | AE 2023; exact Help > About build not recorded | Not checked | Read-only preflight found the system CEP copy at `C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel` has an older gateway file (SHA-256 `F249ED2FE2A903611B91A635EFD852AD5284E9CE2436E48348C130D4BDD5453D`) than the current source (`A062FE03C34EF44F9CB2DAEC9DE368C48007D57FFEEC5F5ABA3525824DE35F2B`). `HKCU\Software\Adobe\CSXS.11\PlayerDebugMode` was absent on read-only inspection; no registry value was changed. Update/qualify the panel only after the owner confirms the exact host action. See `cep_panel/README.md`. |
+| M2 particle render | AE 2023.5.0 Build 52, prior build `0x8002` (candidate hash unknown) | Effect runs and graph diagnostic reports 200 live particles; emitter location wrong at Quarter | Owner readouts establish the exact preview-scale error. The corrected candidate at the row above still needs load/render verification. |
+| M3-01 shapes and playback | AE 2023.5.0 Build 52, corrected candidate not loaded | Core implementation; host visual output unverified | Load the candidate and confirm at t ≥ 1 s with the graph-aware Options readout and visible output. |
+| M3-02 force/appearance | AE 2023.5.0 Build 52, corrected candidate not loaded | Core implementation; host visual output unverified | Gravity, drag, color and the size/opacity age curves have core + control coverage (IDs 17-24). Confirm visible change: with defaults the picture must be unchanged, then set Gravity Y = -2 and Size End = 1 and re-render. |
+| P-02 dockable panel | AE 2023.5.0 Build 52 | Screenshot reviewed; this is an effect-control form, not a node editor | The CEP screenshot shows grouped Emitter/Force/Appearance fields and text separators, with no node cards, ports, or visible edge geometry. Parameter reads/writes and AE undo remain separate host gates. The visual node canvas is not implemented; see P-02A in `docs/agent-backlog.md`. |
 | Delivery examples | AE 2023; exact build not recorded | Not checked | Apply Spark, Snow and Floating Light from `docs/examples.md` and record a still frame at t ≥ 1 s for each |
-| M2 point-control units | Any host | Fixed in code, corroborated by observation, still unverified for our own control | Documented delivery is absolute layer pixels; the adapter normalizes through a ladder (pixels / legacy percentage / fixed-point) and the Options readout prints host values, interpreted pixels, and world position so the real delivery can be recorded. **Corroboration:** the reference product's own `Origin XY` parameter reads `[1920, 1080]` in a 3840×2160 composition (`docs/reference-parameter-map.md`), i.e. point-style parameters carry layer pixels in this host. Our Options readout is still the only way to close D-05 for our control |
-| M2 preview geometry | Any host | Fixed in code, unverified in a host | Static review found the old adapter derived the render grid from `in_data->downsample_x/y`, whose direction the SDK documents inconsistently. The adapter now derives geometry from observed checked-out worlds (`docs/adr/0005`); a core test pins the half-resolution mapping. The readout now records the reference and grid each frame used, so the next host pass can confirm both at once |
-| M2 preview-resolution emitter origin | AE 2023, installed build `0x8002` | **Reported still wrong; measurement was impossible before this pass** | The owner re-reported the offset with the fix installed (binary hash matches the fix build). The readout was truncating exactly the origin lines and never showed the reference the conversion divides by; both are fixed. Owner action: the two-click Full/Quarter readout in `docs/parameter-mapping.md` |
+| M2 point-control units | AE 2023.5.0 Build 52 | **Measured:** absolute pixels scaled by preview resolution | Full/Quarter readouts show center `[1920,1080,1080]` → `[480,270,270]` as `ds` changes 1/1 → 1/4. The adapter restores the per-axis preview scale and the core preserves absolute pixels, including off-layer positions. A newer AE 2023 build needs its own host readout. |
+| M2 preview geometry | AE 2023.5.0 Build 52 | Host reported `ref/grid` at Full and Quarter; visual grid mapping still needs verification | The readouts show `ref 3840x2160` and `grid 3840x2160` at Full, then `ref 3840x2160` and `grid 960x540` at Quarter. Adapter geometry comes from observed worlds and rectangles; a core regression pins the half-resolution mapping. Confirm rendered positions after installing the corrected candidate. |
+| M2 preview-resolution emitter origin | AE 2023.5.0 Build 52 | **Root cause confirmed; source fix built and regression suites pass; host retest pending** | User's Full/Quarter readouts show center `[1920,1080,1080]` at `ds 1/1`, then `[480,270,270]` at `ds 1/4`; `ref` stays 3840×2160 while `grid` becomes 960×540. The old conversion treated Quarter coordinates as full pixels and calculated `(-0.667,0.375,-0.375)`. The adapter now reverses each preview factor before world conversion. Core: 6,188 checks; adapter: 382; panel gateway fake-host suite passes; May 2023 SDK build succeeds. Load the exact candidate above and confirm `px 1920,1080,1080` and world `(0,0,0)` at both resolutions. |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
 
 ### Fixed suspect: the plug-in freed a host-owned handle
@@ -32,50 +32,17 @@ now hand the new handle to the parameter and leave the old one to the host, and 
 to touch a parameter array that is not fully registered and type-correct (apply/undo can deliver a
 partially built array). The adapter suite pins the new ownership rule.
 
-## Fixed: emitter offset at reduced preview resolution (2026-09-27)
+## Superseded diagnosis: emitter offset at reduced preview resolution (2026-09-27)
 
-Symptom reported from the host: at Half/Quarter preview the emitter sits far from where it sits at
-Full resolution. Cause: point controls are delivered in **full-resolution** layer pixels, but the
-parameter bridge divided them by `in_data->width/height`, which shrink with the preview resolution —
-at quarter resolution the conversion scaled the emitter origin by four. The renderer's world-to-pixel
-mapping was already correct: it maps world units through the preview-sized frame grid and the
-full-resolution `ref_width/ref_height`.
+The first cause identified below was incorrect. AE 2023.5.0 Build 52 readouts supplied on
+2026-09-28 show that point controls are preview-scaled; using the full-resolution reference alone
+did not correct the point value. The code and test added after that measurement are the current fix.
 
-Fix: pre-render now performs the input checkout **first** and passes `PF_CheckoutResult::ref_width/
-ref_height` into the parameter conversion, so both sides use the same reference. At Full resolution
-`ref_*` equals `in_data->width/height`, so nothing changes there.
-
-**Capture was the one path that could store a wrong origin:** it has no render context, so it converts
-with `in_data->width/height`, and at a reduced preview resolution that would bake an origin scaled by
-the downsample factor into the stored graph — wrong at every resolution afterwards. It now **refuses**
-when either valid horizontal or vertical downsample factor reports a reduced preview (`capture needs
-Full preview resolution`, `PF_Cmd_USER_CHANGED_PARAM` with a displayed message), and the adapter suite
-pins horizontal/vertical refusal and normal Full capture. The Node Graph sync path cannot refuse a
-control edit — the graph has to keep
-following the controls — so it still converts with `in_data->width/height`; the real fix belongs with
-the manifest-revision-7 work: store raw control values (or the observed reference size) instead of a
-resolution-dependent world position.
-
-### Verification pass (2026-09-27, after the owner re-reported the offset)
-
-The owner reports the offset **still present** in the installed binary. That binary is
-`artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` byte for byte (SHA-256 `7D1BCC10…`), i.e. the
-build produced with the fix above — so "the fix works" was never a measurement. Two facts explain why
-no measurement existed:
-
-- **The Options readout truncated the origin lines.** `PF_OutData::return_msg` holds 255 characters and
-  the writer drops what does not fit; the origin lines came after longer lines, so the numbers that
-  would have answered the question were cut off. The readout was reordered by diagnostic value and
-  compacted, and it now prints `layer/ds/ref/grid`, `org host/px` and both world interpretations.
-- **The reference the render divides by was invisible.** The readout cannot call `checkout_layer`, so
-  `PF_CheckoutResult::ref_width/ref_height` never appeared anywhere. The render phase now records them
-  (`record_render_geometry` in `ae_plugin/Diagnostics.hpp`), so a readout taken after a Quarter-preview
-  frame shows whether `ref` is a real full-resolution size or a fallback to the preview size.
-
-Owner action, two clicks, procedure in `docs/parameter-mapping.md` ("Resolving the point-unit question"):
-render one frame at Full, press `Options`, switch to Quarter, press `Options`, send both readouts. That
-decides the divisor rule; the ladder in `docs/parameter-mapping.md` is then reduced to the confirmed
-delivery instead of three tolerated conventions.
+The first attempted fix only passed the full-resolution reference into conversion. It assumed the
+raw point control stayed at full resolution; that assumption was wrong. The owner supplied the
+readouts that were missing in the earlier pass, and the 2026-09-28 row above records the corrected
+cause and the replacement fix. The earlier Full-only capture restriction is also removed: capture
+and Node Graph synchronization now use the same preview-aware point conversion as rendering.
 
 ## Crash triage (apply-time fatal exit, 2026-09-27)
 
@@ -139,14 +106,15 @@ interpretation table and the two-click D-05 measurement are in `docs/parameter-m
 | Random Seed | Changing the seed changes the rendered pixels | Implemented (M3-01): the seed now keys every per-particle stream. Host confirmation pending |
 | Forces | Each force has isolated enable/disable and stable parameter semantics | Implemented in core (M3-02): gravity and linear drag are force-node values with closed-form integration, authored by controls 17-20. Per-force enable/disable is not implemented: the Alpha chain has one force stage, whose effect is zero at default values. AE confirmation pending |
 | Ages and appearance | Size, opacity, and color follow particle age | Implemented in core (M3-02): linear age curves from the appearance node and the Color Start/End, Size End and Opacity End controls; the rasterizer uses per-particle RGB/opacity/size. Covered by `tests/core_tests.cpp`; AE confirmation pending |
-| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. The editor displays the fixed v1 chain; dynamic node creation, deletion, and rewiring are not implemented. |
+| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. The CEP screenshot shows no node canvas; P-02A adds a visual fixed topology, while dynamic create/delete/rewire remains P-02B. |
 | Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Implemented for 8/16/32-bpc, ROI, rowbytes, and premultiplied alpha. Downsampling no longer depends on the ambiguous SDK factor: geometry comes from observed worlds. Preview-resolution rendering still needs host confirmation |
 | Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Core test covers a half-resolution frame grid; host confirmation pending |
 | Compositing | Particles composite over the input instead of replacing it | Chosen default recorded in ADR 0005; not yet confirmed against the reference effect |
 | Color management | Working-space conversion through documented AE suites | Not started; M2 performs no conversion (ADR 0005) |
 | Control shape | Positions use point controls, rates use scalar sliders | Done in code: Emitter Origin is a 3D point; X/Y/Z velocity are sliders in layer heights/s. Build-2 appends graph data, source mode and capture action; current AE build is unverified |
-| Emitter origin | The point control places the emitter and the render agrees with it | Implemented as host pixels → world conversion, pinned by `tests/core_tests.cpp` (`layer_point_to_world`, unit ladder); host confirmation pending |
-| Point-unit tolerance | A host delivering pixels, a legacy percentage, or fixed-point values all place the emitter sensibly | Implemented as a documented shim; remove the unused branches once a host pass records the real delivery (backlog D-05) |
+| Emitter origin | The point control places the emitter and the render agrees with it | Preview-scale source fix and adapter regression added from AE 2023.5.0 Build 52 readouts; retest the rebuilt binary in AE |
+| Point-control scaling | AE point values map to the same layer position at Full and Quarter | Source fix and adapter regression added from AE 2023.5 Build 52 evidence; host retest of the rebuilt candidate pending |
+| CEP node canvas | The dockable panel visibly presents nodes, ports, and connectors | Not implemented. Current screenshot is a grouped effect-control form; see P-02A |
 | Persistence | Save/reopen, effect copy and undo preserve graph identity and values | Implemented with AE arbitrary-data parameter callbacks; build-2 host verification required. Capturing controls samples current time into a constant graph and does not convert animation tracks. |
 | Concurrency | Repeated concurrent renders return identical pixels and never mutate shared state | Not advertised (no MFR flag); the core render is a pure function of one request, which M6 must audit before claiming support |
 | Cancellation | A host abort stops a long render predictably | Implemented through `PF_ABORT` polling in the simulation and rasterizer; unverified in a host |

@@ -53,16 +53,22 @@ inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is co
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.
 // `reference_width`/`reference_height` are the full-resolution layer size observed in the
-// pre-render input checkout (PF_CheckoutResult::ref_width/ref_height). Point controls are
-// delivered in full-resolution layer pixels, so the conversion must not divide by the
-// preview-sized in_data->width/height: at quarter preview that scaled the emitter origin
-// by four and threw it far off canvas. Zero means "no render context, use in_data".
+// pre-render input checkout (PF_CheckoutResult::ref_width/ref_height). AE 2023.5 Build 52
+// delivers point-control components scaled with preview resolution (verified Full vs
+// Quarter); point_control_to_full_resolution_pixels() reverses that scale before converting to world.
+// Zero means "no render context, use in_data".
 [[nodiscard]] PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                                           std::shared_ptr<const core::Graph>& graph,
                                           A_long* control_source = nullptr,
                                           A_long reference_width = 0, A_long reference_height = 0) noexcept;
 [[nodiscard]] PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data,
                                       PF_ParamDef* params[], PF_UserChangedParamExtra* extra) noexcept;
+
+// Converts a raw PF_Point3DDef value into full-resolution layer pixels. AE 2023.5 Build 52
+// scales point values by the preview factor; X and Y/Z use their corresponding horizontal
+// and vertical rational factors. Invalid/unreported factors are treated as 1:1.
+[[nodiscard]] starfield::core::Vec3 point_control_to_full_resolution_pixels(
+    const starfield::core::Vec3& raw, const PF_InData& in_data) noexcept;
 
 // PF_Cmd_USER_CHANGED_PARAM entry point. The capture button replaces the stored
 // graph; a change to any bound control while Node Graph is selected rewrites the
@@ -111,8 +117,8 @@ public:
     // Values in core units. Only meaningful while valid() is true.
     [[nodiscard]] const starfield::core::Settings& settings() const noexcept { return settings_; }
 
-    // Emitter origin exactly as the host delivered it, before the percent-to-world
-    // conversion. The diagnostics readout uses it to show what the UI stored.
+    // Emitter origin exactly as the host delivered it, before preview-scale normalization.
+    // The diagnostics readout uses it to show the raw control value.
     [[nodiscard]] const starfield::core::Vec3& raw_origin() const noexcept { return raw_origin_; }
 
 private:

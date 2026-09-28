@@ -1,37 +1,14 @@
 #include "starfield/core/Geometry.hpp"
 
-#include <algorithm>
 #include <cmath>
 
 namespace starfield::core {
-namespace {
 
-// Above this magnitude a raw component cannot be a pixel position in any real
-// comp, so it is treated as a fixed-point (percent x 65536) delivery.
-constexpr double kFixedPointThreshold = 1.0e5;
-constexpr double kFixedPointScale = 65536.0;
-
-// A value this far outside the layer cannot be a pixel position either; it is a
-// legacy percentage of the layer extent (50 meaning halfway).
-constexpr double kPlausiblePixelMargin = 4.0;
-
-} // namespace
-
-double host_point_component_to_layer_pixels(double raw_component, double layer_extent) noexcept {
-    if (!std::isfinite(raw_component)) {
+double host_point_component_to_layer_pixels(double pixel_component) noexcept {
+    if (!std::isfinite(pixel_component)) {
         return 0.0;
     }
-
-    const double extent = (std::isfinite(layer_extent) && layer_extent > 0.0) ? layer_extent : 1.0;
-    const double magnitude = std::abs(raw_component);
-
-    if (magnitude > kFixedPointThreshold) {
-        return raw_component / kFixedPointScale;
-    }
-    if (magnitude > kPlausiblePixelMargin * extent) {
-        return raw_component / 100.0 * extent;
-    }
-    return raw_component;
+    return pixel_component;
 }
 
 Vec3 layer_point_to_world(double x_pixels, double y_pixels, double z_pixels, const LayerUnits& units) noexcept {

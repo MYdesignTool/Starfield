@@ -130,7 +130,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
             writer.line("SF 0.1.0 graph evaluation failed: %s\n", evaluated.error().detail);
             return PF_Err_NONE;
         }
-        writer.line("SF 0.1.0 src %s g%llun %llue live %llu\n",
+        writer.line("SF 0.1.0 %s g%llun %llue live %llu\n",
                     control_source == kLegacyControlSource ? "AE" : "NG",
                     static_cast<unsigned long long>(graph->nodes.size()),
                     static_cast<unsigned long long>(graph->edges.size()),
@@ -144,17 +144,14 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     // `layer` and `ds` are what the host reports for this call. `ref` and `grid` are what
-    // the last rendered frame actually used: the point conversion divides by `ref`, and
-    // the core maps world space onto `grid`. When `ref` is larger than the preview size,
-    // point controls are full-resolution pixels divided by the full-resolution reference
-    // and the origin is preview-independent; when `ref` is zero or equals the preview
-    // size, the conversion fell back to the preview size and the origin moves with the
-    // preview resolution. That is the measurement D-05 in docs/parameter-mapping.md asks
-    // for, and the readout could not report it before the render path recorded it.
+    // the last rendered frame actually used. AE 2023.5 Build 52 scales point controls by
+    // the preview factor, so `px` below shows their full-resolution interpretation after
+    // reversing that factor; the core maps world space onto `grid`.
     const RenderGeometry last = last_render_geometry();
-    writer.line("layer %ldx%ld ds %ld/%lu ref %ldx%ld grid %ldx%ld\n",
+    writer.line("layer %ldx%ld ds %ld/%lu,%ld/%lu ref %ldx%ld grid %ldx%ld\n",
                 static_cast<long>(in_data->width), static_cast<long>(in_data->height),
                 static_cast<long>(in_data->downsample_x.num), static_cast<unsigned long>(in_data->downsample_x.den),
+                static_cast<long>(in_data->downsample_y.num), static_cast<unsigned long>(in_data->downsample_y.den),
                 static_cast<long>(last.valid ? last.ref_width : 0),
                 static_cast<long>(last.valid ? last.ref_height : 0),
                 static_cast<long>(last.valid ? last.grid_width : 0),
@@ -177,22 +174,17 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // identifies a unit mismatch in the host delivery. The first world triple is the one
     // this call computed from the sizes above (the fallback path); the second is what the
     // last rendered frame computed from its full-resolution reference.
-    const double layer_width = static_cast<double>(in_data->width > 0 ? in_data->width : 1);
-    const double layer_height = static_cast<double>(in_data->height > 0 ? in_data->height : 1);
+    const core::Vec3 layer_pixels = point_control_to_full_resolution_pixels(raw_origin, *in_data);
     writer.line("org host %.0f,%.0f,%.0f px %.0f,%.0f,%.0f\n", raw_origin.x, raw_origin.y, raw_origin.z,
-                core::host_point_component_to_layer_pixels(raw_origin.x, layer_width),
-                core::host_point_component_to_layer_pixels(raw_origin.y, layer_height),
-                core::host_point_component_to_layer_pixels(raw_origin.z, layer_height));
+                layer_pixels.x, layer_pixels.y, layer_pixels.z);
     if (last.valid && last.ref_width > 0 && last.ref_height > 0) {
         core::LayerUnits ref_units;
         ref_units.layer_width = static_cast<double>(last.ref_width);
         ref_units.layer_height = static_cast<double>(last.ref_height);
         ref_units.pixel_aspect_ratio = (last.par_num > 0 && last.par_den > 0)
             ? static_cast<double>(last.par_num) / static_cast<double>(last.par_den) : 1.0;
-        const core::Vec3 ref_world = core::layer_point_to_world(
-            core::host_point_component_to_layer_pixels(raw_origin.x, ref_units.layer_width),
-            core::host_point_component_to_layer_pixels(raw_origin.y, ref_units.layer_height),
-            core::host_point_component_to_layer_pixels(raw_origin.z, ref_units.layer_height), ref_units);
+        const core::Vec3 ref_pixels = point_control_to_full_resolution_pixels(raw_origin, *in_data);
+        const core::Vec3 ref_world = core::layer_point_to_world(ref_pixels.x, ref_pixels.y, ref_pixels.z, ref_units);
         writer.line("org wld l %.3f,%.3f,%.3f r %.3f,%.3f,%.3f\n", settings.emitter_origin.x,
                     settings.emitter_origin.y, settings.emitter_origin.z, ref_world.x, ref_world.y, ref_world.z);
     } else {

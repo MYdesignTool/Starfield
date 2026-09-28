@@ -265,9 +265,9 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     const PF_RenderRequest request = extra->input->output_request;
 
     // The input checkout comes first because its ref_width/ref_height are the
-    // full-resolution reference the parameter conversion needs: point controls are
-    // delivered in full-resolution layer pixels, and dividing them by the preview-sized
-    // in_data->width/height moved the emitter origin with the preview resolution.
+    // full-resolution reference the parameter conversion needs. AE 2023.5 Build 52
+    // scales point values with preview resolution; Parameters.cpp restores that scale
+    // before dividing by this reference.
     // A successful checkout may have empty pixels, but host errors (including
     // cancellation) must not be converted into a successful transparent render.
     PF_CheckoutResult input_result{};

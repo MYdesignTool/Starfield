@@ -96,29 +96,26 @@ adapter must observe the world before it can map it, so it cannot pre-compute bo
 input/output row bytes, and unverified host behavior is recorded in
 `docs/compatibility-matrix.md` until a host pass confirms it.
 
-## Point controls are positions in host pixels
+## Point controls are preview-scaled positions
 
-AE point controls (2D and 3D) are *position* controls, and the AE SDK guide states that the value
-delivered to an effect is **absolute pixels in destination-layer space** with the origin at the
-layer's top-left, x right and y down — not a percentage. Only the *default* keeps the older
-percentage convention, which is why the SDK header for `PF_Point3DDef` says to "use 50 for
-halfway".
+The user's AE 2023.5.0 Build 52 readouts confirm that the point control's absolute layer-pixel
+coordinates are scaled by the preview resolution. The same 3840×2160 center is delivered as
+1920/1080/1080 at Full (`downsample 1/1`) and 480/270/270 at Quarter (`1/4`), while the render
+reference remains 3840×2160 and the actual grid changes to 960×540. The adapter restores full-size
+coordinates by multiplying X by `downsample_x.den / downsample_x.num` and Y/Z by the vertical
+reciprocal before calling `layer_point_to_world()`. Invalid or absent scale values use 1:1.
 
-Consequences that are now part of the contract:
+This empirical rule is host-qualified only for AE 23.5.0 Build 52; another AE 2023 build must pass
+the same readout before being claimed. It is separate from render-grid derivation: the render grid
+continues to come from observed worlds and rectangles above, not from the ambiguous scale field.
+The core treats the normalized point as an absolute pixel coordinate and preserves legitimate
+off-layer positions; it no longer guesses percentages or fixed-point encodings from the magnitude.
 
-- The adapter treats the delivered value as layer pixels and converts it through
-  `starfield::core::layer_point_to_world()`, which folds the pixel aspect ratio into the
-  horizontal axis because one world unit is one layer *height*.
-- Point controls are used for positions (emitter origin) only. Rates and directions are scalar
-  sliders; a point control would give the user a pick widget and pixel-valued numbers for a
-  quantity that is not a position.
-- `core::host_point_component_to_layer_pixels()` also tolerates a legacy percentage or a
-  fixed-point delivery, because the SDK documents the point value inconsistently. That ladder is
-  a compatibility shim with a removal condition: a host pass must confirm the real delivery and
-  then the unused branches are deleted (tracked in `docs/agent-backlog.md` as D-05).
-- Revision 1 of the bridge read the point value as a percentage. That moved the emitter several
-  layer heights off-canvas and made the effect render nothing, which is the failure this section
-  exists to prevent from recurring: a unit mismatch moves geometry silently and produces no error.
+Point controls are used for positions (emitter origin) only. Rates and directions are scalar sliders;
+a point control would give the user a pick widget and pixel-valued numbers for a quantity that is not
+a position. Revision 1 read points as percentages; later revisions missed the preview scaling and
+divided Quarter-sized values by the full reference. Both errors move geometry silently, so future
+unit changes require a paired host readout and adapter regression.
 
 ## Not in scope
 

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -289,49 +290,117 @@ void test_parameters(PF_InData& host) {
     dispose(registered[kGraphParameterId - 1].u.arb_d.dephault);
 }
 
-// Capture has no render context, so at a reduced preview resolution it can only convert
-// the emitter point with the preview-sized in_data->width/height. That would bake a scaled
-// origin into the stored graph, where it renders wrong at every resolution afterwards, so
-// the action must refuse instead of storing it.
-void test_capture_refuses_reduced_preview(PF_InData& host) {
+void test_point_control_preview_scale(PF_InData& host) {
+    const A_long saved_width = host.width;
+    const A_long saved_height = host.height;
+    const PF_RationalScale saved_x = host.downsample_x;
+    const PF_RationalScale saved_y = host.downsample_y;
+    const PF_Point3DDef saved_origin = parameters[kOriginId].u.point3d_d;
+    host.width = 3840;
+    host.height = 2160;
+
+    const auto check_center = [&host](PF_RationalScale downsample_x, PF_RationalScale downsample_y,
+                                      double x, double y, double z) {
+        host.downsample_x = downsample_x;
+        host.downsample_y = downsample_y;
+        parameters[kOriginId].u.point3d_d.x_value = static_cast<PF_FpLong>(x);
+        parameters[kOriginId].u.point3d_d.y_value = static_cast<PF_FpLong>(y);
+        parameters[kOriginId].u.point3d_d.z_value = static_cast<PF_FpLong>(z);
+        ParameterSnapshot snapshot;
+        CHECK(snapshot.checkout(&host, 3840, 2160) == PF_Err_NONE);
+        CHECK(snapshot.valid());
+        CHECK(std::abs(snapshot.settings().emitter_origin.x) < 1.0e-12);
+        CHECK(std::abs(snapshot.settings().emitter_origin.y) < 1.0e-12);
+        CHECK(std::abs(snapshot.settings().emitter_origin.z) < 1.0e-12);
+        snapshot.checkin(&host);
+        CHECK(checked_out.empty());
+    };
+
+    // AE 2023.5 Build 52 readouts: Full delivers 1920/1080/1080; Quarter delivers
+    // 480/270/270 with downsample 1/4. Both values denote the same layer centre.
+    check_center(PF_RationalScale{1, 1}, PF_RationalScale{1, 1}, 1920, 1080, 1080);
+    check_center(PF_RationalScale{1, 4}, PF_RationalScale{1, 4}, 480, 270, 270);
+    // Horizontal and vertical factors are independent; Z follows the vertical axis.
+    check_center(PF_RationalScale{1, 2}, PF_RationalScale{1, 4}, 960, 270, 270);
+
+    parameters[kOriginId].u.point3d_d = saved_origin;
+    host.width = saved_width;
+    host.height = saved_height;
+    host.downsample_x = saved_x;
+    host.downsample_y = saved_y;
+}
+
+void test_capture_scales_reduced_preview(PF_InData& host) {
     PF_OutData output{};
     parameters[kGraphParameterId].u.arb_d.value = new_value(host);
     parameters[kGraphParameterId].uu.change_flags = 0;
     parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
+    const PF_Point3DDef saved_origin = parameters[kOriginId].u.point3d_d;
+    const PF_RationalScale saved_x = host.downsample_x;
+    const PF_RationalScale saved_y = host.downsample_y;
+    const PF_FpLong saved_gravity_y = parameters[kGravityYId].u.fs_d.value;
     std::array<PF_ParamDef*, 33> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
 
     const auto previous = parameters[kGraphParameterId].u.arb_d.value;
-    const PF_RationalScale saved_x = host.downsample_x;
-    const PF_RationalScale saved_y = host.downsample_y;
-    host.downsample_x = PF_RationalScale{4, 1};
-    output.return_msg[0] = '\0';
-    CHECK(capture_controls(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
-    CHECK(parameters[kGraphParameterId].u.arb_d.value == previous);
-    CHECK(parameters[kControlSourceId].u.pd.value == kLegacyControlSource);
-    CHECK(checked_out.empty());
-    CHECK(output.return_msg[0] != '\0');
-    CHECK(std::strstr(output.return_msg, "Full preview resolution") != nullptr);
-    host.downsample_x = saved_x;
-
-    // A vertical-only reduction must not bake preview-scaled Y coordinates either.
+    host.downsample_x = PF_RationalScale{1, 4};
     host.downsample_y = PF_RationalScale{1, 4};
-    output.return_msg[0] = '\0';
-    CHECK(capture_controls(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
-    CHECK(parameters[kGraphParameterId].u.arb_d.value == previous);
-    CHECK(parameters[kControlSourceId].u.pd.value == kLegacyControlSource);
-    CHECK(checked_out.empty());
-    CHECK(output.return_msg[0] != '\0');
-    CHECK(std::strstr(output.return_msg, "Full preview resolution") != nullptr);
-    host.downsample_y = saved_y;
-
-    // At full preview resolution the same call still captures.
+    parameters[kOriginId].u.point3d_d.x_value = 8;
+    parameters[kOriginId].u.point3d_d.y_value = 8;
+    parameters[kOriginId].u.point3d_d.z_value = 8;
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
     CHECK(parameters[kControlSourceId].u.pd.value == kNodeControlSource);
+    CHECK(checked_out.empty());
+    const auto captured = parameters[kGraphParameterId].u.arb_d.value;
+    const auto captured_graph = read_graph_parameter(&host, captured);
+    CHECK(captured_graph.has_value());
+    if (captured_graph.has_value()) {
+        const auto emitter = std::find_if(captured_graph.value().nodes.begin(), captured_graph.value().nodes.end(),
+            [](const core::GraphNode& node) { return node.type_key == core::graph_keys::kEmitterNode; });
+        CHECK(emitter != captured_graph.value().nodes.end());
+        if (emitter != captured_graph.value().nodes.end()) {
+            const auto origin = std::find_if(emitter->parameters.begin(), emitter->parameters.end(),
+                [](const core::NodeParameter& parameter) { return parameter.key == core::graph_keys::kEmitterOrigin; });
+            CHECK(origin != emitter->parameters.end());
+            if (origin != emitter->parameters.end()) {
+                const auto point = std::get<core::Vec3>(origin->value);
+                CHECK(std::abs(point.x) < 1.0e-12 && std::abs(point.y) < 1.0e-12 && std::abs(point.z) < 1.0e-12);
+            }
+        }
+    }
+
+    // A supervised parameter edit while preview is reduced uses the same conversion
+    // before replacing the stored graph; it must not bake the quarter-sized point.
+    parameters[kGravityYId].u.fs_d.value = -0.5;
+    extra.param_index = kGravityYId;
+    CHECK(user_changed_param(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
+    const auto synced = parameters[kGraphParameterId].u.arb_d.value;
+    const auto synced_graph = read_graph_parameter(&host, synced);
+    CHECK(synced_graph.has_value());
+    if (synced_graph.has_value()) {
+        const auto emitter = std::find_if(synced_graph.value().nodes.begin(), synced_graph.value().nodes.end(),
+            [](const core::GraphNode& node) { return node.type_key == core::graph_keys::kEmitterNode; });
+        CHECK(emitter != synced_graph.value().nodes.end());
+        if (emitter != synced_graph.value().nodes.end()) {
+            const auto origin = std::find_if(emitter->parameters.begin(), emitter->parameters.end(),
+                [](const core::NodeParameter& parameter) { return parameter.key == core::graph_keys::kEmitterOrigin; });
+            CHECK(origin != emitter->parameters.end());
+            if (origin != emitter->parameters.end()) {
+                const auto point = std::get<core::Vec3>(origin->value);
+                CHECK(std::abs(point.x) < 1.0e-12 && std::abs(point.y) < 1.0e-12 && std::abs(point.z) < 1.0e-12);
+            }
+        }
+    }
+
     dispose(parameters[kGraphParameterId].u.arb_d.value);
-    dispose(previous); // replaced by the successful capture; in AE the host frees it
+    dispose(captured); // replaced by the supervised edit; AE owns and frees it
+    dispose(previous); // replaced by capture; AE owns and frees it
     parameters[kGraphParameterId].u.arb_d.value = nullptr;
+    parameters[kOriginId].u.point3d_d = saved_origin;
+    parameters[kGravityYId].u.fs_d.value = saved_gravity_y;
+    host.downsample_x = saved_x;
+    host.downsample_y = saved_y;
 }
 
 // The supervised edit surface the dockable panel drives (ADR 0009): in Node Graph
@@ -451,8 +520,9 @@ int main() {
     // effect_ref intentionally null: arbitrary callbacks must work without one.
     test_callbacks(host);
     test_parameters(host);
+    test_point_control_preview_scale(host);
     test_supervision(host);
-    test_capture_refuses_reduced_preview(host);
+    test_capture_scales_reduced_preview(host);
     test_world_copy_cancellation();
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);

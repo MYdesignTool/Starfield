@@ -170,21 +170,16 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     settings.particle_lifetime_seconds = to_double(*defs[3]);
     settings.emitter_shape = core::emitter_shape_from_index(popup_index(*defs[4]));
 
-    // Emitter Origin is an AE point control. AE delivers *absolute layer pixels* with
-    // the origin at the layer's top-left, x growing right and y growing down; the
-    // control's default is a percentage where 50 means "halfway" (SDK header note for
-    // PF_Point3DDef). The core wants layer heights with the origin at the layer centre
-    // and +Y up, so the conversion happens in testable core helpers (ADR 0003,
-    // docs/parameter-mapping.md).
+    // Emitter Origin is an AE point control. AE delivers absolute layer-pixel positions
+    // with the origin at the layer's top-left, x growing right and y growing down. In AE
+    // 2023.5 Build 52 the delivered values also follow the preview downsample (observed
+    // at Full and Quarter), so first restore full-resolution pixels, then convert into
+    // the core's centered world space (ADR 0003, docs/parameter-mapping.md).
     const PF_Point3DDef& origin = defs[5]->u.point3d_d;
     const core::Vec3 raw{static_cast<double>(origin.x_value), static_cast<double>(origin.y_value),
                          static_cast<double>(origin.z_value)};
     if (raw_origin) *raw_origin = raw;
 
-    // Point controls carry full-resolution layer pixels, so the conversion divides by the
-    // full-resolution reference when the render phase provides one. Using the preview-sized
-    // in_data->width/height here made the emitter origin scale with the preview resolution
-    // (a quarter-resolution preview moved it four times as far from the layer centre).
     const A_long effective_width = reference_width > 0 ? reference_width : in_data.width;
     const A_long effective_height = reference_height > 0 ? reference_height : in_data.height;
     const double layer_width = static_cast<double>(effective_width > 0 ? effective_width : 1);
@@ -193,10 +188,8 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     units.layer_width = layer_width;
     units.layer_height = layer_height;
     units.pixel_aspect_ratio = host_pixel_aspect_ratio(in_data);
-    settings.emitter_origin = core::layer_point_to_world(
-        core::host_point_component_to_layer_pixels(raw.x, layer_width),
-        core::host_point_component_to_layer_pixels(raw.y, layer_height),
-        core::host_point_component_to_layer_pixels(raw.z, layer_height), units);
+    const core::Vec3 pixels = point_control_to_full_resolution_pixels(raw, in_data);
+    settings.emitter_origin = core::layer_point_to_world(pixels.x, pixels.y, pixels.z, units);
 
     // The velocity sliders are already in layer heights per second, which is the
     // core's world unit, so they need no conversion.
@@ -222,6 +215,23 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
 }
 
 } // namespace
+
+core::Vec3 point_control_to_full_resolution_pixels(const core::Vec3& raw,
+                                                   const PF_InData& in_data) noexcept {
+    const auto full_resolution_factor = [](const PF_RationalScale& downsample) noexcept {
+        if (downsample.num <= 0 || downsample.den == 0) return 1.0;
+        // AE's observed 1/4 preview delivers one-quarter-sized point coordinates. The
+        // reciprocal restores those coordinates to full-resolution layer pixels.
+        return static_cast<double>(downsample.den) / static_cast<double>(downsample.num);
+    };
+    const double horizontal_factor = full_resolution_factor(in_data.downsample_x);
+    const double vertical_factor = full_resolution_factor(in_data.downsample_y);
+    return core::Vec3{
+        core::host_point_component_to_layer_pixels(raw.x * horizontal_factor),
+        core::host_point_component_to_layer_pixels(raw.y * vertical_factor),
+        core::host_point_component_to_layer_pixels(raw.z * vertical_factor),
+    };
+}
 
 PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (in_data == nullptr || out_data == nullptr) {
@@ -433,8 +443,8 @@ PF_Err ParameterSnapshot::checkout(PF_InData* in_data, A_long reference_width,
         checked_out_[i] = true;
     }
 
-    // One conversion path for the render checkout and the supervised panel edit;
-    // the emitter-origin unit ladder lives in the shared helper.
+    // One conversion path for rendering and supervised panel edits; preview-scaled
+    // point values are normalized in the shared helper.
     const PF_ParamDef* controls[kEffectParameterCount]{};
     for (std::size_t i = 0; i < kEffectParameterCount; ++i) {
         controls[i] = &defs_[i];
@@ -544,28 +554,6 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
         params[kControlSourceId]->param_type != PF_Param_POPUP) return PF_Err_BAD_CALLBACK_PARAM;
     try {
-        // Capture is the one path that can bake a resolution-dependent origin into stored
-        // data: it has no render context, so it converts the emitter point with
-        // in_data->width/height, and at a reduced preview resolution that stores an origin
-        // scaled by the downsample factor - which then renders wrong at every resolution
-        // afterwards. Refuse instead of storing it. The guard only fires when the host
-        // actually reports a non-trivial factor, so a host that reports 1/1 (or nothing at
-        // all) is unaffected. The render path needs no guard: it has the full-resolution
-        // reference from its input checkout.
-        const auto is_reduced = [](const PF_RationalScale& scale) noexcept {
-            return scale.num > 0 && scale.den > 0 && scale.num != static_cast<A_long>(scale.den);
-        };
-        if (is_reduced(in_data->downsample_x) || is_reduced(in_data->downsample_y)) {
-            std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                          "Starfield: capture needs Full preview resolution (downsample x=%ld/%lu y=%ld/%lu)",
-                          static_cast<long>(in_data->downsample_x.num),
-                          static_cast<unsigned long>(in_data->downsample_x.den),
-                          static_cast<long>(in_data->downsample_y.num),
-                          static_cast<unsigned long>(in_data->downsample_y.den));
-            out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
-            return PF_Err_BAD_CALLBACK_PARAM;
-        }
-
         ScopedParameterCheckin current(in_data);
         const auto err = current.snapshot().checkout(in_data);
         if (err != PF_Err_NONE) return err;
@@ -598,12 +586,9 @@ namespace {
 // the delivered array is the authoritative source here. All fallible work happens
 // before the graph parameter is replaced.
 //
-// Like capture, this path has no input checkout and therefore no full-resolution
-// reference, so at a reduced preview resolution it converts the emitter point with
-// in_data->width/height. Unlike capture it is not refused: the graph has to keep tracking
-// the controls. Editing a control while a reduced-resolution preview is active can
-// therefore store a scaled origin until the point-unit rule is settled (see
-// docs/parameter-mapping.md, D-05).
+// Like capture, this path has no input checkout. The shared point conversion uses the
+// observed downsample rationals to restore AE's preview-scaled control values before
+// baking the world-space origin into the stored graph.
 PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[]) noexcept {
     if (!params[kGraphParameterId] || !params[kControlSourceId]) return PF_Err_NONE;
     if (params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||

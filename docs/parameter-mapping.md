@@ -123,37 +123,26 @@ and therefore the pixels.
 
 ## Emitter Origin semantics
 
-AE point controls deliver **absolute layer pixels** in destination-layer space: the origin is the
-layer's top-left, x grows right and y grows down (AE C++ SDK guide, "Parameters"; the same source
-notes AE corrects the value for origin shifts introduced by upstream effects). Only the *default*
-follows the older percentage convention — the `PF_Point3DDef` header comment says to "use 50 for
-halfway" — so the registered default (50, 50, 50) means "layer centre".
-
-Revision 1 of this bridge treated the delivered value as a percentage, which pushed the emitter
-several layer heights off-canvas at the default "centre" and made the effect render nothing at
-all. The conversion now normalizes to layer pixels first and then to the canonical world space
-(ADR 0003):
+AE point controls deliver absolute destination-layer pixel positions, but AE 2023.5.0 Build 52
+also scales those values with the preview resolution. The user's Full/Quarter Options readouts
+show the same center as `1920,1080,1080` at `ds 1/1` and `480,270,270` at `ds 1/4`, while `ref`
+remains `3840x2160` and `grid` changes from `3840x2160` to `960x540`. Therefore the adapter restores
+full-resolution pixels with the reciprocal preview factor before converting to world space:
 
 ```text
-px      = host_point_component_to_layer_pixels(raw, layer_extent)
+px.x    = raw.x * downsample_x.den / downsample_x.num
+px.y,z  = raw.y,z * downsample_y.den / downsample_y.num
 world.x = (px.x / layer_width - 0.5) * (layer_width * par / layer_height)
 world.y = 0.5 - px.y / layer_height
 world.z = px.z / layer_height - 0.5
 ```
 
-The normalization ladder exists because the SDK describes point values inconsistently; it prefers
-the documented reading and only falls back when a value cannot be a pixel position:
-
-| Raw magnitude | Interpretation | Why |
-|---|---|---|
-| ≤ 4 × layer extent | layer pixels (documented delivery) | Plausible pixel positions, including the converted default |
-| > 4 × layer extent | legacy percentage: `raw / 100 × layer_extent` | On a small layer a "50" cannot be a pixel position |
-| > 1e5 | fixed-point scaled: `raw / 65536` first | Percent × 65536, i.e. what a `PF_Fixed` delivery looks like |
-
-The Options readout prints the raw host value, the interpreted pixels, and the resulting world
-position, so the host's real behaviour can be recorded rather than guessed. **The ladder is a
-compatibility shim:** once a host pass confirms which delivery AE actually uses, delete the unused
-branches and reduce this section to the confirmed fact.
+Invalid or unreported rational factors fall back to 1:1. X and Y are normalized separately;
+Z follows the vertical factor. This conversion is shared by AE Controls rendering, Capture Current
+Controls, Node Graph control synchronization, and the Options diagnostic. The core preserves valid
+off-layer pixel positions as-is; it no longer guesses that large positions are percentages or
+fixed-point values. This host observation is qualified only for AE 2023.5.0 Build 52 until another
+AE 2023 build supplies equivalent readouts.
 
 `emitter_origin` is clamped to ±`kMaxEmitterOffset` (100 layer heights) by `validate_settings`, and
 velocities are clamped to ±`kMaxVelocity` (1000 layer heights per second); both raise a
@@ -188,63 +177,50 @@ The effect sets `PF_OutFlag_I_DO_DIALOG`, so AE shows an `Options` button. Click
 read-only readout (`ae_plugin/Diagnostics.cpp`) that prints exactly what the code receives:
 
 ```text
-SF 0.1.0 src AE g4n3e live 59
-layer 3840x2160 ds 1/1 ref 3840x2160 grid 3840x2160
+SF 0.1.0 AE g4n3e live 59
+layer 3840x2160 ds 1/1,1/1 ref 3840x2160 grid 3840x2160
 org host 1920,1080,1080 px 1920,1080,1080
 org wld l 0.000,0.000,0.000 r 0.000,0.000,0.000
 t 1.000s vel 0.00,0.30,0.00
 cnt 1000 rate 100.00 seed 1 life 2.000
 ```
 
-- `src`: `AE` when the flat controls drive the render, `NG` when the stored graph does. `gn`/`ge` are
-  the evaluated node and edge counts; `live` is the particle count that evaluation produced.
-- `layer` / `ds`: what the host reports for this call, with the preview downsample factor.
+- The label after the version is `AE` when flat controls drive the render or `NG` when the stored
+  graph does. `gn`/`ge` are the evaluated node and edge counts; `live` is the particle count.
+- `layer` / `ds`: what the host reports for this call, with horizontal and vertical preview factors.
 - `ref` / `grid`: what the **last rendered frame** actually used. `ref` is the reference the point
   conversion divided by; `grid` is the pixel grid the core mapped world space onto. The render phase
   records both (`record_render_geometry`), because this readout cannot call `checkout_layer` itself.
-  This pair is the evidence D-05 was missing: with it, one click at Full and one at Quarter settle
-  whether a point control is delivered in full-resolution or preview-sized pixels.
-- `org host` / `px`: the raw host value and the layer pixels it was interpreted as.
+  The user's AE 2023.5 Build 52 screenshots confirmed `ref` stays full-size while `grid` follows
+  preview resolution.
+- `org host` / `px`: the raw host value and the full-resolution layer pixels after reversing the
+  preview factor. At Quarter, `480,270,270` must read back as `1920,1080,1080` in `px`.
 - `org wld l … r …`: the world position this readout computed from the sizes above (`l`) next to the
-  one the last frame computed from its reference (`r`). At Full resolution they agree; at a reduced
-  preview resolution the frame used `r`.
+  one the last frame computed from its reference (`r`). With one effect instance and AE Controls
+  selected they should agree at Full and Quarter; the emitter center should be `(0,0,0)` in both.
 - `grav`/`col` lines appear only when those values differ from their defaults, and `shape`/`size`/
   `not` can fall off the end: `PF_OutData::return_msg` holds 255 characters and the writer drops what
   does not fit. Those controls are visible in the Effect Controls window; the geometry above is not.
 
-### Resolving the point-unit question (D-05)
+### D-05 host measurement and regression
 
-For a reliable measurement, use a fresh comp with one Starfield instance and set `Control Source` to
-`AE Controls` (the default for a new effect). The diagnostic keeps one process-wide last-render
-geometry record, so another Starfield instance can overwrite `ref/grid`; in `Node Graph` mode the
-rendered origin comes from stored graph values, while `org host/px` describes the AE point control.
-If the readout says `src NG`, switch back to `AE Controls` before taking these measurements.
-
-1. Put the playhead at t ≥ 1 s, render a frame with the Composition panel at **Full**, press `Options`,
-   and keep the text.
-2. Switch to **Quarter**, let one frame render, press `Options` again.
-3. Compare the two readouts:
-
-| What the second readout shows | What it means | What to do |
-|---|---|---|
-| `ref` still equals the layer size, `grid` shrinks, `org host` unchanged | The host delivers point controls in **full-resolution pixels**; the frame divides by `ref` and `org wld r` is the position that was rendered. The `l` value is the fallback path and may differ. | Record it, retire the fallback path, and reduce the ladder below to this delivery |
-| `ref 0x0`, or `org host` shrinks with the preview | No usable reference was handed over, or the host delivered preview-sized values; the conversion fell back to `layer` and the origin moves with the preview resolution | Record it, then decide the divisor rule from the numbers instead of the SDK note |
-
-The old readout could not answer this: its origin lines came after longer lines and were cut off by the
-255-character buffer, so every earlier "the fix works" statement about the emitter origin was a code
-reading, never a measurement.
-
-- `ds` is reported for context only; render geometry comes from the observed worlds (ADR 0005) and the
-  reference above.
+The owner supplied Full and Quarter readouts from AE **23.5.0 Build 52** with one effect instance and
+`src AE`. Full reported `ds 1/1`, `ref/grid 3840x2160`, and origin `1920,1080,1080`. Quarter reported
+`ds 1/4`, `ref 3840x2160`, `grid 960x540`, and origin `480,270,270`. The old candidate interpreted the
+Quarter values as full-resolution pixels and reported world `(-0.667,0.375,-0.375)`, exactly the
+observed offset. The source fix now applies the reciprocal `1/4` preview factor per axis before using
+the full-resolution reference. The adapter regression pins Full, Quarter, and anisotropic factors;
+Capture and Node Graph synchronization also exercise this shared conversion. A fresh AE run of the
+new build remains required to confirm the on-screen fix.
 
 ## Motion or position looks wrong: triage
 
 | Readout | Meaning | Next step |
 |---|---|---|
 | `t 0.000s … live 1` | Comp start. Only slot 0 exists by construction | Scrub to t ≥ 1 s, or raise Birth Rate |
-| `org px` far outside the layer | Point-unit mismatch | Compare `host` and `px` against the ladder above and record the host's real delivery in `docs/compatibility-matrix.md` |
-| `org wld l` differs from `org wld r` at reduced resolution | The readout's fallback path disagrees with the frame's reference-based conversion; the frame used `r` | Expected until the fallback path is retired (D-05); always read `ref`/`grid` before believing `org wld l` |
-| `ref 0x0` | The host handed over no full-resolution reference, so the conversion fell back to `layer` | Record the two-click readout from the section above; the origin then depends on the preview resolution |
+| `org px` differs from the intended location | Point conversion or preview factor mismatch | Compare raw `host`, normalized `px`, and both `ds` axes against the measured AE delivery |
+| `org wld l` differs from `org wld r` | The diagnostic's current settings conversion disagrees with the last rendered frame | Confirm one effect instance and `src AE`; then report the complete readout |
+| `ref 0x0` | The host handed over no full-resolution reference, so conversion falls back to the input dimensions | Record the complete readout; `ds` still normalizes the observed preview-scaled point values |
 | `vel` non-zero but the picture is static | Mapping or compositing ignored the position | Reproduce in `tests/core_tests.cpp`, which pins the origin offset, the point conversion, and the half-resolution mapping |
 | `layer 0x0` | Host geometry was not available | The render phase refuses to guess and reports `internal_failure` |
 

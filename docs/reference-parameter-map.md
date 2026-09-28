@@ -84,11 +84,11 @@ Our equivalent is the `Render` topic plus the panel.
 
 ## Findings that change our backlog
 
-- **D-05 is answered for point controls.** The reference's own `Origin XY` reads `[1920, 1080]`
-  in a 3840×2160 composition, i.e. **absolute layer pixels**, and its `Origin Z` reads 0. That is
-  the delivery branch our adapter already prefers; the percentage and fixed-point rungs exist
-  only because no host readout had confirmed it. Our own Options readout must still print the
-  value our control receives, then the unused rungs can go.
+- **D-05 is answered for our AE 2023 target by the owner's 23.5.0 Build 52 readouts.** The reference's
+  own `Origin XY` also reads `[1920,1080]` in a 3840×2160 composition, but that alone did not prove
+  how AE scales our control at reduced preview. The paired Full/Quarter readouts show our control
+  changes from `[1920,1080,1080]` to `[480,270,270]` as the preview factor changes from 1/1 to 1/4.
+  The adapter now reverses that factor; the magnitude-based percentage/fixed-point guesses are gone.
 - **Speed is a scalar plus a direction model** (`Direction`, `Angle X/Y/Z`, `Direction Span`,
   `Orient X/Y/Z`). Our three velocity sliders are the deviation to remove first, because it is
   the most visible behavioural difference in the emitter section.

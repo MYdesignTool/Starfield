@@ -637,14 +637,14 @@ void test_layer_point_conversion() {
     CHECK(std::abs(right_edge.x - 1.5) < 1e-12);
     CHECK(std::abs(right_edge.y) < 1e-12);
 
-    // Unit ladder: plausible pixels pass through (the documented convention), an
-    // implausible magnitude falls back to the legacy percentage, and a fixed-point
-    // scaled delivery is un-scaled first.
-    CHECK(host_point_component_to_layer_pixels(960.0, 1920.0) == 960.0);
-    CHECK(host_point_component_to_layer_pixels(50.0, 1920.0) == 50.0);
-    CHECK(std::abs(host_point_component_to_layer_pixels(50.0, 10.0) - 5.0) < 1e-12);
-    CHECK(std::abs(host_point_component_to_layer_pixels(50.0 * 65536.0, 1920.0) - 50.0) < 1e-9);
-    CHECK(host_point_component_to_layer_pixels(-540.0, 1080.0) == -540.0);
+    // The host adapter restores preview scale, then the core preserves absolute pixel
+    // coordinates exactly. Off-layer points remain valid positions; non-finite inputs
+    // are rejected at this boundary.
+    CHECK(host_point_component_to_layer_pixels(960.0) == 960.0);
+    CHECK(host_point_component_to_layer_pixels(50.0) == 50.0);
+    CHECK(host_point_component_to_layer_pixels(1.0e6) == 1.0e6);
+    CHECK(host_point_component_to_layer_pixels(-540.0) == -540.0);
+    CHECK(host_point_component_to_layer_pixels(std::numeric_limits<double>::infinity()) == 0.0);
 }
 
 void test_settings_validation() {
