@@ -205,7 +205,10 @@ cnt 1000 rate 100.00 seed 1 life 2.000
 ### D-05 host measurement and regression
 
 The owner supplied Full and Quarter readouts from AE **23.5.0 Build 52** with one effect instance and
-`src AE`. Full reported `ds 1/1`, `ref/grid 3840x2160`, and origin `1920,1080,1080`. Quarter reported
+`src AE`. For a repeatable host measurement, select Full/Quarter from the **Composition viewer's
+bottom resolution menu**; the right-side Preview panel has a separate Resolution control, and its
+Quarter setting alone left the Composition viewer at Full (`ds 1/1`) in the 2026-09-28 check. Full
+reported `ds 1/1`, `ref/grid 3840x2160`, and origin `1920,1080,1080`. Quarter reported
 `ds 1/4`, `ref 3840x2160`, `grid 960x540`, and origin `480,270,270`. The old candidate interpreted the
 Quarter values as full-resolution pixels and reported world `(-0.667,0.375,-0.375)`, exactly the
 observed offset. The source fix now applies the reciprocal `1/4` preview factor per axis before using
