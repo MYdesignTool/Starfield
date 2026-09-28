@@ -6,8 +6,8 @@
 
 ## Storage and undo
 
-The graph is a non-animated `PF_Param_ARBITRARY_DATA` parameter, appended at index
-and disk ID 14. Its handle contains canonical schema-1 codec bytes, never C++
+The graph is a non-animated `PF_Param_ARBITRARY_DATA` parameter. Manifest revision
+6 registers it at index/parameter ID 31. Its handle contains canonical schema-1 codec bytes, never C++
 objects, host pointers or caches. AE uses the arbitrary-data lifecycle callbacks
 to copy, flatten, restore and compare these values. The binary graph schema is
 unchanged. Sequence data is unused; there is no second authoritative graph copy.
@@ -39,12 +39,15 @@ indices, see `docs/parameter-mapping.md`). Disk IDs are unchanged.
 - 30: Capture Current Controls, supervised action button. Capture explicitly
   replaces the stored graph with an emitter/force/appearance/output graph of current
   control values and switches to Node Graph in the same user-change transaction.
+  Because capture has no render checkout reference, it refuses when either valid
+  `downsample_x` or `downsample_y` reports reduced preview resolution; a rejected
+  capture leaves the graph and control source unchanged.
 
 Old animated controls remain stored and are still sampled in AE Controls mode.
 Capturing creates a constant snapshot, not a conversion of historical keyframes.
-Switching modes alone never overwrites a stored graph. Control labels and panel
-layout will make these sources clearer in P-02/M3-03; the current controls remain
-available during integration. Default node/edge UUIDs are scoped to the graph;
+Switching modes alone never overwrites a stored graph. The revision-6 topic groups
+and fixed-chain P-02 panel provide the current control organization. Default
+node/edge UUIDs are scoped to the graph;
 copying an effect intentionally preserves them.
 
 ## Render transport
@@ -67,7 +70,9 @@ Native callback tests can verify byte round-trips, independent handles, malforme
 input, bounded buffers, disposal and failures. They cannot prove AE's save/reopen,
 effect duplication, old-project default selection, UI refresh, or undo behavior.
 Those are explicit AE 2023 host gates; until exercised they remain unqualified.
-The panel and the force/appearance kernels are separate remaining Alpha work.
+The force/appearance kernels and P-02 panel are implemented in code. Their
+rendering, scripted-edit, save/reopen, duplication, and undo behavior remain AE
+2023 host qualification gates.
 
 ## Primary reference
 

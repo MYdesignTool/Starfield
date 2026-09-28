@@ -8,7 +8,8 @@ Use this file to turn observed behavior into requirements before implementing ea
 |---|---|---|---|
 | M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass | Effect loads; render pass-through, add/remove, save/reopen, duplicate, and undo/redo still unrecorded |
 | M1 discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Current build must be qualified separately |
-| Build-2 graph render/persistence | AE 2023, exact build not recorded | Not checked | Current AE 2023 target binary has not been loaded; test graph source, save/reopen, duplication and undo/redo |
+| Current candidate artifact | AE 2023, exact build not recorded | Built; not installed or loaded | May 2023 SDK build dated 2026-09-28; `dist/StarfieldParticle.aex`, packed version `0x8002`, SHA-256 `8135BB08CB0F614C9A999C7C86C040FB5DF6164F0E0173C0B1BB623008DCCECC`. Load this exact candidate and record the host result; do not treat earlier-build evidence as qualification |
+| Build-2 graph render/persistence | AE 2023, exact build not recorded | Not checked | Current candidate has not been loaded; test graph source, save/reopen, duplication and undo/redo |
 | Apply-time crash | AE 2023 installed at `D:\Software\Adobe\Adobe After Effects 2023`; plug-in build `0x8002` (24 parameters, `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, 21:19) | **Open: crashed once while applying the effect** | Dump `5f8321e1-3dac-4b7e-b3b7-4fa60b9b283b.dmp` (2026-09-27 21:35). Exception `0x40000015` (fatal app exit, not an access violation), raised on a thread whose stack carries `sentry_crashpad.dll` (Adobe crash handler) and NVIDIA OpenGL/D3D12 frames; scanning the captured stacks found no return address inside `StarfieldParticle.aex`, so the fatal exit did not happen under our own frame. The dump also shows the reference `Stardust_panel.aex` and Adobe plug-ins loaded, and our PDB path. Mitigations in the same commit: the Options readout now refuses to check out parameters without a render context, and `STARFIELD_FLAT_RENDER=1` bisects the graph render path against the flat path. Next steps are listed under "Crash triage" below. |
 | M2 particle render | AE 2023; exact build not recorded | Partial, old revision only | The eight-control build loaded and rendered a center sprite. A later eleven-control revision rendered nothing after adding Emitter Origin. The conversion was rewritten; the current 24-parameter build has not been checked in AE. |
 | M3-01 shapes and playback | AE 2023; exact build not recorded | Core implementation only | Install the current build and confirm at t ≥ 1 s with the graph-aware Options readout |
@@ -47,9 +48,10 @@ ref_height` into the parameter conversion, so both sides use the same reference.
 **Capture was the one path that could store a wrong origin:** it has no render context, so it converts
 with `in_data->width/height`, and at a reduced preview resolution that would bake an origin scaled by
 the downsample factor into the stored graph — wrong at every resolution afterwards. It now **refuses**
-when the host reports a non-trivial downsample factor (`capture needs Full preview resolution`,
-`PF_Cmd_USER_CHANGED_PARAM` with a displayed message), and the adapter suite pins both the refusal and
-the normal capture. The Node Graph sync path cannot refuse a control edit — the graph has to keep
+when either valid horizontal or vertical downsample factor reports a reduced preview (`capture needs
+Full preview resolution`, `PF_Cmd_USER_CHANGED_PARAM` with a displayed message), and the adapter suite
+pins horizontal/vertical refusal and normal Full capture. The Node Graph sync path cannot refuse a
+control edit — the graph has to keep
 following the controls — so it still converts with `in_data->width/height`; the real fix belongs with
 the manifest-revision-7 work: store raw control values (or the observed reference size) instead of a
 resolution-dependent world position.

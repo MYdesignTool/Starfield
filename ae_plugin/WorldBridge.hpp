@@ -51,12 +51,14 @@ struct WorldLayout {
 // retained. Fails with unsupported_format when the host layout cannot be
 // represented and allocation_failed when the bounded allocation fails.
 [[nodiscard]] starfield::core::Result<starfield::core::PixelBuffer> read_world(const PF_EffectWorld& world,
-                                                                             HostBitDepth depth) noexcept;
+                                                                             HostBitDepth depth,
+                                                                             const starfield::core::Cancellation& cancellation) noexcept;
 
 // Copies the core staging buffer into the host output world, translating channel
 // order and clipping to the destination extent. The output format must match the
 // host bit depth; a mismatch is a bug and returns false.
 [[nodiscard]] bool write_output(const starfield::core::RenderOutput& output, const WorldLayout& destination,
-                               PF_EffectWorld& world, HostBitDepth depth) noexcept;
+                               PF_EffectWorld& world, HostBitDepth depth,
+                               const starfield::core::Cancellation& cancellation) noexcept;
 
 } // namespace starfield::adapter

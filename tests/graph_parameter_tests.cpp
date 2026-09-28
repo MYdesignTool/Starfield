@@ -1,6 +1,7 @@
 // Uses the local Adobe SDK declarations and fake host callbacks, not an AE process.
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
+#include "WorldBridge.hpp"
 #include "AE_EffectCB.h"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -27,6 +28,15 @@ std::unordered_map<PF_ParamDef*, A_long> checked_out;
 std::vector<A_long> checked_indices;
 A_long fail_checkout = -1;
 A_long last_time = 0;
+
+class CancelAtPoll final : public core::Cancellation {
+public:
+    explicit CancelAtPoll(unsigned poll) : cancel_at_(poll) {}
+    [[nodiscard]] bool is_cancelled() const noexcept override { return ++polls_ >= cancel_at_; }
+private:
+    unsigned cancel_at_{0};
+    mutable unsigned polls_{0};
+};
 
 PF_Handle allocate(A_u_longlong size) {
     if (fail_allocation) { fail_allocation = false; return nullptr; }
@@ -293,7 +303,8 @@ void test_capture_refuses_reduced_preview(PF_InData& host) {
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
 
     const auto previous = parameters[kGraphParameterId].u.arb_d.value;
-    const PF_RationalScale saved = host.downsample_x;
+    const PF_RationalScale saved_x = host.downsample_x;
+    const PF_RationalScale saved_y = host.downsample_y;
     host.downsample_x = PF_RationalScale{4, 1};
     output.return_msg[0] = '\0';
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
@@ -302,7 +313,18 @@ void test_capture_refuses_reduced_preview(PF_InData& host) {
     CHECK(checked_out.empty());
     CHECK(output.return_msg[0] != '\0');
     CHECK(std::strstr(output.return_msg, "Full preview resolution") != nullptr);
-    host.downsample_x = saved;
+    host.downsample_x = saved_x;
+
+    // A vertical-only reduction must not bake preview-scaled Y coordinates either.
+    host.downsample_y = PF_RationalScale{1, 4};
+    output.return_msg[0] = '\0';
+    CHECK(capture_controls(&host, &output, pointers.data(), &extra) != PF_Err_NONE);
+    CHECK(parameters[kGraphParameterId].u.arb_d.value == previous);
+    CHECK(parameters[kControlSourceId].u.pd.value == kLegacyControlSource);
+    CHECK(checked_out.empty());
+    CHECK(output.return_msg[0] != '\0');
+    CHECK(std::strstr(output.return_msg, "Full preview resolution") != nullptr);
+    host.downsample_y = saved_y;
 
     // At full preview resolution the same call still captures.
     CHECK(capture_controls(&host, &output, pointers.data(), &extra) == PF_Err_NONE);
@@ -379,6 +401,43 @@ void test_supervision(PF_InData& host) {
     dispose(previous); // replaced by the supervised rewrite
     parameters[kGraphParameterId].u.arb_d.value = nullptr;
 }
+
+void test_world_copy_cancellation() {
+    PF_Pixel source_pixels[4]{};
+    PF_EffectWorld source_world{};
+    source_world.data = source_pixels;
+    source_world.width = 2;
+    source_world.height = 2;
+    source_world.rowbytes = static_cast<A_long>(sizeof(source_pixels[0]) * 2);
+
+    const CancelAtPoll cancel_read_after_one_row(3); // preflight, row 0, then row 1
+    const auto source = read_world(source_world, HostBitDepth::bpc8, cancel_read_after_one_row);
+    CHECK(!source.has_value());
+    CHECK(source.error().code == core::ErrorCode::cancelled);
+
+    core::RenderOutput output;
+    output.region = core::RectI{0, 0, 2, 2};
+    output.format = core::PixelFormat::rgba8;
+    output.row_bytes = 8;
+    output.pixels.assign(16, std::byte{0});
+    output.pixels[0] = std::byte{1};
+    output.pixels[1] = std::byte{2};
+    output.pixels[2] = std::byte{3};
+    output.pixels[3] = std::byte{4};
+
+    PF_Pixel destination_pixels[4]{};
+    PF_EffectWorld destination_world{};
+    destination_world.data = destination_pixels;
+    destination_world.width = 2;
+    destination_world.height = 2;
+    destination_world.rowbytes = static_cast<A_long>(sizeof(destination_pixels[0]) * 2);
+    const WorldLayout layout{0, 0, 2, 2, static_cast<std::uint32_t>(destination_world.rowbytes)};
+    const CancelAtPoll cancel_write_after_one_row(2);
+    CHECK(!write_output(output, layout, destination_world, HostBitDepth::bpc8, cancel_write_after_one_row));
+    CHECK(destination_pixels[0].red == 1 && destination_pixels[0].green == 2 &&
+          destination_pixels[0].blue == 3 && destination_pixels[0].alpha == 4);
+    CHECK(destination_pixels[2].alpha == 0); // the second row was not copied after cancellation
+}
 } // namespace
 
 int main() {
@@ -394,6 +453,7 @@ int main() {
     test_parameters(host);
     test_supervision(host);
     test_capture_refuses_reduced_preview(host);
+    test_world_copy_cancellation();
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

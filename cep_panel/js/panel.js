@@ -67,7 +67,7 @@
         return false;
     };
 
-    var state = { revision: null, nodes: [], values: {}, pending: false };
+    var state = { revision: null, targetToken: null, nodes: [], values: {}, pending: false };
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
@@ -134,7 +134,7 @@
                 version: 1,
                 requestId: requestId(),
                 operation: operation,
-                target: {},
+                target: state.targetToken ? { token: state.targetToken } : {},
                 baseRevision: state.revision,
                 changes: []
             };
@@ -306,6 +306,7 @@
     function adoptState(response) {
         state.nodes = response.nodes;
         state.revision = response.revision;
+        state.targetToken = response.target.token;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
         elements.modeLine.textContent = "Mode: " + response.controlSource;
         elements.revisionLine.textContent = "Revision: " + response.revision;

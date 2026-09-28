@@ -67,7 +67,7 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 - `docs/compatibility-matrix.md`: behavior inventory and independently derived acceptance criteria.
 - `docs/adr/`: decisions that affect saved projects or rendering semantics.
 
-The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements the SmartFX selectors and advertises SmartFX and float-color awareness; current host qualification is incomplete. MFR is not advertised and remains gated on a later thread-safety audit. G-03 evaluates immutable emitter/output graphs through the core renderer (ADR 0007); G-04 adds AE arbitrary-parameter persistence and supplies pre-render snapshots (ADR 0008).
+The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements SmartFX transport and 8/16/32-bpc CPU rendering; current host qualification is incomplete. G-03 evaluates the single-emitter `emitter → force → appearance → output` chain (ADR 0007), and G-04 persists a graph snapshot in an AE arbitrary-data parameter (ADR 0008). MFR, GPU, and Compute Cache remain disabled.
 
 ## SDK guidance used
 
@@ -79,13 +79,13 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Delivery sequence
 
-1. **Complete:** select AE 2023 as the minimum, pin the local SDK/toolchain pair, and build/load the M1 shell.
-2. **Complete:** register parameters from the stable manifest and finalize the time/render request contract.
-3. **Complete in code, host qualification open:** SmartFX checkout, ROI, pixel-format adapters, and a deterministic CPU point-emitter renderer. See the M2-06 checklist in `compatibility-matrix.md`.
-4. Add remaining emitters and particle controls as independent behavior tasks.
-5. Add graph types, bounded sequence migration, and presets.
-6. Add the dockable panel after its fixed node parameter bindings exist. Add Compute Cache, MFR, and an optional GPU backend only after the serial CPU contract is stable and each feature has an observed need.
+1. **Complete in code:** M0/M1 contracts and the AE 2023 Windows x64 shell.
+2. **Complete in code; host gate open:** M2 SmartFX transport, ROI, pixel-format adapters, and deterministic CPU rendering. See M2-06 in `compatibility-matrix.md`.
+3. **Implemented in core and controls:** M3-01 seeded emitters and M3-02 gravity, drag, and linear age curves, evaluated through the single-emitter four-stage graph.
+4. **Implemented in code; host gate open:** G-01–G-04 graph model, codec, evaluation, AE arbitrary-data persistence, and P-02 CEP protocol v1 panel. The panel displays a fixed topology and edits supervised AE streams; it does not create or rewire nodes.
+5. **Remaining Alpha work:** qualify the current build in AE 2023, then prioritize animation/history, dynamic graph editing, depth/projection, source types, and presets from observed behavior.
+6. Keep MFR, Compute Cache, and GPU work behind separate concurrency/performance evidence and host-specific decisions.
 
 ## Current scope
 
-M0 contracts, M1 shell, M2 SmartFX/CPU rendering, M3-01 seeded emitters, and G-01–G-04 graph model/codec/evaluation/AE parameter integration are implemented. The current build registers 16 user parameters: 13 legacy values, graph data, source mode and capture action. Core parity/native callback checks and the May 2023 SDK build pass. AE 2023 playback, save/reopen, effect copy and undo/redo remain unqualified. Force/appearance nodes, panel, MFR and GPU remain future work.
+M0/M1, M2 rendering, M3-01/M3-02 core behavior, G-01–G-04, and the P-02 panel implementation are present. The current effect registers 24 active non-input parameters: 21 values that feed `Settings` plus Control Source, Capture, and hidden graph data; topic markers and AE's implicit input account for the larger registration count. The host-independent core has 6,188 checks, the fake-host adapter suite has 298 checks, the panel gateway has Node fake-host regressions, and the May 2023 SDK build succeeds. Current-build load/render, preview geometry, save/reopen, effect copy, and undo/redo still require AE 2023 evidence. Dynamic graph editing, history/animation in the graph, MFR, and GPU remain future work.

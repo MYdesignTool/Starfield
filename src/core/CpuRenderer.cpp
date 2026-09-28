@@ -129,10 +129,11 @@ PixelGrid make_grid(const FrameSpec& frame) noexcept {
     return grid;
 }
 
-void compose_source_into_accumulation(const PixelBuffer* source, const RectI& roi, std::uint32_t roi_width,
-                                     std::uint32_t roi_height, std::vector<float>& accumulation) noexcept {
+bool compose_source_into_accumulation(const PixelBuffer* source, const RectI& roi, std::uint32_t roi_width,
+                                      std::uint32_t roi_height, std::vector<float>& accumulation,
+                                      const Cancellation& cancellation) noexcept {
     if (source == nullptr) {
-        return;
+        return true;
     }
 
     const std::int64_t source_left = source->origin_x;
@@ -141,6 +142,7 @@ void compose_source_into_accumulation(const PixelBuffer* source, const RectI& ro
     const std::int64_t source_bottom = source_top + source->height;
 
     for (std::uint32_t y = 0; y < roi_height; ++y) {
+        if (cancellation.is_cancelled()) return false;
         const std::int64_t frame_y = static_cast<std::int64_t>(roi.top) + y;
         if (frame_y < source_top || frame_y >= source_bottom) {
             continue;
@@ -160,12 +162,15 @@ void compose_source_into_accumulation(const PixelBuffer* source, const RectI& ro
             pixel[3] = color.a;
         }
     }
+    return true;
 }
 
-void encode_region(const std::vector<float>& accumulation, std::uint32_t roi_width, std::uint32_t roi_height,
-                   PixelFormat format, std::uint32_t row_bytes, std::vector<std::byte>& destination) noexcept {
+bool encode_region(const std::vector<float>& accumulation, std::uint32_t roi_width, std::uint32_t roi_height,
+                   PixelFormat format, std::uint32_t row_bytes, std::vector<std::byte>& destination,
+                   const Cancellation& cancellation) noexcept {
     const std::uint32_t pixel_bytes = bytes_per_pixel(format);
     for (std::uint32_t y = 0; y < roi_height; ++y) {
+        if (cancellation.is_cancelled()) return false;
         const float* row = accumulation.data() + static_cast<std::size_t>(y) * roi_width * 4;
         std::byte* out_row = destination.data() + static_cast<std::size_t>(y) * row_bytes;
         for (std::uint32_t x = 0; x < roi_width; ++x) {
@@ -193,6 +198,7 @@ void encode_region(const std::vector<float>& accumulation, std::uint32_t roi_wid
             }
         }
     }
+    return true;
 }
 
 } // namespace
@@ -223,6 +229,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     if (source != nullptr && !source_is_consistent(*source)) {
         return OutputResult::failure(ErrorCode::unsupported_format, "source buffer layout is not supported");
     }
+    if (cancellation.is_cancelled()) {
+        return OutputResult::failure(ErrorCode::cancelled, "render cancelled before staging allocation");
+    }
 
     const auto roi_width = static_cast<std::uint32_t>(roi.width());
     const auto roi_height = static_cast<std::uint32_t>(roi.height());
@@ -244,7 +253,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         return OutputResult::failure(ErrorCode::allocation_failed, "accumulation buffer allocation failed");
     }
 
-    compose_source_into_accumulation(source, roi, roi_width, roi_height, accumulation);
+    if (!compose_source_into_accumulation(source, roi, roi_width, roi_height, accumulation, cancellation)) {
+        return OutputResult::failure(ErrorCode::cancelled, "render cancelled while compositing the source");
+    }
 
     const auto particles = [&]() -> Result<std::vector<ParticleInstance>> {
         if (request.graph) {
@@ -339,7 +350,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     } catch (const std::bad_alloc&) {
         return OutputResult::failure(ErrorCode::allocation_failed, "output buffer allocation failed");
     }
-    encode_region(accumulation, roi_width, roi_height, frame.format, *row_bytes, output.pixels);
+    if (!encode_region(accumulation, roi_width, roi_height, frame.format, *row_bytes, output.pixels, cancellation)) {
+        return OutputResult::failure(ErrorCode::cancelled, "render cancelled while encoding output pixels");
+    }
 
     return OutputResult::success(std::move(output));
 }

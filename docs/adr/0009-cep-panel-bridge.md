@@ -1,6 +1,6 @@
 # ADR 0009: CEP panel bridge through supervised AE parameters
 
-- Status: accepted architecture for the AE 2023 panel MVP; implementation and host qualification pending.
+- Status: accepted architecture; protocol v1 implementation is present, AE 2023 host qualification pending.
 - Date: 2026-09-27.
 - Depends on ADRs 0006–0008 and the stable parameter identity rules in ADR 0001.
 
@@ -53,7 +53,7 @@ Requests and responses are JSON values. The envelope is:
   "version": 1,
   "requestId": "caller-generated-id",
   "operation": "getState | setParameters",
-  "target": {},
+  "target": { "token": "target-token-from-getState" },
   "baseRevision": "state-token",
   "changes": []
 }
@@ -68,9 +68,11 @@ emitter → force → appearance → output chain with one emitter. Its topology
 read-only; parameter values are editable. Dynamic node creation, deletion,
 reordering, and edge rewiring require a later protocol version.
 
-Before writing, the gateway verifies the target token and compares the current
-editable state with `baseRevision`. It validates every node/parameter/value and
-the entire change set before mutation. A successful edit is wrapped in one AE
+Before writing, the gateway requires the target token and non-empty
+`baseRevision` returned by the last `getState`. The target token binds the edit
+to AE's project-root ID, composition ID, layer ID, and effect index; the revision also includes
+that target identity and every current editable value. It validates every
+node/parameter/value and the entire change set before mutation. A successful edit is wrapped in one AE
 undo group. Unknown versions, stale state, ambiguous/missing targets, unknown
 parameter bindings, non-finite/out-of-range values, and oversized payloads are
 rejected without applying the requested changes. The gateway returns a stable
@@ -100,6 +102,9 @@ state.
   retains no assumed project state.
 - No active composition, selected layer, matching effect, or a unique target:
   return a typed target error without mutation.
+- More than one matching effect across the selected layers, including duplicate
+  instances on one layer, is an ambiguous target; never silently select the first
+  effect instance.
 - Target/state token mismatch: return `stale_state`; the panel reloads before a
   new edit.
 - Invalid request/version/value: reject the entire change set before opening an
@@ -121,6 +126,9 @@ close this gate.
 - [CEP HTML Extension Cookbook: invoking host scripts](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_12.x/Documentation/CEP%2012%20HTML%20Extension%20Cookbook.md)
 - [After Effects Scripting Guide: Property.setValue](https://ae-scripting.docsforadobe.dev/property/property/)
 - [After Effects Scripting Guide: effect properties](https://ae-scripting.docsforadobe.dev/property/propertybase/)
+- [After Effects Scripting Guide: Item.id](https://ae-scripting.docsforadobe.dev/item/item/)
+- [After Effects Scripting Guide: Layer.id](https://ae-scripting.docsforadobe.dev/layer/layer/)
+- [After Effects Scripting Guide: PropertyBase.propertyIndex](https://ae-scripting.docsforadobe.dev/property/propertybase/)
 - [After Effects C++ SDK Guide: parameter supervision](https://ae-plugins.docsforadobe.dev/effect-details/parameter-supervision/)
 - [After Effects C++ SDK Guide: PF_ParamDef and arbitrary-data standard controls](https://ae-plugins.docsforadobe.dev/effect-basics/PF_ParamDef/)
 - [After Effects C++ SDK Guide: arbitrary-data parameters](https://ae-plugins.docsforadobe.dev/effect-details/arbitrary-data-parameters/)

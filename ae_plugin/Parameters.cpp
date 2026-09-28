@@ -552,12 +552,16 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         // actually reports a non-trivial factor, so a host that reports 1/1 (or nothing at
         // all) is unaffected. The render path needs no guard: it has the full-resolution
         // reference from its input checkout.
-        if (in_data->downsample_x.num > 0 && in_data->downsample_x.den > 0 &&
-            in_data->downsample_x.num != static_cast<A_long>(in_data->downsample_x.den)) {
+        const auto is_reduced = [](const PF_RationalScale& scale) noexcept {
+            return scale.num > 0 && scale.den > 0 && scale.num != static_cast<A_long>(scale.den);
+        };
+        if (is_reduced(in_data->downsample_x) || is_reduced(in_data->downsample_y)) {
             std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                          "Starfield: capture needs Full preview resolution (downsample %ld/%lu)",
+                          "Starfield: capture needs Full preview resolution (downsample x=%ld/%lu y=%ld/%lu)",
                           static_cast<long>(in_data->downsample_x.num),
-                          static_cast<unsigned long>(in_data->downsample_x.den));
+                          static_cast<unsigned long>(in_data->downsample_x.den),
+                          static_cast<long>(in_data->downsample_y.num),
+                          static_cast<unsigned long>(in_data->downsample_y.den));
             out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
             return PF_Err_BAD_CALLBACK_PARAM;
         }

@@ -35,8 +35,10 @@ the simulation boundary. Schema-1 node parameters are constant values: this work
 does not introduce keyframes, animated parameter sampling, or emission history.
 Those require explicit time-sampling and serialization contracts under M3-03.
 No playback history, host handle, mutable render global, or filesystem access is
-introduced. Cancellation is checked before/after bounded validation, during
-planning/execution, and by the existing particle simulator.
+introduced. Cancellation is checked before staging allocation, during graph
+planning/execution and particle simulation, on each source-composite and output
+encode row, and at the AE world-copy boundary. The adapter polls `PF_ABORT` while
+copying both input and output worlds.
 
 The CPU rasterizer consumes each particle's opacity, rather than the fallback
 settings' opacity. This preserves flat-path pixels and allows later appearance
@@ -53,7 +55,7 @@ construction primitives, not an AE migration or persistence implementation.
 
 ## Evidence and remaining work
 
-Core regression run on 2026-09-27: 6,184 assertions, zero failures. Added cases
+Core regression run on 2026-09-28: 6,188 checks, zero failures. Added cases
 compare graph/flat pixels across four emitter shapes, 8/16/32-bit formats, repeated
 and reverse times, negative/subframe time, and reduced-resolution cropped output.
 Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid

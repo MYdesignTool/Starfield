@@ -77,7 +77,8 @@ bool describe_world(const PF_EffectWorld& world, WorldLayout& out) noexcept {
     return true;
 }
 
-core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitDepth depth) noexcept {
+core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitDepth depth,
+                                           const core::Cancellation& cancellation) noexcept {
     using BufferResult = core::Result<core::PixelBuffer>;
 
     WorldLayout layout{};
@@ -94,6 +95,9 @@ core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitD
     if (layout.row_bytes < *row_bytes) {
         return BufferResult::failure(core::ErrorCode::unsupported_format,
                                      "host world rows are narrower than one pixel row");
+    }
+    if (cancellation.is_cancelled()) {
+        return BufferResult::failure(core::ErrorCode::cancelled, "render cancelled before copying the source world");
     }
     const auto total_bytes = core::checked_buffer_bytes(*row_bytes, layout.height);
     if (!total_bytes.has_value()) {
@@ -117,6 +121,9 @@ core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitD
 
     const auto* source = reinterpret_cast<const std::byte*>(world.data);
     for (std::uint32_t y = 0; y < layout.height; ++y) {
+        if (cancellation.is_cancelled()) {
+            return BufferResult::failure(core::ErrorCode::cancelled, "render cancelled while copying the source world");
+        }
         const std::byte* source_row = source + static_cast<std::size_t>(y) * layout.row_bytes;
         std::byte* destination_row = buffer.pixels.data() + static_cast<std::size_t>(y) * *row_bytes;
         for (std::uint32_t x = 0; x < layout.width; ++x) {
@@ -159,7 +166,7 @@ core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitD
 }
 
 bool write_output(const core::RenderOutput& output, const WorldLayout& destination, PF_EffectWorld& world,
-                  HostBitDepth depth) noexcept {
+                  HostBitDepth depth, const core::Cancellation& cancellation) noexcept {
     if (output.region.empty() || output.pixels.empty()) {
         return true; // nothing to copy; an empty render is legal
     }
@@ -181,6 +188,7 @@ bool write_output(const core::RenderOutput& output, const WorldLayout& destinati
     }
 
     for (std::uint32_t y = 0; y < output.height(); ++y) {
+        if (cancellation.is_cancelled()) return false;
         const auto frame_y = static_cast<std::int64_t>(output.region.top) + y;
         const auto local_y = frame_y - destination.origin_y;
         if (local_y < 0 || local_y >= static_cast<std::int64_t>(destination.height)) {

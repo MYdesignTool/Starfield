@@ -1,6 +1,6 @@
 # Current feature audit
 
-Review baseline: `070c33e` plus G-04 host arbitrary parameter bridge, 2026-09-27.
+Review baseline: `5ac82db` plus this turn's P-02 gateway hardening, 2026-09-28.
 
 ## What the implementation currently does
 
@@ -11,17 +11,17 @@ Review baseline: `070c33e` plus G-04 host arbitrary parameter bridge, 2026-09-27
 
 ## Why the current result feels far from Stardust
 
-The M2 target was a render vertical slice, not a feature-parity release. M3-01 added emitter distributions and M3-02 added gravity, drag, color and the size/opacity age curves, so a trail can now fall, slow down, warm toward its end color, and shrink with age. The picture is still a flat 2D disc — Z does not affect projection, depth, or occlusion — and there are no textures, layer sources, particles-from-layers, meshes, materials, lights, volumes, motion blur, or file-based presets. The chain is fixed: nodes cannot be created, deleted, reordered, or rewired, and one force plus one appearance stage is the whole topology. The controls remain one flat list (twenty-one of them) rather than an organized UI. This explains the gap without treating a successful build as a parity result.
+The M2 target was a render vertical slice, not a feature-parity release. M3-01 added emitter distributions and M3-02 added gravity, drag, color and the size/opacity age curves, so a trail can now fall, slow down, warm toward its end color, and shrink with age. The picture is still a flat 2D disc — Z does not affect projection, depth, or occlusion — and there are no textures, layer sources, particles-from-layers, meshes, materials, lights, volumes, motion blur, or file-based presets. The graph chain is fixed: nodes cannot be created, deleted, reordered, or rewired, and one force plus one appearance stage is the whole topology. Its 21 render controls are grouped in four AE topics; the panel is a fixed-chain editor, not a dynamic graph editor. This explains the gap without treating a successful build as a parity result.
 
 The current compositing default (particles over the optional source) is an explicit project choice in ADR 0005, not yet confirmed to match the reference. Treat differences from the old effect as open behavior questions until a repeatable AE reference case records them.
 
 ## Verification gaps
 
-- The 24-parameter build has not been loaded in AE 2023. Existing host evidence covers an earlier eight-control revision only; the exact AE build is also unrecorded. Save/reopen, effect copy, old-project default selection and undo/redo remain unverified in the host.
+- The current 24-active-parameter build has not been qualified in AE 2023. Existing host evidence covers earlier revisions only; the exact AE build is also unrecorded. Save/reopen, effect copy, old-project default selection and undo/redo remain unverified in the host.
 - AE playback, Full/Half/Quarter preview, 8/16/32-bpc, cancellation, and project lifecycle remain unqualified for the current build.
 - The point-control normalization shim is still provisional until the current AE 2023 Options readout records the delivered origin values.
 - G-01 through G-04 have core/native code and fake-host coverage. Host persistence and undo claims remain unqualified until exercised in AE 2023. Capturing controls stores current-time constants; it does not transform historical animation into node tracks.
-- The CEP panel and its protocol are unqualified: name-based parameter lookup, scripted writes to the supervised streams, undo grouping, and the Node Graph rewrite path all need the AE 2023 host pass recorded in `cep_panel/README.md` and `docs/compatibility-matrix.md`.
+- The CEP panel protocol is implemented and now has host-independent fake-host checks for animation protection and rollback. Name-based parameter lookup, scripted writes to supervised streams, undo grouping, and the Node Graph rewrite path still need AE 2023 qualification recorded in `cep_panel/README.md` and `docs/compatibility-matrix.md`.
 - The three delivery examples are documented recipes and panel presets; none has been rendered in the host yet.
 
 ## Next product steps

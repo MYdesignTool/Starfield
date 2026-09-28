@@ -103,13 +103,14 @@
             // Any selected layer carrying the effect counts, whatever its kind. Text
             // layers were skipped here before, which made a selected text layer with the
             // effect read as "no target".
-            if (effectCount(candidate) > 0) {
+            var candidateEffects = effectCount(candidate);
+            if (candidateEffects > 0) {
                 if (count === 0) layer = candidate;
-                count++;
+                count += candidateEffects;
             }
         }
         if (count === 0) return { error: { code: "no_target", message: "Select a layer carrying Starfield Particle." } };
-        if (count > 1) return { error: { code: "ambiguous_target", message: "Select exactly one layer." } };
+        if (count > 1) return { error: { code: "ambiguous_target", message: "Select exactly one Starfield Particle effect." } };
         var effect = findEffect(layer);
         if (!effect) return { error: { code: "no_effect", message: "The selected layer has no Starfield Particle effect." } };
         return { comp: comp, layer: layer, effect: effect };
@@ -160,6 +161,26 @@
         return Number(value);
     }
 
+    // Keep a detached copy of the exact host value for transaction rollback. The
+    // panel's normalized value intentionally omits color alpha, so rollback must
+    // preserve the raw AE value instead of reconstructing it from readValue().
+    function copyHostValue(value) {
+        if (value === null || typeof value !== "object" || typeof value.length !== "number") return value;
+        var copy = [];
+        for (var i = 0; i < value.length; i++) copy.push(value[i]);
+        return copy;
+    }
+
+    function hostValueFor(binding, value) {
+        if (binding.kind === "color") {
+            return [value[0] / 255, value[1] / 255, value[2] / 255, 1];
+        }
+        if (binding.kind === "point3d") {
+            return [value[0], value[1], value[2]];
+        }
+        return value;
+    }
+
     function validateValue(binding, value) {
         if (binding.kind === "point3d") {
             if (!(value instanceof Array) || value.length !== 3) return false;
@@ -178,18 +199,40 @@
         return value >= binding.min && value <= binding.max;
     }
 
-    function currentRevision(effect, report) {
+    function currentRevision(target, report) {
         // Cheap opaque token over every bound value: identifies the edit base without
-        // exposing host pointers. Not a hash of the arbitrary graph.
-        var text = "";
+        // exposing host pointers. Include the selected comp/layer/effect identity so
+        // equal parameter values on a newly selected effect cannot accept an old edit.
+        // Not a hash of the arbitrary graph.
+        var identity = targetToken(target);
+        if (identity === null) return null;
+        var text = "target=" + identity + ";";
         for (var i = 0; i < BINDINGS.length; i++) {
-            var property = resolveProperty(effect, BINDINGS[i], report);
+            var property = resolveProperty(target.effect, BINDINGS[i], report);
             if (!property) return null;
             text += BINDINGS[i].key + "=" + String(readValue(property, BINDINGS[i])) + ";";
         }
         var hash = 5381;
         for (var c = 0; c < text.length; c++) hash = ((hash * 33) ^ text.charCodeAt(c)) & 0xffffffff;
         return (hash >>> 0).toString(16);
+    }
+
+    // AE 2023 exposes persistent Item.id and Layer.id values (both were added
+    // before AE 2023); the effect's propertyIndex distinguishes its instance on
+    // the layer. The project root ID prevents an open-project switch from reusing
+    // a token when two projects happen to reuse item IDs. The panel treats this
+    // string as an opaque echo token.
+    function targetToken(target) {
+        if (!target || !target.comp || !target.layer || !target.effect || !app.project || !app.project.rootFolder) return null;
+        var projectId = Number(app.project.rootFolder.id);
+        var compId = Number(target.comp.id);
+        var layerId = Number(target.layer.id);
+        var effectIndex = Number(target.effect.propertyIndex);
+        if (!isFinite(projectId) || Math.floor(projectId) !== projectId || projectId < 0 ||
+            !isFinite(compId) || Math.floor(compId) !== compId || compId < 0 ||
+            !isFinite(layerId) || Math.floor(layerId) !== layerId || layerId < 0 ||
+            !isFinite(effectIndex) || Math.floor(effectIndex) !== effectIndex || effectIndex < 1) return null;
+        return "p" + projectId + "-c" + compId + "-l" + layerId + "-e" + effectIndex;
     }
 
     function controlSource(effect) {
@@ -202,7 +245,9 @@
         var target = findTarget();
         if (target.error) return fail(target.error.code, target.error.message);
         var report = { resolution: "name" };
-        var revision = currentRevision(target.effect, report);
+        var token = targetToken(target);
+        if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
+        var revision = currentRevision(target, report);
         if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved; the effect build and panel bindings disagree.");
         var nodes = [];
         for (var i = 0; i < CHAIN.length; i++) {
@@ -217,7 +262,7 @@
             nodes.push(node);
         }
         return reply({ ok: true, operation: "getState", requestId: request.requestId || "",
-                       target: { comp: target.comp.name, layer: target.layer.name,
+                       target: { token: token, comp: target.comp.name, layer: target.layer.name,
                                  effectIndex: target.effect.propertyIndex ? target.effect.propertyIndex : 0 },
                        controlSource: controlSource(target.effect), resolution: report.resolution,
                        revision: revision, nodes: nodes, edges: EDGES });
@@ -226,13 +271,24 @@
     function setParameters(request) {
         var target = findTarget();
         if (target.error) return fail(target.error.code, target.error.message);
+        if (!request.target || typeof request.target.token !== "string" || request.target.token.length === 0) {
+            return fail("invalid_request", "target.token from the last getState response is required.");
+        }
+        var token = targetToken(target);
+        if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
+        if (request.target.token !== token) {
+            return fail("stale_state", "The selected effect changed since the panel loaded it; reload before editing.");
+        }
+        if (typeof request.baseRevision !== "string" || request.baseRevision.length === 0) {
+            return fail("invalid_request", "baseRevision from the last getState response is required.");
+        }
         if (!(request.changes instanceof Array) || request.changes.length === 0 || request.changes.length > MAX_CHANGES) {
             return fail("invalid_request", "changes must contain 1 to " + MAX_CHANGES + " entries.");
         }
         var report = { resolution: "name" };
-        var revision = currentRevision(target.effect, report);
+        var revision = currentRevision(target, report);
         if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved.");
-        if (request.baseRevision && request.baseRevision !== revision) {
+        if (request.baseRevision !== revision) {
             return fail("stale_state", "The effect changed since the panel loaded it; reload before editing.");
         }
 
@@ -251,33 +307,65 @@
             }
             var property = resolveProperty(target.effect, binding, report);
             if (!property) return fail("missing_parameter", "Missing parameter: " + binding.name);
-            if (property.dimensions === 1 && property.numKeys > 0 && property.isTimeVarying) {
+            if (property.numKeys > 0 || property.isTimeVarying) {
                 // Animated controls are owned by AE keyframes; the panel only writes
-                // constants so it cannot silently destroy animation.
+                // constants so it cannot silently destroy scalar, color, or point
+                // animation. `dimensions === 1` would miss vector properties.
                 return fail("animated_parameter", binding.name + " is animated; edit it in the timeline.");
             }
-            planned.push({ binding: binding, property: property, value: change.value });
+            planned.push({ binding: binding, property: property, value: change.value,
+                           previousValue: copyHostValue(property.value) });
         }
 
-        app.beginUndoGroup("Starfield: set parameters");
         var failed = null;
-        for (var p = 0; p < planned.length; p++) {
-            try {
-                var value = planned[p].value;
-                if (planned[p].binding.kind === "color") {
-                    planned[p].property.setValue([value[0] / 255, value[1] / 255, value[2] / 255, 1]);
-                } else if (planned[p].binding.kind === "point3d") {
-                    planned[p].property.setValue([value[0], value[1], value[2]]);
-                } else {
-                    planned[p].property.setValue(value);
+        var rollbackFailure = null;
+        var groupOpen = false;
+        try {
+            app.beginUndoGroup("Starfield: set parameters");
+            groupOpen = true;
+            for (var p = 0; p < planned.length; p++) {
+                try {
+                    planned[p].property.setValue(hostValueFor(planned[p].binding, planned[p].value));
+                } catch (error) {
+                    failed = { binding: planned[p].binding, message: error.toString() };
+                    // Include the failing property: a host setter can throw after
+                    // partially applying its value.
+                    for (var r = p; r >= 0; r--) {
+                        try {
+                            planned[r].property.setValue(planned[r].previousValue);
+                        } catch (rollbackError) {
+                            if (!rollbackFailure) {
+                                rollbackFailure = { binding: planned[r].binding, message: rollbackError.toString() };
+                            }
+                        }
+                    }
+                    break;
                 }
-            } catch (error) {
-                failed = { binding: planned[p].binding, message: error.toString() };
-                break;
+            }
+        } catch (error) {
+            failed = failed || { binding: null, message: error.toString() };
+        } finally {
+            if (groupOpen) {
+                try {
+                    app.endUndoGroup();
+                } catch (error) {
+                    failed = failed || { binding: null, message: error.toString() };
+                }
             }
         }
-        app.endUndoGroup();
-        if (failed) return fail("host_write_failed", failed.message, { key: failed.binding.key });
+        if (failed) {
+            var message = failed.message;
+            var context = {};
+            if (failed.binding) context.key = failed.binding.key;
+            if (rollbackFailure) {
+                context.rollbackFailed = true;
+                message += " Rollback also failed for " + rollbackFailure.binding.name + ": " + rollbackFailure.message;
+            } else if (failed.binding) {
+                context.rollbackFailed = false;
+                message += " Earlier writes were restored.";
+            }
+            return fail("host_write_failed", message, context);
+        }
 
         var updated = getState({ requestId: request.requestId });
         return updated;

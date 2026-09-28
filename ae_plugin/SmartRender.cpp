@@ -217,8 +217,9 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
     request.graph_revision = 0;
 
     try {
+        HostCancellation cancellation(in_data);
         if (input_world != nullptr) {
-            auto source = read_world(*input_world, depth);
+            auto source = read_world(*input_world, depth, cancellation);
             if (!source.has_value()) {
                 report_failure(out_data, source.error());
                 return host_error_for(source.error(), PF_Err_NONE);
@@ -229,7 +230,6 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
             request.source = std::make_shared<const core::PixelBuffer>(std::move(buffer));
         }
 
-        HostCancellation cancellation(in_data);
         const core::CpuParticleRenderer renderer;
         const auto rendered = renderer.render(request, cancellation);
         if (!rendered.has_value()) {
@@ -237,7 +237,12 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
             return host_error_for(rendered.error(), cancellation.abort_error());
         }
 
-        if (!write_output(rendered.value(), output_layout, *output_world, depth)) {
+        if (!write_output(rendered.value(), output_layout, *output_world, depth, cancellation)) {
+            if (cancellation.is_cancelled()) {
+                return host_error_for(core::make_error(core::ErrorCode::cancelled,
+                                                       "render cancelled while copying output pixels"),
+                                      cancellation.abort_error());
+            }
             return PF_Err_INTERNAL_STRUCT_DAMAGED;
         }
     } catch (const std::bad_alloc&) {

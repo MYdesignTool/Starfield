@@ -148,6 +148,16 @@ private:
     bool cancel_{false};
 };
 
+class CancellingAtPoll final : public Cancellation {
+public:
+    explicit CancellingAtPoll(unsigned poll) : cancel_at_(poll) {}
+    [[nodiscard]] bool is_cancelled() const noexcept override { return ++polls_ >= cancel_at_; }
+
+private:
+    unsigned cancel_at_{0};
+    mutable unsigned polls_{0};
+};
+
 void test_rational_time() {
     CHECK(make_rational(2, 4)->value == 1 && make_rational(2, 4)->scale == 2);
     CHECK(make_rational(-2, 4)->value == -1 && make_rational(-2, 4)->scale == 2);
@@ -1127,6 +1137,26 @@ void test_renderer_formats_and_limits() {
     const auto cancelled_output = renderer.render(build_request(scene), cancelled);
     CHECK(!cancelled_output.has_value());
     CHECK(cancelled_output.error().code == ErrorCode::cancelled);
+
+    // Source compositing and final pixel encoding must also observe cancellation,
+    // including the zero-particle path where simulation has no loop to poll.
+    Scene source_copy = scene;
+    source_copy.settings.particle_count = 0;
+    source_copy.settings.birth_rate = 0.0;
+    source_copy.source = std::make_shared<const PixelBuffer>(
+        make_source(64, 64, 0, 0, Rgba8{10, 20, 30, 255}, AlphaMode::premultiplied));
+    const CancellingAtPoll cancel_during_source(3); // initial check, first row, then next row
+    const auto cancelled_source = renderer.render(build_request(source_copy), cancel_during_source);
+    CHECK(!cancelled_source.has_value());
+    CHECK(cancelled_source.error().code == ErrorCode::cancelled);
+
+    Scene encode_only = scene;
+    encode_only.settings.particle_count = 0;
+    encode_only.settings.birth_rate = 0.0;
+    const CancellingAtPoll cancel_during_encode(3); // initial check, then two encoded rows
+    const auto cancelled_encode = renderer.render(build_request(encode_only), cancel_during_encode);
+    CHECK(!cancelled_encode.has_value());
+    CHECK(cancelled_encode.error().code == ErrorCode::cancelled);
 }
 
 void test_graph_evaluation() {

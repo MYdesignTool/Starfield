@@ -128,17 +128,20 @@ mklink /J "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" "
 
 ## Protocol v1 summary
 
-Panel -> gateway requests are JSON strings:
+Panel -> gateway requests are JSON strings. A `getState` request may omit target
+and revision; a `setParameters` request must echo both from its latest `getState`
+response:
 
 ```json
-{ "protocol": "org.starfieldfx.panel", "version": 1, "requestId": "r1",
-  "operation": "getState | setParameters", "target": {}, "baseRevision": "<token>",
-  "changes": [{ "key": "gravity_y", "value": -2.6 }] }
+{ "protocol": "org.starfieldfx.panel", "version": 1, "requestId": "r2",
+  "operation": "setParameters", "target": { "token": "<target-token>" },
+  "baseRevision": "<revision>", "changes": [{ "key": "gravity_y", "value": -2.6 }] }
 ```
 
 The gateway rejects the whole set on an unsupported version, an ambiguous or missing
-target, an unknown binding, an out-of-range or non-finite value, more than 32 changes,
-a payload over 64 KiB, a stale `baseRevision`, or an animated parameter. Error codes:
+target, a missing target token or `baseRevision`, an unknown binding, an out-of-range
+or non-finite value, more than 32 changes, a payload over 64 KiB, a stale token or
+`baseRevision`, or an animated parameter. Error codes:
 `no_project`, `no_active_comp`, `no_target`, `ambiguous_target`, `no_effect`,
 `missing_parameter`, `unknown_binding`, `invalid_value`, `stale_state`,
 `animated_parameter`, `host_write_failed`, `host_error`, `invalid_request`,

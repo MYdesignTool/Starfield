@@ -4,14 +4,15 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The four-stage chain (G-03/M3-02) passed 6,184 core assertions, the adapter suite
-passed 287 fake-host assertions, and the explicit May 2023 SDK build succeeds.
+The four-stage chain (G-03/M3-02) passed 6,188 core checks, the adapter suite
+passed 298 fake-host checks, the panel gateway fake-host checks pass, and the
+explicit May 2023 SDK build succeeds.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
-Current artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. May 2023 SDK build passes. Core suite: 6,184 assertions; adapter simulation: 287 assertions. AE load/render/save/undo evidence applies only to earlier M1/M2 builds; the 24-parameter build (21 controls plus graph, control source and capture) still needs an AE 2023 host pass.
+Current artifact: `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, plug-in build 2 / packed version `0x8002`. Rebuilt on 2026-09-28 with the May 2023 SDK; `dist/StarfieldParticle.aex` has identical bytes. SHA-256: `8135BB08CB0F614C9A999C7C86C040FB5DF6164F0E0173C0B1BB623008DCCECC`. Core suite: 6,188 checks; adapter fake-host suite: 298 checks; panel gateway fake-host checks pass. This exact candidate has not been installed or exercised in AE. Earlier M1/M2 host evidence does not qualify it; the 24-active-parameter build (21 controls plus graph, control source and capture) still needs an AE 2023 host pass.
 
 ## Artifact layout
 
@@ -55,7 +56,9 @@ inside the `.aex`. Two guards now make that failure impossible to ship silently:
 
 `tests/core_tests.cpp` covers rational-time normalization and overflow, settings validation, simulation determinism and boundaries, graph identities/schema/type/cardinality/cycle validation, sequence codec round-trips and malformed-input rejection, ROI equality against full-frame rendering, world-to-pixel mapping at a downsampled frame grid, source compositing and placement, bit-depth output, the force/appearance chain (closed-form gravity/drag against the analytic solution, age curves, stage-order and single-appearance enforcement, codec round-trip of a four-stage graph), and the bounded-work/cancellation paths.
 
-`tests/graph_parameter_tests.cpp` (`-Adapter`) covers the arbitrary-data callbacks, parameter registration and mapping, the four-stage chain built from the controls, the supervised edit path (Node Graph rewrite, AE Controls isolation, allocation failure), and checkout/checkin bookkeeping.
+`tests/graph_parameter_tests.cpp` (`-Adapter`) covers the arbitrary-data callbacks, parameter registration and mapping, the four-stage chain built from the controls, the supervised edit path (Node Graph rewrite, AE Controls isolation, allocation failure), checkout/checkin bookkeeping, and cancellation during host-world copies.
+
+`tests/panel_gateway_tests.js` runs the ExtendScript protocol gateway in a Node fake host and covers multidimensional animation rejection, successful writes, and failed-batch rollback. Run it with `node tests/panel_gateway_tests.js`. This does not replace the AE 2023 panel qualification gate.
 
 - With CMake available: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 - On the current Windows machine CMake is not installed, so use `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`, which compiles the same sources with the locked MSVC toolset behind a mapped drive letter and runs the executable. Output lands in `artifacts/core-tests/`.
