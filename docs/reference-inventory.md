@@ -23,3 +23,9 @@ This is a planning index distilled from the existing Stardust binary-analysis re
 5. Qualify MFR and GPU only after serial graph rendering is correct and the host APIs are qualified.
 
 The existing reverse-analysis report remains outside this Git root. This checked-in summary is the portable, reviewable feature index; do not add raw SDK payloads, plug-in binaries, or copied decompilation output to the source repository.
+
+## External implementation reference
+
+The owner suggested [H2O-2/particleGL](https://github.com/H2O-2/particleGL) on 2026-09-28. GitHub identifies the repository as MIT-licensed; it describes itself as a partially implemented OpenGL particle tool inspired by Trapcode Particular. Its README documents behavior differences in velocity distribution and feathering, and additional sprite color blending. Treat it as an independent behavior/performance reference, not as a drop-in engine or a specification for Stardust.
+
+The implementation is a standalone SDL/OpenGL application with its own window/context, immediate-mode UI, and a wall-clock accumulator (`SDL_GetTicks`) that advances mutable emitter state. Its renderer uploads per-particle attributes/matrices and uses instanced draws. That buffer/draw pattern is a useful performance reference, but the live-time state model does not meet this plug-in's arbitrary-time, out-of-order deterministic AE render contract, and the private GL context is outside the current AE 2023 CPU-renderer policy. Do not link it into the `.aex` or copy code into the core as part of M2/M3; revisit its data-layout ideas only in a future GPU task using documented AE GPU selectors and a CPU fallback. If source code is ever adopted, pin the exact commit and retain the MIT notice plus notices for each bundled dependency.
