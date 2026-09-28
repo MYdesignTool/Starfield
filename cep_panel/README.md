@@ -57,12 +57,15 @@ If panels go missing after an update:
    reg query "HKCU\Software\Adobe\CSXS.11" /v PlayerDebugMode
    ```
 
-   AE 2023 ships CEP 11, so that is the key that matters; check `CSXS.12` too if the panel does not
-   appear. On this machine it is already `1` and other panels rely on it staying that way. `Install.ps1`
-   prints the value it finds, read-only, and leaves it alone.
+   AE 2023 ships CEP 11, so that is the primary key; check `CSXS.12` too if the panel does not appear.
+   A read-only check on 2026-09-28 found no `PlayerDebugMode` key/value under either `CSXS.11` or
+   `CSXS.12` on this machine. `Install.ps1` reports the value it finds and leaves it alone. If the
+   owner decides to enable unsigned extensions, that host-wide setting must be changed manually;
+   this project does not create or modify it.
 
-3. Put this folder where CEP scans for extensions. Both roots work; the owner's current install is the
-   system-wide one, as a plain copy:
+3. Put this folder where CEP scans for extensions. Both roots work. The authorized test target is
+   the system-wide root below; a read-only inspection on 2026-09-28 found no Starfield panel entry
+   there yet:
 
    | Root | Path | Needs admin |
    |---|---|---|
