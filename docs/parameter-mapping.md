@@ -214,6 +214,12 @@ cnt 1000 rate 100.00 seed 1 life 2.000
 
 ### Resolving the point-unit question (D-05)
 
+For a reliable measurement, use a fresh comp with one Starfield instance and set `Control Source` to
+`AE Controls` (the default for a new effect). The diagnostic keeps one process-wide last-render
+geometry record, so another Starfield instance can overwrite `ref/grid`; in `Node Graph` mode the
+rendered origin comes from stored graph values, while `org host/px` describes the AE point control.
+If the readout says `src NG`, switch back to `AE Controls` before taking these measurements.
+
 1. Put the playhead at t ≥ 1 s, render a frame with the Composition panel at **Full**, press `Options`,
    and keep the text.
 2. Switch to **Quarter**, let one frame render, press `Options` again.
