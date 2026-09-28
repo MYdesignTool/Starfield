@@ -9,6 +9,7 @@
 #include "starfield/core/Render.hpp"
 
 #include <cstdint>
+#include <span>
 
 namespace starfield::adapter {
 
@@ -54,9 +55,25 @@ struct WorldLayout {
                                                                              HostBitDepth depth,
                                                                              const starfield::core::Cancellation& cancellation) noexcept;
 
-// Copies the core staging buffer into the host output world, translating channel
-// order and clipping to the destination extent. The output format must match the
-// host bit depth; a mismatch is a bug and returns false.
+// Clears the host output world to transparent black, then copies the core staging
+// buffer into it, translating channel order and clipping to the destination extent.
+// The output format must match the host bit depth; a mismatch is a bug and returns false.
+struct OutputView {
+    starfield::core::RectI region{};
+    std::uint32_t row_bytes{0};
+    starfield::core::PixelFormat format{starfield::core::PixelFormat::rgba8};
+    std::span<const std::byte> pixels;
+    [[nodiscard]] std::uint32_t width() const noexcept {
+        return static_cast<std::uint32_t>(region.width());
+    }
+    [[nodiscard]] std::uint32_t height() const noexcept {
+        return static_cast<std::uint32_t>(region.height());
+    }
+};
+
+[[nodiscard]] bool write_output(OutputView output, const WorldLayout& destination,
+                               PF_EffectWorld& world, HostBitDepth depth,
+                               const starfield::core::Cancellation& cancellation) noexcept;
 [[nodiscard]] bool write_output(const starfield::core::RenderOutput& output, const WorldLayout& destination,
                                PF_EffectWorld& world, HostBitDepth depth,
                                const starfield::core::Cancellation& cancellation) noexcept;

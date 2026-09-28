@@ -13,8 +13,10 @@
  *   PF_OutFlag_I_DO_DIALOG            = 1 << 5   (0x00000020)  diagnostic readout
  *   PF_OutFlag_NON_PARAM_VARY         = 1 << 2   (0x00000004)  absolute-time particles
  *   PF_OutFlag2_SUPPORTS_SMART_RENDER = 1 << 10  (0x00000400)
+ *   PF_OutFlag2_REVEALS_ZERO_ALPHA    = 1 << 7   (0x00000080)
  *   PF_OutFlag2_FLOAT_COLOR_AWARE     = 1 << 12  (0x00001000)
  *   PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG = 1 << 3 (0x00000008)
+ *   PF_OutFlag2_I_MIX_GUID_DEPENDENCIES = 1 << 21 (0x00200000)
  *
  * The group-collapsed flag is required for the topic layout: without it AE collapses
  * every parameter group, and with it each topic honours PF_ParamFlag_START_COLLAPSED,
@@ -23,6 +25,6 @@
  * unset until their milestones are implemented and qualified.
  */
 #define STARFIELD_OUT_FLAGS 0x02000464L  /* DEEP_COLOR_AWARE | PIX_INDEPENDENT | USE_OUTPUT_EXTENT | I_DO_DIALOG | NON_PARAM_VARY */
-#define STARFIELD_OUT_FLAGS2 0x00001408L /* SUPPORTS_SMART_RENDER | FLOAT_COLOR_AWARE | PARAM_GROUP_START_COLLAPSED */
+#define STARFIELD_OUT_FLAGS2 0x00201488L /* REVEALS_ZERO_ALPHA | SUPPORTS_SMART_RENDER | FLOAT_COLOR_AWARE | PARAM_GROUP_START_COLLAPSED | I_MIX_GUID_DEPENDENCIES */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

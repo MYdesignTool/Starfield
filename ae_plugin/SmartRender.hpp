@@ -1,9 +1,8 @@
 #pragma once
 
-// SmartFX transport for the particle renderer. Pre-render declares the pixels this
-// effect will produce and checks out exactly one input; render re-fetches those
-// pixels, converts them into owned core buffers, runs the host-independent core,
-// and copies the staging buffer into the host output world.
+// SmartFX transport for the particle renderer. Pre-render checks empty input metadata
+// for bounds/reference geometry; render satisfies AE's input/output checkout ordering
+// but does not read input pixels, then copies transparent particle output to AE's world.
 
 #include "AEConfig.h"
 #include "AE_Effect.h"

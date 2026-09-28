@@ -148,8 +148,8 @@ struct PixelBuffer {
 };
 
 // Immutable render input assembled by the adapter. It owns no host handles, no
-// PF_ParamDef pointers, and no host pixel pointers; the optional source is an
-// adapter-owned conversion that stays valid for the duration of the call.
+// PF_ParamDef pointers, and no host pixel pointers. This effect generates particles
+// over transparent black; its layer input provides geometry and controls only.
 struct RenderRequest {
     ValidatedSettings settings;
     FrameSpec frame;
@@ -159,8 +159,6 @@ struct RenderRequest {
     std::shared_ptr<const Graph> graph;
     // Stable caller-owned revision key reserved for derived render caches.
     std::uint64_t graph_revision{0};
-    // Absent means "no input layer": particles composite over transparent black.
-    std::shared_ptr<const PixelBuffer> source;
 };
 
 struct RenderOutput {

@@ -33,9 +33,11 @@ try {
         'src\core\Settings.cpp',
         'src\core\Geometry.cpp',
         'src\core\Graph.cpp',
+        'src\core\GraphConstruction.cpp',
         'src\core\GraphEvaluation.cpp',
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',
+        'src\core\PluginApi.cpp',
         'src\core\CpuRenderer.cpp'
     )
 

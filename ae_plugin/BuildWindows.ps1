@@ -3,12 +3,48 @@ param(
     [ValidateSet('x64')][string]$Platform = 'x64',
     [string]$SdkPath = 'AdobeSDK\May2023_AfterEffectsSDK',
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '2023',
+    [switch]$CoreOnly,
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSBuildPath" }
+
+# A CoreOnly build is safe only while every source that feeds the installed AEX
+# and the cross-DLL ABI remains unchanged from the last full build. Algorithm
+# sources (CpuRenderer, GraphEvaluation, ParticleSimulation, Random, PluginApi.cpp)
+# are intentionally absent here.
+$adapterInputs = @(
+    'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
+    'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
+    'ae_plugin\EffectMain.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
+    'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
+    'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
+    'ae_plugin\WorldBridge.cpp', 'ae_plugin\WorldBridge.hpp',
+    'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h',
+    'ae_plugin\StarfieldPiPL.r', 'ae_plugin\Starfield.vcxproj',
+    'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
+    'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
+    'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
+    'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',
+    'include\starfield\core\Time.hpp', 'schema\parameters.json',
+    'src\core\Geometry.cpp', 'src\core\Graph.cpp',
+    'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
+    'src\core\SequenceCodec.cpp', 'src\core\Settings.cpp', 'src\core\Time.cpp'
+)
+$adapterFingerprint = ($adapterInputs | ForEach-Object {
+    $path = Join-Path $repositoryRoot $_
+    if (-not (Test-Path -LiteralPath $path)) { throw "Missing adapter input: $path" }
+    "$_ $((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash)"
+}) -join "`n"
+$fingerprintPath = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\adapter-inputs.sha256"
+if ($CoreOnly) {
+    if (-not (Test-Path -LiteralPath $fingerprintPath) -or
+        [IO.File]::ReadAllText($fingerprintPath) -ne $adapterFingerprint) {
+        throw 'Adapter or C ABI sources changed since the last full build. Rebuild and install the matching AEX before CoreOnly.'
+    }
+}
 
 $driveLetter = @('Z', 'Y', 'X', 'W', 'V') |
     Where-Object { -not (Test-Path -LiteralPath "$_`:\") } |
@@ -21,6 +57,8 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 try {
     $aliasSdkPath = Join-Path $drive $SdkPath
     $projectPath = Join-Path $drive 'ae_plugin\Starfield.vcxproj'
+    $coreProjectPath = Join-Path $drive 'ae_plugin\StarfieldCore.vcxproj'
+    $coreArguments = @($coreProjectPath, '/t:Build', '/m', "/p:Configuration=$Configuration", "/p:Platform=$Platform")
     $arguments = @($projectPath, '/t:Build', '/m', "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath")
     if ($ArtifactLabel) {
         $artifactRoot = Join-Path $drive "artifacts\plugin\$ArtifactLabel"
@@ -28,15 +66,69 @@ try {
         $intermediateDir = Join-Path $artifactRoot "obj\$Platform\$Configuration"
         $arguments += "/p:OutDir=$outputDir\"
         $arguments += "/p:IntDir=$intermediateDir\"
+        $coreOutputDir = Join-Path $drive "artifacts\core-dll\$ArtifactLabel\$Platform\$Configuration"
+        $coreIntermediateDir = Join-Path $drive "artifacts\core-dll\$ArtifactLabel\obj\$Platform\$Configuration"
+        $coreArguments += "/p:OutDir=$coreOutputDir\"
+        $coreArguments += "/p:IntDir=$coreIntermediateDir\"
     }
+    $coreArguments += '/v:minimal'
+    & $MSBuildPath @coreArguments
+    if ($LASTEXITCODE -ne 0) { throw "Core DLL MSBuild failed with exit code $LASTEXITCODE" }
+
+    $builtCore = Join-Path $repositoryRoot "artifacts\core-dll\$ArtifactLabel\$Platform\$Configuration\StarfieldCore.dll"
+    if (-not (Test-Path -LiteralPath $builtCore)) { throw "Core build reported success but $builtCore is missing." }
+
+    if (-not $CoreOnly) {
     $arguments += '/v:minimal'
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
+    [IO.File]::WriteAllText($fingerprintPath, $adapterFingerprint, [Text.Encoding]::ASCII)
+    }
+
+    # Runtime publication is last: a failed build must leave the currently
+    # selected DLL unchanged. Filenames are content-addressed, so a mapped
+    # generation is never overwritten.
+    $runtimeDir = Join-Path $repositoryRoot 'artifacts\runtime'
+    New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+    $builtCoreHash = (Get-FileHash -LiteralPath $builtCore -Algorithm SHA256).Hash
+    $coreHash = $builtCoreHash.Substring(0, 16)
+    $runtimeName = "StarfieldCore-$coreHash.dll"
+    $runtimeCore = Join-Path $runtimeDir $runtimeName
+    if (Test-Path -LiteralPath $runtimeCore) {
+        if ((Get-FileHash -LiteralPath $runtimeCore -Algorithm SHA256).Hash -ne $builtCoreHash) {
+            throw "Existing runtime DLL has the expected name but different contents: $runtimeCore"
+        }
+    } else {
+        $runtimeTemp = Join-Path $runtimeDir "$runtimeName.$PID.tmp"
+        try {
+            Copy-Item -LiteralPath $builtCore -Destination $runtimeTemp -Force
+            if ((Get-FileHash -LiteralPath $runtimeTemp -Algorithm SHA256).Hash -ne $builtCoreHash) {
+                throw "Runtime DLL copy failed hash verification: $runtimeTemp"
+            }
+            [IO.File]::Move($runtimeTemp, $runtimeCore)
+        } finally {
+            if (Test-Path -LiteralPath $runtimeTemp) { Remove-Item -LiteralPath $runtimeTemp }
+        }
+    }
+    $manifest = Join-Path $runtimeDir 'current.txt'
+    $manifestTemp = Join-Path $runtimeDir "current.$PID.tmp"
+    $manifestBackup = Join-Path $runtimeDir "current.$PID.previous"
+    [IO.File]::WriteAllText($manifestTemp, "$runtimeName`n", [Text.Encoding]::ASCII)
+    try {
+        if ([IO.File]::Exists($manifest)) {
+            [IO.File]::Replace($manifestTemp, $manifest, $manifestBackup)
+        } else {
+            [IO.File]::Move($manifestTemp, $manifest)
+        }
+    } finally {
+        if (Test-Path -LiteralPath $manifestTemp) { Remove-Item -LiteralPath $manifestTemp }
+        if (Test-Path -LiteralPath $manifestBackup) { Remove-Item -LiteralPath $manifestBackup }
+    }
 
     # Publish a plainly named copy where a person can find it. MSBuild's OutDir is
     # artifacts/plugin/<label>/<platform>/<configuration>/, which is the right place to keep
     # one directory per SDK target but a tedious place to fetch an installable file from.
-    if ($ArtifactLabel) {
+    if ($ArtifactLabel -and -not $CoreOnly) {
         $publishedDir = Join-Path $repositoryRoot 'dist'
         $builtAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\StarfieldParticle.aex"
         if (-not (Test-Path -LiteralPath $builtAex)) { throw "Build reported success but $builtAex is missing." }
@@ -48,8 +140,14 @@ try {
         }
         Write-Host ''
         Write-Host "Installable build: $(Join-Path $publishedDir 'StarfieldParticle.aex')" -ForegroundColor Green
-        Write-Host 'Install or roll back with: powershell -ExecutionPolicy Bypass -File tools\Install-Plugin.ps1 [-Uninstall]'
+        Copy-Item -LiteralPath $builtCore -Destination (Join-Path $publishedDir 'StarfieldCore.dll') -Force
+        $builtCorePdb = [IO.Path]::ChangeExtension($builtCore, '.pdb')
+        if (Test-Path -LiteralPath $builtCorePdb) {
+            Copy-Item -LiteralPath $builtCorePdb -Destination (Join-Path $publishedDir 'StarfieldCore.pdb') -Force
+        }
+        Write-Host "Core DLL: $(Join-Path $publishedDir 'StarfieldCore.dll')" -ForegroundColor Green
     }
+    Write-Host "Selected runtime core: $runtimeCore" -ForegroundColor Green
 }
 finally {
     & $env:ComSpec /d /c "subst $drive /d" | Out-Null

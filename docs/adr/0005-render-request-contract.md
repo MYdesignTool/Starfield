@@ -1,6 +1,6 @@
-# ADR 0005: render request, region of interest, and the M2 compositing default
+# ADR 0005: render request, region of interest, and alpha-only particle output
 
-- Status: accepted for M2.
+- Status: accepted for M2; output semantics amended 2026-09-28 from owner AE feedback.
 - Date: 2026-09-27
 - Task: M2-01 (contract), consumed by M2-03/M2-04/M2-05.
 
@@ -45,17 +45,33 @@ Work is bounded on purpose: the CPU renderer accumulates a sprite-coverage budge
 `work_limit_exceeded` instead of blocking the host for an unbounded time. The budget is a
 documented constant, not a hidden truncation.
 
-## Compositing default (open behavior question from the M2-04 card)
+## Output semantics (owner direction, 2026-09-28)
 
-Particles composite **over** the source with premultiplied "over"; wherever no sprite covers a
-pixel the source passes through, and an absent source means transparent black. This is a chosen
-default for the first vertical slice, recorded here instead of being presented as verified
-reference compatibility. It must be confirmed against the observed reference effect before the
-project claims parity for input-dependent cases.
+The effect generates particle RGBA over transparent black. It does not copy or composite the input
+layer's pixels. The implicit AE layer input remains the source of parameter and geometry context.
+SmartFX requests an empty source rectangle for bounds, then performs the empty pixel checkout AE
+requires before output checkout; the renderer never reads that pixel world. This makes a solid
+layer with the effect applied behave as a particle layer: pixels outside the sprites have zero
+alpha and underlying composition layers show through. The effect does not change the layer's
+visibility.
+
+The core accumulates particles with premultiplied-alpha "over" and writes premultiplied output in
+the requested format. The AE adapter advertises `PF_OutFlag2_REVEALS_ZERO_ALPHA`, so AE retains the
+requested extent even when the input pixels have zero alpha; PiPL and runtime values are statically
+checked against the May 2023 SDK declaration. The render request intentionally has no source-pixel
+field, preventing accidental reintroduction of source passthrough. Texture/layer sources remain a
+separate future feature and require their own explicit graph and alpha contract.
+
+The owner-tested AE 2023.5.0 Build 52 candidate initially exposed an adapter issue: AE could seed
+the output world with source pixels, so copying only the sparse particle staging region left the
+solid layer visible outside sprites. `WorldBridge::write_output` now clears the destination pixel
+extent to transparent black before copying the core output. This behavior was visually checked in
+AE against the transparency grid on 2026-09-28; testing a lower composition layer behind the
+particle layer remains a separate visual check.
 
 ## Color
 
-M2 performs no color-space conversion. Source samples are composited as given in the declared
+M2 performs no color-space conversion. Particle colors are accumulated in the declared
 `ColorSpace` and the output is written in the same space. Color management through documented AE
 suites is deferred until the reference behavior is confirmed (ADR 0003 remains the long-term
 contract).

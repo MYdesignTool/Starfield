@@ -1,4 +1,4 @@
-// Starfield node editor panel. Thin client for the ADR 0009 protocol v1: it renders
+// Starfield Particle Controls panel. Thin client for the ADR 0009 protocol v1: it renders
 // the fixed emitter -> force -> appearance -> output chain, edits the supervised AE
 // parameter streams through the ExtendScript gateway, and never touches the effect's
 // arbitrary-data graph parameter or any host-private state.
@@ -7,6 +7,10 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
+    var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
+    var startupRetryAttempt = 0;
+    var startupRetryTimer = null;
+    var refreshEpoch = 0;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
     // Adobe's full CSInterface library can replace this shim later without changing
@@ -125,8 +129,10 @@
     function call(operation, extra, callback) {
         ensureGateway(function (ready) {
             if (!ready) {
-                showError("gateway_missing",
-                          "The ExtendScript gateway is not loaded. Check the install steps in cep_panel/README.md.");
+                callback({ ok: false, error: {
+                    code: "gateway_missing",
+                    message: "The ExtendScript gateway is not loaded. Check the install steps in cep_panel/README.md."
+                } });
                 return;
             }
             var envelope = {
@@ -148,7 +154,10 @@
             var timer = window.setTimeout(function () {
                 if (settled) return;
                 settled = true;
-                showError("host_timeout", "The host did not answer within " + (REQUEST_TIMEOUT_MS / 1000) + "s.");
+                callback({ ok: false, error: {
+                    code: "host_timeout",
+                    message: "The host did not answer within " + (REQUEST_TIMEOUT_MS / 1000) + "s."
+                } });
             }, REQUEST_TIMEOUT_MS);
             evalScript(script, function (raw) {
                 if (settled) return;
@@ -158,13 +167,27 @@
                 try {
                     response = JSON.parse(raw);
                 } catch (error) {
-                    // The raw reply is the whole diagnosis: "EvalScript error." means the
-                    // gateway threw, "undefined" means the entry point is not global.
-                    showError("bad_response", "The gateway returned unreadable data: " + snippet(raw));
+                    var replyText = raw === null || typeof raw === "undefined" ? "" : String(raw).trim();
+                    if (!replyText || replyText === "undefined" || /^EvalScript error\.?$/i.test(replyText)) {
+                        // During AE startup CEP can complete evalScript with no usable
+                        // result before the project/ExtendScript context is ready.
+                        gatewayReady = false;
+                        callback({ ok: false, error: {
+                            code: "host_not_ready", message: "After Effects has not returned a panel response yet."
+                        } });
+                        return;
+                    }
+                    // Non-empty malformed replies are useful diagnostics and should not be
+                    // collapsed into the transient startup state handled above.
+                    callback({ ok: false, error: {
+                        code: "bad_response", message: "The gateway returned unreadable data: " + snippet(raw)
+                    } });
                     return;
                 }
                 if (!response || response.protocol !== "org.starfieldfx.panel") {
-                    showError("bad_response", "Unexpected response envelope: " + snippet(raw));
+                    callback({ ok: false, error: {
+                        code: "bad_response", message: "Unexpected response envelope: " + snippet(raw)
+                    } });
                     return;
                 }
                 callback(response);
@@ -314,15 +337,40 @@
         render(response);
     }
 
-    function refresh() {
+    function isStartupRetryable(code) {
+        return code === "gateway_missing" || code === "host_timeout" || code === "host_not_ready" || code === "no_host" ||
+               code === "no_project" || code === "no_active_comp" || code === "no_target" || code === "no_effect";
+    }
+
+    function refresh(autoRetry, resetRetryBudget) {
+        if (startupRetryTimer !== null) {
+            window.clearTimeout(startupRetryTimer);
+            startupRetryTimer = null;
+        }
+        if (resetRetryBudget) startupRetryAttempt = 0;
+        var epoch = ++refreshEpoch;
         call("getState", null, function (response) {
+            if (epoch !== refreshEpoch) return;
             if (!response.ok) {
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
+                if (autoRetry && isStartupRetryable(error.code)) {
+                    var retryIndex = Math.min(startupRetryAttempt, STARTUP_RETRY_DELAYS_MS.length - 1);
+                    var delay = STARTUP_RETRY_DELAYS_MS[retryIndex];
+                    startupRetryAttempt += 1;
+                    elements.banner.className = "banner";
+                    elements.banner.textContent = "Connecting to After Effects; retrying shortly...";
+                    startupRetryTimer = window.setTimeout(function () {
+                        startupRetryTimer = null;
+                        if (epoch === refreshEpoch) refresh(true, false);
+                    }, delay);
+                    return;
+                }
                 showError(error.code, error.message);
                 elements.targetLine.textContent = "No target";
                 elements.chain.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle, then press Refresh.</p>";
                 return;
             }
+            startupRetryAttempt = 0;
             clearBanner();
             adoptState(response);
         });
@@ -332,7 +380,16 @@
     elements.banner.className = "banner";
     elements.banner.textContent = "Panel script loaded; asking the host for the selected effect...";
 
-    elements.refresh.addEventListener("click", refresh);
+    elements.refresh.addEventListener("click", function () { refresh(true, true); });
+
+    // AE can change the effect behind the panel's back: Ctrl+Z, keyframes, or an edit in
+    // the Effect Controls window. The protocol has no push channel, so without this the
+    // panel keeps displaying whatever it last adopted (host-side undo left a stale 40 on
+    // screen). Re-read whenever the panel regains focus, but never race a pending write.
+    window.addEventListener("focus", function () {
+        if (!state.pending) refresh(false, false);
+    });
+
     elements.preset.addEventListener("change", function () {
         var preset = PRESETS[elements.preset.value];
         elements.preset.value = "";
@@ -344,5 +401,5 @@
         applyChanges(changes);
     });
 
-    refresh();
+    refresh(true, true);
 })();

@@ -1,11 +1,12 @@
 #include "SmartRender.hpp"
 
 #include "AE_Macros.h"
+#include "CoreLoader.hpp"
 #include "Diagnostics.hpp"
 #include "Parameters.hpp"
 #include "WorldBridge.hpp"
 
-#include "starfield/core/CpuRenderer.hpp"
+#include "starfield/core/SequenceCodec.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <memory>
 #include <new>
+#include <limits>
 
 // Geometry contract (ADR 0005). AE_Effect.h documents in_data->width/height as the
 // full-resolution layer size and says every layer size is "automatically adjusted
@@ -21,7 +23,7 @@
 // header describes a range of "1 to 999+" while the SDK's own samples multiply by
 // the rational. Rather than trusting either reading, all render-space geometry here
 // is derived from what the host actually hands over:
-//   * the checked-out world's dimensions vs the rect we asked for -> pixels per
+//   * the output world's dimensions vs the pre-render result rect -> pixels per
 //     host rect unit,
 //   * PF_CheckoutResult::max_result_rect -> the layer extent in host rect units,
 //   * PF_CheckoutResult::ref_width/ref_height -> the full-resolution reference used
@@ -33,8 +35,9 @@ namespace {
 
 namespace core = starfield::core;
 
-// Pre-render performs exactly one input checkout; render must re-fetch the same
-// pixels with the same id (AE requires a one-to-one correspondence).
+// Pre-render checks out empty input metadata to obtain AE's layer bounds and
+// full-resolution reference geometry. Smart Render still pairs the checkout with an
+// empty pixel checkout to satisfy AE's checkout_output ordering, but never reads it.
 constexpr A_long kInputCheckoutId = 1;
 constexpr PF_ParamIndex kInputParameterIndex = 0;
 
@@ -87,6 +90,26 @@ void report_failure(PF_OutData* out_data, const core::CoreError& error) noexcept
     // should land in AE's error list instead of interrupting every render.
 }
 
+PF_Err host_error_for_status(SfCoreStatus status, PF_Err abort_error) noexcept {
+    switch (status) {
+        case SF_CORE_OK: return PF_Err_NONE;
+        case SF_CORE_ALLOCATION_FAILED: return PF_Err_OUT_OF_MEMORY;
+        case SF_CORE_CANCELLED: return abort_error != PF_Err_NONE ? abort_error : PF_Interrupt_CANCEL;
+        case SF_CORE_INVALID_REQUEST:
+        case SF_CORE_INVALID_TIME:
+        case SF_CORE_UNSUPPORTED_FORMAT: return PF_Err_BAD_CALLBACK_PARAM;
+        case SF_CORE_WORK_LIMIT:
+        case SF_CORE_INTERNAL_FAILURE: return PF_Err_INTERNAL_STRUCT_DAMAGED;
+    }
+    return PF_Err_INTERNAL_STRUCT_DAMAGED;
+}
+
+void report_core_failure(PF_OutData* out_data, const char* detail) noexcept {
+    if (out_data != nullptr)
+        std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                      "Starfield Particle core: %s", detail != nullptr ? detail : "unknown error");
+}
+
 // Host abort callback exposed as the core cancellation contract.
 class HostCancellation final : public core::Cancellation {
 public:
@@ -110,7 +133,8 @@ private:
 // Pre-render facts handed to the render phase. AE takes ownership after pre-render
 // returns and frees the block through the callback below.
 struct PreRenderState {
-    std::shared_ptr<const core::Graph> graph;
+    core::OpaqueBytes graph_bytes;
+    std::shared_ptr<const CoreGeneration> generation;
     PF_LRect result_rect{};
     PF_LRect max_result_rect{};
     A_long ref_width{0};
@@ -161,7 +185,7 @@ std::int32_t scaled_origin(A_long rect_origin, double pixel_per_rect) noexcept {
 }
 
 PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth, const PreRenderState& state,
-                    PF_EffectWorld* input_world, PF_EffectWorld* output_world) noexcept {
+                    PF_EffectWorld* output_world) noexcept {
     WorldLayout output_layout{};
     if (!describe_world(*output_world, output_layout)) {
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
@@ -211,33 +235,50 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
     frame.pixel_aspect_ratio = rational_scale_value(state.par, host_pixel_aspect_ratio(*in_data));
     frame.quality = in_data->quality == PF_Quality_HI ? core::Quality::full : core::Quality::draft;
 
-    core::RenderRequest request;
-    request.graph = state.graph;
-    request.frame = frame;
-    request.graph_revision = 0;
-
     try {
         HostCancellation cancellation(in_data);
-        if (input_world != nullptr) {
-            auto source = read_world(*input_world, depth, cancellation);
-            if (!source.has_value()) {
-                report_failure(out_data, source.error());
-                return host_error_for(source.error(), PF_Err_NONE);
-            }
-            core::PixelBuffer buffer = source.take_value();
-            buffer.origin_x = scaled_origin(buffer.origin_x, geometry.pixel_per_rect_x);
-            buffer.origin_y = scaled_origin(buffer.origin_y, geometry.pixel_per_rect_y);
-            request.source = std::make_shared<const core::PixelBuffer>(std::move(buffer));
+        SfCoreRenderRequest request{};
+        request.struct_size = sizeof(request);
+        request.frame = SfCoreFrame{
+            frame.layer_width, frame.layer_height, frame.frame_width, frame.frame_height,
+            {frame.region_of_interest.left, frame.region_of_interest.top,
+             frame.region_of_interest.right, frame.region_of_interest.bottom},
+            frame.time.value, frame.time.scale, frame.frame_duration.value, frame.frame_duration.scale,
+            static_cast<std::uint32_t>(frame.format), static_cast<std::uint32_t>(frame.color_space),
+            static_cast<std::uint32_t>(frame.alpha_mode), static_cast<std::uint32_t>(frame.quality),
+            frame.pixel_aspect_ratio};
+        request.graph_bytes = state.graph_bytes.data();
+        request.graph_byte_count = state.graph_bytes.size();
+        request.is_cancelled = [](void* context) -> std::int32_t {
+            return static_cast<HostCancellation*>(context)->is_cancelled() ? 1 : 0;
+        };
+        request.cancel_context = &cancellation;
+        SfCoreRenderResult rendered{};
+        rendered.struct_size = sizeof(rendered);
+        const auto& api = state.generation->api();
+        const SfCoreStatus status = api.render(&request, &rendered);
+        struct ResultRelease {
+            const SfCoreApi& api;
+            SfCoreRenderResult& result;
+            ~ResultRelease() { api.release_render_result(&result); }
+        } release{api, rendered};
+        if (status != SF_CORE_OK || rendered.status != SF_CORE_OK) {
+            report_core_failure(out_data, rendered.detail);
+            return host_error_for_status(status != SF_CORE_OK ? status : rendered.status,
+                                         cancellation.abort_error());
         }
-
-        const core::CpuParticleRenderer renderer;
-        const auto rendered = renderer.render(request, cancellation);
-        if (!rendered.has_value()) {
-            report_failure(out_data, rendered.error());
-            return host_error_for(rendered.error(), cancellation.abort_error());
+        if (rendered.pixel_byte_count > std::numeric_limits<std::size_t>::max() ||
+            (rendered.pixel_byte_count > 0 && rendered.pixels == nullptr) ||
+            rendered.pixel_format != static_cast<std::uint32_t>(frame.format)) {
+            report_core_failure(out_data, "core returned an invalid pixel buffer");
+            return PF_Err_INTERNAL_STRUCT_DAMAGED;
         }
-
-        if (!write_output(rendered.value(), output_layout, *output_world, depth, cancellation)) {
+        const OutputView pixels{
+            {rendered.region.left, rendered.region.top, rendered.region.right, rendered.region.bottom},
+            rendered.row_bytes, static_cast<core::PixelFormat>(rendered.pixel_format),
+            std::span<const std::byte>(static_cast<const std::byte*>(rendered.pixels),
+                                       static_cast<std::size_t>(rendered.pixel_byte_count))};
+        if (!write_output(pixels, output_layout, *output_world, depth, cancellation)) {
             if (cancellation.is_cancelled()) {
                 return host_error_for(core::make_error(core::ErrorCode::cancelled,
                                                        "render cancelled while copying output pixels"),
@@ -256,7 +297,7 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
 
 } // namespace
 
-PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept {
+PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept try {
     if (in_data == nullptr || extra == nullptr || extra->input == nullptr || extra->output == nullptr ||
         extra->cb == nullptr || extra->cb->checkout_layer == nullptr) {
         return PF_Err_BAD_CALLBACK_PARAM;
@@ -264,16 +305,19 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
 
     const PF_RenderRequest request = extra->input->output_request;
 
-    // The input checkout comes first because its ref_width/ref_height are the
+    // The metadata checkout comes first because its ref_width/ref_height are the
     // full-resolution reference the parameter conversion needs. AE 2023.5 Build 52
     // scales point values with preview resolution; Parameters.cpp restores that scale
     // before dividing by this reference.
-    // A successful checkout may have empty pixels, but host errors (including
-    // cancellation) must not be converted into a successful transparent render.
+    // This emitter does not depend on source pixels. Request an empty input rectangle
+    // to preserve the layer metadata while avoiding a render of the solid/background.
     PF_CheckoutResult input_result{};
     AEFX_CLR_STRUCT(input_result);
-    const auto input_err = extra->cb->checkout_layer(in_data->effect_ref, kInputParameterIndex, kInputCheckoutId, &request,
-                                    in_data->current_time, in_data->time_step, in_data->time_scale, &input_result);
+    PF_RenderRequest input_request = request;
+    input_request.rect = PF_LRect{0, 0, 0, 0};
+    const auto input_err = extra->cb->checkout_layer(in_data->effect_ref, kInputParameterIndex, kInputCheckoutId,
+                                                     &input_request, in_data->current_time, in_data->time_step,
+                                                     in_data->time_scale, &input_result);
     if (input_err != PF_Err_NONE) return input_err;
 
     std::shared_ptr<const core::Graph> graph;
@@ -284,6 +328,17 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         // only the smart-render phase checks them in, and AE tears the frame down when
         // pre-render reports an error. (PF_PreRenderCallbacks has no checkin callback.)
         return graph_err;
+    }
+    auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
+    if (!encoded.has_value()) {
+        report_core_failure(out_data, encoded.error().detail);
+        return encoded.error().code == core::SequenceErrorCode::allocation_failed
+            ? PF_Err_OUT_OF_MEMORY : PF_Err_BAD_CALLBACK_PARAM;
+    }
+    const auto loaded = acquire_core();
+    if (!loaded) {
+        report_core_failure(out_data, loaded.error.c_str());
+        return PF_Err_INTERNAL_STRUCT_DAMAGED;
     }
 
     // Layer extent in host rect units. AE documents this as independent of the
@@ -299,11 +354,12 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     // be produced; it never exceeds the request (RETURNS_EXTRA_PIXELS stays unset).
     const PF_LRect result = intersect_lrect(request.rect, layer_rect);
 
-    auto* state = new (std::nothrow) PreRenderState{};
-    if (state == nullptr) {
+    auto state = std::unique_ptr<PreRenderState>(new (std::nothrow) PreRenderState{});
+    if (!state) {
         return PF_Err_OUT_OF_MEMORY;
     }
-    state->graph = std::move(graph);
+    state->graph_bytes = encoded.take_value();
+    state->generation = loaded.generation;
     state->result_rect = result;
     state->max_result_rect = layer_rect;
     state->ref_width = input_result.ref_width > 0 ? input_result.ref_width : (in_data->width > 0 ? in_data->width : 1);
@@ -317,13 +373,29 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         state->par = PF_RationalScale{1, 1};
     }
 
+    // External code generation affects pixels but is not an AE parameter stream.
+    // Mix the selected immutable generation into the SmartFX cache key.
+    if (extra->cb->GuidMixInPtr == nullptr) {
+        report_core_failure(out_data, "AE did not provide the SmartFX cache-key callback");
+        return PF_Err_BAD_CALLBACK_PARAM;
+    }
+    const std::uint64_t generation_identity = state->generation->cache_identity();
+    const PF_Err cache_err = extra->cb->GuidMixInPtr(in_data->effect_ref,
+                                                     static_cast<A_u_long>(sizeof(generation_identity)),
+                                                     &generation_identity);
+    if (cache_err != PF_Err_NONE) return cache_err;
+
     extra->output->result_rect = result;
     extra->output->max_result_rect = layer_rect;
     extra->output->solid = PF_Boolean{0}; // the composite always carries alpha
     extra->output->flags = 0;
-    extra->output->pre_render_data = state;
+    extra->output->pre_render_data = state.release();
     extra->output->delete_pre_render_data_func = delete_pre_render_state;
     return PF_Err_NONE;
+} catch (const std::bad_alloc&) {
+    return PF_Err_OUT_OF_MEMORY;
+} catch (...) {
+    return PF_Err_INTERNAL_STRUCT_DAMAGED;
 }
 
 PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtra* extra) noexcept {
@@ -334,7 +406,7 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
     }
 
     const auto* state = static_cast<const PreRenderState*>(extra->input->pre_render_data);
-    if (state == nullptr || !state->graph) {
+    if (state == nullptr || !state->generation || state->graph_bytes.empty()) {
         // Render without a matching pre-render cannot know the layer geometry; fail
         // loudly instead of guessing coordinates.
         report_failure(out_data, core::make_error(core::ErrorCode::internal_failure, "pre-render state missing"));
@@ -346,9 +418,12 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         return PF_Err_UNRECOGNIZED_PARAM_TYPE;
     }
 
-    // Check in a successful input checkout on output-checkout/render failures too.
-    PF_EffectWorld* input_world = nullptr;
-    const auto input_err = extra->cb->checkout_layer_pixels(in_data->effect_ref, kInputCheckoutId, &input_world);
+    // SmartFX requires one pixel checkout for each pre-render layer checkout, and AE
+    // requires an input pixel checkout before output checkout. The pre-render request
+    // is empty, and this pixel world is deliberately ignored by render_frame().
+    PF_EffectWorld* unused_input_world = nullptr;
+    const auto input_err = extra->cb->checkout_layer_pixels(in_data->effect_ref, kInputCheckoutId,
+                                                            &unused_input_world);
     if (input_err != PF_Err_NONE) return input_err;
     struct InputCheckin {
         PF_InData* in;
@@ -368,7 +443,7 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         return PF_Err_BAD_CALLBACK_PARAM;
     }
 
-    const PF_Err err = render_frame(in_data, out_data, depth, *state, input_world, output_world);
+    const PF_Err err = render_frame(in_data, out_data, depth, *state, output_world);
 
     return err;
 }

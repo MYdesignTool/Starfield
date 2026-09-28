@@ -10,6 +10,7 @@
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
+#include "starfield/core/PluginApi.h"
 #include "starfield/core/Random.hpp"
 #include "starfield/core/Render.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -60,7 +61,6 @@ struct Scene {
     PixelFormat format{PixelFormat::rgba8};
     double pixel_aspect{1.0};
     double time_seconds{1.0};
-    std::shared_ptr<const PixelBuffer> source;
 };
 
 RenderRequest build_request(const Scene& scene) {
@@ -80,7 +80,6 @@ RenderRequest build_request(const Scene& scene) {
     frame.alpha_mode = AlphaMode::premultiplied;
     frame.pixel_aspect_ratio = scene.pixel_aspect;
     frame.quality = Quality::full;
-    request.source = scene.source;
     return request;
 }
 
@@ -113,30 +112,6 @@ float channel32(const RenderOutput& output, std::uint32_t x, std::uint32_t y, st
     float value = 0.0f;
     std::memcpy(&value, pixel, sizeof(value));
     return value;
-}
-
-PixelBuffer make_source(std::uint32_t width, std::uint32_t height, std::int32_t origin_x,
-                        std::int32_t origin_y, Rgba8 color, AlphaMode alpha_mode) {
-    PixelBuffer buffer;
-    buffer.width = width;
-    buffer.height = height;
-    buffer.row_bytes = width * 4;
-    buffer.format = PixelFormat::rgba8;
-    buffer.alpha_mode = alpha_mode;
-    buffer.origin_x = origin_x;
-    buffer.origin_y = origin_y;
-    buffer.pixels.resize(static_cast<std::size_t>(buffer.row_bytes) * height);
-    for (std::uint32_t y = 0; y < height; ++y) {
-        for (std::uint32_t x = 0; x < width; ++x) {
-            std::byte* pixel = buffer.pixels.data() + static_cast<std::size_t>(y) * buffer.row_bytes +
-                               static_cast<std::size_t>(x) * 4;
-            pixel[0] = static_cast<std::byte>(color.r);
-            pixel[1] = static_cast<std::byte>(color.g);
-            pixel[2] = static_cast<std::byte>(color.b);
-            pixel[3] = static_cast<std::byte>(color.a);
-        }
-    }
-    return buffer;
 }
 
 class CancellingAfterFirstPoll final : public Cancellation {
@@ -1022,7 +997,7 @@ void test_renderer_downsampled_frame_mapping() {
     }
 }
 
-void test_renderer_source_compositing() {
+void test_renderer_transparent_particle_output() {
     const CpuParticleRenderer renderer;
     const CancellingAfterFirstPoll never(false);
 
@@ -1030,49 +1005,26 @@ void test_renderer_source_compositing() {
     scene.settings.particle_count = 1;
     scene.settings.birth_rate = 1.0;
     scene.settings.particle_lifetime_seconds = 4.0;
-    scene.settings.particle_size = 0.0;                  // invisible: isolates the source path
-    scene.settings.velocity = Vec3{0.0, 0.0, 0.0};       // motion is not under test here
+    scene.settings.particle_size = 0.0;
+    scene.settings.velocity = Vec3{0.0, 0.0, 0.0};
     scene.time_seconds = 1.0;
 
-    auto source = make_source(64, 64, 0, 0, Rgba8{255, 0, 0, 255}, AlphaMode::premultiplied);
-    scene.source = std::make_shared<const PixelBuffer>(source);
+    const auto empty = renderer.render(build_request(scene), never);
+    CHECK(empty.has_value());
+    if (!empty.has_value()) return;
+    const Rgba8 clear_pixel = pixel8(empty.value(), 5, 5);
+    CHECK(clear_pixel.r == 0 && clear_pixel.g == 0 && clear_pixel.b == 0 && clear_pixel.a == 0);
 
-    const auto passthrough = renderer.render(build_request(scene), never);
-    CHECK(passthrough.has_value());
-    const Rgba8 corner = pixel8(passthrough.value(), 5, 5);
-    CHECK(corner.r == 255 && corner.g == 0 && corner.b == 0 && corner.a == 255);
-
-    // A straight-alpha source is premultiplied on input.
-    Scene straight_scene = scene;
-    straight_scene.source = std::make_shared<const PixelBuffer>(
-        make_source(64, 64, 0, 0, Rgba8{255, 0, 0, 128}, AlphaMode::straight));
-    const auto straight = renderer.render(build_request(straight_scene), never);
-    CHECK(straight.has_value());
-    const Rgba8 straight_pixel = pixel8(straight.value(), 5, 5);
-    CHECK(straight_pixel.a == 128);
-    CHECK(straight_pixel.r <= 129); // premultiplied red: 255 * 128 / 255
-
-    // Source placement is explicit: a source that starts at x = 32 only covers the
-    // right half of the frame.
-    Scene placed = scene;
-    placed.source = std::make_shared<const PixelBuffer>(
-        make_source(32, 64, 32, 0, Rgba8{255, 0, 0, 255}, AlphaMode::premultiplied));
-    const auto placed_output = renderer.render(build_request(placed), never);
-    CHECK(placed_output.has_value());
-    CHECK(pixel8(placed_output.value(), 10, 10).a == 0);
-    CHECK(pixel8(placed_output.value(), 40, 10).a == 255);
-
-    // A visible sprite composites over the opaque source and adds white.
-    Scene sprite = scene;
-    sprite.settings.particle_size = 10.0;
-    sprite.settings.opacity = 0.5;
-    sprite.source = std::make_shared<const PixelBuffer>(source);
-    const auto composited = renderer.render(build_request(sprite), never);
-    CHECK(composited.has_value());
-    const Rgba8 center = pixel8(composited.value(), 32, 32);
-    CHECK(center.r == 255);
-    CHECK(center.g > 100 && center.g < 200);
-    CHECK(center.a == 255);
+    scene.settings.particle_size = 10.0;
+    scene.settings.opacity = 0.5;
+    const auto particles = renderer.render(build_request(scene), never);
+    CHECK(particles.has_value());
+    if (!particles.has_value()) return;
+    const Rgba8 center = pixel8(particles.value(), 32, 32);
+    CHECK(center.a >= 126 && center.a <= 129);
+    CHECK(center.r <= center.a && center.g <= center.a && center.b <= center.a);
+    const Rgba8 background = pixel8(particles.value(), 5, 5);
+    CHECK(background.r == 0 && background.g == 0 && background.b == 0 && background.a == 0);
 }
 
 void test_renderer_formats_and_limits() {
@@ -1138,18 +1090,7 @@ void test_renderer_formats_and_limits() {
     CHECK(!cancelled_output.has_value());
     CHECK(cancelled_output.error().code == ErrorCode::cancelled);
 
-    // Source compositing and final pixel encoding must also observe cancellation,
-    // including the zero-particle path where simulation has no loop to poll.
-    Scene source_copy = scene;
-    source_copy.settings.particle_count = 0;
-    source_copy.settings.birth_rate = 0.0;
-    source_copy.source = std::make_shared<const PixelBuffer>(
-        make_source(64, 64, 0, 0, Rgba8{10, 20, 30, 255}, AlphaMode::premultiplied));
-    const CancellingAtPoll cancel_during_source(3); // initial check, first row, then next row
-    const auto cancelled_source = renderer.render(build_request(source_copy), cancel_during_source);
-    CHECK(!cancelled_source.has_value());
-    CHECK(cancelled_source.error().code == ErrorCode::cancelled);
-
+    // Final pixel encoding observes cancellation even when no particles are alive.
     Scene encode_only = scene;
     encode_only.settings.particle_count = 0;
     encode_only.settings.birth_rate = 0.0;
@@ -1585,9 +1526,68 @@ void test_emission_direction() {
     }
 }
 
+void test_core_plugin_api() {
+    SfCoreApi api{};
+    CHECK(StarfieldCore_GetApi(SF_CORE_ABI_VERSION + 1, sizeof(api), &api) == 0);
+    CHECK(StarfieldCore_GetApi(SF_CORE_ABI_VERSION, sizeof(api), &api) == 1);
+    CHECK(api.abi_version == SF_CORE_ABI_VERSION && api.render && api.release_render_result && api.inspect);
+
+    const Settings settings{};
+    auto made = make_emitter_output_graph(settings, NodeId{test_uuid(41)}, NodeId{test_uuid(42)},
+                                          EdgeId{test_uuid(43)});
+    CHECK(made.has_value());
+    if (!made.has_value()) return;
+    const auto encoded = serialize_graph(made.value(), particle_node_registry());
+    CHECK(encoded.has_value());
+    if (!encoded.has_value()) return;
+
+    SfCoreRenderRequest request{};
+    request.struct_size = sizeof(request);
+    request.frame = SfCoreFrame{64, 64, 64, 64, {0, 0, 64, 64},
+                                1, 1, 1, 24, 0, 0, 1, 1, 1.0};
+    request.graph_bytes = encoded.value().data();
+    request.graph_byte_count = encoded.value().size();
+    SfCoreRenderResult result{};
+    result.struct_size = sizeof(result);
+    CHECK(api.render(&request, &result) == SF_CORE_OK);
+    CHECK(result.status == SF_CORE_OK && result.opaque_handle != nullptr);
+    CHECK(result.pixels != nullptr && result.pixel_byte_count > 0);
+
+    RenderRequest direct_request;
+    direct_request.frame = FrameSpec{64, 64, 64, 64, {0, 0, 64, 64},
+                                     {1, 1}, {1, 24}, PixelFormat::rgba8,
+                                     ColorSpace::ae_working_space, AlphaMode::premultiplied, 1.0, Quality::full};
+    direct_request.graph = std::make_shared<const Graph>(made.value());
+    const NeverCancelled never;
+    const auto direct = CpuParticleRenderer{}.render(direct_request, never);
+    CHECK(direct.has_value());
+    if (direct.has_value() && result.pixels) {
+        CHECK(result.pixel_byte_count == direct.value().pixels.size());
+        CHECK(std::memcmp(result.pixels, direct.value().pixels.data(),
+                          direct.value().pixels.size()) == 0);
+    }
+
+    SfCoreInspectRequest inspect_request{sizeof(SfCoreInspectRequest), encoded.value().data(),
+                                         encoded.value().size(), 1, 1};
+    SfCoreInspectResult inspection{};
+    inspection.struct_size = sizeof(inspection);
+    CHECK(api.inspect(&inspect_request, &inspection) == SF_CORE_OK);
+    CHECK(inspection.node_count == 2 && inspection.edge_count == 1 &&
+          inspection.live_particle_count > 0);
+
+    api.release_render_result(&result);
+    CHECK(result.opaque_handle == nullptr && result.pixels == nullptr);
+    request.graph_byte_count = 0;
+    result.struct_size = sizeof(result);
+    CHECK(api.render(&request, &result) == SF_CORE_INVALID_REQUEST);
+    CHECK(result.detail[0] != '\0' && result.opaque_handle == nullptr);
+    api.release_render_result(&result);
+}
+
 } // namespace
 
 int main() {
+    test_core_plugin_api();
     test_emission_direction();
     test_force_and_appearance();
     test_graph_evaluation();
@@ -1603,7 +1603,7 @@ int main() {
     test_renderer_determinism_and_geometry();
     test_renderer_region_of_interest();
     test_renderer_downsampled_frame_mapping();
-    test_renderer_source_compositing();
+    test_renderer_transparent_particle_output();
     test_renderer_formats_and_limits();
 
     std::printf("%d checks, %d failures\n", g_checks, g_failures);

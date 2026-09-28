@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Starfield node editor panel. Targets After Effects 2023 on Windows x64, the only
+<!-- Starfield Particle Controls panel. Targets After Effects 2023 on Windows x64, the only
      current host target. The panel speaks the versioned JSON protocol of ADR 0009
      through a namespaced ExtendScript gateway; it never touches the effect's
      arbitrary-data graph parameter directly. -->
 <ExtensionManifest Version="11.0"
                    ExtensionBundleId="org.starfieldfx.panel"
                    ExtensionBundleVersion="0.1.0.0"
-                   ExtensionBundleName="Starfield Node Editor"
+                   ExtensionBundleName="Starfield Particle Controls"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="org.starfieldfx.panel.main" Version="0.1.0" />
@@ -40,7 +40,7 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>Starfield Node Editor</Menu>
+          <Menu>Starfield Particle Controls</Menu>
           <Geometry>
             <Size>
               <Height>660</Height>

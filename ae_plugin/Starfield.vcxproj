@@ -31,24 +31,26 @@
            which /sdl (SDLCheck) escalates to an error. Owned code does not use it. -->
       <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\Win;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary><ExceptionHandling>Sync</ExceptionHandling>
+      <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><ExceptionHandling>Sync</ExceptionHandling>
+      <!-- AE 2023 ships an older app-local MSVCP140.dll. Keep modern STL/CRT
+           implementation private to this AEX; the Core boundary is a C ABI. -->
+      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
     <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><ImportLibrary>$(IntDir)StarfieldParticle.lib</ImportLibrary><TargetMachine>MachineX64</TargetMachine></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Diagnostics.cpp" />
+    <ClCompile Include="CoreLoader.cpp" />
     <ClCompile Include="EffectMain.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />
     <ClCompile Include="WorldBridge.cpp" />
-    <ClCompile Include="..\src\core\CpuRenderer.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
-    <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
-    <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
-    <ClCompile Include="..\src\core\Random.cpp" />
+    <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\Render.cpp" />
     <ClCompile Include="..\src\core\SequenceCodec.cpp" />
     <ClCompile Include="..\src\core\Settings.cpp" />

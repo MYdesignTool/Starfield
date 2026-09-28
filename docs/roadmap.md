@@ -4,23 +4,34 @@ Planning baseline: 2026-09-27.
 
 Current owner scope supersedes the earlier multi-host plan: build and qualify AE
 2023 only. The current Alpha must deliver emitter -> force -> appearance -> output,
-a minimal dockable editor, four emitter shapes, gravity/drag, color and life curves,
+a minimal dockable effect-control panel, four emitter shapes, gravity/drag, color and life curves,
 project persistence/copy/undo behavior, and spark/snow/floating-light examples.
 Full observed Stardust functionality and architecture/performance improvements
 remain the long-term goal; this Alpha does not complete that goal.
 
 ## Current implementation and qualification status
 
+- **H-01 reloadable core (repository gate passed; AE smoke gate passed):** the May 2023
+  build now produces an AE adapter plus independently buildable Core DLL. A
+  content-addressed development manifest selects the DLL; Options explicitly
+  reloads it. The adapter pins the generation across SmartFX pre-render/render
+  and mixes its content identity into the cache GUID. Core-only builds leave the
+  `.aex` unchanged. AE 2023.5.0 Build 52 confirmed Full/Quarter hot reload
+  without a restart, missing-DLL fallback, visual 8/16/32-bpc rendering,
+  transparency, and save/close/reopen. The first `/MD` candidate crashed under
+  AE's old app-local C++ runtime; both modules now use `/MT`. An in-flight AE
+  render switch and exact monolithic pixel comparison remain open.
+
 - **M0 contract work is in place:** parameter manifest, sequence-format specification, build matrix, and ADRs for product identity, time, and pixels/alpha are checked in. The M1 shell uses the selected internal identity `org.starfieldfx.particle`.
 - **M1 implementation is in place:** native entry-point source, official PiPL pipeline, lifecycle dispatch, and legacy pass-through render are present.
 - **M1 SDK builds succeeded historically:** May 2023 and SDK 26.5 Windows x64 builds exported `EffectMain` and `PluginDataEntryFunction2`; the May 2023 SDK is the current build target, and newer-host qualification is deferred.
-- **M1 load smoke check passed:** the user confirmed the shell loads in AE 2023 after correcting PiPL stage encoding. The precise AE build is not recorded. Render pass-through, save/reopen, duplicate, undo/redo, and current-AE load remain unqualified.
+- **M1 load smoke check passed:** the user confirmed the shell loads in AE 2023 after correcting PiPL stage encoding. The precise AE build is not recorded. That pass-through shell was superseded by the M2 SmartFX render path; add/remove, save/reopen, duplicate, undo/redo and repeated loads were later qualified on the M2 and build-2 candidates (evidence in `docs/compatibility-matrix.md`).
 - **M2 render-slice code is present and builds:** SmartFX transport, the parameter bridge, deterministic simulation, and the CPU sprite compositor are implemented; this deliberately minimal look is not feature parity. `docs/current-feature-audit.md` records the visible gaps. Current build verification uses the May 2023 SDK.
 - **M2/G-04 host qualification is partial:** AE 2023.5.0 Build 52 loaded the corrected candidate. Full and Quarter readouts show normalized emitter origin `[1920,1080,1080]` and world `(0,0,0)`; a direct Quarter render reported grid `960x540`, and Quarter RAM preview visibly advanced. The Options diagnostic is process-global, so isolation across multiple effects/comps remains unqualified. The owner can open the project by dragging it into AE, so the missing-file warning is treated as a path/open-flow mismatch. Effect/control retention and the remaining render/lifecycle checks are recorded in `docs/compatibility-matrix.md`.
-- **M3-01 core implementation is complete:** seeded Point/Box/Sphere/Disc birth distributions and per-particle velocity spread are implemented. A Point emitter visibly advances during Quarter RAM preview in AE 2023.5.0 Build 52; Box/Sphere/Disc appearance and reverse-time image determinism remain unconfirmed in the host.
-- **M3-02 core implementation is complete (current version goal 1 and 3):** the emitter -> force -> appearance -> output chain evaluates with stage-order enforcement, closed-form gravity/drag integration and linear age curves for size, opacity and color. Gravity X/Y/Z (17-19), Linear Drag (20), Color Start/End (21/22), Size End (23) and Opacity End (24) are registered supervised controls whose defaults reproduce the previous look. AE confirmation pending.
-- **G-01–G-04 implementation:** model, validator, codec, four-stage runtime, arbitrary-data callbacks, legacy-control selection/capture, supervised edit surface and render snapshot bridge are implemented. On 2026-09-28, the core suite passed 6,188 checks and the adapter suite passed 382 checks. Graph values are constant; capture samples controls at one time. AE Controls save/reopen, effect copy and undo/redo passed; Node Graph persistence and build-1 migration remain host gates (ADR 0008).
-- **P-02 parameter bridge (partial):** `cep_panel/` implements ADR 0009 protocol v1 over supervised parameter streams. The owner screenshot shows a grouped effect-control form, not a visual node editor: there are no node cards, ports, or drawn edges. A repository-local fake-host test covers animated vector/color rejection and multi-value rollback. The actual fixed-topology canvas is P-02A; dynamic topology editing is P-02B.
+- **M3-01 core implementation is complete:** seeded Point/Box/Sphere/Disc birth distributions and per-particle velocity spread are implemented. AE 2023.5.0 Build 52 visually confirmed distinct Box/Sphere/Disc distributions and Quarter Point playback; exact distribution matching and reverse-time image determinism remain open.
+- **M3-02 core implementation is complete (current version goal 1 and 3):** the emitter -> force -> appearance -> output chain evaluates with stage-order enforcement, closed-form gravity/drag integration and linear age curves for size, opacity and color. The split build visibly responds to `Gravity Y = -2` and `Size Over Life = 1`; drag, opacity and color curves still need host visual checks.
+- **G-01–G-04 implementation:** model, validator, codec, four-stage runtime, arbitrary-data callbacks, legacy-control selection/capture, supervised edit surface and render snapshot bridge are implemented. The current core suite passes 6,196 checks and the adapter suite passes 395 checks. Graph values are constant; capture samples controls at one time. AE Controls save/reopen, effect copy and undo/redo passed; Node Graph persistence and build-1 migration remain host gates (ADR 0008).
+- **P-02 parameter bridge (partial):** `cep_panel/` implements ADR 0009 protocol v1 over supervised parameter streams. It is a grouped effect-control form, not a node canvas. AE 2023 confirmed automatic target discovery, a `Size` edit updating the frame, and host undo restoring the picture. A focus-triggered re-read was added after undo left stale panel values; the owner reports the panel updates again. Redo, stale-state rejection and Node Graph synchronization remain open.
 - **Delivery examples (current version goal 5):** Spark, Snow and Floating Light are documented in `docs/examples.md` and shipped as panel presets; none has been rendered in the host yet.
 - **Known renderer gaps:** output is still flat 2D discs; Z does not affect projection, depth, or occlusion. Texture/layer sources, motion blur, mesh/volume rendering, and dynamic graph editing (create/delete/rewire) remain open. ROI narrowing is deferred to profiling.
 - **Render geometry and point values are separate:** the render grid comes from observed checked-out worlds plus `max_result_rect`, `ref_width/ref_height`, and `par` (ADR 0005). The owner’s corrected-candidate AE 2023.5.0 Build 52 screenshots plus a direct Quarter session confirm point controls shrink with Quarter preview (`1920,1080,1080` → `480,270,270`), while normalized pixels remain `[1920,1080,1080]`, world offset stays zero, and the single-effect Quarter grid reports `960x540`. Options reads a process-global record of whichever instance rendered last; diagnostics across multiple effects/comps remain unqualified.
@@ -65,7 +76,7 @@ The owner's product statement: **node-based editing is the essence of the refere
 2. Parameter contract: manifest revision 6 currently assigns registration indices 1–32, including AE topic markers; the 24 active non-input parameters are still pre-release and will freeze at the first shared release. Graph `NodeId`, `EdgeId`, and `ParamKey` remain separate identity domains.
 3. Sequence storage: schema 1 defines a bounded binary representation with magic, lengths, counts, CRC, and migration rules in `schema/sequence-format.md`.
 4. Time model: comp time and frame duration remain signed integer rationals; negative time, subframes, shutter samples, seed derivation, and particle ordering must stay deterministic.
-5. Render semantics: canonical coordinates, pixel aspect/downsample, ROI, 8/16/32-bpc conversion, color space, and premultiplied-alpha handling are recorded in ADR 0003. Behavior for source-independent output remains to be confirmed against the reference.
+5. Render semantics: canonical coordinates, pixel aspect/downsample, ROI, 8/16/32-bpc conversion, color space, and premultiplied-alpha handling are recorded in ADR 0003. The owner directs the effect to output particles over transparent black without copying its input layer (ADR 0005); AE 2023.5.0 Build 52 confirmed the rebuilt adapter's transparent output.
 6. Failure model: map core errors to stable AE errors/messages. Every checkout, handle, suite acquisition, lock, and staging buffer has one clearly owned cleanup path.
 
 ## Milestones
@@ -106,8 +117,8 @@ M1 used legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 has
 
 ## Immediate next work
 
-1. **Finish AE 2023 host qualification.** Full/Quarter point placement and Quarter Point playback, save/reopen in AE Controls mode, effect copy, and undo/redo are recorded as passes. Still test fresh add/build-1 project load, Half/Third resolution, Box/Sphere/Disc, gravity/drag/color/curve edits, control capture, Node Graph persistence, 16/32-bpc, render queue, cancellation, and reverse-time frame identity.
-2. **Qualify the CEP panel** using the checklist in `cep_panel/README.md` (name lookup, undo group, stale-state rejection, Node Graph rewrite).
+1. **Continue AE 2023 host qualification.** Full/Half/Third/Quarter centre normalization, Quarter Point playback, save/reopen, effect copy, undo/redo, all bit depths, transparency, lower-layer compositing, shape distinctions, gravity and size changes have host evidence. Still test fresh add/build-1 project load, off-centre positioning, drag/color/opacity curves, control capture, graph-byte persistence, render queue, cancellation, reverse-time frame identity, and an in-flight Core switch.
+2. **Continue CEP panel qualification** using the checklist in `cep_panel/README.md`. Automatic target discovery, a panel `Size` write and host undo updating the picture passed. Verify redo, focus refresh after other host edits, stale-state rejection and Node Graph synchronization.
 3. **Record the three delivery examples** from `docs/examples.md`.
 4. **Grow the graph past the fixed chain:** protocol v2 for create/delete/rewire, then the next node kernels (textures/layer sources, depth, spawn) each tied to an observed reference case.
 5. **Deferred deliberately:** analytic ROI narrowing, Compute Cache, MFR, and GPU stay on their milestone cards.

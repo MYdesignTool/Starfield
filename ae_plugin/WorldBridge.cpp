@@ -165,26 +165,53 @@ core::Result<core::PixelBuffer> read_world(const PF_EffectWorld& world, HostBitD
     return BufferResult::success(std::move(buffer));
 }
 
-bool write_output(const core::RenderOutput& output, const WorldLayout& destination, PF_EffectWorld& world,
+bool write_output(OutputView output, const WorldLayout& destination, PF_EffectWorld& world,
                   HostBitDepth depth, const core::Cancellation& cancellation) noexcept {
-    if (output.region.empty() || output.pixels.empty()) {
-        return true; // nothing to copy; an empty render is legal
-    }
-
     const core::PixelFormat format = pixel_format_for(depth);
-    if (output.format != format) {
+    if (output.format != format || world.data == nullptr || world.width <= 0 || world.height <= 0 ||
+        world.rowbytes <= 0 ||
+        destination.width != static_cast<std::uint32_t>(world.width) ||
+        destination.height != static_cast<std::uint32_t>(world.height) ||
+        destination.row_bytes != static_cast<std::uint32_t>(world.rowbytes)) {
         return false;
     }
     const std::uint32_t pixel_bytes = core::bytes_per_pixel(format);
-    const auto rows = core::checked_row_bytes(output.width(), format);
-    if (!rows.has_value() || output.row_bytes < *rows) {
+    const auto destination_bytes = core::checked_row_bytes(destination.width, format);
+    if (!destination_bytes.has_value() || destination.row_bytes < *destination_bytes) {
         return false;
     }
 
+    std::uint32_t output_min_row_bytes = 0;
+    if (output.region.empty()) {
+        if (!output.pixels.empty()) return false;
+    } else {
+        if (output.pixels.empty()) return false;
+        const auto rows = core::checked_row_bytes(output.width(), format);
+        if (!rows.has_value() || output.row_bytes < *rows) {
+            return false;
+        }
+        const auto storage_bytes = core::checked_buffer_bytes(output.row_bytes, output.height());
+        if (!storage_bytes.has_value() || output.pixels.size() < *storage_bytes) {
+            return false;
+        }
+        output_min_row_bytes = static_cast<std::uint32_t>(*rows);
+        if (destination.width < output.width() || destination.row_bytes < output_min_row_bytes) {
+            return false;
+        }
+    }
+
+    // AE may hand the effect an output world already seeded with the input layer.
+    // A particle pass owns the whole result: clear it first so pixels outside the
+    // sparse sprite staging buffer are transparent instead of retaining a solid.
     auto* destination_pixels = reinterpret_cast<std::byte*>(world.data);
-    if (destination_pixels == nullptr || destination.width < output.width() ||
-        destination.row_bytes < static_cast<std::uint32_t>(*rows)) {
-        return false;
+    for (std::uint32_t y = 0; y < destination.height; ++y) {
+        if (cancellation.is_cancelled()) return false;
+        std::memset(destination_pixels + static_cast<std::size_t>(y) * destination.row_bytes, 0,
+                    static_cast<std::size_t>(*destination_bytes));
+    }
+
+    if (output.region.empty()) {
+        return true; // an empty render is transparent black
     }
 
     for (std::uint32_t y = 0; y < output.height(); ++y) {
@@ -239,6 +266,13 @@ bool write_output(const core::RenderOutput& output, const WorldLayout& destinati
         }
     }
     return true;
+}
+
+bool write_output(const core::RenderOutput& output, const WorldLayout& destination, PF_EffectWorld& world,
+                  HostBitDepth depth, const core::Cancellation& cancellation) noexcept {
+    return write_output(OutputView{output.region, output.row_bytes, output.format,
+                                   std::span<const std::byte>(output.pixels.data(), output.pixels.size())},
+                        destination, world, depth, cancellation);
 }
 
 } // namespace starfield::adapter

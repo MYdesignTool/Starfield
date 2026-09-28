@@ -15,13 +15,6 @@ namespace {
 constexpr float kMaxChannel16 = 32768.0f;
 constexpr std::uint64_t kCancellationParticleInterval = 64;
 
-struct Color4 {
-    float r{0.0f};
-    float g{0.0f};
-    float b{0.0f};
-    float a{0.0f};
-};
-
 // Core buffers are byte-order explicit (r, g, b, a) with native byte order for
 // multi-byte channels; see ADR 0003.
 std::uint16_t load_u16(const std::byte* source) noexcept {
@@ -54,62 +47,6 @@ std::uint16_t encode16(float value) noexcept {
     return static_cast<std::uint16_t>(bounded * kMaxChannel16 + 0.5f);
 }
 
-float decode8(std::uint8_t value) noexcept {
-    return static_cast<float>(value) / 255.0f;
-}
-
-float decode16(std::uint16_t value) noexcept {
-    return static_cast<float>(value) / kMaxChannel16;
-}
-
-bool source_is_consistent(const PixelBuffer& source) noexcept {
-    const std::uint32_t pixel_bytes = bytes_per_pixel(source.format);
-    if (pixel_bytes == 0 || source.width == 0 || source.height == 0) {
-        return false;
-    }
-    const std::uint64_t minimum_row = static_cast<std::uint64_t>(source.width) * pixel_bytes;
-    if (source.row_bytes < minimum_row) {
-        return false;
-    }
-    return source.pixels.size() >= static_cast<std::size_t>(source.row_bytes) * source.height;
-}
-
-// Reads one source pixel as premultiplied float RGBA, converting the declared
-// alpha mode and channel scale.
-Color4 read_source_pixel(const PixelBuffer& source, std::uint32_t x, std::uint32_t y) noexcept {
-    const std::byte* row = source.pixels.data() + static_cast<std::size_t>(y) * source.row_bytes;
-    const std::byte* pixel = row + static_cast<std::size_t>(x) * bytes_per_pixel(source.format);
-
-    Color4 color;
-    switch (source.format) {
-        case PixelFormat::rgba8:
-            color.r = decode8(static_cast<std::uint8_t>(pixel[0]));
-            color.g = decode8(static_cast<std::uint8_t>(pixel[1]));
-            color.b = decode8(static_cast<std::uint8_t>(pixel[2]));
-            color.a = decode8(static_cast<std::uint8_t>(pixel[3]));
-            break;
-        case PixelFormat::rgba16:
-            color.r = decode16(load_u16(pixel + 0));
-            color.g = decode16(load_u16(pixel + 2));
-            color.b = decode16(load_u16(pixel + 4));
-            color.a = decode16(load_u16(pixel + 6));
-            break;
-        case PixelFormat::rgba32f:
-            color.r = load_f32(pixel + 0);
-            color.g = load_f32(pixel + 4);
-            color.b = load_f32(pixel + 8);
-            color.a = load_f32(pixel + 12);
-            break;
-    }
-
-    if (source.alpha_mode == AlphaMode::straight) {
-        color.r *= color.a;
-        color.g *= color.a;
-        color.b *= color.a;
-    }
-    return color;
-}
-
 struct PixelGrid {
     double aspect{1.0};
     double frame_width{1.0};
@@ -127,42 +64,6 @@ PixelGrid make_grid(const FrameSpec& frame) noexcept {
     grid.scale_x = grid.frame_width / static_cast<double>(frame.layer_width);
     grid.scale_y = grid.frame_height / static_cast<double>(frame.layer_height);
     return grid;
-}
-
-bool compose_source_into_accumulation(const PixelBuffer* source, const RectI& roi, std::uint32_t roi_width,
-                                      std::uint32_t roi_height, std::vector<float>& accumulation,
-                                      const Cancellation& cancellation) noexcept {
-    if (source == nullptr) {
-        return true;
-    }
-
-    const std::int64_t source_left = source->origin_x;
-    const std::int64_t source_top = source->origin_y;
-    const std::int64_t source_right = source_left + source->width;
-    const std::int64_t source_bottom = source_top + source->height;
-
-    for (std::uint32_t y = 0; y < roi_height; ++y) {
-        if (cancellation.is_cancelled()) return false;
-        const std::int64_t frame_y = static_cast<std::int64_t>(roi.top) + y;
-        if (frame_y < source_top || frame_y >= source_bottom) {
-            continue;
-        }
-        float* row = accumulation.data() + static_cast<std::size_t>(y) * roi_width * 4;
-        for (std::uint32_t x = 0; x < roi_width; ++x) {
-            const std::int64_t frame_x = static_cast<std::int64_t>(roi.left) + x;
-            if (frame_x < source_left || frame_x >= source_right) {
-                continue;
-            }
-            const Color4 color = read_source_pixel(*source, static_cast<std::uint32_t>(frame_x - source_left),
-                                                   static_cast<std::uint32_t>(frame_y - source_top));
-            float* pixel = row + static_cast<std::size_t>(x) * 4;
-            pixel[0] = color.r;
-            pixel[1] = color.g;
-            pixel[2] = color.b;
-            pixel[3] = color.a;
-        }
-    }
-    return true;
 }
 
 bool encode_region(const std::vector<float>& accumulation, std::uint32_t roi_width, std::uint32_t roi_height,
@@ -225,10 +126,6 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         return OutputResult::success(std::move(output));
     }
 
-    const PixelBuffer* source = request.source.get();
-    if (source != nullptr && !source_is_consistent(*source)) {
-        return OutputResult::failure(ErrorCode::unsupported_format, "source buffer layout is not supported");
-    }
     if (cancellation.is_cancelled()) {
         return OutputResult::failure(ErrorCode::cancelled, "render cancelled before staging allocation");
     }
@@ -251,10 +148,6 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         accumulation.assign(static_cast<std::size_t>(accumulation_values), 0.0f);
     } catch (const std::bad_alloc&) {
         return OutputResult::failure(ErrorCode::allocation_failed, "accumulation buffer allocation failed");
-    }
-
-    if (!compose_source_into_accumulation(source, roi, roi_width, roi_height, accumulation, cancellation)) {
-        return OutputResult::failure(ErrorCode::cancelled, "render cancelled while compositing the source");
     }
 
     const auto particles = [&]() -> Result<std::vector<ParticleInstance>> {

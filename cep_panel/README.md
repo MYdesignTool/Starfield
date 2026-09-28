@@ -1,11 +1,16 @@
-# Starfield node editor panel (CEP)
+# Starfield CEP panel
 
-Dockable After Effects 2023 panel for the current Alpha chain
+Dockable After Effects 2023 effect-control panel for the current Alpha chain
 `emitter -> force -> appearance -> output`. It implements protocol v1 of
-[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel renders the fixed chain,
+[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel groups controls by stage,
 reads and writes the effect's **supervised ordinary parameters** through a namespaced
 ExtendScript gateway, and never touches `Node Graph Data` (the arbitrary-data
 parameter) or any host-private state.
+
+At startup, the panel requests the selected effect's state. If AE is still resolving the
+project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
+that grows to a 5-second cap. Retries continue until state is found, then stop. **Refresh**
+remains available for a deliberate re-query; it is not required for normal panel discovery.
 
 ## Files
 
@@ -63,9 +68,10 @@ If panels go missing after an update:
    owner decides to enable unsigned extensions, that host-wide setting must be changed manually;
    this project does not create or modify it.
 
-3. Put this folder where CEP scans for extensions. Both roots work. The authorized test target is
-   the system-wide root below; a read-only inspection on 2026-09-28 found no Starfield panel entry
-   there yet:
+3. Put this folder where CEP scans for extensions. Both roots work. On 2026-09-28, the owner
+   authorized a Junction from the actual `cep_panel` source into the system-wide root below. AE
+   lists and opens **Starfield Particle Controls** from that location. The Junction points to the
+   repository source, so edits appear after reopening the panel:
 
    | Root | Path | Needs admin |
    |---|---|---|
@@ -75,29 +81,18 @@ If panels go missing after an update:
    The folder name is the extension's identity in the menu; `cep_panel` and
    `org.starfieldfx.panel` (the bundle id) both work. Two copies under two names would appear twice.
 
-4. Restart After Effects. Open the panel from **Window > Extensions**, entry **Starfield Node
-   Editor**.
+4. Restart After Effects. Open the panel from **Window > Extensions**, entry
+   **Starfield Particle Controls**.
 
-### Updating an installed copy
+### Updating the development installation
 
-A copy does not follow the repository, and the panel is plain HTML/JS/JSX, so an update is a file copy
-and a panel reload — After Effects itself does not have to restart. The panel evaluates
-`jsx/starfield_gateway.jsx` by itself on the first host call, so the JSX does not need the app-start
-ScriptPath pass either.
-
-```
-robocopy "<repo>\cep_panel" "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" /MIR
-```
-
-Then close and reopen the panel window (`Window > Extensions > Starfield Node Editor`). If the JSX ever
-looks stale, the panel reload is enough; a full restart is only needed when the manifest itself changed.
-
-A junction avoids the copy step entirely when the repository can be the source of truth:
-
-```
-rmdir "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel"
-mklink /J "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" "<repo>\cep_panel"
-```
+The current authorized installation is a Junction to the repository's `cep_panel/`.
+Edits to HTML, JS, CSS or JSX are visible after closing and reopening **Starfield
+Particle Controls**; the panel loads `jsx/starfield_gateway.jsx` on its first host
+call. A manifest change requires an AE restart. A separate copied installation
+would need its files copied again before reopening the panel. Changing or
+replacing either installation path is an ADR 0011 host action with its own
+authorization.
 
 ## Troubleshooting
 
@@ -106,16 +101,15 @@ mklink /J "C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel" "
 | `bad_response: … unreadable data: EvalScript error.` | The gateway threw before it could answer. The first host run hit this because the entry points were private to the file's IIFE, so `SFLD_getState(...)` was a `ReferenceError`. | Fixed: the gateway publishes `SFLD_getState`/`SFLD_setParameters`/`SFLD_ready` on the ExtendScript global object and the panel loads it by path if the host has not. Update the installed copy (above) and reload the panel. |
 | `bad_response: … unreadable data: undefined` | The gateway is not loaded in this session. | Same as above; the panel's self-loading path covers it. If it persists, confirm `jsx/starfield_gateway.jsx` exists in the installed copy. |
 | `gateway_missing` | Neither the ScriptPath pass nor the self-loading path produced the gateway. | Check the installed copy for `jsx/starfield_gateway.jsx`, then reload the panel. |
-| `no_target` | No selected layer carries the effect. | Select exactly one layer carrying Starfield Particle and press **Refresh**. |
+| `no_target` | No selected layer carries the effect. | Select exactly one layer carrying Starfield Particle; the panel retries automatically. **Refresh** is an optional manual re-query. |
 | `missing_parameter` | The installed `.aex` build and the panel's binding table disagree (a parameter was renamed or removed). | Rebuild/install the current `.aex`; the bindings list the names the gateway resolves. |
 
 ## Use
 
 1. Put `StarfieldParticle.aex` in the AE plug-ins folder (see the repository
    `README.md`) and apply the effect to a layer.
-2. Select exactly one layer that carries the effect, then press **Refresh** in the
-   panel. The panel shows the emitter, force, appearance, and output stages with their
-   parameters and connections.
+2. Select exactly one layer that carries the effect. The panel discovers it automatically
+   and shows the emitter, force, appearance, and output sections with their parameters.
 3. Edit a value: the panel validates it, writes it through the gateway in one undo
    group, and the composition updates.
 4. **Example** presets: `Spark`, `Snow`, `Floating Light`, and `Reset Defaults` fill in
@@ -150,21 +144,22 @@ or non-finite value, more than 32 changes, a payload over 64 KiB, a stale token 
 `animated_parameter`, `host_write_failed`, `host_error`, `invalid_request`,
 `unknown_operation`, `no_host`, `bad_response`, `host_timeout`.
 
-## Qualification status (not yet verified on a host)
+## Qualification status (partial AE 2023 host pass, 2026-09-28)
 
-The panel is **code complete and unqualified**. Before it can be called working, an
-AE 2023 pass must record:
+AE 2023.5.0 Build 52 lists the panel under **Window > Extensions** and opens the repository page
+through the Junction. After opening the test project and selecting the layer with Starfield
+Particle, the form populated automatically without clicking **Refresh**. The initial `No target`
+state was caused by the panel polling before AE had a selected project target; startup retry now
+waits for that transient condition to clear. No host preference or registry value was changed.
+The owner then observed `Lookup: name` in the footer, a panel `Size` edit updating
+the AE frame, and host undo restoring the picture. Undo initially left the panel
+displaying the prior value; the client now re-reads on focus, and the owner reports
+that values update again. Remaining qualification:
 
-1. AE build number, OS, and the `.aex` build; the panel appears under
-   **Window > Extensions**.
-2. Effect parameters resolve **by name** (the footer shows `Lookup: name`; `index`
-   means the fallback ran).
-3. Hidden/standard parameter streams can be read and written by the gateway.
-4. A panel edit updates the composition and one undo/redo restores and reapplies it.
-5. A panel edit in `Node Graph` mode rewrites the stored graph (Options readout shows
-   the changed value).
-6. Save/reopen and effect duplication preserve the values; a stale `baseRevision`
-   edit is rejected with `stale_state`.
+1. Redo, panel focus refresh after other AE edits, and undo grouping across a batch.
+2. A panel edit in `Node Graph` mode rewrites the stored graph bytes.
+3. Save/reopen and effect duplication preserve panel-authored values; a stale
+   `baseRevision` edit is rejected with `stale_state` in AE.
 
 Record results in [docs/compatibility-matrix.md](../docs/compatibility-matrix.md).
 Until that is done, treat the panel as a preview, not a supported feature.

@@ -1,6 +1,8 @@
 #include "Diagnostics.hpp"
+#include "CoreLoader.hpp"
 
 #include "Parameters.hpp"
+#include "starfield/core/SequenceCodec.hpp"
 #include "WorldBridge.hpp"
 
 #include "starfield/core/Geometry.hpp"
@@ -97,6 +99,14 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     MessageWriter writer(out_data);
+    const auto loaded = reload_core();
+    if (loaded.changed) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
+    if (!loaded.error.empty()) writer.line("Core reload: %s\n", loaded.error.c_str());
+    else writer.line("Core: %s\n", loaded.changed ? "new DLL loaded" : "current DLL");
+    if (!loaded) {
+        out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
+        return PF_Err_NONE;
+    }
 
     // PF_Cmd_DO_DIALOG can arrive without a render context: the SDK documents it as
     // "after SEQUENCE_SETUP", and PF_OutFlag_SEND_DO_DIALOG can request it once when
@@ -123,18 +133,28 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         std::shared_ptr<const core::Graph> graph;
         const auto graph_err = checkout_render_graph(in_data, out_data, graph, &control_source);
         if (graph_err != PF_Err_NONE) return graph_err;
-        const core::NeverCancelled never;
-        const auto evaluated = core::evaluate_particle_graph(*graph,
-            core::RationalTime{in_data->current_time, in_data->time_scale}, never);
-        if (!evaluated.has_value()) {
-            writer.line("SF 0.1.0 graph evaluation failed: %s\n", evaluated.error().detail);
+        const auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
+        if (!encoded.has_value()) {
+            writer.line("SF 0.1.0 graph serialization failed: %s\n", encoded.error().detail);
+            return PF_Err_NONE;
+        }
+        SfCoreInspectRequest inspect_request{};
+        inspect_request.struct_size = sizeof(inspect_request);
+        inspect_request.graph_bytes = encoded.value().data();
+        inspect_request.graph_byte_count = encoded.value().size();
+        inspect_request.time_value = in_data->current_time;
+        inspect_request.time_scale = in_data->time_scale;
+        SfCoreInspectResult evaluated{};
+        evaluated.struct_size = sizeof(evaluated);
+        if (loaded.generation->api().inspect(&inspect_request, &evaluated) != SF_CORE_OK) {
+            writer.line("SF 0.1.0 graph evaluation failed: %s\n", evaluated.detail);
             return PF_Err_NONE;
         }
         writer.line("SF 0.1.0 %s g%llun %llue live %llu\n",
                     control_source == kLegacyControlSource ? "AE" : "NG",
-                    static_cast<unsigned long long>(graph->nodes.size()),
-                    static_cast<unsigned long long>(graph->edges.size()),
-                    static_cast<unsigned long long>(evaluated.value().particles.size()));
+                    static_cast<unsigned long long>(evaluated.node_count),
+                    static_cast<unsigned long long>(evaluated.edge_count),
+                    static_cast<unsigned long long>(evaluated.live_particle_count));
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
     if (graph_parameter_disabled()) {

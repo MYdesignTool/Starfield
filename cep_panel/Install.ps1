@@ -79,5 +79,5 @@ if (-not (Test-Path (Join-Path $target 'CSXS\manifest.xml'))) {
 Write-Host "Linked: $target -> $source"
 Show-DebugKeyStatus
 Write-Host ''
-Write-Host 'Next: restart After Effects, then Window > Extensions > Starfield Node Editor.'
+Write-Host 'Next: restart After Effects, then Window > Extensions > Starfield Particle Controls.'
 Write-Host 'Qualification steps are in cep_panel/README.md.'

@@ -55,7 +55,8 @@ construction primitives, not an AE migration or persistence implementation.
 
 ## Evidence and remaining work
 
-Core regression run on 2026-09-28: 6,188 checks, zero failures. Added cases
+Core regression run on 2026-09-28: 6,180 checks, zero failures (the suite has since
+grown to 6,196 checks with the H-01 C-ABI and loader cases). Added cases
 compare graph/flat pixels across four emitter shapes, 8/16/32-bit formats, repeated
 and reverse times, negative/subframe time, and reduced-resolution cropped output.
 Cases also cover unchanged graph bytes after evaluation, parked nodes, invalid

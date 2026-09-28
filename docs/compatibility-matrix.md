@@ -6,19 +6,18 @@ Use this file to turn observed behavior into requirements before implementing ea
 
 | Check | Host | Status | Evidence / next step |
 |---|---|---|---|
-| M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass | Effect loads; render pass-through, add/remove, save/reopen, duplicate, and undo/redo still unrecorded |
-| M1 discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Current build must be qualified separately |
-| Corrected coordinate candidate | AE 2023.5.0 Build 52 (owner readout) | **Loaded; Full/Quarter origin placement confirmed** | May 2023 SDK build on 2026-09-28. Installable file `dist/StarfieldParticle.aex`, 189,440 bytes, packed version `0x8002`, SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`; PDB SHA-256 `B0EB472A139D151424E87CF789E7A72B9E4220F94E1CC6FE1452EA016330B075`. `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` matches the installed copy. Owner Full/Quarter screenshots and the direct Quarter session show normalized `px 1920,1080,1080` and world `(0,0,0)`. The direct Quarter session reports `grid 960x540`; diagnostic isolation across multiple render contexts remains untested. |
-| Build-2 graph render/persistence | AE 2023.5.0 Build 52 | **Save/reopen, Ctrl+D effect duplicate, same-name Ctrl+C/Ctrl+V replacement, undo and redo passed** | On 2026-09-28, saved and reopened `D:\Project\Code\test\testproject.aep` through AE's Open dialog. Comp 1, Medium Blue Solid 1, the Starfield Particle effect, visible particle output, and saved controls (Point, rate 100, origin 1920/1080/1080, velocity Y 0.30, lifetime 2 s, size 10) returned. The current installed `0x8002` plug-in matches `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` (SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`). Selecting the effect and pressing Ctrl+D added `Starfield Particle 2` with matching visible parameters; Ctrl+Z removed it, Ctrl+Shift+Z restored it, and Ctrl+Z removed it again. To check same-name copy/paste, duplicated the solid layer, changed the duplicate layer's effect rate from 100 to 25, copied the original layer's Starfield effect with Ctrl+C, selected the duplicate layer's existing effect and pressed Ctrl+V; the target rate returned to 100 and only one effect instance remained on that layer. Undo restored the rate and removed the temporary layer; the original single-layer project was saved. The previously reported missing-file warning did not recur when opening the actual test path; the owner attributes that warning to a path/open-flow mismatch. These checks used AE Controls mode; Node Graph-specific persistence still needs a separate check. |
+| M1 plug-in discovery and load | AE 2023, exact build not recorded | User-confirmed pass for the empty M1 shell | Historical load check only; current H-01 build has its own host evidence below |
+| Corrected coordinate candidate (superseded) | AE 2023.5.0 Build 52 | **Full/Quarter origin placement confirmed on this candidate** | May 2023 SDK build on 2026-09-28. This earlier installable file `dist/StarfieldParticle.aex` was 189,440 bytes, packed version `0x8002`, SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`; PDB SHA-256 `B0EB472A139D151424E87CF789E7A72B9E4220F94E1CC6FE1452EA016330B075`. AE loaded this candidate. Owner Full/Quarter screenshots and the direct Quarter session show normalized `px 1920,1080,1080` and world `(0,0,0)`. The direct Quarter session reports `grid 960x540`; diagnostic isolation across multiple render contexts remains untested. The current binary and transparency check are recorded in the M2 row below. |
+| Build-2 graph render/persistence | AE 2023.5.0 Build 52 | **Save/reopen, Ctrl+D effect duplicate, same-name Ctrl+C/Ctrl+V replacement, undo and redo passed** | On 2026-09-28, saved and reopened `D:\Project\Code\test\testproject.aep` through AE's Open dialog. Comp 1, Medium Blue Solid 1, the Starfield Particle effect, visible particle output, and saved controls (Point, rate 100, origin 1920/1080/1080, velocity Y 0.30, lifetime 2 s, size 10) returned. At that time, the installed `0x8002` candidate matched `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` (SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`). Selecting the effect and pressing Ctrl+D added `Starfield Particle 2` with matching visible parameters; Ctrl+Z removed it, Ctrl+Shift+Z restored it, and Ctrl+Z removed it again. To check same-name copy/paste, duplicated the solid layer, changed the duplicate layer's effect rate from 100 to 25, copied the original layer's Starfield effect with Ctrl+C, selected the duplicate layer's existing effect and pressed Ctrl+V; the target rate returned to 100 and only one effect instance remained on that layer. Undo restored the rate and removed the temporary layer; the original single-layer project was saved. The previously reported missing-file warning did not recur when opening the actual test path; the owner attributes that warning to a path/open-flow mismatch. These checks used AE Controls mode; Node Graph-specific persistence still needs a separate check. |
 | Apply-time crash | AE 2023 installed at `D:\Software\Adobe\Adobe After Effects 2023`; plug-in build `0x8002` (24 parameters, `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, 21:19) | **Open: crashed once while applying the effect** | Dump `5f8321e1-3dac-4b7e-b3b7-4fa60b9b283b.dmp` (2026-09-27 21:35). Exception `0x40000015` (fatal app exit, not an access violation), raised on a thread whose stack carries `sentry_crashpad.dll` (Adobe crash handler) and NVIDIA OpenGL/D3D12 frames; scanning the captured stacks found no return address inside `StarfieldParticle.aex`, so the fatal exit did not happen under our own frame. The dump also shows the reference `Stardust_panel.aex` and Adobe plug-ins loaded, and our PDB path. Mitigations in the same commit: the Options readout now refuses to check out parameters without a render context, and `STARFIELD_FLAT_RENDER=1` bisects the graph render path against the flat path. Next steps are listed under "Crash triage" below. |
-| M2 particle render | AE 2023.5.0 Build 52, corrected build `0x8002` | **Loaded; visible render and source compositing pass at 8-bpc** | The current installed binary hashes to the recorded May 2023 SDK artifact. At t=2.75 s after reopening the saved test project, Full Options reported 200 live particles, `layer 3840x2160 ds 1/1 ref/grid 3840x2160`, host/normalized origin `[1920,1080,1080]`, and world `(0,0,0)`. With the Composition viewer explicitly set to Quarter, Options reported `layer 3840x2160 ds 1/4,1/4 ref 3840x2160 grid 960x540`, host origin `[480,270,270]`, normalized origin `[1920,1080,1080]`, and world `(0,0,0)`. The purple source solid remains visible beneath the particle trail. 16/32-bpc, cancellation, render-queue behavior, and multi-context diagnostic isolation remain open. |
-| M3-01 shapes and playback | AE 2023.5.0 Build 52, corrected build `0x8002` loaded | **Quarter playback advances and visibly updates the Point emitter; Box/Sphere/Disc and reverse-time determinism unverified** | A RAM preview with the Composition viewer set to Quarter advanced from 2:45 to 4:55 in about 1.5 seconds; the particle cluster changed and rose. Playback was stopped, the viewer restored to Full, the playhead restored to 2:45, and the project saved. This confirms playback is not frozen at Quarter; it does not establish frame-for-frame reverse-time determinism or shape parity. |
-| M3-02 force/appearance | AE 2023.5.0 Build 52, corrected candidate not loaded | Core implementation; host visual output unverified | Gravity, drag, color and the size/opacity age curves have core + control coverage (IDs 17-24). Confirm visible change: with defaults the picture must be unchanged, then set Gravity Y = -2 and Size End = 1 and re-render. |
-| P-02 dockable panel | AE 2023.5.0 Build 52 | **Host connection not tested: extension is not installed** | The system CEP extension folder contains no Starfield entry. The user-authorized source path `newStardust/cep/_panel` does not exist; the repository panel is `newStardust/cep_panel`. Read-only queries found no `PlayerDebugMode` key/value under `CSXS.11` or `CSXS.12`; the panel is unsigned, and this project will not change that host-wide setting. Correct source-path authorization plus the owner's deliberate manual debug-mode decision are required before the panel can be loaded. The screenshot remains an effect-control form, not a node editor; see P-02A for the separate canvas task. |
+| M2 particle render (superseded) | AE 2023.5.0 Build 52 | **Superseded by the H-01 split pair; its transparency and bit-depth checks carried over** | On 2026-09-28, built with the May 2023 SDK, installed, and loaded candidate `D22D43BAD15C5173867907369B2EF3293A3FD601C308158665A1F3FD0AB0816B` (packed version `0x8002`). Moving the playhead forced a fresh render; the Composition viewer showed particles over the transparency grid rather than the opaque purple solid. The adapter clears the AE output world before copying the sparse particle buffer, because AE may seed that world with source pixels. The row-stride guard build `C0830F649A149990942B40531E25E23C0841FA6BED9C9805B9D3E233AB1ABCAB` was never loaded in AE and is now superseded by the H-01 split pair recorded below. Owner reports all bit depths render normally and time consistency passes; exact frame-comparison procedure is not recorded. Lower-layer compositing remains a useful follow-up visual check. Save/reopen, Ctrl+D, copy/paste replacement, undo/redo and Full/Quarter geometry evidence is recorded above. |
+| M3-01 shapes and playback | AE 2023.5.0 Build 52 | **Quarter playback and visual shape distinction passed** | The corrected candidate's Quarter RAM preview advanced visibly. On the later H-01 split build, Box/Sphere/Disc looked distinct from Point. Exact distributions and byte-for-byte out-of-order identity remain open. |
+| M3-02 force/appearance | AE 2023.5.0 Build 52 | **Gravity and size changes passed visually on H-01** | Gravity, drag, color and size/opacity age curves have core coverage. On the split build, `Gravity Y = -2` and `Size Over Life = 1` made the trail fall and shrink. Drag, color and opacity still need host visual checks. |
+| P-02 dockable panel | AE 2023.5.0 Build 52 | **Discovery and one panel write passed; protocol checks remain open** | Through the installed Junction, the form populated after selecting the effect layer without Refresh and showed `Lookup: name`. A panel `Size` edit updated the AE frame; host undo restored the picture. The panel initially displayed a stale value after undo. A focus-triggered re-read was added and the owner reports it updates; redo, stale-state rejection, graph synchronization and panel-authored persistence remain open. |
 | Delivery examples | AE 2023; exact build not recorded | Not checked | Apply Spark, Snow and Floating Light from `docs/examples.md` and record a still frame at t ≥ 1 s for each |
 | M2 point-control units | AE 2023.5.0 Build 52 | **Measured:** absolute pixels scaled by preview resolution | Full/Quarter readouts show center `[1920,1080,1080]` → `[480,270,270]` as `ds` changes 1/1 → 1/4. The adapter restores the per-axis preview scale and the core preserves absolute pixels, including off-layer positions. A newer AE 2023 build needs its own host readout. |
 | M2 preview geometry | AE 2023.5.0 Build 52 | **Single-effect Quarter grid observed; cross-context isolation remains open** | With the Composition viewer explicitly set to Quarter and the test comp/effect rendering, Options reported `ds 1/4,1/4`, `ref 3840x2160`, `grid 960x540`. This resolves the earlier mismatch caused by reading the right-side Preview panel while the Composition viewer was still Full. The diagnostic is process-global, so multiple effects or comps could overwrite the last-render record; that separate isolation behavior has not been checked. |
-| M2 preview-resolution emitter origin | AE 2023.5.0 Build 52 | **Full and Quarter placement/playback checks passed** | Corrected-candidate Full/Quarter readouts show raw points `[1920,1080,1080]` at `ds 1/1` and `[480,270,270]` at `ds 1/4`; both normalize to `[1920,1080,1080]` and world `(0,0,0)`. The Quarter render grid was observed as `960x540`; a Quarter RAM preview showed the point trail moving from the expected center. The owner had already reported the visual offset fixed. Half/Third and anisotropic host views remain untested. |
+| M2 preview-resolution emitter origin | AE 2023.5.0 Build 52 | **Full/Half/Third/Quarter centre normalization passed** | Corrected-candidate Full/Quarter readouts and H-01 Half/Third readouts all normalize raw points to `[1920,1080,1080]`. Quarter playback placed the trail near the expected centre. Off-centre, anisotropic and exact image comparisons remain open. |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
 
 ### Fixed suspect: the plug-in freed a host-owned handle
@@ -77,8 +76,8 @@ Load the current build once, then record host, build, and result per row:
 6. **Determinism** — scrubbing forward and backward over the same frames renders identical frames.
 7. **Rate and lifetime** — Birth Rate and Particle Lifetime change the trail length; Particle Count caps how many sprites can be alive.
 8. **Size and opacity** — both visibly change the sprite; size `0` renders nothing.
-9. **Source compositing** — the layer content stays visible under the particles rather than being replaced.
-10. **Bit depth** — repeat rows 3–8 in 8-bpc, 16-bpc, and 32-bpc comps and record any difference.
+9. **Alpha output** — with a solid source layer, only particles have alpha; pixels between particles are transparent and layers beneath the source show through. The effect must not toggle the source layer's visibility.
+10. **Bit depth** — owner reports 8/16/32-bpc rendering normally on the previous candidate; repeat alpha-output check after the `REVEALS_ZERO_ALPHA` build is installed.
 11. **Lifecycle** — duplicate the effect, undo/redo, copy/paste, save, reopen, and render through the Render Queue.
 12. **Cancellation** — start a RAM preview on a heavy setting and stop it; the effect must abort without an error dialog.
 13. **Panel** — install `cep_panel/` per its README, confirm the chain renders, edit one value, undo/redo it, then re-open the panel and confirm the values are current.
@@ -86,7 +85,10 @@ Load the current build once, then record host, build, and result per row:
 
 ## Options readout
 
-The effect's `Options` button prints a read-only diagnostic summary in the order that matters when
+In the H-01 build, the effect's `Options` button first attempts to load the
+versioned DLL named by `StarfieldRuntime/current.txt`. A successful switch
+requests a fresh render; a failed switch keeps the prior generation. It then
+prints a diagnostic summary in the order that matters when
 something looks wrong: graph/control source with the live count, the layer size and downsample factor,
 the reference and pixel grid of the **last rendered frame**, the raw emitter point with both world
 interpretations (the readout's fallback and the frame's reference-based one), time and velocity, then
@@ -94,6 +96,111 @@ the remaining counts. `grav`/`col` are printed only when they differ from their 
 `PF_OutData::return_msg` holds 255 characters and lines past the end are dropped — the earlier layout
 put the origin lines there and silently lost them. It changes no pixels and no settings; the
 interpretation table and the two-click D-05 measurement are in `docs/parameter-mapping.md`.
+The superseded monolithic build had a read-only Options button.
+
+## H-01 AE 2023 hot-core qualification (partial host pass, 2026-09-28)
+
+The authorized development installation is in
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`.
+AE 2023.5.0 Build 52 loaded `StarfieldParticle.aex` SHA-256
+`B7362B01AC0E935D8AD596A70D61690DA4D586EEEC3E939328BA1BDC420069D5`.
+The pinned fallback `StarfieldCore.dll` is
+`A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545`.
+`StarfieldRuntime` is a junction to this checkout's ignored `artifacts/runtime/`;
+`current.txt` currently selects `StarfieldCore-095219764514FFCA.dll`, SHA-256
+`095219764514FFCA1A5C3CFD36D78E6C8368ECF32C6C17576A8C26F2FA584564`.
+The live AE process (PID 36424 at the final check) mapped that selected generation.
+The prior monolithic AEX remains under `artifacts/disabled/h01-ae2023-crt-before-20260928`.
+
+The first `/MD` split build crashed when opening the project. Dump
+`f9992d57-3c46-4b68-9736-0d836874a46d.dmp` recorded a null read in AE's
+app-local `MSVCP140.dll` while `CoreLoader.cpp:195` locked the loader mutex;
+no core DLL had loaded. That dump was not copied into `artifacts/crash/`, which
+holds only the earlier `5f8321e1-3dac-4b7e-b3b7-4fa60b9b283b.dmp`. AE bundles version 14.00.24210.0, older than the v145
+toolset's STL. Both modules now use `/MT` in Release, keeping their CRT state
+inside the module and their C ABI free of CRT-owned pointers. `dumpbin /dependents`
+shows only `KERNEL32.dll` for both modules. The rebuilt pair opened and rendered
+the same saved project without that crash.
+
+Host observations on the `/MT` build:
+
+- AE stayed in one process while Options switched the selected Core from normal
+  (white) to a temporary red-only rasterizer and back at Full and Quarter.
+  Preview pixels updated after each switch. The installed AEX hash stayed fixed;
+  the old generation unloaded after the new one loaded. Quarter Options reported
+  `ds 1/4,1/4`, `ref 3840x2160`, and `grid 960x540`.
+- Selecting a nonexistent DLL in `current.txt` made Options report `cannot hash
+  selected core DLL for the AE cache key`; the prior Core and visible frame were
+  retained. The valid manifest was restored.
+- `D:\Project\Code\test\testproject.aep` was saved, AE closed normally, and the
+  project reopened through AE's Open dialog in a new process. The effect, Node
+  Graph control mode, saved values, particle preview, and CEP panel target returned.
+  The panel populated after layer selection without pressing Refresh.
+- With the split build, the same project visibly rendered particles at 8, 16,
+  and 32 bpc in Quarter. The 8-bpc transparency-grid view showed only particles
+  over the grid, without the solid's opaque source color. Project depth was
+  restored to 8 bpc and saved. This is a visual smoke check, not a pixel-diff
+  comparison across bit depths or against the monolithic binary.
+
+Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-28):
+
+- **Effect duplicate, undo/redo and same-name copy/paste passed on the split build.**
+  Ctrl+D added `Starfield Particle 2`, Ctrl+Z removed it, Ctrl+Shift+Z restored it and a
+  second Ctrl+Z removed it again. Pasting the original effect over the duplicate layer's
+  existing instance restored its `Particles Per Second` to 100 and left exactly one
+  instance on that layer. This closes the earlier "copy/undo evidence predates the split
+  build" gap.
+- **Half and Third preview were measured for the first time.** Half reported
+  `layer 3840x2160 ds 1/2,1/2 ref 3840x2160 grid 1920x1080` with
+  `org host 960,540,540 px 1920,1080,1080`; Third reported `ds 1/3,1/3`,
+  `grid 1280x720` and `org host 640,360,360 px 1920,1080,1080`. Both normalize to the
+  same centre, so the preview-scale fix holds at every resolution measured so far.
+- **Source compositing confirmed visually:** a solid layer placed below the particle
+  layer stays visible between the particles, and the effect leaves the source layer's
+  own visibility untouched.
+- **Emitter shapes and the force/appearance stages are now host-confirmed.** Box, Sphere
+  and Disc produce visibly different birth distributions from Point. `Gravity Y = -2`
+  with `Size Over Life = 1` made the trail fall and shrink with age, and the readout
+  printed `grav 0.00,-2.00,0.00 drag 0.000` for that frame.
+- **Stacked instances:** two Starfield Particle effects on one layer render only the
+  topmost one. This is the written contract, not a defect — the effect writes particles
+  over transparent black, never copies its input, and pre-render requests an empty input
+  rect, which lets AE skip the upstream instance entirely. Recorded because it is
+  user-visible and may need a product decision.
+- **Options readout truncation:** the closing `shape/esz/vspr/size/not` line was missing
+  from every capture. The 255-character `return_msg` budget is consumed by the lines
+  printed before it, so the emitter-shape readout is never visible. Geometry, force and
+  count lines are intact, so the captures above remain usable; the writer needs
+  compacting.
+- **Panel write works; host undo initially left a stale panel value.** Editing `Size` from 10 to 40 in the panel
+  updated the AE frame immediately, and Ctrl+Z restored both the value and the picture —
+  but the panel kept showing 40 until it re-read host state. The protocol has no push
+  channel; a focus-triggered re-read was added and the owner reports that it updates.
+- **Panel/host value divergence, root-caused and fixed:** on the same layer the panel
+  displayed `Origin 836,1732,1080`, `Velocity Y 0.1` and footer `Mode: Node Graph` while
+  the Effect Controls window showed `1920,1080,1080` and `0.30`. The client only re-read
+  on load, on Refresh and after its own writes, so it kept showing the snapshot it last
+  adopted — including that stale mode line. `panel.js` now re-reads when the panel
+  regains focus and skips a pending write; the owner reports the values update again.
+- **Control animation works, and only in AE Controls mode.** The owner keyframed
+  `Origin` and the emitter animated. That matches the code path exactly: with
+  `Control Source = AE Controls`, pre-render rebuilds the graph from parameters checked
+  out at the frame's time; with `Node Graph` it reads the stored bytes, which hold
+  constants. Animation and Node Graph mode are therefore mutually exclusive today, and
+  graph-side history needs M3-03's contract.
+- The owner's verdict on the panel surface: **the node graph is not implemented yet.**
+  It renders four bordered stage cards with a `↓ particles` text connector and no ports,
+  no drawn edges and no pan/zoom, so P-02A stays open.
+
+Repository gates still pass: 6,196 core checks, 395 adapter checks, and the
+two-generation loader harness including a real pinned render and failed-reload
+fallback. `-CoreOnly` leaves the AEX hash unchanged. **Open host gates:** switch
+while an AE render is actually in flight; compare exact frames with the prior
+monolith; exercise repeated switches, reverse-time requests, render queue and
+cancellation. The rollback command (run after AE closes) is
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Deploy-HotCore.ps1 -Rollback -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins'`.
+Rollback has been prepared and backed up; it has not been exercised, since the
+tested split pair is still installed for development.
 
 ## Behavior status
 
@@ -101,21 +208,22 @@ interpretation table and the two-click D-05 measurement are in `docs/parameter-m
 |---|---|---|
 | Emitter | Emitter positions are deterministic from seed, rate, lifetime, and absolute time | Implemented for Point/Box/Sphere/Disc; the seed selects stable per-particle streams. Determinism and frame order are covered by `tests/core_tests.cpp` |
 | Particle lifecycle | Birth rate, lifetime, age, and population cap behave consistently at arbitrary frame order | Implemented; half-open lifetime and newest-slot cap are documented in `docs/parameter-mapping.md` |
-| Emitter shapes | Box/sphere/disc distributions produce deterministic positions | Implemented in core (M3-01): seeded uniform sampling inside the requested extent, bounded and reproducible; see `docs/parameter-mapping.md`. AE confirmation pending |
+| Emitter shapes | Box/sphere/disc distributions produce deterministic positions | Core determinism is covered by tests; AE 2023.5.0 Build 52 visually confirmed Box, Sphere and Disc differ from Point on the split build. Exact distribution matching remains open |
 | Per-particle variation | A steady emitter animates on playback instead of looking frozen | Implemented in core (M3-01): per-particle birth offsets plus per-axis velocity spread from `core::Random`, covered by core tests. Host playback confirmation pending |
 | Random Seed | Changing the seed changes the rendered pixels | Implemented (M3-01): the seed now keys every per-particle stream. Host confirmation pending |
-| Forces | Each force has isolated enable/disable and stable parameter semantics | Implemented in core (M3-02): gravity and linear drag are force-node values with closed-form integration, authored by controls 17-20. Per-force enable/disable is not implemented: the Alpha chain has one force stage, whose effect is zero at default values. AE confirmation pending |
-| Ages and appearance | Size, opacity, and color follow particle age | Implemented in core (M3-02): linear age curves from the appearance node and the Color Start/End, Size End and Opacity End controls; the rasterizer uses per-particle RGB/opacity/size. Covered by `tests/core_tests.cpp`; AE confirmation pending |
+| Forces | Each force has isolated enable/disable and stable parameter semantics | Gravity and linear drag are implemented in one force stage. AE 2023.5.0 Build 52 visually confirmed `Gravity Y = -2` changes the trail on the split build; drag and per-force enable/disable remain unqualified or unimplemented respectively |
+| Ages and appearance | Size, opacity, and color follow particle age | Core age curves are covered by tests; AE 2023.5.0 Build 52 visually confirmed a shrinking trail with `Size Over Life = 1`. Opacity and color curve visuals remain open |
 | Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. The CEP screenshot shows no node canvas; P-02A adds a visual fixed topology, while dynamic create/delete/rewire remains P-02B. |
-| Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Implemented for 8/16/32-bpc, ROI, rowbytes, and premultiplied alpha. Full and Quarter geometry were observed in AE 2023.5.0 Build 52; 16/32-bpc and other preview scales remain unqualified |
-| Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Full and Quarter center placement are host-confirmed for AE 2023.5.0 Build 52; Quarter playback advances and updates visibly. Half/Third and exact reverse-time image comparison remain open |
-| Compositing | Particles composite over the input instead of replacing it | Chosen default recorded in ADR 0005; not yet confirmed against the reference effect |
+| Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Core emits premultiplied particles over transparent black. The split build visibly renders at 8/16/32 bpc and on the transparency grid in AE 2023.5.0 Build 52; exact per-pixel comparisons remain open |
+| Reloadable core | A new core algorithm builds and renders in AE without restarting or replacing the AEX | AE 2023.5.0 Build 52 visually confirmed Full/Quarter white → red → white reload with unchanged AEX/process, and missing-DLL fallback. An in-flight AE render switch and exact monolith pixel comparison remain open (H-01) |
+| Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Full/Half/Third/Quarter centre normalization is host-confirmed in AE 2023.5.0 Build 52; Quarter playback advances visibly. Exact reverse-time image comparison remains open |
+| Compositing | Effect output contains particles with transparent pixels; the input layer's solid color is not copied | AE 2023.5.0 Build 52 confirmed the transparency grid and a lower solid visible between particles on the split build. Two instances stacked on one layer display only the topmost effect under the current input-independent contract |
 | Color management | Working-space conversion through documented AE suites | Not started; M2 performs no conversion (ADR 0005) |
-| Control shape | Positions use point controls, rates use scalar sliders | Done in code: Emitter Origin is a 3D point; X/Y/Z velocity are sliders in layer heights/s. Build-2 appends graph data, source mode and capture action; current AE build is unverified |
-| Emitter origin | The point control places the emitter and the render agrees with it | Preview-scale source fix and adapter regression added from AE 2023.5.0 Build 52 readouts; retest the rebuilt binary in AE |
-| Point-control scaling | AE point values map to the same layer position at Full and Quarter | Source fix and adapter regression added from AE 2023.5 Build 52 evidence; host retest of the rebuilt candidate pending |
+| Control shape | Positions use point controls, rates use scalar sliders | Emitter Origin is a 3D point and X/Y/Z velocity are sliders; AE 2023.5.0 Build 52 exercised these controls on the split build. Capture and stored graph bytes need separate qualification |
+| Emitter origin | The point control places the emitter and the render agrees with it | The split build's Full/Half/Third/Quarter readouts normalize the centre to `[1920,1080,1080]`; off-centre visual parity remains open |
+| Point-control scaling | AE point values map to the same layer position at Full and Quarter | Host readouts confirm preview-scaled raw points normalize to the same comp coordinates at Full/Half/Third/Quarter in AE 2023.5.0 Build 52 |
 | CEP node canvas | The dockable panel visibly presents nodes, ports, and connectors | Not implemented. Current screenshot is a grouped effect-control form; see P-02A |
-| Persistence | Save/reopen, effect copy and undo preserve graph identity and values | Implemented with AE arbitrary-data parameter callbacks; build-2 host verification required. Capturing controls samples current time into a constant graph and does not convert animation tracks. |
+| Persistence | Save/reopen, effect copy and undo preserve graph identity and values | On the split build, save/close/reopen retained visible Node Graph mode and values; Ctrl+D, same-name paste, undo/redo passed. A byte-level stored-graph comparison and build-1 migration remain open. Capture samples current-time constants and does not convert animation tracks |
 | Concurrency | Repeated concurrent renders return identical pixels and never mutate shared state | Not advertised (no MFR flag); the core render is a pure function of one request, which M6 must audit before claiming support |
 | Cancellation | A host abort stops a long render predictably | Implemented through `PF_ABORT` polling in the simulation and rasterizer; unverified in a host |
 | Bounded work | Extreme settings fail with a typed error instead of hanging the host | Implemented (`work_limit_exceeded` + manifest caps); the specific budget is a provisional constant pending M6 profiling |

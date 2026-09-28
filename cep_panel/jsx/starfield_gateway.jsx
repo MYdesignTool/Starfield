@@ -1,4 +1,4 @@
-// ExtendScript gateway for the Starfield node editor panel (ADR 0009 protocol v1).
+// ExtendScript gateway for the Starfield Particle Controls panel (ADR 0009 protocol v1).
 //
 // Rules this file must keep:
 //   - Only the public AE scripting DOM is used. No sockets, no helper processes,

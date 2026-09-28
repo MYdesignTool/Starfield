@@ -495,17 +495,70 @@ void test_world_copy_cancellation() {
     output.pixels[3] = std::byte{4};
 
     PF_Pixel destination_pixels[4]{};
+    for (auto& pixel : destination_pixels) {
+        pixel.red = 40; pixel.green = 80; pixel.blue = 120; pixel.alpha = 255;
+    }
     PF_EffectWorld destination_world{};
     destination_world.data = destination_pixels;
     destination_world.width = 2;
     destination_world.height = 2;
     destination_world.rowbytes = static_cast<A_long>(sizeof(destination_pixels[0]) * 2);
     const WorldLayout layout{0, 0, 2, 2, static_cast<std::uint32_t>(destination_world.rowbytes)};
-    const CancelAtPoll cancel_write_after_one_row(2);
+    // Two world-clear rows run before output-copy row 0; cancel before copy row 1.
+    const CancelAtPoll cancel_write_after_one_row(4);
     CHECK(!write_output(output, layout, destination_world, HostBitDepth::bpc8, cancel_write_after_one_row));
     CHECK(destination_pixels[0].red == 1 && destination_pixels[0].green == 2 &&
           destination_pixels[0].blue == 3 && destination_pixels[0].alpha == 4);
     CHECK(destination_pixels[2].alpha == 0); // the second row was not copied after cancellation
+}
+
+void test_world_output_is_transparent_outside_particles() {
+    core::RenderOutput output;
+    output.region = core::RectI{0, 0, 1, 1};
+    output.format = core::PixelFormat::rgba8;
+    output.row_bytes = 4;
+    output.pixels = {std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}};
+
+    PF_Pixel destination_pixels[4]{};
+    for (auto& pixel : destination_pixels) {
+        pixel.red = 40; pixel.green = 80; pixel.blue = 120; pixel.alpha = 255;
+    }
+    PF_EffectWorld destination_world{};
+    destination_world.data = destination_pixels;
+    destination_world.width = 2;
+    destination_world.height = 2;
+    destination_world.rowbytes = static_cast<A_long>(sizeof(destination_pixels[0]) * 2);
+    const WorldLayout layout{0, 0, 2, 2, static_cast<std::uint32_t>(destination_world.rowbytes)};
+    const CancelAtPoll no_cancel(100);
+
+    CHECK(write_output(output, layout, destination_world, HostBitDepth::bpc8, no_cancel));
+    CHECK(destination_pixels[0].red == 1 && destination_pixels[0].green == 2 &&
+          destination_pixels[0].blue == 3 && destination_pixels[0].alpha == 4);
+    for (std::size_t i = 1; i < std::size(destination_pixels); ++i) {
+        CHECK(destination_pixels[i].red == 0 && destination_pixels[i].green == 0 &&
+              destination_pixels[i].blue == 0 && destination_pixels[i].alpha == 0);
+    }
+
+    output.region = core::RectI{0, 0, 0, 0};
+    output.pixels.clear();
+    for (auto& pixel : destination_pixels) {
+        pixel.red = 40; pixel.green = 80; pixel.blue = 120; pixel.alpha = 255;
+    }
+    CHECK(write_output(output, layout, destination_world, HostBitDepth::bpc8, no_cancel));
+    for (const auto& pixel : destination_pixels) {
+        CHECK(pixel.red == 0 && pixel.green == 0 && pixel.blue == 0 && pixel.alpha == 0);
+    }
+
+    for (auto& pixel : destination_pixels) {
+        pixel.red = 40; pixel.green = 80; pixel.blue = 120; pixel.alpha = 255;
+    }
+    PF_EffectWorld invalid_stride_world = destination_world;
+    invalid_stride_world.rowbytes = -1;
+    const WorldLayout invalid_stride_layout{0, 0, 2, 2,
+                                            static_cast<std::uint32_t>(invalid_stride_world.rowbytes)};
+    CHECK(!write_output(output, invalid_stride_layout, invalid_stride_world, HostBitDepth::bpc8, no_cancel));
+    CHECK(destination_pixels[0].red == 40 && destination_pixels[0].alpha == 255);
+    CHECK(destination_pixels[3].blue == 120 && destination_pixels[3].alpha == 255);
 }
 } // namespace
 
@@ -524,6 +577,7 @@ int main() {
     test_supervision(host);
     test_capture_scales_reduced_preview(host);
     test_world_copy_cancellation();
+    test_world_output_is_transparent_outside_particles();
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

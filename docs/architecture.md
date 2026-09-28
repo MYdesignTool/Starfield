@@ -12,20 +12,24 @@ The native effect is the product boundary. The AE SDK adapter translates selecto
 
 ```text
 After Effects
-  └─ ae_plugin/       PiPL, selector dispatch, suites, parameter checkout,
-                      SmartFX snapshots/render, arbitrary-data persistence
-       └─ core/       typed graph/settings, deterministic simulation,
-                      coordinate/color conversion, renderer interfaces
-            ├─ cpu/   reference renderer; first production backend
-            ├─ gpu/   optional backend behind the same render contract
-            └─ cache/ stable keys and AE Compute Cache integration
+  └─ StarfieldParticle.aex   PiPL, selectors, AE parameters, graph persistence,
+       │                     SmartFX snapshots, host pixels and DLL loader
+       └─ StarfieldCore.dll graph evaluation, deterministic simulation,
+                             CPU renderer and later backends
 ```
 
 Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. It edits supervised, script-visible AE parameter streams; the effect turns those changes into the canonical arbitrary-data graph during `PF_Cmd_USER_CHANGED_PARAM`. The panel never shares C++ object layouts with the effect, and render code never queries panel or AEGP state.
 
+ADR 0012 defines the runtime C ABI and versioned development DLLs. The AE
+adapter still owns graph serialization and control-to-graph construction because
+those operations participate in AE parameter persistence; evaluation and
+rasterization run in the selected DLL generation. Each pre-render pins that
+generation until its matching render and result release finish. Its content
+identity is mixed into the SmartFX cache key.
+
 ## Render contract
 
-1. SmartFX pre-render checks out only the requested inputs and time-varying values, determines the output/ROI, and constructs an immutable `RenderRequest`.
+1. SmartFX pre-render checks out input metadata for layer bounds/reference geometry and time-varying values, determines the output/ROI, and constructs an immutable `RenderRequest`. Particle rendering does not consume input pixels; it writes premultiplied particle color over transparent black (ADR 0005).
 2. The core validates all external values, evaluates the graph deterministically for the requested rational time, and returns an owned staging buffer or a typed error.
 3. The adapter copies pixels to the host output while checkouts are valid, then releases every checkout on every exit path.
 
@@ -61,13 +65,18 @@ Particle state must be reproducible from graph parameters, seed, and absolute ti
 - `include/starfield/core/ParticleSimulation.hpp`: deterministic point-emitter evaluation for one absolute time.
 - `include/starfield/core/CpuRenderer.hpp`: the CPU reference backend and its bounded-work limits.
 - `src/core/`: implementations of the above plus bounded, finite-value settings validation.
+- `include/starfield/core/PluginApi.h` and `src/core/PluginApi.cpp`: fixed-width
+  render/inspect C ABI with opaque result ownership and generation-local release.
+- `src/core/GraphConstruction.cpp`: graph creation shared by the adapter and DLL;
+  `GraphEvaluation.cpp` stays in the DLL for frequent algorithm changes.
+- `ae_plugin/CoreLoader.*`: versioned DLL selection, ABI validation and leases.
 - `tests/core_tests.cpp`: host-independent self-tests for the M2 contracts.
 - `ae_plugin/`: native SDK adapter, PiPL resource, Windows MSBuild project, and reproducible PiPL build scripts (see `ae_plugin/README.md`).
 - `docs/parameter-mapping.md`: schema row → AE control → core field table and the emission rules.
 - `docs/compatibility-matrix.md`: behavior inventory and independently derived acceptance criteria.
 - `docs/adr/`: decisions that affect saved projects or rendering semantics.
 
-The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements SmartFX transport and 8/16/32-bpc CPU rendering; current host qualification is incomplete. G-03 evaluates the single-emitter `emitter → force → appearance → output` chain (ADR 0007), and G-04 persists a graph snapshot in an AE arbitrary-data parameter (ADR 0008). MFR, GPU, and Compute Cache remain disabled.
+The CMake build compiles only the portable core. The AE module is built by the Windows MSBuild project against the local May 2023 SDK by default. M2 implements SmartFX transport and 8/16/32-bpc CPU rendering; the owner reports all bit depths and time consistency pass in AE 2023. On 2026-09-28, AE 2023.5.0 Build 52 visually confirmed the updated adapter renders particles over transparency. G-03 evaluates the single-emitter `emitter → force → appearance → output` chain (ADR 0007), and G-04 persists a graph snapshot in an AE arbitrary-data parameter (ADR 0008). MFR, GPU, and Compute Cache remain disabled.
 
 ## SDK guidance used
 
@@ -88,4 +97,14 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 ## Current scope
 
-M0/M1, M2 rendering, M3-01/M3-02 core behavior, and G-01–G-04 are implemented. P-02 has a working CEP parameter-control bridge but not the visible node editor required by the product direction. The current effect registers 24 active non-input parameters: 21 values that feed `Settings` plus Control Source, Capture, and hidden graph data; topic markers and AE's implicit input account for the larger registration count. The host-independent core has 6,188 checks, the fake-host adapter suite has 382 checks, and the panel gateway has Node fake-host regressions. The May 2023 SDK builds the corrected candidate at `dist/StarfieldParticle.aex` (SHA-256 `E2F304BFD3AC13A522CA71635E27F10BF8E0138BED9ACF5FDF4C30697D8B6FA0`). The owner's AE 2023.5.0 Build 52 readouts confirm the old Quarter point-scaling bug; the new candidate still needs a host retest. Save/reopen, effect copy, and undo/redo also require AE evidence. Dynamic topology editing, graph history/animation, MFR, and GPU remain future work.
+H-01 separates the AE adapter from the runtime core and adds manual development
+reload. The May 2023 SDK builds both binaries; 6,196 core checks, 395 adapter
+checks and the loader harness pass. The `/MT` split pair is installed in AE
+2023.5.0 Build 52. Full/Quarter hot reload, missing-DLL fallback, 8/16/32-bpc
+visual rendering and save/close/reopen have host evidence; an in-flight AE render
+switch and exact pixel comparison with the monolithic binary remain open. The
+prior monolith is backed up for rollback. Half/Third point mapping, split-build
+copy/undo, shapes and basic gravity/size changes also have AE observations. See
+`compatibility-matrix.md`.
+
+M0/M1, M2 rendering, M3-01/M3-02 core behavior, and G-01–G-04 are implemented. P-02 is a CEP parameter-control form; in AE 2023.5.0 Build 52 it populated automatically after the project and target layer were selected, without a Refresh click. Startup discovery retries transient conditions until the target is available, with delay capped at 5 seconds; fake-DOM regression covers delayed recovery. The current effect registers 24 active non-input parameters: 21 values that feed `Settings` plus Control Source, Capture, and hidden graph data; topic markers and AE's implicit input account for the larger registration count. The host-independent core has 6,196 checks, the fake-host adapter suite has 395 checks, and panel gateway/startup tests pass. Owner testing confirms time consistency; AE visually confirmed 8/16/32-bpc output and transparent particles with the split build. Save/reopen, effect copy, and undo/redo have host evidence on the split build. Dynamic topology editing, graph history/animation, MFR, and GPU remain future work.

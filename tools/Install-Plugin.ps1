@@ -26,6 +26,12 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $pluginName = 'StarfieldParticle.aex'
 $backupDir = Join-Path $repositoryRoot 'artifacts\disabled'
 
+# H-01 ships an AEX/DLL pair. Refuse the historical single-file install instead
+# of leaving an adapter that cannot load its matching core.
+if (-not $Uninstall -and (Test-Path -LiteralPath (Join-Path $repositoryRoot 'dist\StarfieldCore.dll'))) {
+    throw 'This build requires StarfieldCore.dll. Use tools\Deploy-HotCore.ps1 -PluginDir <AE 2023 Plug-ins> (read-only report), then -Install after ADR 0011 authorization.'
+}
+
 function Get-PluginDirectory {
     if ($PluginDir) {
         if (-not (Test-Path -LiteralPath $PluginDir)) { throw "PluginDir does not exist: $PluginDir" }
