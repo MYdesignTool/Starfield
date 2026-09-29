@@ -46,6 +46,14 @@ constexpr A_long kEmitterTopicDiskId = 'topE';
 constexpr A_long kParticleTopicDiskId = 'topP';
 constexpr A_long kPhysicsTopicDiskId = 'topH';
 constexpr A_long kRenderTopicDiskId = 'topR';
+constexpr A_long kLayoutEmitterXDiskId = 'lEx0';
+constexpr A_long kLayoutEmitterYDiskId = 'lEy0';
+constexpr A_long kLayoutForceXDiskId = 'lFx0';
+constexpr A_long kLayoutForceYDiskId = 'lFy0';
+constexpr A_long kLayoutAppearanceXDiskId = 'lAx0';
+constexpr A_long kLayoutAppearanceYDiskId = 'lAy0';
+constexpr A_long kLayoutOutputXDiskId = 'lOx0';
+constexpr A_long kLayoutOutputYDiskId = 'lOy0';
 
 // Parameter types and host indices in binding order: slot 0..20 map to the manifest
 // controls. Types are stamped into the checked-out PF_ParamDef before
@@ -212,6 +220,24 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     settings.particle_size_end = to_double(*defs[19]);
     settings.opacity_end = to_double(*defs[20]);
     return settings;
+}
+
+PF_Err add_hidden_layout_coordinate(PF_InData* in_data, PF_ParamDef& def, const char* name,
+                                    A_long disk_id, PF_FpLong default_value) noexcept {
+    constexpr PF_FpLong kCoordinateLimit = 1000000000.0;
+    if (in_data == nullptr || name == nullptr) return PF_Err_BAD_CALLBACK_PARAM;
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_FLOAT_SLIDER;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+    std::snprintf(def.name, sizeof(def.name), "%s", name);
+    def.uu.id = disk_id;
+    def.u.fs_d.value = def.u.fs_d.dephault = default_value;
+    def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCoordinateLimit;
+    def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCoordinateLimit;
+    def.u.fs_d.precision = PF_Precision_THOUSANDTHS;
+    def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+    return PF_ADD_PARAM(in_data, -1, &def);
 }
 
 } // namespace
@@ -411,6 +437,30 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
     }
     PF_END_TOPIC(kRenderTopicDiskId);
+
+    // Node positions are non-rendering UI state, but they belong to this effect
+    // instance so AE can save, duplicate, and undo the layout with the project.
+    // Standard hidden sliders remain script-readable/writable, unlike graph_data's
+    // CUSTOM_VALUE stream. Append them after the Render topic to preserve old indices.
+    const struct LayoutCoordinate {
+        const char* name;
+        A_long disk_id;
+        PF_FpLong default_value;
+    } layout_coordinates[] = {
+        {"Layout Emitter X", kLayoutEmitterXDiskId, 180.0},
+        {"Layout Emitter Y", kLayoutEmitterYDiskId, 22.0},
+        {"Layout Force X", kLayoutForceXDiskId, 180.0},
+        {"Layout Force Y", kLayoutForceYDiskId, 190.0},
+        {"Layout Appearance X", kLayoutAppearanceXDiskId, 180.0},
+        {"Layout Appearance Y", kLayoutAppearanceYDiskId, 358.0},
+        {"Layout Output X", kLayoutOutputXDiskId, 180.0},
+        {"Layout Output Y", kLayoutOutputYDiskId, 526.0},
+    };
+    for (const auto& coordinate : layout_coordinates) {
+        err = add_hidden_layout_coordinate(in_data, def, coordinate.name, coordinate.disk_id,
+                                           coordinate.default_value);
+        if (err != PF_Err_NONE) return err;
+    }
 
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;

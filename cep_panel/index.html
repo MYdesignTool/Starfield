@@ -8,7 +8,10 @@
 <body>
   <header class="bar">
     <div class="title">Starfield Node Editor</div>
-    <div class="sub" id="targetLine">No target</div>
+    <div class="target-row">
+      <div class="sub" id="targetLine">No target</div>
+      <button id="targetLock" type="button" aria-pressed="false" title="Keep this effect targeted when AE selection changes">Pin Target</button>
+    </div>
   </header>
 
   <div id="banner" class="banner hidden" role="status"></div>
@@ -32,11 +35,12 @@
     <section class="graph-pane" aria-label="Particle graph">
       <div class="section-heading">
         <span>Graph</span>
-        <span class="section-note">Fixed chain · select a node to edit</span>
+        <span class="graph-tools"><span class="section-note">Drag nodes · drag empty space to select</span><span id="zoomReadout">100%</span></span>
       </div>
-      <div class="graph-scroll">
-        <div class="graph-canvas">
-          <svg id="graphEdges" class="graph-edges" viewBox="0 0 580 320" aria-hidden="true">
+      <div id="graphScroll" class="graph-scroll">
+        <div id="graphViewport" class="graph-viewport">
+          <div class="graph-canvas">
+          <svg id="graphEdges" class="graph-edges" viewBox="0 0 580 320" role="group" aria-label="Graph connections">
             <defs>
               <marker id="edgeArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
                 <path d="M0 0 L6 3 L0 6 Z" />
@@ -47,6 +51,11 @@
           <div id="chain" class="graph-nodes" aria-label="Emitter to force to appearance to output chain">
             <p class="hint">Select one layer carrying Starfield Particle.</p>
           </div>
+          <div id="selectionBox" class="selection-box" hidden></div>
+          </div>
+          <canvas id="graphMinimap" class="graph-minimap" width="192" height="120"
+                  role="application" aria-label="Node minimap; click or drag to navigate"
+                  title="Node map · click or drag to navigate"></canvas>
         </div>
       </div>
     </section>
@@ -69,6 +78,19 @@
     <span id="revisionLine">Revision: -</span>
     <span id="resolutionLine" title="How effect parameters were resolved on the host">Lookup: -</span>
   </footer>
+
+  <div id="graphContextMenu" class="graph-context-menu" role="menu" aria-label="Node graph actions" hidden>
+    <div class="context-menu-heading">Add Node</div>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="appearance">Appearance</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="emitter">Emitter</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="output">Output</button>
+    <div class="context-menu-separator"></div>
+    <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
+    <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected</button>
+    <button id="disconnectContextAction" type="button" role="menuitem" data-action="disconnect" hidden>Disconnect This Wire</button>
+  </div>
 
   <script src="js/panel.js"></script>
 </body>

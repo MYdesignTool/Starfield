@@ -1,12 +1,32 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 6. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 7. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
 render checkout and the supervised panel edit, so the two cannot drift apart.
 
-## Manifest revision 6: topic grouping and renumbering (current)
+## Manifest revision 7: project-saved node layout (current)
+
+Revision 7 appends hidden, non-animated float sliders for the four fixed node positions.
+These values are UI metadata owned by the effect instance: AE saves them with the project,
+copies them with the effect, and records panel moves in one undo group. They are not
+supervised and do not feed `Settings` or graph evaluation. CEP reads and writes them through
+the public scripting DOM; AE 2023 read/write, save/reopen, duplicate, and undo qualification
+is still open (ADR 0014).
+
+| ID / index | key | AE stream | Default | Range |
+|---|---|---|---:|---:|
+| 33 | `layout_emitter_x` | Layout Emitter X | 180 | ±1,000,000,000 canvas units |
+| 34 | `layout_emitter_y` | Layout Emitter Y | 22 | ±1,000,000,000 canvas units |
+| 35 | `layout_force_x` | Layout Force X | 180 | ±1,000,000,000 canvas units |
+| 36 | `layout_force_y` | Layout Force Y | 190 | ±1,000,000,000 canvas units |
+| 37 | `layout_appearance_x` | Layout Appearance X | 180 | ±1,000,000,000 canvas units |
+| 38 | `layout_appearance_y` | Layout Appearance Y | 358 | ±1,000,000,000 canvas units |
+| 39 | `layout_output_x` | Layout Output X | 180 | ±1,000,000,000 canvas units |
+| 40 | `layout_output_y` | Layout Output Y | 526 | ±1,000,000,000 canvas units |
+
+## Manifest revision 6: topic grouping and renumbering (previous)
 
 The ECW now follows the reference product's structure. Topic markers (`PF_Param_GROUP_START` /
 `GROUP_END`) are parameters, so every index moved. Global out-flags carry

@@ -4,15 +4,27 @@ Dockable After Effects 2023 node editor for the current Alpha chain
 `emitter -> force -> appearance -> output`. It implements protocol v1 of
 [ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel displays a fixed graph
 with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
-Topology changes are not part of protocol v1. The panel
-reads and writes the effect's **supervised ordinary parameters** through a namespaced
-ExtendScript gateway, and never touches `Node Graph Data` (the arbitrary-data
-parameter) or any host-private state.
+The current canvas source supports a pinned target, top-down layout, project-saved node
+positions, viewport-wide marquee/group movement, wheel zoom, unrestricted middle-button
+canvas pan with a clipped viewport and no scrollbars, a bottom-left interactive minimap,
+Alt-drag copy preview, Ctrl+D, port-to-port
+connection gestures, and a graph context menu. Wire disconnect, insert, connect, add,
+duplicate, and delete commands are routed
+to a guarded topology boundary because the v1 gateway has no graph-backed write
+transaction; they do not change the saved project.
+The panel reads and writes the effect's **supervised render-value parameters** and
+separate hidden layout parameters through a namespaced ExtendScript gateway. If an older
+plug-in build lacks layout streams, the graph still loads at default positions and node
+moves stay in that panel session; the panel reports that project persistence needs the
+matching plug-in build. It never touches `Node Graph Data` (the arbitrary-data parameter)
+or any host-private state.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
 that grows to a 5-second cap. Retries continue until state is found, then stop. **Refresh**
 remains available for a deliberate re-query; it is not required for normal panel discovery.
+After changing the panel's source files, close and reopen the CEP panel to load the new
+JavaScript and ExtendScript gateway; the Refresh button only re-queries AE state.
 
 ## Files
 
@@ -20,7 +32,7 @@ remains available for a deliberate re-query; it is not required for normal panel
 |---|---|
 | `CSXS/manifest.xml` | CEP 11 manifest; host `AEFT [23.0, 99.9]`; panel entry `index.html` |
 | `index.html`, `css/panel.css`, `js/panel.js` | Panel UI and protocol client |
-| `jsx/starfield_gateway.jsx` | `SFLD_getState` / `SFLD_setParameters` gateway (public AE scripting DOM only) |
+| `jsx/starfield_gateway.jsx` | `SFLD_getState`, `SFLD_setParameters`, and `SFLD_setNodeLayout` gateway (public AE scripting DOM only) |
 
 No third-party JavaScript is bundled. `js/panel.js` contains a ~10-line CEP bridge
 shim around `window.__adobe_cep__.evalScript`; Adobe's full `CSInterface.js` can be
@@ -111,8 +123,19 @@ authorization.
 1. Put `StarfieldParticle.aex` in the AE plug-ins folder (see the repository
    `README.md`) and apply the effect to a layer.
 2. Select exactly one layer that carries the effect. The panel discovers it automatically
-   and shows the four connected nodes. Drag a node card to arrange the canvas; layout is local
-   to the open panel session. Click a node to open its floating properties window. The checked
+    and shows the four connected nodes. Drag node cards freely, including left/up past the
+    original canvas origin. Node positions are stored in hidden AE effect parameters and travel
+    with the project and duplicated effect when the revision-7 plug-in is installed; older
+    effect builds use default positions. Pan and zoom are transient view state. Drag empty
+    canvas anywhere in the viewport to marquee-select, move the middle mouse button to pan, and scroll
+    to zoom at the cursor. Use the bottom-left minimap to inspect the whole graph and click or
+    drag it to navigate. Alt-drag previews a duplicate; Ctrl+D and the
+   right-click menu expose graph operations. Since the AE 2023 script API cannot read the
+   graph's `CUSTOM_VALUE`, topology operations currently report that the graph transaction
+   bridge is unavailable and leave the project topology unchanged. Node moves are written to
+   AE in one undo group when the matching layout streams exist. Click a node to open its floating
+   properties window. The proposed carrier and its qualification gate are documented in
+   [ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md). The checked
    **Refresh Automatically** option re-reads the selected AE target while the panel is visible;
    **Refresh** remains available for an immediate manual read.
 3. Edit a value in the floating inspector: the panel validates it, writes it through the gateway in one undo
@@ -160,11 +183,11 @@ The owner then observed `Lookup: name` in the footer, a panel `Size` edit updati
 the AE frame, and host undo restoring the picture. Undo initially left the panel
 displaying the prior value; the client now re-reads on focus, and the owner reports
 that values update again. These observations were made on the earlier grouped form.
-The draggable canvas, floating inspector, and target polling are implemented in source,
-but this UI revision has not yet been viewed in the owner's AE dock. The current canvas
-still shows the fixed four-stage topology: it does not create, delete, or reconnect nodes.
-Those actions need the graph-backed transaction contract in P-02B; protocol v1 only edits
-the supervised parameter streams.
+The draggable canvas, floating inspector, pinned target, marquee/group movement, and zoom
+are implemented in source, but this UI revision has not yet been viewed in the owner's AE
+dock. The graph remains fixed: node creation, deletion, reconnection, wire disconnect, and
+edge insertion require the graph-backed transaction contract in P-02B; protocol v1 only
+edits the supervised parameter streams.
 Remaining qualification:
 
 1. Redo, panel focus refresh after other AE edits, and undo grouping across a batch.

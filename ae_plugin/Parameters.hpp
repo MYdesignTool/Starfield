@@ -19,10 +19,10 @@ namespace starfield::adapter {
 // reference product's structure; group markers are parameters too, which is why the
 // indices below are not contiguous. AE's implicit input layer occupies parameter index
 // 0, so the effect registers one more parameter than kTotalEffectParameterCount.
-// Manifest revision 6 renumbered everything for the grouping: pre-release projects
-// saved with revision 5 read the new positions (see docs/parameter-mapping.md).
+// Manifest revision 6 renumbered everything for the grouping; revision 7 appends the
+// hidden node-layout streams after the prior parameter list (see docs/parameter-mapping.md).
 inline constexpr std::size_t kEffectParameterCount = 21;      // controls that feed Settings
-inline constexpr std::size_t kTotalEffectParameterCount = 32; // controls + topics + system
+inline constexpr std::size_t kTotalEffectParameterCount = 40; // controls + topics + graph + layout metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -45,10 +45,18 @@ inline constexpr A_long kGravityZId = 23;
 inline constexpr A_long kLinearDragId = 24;
 inline constexpr A_long kMaxParticlesId = 27;
 inline constexpr A_long kSeedId = 28;
-// 29/30/31 are the control source, capture action and hidden graph parameter; their
-// indices live next to the arbitrary-data contract in GraphParameter.hpp.
+// 29/30/31 are the control source, capture action and hidden graph parameter. Index 32
+// closes the Render topic; 33..40 are hidden project-saved node-layout coordinates.
 inline constexpr A_long kFirstEffectParameterId = 1;
 inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is control source)
+inline constexpr A_long kLayoutEmitterXId = 33;
+inline constexpr A_long kLayoutEmitterYId = 34;
+inline constexpr A_long kLayoutForceXId = 35;
+inline constexpr A_long kLayoutForceYId = 36;
+inline constexpr A_long kLayoutAppearanceXId = 37;
+inline constexpr A_long kLayoutAppearanceYId = 38;
+inline constexpr A_long kLayoutOutputXId = 39;
+inline constexpr A_long kLayoutOutputYId = 40;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

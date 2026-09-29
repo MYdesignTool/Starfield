@@ -5,9 +5,9 @@
 //     no direct writes to the effect's arbitrary-data graph parameter.
 //   - Every request is parsed, version-checked and fully validated before any
 //     mutation; a failure rejects the whole change set.
-//   - Values written here are the effect's ordinary supervised parameters. The
-//     effect turns them into its canonical graph during PF_Cmd_USER_CHANGED_PARAM
-//     (Node Graph mode) or renders them directly (AE Controls mode).
+//   - Render values are ordinary supervised parameters. Node positions use separate
+//     hidden, non-animated ordinary streams owned by the effect instance; they never
+//     enter the renderer's graph or rely on CEP-local persistence.
 //
 // Host qualification status: see docs/compatibility-matrix.md. Name-based property
 // resolution and scripted supervision are AE 2023 gates, not yet verified.
@@ -15,6 +15,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
+    var GATEWAY_BUILD = "layout-compat-2";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 32;
     var MAX_REQUEST_BYTES = 65536;
@@ -47,6 +48,17 @@
         { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1 }
     ];
 
+    var LAYOUT_BINDINGS = [
+        { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 33, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 180 },
+        { nodeId: "emitter", axis: "y", key: "layout_emitter_y", index: 34, name: "Layout Emitter Y", min: -1000000000, max: 1000000000, defaultValue: 22 },
+        { nodeId: "force", axis: "x", key: "layout_force_x", index: 35, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 180 },
+        { nodeId: "force", axis: "y", key: "layout_force_y", index: 36, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 190 },
+        { nodeId: "appearance", axis: "x", key: "layout_appearance_x", index: 37, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 180 },
+        { nodeId: "appearance", axis: "y", key: "layout_appearance_y", index: 38, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 358 },
+        { nodeId: "output", axis: "x", key: "layout_output_x", index: 39, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 180 },
+        { nodeId: "output", axis: "y", key: "layout_output_y", index: 40, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 526 }
+    ];
+
     // The Alpha chain is fixed in protocol v1: display order, not a hidden graph.
     var CHAIN = [
         { id: "emitter", label: "Emitter", keys: ["particle_count", "birth_rate", "seed", "particle_lifetime",
@@ -62,6 +74,13 @@
     function bindingFor(key) {
         for (var i = 0; i < BINDINGS.length; i++) {
             if (BINDINGS[i].key === key) return BINDINGS[i];
+        }
+        return null;
+    }
+
+    function layoutBindingFor(nodeId, axis) {
+        for (var i = 0; i < LAYOUT_BINDINGS.length; i++) {
+            if (LAYOUT_BINDINGS[i].nodeId === nodeId && LAYOUT_BINDINGS[i].axis === axis) return LAYOUT_BINDINGS[i];
         }
         return null;
     }
@@ -116,6 +135,44 @@
         return { comp: comp, layer: layer, effect: effect };
     }
 
+    // A pinned panel target is resolved by the opaque identity captured from
+    // getState. It remains independent of AE's current selection, but fails closed
+    // if the project, comp, layer, or effect instance no longer exists.
+    function findTargetByToken(token) {
+        if (!app.project) return { error: { code: "no_project", message: "No project is open." } };
+        if (typeof token !== "string") return { error: { code: "invalid_request", message: "A pinned target token is required." } };
+        var match = /^p([0-9]+)-c([0-9]+)-l([0-9]+)-e([0-9]+)$/.exec(token);
+        if (!match) return { error: { code: "invalid_request", message: "The pinned target token is malformed." } };
+        if (!app.project.rootFolder || String(app.project.rootFolder.id) !== match[1]) {
+            return { error: { code: "stale_target", message: "The pinned effect belongs to a different project. Unlock it to follow the current selection." } };
+        }
+        var comp = null;
+        for (var i = 1; i <= app.project.numItems; i++) {
+            var item = app.project.item(i);
+            if (item instanceof CompItem && String(item.id) === match[2]) { comp = item; break; }
+        }
+        if (!comp) return { error: { code: "stale_target", message: "The pinned composition no longer exists." } };
+        var layer = null;
+        for (var l = 1; l <= comp.numLayers; l++) {
+            var candidate = comp.layer(l);
+            if (String(candidate.id) === match[3]) { layer = candidate; break; }
+        }
+        if (!layer) return { error: { code: "stale_target", message: "The pinned layer no longer exists." } };
+        var parade = layer.property("ADBE Effect Parade");
+        var effect = parade ? parade.property(Number(match[4])) : null;
+        if (!effect || effect.matchName !== MATCH_NAME) {
+            return { error: { code: "stale_target", message: "The pinned Starfield effect no longer exists at that location." } };
+        }
+        return { comp: comp, layer: layer, effect: effect };
+    }
+
+    function findRequestTarget(request) {
+        if (request && request.pinTarget === true) {
+            return findTargetByToken(request.target && request.target.token);
+        }
+        return findTarget();
+    }
+
     function effectCount(layer) {
         if (!layer) return 0;
         var parade = layer.property("ADBE Effect Parade");
@@ -147,6 +204,7 @@
             if (report && report.resolution === "name") report.resolution = "index";
             return property;
         }
+        if (report) report.missingParameter = binding.name;
         return null;
     }
 
@@ -212,6 +270,34 @@
             if (!property) return null;
             text += BINDINGS[i].key + "=" + String(readValue(property, BINDINGS[i])) + ";";
         }
+        var layoutValues = {};
+        var layoutSupported = true;
+        for (var l = 0; l < LAYOUT_BINDINGS.length; l++) {
+            var layoutBinding = LAYOUT_BINDINGS[l];
+            var layoutProperty = resolveProperty(target.effect, layoutBinding, report);
+            var layoutValue = null;
+            try {
+                if (layoutProperty) layoutValue = Number(layoutProperty.value);
+            } catch (ignored) { layoutProperty = null; }
+            if (!layoutProperty || !isFinite(layoutValue)) {
+                layoutSupported = false;
+                break;
+            }
+            if (!layoutValues[layoutBinding.nodeId]) layoutValues[layoutBinding.nodeId] = {};
+            layoutValues[layoutBinding.nodeId][layoutBinding.axis] = layoutValue;
+        }
+        if (report) {
+            report.layoutPersistence = layoutSupported;
+            report.layoutValues = layoutSupported ? layoutValues : null;
+        }
+        if (layoutSupported) {
+            for (var lv = 0; lv < LAYOUT_BINDINGS.length; lv++) {
+                var valueBinding = LAYOUT_BINDINGS[lv];
+                text += valueBinding.key + "=" + String(layoutValues[valueBinding.nodeId][valueBinding.axis]) + ";";
+            }
+        } else {
+            text += "layoutPersistence=session-only;";
+        }
         var hash = 5381;
         for (var c = 0; c < text.length; c++) hash = ((hash * 33) ^ text.charCodeAt(c)) & 0xffffffff;
         return (hash >>> 0).toString(16);
@@ -242,13 +328,14 @@
     }
 
     function getState(request) {
-        var target = findTarget();
+        var target = findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
         var report = { resolution: "name" };
         var token = targetToken(target);
         if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
         var revision = currentRevision(target, report);
-        if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved; the effect build and panel bindings disagree.");
+        if (revision === null) return fail("missing_parameter", "A render parameter could not be resolved" +
+            (report.missingParameter ? ": " + report.missingParameter : ".") + " Check that the plug-in and panel builds match.");
         var nodes = [];
         for (var i = 0; i < CHAIN.length; i++) {
             var node = { id: CHAIN[i].id, label: CHAIN[i].label, params: [] };
@@ -261,15 +348,24 @@
             }
             nodes.push(node);
         }
+        var layout = {};
+        for (var n = 0; n < CHAIN.length; n++) {
+            var nodeId = CHAIN[n].id;
+            layout[nodeId] = report.layoutPersistence ? report.layoutValues[nodeId] : {
+                x: layoutBindingFor(nodeId, "x").defaultValue,
+                y: layoutBindingFor(nodeId, "y").defaultValue
+            };
+        }
         return reply({ ok: true, operation: "getState", requestId: request.requestId || "",
                        target: { token: token, comp: target.comp.name, layer: target.layer.name,
                                  effectIndex: target.effect.propertyIndex ? target.effect.propertyIndex : 0 },
                        controlSource: controlSource(target.effect), resolution: report.resolution,
-                       revision: revision, nodes: nodes, edges: EDGES });
+                        revision: revision, nodes: nodes, edges: EDGES, layout: layout,
+                        layoutPersistence: report.layoutPersistence });
     }
 
     function setParameters(request) {
-        var target = findTarget();
+        var target = findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
         if (!request.target || typeof request.target.token !== "string" || request.target.token.length === 0) {
             return fail("invalid_request", "target.token from the last getState response is required.");
@@ -287,7 +383,8 @@
         }
         var report = { resolution: "name" };
         var revision = currentRevision(target, report);
-        if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved.");
+        if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved" +
+            (report.missingParameter ? ": " + report.missingParameter : "."));
         if (request.baseRevision !== revision) {
             return fail("stale_state", "The effect changed since the panel loaded it; reload before editing.");
         }
@@ -367,8 +464,111 @@
             return fail("host_write_failed", message, context);
         }
 
-        var updated = getState({ requestId: request.requestId });
+        var updated = getState({ requestId: request.requestId, pinTarget: request.pinTarget,
+                                 target: request.target });
         return updated;
+    }
+
+    function setNodeLayout(request) {
+        var target = findRequestTarget(request);
+        if (target.error) return fail(target.error.code, target.error.message);
+        if (!request.target || typeof request.target.token !== "string" || request.target.token.length === 0) {
+            return fail("invalid_request", "target.token from the last getState response is required.");
+        }
+        var token = targetToken(target);
+        if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
+        if (request.target.token !== token) {
+            return fail("stale_state", "The selected effect changed since the panel loaded it; reload before editing.");
+        }
+        if (typeof request.baseRevision !== "string" || request.baseRevision.length === 0) {
+            return fail("invalid_request", "baseRevision from the last getState response is required.");
+        }
+        if (!request.layout || typeof request.layout !== "object") {
+            return fail("invalid_request", "layout must contain the x and y position for each fixed node.");
+        }
+
+        var report = { resolution: "name" };
+        var revision = currentRevision(target, report);
+        if (revision === null) return fail("missing_parameter", "A bound effect parameter could not be resolved" +
+            (report.missingParameter ? ": " + report.missingParameter : "."));
+        if (!report.layoutPersistence) {
+            return fail("layout_persistence_unavailable", "This effect build has no script-accessible project layout streams. Update the plug-in to save node positions in the AE project.");
+        }
+        if (request.baseRevision !== revision) {
+            return fail("stale_state", "The effect changed since the panel loaded it; reload before editing.");
+        }
+
+        // Validate and resolve all eight streams before mutating any of them.
+        var planned = [];
+        for (var i = 0; i < LAYOUT_BINDINGS.length; i++) {
+            var binding = LAYOUT_BINDINGS[i];
+            var position = request.layout[binding.nodeId];
+            if (!position || typeof position !== "object") {
+                return fail("invalid_request", "Missing layout position for " + binding.nodeId + ".");
+            }
+            var value = position[binding.axis];
+            if (typeof value !== "number" || !isFinite(value) || value < binding.min || value > binding.max) {
+                return fail("invalid_value", "Rejected layout coordinate for " + binding.nodeId + " " + binding.axis + ".");
+            }
+            var property = resolveProperty(target.effect, binding, report);
+            if (!property) return fail("missing_parameter", "Missing saved node layout stream: " + binding.name);
+            if (property.numKeys > 0 || property.isTimeVarying) {
+                return fail("animated_parameter", binding.name + " must remain a constant layout value.");
+            }
+            planned.push({ binding: binding, property: property, value: value,
+                           previousValue: Number(property.value) });
+        }
+
+        var failed = null;
+        var rollbackFailure = null;
+        var groupOpen = false;
+        try {
+            app.beginUndoGroup("Starfield: move nodes");
+            groupOpen = true;
+            for (var p = 0; p < planned.length; p++) {
+                try {
+                    planned[p].property.setValue(planned[p].value);
+                } catch (error) {
+                    failed = { binding: planned[p].binding, message: error.toString() };
+                    for (var r = p; r >= 0; r--) {
+                        try {
+                            planned[r].property.setValue(planned[r].previousValue);
+                        } catch (rollbackError) {
+                            if (!rollbackFailure) {
+                                rollbackFailure = { binding: planned[r].binding, message: rollbackError.toString() };
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (error) {
+            failed = failed || { binding: null, message: error.toString() };
+        } finally {
+            if (groupOpen) {
+                try {
+                    app.endUndoGroup();
+                } catch (error) {
+                    failed = failed || { binding: null, message: error.toString() };
+                }
+            }
+        }
+        if (failed) {
+            var message = failed.message;
+            var context = {};
+            if (failed.binding) context.key = failed.binding.key;
+            if (rollbackFailure) {
+                context.rollbackFailed = true;
+                message += " Rollback also failed for " + rollbackFailure.binding.name + ": " + rollbackFailure.message;
+            } else if (failed.binding) {
+                context.rollbackFailed = false;
+                message += " Earlier writes were restored.";
+            }
+            return fail("host_write_failed", message, context);
+        }
+
+        return getState({ requestId: request.requestId, pinTarget: request.pinTarget,
+                          target: request.target });
     }
 
     // Public entry points. Both take and return JSON strings, so the panel never
@@ -402,11 +602,23 @@
         }
     }
 
+    function SFLD_setNodeLayout(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "setNodeLayout") return fail("unknown_operation", request.operation);
+            return setNodeLayout(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
     host.SFLD_getState = SFLD_getState;
     host.SFLD_setParameters = SFLD_setParameters;
+    host.SFLD_setNodeLayout = SFLD_setNodeLayout;
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
-    host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION; };
+    host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
 })();

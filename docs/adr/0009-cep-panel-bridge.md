@@ -1,6 +1,6 @@
 # ADR 0009: CEP panel bridge through supervised AE parameters
 
-- Status: accepted architecture; protocol v1 implementation is present, AE 2023 host qualification pending.
+- Status: protocol v1 accepted and implemented; graph topology editing is blocked on a qualified undoable graph transaction carrier.
 - Date: 2026-09-27.
 - Depends on ADRs 0006–0008 and the stable parameter identity rules in ADR 0001.
 
@@ -52,7 +52,7 @@ Requests and responses are JSON values. The envelope is:
   "protocol": "org.starfieldfx.panel",
   "version": 1,
   "requestId": "caller-generated-id",
-  "operation": "getState | setParameters",
+  "operation": "getState | setParameters | setNodeLayout",
   "target": { "token": "target-token-from-getState" },
   "baseRevision": "state-token",
   "changes": []
@@ -61,17 +61,19 @@ Requests and responses are JSON values. The envelope is:
 
 `getState` resolves the selected composition, layer, and Starfield effect,
 returns an opaque target token, the fixed node/port/edge snapshot, editable
-values, and a revision token. `setParameters` identifies bindings by stable
+values, project-saved node positions, and a revision token. `setParameters` identifies bindings by stable
 graph `NodeId` + `ParamKey`; AE parameter IDs remain the storage mapping and are
 never treated as graph identities. Version 1 displays the required
 emitter → force → appearance → output chain with one emitter. Its topology is
-read-only; parameter values are editable. Dynamic node creation, deletion,
+read-only; parameter values and the fixed nodes' saved positions are editable.
+`setNodeLayout` validates and writes all eight hidden layout coordinates in one AE
+undo group (ADR 0014). Dynamic node creation, deletion,
 reordering, and edge rewiring require a later protocol version.
 
 Before writing, the gateway requires the target token and non-empty
 `baseRevision` returned by the last `getState`. The target token binds the edit
 to AE's project-root ID, composition ID, layer ID, and effect index; the revision also includes
-that target identity and every current editable value. It validates every
+that target identity, every current render value, and all saved layout coordinates. It validates every
 node/parameter/value and the entire change set before mutation. A successful edit is wrapped in one AE
 undo group. Unknown versions, stale state, ambiguous/missing targets, unknown
 parameter bindings, non-finite/out-of-range values, and oversized payloads are
@@ -133,3 +135,59 @@ close this gate.
 - [After Effects C++ SDK Guide: PF_ParamDef and arbitrary-data standard controls](https://ae-plugins.docsforadobe.dev/effect-basics/PF_ParamDef/)
 - [After Effects C++ SDK Guide: arbitrary-data parameters](https://ae-plugins.docsforadobe.dev/effect-details/arbitrary-data-parameters/)
 - [After Effects C++ SDK Guide: AEGP query/render dependency warning](https://ae-plugins.docsforadobe.dev/aegps/cheating-effect-usage-of-aegp-suites/)
+
+## Amendment: graph editor interactions and protocol v2 gate (2026-09-29)
+
+The owner requested a pinned target that survives AE selection changes and direct
+node-canvas gestures: select a wire to disconnect it, and drop a node over a wire to
+insert it into that connection. The panel source now resolves a pinned target by the
+project/comp/layer/effect token from `getState`; missing or changed identities fail
+closed. Node card coordinates are persisted by the hidden standard effect parameters
+defined in ADR 0014. Marquee selection, canvas pan, and wheel zoom remain transient
+view state. A topology gesture must never update only the canvas and pretend it changed
+the project.
+
+Protocol v1 cannot persist these edits: its state is a hard-coded four-node view, its
+revision hashes only flat parameter values, and its only write operation updates those
+ordinary streams. The graph itself is a `PF_Param_ARBITRARY_DATA` value. The scripting
+API documents `PropertyValueType.CUSTOM_VALUE` generically, but does not establish that
+AE 2023 scripts can read or set this plug-in's arbitrary-data encoding or that such a
+write reaches the supervised callback and participates in undo. Do not assume that a
+custom-value property accepts the plug-in's `PRINT`/`SCAN` text representation.
+
+Protocol v2 must provide a bounded graph snapshot with stable NodeId, PortKey, and
+EdgeId values, plus an atomic, revision-checked edit transaction. At minimum it must
+support adding nodes, connecting ports, disconnecting a specific EdgeId, and
+`InsertNodeOnEdge` (remove one edge and create the two typed replacement edges in one
+transaction). The host validates the complete resulting graph before committing it to
+the AE-owned graph parameter in one undo step. A successful response returns the new
+graph snapshot and revision. Failed validation, stale revisions, or failed host writes
+leave the stored graph unchanged. Node card coordinates are already covered by ADR
+0014 and live in the AE project. Canvas pan and zoom are transient view state.
+
+The owner ran the read-only
+[`tools/probe_graph_property.jsx`](../../tools/probe_graph_property.jsx) in AE
+23.5x52 (AE 2023.5.2), with one Starfield effect selected. The property at index 31
+reported `propertyValueType: 649` (`CUSTOM_VALUE`). Reading `.value` threw “Can not
+get or set a value from this property … This propertyValueType CUSTOM_VALUE has not
+been implemented.” The object exposes a `setValue` function, but no setter call was
+made, so script write, callback delivery, undo, and persistence are all unverified.
+This closes the read-capability probe: ExtendScript cannot read the graph snapshot
+through the arbitrary-data property on this tested host. Do not ask the owner to rerun
+this probe.
+
+The next step is a source-level carrier design review, recorded in a separate ADR,
+before adding host parameters or changing the panel protocol. A viable design must
+provide both directions: an atomic edit command into the supervised callback and a
+bounded project-saved graph snapshot back to the panel. It must also preserve a single
+AE undo step, duplicate/copy behavior, and stale-revision rejection. A one-way command
+mailbox alone is insufficient because protocol v2 must redraw the committed graph
+after edits and reopen. Do not assume that a `setValue` method existing means it can
+serialize a plug-in custom value; do not add socket/helper-process channels, mutate
+the graph from the panel, or claim topology edits are persistent. Any setter/carrier
+host experiment must use a disposable duplicate project/effect and explicit owner
+authorization under ADR 0011.
+
+The current source-level carrier proposal is in
+[ADR 0013](0013-script-visible-graph-snapshot.md). Its expression-backed snapshot is
+not accepted until AE 2023 confirms the callback read and single-step undo gates.

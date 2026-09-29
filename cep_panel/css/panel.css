@@ -34,6 +34,10 @@ body {
 .bar { display: flex; flex-direction: column; gap: 2px; }
 .title { font-weight: 600; font-size: 12px; }
 .sub { color: var(--muted); }
+.target-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#targetLock { flex: 0 0 auto; padding: 1px 7px; color: var(--muted); }
+#targetLock[aria-pressed="true"] { color: var(--text); border-color: var(--accent); }
+#targetLock:disabled { opacity: 0.55; cursor: default; }
 
 .footer {
   flex-direction: row;
@@ -98,27 +102,99 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   font-weight: 600;
 }
 .section-note { color: var(--muted); font-weight: 400; text-align: right; }
+.graph-tools { display: inline-flex; align-items: center; gap: 12px; }
+#zoomReadout { min-width: 34px; color: var(--muted); font-weight: 400; text-align: right; }
 
 .graph-pane { display: flex; flex: 1 1 auto; flex-direction: column; }
 .graph-scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-x: auto;
-  overflow-y: auto;
+  min-width: 0;
+  overflow: hidden;
   background-color: #24262b;
   background-image: radial-gradient(#414650 0.7px, transparent 0.7px);
   background-size: 16px 16px;
+  cursor: default;
 }
-.graph-canvas { position: relative; width: 580px; height: 320px; }
+.graph-scroll.panning { cursor: grabbing; }
+.graph-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.graph-canvas { position: absolute; left: 0; top: 0; width: 580px; height: 320px; transform-origin: top left; }
+.graph-minimap {
+  position: absolute;
+  z-index: 20;
+  left: 8px;
+  bottom: 8px;
+  width: 192px;
+  height: 120px;
+  border: 1px solid #596170;
+  border-radius: 4px;
+  background: #202227e8;
+  box-shadow: 0 3px 12px #0008;
+  cursor: crosshair;
+  touch-action: none;
+}
 .graph-edges, .graph-nodes { position: absolute; inset: 0; width: 100%; height: 100%; }
-.graph-edges { overflow: visible; pointer-events: none; }
+.graph-edges { overflow: visible; pointer-events: auto; }
 .graph-edges .edge {
   fill: none;
   stroke: #89a9d2;
   stroke-width: 2;
   marker-end: url(#edgeArrow);
+  pointer-events: none;
 }
 .graph-edges marker path { fill: #89a9d2; }
+.graph-edges .edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.graph-edges .edge-hit:focus-visible { stroke: #89a9d255; outline: none; }
+.graph-edges .edge-preview {
+  fill: none;
+  stroke: #9abaff;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+.selection-box {
+  position: absolute;
+  z-index: 5;
+  border: 1px solid #8ab5ff;
+  background: #5796ff26;
+  pointer-events: none;
+}
+.selection-box[hidden] { display: none; }
+.graph-context-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  min-width: 190px;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid #555b65;
+  border-radius: 4px;
+  background: #2d3036;
+  box-shadow: 0 6px 20px #000a;
+}
+.graph-context-menu[hidden] { display: none; }
+.graph-context-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.graph-context-menu button:hover:not(:disabled),
+.graph-context-menu button:focus-visible { background: #414650; }
+.graph-context-menu button:disabled { opacity: 0.45; cursor: default; }
+.context-menu-heading { padding: 4px 6px; color: var(--muted); font-weight: 600; }
+.context-menu-separator { height: 1px; margin: 4px 2px; background: var(--line); }
+.graph-context-menu span { color: var(--muted); }
+.drag-copy-preview { opacity: 0.7; border-style: dashed; pointer-events: none; }
 
 .hint { color: var(--muted); margin: 9px; }
 
@@ -164,7 +240,8 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   border: 2px solid #dbe6f5;
   border-radius: 50%;
   background: var(--node-color);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: crosshair;
 }
 .floating-inspector {
   position: absolute;
@@ -217,3 +294,5 @@ button:hover, button:focus-visible { border-color: var(--accent); }
 
 body.dragging-node .node-select { cursor: grabbing; }
 body.dragging-node { user-select: none; }
+body.marquee-selecting { user-select: none; cursor: crosshair; }
+body.panning-canvas { user-select: none; cursor: grabbing; }

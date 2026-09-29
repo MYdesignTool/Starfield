@@ -7,12 +7,16 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/layout-compat-2";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var NODE_WIDTH = 220;
     var NODE_HEIGHT = 108;
     var CANVAS_MIN_WIDTH = 580;
     var CANVAS_MIN_HEIGHT = 320;
+    var ZOOM_MIN = 0.5;
+    var ZOOM_MAX = 2.0;
+    var PIN_STORAGE_KEY = "org.starfieldfx.panel.pinnedTarget.v1";
     var startupRetryAttempt = 0;
     var startupRetryTimer = null;
     var refreshEpoch = 0;
@@ -20,9 +24,21 @@
     var resolvedTarget = false;
     var dragState = null;
     var inspectorDragState = null;
+    var marqueeState = null;
+    var panState = null;
+    var connectionState = null;
+    var contextEdge = null;
+    var contextGraphPoint = null;
     var nodePositions = {};
+    var canvasOffset = { x: 0, y: 0 };
+    var centerGraphOnNextRender = true;
     var graphNodeElements = {};
     var shownInspectorNodeId = null;
+    var suppressNextNodeClick = false;
+    var zoom = 1;
+    var viewPan = { x: 0, y: 0 };
+    var minimapPanState = null;
+    var minimapTransform = null;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
     // Adobe's full CSInterface library can replace this shim later without changing
@@ -83,15 +99,24 @@
         return false;
     };
 
+    var pinnedTargetToken = null;
+    try { pinnedTargetToken = window.localStorage.getItem(PIN_STORAGE_KEY) || null; }
+    catch (ignored) { /* target pin remains available for this panel session */ }
     var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {},
-                  selectedNodeId: "emitter", inspectorOpen: false, pending: false };
+                  selectedNodeId: "emitter", selectedNodeIds: {}, inspectorOpen: false, pending: false,
+                  pinnedTargetToken: pinnedTargetToken, layoutPersistence: false };
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
         workspace: document.getElementById("workspace"),
         graphCanvas: document.querySelector ? document.querySelector(".graph-canvas") : null,
+        graphScroll: document.getElementById("graphScroll"),
+        graphViewport: document.getElementById("graphViewport"),
+        graphMinimap: document.getElementById("graphMinimap"),
         graphEdges: document.getElementById("graphEdges"),
         edgePaths: document.getElementById("edgePaths"),
+        selectionBox: document.getElementById("selectionBox"),
+        zoomReadout: document.getElementById("zoomReadout"),
         inspectorTitle: document.getElementById("inspectorTitle"),
         inspectorMeta: document.getElementById("inspectorMeta"),
         inspectorBody: document.getElementById("inspectorBody"),
@@ -104,8 +129,11 @@
         resolutionLine: document.getElementById("resolutionLine"),
         preset: document.getElementById("preset"),
         refresh: document.getElementById("refresh"),
-        autoRefresh: document.getElementById("autoRefresh")
+        autoRefresh: document.getElementById("autoRefresh"),
+        targetLock: document.getElementById("targetLock")
     };
+    elements.contextMenu = document.getElementById("graphContextMenu");
+    elements.disconnectContextAction = document.getElementById("disconnectContextAction");
 
     function requestId() {
         return "r" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
@@ -138,12 +166,12 @@
     function ensureGateway(callback) {
         if (gatewayReady) { callback(true); return; }
         evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (probe) {
-            if (String(probe).indexOf("org.starfieldfx.panel") === 0) { gatewayReady = true; callback(true); return; }
+            if (String(probe) === GATEWAY_READY_TOKEN) { gatewayReady = true; callback(true); return; }
             var root = extensionRoot();
             if (!root) { callback(false); return; }
             evalScript("$.evalFile(" + quote(root + "/jsx/starfield_gateway.jsx") + ")", function () {
                 evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (second) {
-                    gatewayReady = String(second).indexOf("org.starfieldfx.panel") === 0;
+                    gatewayReady = String(second) === GATEWAY_READY_TOKEN;
                     callback(gatewayReady);
                 });
             });
@@ -164,7 +192,9 @@
                 version: 1,
                 requestId: requestId(),
                 operation: operation,
-                target: state.targetToken ? { token: state.targetToken } : {},
+                target: (state.pinnedTargetToken || state.targetToken) ?
+                        { token: state.pinnedTargetToken || state.targetToken } : {},
+                pinTarget: !!state.pinnedTargetToken,
                 baseRevision: state.revision,
                 changes: []
             };
@@ -235,39 +265,278 @@
         elements.banner.textContent = "";
     }
 
+    function syncTargetLock() {
+        if (!elements.targetLock) return;
+        var locked = !!state.pinnedTargetToken;
+        elements.targetLock.textContent = locked ? "Pinned" : "Pin Target";
+        elements.targetLock.setAttribute("aria-pressed", locked ? "true" : "false");
+        elements.targetLock.disabled = !locked && !state.targetToken;
+        elements.targetLock.title = locked ? "Unlock target and follow the current AE selection" :
+            "Keep this effect targeted when AE selection changes";
+    }
+
     var NODE_KICKERS = {
         emitter: "01 / SOURCE", force: "02 / MOTION",
         appearance: "03 / LOOK", output: "04 / RESULT"
     };
     var DEFAULT_NODE_POSITIONS = {
-        emitter: { x: 25, y: 22 }, force: { x: 335, y: 22 },
-        appearance: { x: 335, y: 190 }, output: { x: 25, y: 190 }
+        emitter: { x: 180, y: 22 }, force: { x: 180, y: 190 },
+        appearance: { x: 180, y: 358 }, output: { x: 180, y: 526 }
     };
 
     function positionFor(node, index) {
         if (!nodePositions[node.id]) {
             var preset = DEFAULT_NODE_POSITIONS[node.id];
             nodePositions[node.id] = preset ? { x: preset.x, y: preset.y } : {
-                x: 25 + (index % 2) * 310,
-                y: 22 + Math.floor(index / 2) * 168
+                x: (CANVAS_MIN_WIDTH - NODE_WIDTH) / 2,
+                y: 22 + index * 168
             };
         }
         return nodePositions[node.id];
+    }
+
+    function displayPosition(position) {
+        return { x: position.x + canvasOffset.x, y: position.y + canvasOffset.y };
+    }
+
+    function resetViewForTarget() {
+        nodePositions = {};
+        canvasOffset = { x: 0, y: 0 };
+        viewPan = { x: 0, y: 0 };
+        zoom = 1;
+        centerGraphOnNextRender = true;
+    }
+
+    function applyProjectNodeLayout(layout) {
+        if (!layout || typeof layout !== "object") return false;
+        var changed = false;
+        for (var nodeId in DEFAULT_NODE_POSITIONS) {
+            if (!Object.prototype.hasOwnProperty.call(DEFAULT_NODE_POSITIONS, nodeId)) continue;
+            var position = layout[nodeId];
+            if (!position || !isFinite(Number(position.x)) || !isFinite(Number(position.y))) continue;
+            var x = Number(position.x);
+            var y = Number(position.y);
+            if (!nodePositions[nodeId] || nodePositions[nodeId].x !== x || nodePositions[nodeId].y !== y) changed = true;
+            nodePositions[nodeId] = { x: x, y: y };
+        }
+        return changed;
+    }
+
+    function centerGraphView() {
+        if (!elements.graphScroll || !state.nodes.length) return;
+        var left = Infinity;
+        var top = Infinity;
+        var right = -Infinity;
+        var bottom = -Infinity;
+        for (var i = 0; i < state.nodes.length; i++) {
+            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            var position = displayPosition(positionFor(state.nodes[i], i));
+            left = Math.min(left, position.x);
+            top = Math.min(top, position.y);
+            right = Math.max(right, position.x + NODE_WIDTH);
+            bottom = Math.max(bottom, position.y + NODE_HEIGHT);
+        }
+        if (left === Infinity) return;
+        viewPan.x = (elements.graphScroll.clientWidth - (right - left) * zoom) / 2 - left * zoom;
+        viewPan.y = (elements.graphScroll.clientHeight - (bottom - top) * zoom) / 2 - top * zoom;
+    }
+
+    function canvasInteractionActive() {
+        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState);
+    }
+
+    function commitNodeLayout() {
+        if (!state.layoutPersistence || !state.targetToken || !state.revision || state.pending || !state.nodes.length) return;
+        var layout = {};
+        for (var i = 0; i < state.nodes.length; i++) {
+            var nodeId = state.nodes[i].id;
+            if (!NODE_KICKERS[nodeId]) continue;
+            var position = positionFor(state.nodes[i], i);
+            layout[nodeId] = { x: Number(position.x), y: Number(position.y) };
+        }
+        refreshEpoch += 1;
+        state.pending = true;
+        call("setNodeLayout", { layout: layout }, function (response) {
+            state.pending = false;
+            if (response.ok) {
+                clearBanner();
+                adoptState(response);
+                return;
+            }
+            var error = response.error || { code: "unknown", message: "Unknown failure." };
+            call("getState", null, function (latest) {
+                if (latest.ok) adoptState(latest);
+                showError(error.code, error.message);
+            });
+        });
+    }
+
+    function drawMinimap() {
+        var canvas = elements.graphMinimap;
+        if (!canvas || !canvas.getContext || !elements.graphScroll) return;
+        var context = canvas.getContext("2d");
+        if (!context) return;
+        var width = canvas.width;
+        var height = canvas.height;
+        var padding = 9;
+        var viewportLeft = -viewPan.x / zoom;
+        var viewportTop = -viewPan.y / zoom;
+        var viewportRight = viewportLeft + elements.graphScroll.clientWidth / zoom;
+        var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
+        var bounds = { left: viewportLeft, top: viewportTop,
+                       right: viewportRight, bottom: viewportBottom };
+        var colors = { emitter: "#e5aa69", force: "#94a9ed", appearance: "#b7a0e9", output: "#83c9b1" };
+        for (var i = 0; i < state.nodes.length; i++) {
+            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            var position = displayPosition(positionFor(state.nodes[i], i));
+            bounds.left = Math.min(bounds.left, position.x);
+            bounds.top = Math.min(bounds.top, position.y);
+            bounds.right = Math.max(bounds.right, position.x + NODE_WIDTH);
+            bounds.bottom = Math.max(bounds.bottom, position.y + NODE_HEIGHT);
+        }
+        var rangeWidth = Math.max(1, bounds.right - bounds.left);
+        var rangeHeight = Math.max(1, bounds.bottom - bounds.top);
+        var scale = Math.min((width - padding * 2) / rangeWidth, (height - padding * 2) / rangeHeight);
+        var mapWidth = rangeWidth * scale;
+        var mapHeight = rangeHeight * scale;
+        var offsetX = (width - mapWidth) / 2;
+        var offsetY = (height - mapHeight) / 2;
+        minimapTransform = { left: bounds.left, top: bounds.top, scale: scale,
+                             offsetX: offsetX, offsetY: offsetY };
+
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "rgba(32,34,39,0.94)";
+        context.fillRect(0, 0, width, height);
+        context.save();
+        context.beginPath();
+        context.rect(padding, padding, width - padding * 2, height - padding * 2);
+        context.clip();
+        for (var n = 0; n < state.nodes.length; n++) {
+            var node = state.nodes[n];
+            if (!NODE_KICKERS[node.id]) continue;
+            var nodePosition = displayPosition(positionFor(node, n));
+            var nodeX = offsetX + (nodePosition.x - bounds.left) * scale;
+            var nodeY = offsetY + (nodePosition.y - bounds.top) * scale;
+            context.fillStyle = colors[node.id] || "#aab2bf";
+            context.fillRect(nodeX, nodeY, Math.max(3, NODE_WIDTH * scale), Math.max(2, NODE_HEIGHT * scale));
+        }
+        var viewX = offsetX + (viewportLeft - bounds.left) * scale;
+        var viewY = offsetY + (viewportTop - bounds.top) * scale;
+        var viewWidth = (viewportRight - viewportLeft) * scale;
+        var viewHeight = (viewportBottom - viewportTop) * scale;
+        context.fillStyle = "rgba(116,164,235,0.12)";
+        context.fillRect(viewX, viewY, viewWidth, viewHeight);
+        context.strokeStyle = "#c5d9fa";
+        context.lineWidth = 1.5;
+        context.strokeRect(viewX + 0.75, viewY + 0.75, Math.max(0, viewWidth - 1.5), Math.max(0, viewHeight - 1.5));
+        context.restore();
+        context.strokeStyle = "#596170";
+        context.lineWidth = 1;
+        context.strokeRect(0.5, 0.5, width - 1, height - 1);
+    }
+
+    function moveViewToMinimapPoint(event) {
+        if (!minimapTransform || !elements.graphMinimap || !elements.graphScroll) return;
+        var rect = elements.graphMinimap.getBoundingClientRect();
+        var mapX = (event.clientX - rect.left) * (elements.graphMinimap.width / rect.width);
+        var mapY = (event.clientY - rect.top) * (elements.graphMinimap.height / rect.height);
+        var pointX = minimapTransform.left + (mapX - minimapTransform.offsetX) / minimapTransform.scale;
+        var pointY = minimapTransform.top + (mapY - minimapTransform.offsetY) / minimapTransform.scale;
+        viewPan.x = elements.graphScroll.clientWidth / 2 - pointX * zoom;
+        viewPan.y = elements.graphScroll.clientHeight / 2 - pointY * zoom;
+        updateCanvasBounds();
     }
 
     function updateCanvasBounds() {
         if (!elements.graphCanvas) return;
         var width = CANVAS_MIN_WIDTH;
         var height = CANVAS_MIN_HEIGHT;
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = -Infinity;
+        var maxY = -Infinity;
         for (var i = 0; i < state.nodes.length; i++) {
             if (!NODE_KICKERS[state.nodes[i].id]) continue;
             var position = positionFor(state.nodes[i], i);
-            width = Math.max(width, position.x + NODE_WIDTH + 25);
-            height = Math.max(height, position.y + NODE_HEIGHT + 22);
+            minX = Math.min(minX, position.x);
+            minY = Math.min(minY, position.y);
+            maxX = Math.max(maxX, position.x + NODE_WIDTH);
+            maxY = Math.max(maxY, position.y + NODE_HEIGHT);
         }
+        if (dragState && dragState.copy && dragState.moved) {
+            var copyDx = (dragState.lastX - dragState.startX) / zoom;
+            var copyDy = (dragState.lastY - dragState.startY) / zoom;
+            for (var copyIndex = 0; copyIndex < dragState.origins.length; copyIndex++) {
+                var copyOrigin = dragState.origins[copyIndex];
+                minX = Math.min(minX, copyOrigin.x + copyDx);
+                minY = Math.min(minY, copyOrigin.y + copyDy);
+                maxX = Math.max(maxX, copyOrigin.x + copyDx + NODE_WIDTH);
+                maxY = Math.max(maxY, copyOrigin.y + copyDy + NODE_HEIGHT);
+            }
+        }
+        if (minX === Infinity) { minX = 0; minY = 0; maxX = CANVAS_MIN_WIDTH; maxY = CANVAS_MIN_HEIGHT; }
+        // Keep the canvas dimensions proportional to the node spread, not their
+        // absolute graph coordinates. This supports long drags in every direction
+        // without Chromium's large-element limit becoming an invisible boundary.
+        var nextOffsetX = 24 - minX;
+        var nextOffsetY = 24 - minY;
+        viewPan.x -= (nextOffsetX - canvasOffset.x) * zoom;
+        viewPan.y -= (nextOffsetY - canvasOffset.y) * zoom;
+        canvasOffset = { x: nextOffsetX, y: nextOffsetY };
+        width = Math.max(width, maxX + canvasOffset.x + 25);
+        height = Math.max(height, maxY + canvasOffset.y + 22);
         elements.graphCanvas.style.width = width + "px";
         elements.graphCanvas.style.height = height + "px";
+        elements.graphCanvas.style.transform = "translate(" + viewPan.x + "px," + viewPan.y + "px) scale(" + zoom + ")";
+        for (var nodeId in graphNodeElements) {
+            if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId) || !nodePositions[nodeId]) continue;
+            var nodePosition = displayPosition(nodePositions[nodeId]);
+            graphNodeElements[nodeId].card.style.left = nodePosition.x + "px";
+            graphNodeElements[nodeId].card.style.top = nodePosition.y + "px";
+        }
+        if (dragState && dragState.copy && dragState.previewElements.length) {
+            var previewDx = (dragState.lastX - dragState.startX) / zoom;
+            var previewDy = (dragState.lastY - dragState.startY) / zoom;
+            for (var previewIndex = 0; previewIndex < dragState.previewElements.length; previewIndex++) {
+                var previewOrigin = dragState.origins[previewIndex];
+                var previewPosition = displayPosition({ x: previewOrigin.x + previewDx, y: previewOrigin.y + previewDy });
+                dragState.previewElements[previewIndex].style.left = previewPosition.x + "px";
+                dragState.previewElements[previewIndex].style.top = previewPosition.y + "px";
+            }
+        }
+        if (elements.graphViewport) {
+            elements.graphViewport.style.width = (elements.graphScroll ? elements.graphScroll.clientWidth : width) + "px";
+            elements.graphViewport.style.height = (elements.graphScroll ? elements.graphScroll.clientHeight : height) + "px";
+        }
+        if (elements.graphScroll) {
+            var gridSize = 16 * zoom;
+            elements.graphScroll.style.backgroundSize = gridSize + "px " + gridSize + "px";
+            elements.graphScroll.style.backgroundPosition =
+                (((viewPan.x % gridSize) + gridSize) % gridSize) + "px " +
+                (((viewPan.y % gridSize) + gridSize) % gridSize) + "px";
+            elements.graphScroll.scrollLeft = 0;
+            elements.graphScroll.scrollTop = 0;
+        }
         if (elements.graphEdges) elements.graphEdges.setAttribute("viewBox", "0 0 " + width + " " + height);
+        if (elements.zoomReadout) elements.zoomReadout.textContent = Math.round(zoom * 100) + "%";
+        drawMinimap();
+    }
+
+    function syncNodeSelectionStyles() {
+        for (var nodeId in graphNodeElements) {
+            if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
+            var card = graphNodeElements[nodeId].card;
+            var selected = !!state.selectedNodeIds[nodeId];
+            card.className = "graph-node " + nodeId + (selected ? " selected" : "");
+            var button = card.querySelector(".node-select");
+            if (button) button.setAttribute("aria-pressed", state.selectedNodeId === nodeId ? "true" : "false");
+        }
+    }
+
+    function canvasPoint(clientX, clientY) {
+        var bounds = elements.graphScroll.getBoundingClientRect();
+        return { x: (clientX - bounds.left - viewPan.x) / zoom,
+                 y: (clientY - bounds.top - viewPan.y) / zoom };
     }
 
     function chooseSide(dx, dy, fallback) {
@@ -309,10 +578,11 @@
     function portPoint(nodeId, side) {
         var position = nodePositions[nodeId];
         if (!position) return null;
-        if (side === "right") return { x: position.x + NODE_WIDTH, y: position.y + NODE_HEIGHT / 2 };
-        if (side === "left") return { x: position.x, y: position.y + NODE_HEIGHT / 2 };
-        if (side === "bottom") return { x: position.x + NODE_WIDTH / 2, y: position.y + NODE_HEIGHT };
-        return { x: position.x + NODE_WIDTH / 2, y: position.y };
+        var display = displayPosition(position);
+        if (side === "right") return { x: display.x + NODE_WIDTH, y: display.y + NODE_HEIGHT / 2 };
+        if (side === "left") return { x: display.x, y: display.y + NODE_HEIGHT / 2 };
+        if (side === "bottom") return { x: display.x + NODE_WIDTH / 2, y: display.y + NODE_HEIGHT };
+        return { x: display.x + NODE_WIDTH / 2, y: display.y };
     }
 
     function edgePath(edge, sides) {
@@ -370,10 +640,12 @@
     function addGraphNode(node) {
         var card = document.createElement("section");
         var position = positionFor(node, state.nodes.indexOf(node));
+        var display = displayPosition(position);
+        card.setAttribute("data-node-id", node.id);
         card.className = "graph-node " + node.id +
-                         (state.selectedNodeId === node.id ? " selected" : "");
-        card.style.left = position.x + "px";
-        card.style.top = position.y + "px";
+                         (state.selectedNodeIds[node.id] ? " selected" : "");
+        card.style.left = display.x + "px";
+        card.style.top = display.y + "px";
         var portElements = { card: card, input: null, output: null };
         var button = document.createElement("button");
         button.type = "button";
@@ -392,20 +664,32 @@
         button.appendChild(kicker);
         button.appendChild(title);
         button.appendChild(summary);
-        button.addEventListener("click", function () {
+        button.addEventListener("click", function (event) {
+            if (suppressNextNodeClick) { suppressNextNodeClick = false; return; }
+            if (event.shiftKey || event.ctrlKey) {
+                if (state.selectedNodeIds[node.id]) delete state.selectedNodeIds[node.id];
+                else state.selectedNodeIds[node.id] = true;
+            } else {
+                state.selectedNodeIds = {};
+                state.selectedNodeIds[node.id] = true;
+            }
             state.selectedNodeId = node.id;
             state.inspectorOpen = true;
-            render(state);
+            syncNodeSelectionStyles();
+            renderInspector();
             refresh(false, false);
         });
         button.addEventListener("pointerdown", function (event) {
-            beginNodeDrag(node.id, event, card);
+            beginNodeDrag(node.id, event);
         });
         card.appendChild(button);
         if (node.id !== "emitter") {
             var input = document.createElement("span");
             input.className = "port port-in";
             input.title = "Input";
+            input.setAttribute("data-node-id", node.id);
+            input.setAttribute("data-port-direction", "in");
+            input.addEventListener("pointerdown", function (event) { beginPortDrag(node.id, "in", event); });
             card.appendChild(input);
             portElements.input = input;
         }
@@ -413,6 +697,9 @@
             var output = document.createElement("span");
             output.className = "port port-out";
             output.title = "Output";
+            output.setAttribute("data-node-id", node.id);
+            output.setAttribute("data-port-direction", "out");
+            output.addEventListener("pointerdown", function (event) { beginPortDrag(node.id, "out", event); });
             card.appendChild(output);
             portElements.output = output;
         }
@@ -436,10 +723,205 @@
             var pathData = edgePath(edge, sides);
             if (!pathData) continue;
             var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("class", "edge");
+            path.setAttribute("class", "edge-hit");
             path.setAttribute("d", pathData);
+            path.setAttribute("data-from", edge[0]);
+            path.setAttribute("data-to", edge[1]);
+            path.setAttribute("tabindex", "0");
+            path.setAttribute("role", "button");
+            path.setAttribute("aria-label", "Disconnect " + edge[0] + " from " + edge[1]);
+            path.addEventListener("click", function () {
+                requestTopologyEdit({ type: "disconnect", from: this.getAttribute("data-from"),
+                                      to: this.getAttribute("data-to") });
+            });
+            path.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    this.click();
+                }
+            });
             elements.edgePaths.appendChild(path);
+            var visible = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            visible.setAttribute("class", "edge");
+            visible.setAttribute("d", pathData);
+            visible.setAttribute("aria-hidden", "true");
+            elements.edgePaths.appendChild(visible);
         }
+        if (connectionState) {
+            var currentSides = computePortSides();
+            var side = currentSides[connectionState.nodeId] || {};
+            var fixedSide = connectionState.direction === "out" ? side.output : side.input;
+            var fixedPoint = portPoint(connectionState.nodeId, fixedSide ||
+                (connectionState.direction === "out" ? "bottom" : "top"));
+            if (fixedPoint) {
+                var start = connectionState.direction === "out" ? fixedPoint : connectionState.point;
+                var end = connectionState.direction === "out" ? connectionState.point : fixedPoint;
+                var dx = end.x - start.x;
+                var dy = end.y - start.y;
+                var alongY = Math.abs(dy) >= Math.abs(dx);
+                var bend = Math.max(32, Math.min(120, (Math.abs(dx) + Math.abs(dy)) * 0.35));
+                var c1x = start.x + (alongY ? 0 : (dx >= 0 ? bend : -bend));
+                var c1y = start.y + (alongY ? (dy >= 0 ? bend : -bend) : 0);
+                var c2x = end.x - (alongY ? 0 : (dx >= 0 ? bend : -bend));
+                var c2y = end.y - (alongY ? (dy >= 0 ? bend : -bend) : 0);
+                var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                preview.setAttribute("class", "edge-preview");
+                preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
+                    c2x + " " + c2y + " " + end.x + " " + end.y);
+                preview.setAttribute("aria-hidden", "true");
+                elements.edgePaths.appendChild(preview);
+            }
+        }
+    }
+
+    function requestTopologyEdit(edit) {
+        if (!state.targetToken || !state.revision || state.pending) return;
+        applyTopologyEdit(edit);
+    }
+
+    function applyTopologyEdit(edit) {
+        // P-02B needs a graph-backed, undoable host transaction. Protocol v1 only
+        // exposes flat parameter streams, so never fake a local-only topology edit.
+        var labels = {
+            disconnect: "Disconnect this wire",
+            insertNode: "Insert this node",
+            connect: "Connect these ports",
+            addNode: "Add node",
+            duplicateNodes: "Duplicate selected nodes",
+            deleteNodes: "Delete selected nodes"
+        };
+        var action = edit && labels[edit.type] ? labels[edit.type] : "Edit graph";
+        showError("graph_edit_transport_unavailable", action +
+                  " is unavailable until the graph transaction bridge is implemented.");
+    }
+
+    function closestElement(target, selector) {
+        var element = target;
+        while (element && element !== document) {
+            if (element.matches && element.matches(selector)) return element;
+            element = element.parentNode;
+        }
+        return null;
+    }
+
+    function hideGraphContextMenu() {
+        if (elements.contextMenu) elements.contextMenu.hidden = true;
+        contextEdge = null;
+        contextGraphPoint = null;
+    }
+
+    function showGraphContextMenu(event) {
+        if (!elements.contextMenu || !elements.graphCanvas) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var edgePath = closestElement(event.target, ".edge-hit");
+        var nodeCard = closestElement(event.target, ".graph-node");
+        contextEdge = edgePath ? {
+            from: edgePath.getAttribute("data-from"),
+            to: edgePath.getAttribute("data-to")
+        } : null;
+        if (nodeCard) {
+            var nodeId = nodeCard.getAttribute("data-node-id");
+            if (nodeId && !state.selectedNodeIds[nodeId]) {
+                state.selectedNodeIds = {};
+                state.selectedNodeIds[nodeId] = true;
+                state.selectedNodeId = nodeId;
+                syncNodeSelectionStyles();
+            }
+        }
+        var point = canvasPoint(event.clientX, event.clientY);
+        contextGraphPoint = { x: point.x - canvasOffset.x, y: point.y - canvasOffset.y };
+        if (elements.disconnectContextAction) elements.disconnectContextAction.hidden = !contextEdge;
+        var selectedCount = 0;
+        for (var selectedId in state.selectedNodeIds) {
+            if (Object.prototype.hasOwnProperty.call(state.selectedNodeIds, selectedId)) selectedCount += 1;
+        }
+        var selectionActions = elements.contextMenu.querySelectorAll('[data-action="duplicateNodes"], [data-action="deleteNodes"]');
+        for (var i = 0; i < selectionActions.length; i++) selectionActions[i].disabled = selectedCount === 0;
+        elements.contextMenu.hidden = false;
+        var menuWidth = elements.contextMenu.offsetWidth || 190;
+        var menuHeight = elements.contextMenu.offsetHeight || 250;
+        elements.contextMenu.style.left = Math.max(4, Math.min(window.innerWidth - menuWidth - 4, event.clientX)) + "px";
+        elements.contextMenu.style.top = Math.max(4, Math.min(window.innerHeight - menuHeight - 4, event.clientY)) + "px";
+    }
+
+    function selectedNodeIds() {
+        var ids = [];
+        for (var nodeId in state.selectedNodeIds) {
+            if (Object.prototype.hasOwnProperty.call(state.selectedNodeIds, nodeId)) ids.push(nodeId);
+        }
+        return ids;
+    }
+
+    function capturePointer(event) {
+        var target = event.currentTarget;
+        if (!target || typeof target.setPointerCapture !== "function" || event.pointerId === undefined) return;
+        try { target.setPointerCapture(event.pointerId); } catch (ignored) { /* window listeners still handle in-panel drags */ }
+    }
+
+    function duplicateSelection(offsetX, offsetY) {
+        var ids = selectedNodeIds();
+        if (!ids.length) return;
+        requestTopologyEdit({ type: "duplicateNodes", nodeIds: ids,
+                              offset: { x: offsetX || 28, y: offsetY || 28 } });
+    }
+
+    function handleContextMenuAction(event) {
+        var button = closestElement(event.target, "[data-action]");
+        if (!button || !elements.contextMenu.contains(button)) return;
+        event.preventDefault();
+        var action = button.getAttribute("data-action");
+        var edit;
+        if (action === "addNode") {
+            edit = { type: "addNode", nodeType: button.getAttribute("data-node-type"),
+                     position: contextGraphPoint || { x: 280, y: 40 } };
+        } else if (action === "duplicateNodes") {
+            edit = { type: "duplicateNodes", nodeIds: selectedNodeIds(), offset: { x: 28, y: 28 } };
+        } else if (action === "deleteNodes") {
+            edit = { type: "deleteNodes", nodeIds: selectedNodeIds() };
+        } else if (action === "disconnect" && contextEdge) {
+            edit = { type: "disconnect", from: contextEdge.from, to: contextEdge.to };
+        }
+        hideGraphContextMenu();
+        if (edit) requestTopologyEdit(edit);
+    }
+
+    function edgeUnderNode(nodeId) {
+        var position = nodePositions[nodeId];
+        if (!position) return null;
+        var display = displayPosition(position);
+        var left = display.x - 8;
+        var right = display.x + NODE_WIDTH + 8;
+        var top = display.y - 8;
+        var bottom = display.y + NODE_HEIGHT + 8;
+        var sides = computePortSides();
+        for (var i = 0; i < state.edges.length; i++) {
+            var edge = state.edges[i];
+            if (!edge || edge.length !== 2 || edge[0] === nodeId || edge[1] === nodeId) continue;
+            var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "right");
+            var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "left");
+            if (!start || !end) continue;
+            var startSide = sides[edge[0]] ? sides[edge[0]].output : "right";
+            var endSide = sides[edge[1]] ? sides[edge[1]].input : "left";
+            var distance = Math.max(42, Math.min(180,
+                (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) * 0.45));
+            var vectors = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
+                            bottom: { x: 0, y: 1 }, top: { x: 0, y: -1 } };
+            var first = vectors[startSide];
+            var second = vectors[endSide];
+            var c1 = { x: start.x + first.x * distance, y: start.y + first.y * distance };
+            var c2 = { x: end.x + second.x * distance, y: end.y + second.y * distance };
+            for (var sample = 1; sample <= 32; sample++) {
+                var t = sample / 32;
+                var inverse = 1 - t;
+                var x = inverse * inverse * inverse * start.x + 3 * inverse * inverse * t * c1.x +
+                        3 * inverse * t * t * c2.x + t * t * t * end.x;
+                var y = inverse * inverse * inverse * start.y + 3 * inverse * inverse * t * c1.y +
+                        3 * inverse * t * t * c2.y + t * t * t * end.y;
+                if (x >= left && x <= right && y >= top && y <= bottom) return edge;
+            }
+        }
+        return null;
     }
 
     function renderInspector() {
@@ -483,8 +965,15 @@
         var height = elements.workspace.clientHeight;
         var popupWidth = elements.inspector.offsetWidth;
         var popupHeight = elements.inspector.offsetHeight;
-        var nodeOnRight = position.x + NODE_WIDTH / 2 > width / 2;
-        var nodeInUpperHalf = position.y + NODE_HEIGHT / 2 < height / 2;
+        var card = graphNodeElements[nodeId] && graphNodeElements[nodeId].card;
+        var workspaceBounds = elements.workspace.getBoundingClientRect();
+        var cardBounds = card ? card.getBoundingClientRect() : null;
+        var nodeOnRight = cardBounds ?
+            cardBounds.left + cardBounds.width / 2 > workspaceBounds.left + width / 2 :
+            position.x + NODE_WIDTH / 2 > width / 2;
+        var nodeInUpperHalf = cardBounds ?
+            cardBounds.top + cardBounds.height / 2 < workspaceBounds.top + height / 2 :
+            position.y + NODE_HEIGHT / 2 < height / 2;
         var left = nodeOnRight ? 8 : width - popupWidth - 8;
         var top = nodeInUpperHalf ? height - popupHeight - 8 : 8;
         elements.inspector.style.left = Math.max(8, left) + "px";
@@ -510,7 +999,23 @@
             if (node.id === state.selectedNodeId) selectedExists = true;
         }
         if (!selectedExists) state.selectedNodeId = state.nodes[0].id;
+        var selectedCount = 0;
+        for (var selectedId in state.selectedNodeIds) {
+            if (!Object.prototype.hasOwnProperty.call(state.selectedNodeIds, selectedId)) continue;
+            var foundSelection = false;
+            for (var nodeIndex = 0; nodeIndex < state.nodes.length; nodeIndex++) {
+                if (state.nodes[nodeIndex].id === selectedId) { foundSelection = true; break; }
+            }
+            if (!foundSelection) delete state.selectedNodeIds[selectedId];
+            else selectedCount += 1;
+        }
+        if (selectedCount === 0) state.selectedNodeIds[state.selectedNodeId] = true;
         updateCanvasBounds();
+        if (centerGraphOnNextRender) {
+            centerGraphView();
+            centerGraphOnNextRender = false;
+            updateCanvasBounds();
+        }
         for (var n = 0; n < state.nodes.length; n++) {
             if (NODE_KICKERS[state.nodes[n].id]) addGraphNode(state.nodes[n]);
         }
@@ -518,14 +1023,197 @@
         renderInspector();
     }
 
-    function beginNodeDrag(nodeId, event, card) {
-        if (event.button !== 0 || event.isPrimary === false) return;
-        var position = positionFor({ id: nodeId }, 0);
-        dragState = { nodeId: nodeId, card: card, startX: event.clientX, startY: event.clientY,
-                      originX: position.x, originY: position.y, moved: false };
+    function beginNodeDrag(nodeId, event) {
+        if (event.button !== 0 || event.isPrimary === false || state.pending) return;
+        if (event.shiftKey || event.ctrlKey) return;
+        capturePointer(event);
+        if (event.altKey && event.preventDefault) event.preventDefault();
+        if (!state.selectedNodeIds[nodeId]) {
+            state.selectedNodeIds = {};
+            state.selectedNodeIds[nodeId] = true;
+            state.selectedNodeId = nodeId;
+            syncNodeSelectionStyles();
+        }
+        var origins = [];
+        for (var selectedId in state.selectedNodeIds) {
+            if (!Object.prototype.hasOwnProperty.call(state.selectedNodeIds, selectedId)) continue;
+            var selected = graphNodeElements[selectedId];
+            if (!selected) continue;
+            var position = nodePositions[selectedId];
+            origins.push({ id: selectedId, card: selected.card, x: position.x, y: position.y });
+        }
+        dragState = { nodeId: nodeId, startX: event.clientX, startY: event.clientY,
+                      lastX: event.clientX, lastY: event.clientY, origins: origins,
+                      moved: false, copy: !!event.altKey, previewElements: [] };
+    }
+
+    function beginPortDrag(nodeId, direction, event) {
+        if (event.button !== 0 || event.isPrimary === false || state.pending) return;
+        event.preventDefault();
+        event.stopPropagation();
+        capturePointer(event);
+        connectionState = { nodeId: nodeId, direction: direction,
+                            point: canvasPoint(event.clientX, event.clientY) };
+        renderEdges();
+    }
+
+    function beginMarquee(event) {
+        if (event.button !== 0 || event.isPrimary === false || !elements.graphScroll || state.pending) return;
+        if (event.target.closest && (event.target.closest(".graph-node") || event.target.closest(".edge-hit") ||
+                                     event.target.closest(".graph-minimap"))) return;
+        capturePointer(event);
+        var point = canvasPoint(event.clientX, event.clientY);
+        marqueeState = { start: point, current: point, moved: false, additive: !!(event.shiftKey || event.ctrlKey) };
+        if (!marqueeState.additive) state.selectedNodeIds = {};
+        if (elements.selectionBox) {
+            elements.selectionBox.hidden = true;
+            elements.selectionBox.style.left = point.x + "px";
+            elements.selectionBox.style.top = point.y + "px";
+            elements.selectionBox.style.width = "0px";
+            elements.selectionBox.style.height = "0px";
+        }
+    }
+
+    function updateMarquee(event) {
+        if (!marqueeState) return;
+        var point = canvasPoint(event.clientX, event.clientY);
+        marqueeState.current = point;
+        var dx = point.x - marqueeState.start.x;
+        var dy = point.y - marqueeState.start.y;
+        if (!marqueeState.moved && Math.abs(dx) + Math.abs(dy) < 4 / zoom) return;
+        marqueeState.moved = true;
+        var left = Math.min(point.x, marqueeState.start.x);
+        var top = Math.min(point.y, marqueeState.start.y);
+        if (elements.selectionBox) {
+            elements.selectionBox.hidden = false;
+            elements.selectionBox.style.left = left + "px";
+            elements.selectionBox.style.top = top + "px";
+            elements.selectionBox.style.width = Math.abs(dx) + "px";
+            elements.selectionBox.style.height = Math.abs(dy) + "px";
+        }
+        if (document.body.classList) document.body.classList.add("marquee-selecting");
+        if (event.preventDefault) event.preventDefault();
+    }
+
+    function finishMarquee() {
+        if (!marqueeState) return;
+        if (marqueeState.moved) {
+            var left = Math.min(marqueeState.start.x, marqueeState.current.x);
+            var right = Math.max(marqueeState.start.x, marqueeState.current.x);
+            var top = Math.min(marqueeState.start.y, marqueeState.current.y);
+            var bottom = Math.max(marqueeState.start.y, marqueeState.current.y);
+            for (var i = 0; i < state.nodes.length; i++) {
+                var node = state.nodes[i];
+                var position = nodePositions[node.id];
+                if (!position) continue;
+                var display = displayPosition(position);
+                var intersects = display.x <= right && display.x + NODE_WIDTH >= left &&
+                                 display.y <= bottom && display.y + NODE_HEIGHT >= top;
+                if (intersects) state.selectedNodeIds[node.id] = true;
+            }
+            var first = null;
+            for (var selectedId in state.selectedNodeIds) {
+                if (Object.prototype.hasOwnProperty.call(state.selectedNodeIds, selectedId)) { first = selectedId; break; }
+            }
+            if (first) state.selectedNodeId = first;
+            syncNodeSelectionStyles();
+            if (first) {
+                state.inspectorOpen = true;
+                renderInspector();
+            } else {
+                state.inspectorOpen = false;
+                renderInspector();
+            }
+        } else {
+            syncNodeSelectionStyles();
+            if (!marqueeState.additive) {
+                state.inspectorOpen = false;
+                renderInspector();
+            }
+        }
+        marqueeState = null;
+        if (elements.selectionBox) elements.selectionBox.hidden = true;
+        if (document.body.classList) document.body.classList.remove("marquee-selecting");
+    }
+
+    function zoomAt(event) {
+        if (!elements.graphScroll || !elements.graphCanvas) return;
+        if (event.preventDefault) event.preventDefault();
+        var bounds = elements.graphScroll.getBoundingClientRect();
+        var anchorX = event.clientX - bounds.left;
+        var anchorY = event.clientY - bounds.top;
+        var logicalX = (anchorX - viewPan.x) / zoom;
+        var logicalY = (anchorY - viewPan.y) / zoom;
+        var step = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+        zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * step));
+        viewPan.x = anchorX - logicalX * zoom;
+        viewPan.y = anchorY - logicalY * zoom;
+        updateCanvasBounds();
+    }
+
+    function beginCanvasPan(event) {
+        if (!elements.graphScroll || event.button !== 1) return;
+        event.preventDefault();
+        capturePointer(event);
+        panState = { startX: event.clientX, startY: event.clientY,
+                     panX: viewPan.x, panY: viewPan.y };
+        elements.graphScroll.classList.add("panning");
+        if (document.body.classList) document.body.classList.add("panning-canvas");
+    }
+
+    function beginMinimapPan(event) {
+        if (!elements.graphMinimap || event.button !== 0 || event.isPrimary === false) return;
+        event.preventDefault();
+        capturePointer(event);
+        minimapPanState = true;
+        moveViewToMinimapPoint(event);
+    }
+
+    function updateCanvasPan(event) {
+        if (!panState || !elements.graphScroll) return;
+        viewPan.x = panState.panX + (event.clientX - panState.startX);
+        viewPan.y = panState.panY + (event.clientY - panState.startY);
+        updateCanvasBounds();
+        if (event.preventDefault) event.preventDefault();
+    }
+
+    function clearCopyPreviews() {
+        if (!dragState || !dragState.previewElements) return;
+        for (var i = 0; i < dragState.previewElements.length; i++) {
+            var preview = dragState.previewElements[i];
+            if (preview.parentNode) preview.parentNode.removeChild(preview);
+        }
+        dragState.previewElements.length = 0;
+    }
+
+    function updateCopyPreview(dx, dy) {
+        if (!dragState.copy) return;
+        if (!dragState.previewElements.length) {
+            for (var i = 0; i < dragState.origins.length; i++) {
+                var source = dragState.origins[i];
+                var preview = source.card.cloneNode(true);
+                preview.className += " drag-copy-preview";
+                preview.setAttribute("aria-hidden", "true");
+                preview.style.pointerEvents = "none";
+                var previewPosition = displayPosition({ x: source.x + dx, y: source.y + dy });
+                preview.style.left = previewPosition.x + "px";
+                preview.style.top = previewPosition.y + "px";
+                elements.chain.appendChild(preview);
+                dragState.previewElements.push(preview);
+            }
+        } else {
+            for (var j = 0; j < dragState.previewElements.length; j++) {
+                var origin = dragState.origins[j];
+                var position = displayPosition({ x: origin.x + dx, y: origin.y + dy });
+                dragState.previewElements[j].style.left = position.x + "px";
+                dragState.previewElements[j].style.top = position.y + "px";
+            }
+        }
     }
 
     function moveNodeDrag(event) {
+        if (minimapPanState) { moveViewToMinimapPoint(event); return; }
+        if (panState) { updateCanvasPan(event); return; }
         if (inspectorDragState) {
             var panelWidth = elements.workspace.clientWidth;
             var panelHeight = elements.workspace.clientHeight;
@@ -538,26 +1226,95 @@
             if (event.preventDefault) event.preventDefault();
             return;
         }
+        if (connectionState) {
+            connectionState.point = canvasPoint(event.clientX, event.clientY);
+            renderEdges();
+            if (event.preventDefault) event.preventDefault();
+            return;
+        }
+        if (marqueeState) { updateMarquee(event); return; }
         if (!dragState) return;
         var dx = event.clientX - dragState.startX;
         var dy = event.clientY - dragState.startY;
+        dragState.lastX = event.clientX;
+        dragState.lastY = event.clientY;
         if (!dragState.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
         dragState.moved = true;
+        suppressNextNodeClick = true;
         if (document.body.classList) document.body.classList.add("dragging-node");
         if (event.preventDefault) event.preventDefault();
-        var position = nodePositions[dragState.nodeId];
-        position.x = Math.max(12, Math.min(12000, dragState.originX + dx));
-        position.y = Math.max(12, Math.min(12000, dragState.originY + dy));
-        dragState.card.style.left = position.x + "px";
-        dragState.card.style.top = position.y + "px";
+        dx /= zoom;
+        dy /= zoom;
+        if (dragState.copy) {
+            updateCopyPreview(dx, dy);
+            updateCanvasBounds();
+            return;
+        }
+        for (var i = 0; i < dragState.origins.length; i++) {
+            var origin = dragState.origins[i];
+            var position = nodePositions[origin.id];
+            position.x = origin.x + dx;
+            position.y = origin.y + dy;
+        }
         updateCanvasBounds();
         renderEdges();
     }
 
-    function endNodeDrag() {
+    function endNodeDrag(event) {
+        if (minimapPanState) {
+            minimapPanState = null;
+        }
+        if (panState) {
+            panState = null;
+            if (elements.graphScroll) elements.graphScroll.classList.remove("panning");
+            if (document.body.classList) document.body.classList.remove("panning-canvas");
+        }
+        if (connectionState) {
+            if (event && event.type !== "pointercancel") {
+                var hit = document.elementFromPoint(event.clientX, event.clientY);
+                var port = closestElement(hit, ".port");
+                if (port && port.getAttribute("data-port-direction") !== connectionState.direction) {
+                    var otherNodeId = port.getAttribute("data-node-id");
+                    if (otherNodeId && otherNodeId !== connectionState.nodeId) {
+                        var from = connectionState.direction === "out" ? connectionState.nodeId : otherNodeId;
+                        var to = connectionState.direction === "in" ? connectionState.nodeId : otherNodeId;
+                        requestTopologyEdit({ type: "connect", from: from, to: to,
+                                              outputPort: "out", inputPort: "in" });
+                    }
+                }
+            }
+            connectionState = null;
+            renderEdges();
+        }
+        if (marqueeState) finishMarquee();
+        if (dragState && dragState.moved && dragState.copy && (!event || event.type !== "pointercancel")) {
+            var copyDx = (dragState.lastX - dragState.startX) / zoom;
+            var copyDy = (dragState.lastY - dragState.startY) / zoom;
+            requestTopologyEdit({ type: "duplicateNodes", nodeIds: selectedNodeIds(),
+                                  offset: { x: copyDx, y: copyDy } });
+        } else if (dragState && dragState.moved && (!event || event.type !== "pointercancel")) {
+            var draggedNode = state.nodes.filter(function (node) { return node.id === dragState.nodeId; })[0];
+            var edge = draggedNode ? edgeUnderNode(draggedNode.id) : null;
+            if (draggedNode && edge) {
+                requestTopologyEdit({ type: "insertNode", nodeId: draggedNode.id,
+                                      from: edge[0], to: edge[1] });
+            }
+        } else if (dragState && dragState.moved && event && event.type === "pointercancel") {
+            for (var restoreIndex = 0; restoreIndex < dragState.origins.length; restoreIndex++) {
+                var restoreOrigin = dragState.origins[restoreIndex];
+                nodePositions[restoreOrigin.id] = { x: restoreOrigin.x, y: restoreOrigin.y };
+            }
+            updateCanvasBounds();
+            renderEdges();
+        }
+        var shouldCommitLayout = !!(dragState && dragState.moved && !dragState.copy &&
+                                    (!event || event.type !== "pointercancel"));
+        clearCopyPreviews();
         dragState = null;
         inspectorDragState = null;
         if (document.body.classList) document.body.classList.remove("dragging-node");
+        window.setTimeout(function () { suppressNextNodeClick = false; }, 0);
+        if (shouldCommitLayout) commitNodeLayout();
     }
 
     function beginInspectorDrag(event) {
@@ -653,16 +1410,28 @@
 
     function adoptState(response) {
         var changed = state.targetToken !== response.target.token || state.revision !== response.revision;
+        var targetChanged = state.targetToken !== response.target.token;
+        if (targetChanged) resetViewForTarget();
+        var layoutChanged = response.layoutPersistence === true ? applyProjectNodeLayout(response.layout) : false;
         state.nodes = response.nodes;
         state.edges = response.edges || [];
         state.revision = response.revision;
         state.targetToken = response.target.token;
+        state.layoutPersistence = response.layoutPersistence === true;
         resolvedTarget = true;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
         elements.modeLine.textContent = "Mode: " + response.controlSource;
         elements.revisionLine.textContent = "Revision: " + response.revision;
-        elements.resolutionLine.textContent = "Lookup: " + response.resolution;
-        if (changed) render(state);
+        elements.resolutionLine.textContent = "Lookup: " + response.resolution +
+            (state.layoutPersistence ? " · Layout: AE project" : " · Layout: session only");
+        if (state.layoutPersistence) {
+            clearBanner();
+        } else {
+            elements.banner.className = "banner";
+            elements.banner.textContent = "This plug-in build lacks node-layout streams. The graph uses default positions; update the plug-in to save node moves in the AE project.";
+        }
+        syncTargetLock();
+        if (changed || layoutChanged) render(state);
     }
 
     function isStartupRetryable(code) {
@@ -682,6 +1451,7 @@
         call("getState", null, function (response) {
             refreshInFlight = false;
             if (epoch !== refreshEpoch) return;
+            if (canvasInteractionActive() || state.pending) return;
             if (!response.ok) {
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
                 if (autoRetry && isStartupRetryable(error.code)) {
@@ -697,6 +1467,16 @@
                     return;
                 }
                 showError(error.code, error.message);
+                if (state.pinnedTargetToken) {
+                    elements.targetLine.textContent = "Pinned target unavailable";
+                    state.revision = null;
+                    state.targetToken = null;
+                    state.nodes = [];
+                    state.edges = [];
+                    render(state);
+                    syncTargetLock();
+                    return;
+                }
                 elements.targetLine.textContent = "No target";
                 state.revision = null;
                 state.targetToken = null;
@@ -716,6 +1496,46 @@
     elements.banner.textContent = "Panel script loaded; asking the host for the selected effect...";
 
     elements.refresh.addEventListener("click", function () { refresh(true, true); });
+    if (elements.graphCanvas) elements.graphCanvas.addEventListener("contextmenu", showGraphContextMenu);
+    if (elements.contextMenu) elements.contextMenu.addEventListener("click", handleContextMenuAction);
+    if (elements.graphScroll) {
+        elements.graphScroll.addEventListener("pointerdown", beginCanvasPan);
+        elements.graphScroll.addEventListener("auxclick", function (event) {
+            if (event.button === 1) event.preventDefault();
+        });
+        elements.graphScroll.addEventListener("contextmenu", function (event) { event.preventDefault(); });
+    }
+    if (elements.graphMinimap) elements.graphMinimap.addEventListener("pointerdown", beginMinimapPan);
+    if (elements.targetLock) elements.targetLock.addEventListener("click", function () {
+        if (state.pinnedTargetToken) {
+            state.pinnedTargetToken = null;
+            try { window.localStorage.removeItem(PIN_STORAGE_KEY); } catch (ignored) { /* session unlock still works */ }
+        } else if (state.targetToken) {
+            state.pinnedTargetToken = state.targetToken;
+            try { window.localStorage.setItem(PIN_STORAGE_KEY, state.pinnedTargetToken); } catch (ignored) { /* session pin still works */ }
+        }
+        syncTargetLock();
+        refresh(true, true);
+    });
+    if (elements.graphScroll) elements.graphScroll.addEventListener("pointerdown", beginMarquee);
+    if (elements.graphScroll) elements.graphScroll.addEventListener("wheel", zoomAt, false);
+    document.addEventListener("pointerdown", function (event) {
+        if (elements.contextMenu && !elements.contextMenu.hidden && !elements.contextMenu.contains(event.target)) {
+            hideGraphContextMenu();
+        }
+    });
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") { hideGraphContextMenu(); return; }
+        var target = event.target;
+        if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === "d" &&
+            !(target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+                         target.tagName === "SELECT" || target.isContentEditable)) &&
+            selectedNodeIds().length) {
+            event.preventDefault();
+            duplicateSelection(28, 28);
+        }
+    });
+    syncTargetLock();
 
     // AE can change the effect behind the panel's back: Ctrl+Z, keyframes, or an edit in
     // the Effect Controls window. The protocol has no push channel, so without this the
@@ -727,8 +1547,13 @@
         window.addEventListener("pointerup", endNodeDrag);
         window.addEventListener("pointercancel", endNodeDrag);
         window.addEventListener("resize", function () {
+            updateCanvasBounds();
             if (state.inspectorOpen) positionInspector(state.selectedNodeId);
         });
+    }
+    if (window.ResizeObserver && elements.graphScroll) {
+        var graphViewportObserver = new window.ResizeObserver(updateCanvasBounds);
+        graphViewportObserver.observe(elements.graphScroll);
     }
     if (elements.inspectorDrag) elements.inspectorDrag.addEventListener("pointerdown", beginInspectorDrag);
     if (elements.closeInspector) elements.closeInspector.addEventListener("click", function () {

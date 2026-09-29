@@ -67,6 +67,17 @@ reported the malformed manifest while retaining visible particles. After the val
 manifest was restored, Options reported `Core: current DLL` in the same AE process.
 See `docs/compatibility-matrix.md` for the exact host scope.
 
+The layout-parameter build was rebuilt with the May 2023 SDK on 2026-09-29 and
+installed once while AE was closed. Installed `StarfieldParticle.aex` SHA-256 is
+`901AD65F50C71C992EA07EEA624610E1E7DF0B1794D4372CE10C4B12D0FE5727`; the prior
+`AEF07478…` file is preserved at
+`artifacts/disabled/StarfieldParticle-before-layout-parameters-20260929.aex`.
+The existing `StarfieldRuntime` junction and selected
+`StarfieldCore-095219764514FFCA.dll` were unchanged. The AEX registers the eight
+project-saved node-layout streams. The owner subsequently confirmed the interface
+and plug-in load without issue; a dedicated node-move save/reopen and undo/redo
+pass is still required before project-layout persistence is host-qualified.
+
 AE 2023.5.0 Build 52 `aerender` also exported frames 51–53 of `Comp 1` from
 `testproject.aep` as 3840×2160 premultiplied RGBA PSD sequences with MFR off.
 The current split AEX/Core and the prior AE-qualified monolith `D22D43BA…`
