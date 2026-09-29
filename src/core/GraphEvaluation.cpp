@@ -343,7 +343,11 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             return R::success(std::move(result));
         }
 
-        const Settings emitter_settings = emitters[active_emitter]->value;
+        const ValidatedSettings& validated_emitter = *emitters[active_emitter];
+        const Settings& emitter_settings = validated_emitter.value;
+        const auto live_slots_result = live_particle_slot_range(validated_emitter, to_seconds(*normalized));
+        if (!live_slots_result.has_value()) return R::failure(live_slots_result.error());
+        const ParticleSlotRange live_slots = live_slots_result.value();
         std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
             return nodes[left]->id < nodes[right]->id;
         });
@@ -369,6 +373,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         }
 
         std::vector<std::uint32_t> visited(count, 0);
+        std::vector<std::size_t> branch_appearance(particle_count, count);
+        result.particles.resize(static_cast<std::size_t>(live_slots.count));
         std::uint64_t traversal_work = 0;
         for (std::size_t branch = 0; branch < particle_count; ++branch) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "particle branch planning cancelled");
@@ -412,6 +418,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 return R::failure(ErrorCode::invalid_request,
                                   "one Particle stream cannot have multiple active Appearance overrides");
             }
+            if (!branch_appearances.empty()) branch_appearance[branch] = branch_appearances.front();
 
             Settings branch_settings = emitter_settings;
             for (const std::size_t force_index : branch_forces) {
@@ -430,20 +437,21 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                                   "combined force values exceed supported bounds");
             }
 
-            auto branch_result = simulate_particles_partition(
+            const auto branch_result = simulate_particles_partition_into(
                 bounded, to_seconds(*normalized), static_cast<std::uint32_t>(particle_count),
-                static_cast<std::uint32_t>(branch), cancellation);
+                static_cast<std::uint32_t>(branch), result.particles, cancellation);
             if (!branch_result.has_value()) return R::failure(branch_result.error());
-            auto branch_particles = branch_result.take_value();
-            const AppearanceValues& particle_look = *particles[active_particles[branch]];
-            for (auto& instance : branch_particles) {
-                apply_appearance(instance, particle_look);
-                if (!branch_appearances.empty()) apply_appearance(instance, *appearances[branch_appearances.front()]);
-                result.particles.push_back(std::move(instance));
-            }
         }
-        std::sort(result.particles.begin(), result.particles.end(),
-                  [](const ParticleInstance& left, const ParticleInstance& right) { return left.id < right.id; });
+
+        // Particle appearance is the default for its stream; a downstream Appearance
+        // replaces it. Resolve that precedence once, after branch simulation.
+        for (auto& instance : result.particles) {
+            const std::size_t branch = static_cast<std::size_t>(instance.id % particle_count);
+            const std::size_t override_index = branch_appearance[branch];
+            const AppearanceValues& appearance = override_index == count
+                ? *particles[active_particles[branch]] : *appearances[override_index];
+            apply_appearance(instance, appearance);
+        }
         return R::success(std::move(result));
     } catch (const std::bad_alloc&) {
         return R::failure(ErrorCode::allocation_failed, "graph evaluation allocation failed");

@@ -34,7 +34,7 @@ const window = {
     __adobe_cep__: {
         evalScript(script, callback) {
             if (script.indexOf("SFLD_ready") >= 0) {
-                callback("org.starfieldfx.panel v1");
+                callback("org.starfieldfx.panel/1/graph-carrier-source-3");
                 return;
             }
             if (script.indexOf("SFLD_getState(") >= 0) {
@@ -47,7 +47,8 @@ const window = {
                     ? { protocol: "org.starfieldfx.panel", ok: false,
                         error: { code: "no_target", message: "Target is not ready yet." } }
                     : { protocol: "org.starfieldfx.panel", ok: true, revision: "r2", controlSource: "AE Controls",
-                        resolution: "name", target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [] };
+                        resolution: "name", layoutPersistence: true, layout: {},
+                        target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [] };
                 callback(JSON.stringify(response));
                 return;
             }
@@ -64,7 +65,8 @@ const window = {
 
 const document = {
     getElementById(id) { return elements[id]; },
-    createElement() { return new FakeElement("created"); }
+    createElement() { return new FakeElement("created"); },
+    addEventListener() {}
 };
 
 const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "panel.js"), "utf8");
@@ -88,7 +90,8 @@ for (let i = 0; i < expectedRetryDelays.length; i++) {
 
 assert.strictEqual(stateCalls, 7, "panel should keep discovering until the target becomes available");
 assert.strictEqual(elements.targetLine.textContent, "Comp 1 / Particles", "retry should populate target details");
-assert.strictEqual(elements.banner.className, "banner hidden", "successful discovery should clear the banner");
+assert.strictEqual(elements.banner.className, "banner hidden",
+    "successful discovery should clear the banner: " + elements.banner.textContent);
 assert.strictEqual(timers.size, 0, "successful discovery should stop the retry loop");
 
 console.log("panel startup discovery passed (empty reply and delayed target recovered without manual Refresh)");

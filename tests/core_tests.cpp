@@ -1404,6 +1404,144 @@ void test_force_and_appearance() {
                                                       emitter_to_force, force_to_appearance, appearance_to_output).has_value());
 }
 
+void test_particle_branches_and_ordered_buffer() {
+    using namespace graph_keys;
+    const NeverCancelled never;
+    const NodeId emitter{test_uuid(9)};
+    const NodeId particle_a{test_uuid(5)};
+    const NodeId particle_b{test_uuid(6)};
+    const NodeId output{test_uuid(1)};
+    const NodeId appearance{test_uuid(7)};
+    const NodeId bypass_force{test_uuid(30)};
+    const NodeId bypass_appearance{test_uuid(31)};
+
+    Settings settings;
+    settings.particle_count = 10;
+    settings.birth_rate = 10.0;
+    settings.particle_lifetime_seconds = 1.0;
+    settings.velocity = Vec3{0.2, 0.4, 0.0};
+    settings.velocity_spread = 0.0;
+    settings.emitter_size = 0.0;
+    settings.particle_size = 2.0;
+    settings.opacity = 0.25;
+    const auto validated = validate_settings(settings);
+
+    const auto range = live_particle_slot_range(validated, 1.25);
+    CHECK(range.has_value());
+    if (!range.has_value()) return;
+    CHECK(range.value().first_slot == 3 && range.value().count == 10);
+
+    // Every branch writes its modulo-assigned slots into one pre-sized buffer;
+    // the resulting list is already in global ID order and matches flat simulation.
+    std::vector<ParticleInstance> partitioned(static_cast<std::size_t>(range.value().count));
+    std::size_t assigned = 0;
+    for (std::uint32_t branch = 0; branch < 2; ++branch) {
+        const auto written = simulate_particles_partition_into(validated, 1.25, 2, branch, partitioned, never);
+        CHECK(written.has_value());
+        if (written.has_value()) assigned += written.value();
+    }
+    CHECK(assigned == partitioned.size());
+    const auto flat = simulate_particles(validated, 1.25, never);
+    CHECK(flat.has_value() && flat.value().size() == partitioned.size());
+    if (flat.has_value() && flat.value().size() == partitioned.size()) {
+        for (std::size_t i = 0; i < partitioned.size(); ++i) {
+            CHECK(partitioned[i].id == range.value().first_slot + i);
+            CHECK(partitioned[i].id == flat.value()[i].id);
+            CHECK(partitioned[i].position.x == flat.value()[i].position.x);
+            CHECK(partitioned[i].position.y == flat.value()[i].position.y);
+            CHECK(partitioned[i].age_seconds == flat.value()[i].age_seconds);
+        }
+    }
+    const auto wrong_size = simulate_particles_partition_into(validated, 1.25, 2, 0,
+                                                               std::span<ParticleInstance>{}, never);
+    CHECK(!wrong_size.has_value() && wrong_size.error().code == ErrorCode::invalid_request);
+
+    auto made = make_emitter_particle_output_graph(
+        settings, emitter, particle_a, output, EdgeId{test_uuid(10)}, EdgeId{test_uuid(11)});
+    CHECK(made.has_value());
+    if (!made.has_value()) return;
+    Graph graph = made.take_value();
+
+    // A second Particle branch has its own appearance. The first branch's
+    // downstream Appearance node replaces all three Particle curves.
+    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 1, {
+        {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
+        {kSizeStart, 9.0}, {kSizeEnd, 19.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 0.9}}});
+    graph.nodes.push_back(GraphNode{appearance, kAppearanceNode, 1, {
+        {kColorStart, Vec3{1.0, 0.0, 0.0}}, {kColorEnd, Vec3{0.5, 0.0, 0.0}},
+        {kSizeStart, 4.0}, {kSizeEnd, 8.0}, {kOpacityStart, 0.2}, {kOpacityEnd, 0.8}}});
+    graph.edges[1] = GraphEdge{EdgeId{test_uuid(11)}, particle_a, kParticleParticlesOut,
+                               appearance, kAppearanceParticlesIn};
+    graph.edges.push_back(GraphEdge{EdgeId{test_uuid(12)}, appearance, kAppearanceParticlesOut,
+                                    output, kOutputParticles});
+    graph.edges.push_back(GraphEdge{EdgeId{test_uuid(13)}, emitter, kEmitterParticles,
+                                    particle_b, kParticleParticlesIn});
+    graph.edges.push_back(GraphEdge{EdgeId{test_uuid(14)}, particle_b, kParticleParticlesOut,
+                                    output, kOutputParticles});
+    CHECK(validate_graph(graph, particle_node_registry()).ok());
+
+    const auto evaluated = evaluate_particle_graph(graph, RationalTime{5, 4}, never);
+    CHECK(evaluated.has_value());
+    if (evaluated.has_value()) {
+        const auto& result = evaluated.value().particles;
+        CHECK(result.size() == 10);
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            CHECK(result[i].id == 3 + i);
+        }
+        // NodeId order places particle_a in branch 0; even slots reach its
+        // downstream override, odd slots retain particle_b's own curve.
+        const auto even = std::find_if(result.begin(), result.end(), [](const auto& p) { return p.id == 4; });
+        const auto odd = std::find_if(result.begin(), result.end(), [](const auto& p) { return p.id == 5; });
+        CHECK(even != result.end() && odd != result.end());
+        if (even != result.end()) {
+            const double fraction = even->age_seconds / even->lifetime_seconds;
+            CHECK(std::abs(even->size_pixels - (4.0 + 4.0 * fraction)) < 1e-12);
+            CHECK(std::abs(even->opacity - (0.2 + 0.6 * fraction)) < 1e-12);
+            CHECK(std::abs(even->color.x - (1.0 - 0.5 * fraction)) < 1e-12);
+            CHECK(even->color.y == 0.0 && even->color.z == 0.0);
+        }
+        if (odd != result.end()) {
+            const double fraction = odd->age_seconds / odd->lifetime_seconds;
+            CHECK(std::abs(odd->size_pixels - (9.0 + 10.0 * fraction)) < 1e-12);
+            CHECK(std::abs(odd->opacity - (0.1 + 0.8 * fraction)) < 1e-12);
+            CHECK(odd->color.y > 0.0 && odd->color.x == 0.0 && odd->color.z == 0.0);
+        }
+    }
+
+    // An active force path that bypasses Particle is rejected explicitly rather
+    // than being silently omitted from the rendered graph.
+    Graph force_bypass = graph;
+    force_bypass.nodes.push_back(GraphNode{bypass_force, kForceNode, 1, {
+        {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
+    force_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(32)}, emitter, kEmitterParticles,
+                                           bypass_force, kForceParticlesIn});
+    force_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(33)}, bypass_force, kForceParticlesOut,
+                                           output, kOutputParticles});
+    CHECK(validate_graph(force_bypass, particle_node_registry()).ok());
+    const auto rejected_force_bypass = evaluate_particle_graph(force_bypass, RationalTime{5, 4}, never);
+    CHECK(!rejected_force_bypass.has_value());
+    if (!rejected_force_bypass.has_value()) {
+        CHECK(rejected_force_bypass.error().code == ErrorCode::invalid_request);
+        CHECK(std::strcmp(rejected_force_bypass.error().detail, "invalid active Particle graph connection") == 0);
+    }
+
+    Graph appearance_bypass = graph;
+    appearance_bypass.nodes.push_back(GraphNode{bypass_appearance, kAppearanceNode, 1, {
+        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
+        {kSizeStart, 1.0}, {kSizeEnd, 1.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}});
+    appearance_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(34)}, emitter, kEmitterParticles,
+                                                bypass_appearance, kAppearanceParticlesIn});
+    appearance_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(35)}, bypass_appearance,
+                                                kAppearanceParticlesOut, output, kOutputParticles});
+    CHECK(validate_graph(appearance_bypass, particle_node_registry()).ok());
+    const auto rejected_appearance_bypass = evaluate_particle_graph(appearance_bypass, RationalTime{5, 4}, never);
+    CHECK(!rejected_appearance_bypass.has_value());
+    if (!rejected_appearance_bypass.has_value()) {
+        CHECK(rejected_appearance_bypass.error().code == ErrorCode::invalid_request);
+        CHECK(std::strcmp(rejected_appearance_bypass.error().detail, "invalid active Particle graph connection") == 0);
+    }
+}
+
 // Emission direction model (M3-04): the reference emitter's Speed plus a direction axis,
 // a cone span and a whole-sphere mode. Checks that the cone is bounded, that `uniform`
 // really covers the sphere, that speed jitter varies the magnitude, and that everything
@@ -1589,6 +1727,7 @@ void test_core_plugin_api() {
 int main() {
     test_core_plugin_api();
     test_emission_direction();
+    test_particle_branches_and_ordered_buffer();
     test_force_and_appearance();
     test_graph_evaluation();
     test_rational_time();

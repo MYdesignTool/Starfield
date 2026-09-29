@@ -1,5 +1,5 @@
 // Starfield Node Editor panel. Thin client for the ADR 0009 protocol v1: it draws
-// the fixed emitter -> force -> appearance -> output graph, edits the supervised AE
+// the fixed emitter -> Particle -> force -> output view, edits the supervised AE
 // parameter streams through the ExtendScript gateway, and never touches the effect's
 // arbitrary-data graph parameter or any host-private state.
 
@@ -10,8 +10,8 @@
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-3";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
-    var NODE_WIDTH = 220;
-    var NODE_HEIGHT = 108;
+    var NODE_WIDTH = 110;
+    var NODE_HEIGHT = 54;
     var CANVAS_MIN_WIDTH = 580;
     var CANVAS_MIN_HEIGHT = 320;
     var ZOOM_MIN = 0.5;
@@ -276,13 +276,12 @@
             "Keep this effect targeted when AE selection changes";
     }
 
-    var NODE_KICKERS = {
-        emitter: "01 / SOURCE", force: "02 / MOTION",
-        appearance: "03 / LOOK", output: "04 / RESULT"
+    var NODE_TYPES = {
+        emitter: true, particle: true, force: true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
-        emitter: { x: 180, y: 22 }, force: { x: 180, y: 190 },
-        appearance: { x: 180, y: 358 }, output: { x: 180, y: 526 }
+        emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
+        force: { x: 235, y: 178 }, output: { x: 235, y: 256 }
     };
 
     function positionFor(node, index) {
@@ -290,7 +289,7 @@
             var preset = DEFAULT_NODE_POSITIONS[node.id];
             nodePositions[node.id] = preset ? { x: preset.x, y: preset.y } : {
                 x: (CANVAS_MIN_WIDTH - NODE_WIDTH) / 2,
-                y: 22 + index * 168
+                y: 22 + index * 78
             };
         }
         return nodePositions[node.id];
@@ -330,7 +329,7 @@
         var right = -Infinity;
         var bottom = -Infinity;
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            if (!NODE_TYPES[state.nodes[i].id]) continue;
             var position = displayPosition(positionFor(state.nodes[i], i));
             left = Math.min(left, position.x);
             top = Math.min(top, position.y);
@@ -352,7 +351,7 @@
         var layout = {};
         for (var i = 0; i < state.nodes.length; i++) {
             var nodeId = state.nodes[i].id;
-            if (!NODE_KICKERS[nodeId]) continue;
+            if (!NODE_TYPES[nodeId]) continue;
             var position = positionFor(state.nodes[i], i);
             layout[nodeId] = { x: Number(position.x), y: Number(position.y) };
         }
@@ -387,9 +386,9 @@
         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
-        var colors = { emitter: "#e5aa69", force: "#94a9ed", appearance: "#b7a0e9", output: "#83c9b1" };
+        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            if (!NODE_TYPES[state.nodes[i].id]) continue;
             var position = displayPosition(positionFor(state.nodes[i], i));
             bounds.left = Math.min(bounds.left, position.x);
             bounds.top = Math.min(bounds.top, position.y);
@@ -415,7 +414,7 @@
         context.clip();
         for (var n = 0; n < state.nodes.length; n++) {
             var node = state.nodes[n];
-            if (!NODE_KICKERS[node.id]) continue;
+            if (!NODE_TYPES[node.id]) continue;
             var nodePosition = displayPosition(positionFor(node, n));
             var nodeX = offsetX + (nodePosition.x - bounds.left) * scale;
             var nodeY = offsetY + (nodePosition.y - bounds.top) * scale;
@@ -458,7 +457,7 @@
         var maxX = -Infinity;
         var maxY = -Infinity;
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            if (!NODE_TYPES[state.nodes[i].id]) continue;
             var position = positionFor(state.nodes[i], i);
             minX = Math.min(minX, position.x);
             minY = Math.min(minY, position.y);
@@ -541,38 +540,11 @@
                  y: (clientY - bounds.top - viewPan.y) / zoom };
     }
 
-    function chooseSide(dx, dy, fallback) {
-        if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? "right" : "left";
-        if (Math.abs(dy) > 0) return dy >= 0 ? "bottom" : "top";
-        return fallback;
-    }
-
     function computePortSides() {
-        var vectors = {};
-        for (var i = 0; i < state.edges.length; i++) {
-            var edge = state.edges[i];
-            if (!edge || edge.length !== 2 || !nodePositions[edge[0]] || !nodePositions[edge[1]]) continue;
-            var source = nodePositions[edge[0]];
-            var destination = nodePositions[edge[1]];
-            var sourceCenterX = source.x + NODE_WIDTH / 2;
-            var sourceCenterY = source.y + NODE_HEIGHT / 2;
-            var destinationCenterX = destination.x + NODE_WIDTH / 2;
-            var destinationCenterY = destination.y + NODE_HEIGHT / 2;
-            if (!vectors[edge[0]]) vectors[edge[0]] = { outX: 0, outY: 0, inX: 0, inY: 0 };
-            if (!vectors[edge[1]]) vectors[edge[1]] = { outX: 0, outY: 0, inX: 0, inY: 0 };
-            vectors[edge[0]].outX += destinationCenterX - sourceCenterX;
-            vectors[edge[0]].outY += destinationCenterY - sourceCenterY;
-            vectors[edge[1]].inX += sourceCenterX - destinationCenterX;
-            vectors[edge[1]].inY += sourceCenterY - destinationCenterY;
-        }
         var sides = {};
-        for (var nodeId in nodePositions) {
-            if (!Object.prototype.hasOwnProperty.call(nodePositions, nodeId)) continue;
-            var vector = vectors[nodeId] || {};
-            sides[nodeId] = {
-                output: chooseSide(vector.outX || 0, vector.outY || 0, "right"),
-                input: chooseSide(vector.inX || 0, vector.inY || 0, "left")
-            };
+        for (var nodeId in graphNodeElements) {
+            if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
+            sides[nodeId] = { input: "top", output: "bottom" };
         }
         return sides;
     }
@@ -581,34 +553,30 @@
         var position = nodePositions[nodeId];
         if (!position) return null;
         var display = displayPosition(position);
-        if (side === "right") return { x: display.x + NODE_WIDTH, y: display.y + NODE_HEIGHT / 2 };
-        if (side === "left") return { x: display.x, y: display.y + NODE_HEIGHT / 2 };
         if (side === "bottom") return { x: display.x + NODE_WIDTH / 2, y: display.y + NODE_HEIGHT };
         return { x: display.x + NODE_WIDTH / 2, y: display.y };
     }
 
+    function isTopDownConnection(fromNodeId, toNodeId) {
+        var from = nodePositions[fromNodeId];
+        var to = nodePositions[toNodeId];
+        return !!(from && to && to.y > from.y + NODE_HEIGHT);
+    }
+
     function edgePath(edge, sides) {
-        var startSide = sides[edge[0]] ? sides[edge[0]].output : "right";
-        var endSide = sides[edge[1]] ? sides[edge[1]].input : "left";
+        var startSide = sides[edge[0]] ? sides[edge[0]].output : "bottom";
+        var endSide = sides[edge[1]] ? sides[edge[1]].input : "top";
         var start = portPoint(edge[0], startSide);
         var end = portPoint(edge[1], endSide);
         if (!start || !end) return null;
-        var distance = Math.max(42, Math.min(180,
-            (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) * 0.45));
-        var vectors = {
-            right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
-            bottom: { x: 0, y: 1 }, top: { x: 0, y: -1 }
-        };
-        var first = vectors[startSide];
-        var second = vectors[endSide];
-        return "M" + start.x + " " + start.y + " C" + (start.x + first.x * distance) + " " +
-               (start.y + first.y * distance) + " " + (end.x + second.x * distance) + " " +
-               (end.y + second.y * distance) + " " + end.x + " " + end.y;
+        var distance = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
+        return "M" + start.x + " " + start.y + " C" + start.x + " " + (start.y + distance) + " " +
+               end.x + " " + (end.y - distance) + " " + end.x + " " + end.y;
     }
 
     function placePort(port, side) {
         if (!port) return;
-        port.style.left = side === "left" ? "-6px" : side === "right" ? (NODE_WIDTH - 4) + "px" : "calc(50% - 5px)";
+        port.style.left = "calc(50% - 5px)";
         port.style.top = side === "top" ? "-6px" : side === "bottom" ? (NODE_HEIGHT - 4) + "px" : "calc(50% - 5px)";
     }
 
@@ -632,7 +600,7 @@
             return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y")) +
                    " · drag " + shortNumber(parameterValue(node, "linear_drag"));
         }
-        if (node.id === "appearance") {
+        if (node.id === "particle") {
             return "Size " + shortNumber(parameterValue(node, "particle_size")) +
                    " · opacity " + shortNumber(parameterValue(node, "opacity"));
         }
@@ -654,16 +622,12 @@
         button.className = "node-select";
         button.setAttribute("aria-pressed", state.selectedNodeId === node.id ? "true" : "false");
         button.title = "Inspect " + node.label;
-        var kicker = document.createElement("span");
-        kicker.className = "node-kicker";
-        kicker.textContent = NODE_KICKERS[node.id];
         var title = document.createElement("span");
         title.className = "node-title";
         title.textContent = node.label;
         var summary = document.createElement("span");
         summary.className = "node-summary";
         summary.textContent = nodeSummary(node);
-        button.appendChild(kicker);
         button.appendChild(title);
         button.appendChild(summary);
         button.addEventListener("click", function (event) {
@@ -715,7 +679,7 @@
         var sides = computePortSides();
         for (var nodeId in graphNodeElements) {
             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
-            var nodeSides = sides[nodeId] || { input: "left", output: "right" };
+            var nodeSides = sides[nodeId] || { input: "top", output: "bottom" };
             placePort(graphNodeElements[nodeId].input, nodeSides.input);
             placePort(graphNodeElements[nodeId].output, nodeSides.output);
         }
@@ -758,20 +722,19 @@
             if (fixedPoint) {
                 var start = connectionState.direction === "out" ? fixedPoint : connectionState.point;
                 var end = connectionState.direction === "out" ? connectionState.point : fixedPoint;
-                var dx = end.x - start.x;
-                var dy = end.y - start.y;
-                var alongY = Math.abs(dy) >= Math.abs(dx);
-                var bend = Math.max(32, Math.min(120, (Math.abs(dx) + Math.abs(dy)) * 0.35));
-                var c1x = start.x + (alongY ? 0 : (dx >= 0 ? bend : -bend));
-                var c1y = start.y + (alongY ? (dy >= 0 ? bend : -bend) : 0);
-                var c2x = end.x - (alongY ? 0 : (dx >= 0 ? bend : -bend));
-                var c2y = end.y - (alongY ? (dy >= 0 ? bend : -bend) : 0);
-                var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                preview.setAttribute("class", "edge-preview");
-                preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
-                    c2x + " " + c2y + " " + end.x + " " + end.y);
-                preview.setAttribute("aria-hidden", "true");
-                elements.edgePaths.appendChild(preview);
+                if (end.y > start.y) {
+                    var bend = Math.max(12, Math.min(80, (end.y - start.y) * 0.45));
+                    var c1x = start.x;
+                    var c1y = start.y + bend;
+                    var c2x = end.x;
+                    var c2y = end.y - bend;
+                    var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    preview.setAttribute("class", "edge-preview");
+                    preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
+                        c2x + " " + c2y + " " + end.x + " " + end.y);
+                    preview.setAttribute("aria-hidden", "true");
+                    elements.edgePaths.appendChild(preview);
+                }
             }
         }
     }
@@ -900,19 +863,12 @@
         for (var i = 0; i < state.edges.length; i++) {
             var edge = state.edges[i];
             if (!edge || edge.length !== 2 || edge[0] === nodeId || edge[1] === nodeId) continue;
-            var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "right");
-            var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "left");
+            var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "bottom");
+            var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "top");
             if (!start || !end) continue;
-            var startSide = sides[edge[0]] ? sides[edge[0]].output : "right";
-            var endSide = sides[edge[1]] ? sides[edge[1]].input : "left";
-            var distance = Math.max(42, Math.min(180,
-                (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) * 0.45));
-            var vectors = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
-                            bottom: { x: 0, y: 1 }, top: { x: 0, y: -1 } };
-            var first = vectors[startSide];
-            var second = vectors[endSide];
-            var c1 = { x: start.x + first.x * distance, y: start.y + first.y * distance };
-            var c2 = { x: end.x + second.x * distance, y: end.y + second.y * distance };
+            var distance = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
+            var c1 = { x: start.x, y: start.y + distance };
+            var c2 = { x: end.x, y: end.y - distance };
             for (var sample = 1; sample <= 32; sample++) {
                 var t = sample / 32;
                 var inverse = 1 - t;
@@ -1038,7 +994,7 @@
             updateCanvasBounds();
         }
         for (var n = 0; n < state.nodes.length; n++) {
-            if (NODE_KICKERS[state.nodes[n].id]) addGraphNode(state.nodes[n]);
+            if (NODE_TYPES[state.nodes[n].id]) addGraphNode(state.nodes[n]);
         }
         renderEdges();
         renderInspector();
@@ -1310,8 +1266,13 @@
                     if (otherNodeId && otherNodeId !== connectionState.nodeId) {
                         var from = connectionState.direction === "out" ? connectionState.nodeId : otherNodeId;
                         var to = connectionState.direction === "in" ? connectionState.nodeId : otherNodeId;
-                        requestTopologyEdit({ type: "connect", from: from, to: to,
-                                              outputPort: "out", inputPort: "in" });
+                        if (isTopDownConnection(from, to)) {
+                            requestTopologyEdit({ type: "connect", from: from, to: to,
+                                                  outputPort: "out", inputPort: "in" });
+                        } else {
+                            showError("invalid_connection_direction",
+                                      "Connections must run from a node's bottom output to the top input of a node below it.");
+                        }
                     }
                 }
             }

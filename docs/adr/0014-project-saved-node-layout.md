@@ -13,14 +13,19 @@ streams across project save/reopen, effect duplication, and undo.
 
 The graph itself is stored as `PF_Param_ARBITRARY_DATA`, which the owner's AE 2023
 ExtendScript probe could not read. Layout does not need to share that stream: the
-current panel shows a fixed four-node topology, so eight ordinary scalar values are
-sufficient and remain independent of rendering and graph evaluation.
+protocol-v1 panel shows a fixed four-node parameter view, so eight ordinary scalar
+values are sufficient and remain independent of rendering and graph evaluation.
 
 ## Decision
 
 - Append eight hidden, non-animated standard float-slider parameters after the existing
-  parameter index 32: X and Y for Emitter, Force, Appearance, and Output. Their
+  parameter index 32: X and Y for Emitter, Force, the logical Particle card, and Output. Their
   persistent IDs are 33–40; earlier indices and IDs do not move.
+- Keep IDs 37–38 and their underlying `layout_appearance_x/y` storage keys unchanged;
+  the panel now maps these saved coordinates to the Particle card. If all four positions
+  remain at the old default coordinates, present the new top-down default arrangement
+  (Emitter → Particle → Force → Output) without mutating the project. Authored positions
+  remain intact and are still written to those AE-owned streams when a drag is committed.
 - Use a symmetric coordinate range of −1,000,000,000 to +1,000,000,000 canvas units.
   The canvas derives its element dimensions from the spread between nodes, so absolute
   positive or negative coordinates do not expand it toward a browser element-size cap.
@@ -35,7 +40,7 @@ sufficient and remain independent of rendering and graph evaluation.
 - Canvas pan, zoom, and selection remain transient view state. On the first state for a
   target, center the saved node arrangement in the viewport.
 - If the running effect predates revision 7, or AE scripting cannot resolve the new
-  streams, `getState` still returns the four default positions and marks project layout
+  streams, `getState` still returns the four current default positions and marks project layout
   persistence unavailable. The panel remains usable for that session and clearly reports
   that node moves will not survive panel reload until the matching plug-in is installed.
 - Layout values are not supervised render controls and are not copied into the graph

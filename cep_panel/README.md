@@ -1,9 +1,13 @@
 # Starfield CEP panel
 
-Dockable After Effects 2023 node editor for the current Alpha chain
-`emitter -> force -> appearance -> output`. It implements protocol v1 of
-[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel displays a fixed graph
+Dockable After Effects 2023 node editor for the current top-down parameter view
+`Emitter -> Particle -> Force -> Output`. It implements protocol v1 of
+[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): this is a fixed display projection
 with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
+Cards are 110 × 54 pixels, use color by node type, and connect only from a lower output
+port to an upper input port. Reverse or overlapping connections are rejected, and the
+drag preview is only drawn downward. Particle remains the node label for the particle
+appearance controls.
 Numeric values use AE-style scrub controls: drag left or right to adjust, Shift-drag
 for faster changes, Ctrl-drag for finer changes, or click to type a value directly.
 The panel formats and commits values at each control's precision (integer
@@ -18,7 +22,9 @@ duplicate, and delete commands remain routed to a guarded topology boundary; the
 graph carrier gateway endpoints are not connected to the canvas yet, so these actions
 do not change the saved project.
 The panel reads and writes the effect's **supervised render-value parameters** and
-separate hidden layout parameters through a namespaced ExtendScript gateway. If an older
+separate hidden layout parameters through a namespaced ExtendScript gateway. The visual
+projection is not the canonical graph snapshot; topology actions stay guarded until the
+graph-backed transaction bridge qualifies. If an older
 plug-in build lacks layout streams, the graph still loads at default positions and node
 moves stay in that panel session; the panel reports that project persistence needs the
 matching plug-in build. It never touches `Node Graph Data` (the arbitrary-data parameter)

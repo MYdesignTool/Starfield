@@ -120,6 +120,7 @@ function createHarness(options = {}) {
     }
 
     return {
+        initialState,
         call,
         values,
         writes,
@@ -127,6 +128,20 @@ function createHarness(options = {}) {
         setLayerId(id) { layer.id = id; },
         setProjectId(id) { rootFolder.id = id; }
     };
+}
+
+function testParticleFlowPresentation() {
+    const host = createHarness();
+    assert.deepEqual(host.initialState.nodes.map(node => [node.id, node.label]), [
+        ["emitter", "Emitter"], ["particle", "Particle"], ["force", "Force"], ["output", "Output"]
+    ]);
+    assert.deepEqual(host.initialState.edges, [
+        ["emitter", "particle"], ["particle", "force"], ["force", "output"]
+    ]);
+    assert.deepEqual(host.initialState.layout, {
+        emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
+        force: { x: 235, y: 178 }, output: { x: 235, y: 256 }
+    });
 }
 
 function testVectorAnimationIsProtected() {
@@ -244,6 +259,7 @@ function testStaleBaseRevisionIsRequiredToMatch() {
     assert.equal(host.undo.begins, 0);
 }
 
+testParticleFlowPresentation();
 testVectorAnimationIsProtected();
 testFailedBatchRollsBackAndPreservesRawColorAlpha();
 testRollbackFailureIsReported();

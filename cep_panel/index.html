@@ -48,7 +48,7 @@
             </defs>
             <g id="edgePaths"></g>
           </svg>
-          <div id="chain" class="graph-nodes" aria-label="Emitter to force to appearance to output chain">
+          <div id="chain" class="graph-nodes" aria-label="Emitter to Particle to Force to Output flow">
             <p class="hint">Select one layer carrying Starfield Particle.</p>
           </div>
           <div id="selectionBox" class="selection-box" hidden></div>
@@ -81,10 +81,10 @@
 
   <div id="graphContextMenu" class="graph-context-menu" role="menu" aria-label="Node graph actions" hidden>
     <div class="context-menu-heading">Add Node</div>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="emitter">Emitter</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
-    <button type="button" role="menuitem" data-action="addNode" data-node-type="appearance">Appearance</button>
-    <button type="button" role="menuitem" data-action="addNode" data-node-type="emitter">Emitter</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="appearance">Appearance Override</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="output">Output</button>
     <div class="context-menu-separator"></div>
     <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>

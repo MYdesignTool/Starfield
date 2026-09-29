@@ -62,27 +62,30 @@
     ];
 
     var LAYOUT_BINDINGS = [
-        { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 33, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 180 },
+        { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 33, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 235 },
         { nodeId: "emitter", axis: "y", key: "layout_emitter_y", index: 34, name: "Layout Emitter Y", min: -1000000000, max: 1000000000, defaultValue: 22 },
-        { nodeId: "force", axis: "x", key: "layout_force_x", index: 35, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 180 },
-        { nodeId: "force", axis: "y", key: "layout_force_y", index: 36, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 190 },
-        { nodeId: "appearance", axis: "x", key: "layout_appearance_x", index: 37, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 180 },
-        { nodeId: "appearance", axis: "y", key: "layout_appearance_y", index: 38, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 358 },
-        { nodeId: "output", axis: "x", key: "layout_output_x", index: 39, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 180 },
-        { nodeId: "output", axis: "y", key: "layout_output_y", index: 40, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 526 }
+        { nodeId: "force", axis: "x", key: "layout_force_x", index: 35, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "force", axis: "y", key: "layout_force_y", index: 36, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 178 },
+        // Indices 37/38 keep their shipped storage identity; the panel now assigns
+        // that card to the logical Particle stage instead of Appearance.
+        { nodeId: "particle", axis: "x", key: "layout_appearance_x", index: 37, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "particle", axis: "y", key: "layout_appearance_y", index: 38, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 100 },
+        { nodeId: "output", axis: "x", key: "layout_output_x", index: 39, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "output", axis: "y", key: "layout_output_y", index: 40, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 256 }
     ];
 
-    // The Alpha chain is fixed in protocol v1: display order, not a hidden graph.
+    // Protocol v1 is a fixed parameter view, not a live graph snapshot. Display
+    // the product's intended stream order while graph-backed editing is qualified.
     var CHAIN = [
         { id: "emitter", label: "Emitter", keys: ["particle_count", "birth_rate", "seed", "particle_lifetime",
                                                   "emitter_shape", "emitter_origin", "velocity_x", "velocity_y",
                                                   "velocity_z", "emitter_size", "velocity_spread"] },
+        { id: "particle", label: "Particle", keys: ["particle_size", "particle_size_end", "opacity",
+                                                      "opacity_end", "color_start", "color_end"] },
         { id: "force", label: "Force", keys: ["gravity_x", "gravity_y", "gravity_z", "linear_drag"] },
-        { id: "appearance", label: "Appearance", keys: ["particle_size", "particle_size_end", "opacity",
-                                                        "opacity_end", "color_start", "color_end"] },
         { id: "output", label: "Output", keys: [] }
     ];
-    var EDGES = [["emitter", "force"], ["force", "appearance"], ["appearance", "output"]];
+    var EDGES = [["emitter", "particle"], ["particle", "force"], ["force", "output"]];
 
     function bindingFor(key) {
         for (var i = 0; i < BINDINGS.length; i++) {
@@ -536,9 +539,24 @@
             nodes.push(node);
         }
         var layout = {};
+        var oldDefaultLayout = {
+            emitter: { x: 180, y: 22 }, force: { x: 180, y: 190 },
+            particle: { x: 180, y: 358 }, output: { x: 180, y: 526 }
+        };
+        var oldDefaultsUnchanged = report.layoutPersistence;
+        if (oldDefaultsUnchanged) {
+            for (var oldId in oldDefaultLayout) {
+                if (!Object.prototype.hasOwnProperty.call(oldDefaultLayout, oldId)) continue;
+                var saved = report.layoutValues[oldId];
+                if (!saved || saved.x !== oldDefaultLayout[oldId].x || saved.y !== oldDefaultLayout[oldId].y) {
+                    oldDefaultsUnchanged = false;
+                    break;
+                }
+            }
+        }
         for (var n = 0; n < CHAIN.length; n++) {
             var nodeId = CHAIN[n].id;
-            layout[nodeId] = report.layoutPersistence ? report.layoutValues[nodeId] : {
+            layout[nodeId] = report.layoutPersistence && !oldDefaultsUnchanged ? report.layoutValues[nodeId] : {
                 x: layoutBindingFor(nodeId, "x").defaultValue,
                 y: layoutBindingFor(nodeId, "y").defaultValue
             };

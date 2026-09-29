@@ -63,9 +63,11 @@ Requests and responses are JSON values. The envelope is:
 returns an opaque target token, the fixed node/port/edge snapshot, editable
 values, project-saved node positions, and a revision token. `setParameters` identifies bindings by stable
 graph `NodeId` + `ParamKey`; AE parameter IDs remain the storage mapping and are
-never treated as graph identities. Version 1 displays the required
-emitter → force → appearance → output chain with one emitter. Its topology is
-read-only; parameter values and the fixed nodes' saved positions are editable.
+never treated as graph identities. Version 1 displays an Emitter → Particle →
+Force → Output parameter view. It is a fixed projection, not a live snapshot of
+the canonical graph. Its topology is read-only; parameter values and the
+displayed nodes' saved positions are editable. The Particle card owns the size,
+opacity, and color controls in this view.
 `setNodeLayout` validates and writes all eight hidden layout coordinates in one AE
 undo group (ADR 0014). Dynamic node creation, deletion,
 reordering, and edge rewiring require a later protocol version.
@@ -200,3 +202,26 @@ authorization under ADR 0011.
 The current source-level carrier proposal is in
 [ADR 0013](0013-script-visible-graph-snapshot.md). Its expression-backed snapshot is
 not accepted until AE 2023 confirms the callback read and single-step undo gates.
+
+## Amendment: vertical Particle flow and compact cards (2026-09-30)
+
+The owner requests a top-to-bottom display flow: Emitter → Particle → Force →
+Output. The Particle stage keeps the name `Particle`; it must not be presented as
+`Appearance`. Node cards omit numbered stage/category badges, retain distinct
+type colors, and use about one quarter of the previous card area (110 × 54 CSS
+pixels). Inputs sit only on the top edge and outputs only on the bottom edge;
+wire paths remain vertical at the ports. Reverse or overlapping connections are
+rejected, and a connection preview is shown only when it runs downwards. The default
+card positions follow the same top-to-bottom order.
+
+Protocol v1 still constructs this view from flat supervised parameter streams.
+It does not read the canonical graph bytes, and add/connect/disconnect/splice
+gestures remain guarded. These display changes do not qualify topology editing;
+protocol v2 must show and edit the actual graph snapshot through the transaction
+carrier before the panel can claim graph edits are project-effective.
+
+For compatibility with already saved panel layouts, indices 37–38 keep their
+existing hidden-stream identities and values. The panel maps those coordinates
+to the Particle card. When all four positions still equal the old untouched
+defaults, the gateway presents the new vertical default layout; manually saved
+positions remain intact and continue to be written to the same AE-owned streams.

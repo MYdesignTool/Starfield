@@ -2,7 +2,9 @@
 
 #include "starfield/core/Render.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace starfield::core {
@@ -17,6 +19,13 @@ struct ParticleInstance {
     double opacity{0.0};
     Vec3 color{1.0, 1.0, 1.0};
     Vec3 position{};
+};
+
+// The contiguous global emission-slot interval alive at one absolute time.
+// A zero count means no particles are alive.
+struct ParticleSlotRange {
+    std::uint64_t first_slot{0};
+    std::uint64_t count{0};
 };
 
 // Deterministic particle evaluation for one absolute time.
@@ -48,5 +57,17 @@ struct ParticleInstance {
 [[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles_partition(
     const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
     std::uint32_t partition_index, const Cancellation& cancellation);
+
+// Return the bounded global slot interval used by every branch of an emitter.
+[[nodiscard]] Result<ParticleSlotRange> live_particle_slot_range(
+    const ValidatedSettings& settings, double time_seconds);
+
+// Write one deterministic branch directly into a pre-sized, global-slot-ordered
+// buffer. Call once for every partition index. The destination size must equal
+// live_particle_slot_range(settings, time_seconds).count.
+[[nodiscard]] Result<std::size_t> simulate_particles_partition_into(
+    const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
+    std::uint32_t partition_index, std::span<ParticleInstance> destination,
+    const Cancellation& cancellation);
 
 } // namespace starfield::core
