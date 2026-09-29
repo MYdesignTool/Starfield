@@ -316,6 +316,35 @@ button:hover, button:focus-visible { border-color: var(--accent); }
 .param-value.multi input { flex: 0 1 70px; }
 .param-value select { width: 100%; min-width: 70px; max-width: 170px; }
 .swatch { flex: 0 0 16px; width: 16px; height: 16px; border: 1px solid var(--line); border-radius: 2px; }
+.age-curve-editor {
+  margin-top: 10px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #22252a;
+}
+.age-curve-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.age-curve-heading strong { color: #d9e1ed; font-size: 12px; }
+.age-curve-actions { display: flex; gap: 4px; }
+.age-curve-actions button { min-height: 22px; padding: 2px 6px; font-size: 11px; }
+.age-curve-controls { display: flex; align-items: center; gap: 9px; margin-top: 3px; }
+.age-curve-control { display: flex; align-items: center; gap: 4px; color: #aeb8c7; font-size: 10px; }
+.age-curve-control input { width: 56px; min-width: 0; min-height: 22px; padding: 2px 4px; color: var(--accent); text-align: right; cursor: ew-resize; }
+.age-curve-control input:focus { background: var(--panel-2); border-color: var(--accent); cursor: text; }
+.age-curve-control input:disabled { opacity: .55; cursor: default; }
+.age-curve-navigation { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.age-curve-navigation button { width: 22px; min-height: 22px; padding: 1px 3px; font-size: 15px; line-height: 16px; }
+.age-curve-point-index { min-width: 29px; color: #8993a2; font-size: 10px; text-align: center; }
+.age-curve-actions button:disabled, .age-curve-navigation button:disabled { opacity: .45; cursor: default; }
+.age-curve-plot { display: block; width: 100%; height: 140px; overflow: visible; touch-action: none; }
+.age-curve-border { fill: #292d33; stroke: #777e88; stroke-width: 1; }
+.age-curve-grid { stroke: #454a52; stroke-width: .65; }
+.age-curve-line { fill: none; stroke: #d8dee8; stroke-width: 1.2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.age-curve-point { fill: #25282e; stroke: #e1e7f0; stroke-width: 1.2; cursor: grab; vector-effect: non-scaling-stroke; }
+.age-curve-point.locked { stroke-dasharray: 2 1; cursor: not-allowed; }
+.age-curve-point.selected { fill: var(--accent); stroke: #fff; }
+.age-curve-axis-label { fill: #8993a2; font-size: 9px; user-select: none; pointer-events: none; }
+body.dragging-age-curve, body.dragging-age-curve * { user-select: none; cursor: crosshair !important; }
 
 body.dragging-node .node-select { cursor: grabbing; }
 body.dragging-node { user-select: none; }

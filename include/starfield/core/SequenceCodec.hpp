@@ -61,9 +61,9 @@ private:
 [[nodiscard]] const char* describe(SequenceErrorCode code) noexcept;
 
 // Serialization validates first and emits canonical byte order: nodes by NodeId,
-// edges by EdgeId, and parameters by ParameterKey. Deserialization checks all
-// lengths/counts before allocation, verifies CRC-32, then validates the graph
-// against the supplied immutable node registry.
+// edges by EdgeId, and parameters by ParameterKey. Opaque optional records retain
+// their original bytes and follow known records in their stored order. Deserialization
+// checks lengths/counts, verifies CRC-32, and validates nodes against the registry.
 [[nodiscard]] SequenceResult<OpaqueBytes> serialize_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
 [[nodiscard]] SequenceResult<Graph> deserialize_graph(std::span<const std::byte> bytes,
                                                       const NodeRegistry& registry) noexcept;

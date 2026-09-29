@@ -1,4 +1,5 @@
 #include "starfield/core/ParticleSimulation.hpp"
+#include "starfield/core/AgeCurve.hpp"
 
 #include "starfield/core/Random.hpp"
 
@@ -13,32 +14,41 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 
 // Deterministic per-particle birth offset for the selected emitter shape. `extent`
-// is the cube edge length for Box and the diameter for Sphere/Disc, in layer heights.
-Vec3 birth_offset(EmitterShape shape, double extent, std::uint32_t seed, std::uint64_t id) noexcept {
+// is the shared edge/diameter in layer heights; percentages scale its axes without
+// changing the existing uniform-size case.
+Vec3 birth_offset(EmitterShape shape, double extent, const Vec3& size_percent,
+                  std::uint32_t seed, std::uint64_t id) noexcept {
     const double half = 0.5 * extent;
     if (!(half > 0.0)) {
         return Vec3{};
     }
+    const double half_x = half * size_percent.x / 100.0;
+    const double half_y = half * size_percent.y / 100.0;
+    const double half_z = half * size_percent.z / 100.0;
 
     switch (shape) {
         case EmitterShape::box:
-            return Vec3{symmetric_value(seed, id, RandomPurpose::position_x) * half,
-                        symmetric_value(seed, id, RandomPurpose::position_y) * half,
-                        symmetric_value(seed, id, RandomPurpose::position_z) * half};
+            return Vec3{symmetric_value(seed, id, RandomPurpose::position_x) * half_x,
+                        symmetric_value(seed, id, RandomPurpose::position_y) * half_y,
+                        symmetric_value(seed, id, RandomPurpose::position_z) * half_z};
         case EmitterShape::sphere: {
-            // Uniform inside the volume: cube-root radius with an isotropic direction.
+            // Uniform inside a sphere by cube-root radius and isotropic direction,
+            // followed by an axis transform to an ellipsoid.
             const double radius = half * std::cbrt(unit_value(seed, id, RandomPurpose::position_x));
             const double cos_theta = symmetric_value(seed, id, RandomPurpose::position_y);
             const double sin_theta = std::sqrt(std::max(0.0, 1.0 - cos_theta * cos_theta));
             const double phi = unit_value(seed, id, RandomPurpose::position_z) * 2.0 * kPi;
-            return Vec3{radius * sin_theta * std::cos(phi), radius * sin_theta * std::sin(phi),
-                        radius * cos_theta};
+            return Vec3{radius * sin_theta * std::cos(phi) * (size_percent.x / 100.0),
+                        radius * sin_theta * std::sin(phi) * (size_percent.y / 100.0),
+                        radius * cos_theta * (size_percent.z / 100.0)};
         }
         case EmitterShape::disc: {
-            // Uniform over the area: square-root radius inside the XY plane.
+            // Uniform over the XY area, then scaled to an ellipse. Z is intentionally
+            // unused until the disc shape has a defined depth model.
             const double radius = half * std::sqrt(unit_value(seed, id, RandomPurpose::position_x));
             const double angle = unit_value(seed, id, RandomPurpose::position_y) * 2.0 * kPi;
-            return Vec3{radius * std::cos(angle), radius * std::sin(angle), 0.0};
+            return Vec3{radius * std::cos(angle) * (size_percent.x / 100.0),
+                        radius * std::sin(angle) * (size_percent.y / 100.0), 0.0};
         }
         case EmitterShape::point:
             break;
@@ -222,9 +232,10 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
     const double age_fraction = values.particle_lifetime_seconds > 0.0
         ? std::clamp(age / values.particle_lifetime_seconds, 0.0, 1.0) : 0.0;
     if (values.appearance_enabled) {
-        particle.size_pixels = values.particle_size +
-            (values.particle_size_end - values.particle_size) * age_fraction;
-        particle.opacity = values.opacity + (values.opacity_end - values.opacity) * age_fraction;
+        particle.size_pixels = evaluate_age_curve(values.size_over_life, age_fraction,
+                                                  values.particle_size, values.particle_size_end);
+        particle.opacity = evaluate_age_curve(values.opacity_over_life, age_fraction,
+                                              values.opacity, values.opacity_end);
         particle.color = Vec3{
             values.color_start.x + (values.color_end.x - values.color_start.x) * age_fraction,
             values.color_start.y + (values.color_end.y - values.color_start.y) * age_fraction,
@@ -239,7 +250,8 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
     // by (seed, id, purpose). This variation is what makes a steady emitter move:
     // with identical particles, births continuously replace the particles that
     // leave, so a correctly computed sequence still looks frozen on playback.
-    const Vec3 birth = birth_offset(values.emitter_shape, values.emitter_size, values.seed, slot);
+    const Vec3 birth = birth_offset(values.emitter_shape, values.emitter_size,
+                                    values.emitter_size_percent, values.seed, slot);
     Vec3 particle_velocity = values.velocity;
     // Emission direction model (M3-04): a per-particle direction on the cone (or the
     // sphere) times the emitted speed. Independent streams keep every frame identical

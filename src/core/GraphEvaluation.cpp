@@ -1,4 +1,5 @@
 #include "starfield/core/GraphEvaluation.hpp"
+#include "starfield/core/AgeCurve.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -26,6 +27,8 @@ struct AppearanceValues {
     double size_end{8.0};
     double opacity_start{1.0};
     double opacity_end{1.0};
+    AgeCurve size_curve{};
+    AgeCurve opacity_curve{};
 };
 
 constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
@@ -78,6 +81,9 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
                 break;
             }
             case kDirectionSpan.value: settings.direction_span_degrees = std::get<double>(parameter.value); break;
+            case kEmitterSizePercentX.value: settings.emitter_size_percent.x = std::get<double>(parameter.value); break;
+            case kEmitterSizePercentY.value: settings.emitter_size_percent.y = std::get<double>(parameter.value); break;
+            case kEmitterSizePercentZ.value: settings.emitter_size_percent.z = std::get<double>(parameter.value); break;
             case kParticleSize.value:
                 settings.particle_size = std::get<double>(parameter.value);
                 settings.particle_size_end = settings.particle_size;
@@ -129,6 +135,20 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     settings.opacity = std::get<double>(*opacity_start);
     settings.opacity_end = std::get<double>(*opacity_end);
     settings.appearance_enabled = true;
+    const auto* size_curve = find_value(node, kSizeOverLifeCurve);
+    const auto* opacity_curve = find_value(node, kOpacityOverLifeCurve);
+    if (size_curve) {
+        const auto* bytes = std::get_if<OpaqueBytes>(size_curve);
+        if (!bytes || !decode_age_curve(*bytes, settings.size_over_life, 0.0, kMaxParticleSize)) {
+            return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance size curve is invalid");
+        }
+    }
+    if (opacity_curve) {
+        const auto* bytes = std::get_if<OpaqueBytes>(opacity_curve);
+        if (!bytes || !decode_age_curve(*bytes, settings.opacity_over_life, 0.0, 1.0)) {
+            return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance opacity curve is invalid");
+        }
+    }
     auto validated = validate_settings(settings);
     if (!validated.notices.empty()) {
         return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance node value is outside supported bounds");
@@ -136,15 +156,17 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     return Result<AppearanceValues>::success(AppearanceValues{
         validated.value.color_start, validated.value.color_end,
         validated.value.particle_size, validated.value.particle_size_end,
-        validated.value.opacity, validated.value.opacity_end});
+        validated.value.opacity, validated.value.opacity_end,
+        validated.value.size_over_life, validated.value.opacity_over_life});
 }
 
 void apply_appearance(ParticleInstance& particle, const AppearanceValues& appearance) noexcept {
     const double age_fraction = particle.lifetime_seconds > 0.0
         ? std::clamp(particle.age_seconds / particle.lifetime_seconds, 0.0, 1.0) : 0.0;
-    particle.size_pixels = appearance.size_start + (appearance.size_end - appearance.size_start) * age_fraction;
-    particle.opacity = appearance.opacity_start +
-        (appearance.opacity_end - appearance.opacity_start) * age_fraction;
+    particle.size_pixels = evaluate_age_curve(appearance.size_curve, age_fraction,
+                                              appearance.size_start, appearance.size_end);
+    particle.opacity = evaluate_age_curve(appearance.opacity_curve, age_fraction,
+                                          appearance.opacity_start, appearance.opacity_end);
     particle.color = Vec3{
         appearance.color_start.x + (appearance.color_end.x - appearance.color_start.x) * age_fraction,
         appearance.color_start.y + (appearance.color_end.y - appearance.color_start.y) * age_fraction,
@@ -329,6 +351,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                     render_settings.particle_size_end = appearance.size_end;
                     render_settings.opacity = appearance.opacity_start;
                     render_settings.opacity_end = appearance.opacity_end;
+                    render_settings.size_over_life = appearance.size_curve;
+                    render_settings.opacity_over_life = appearance.opacity_curve;
                     render_settings.appearance_enabled = true;
                 }
             }

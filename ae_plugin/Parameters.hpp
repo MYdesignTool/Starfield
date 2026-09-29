@@ -14,15 +14,17 @@
 
 namespace starfield::adapter {
 
-// User-visible controls and their registration-order indices. The ECW is grouped
-// into Emitter / Particle / Physics / Render topics so the control layout follows the
+// Settings bindings and their registration-order indices. The ECW is grouped into
+// Emitter / Particle / Physics / Render topics so the control layout follows the
 // reference product's structure; group markers are parameters too, which is why the
 // indices below are not contiguous. AE's implicit input layer occupies parameter index
 // 0, so the effect registers one more parameter than kTotalEffectParameterCount.
-// Manifest revision 6 renumbered everything for the grouping; revision 7 appends the
-// hidden node-layout streams, and revision 8 appends the hidden graph carrier streams.
-inline constexpr std::size_t kEffectParameterCount = 21;      // controls that feed Settings
-inline constexpr std::size_t kTotalEffectParameterCount = 44; // controls + topics + graph + panel metadata
+// Manifest revision 6 renumbered everything for the grouping; revisions 7–9 append
+// layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions.
+inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
+inline constexpr std::size_t kEmitterSizeParameterCount = 3;
+inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount + kEmitterSizeParameterCount;
+inline constexpr std::size_t kTotalEffectParameterCount = 84; // controls + topics + project metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -62,6 +64,14 @@ inline constexpr A_long kGraphSnapshotId = 41;
 inline constexpr A_long kGraphEditRequestId = 42;
 inline constexpr A_long kGraphEditCommitId = 43;
 inline constexpr A_long kGraphEditReceiptId = 44;
+inline constexpr A_long kSizeCurveCountId = 45;
+inline constexpr A_long kSizeCurveFirstPointId = 46; // alternating age/value sliders
+inline constexpr A_long kOpacityCurveCountId = 62;
+inline constexpr A_long kOpacityCurveFirstPointId = 63; // alternating age/value sliders
+inline constexpr A_long kCurveEditCommitId = 79;
+inline constexpr A_long kEmitterSizeXId = 81;
+inline constexpr A_long kEmitterSizeYId = 82;
+inline constexpr A_long kEmitterSizeZId = 83;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

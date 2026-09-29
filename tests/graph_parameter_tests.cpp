@@ -1,5 +1,6 @@
 // Uses the local Adobe SDK declarations and fake host callbacks, not an AE process.
 #include "GraphParameter.hpp"
+#include "GraphCarrier.hpp"
 #include "Parameters.hpp"
 #include "WorldBridge.hpp"
 #include "AE_EffectCB.h"
@@ -17,13 +18,24 @@
 
 using namespace starfield;
 using namespace starfield::adapter;
+
+namespace starfield::adapter {
+// The adapter fake-host suite exercises parameter checkout and graph construction;
+// AEGP expression access is covered by the separate host carrier gate, so capture
+// tests provide a successful snapshot sink instead of linking real AEGP suites.
+PF_Err write_graph_snapshot(PF_InData*, const core::Graph&, A_long* new_revision) noexcept {
+    if (new_revision) *new_revision = 1;
+    return PF_Err_NONE;
+}
+}
+
 namespace {
 int checks = 0, failures = 0;
 #define CHECK(x) do { ++checks; if (!(x)) { ++failures; std::printf("FAIL line %d: %s\n", __LINE__, #x); } } while (0)
 struct Memory { core::OpaqueBytes bytes; unsigned locks{0}; };
 std::unordered_map<PF_Handle, std::unique_ptr<Memory>> handles;
 bool fail_allocation = false, fail_lock = false;
-std::array<PF_ParamDef, 33> parameters{};
+std::array<PF_ParamDef, kTotalEffectParameterCount + 1> parameters{};
 std::vector<PF_ParamDef> registered;
 std::unordered_map<PF_ParamDef*, A_long> checked_out;
 std::vector<A_long> checked_indices;
@@ -66,7 +78,9 @@ PF_Err checkout(PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, 
     last_time = time;
     checked_indices.push_back(index);
     if (index == fail_checkout) return PF_Err_OUT_OF_MEMORY;
-    if (index < 1 || index > 32 || !value) return PF_Err_BAD_CALLBACK_PARAM;
+    if (index < 1 || index > static_cast<PF_ParamIndex>(kTotalEffectParameterCount) || !value) {
+        return PF_Err_BAD_CALLBACK_PARAM;
+    }
     *value = parameters[static_cast<std::size_t>(index)];
     checked_out[value] = index;
     return PF_Err_NONE;
@@ -180,7 +194,8 @@ void test_callbacks(PF_InData& host) {
 void test_parameters(PF_InData& host) {
     PF_OutData output{};
     CHECK(setup_parameters(&host, &output) == PF_Err_NONE);
-    CHECK(output.num_params == 33 && registered.size() == 32);
+    CHECK(output.num_params == static_cast<A_long>(kTotalEffectParameterCount + 1) &&
+          registered.size() == kTotalEffectParameterCount);
     const auto& source = registered[kControlSourceId - 1];
     // Manifest revision 6: a fresh effect must drive the visible controls, so both the
     // default and the old-project value select AE Controls. Node Graph is opt-in.
@@ -190,7 +205,7 @@ void test_parameters(PF_InData& host) {
     // animated, and the two flags this used to carry were never part of the contract.
     CHECK(registered[kGraphParameterId - 1].flags == 0);
     CHECK(registered[kGraphParameterId - 1].u.arb_d.value == nullptr);
-    for (std::size_t i = 1; i <= 32; ++i) {
+    for (std::size_t i = 1; i <= kTotalEffectParameterCount; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;
     }
@@ -224,14 +239,17 @@ void test_parameters(PF_InData& host) {
     parameters[kColorStartId].u.cd.value.blue = 0;
     parameters[kParticleSizeEndId].u.fs_d.value = 2.0;
     parameters[kOpacityEndId].u.fs_d.value = 0.25;
+    parameters[kEmitterSizeXId].u.fs_d.value = 250.0;
+    parameters[kEmitterSizeYId].u.fs_d.value = 75.0;
+    parameters[kEmitterSizeZId].u.fs_d.value = 150.0;
     parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(checked_out.empty() && last_time == host.current_time && active_source == kLegacyControlSource);
     const auto legacy = core::serialize_graph(*snapshot, core::particle_node_registry());
     CHECK(legacy.has_value() && legacy.value() != frozen.value());
 
-    // The single-emitter chain is emitter -> force -> appearance -> output, and the
-    // delivered control values reach the force and appearance nodes.
+    // The current control projection follows Emitter -> Particle -> Force -> Output.
+    // Appearance controls belong to Particle and force values stay on the Force node.
     const auto find_node = [](const core::Graph& graph, const char* key) {
         return std::find_if(graph.nodes.begin(), graph.nodes.end(),
                             [key](const core::GraphNode& node) { return node.type_key == key; });
@@ -244,24 +262,44 @@ void test_parameters(PF_InData& host) {
     };
     CHECK(snapshot->nodes.size() == 4 && snapshot->edges.size() == 3);
     const auto force_node = find_node(*snapshot, core::graph_keys::kForceNode);
-    const auto appearance_node = find_node(*snapshot, core::graph_keys::kAppearanceNode);
-    CHECK(force_node != snapshot->nodes.end() && appearance_node != snapshot->nodes.end());
+    const auto particle_node = find_node(*snapshot, core::graph_keys::kParticleNode);
+    const auto emitter_node = find_node(*snapshot, core::graph_keys::kEmitterNode);
+    const auto output_node = find_node(*snapshot, core::graph_keys::kOutputNode);
+    CHECK(force_node != snapshot->nodes.end() && particle_node != snapshot->nodes.end() &&
+          output_node != snapshot->nodes.end() &&
+          emitter_node != snapshot->nodes.end());
+    if (snapshot->nodes.size() == 4 && snapshot->edges.size() == 3) {
+        CHECK(snapshot->edges[0].source_node == emitter_node->id &&
+              snapshot->edges[0].destination_node == particle_node->id);
+        CHECK(snapshot->edges[1].source_node == particle_node->id &&
+              snapshot->edges[1].destination_node == force_node->id);
+        CHECK(snapshot->edges[2].source_node == force_node->id &&
+              snapshot->edges[2].destination_node == output_node->id);
+    }
+    if (emitter_node != snapshot->nodes.end()) {
+        const auto* size_x = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentX);
+        const auto* size_y = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentY);
+        const auto* size_z = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentZ);
+        CHECK(size_x != nullptr && std::get<double>(*size_x) == 250.0);
+        CHECK(size_y != nullptr && std::get<double>(*size_y) == 75.0);
+        CHECK(size_z != nullptr && std::get<double>(*size_z) == 150.0);
+    }
     if (force_node != snapshot->nodes.end()) {
         const auto* gravity = find_value(*force_node, core::graph_keys::kGravity);
         const auto* drag = find_value(*force_node, core::graph_keys::kLinearDrag);
         CHECK(gravity != nullptr && std::get<core::Vec3>(*gravity).y == -0.5);
         CHECK(drag != nullptr && std::get<double>(*drag) == 0.25);
     }
-    if (appearance_node != snapshot->nodes.end()) {
-        const auto* color_start = find_value(*appearance_node, core::graph_keys::kColorStart);
-        const auto* size_end = find_value(*appearance_node, core::graph_keys::kSizeEnd);
-        const auto* opacity_end = find_value(*appearance_node, core::graph_keys::kOpacityEnd);
+    if (particle_node != snapshot->nodes.end()) {
+        const auto* color_start = find_value(*particle_node, core::graph_keys::kColorStart);
+        const auto* size_end = find_value(*particle_node, core::graph_keys::kSizeEnd);
+        const auto* opacity_end = find_value(*particle_node, core::graph_keys::kOpacityEnd);
         CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).x == 1.0);
         CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).y == 0.0);
         CHECK(size_end != nullptr && std::get<double>(*size_end) == 2.0);
         CHECK(opacity_end != nullptr && std::get<double>(*opacity_end) == 0.25);
     }
-    std::array<PF_ParamDef*, 33> pointers{};
+    std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
     fail_allocation = true;
@@ -339,7 +377,7 @@ void test_capture_scales_reduced_preview(PF_InData& host) {
     const PF_RationalScale saved_x = host.downsample_x;
     const PF_RationalScale saved_y = host.downsample_y;
     const PF_FpLong saved_gravity_y = parameters[kGravityYId].u.fs_d.value;
-    std::array<PF_ParamDef*, 33> pointers{};
+    std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{}; extra.param_index = kCaptureControlsId;
 
@@ -413,7 +451,7 @@ void test_supervision(PF_InData& host) {
     parameters[kControlSourceId].u.pd.value = kNodeControlSource;
     parameters[kGravityYId].u.fs_d.value = 0.0;
     parameters[kGravityYId].uu.change_flags = 0;
-    std::array<PF_ParamDef*, 33> pointers{};
+    std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];
     PF_UserChangedParamExtra extra{};
     extra.param_index = kGravityYId;

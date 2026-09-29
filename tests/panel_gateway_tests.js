@@ -25,6 +25,9 @@ const initialValues = {
     "Size": 8,
     "Opacity": 1,
     "Emitter Size": 0.05,
+    "Size X": 100,
+    "Size Y": 100,
+    "Size Z": 100,
     "Speed Random": 0.15,
     "Gravity X": 0,
     "Gravity Y": 0,
@@ -36,6 +39,18 @@ const initialValues = {
     "Opacity Over Life": 1,
     "Control Source": 2
 };
+
+// Revision 9 added a bounded project curve bank and supervised commit nonce.
+// Keep every named stream in the fake host so getState exercises the same
+// resolution path as the installed effect (zero counts preserve linear curves).
+for (const prefix of ["Size", "Opacity"]) {
+    initialValues[prefix + " Curve Count"] = 0;
+    for (let point = 0; point < 8; point++) {
+        initialValues[prefix + " Curve Point " + point + " Age"] = 0;
+        initialValues[prefix + " Curve Point " + point + " Value"] = 0;
+    }
+}
+initialValues["Curve Edit Commit"] = 0;
 
 function createHarness(options = {}) {
     const values = {};

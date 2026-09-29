@@ -26,6 +26,8 @@
     var dragState = null;
     var inspectorDragState = null;
     var numericScrubState = null;
+    var curveDragState = null;
+    var selectedCurvePoints = { size: 0, opacity: 0 };
     var marqueeState = null;
     var panState = null;
     var connectionState = null;
@@ -60,28 +62,32 @@
     var PRESETS = {
         defaults: {
             particle_count: 1000, birth_rate: 30, seed: 1, particle_lifetime: 2, emitter_shape: 1,
-            velocity_x: 0, velocity_y: 0.3, velocity_z: 0, emitter_size: 0.05, velocity_spread: 0.15,
+            velocity_x: 0, velocity_y: 0.3, velocity_z: 0, emitter_size: 0.05,
+            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.15,
             gravity_x: 0, gravity_y: 0, gravity_z: 0, linear_drag: 0,
             particle_size: 8, particle_size_end: 8, opacity: 1, opacity_end: 1,
             color_start: [255, 255, 255], color_end: [255, 255, 255]
         },
         spark: {
             particle_count: 4000, birth_rate: 220, seed: 7, particle_lifetime: 1.1, emitter_shape: 1,
-            velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0, velocity_spread: 1.1,
+            velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0,
+            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 1.1,
             gravity_x: 0, gravity_y: -2.6, gravity_z: 0, linear_drag: 0.9,
             particle_size: 3.2, particle_size_end: 0.6, opacity: 1, opacity_end: 0,
             color_start: [255, 240, 180], color_end: [255, 90, 20]
         },
         snow: {
             particle_count: 2500, birth_rate: 90, seed: 21, particle_lifetime: 6.5, emitter_shape: 2,
-            velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1, velocity_spread: 0.35,
+            velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1,
+            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.35,
             gravity_x: 0, gravity_y: -0.05, gravity_z: 0, linear_drag: 0.15,
             particle_size: 4.5, particle_size_end: 4.5, opacity: 0.9, opacity_end: 0.75,
             color_start: [235, 245, 255], color_end: [200, 215, 235]
         },
         floating_light: {
             particle_count: 300, birth_rate: 14, seed: 3, particle_lifetime: 9, emitter_shape: 3,
-            velocity_x: 0, velocity_y: 0.16, velocity_z: 0, emitter_size: 0.9, velocity_spread: 0.4,
+            velocity_x: 0, velocity_y: 0.16, velocity_z: 0, emitter_size: 0.9,
+            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.4,
             gravity_x: 0, gravity_y: 0.06, gravity_z: 0, linear_drag: 0.35,
             particle_size: 14, particle_size_end: 3, opacity: 0.85, opacity_end: 0,
             color_start: [255, 232, 150], color_end: [255, 140, 60]
@@ -105,10 +111,12 @@
     var pinnedTargetToken = null;
     try { pinnedTargetToken = window.localStorage.getItem(PIN_STORAGE_KEY) || null; }
     catch (ignored) { /* target pin remains available for this panel session */ }
-    var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {},
+    var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {}, curves: null,
                   selectedNodeId: "emitter", selectedNodeIds: {}, inspectorOpen: false, pending: false,
                   pinnedTargetToken: pinnedTargetToken, layoutPersistence: false,
-                  frameStatus: null, liveParticleCount: null };
+                  frameStatus: null, liveParticleCount: null, controlSource: "AE Controls",
+                  graphMode: false, graphSnapshot: null, topologyReady: false };
+    var graphTransactionClient = null;
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
@@ -280,7 +288,7 @@
     }
 
     var NODE_TYPES = {
-        emitter: true, particle: true, force: true, output: true
+        emitter: true, particle: true, force: true, appearance: true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
@@ -289,13 +297,21 @@
 
     function positionFor(node, index) {
         if (!nodePositions[node.id]) {
-            var preset = DEFAULT_NODE_POSITIONS[node.id];
+            var preset = node.position || DEFAULT_NODE_POSITIONS[node.id];
             nodePositions[node.id] = preset ? { x: preset.x, y: preset.y } : {
                 x: (CANVAS_MIN_WIDTH - NODE_WIDTH) / 2,
                 y: 22 + index * 78
             };
         }
         return nodePositions[node.id];
+    }
+
+    function nodeKind(node) {
+        return node && (node.kind || node.id);
+    }
+
+    function isSupportedNode(node) {
+        return !!NODE_TYPES[nodeKind(node)];
     }
 
     function displayPosition(position) {
@@ -307,6 +323,9 @@
         canvasOffset = { x: 0, y: 0 };
         viewPan = { x: 0, y: 0 };
         zoom = 1;
+        selectedCurvePoints = { size: 0, opacity: 0 };
+        curveDragState = null;
+        if (document.body && document.body.classList) document.body.classList.remove("dragging-age-curve");
         centerGraphOnNextRender = true;
     }
 
@@ -332,7 +351,7 @@
         var right = -Infinity;
         var bottom = -Infinity;
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_TYPES[state.nodes[i].id]) continue;
+            if (!isSupportedNode(state.nodes[i])) continue;
             var position = displayPosition(positionFor(state.nodes[i], i));
             left = Math.min(left, position.x);
             top = Math.min(top, position.y);
@@ -345,12 +364,22 @@
     }
 
     function canvasInteractionActive() {
-        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState ||
+        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState || curveDragState ||
                   numericScrubState);
     }
 
     function commitNodeLayout() {
         if (!state.layoutPersistence || !state.targetToken || !state.revision || state.pending || !state.nodes.length) return;
+        if (state.graphMode) {
+            var positions = {};
+            for (var dynamicIndex = 0; dynamicIndex < state.nodes.length; dynamicIndex++) {
+                var dynamicNode = state.nodes[dynamicIndex];
+                var dynamicPosition = positionFor(dynamicNode, dynamicIndex);
+                positions[dynamicNode.id] = { x: Number(dynamicPosition.x), y: Number(dynamicPosition.y) };
+            }
+            applyTopologyEdit({ type: "moveNodes", positions: positions });
+            return;
+        }
         var layout = {};
         for (var i = 0; i < state.nodes.length; i++) {
             var nodeId = state.nodes[i].id;
@@ -389,9 +418,10 @@
         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", output: "#83c9b1" };
+        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed",
+                       appearance: "#ca8bea", output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_TYPES[state.nodes[i].id]) continue;
+            if (!isSupportedNode(state.nodes[i])) continue;
             var position = displayPosition(positionFor(state.nodes[i], i));
             bounds.left = Math.min(bounds.left, position.x);
             bounds.top = Math.min(bounds.top, position.y);
@@ -417,11 +447,11 @@
         context.clip();
         for (var n = 0; n < state.nodes.length; n++) {
             var node = state.nodes[n];
-            if (!NODE_TYPES[node.id]) continue;
+            if (!isSupportedNode(node)) continue;
             var nodePosition = displayPosition(positionFor(node, n));
             var nodeX = offsetX + (nodePosition.x - bounds.left) * scale;
             var nodeY = offsetY + (nodePosition.y - bounds.top) * scale;
-            context.fillStyle = colors[node.id] || "#aab2bf";
+            context.fillStyle = colors[nodeKind(node)] || "#aab2bf";
             context.fillRect(nodeX, nodeY, Math.max(3, NODE_WIDTH * scale), Math.max(2, NODE_HEIGHT * scale));
         }
         var viewX = offsetX + (viewportLeft - bounds.left) * scale;
@@ -460,7 +490,7 @@
         var maxX = -Infinity;
         var maxY = -Infinity;
         for (var i = 0; i < state.nodes.length; i++) {
-            if (!NODE_TYPES[state.nodes[i].id]) continue;
+            if (!isSupportedNode(state.nodes[i])) continue;
             var position = positionFor(state.nodes[i], i);
             minX = Math.min(minX, position.x);
             minY = Math.min(minY, position.y);
@@ -531,7 +561,8 @@
             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
             var card = graphNodeElements[nodeId].card;
             var selected = !!state.selectedNodeIds[nodeId];
-            card.className = "graph-node " + nodeId + (selected ? " selected" : "");
+            card.className = "graph-node " + nodeKind(graphNodeElements[nodeId].node) +
+                             (selected ? " selected" : "");
             var button = card.querySelector(".node-select");
             if (button) button.setAttribute("aria-pressed", state.selectedNodeId === nodeId ? "true" : "false");
         }
@@ -585,7 +616,14 @@
 
     function parameterValue(node, key) {
         for (var i = 0; i < node.params.length; i++) {
-            if (node.params[i].key === key) return node.params[i].value;
+            if (node.params[i].key === key || node.params[i].legacyKey === key) return node.params[i].value;
+        }
+        return null;
+    }
+
+    function graphParameterValue(node, key) {
+        for (var i = 0; i < node.params.length; i++) {
+            if (node.params[i].graphKey === String(key)) return node.params[i].value;
         }
         return null;
     }
@@ -595,20 +633,23 @@
     }
 
     function nodeSummary(node) {
-        if (node.id === "emitter") {
-            return shortNumber(parameterValue(node, "birth_rate")) + "/s";
+        var kind = nodeKind(node);
+        if (kind === "emitter") {
+            return shortNumber(parameterValue(node, "birth_rate") || graphParameterValue(node, 2)) + "/s";
         }
-        if (node.id === "force") {
-            return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y")) +
-                   " · drag " + shortNumber(parameterValue(node, "linear_drag"));
+        if (kind === "force") {
+            var gravity = graphParameterValue(node, 1);
+            return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y") || (gravity && gravity[1])) +
+                   " · drag " + shortNumber(parameterValue(node, "linear_drag") || graphParameterValue(node, 2));
         }
-        if (node.id === "particle") {
-            return "Size " + shortNumber(parameterValue(node, "particle_size")) +
-                   " · opacity " + shortNumber(parameterValue(node, "opacity"));
+        if (kind === "particle" || kind === "appearance") {
+            return "Size " + shortNumber(parameterValue(node, "particle_size") || graphParameterValue(node, 3)) +
+                   " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5));
         }
         var status = state.frameStatus;
         if (status && status.available === false) return "Live count unavailable";
-        var maxParticles = status ? status.maxParticles : parameterValue(node, "particle_count");
+        var maxParticles = status ? status.maxParticles :
+            (node.maxParticles !== undefined ? node.maxParticles : parameterValue(node, "particle_count"));
         var live = state.liveParticleCount === null ? "–" : String(state.liveParticleCount);
         return "Live " + live + " · Max " + shortNumber(maxParticles);
     }
@@ -640,7 +681,10 @@
             state.liveParticleCount = response.available === false ? null :
                 countLiveParticles(response.timeSeconds, response.birthRate,
                                    response.lifetimeSeconds, response.maxParticles);
-            var output = graphNodeElements.output;
+            var output = null;
+            for (var i = 0; i < state.nodes.length; i++) {
+                if (nodeKind(state.nodes[i]) === "output") { output = graphNodeElements[state.nodes[i].id]; break; }
+            }
             if (output && output.summary && output.node) output.summary.textContent = nodeSummary(output.node);
         });
     }
@@ -650,7 +694,7 @@
         var position = positionFor(node, state.nodes.indexOf(node));
         var display = displayPosition(position);
         card.setAttribute("data-node-id", node.id);
-        card.className = "graph-node " + node.id +
+        card.className = "graph-node " + nodeKind(node) +
                          (state.selectedNodeIds[node.id] ? " selected" : "");
         card.style.left = display.x + "px";
         card.style.top = display.y + "px";
@@ -682,28 +726,29 @@
             state.inspectorOpen = true;
             syncNodeSelectionStyles();
             renderInspector();
-            refresh(false, false);
         });
         button.addEventListener("pointerdown", function (event) {
             beginNodeDrag(node.id, event);
         });
         card.appendChild(button);
-        if (node.id !== "emitter") {
+        if (node.inputPort !== null && node.inputPort !== undefined ? node.inputPort !== false : nodeKind(node) !== "emitter") {
             var input = document.createElement("span");
             input.className = "port port-in";
             input.title = "Input";
             input.setAttribute("data-node-id", node.id);
             input.setAttribute("data-port-direction", "in");
+            input.setAttribute("data-port-key", node.inputPort || "1");
             input.addEventListener("pointerdown", function (event) { beginPortDrag(node.id, "in", event); });
             card.appendChild(input);
             portElements.input = input;
         }
-        if (node.id !== "output") {
+        if (node.outputPort !== null && node.outputPort !== undefined ? node.outputPort !== false : nodeKind(node) !== "output") {
             var output = document.createElement("span");
             output.className = "port port-out";
             output.title = "Output";
             output.setAttribute("data-node-id", node.id);
             output.setAttribute("data-port-direction", "out");
+            output.setAttribute("data-port-key", node.outputPort || (nodeKind(node) === "emitter" ? "1" : "2"));
             output.addEventListener("pointerdown", function (event) { beginPortDrag(node.id, "out", event); });
             card.appendChild(output);
             portElements.output = output;
@@ -732,12 +777,14 @@
             path.setAttribute("d", pathData);
             path.setAttribute("data-from", edge[0]);
             path.setAttribute("data-to", edge[1]);
+            if (edge.id) path.setAttribute("data-edge-id", edge.id);
             path.setAttribute("tabindex", "0");
             path.setAttribute("role", "button");
             path.setAttribute("aria-label", "Disconnect " + edge[0] + " from " + edge[1]);
             path.addEventListener("click", function () {
                 requestTopologyEdit({ type: "disconnect", from: this.getAttribute("data-from"),
-                                      to: this.getAttribute("data-to") });
+                                      to: this.getAttribute("data-to"),
+                                      edgeId: this.getAttribute("data-edge-id") || undefined });
             });
             path.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" || event.key === " ") {
@@ -783,20 +830,84 @@
         applyTopologyEdit(edit);
     }
 
+    function loadGraphSnapshot(targetToken, callback) {
+        if (!window.StarfieldGraphCodec || !window.StarfieldGraphView ||
+            !window.StarfieldGraphTransactions || !window.StarfieldGraphEdits) {
+            callback({ ok: false, error: { code: "graph_modules_missing", message: "The graph editor modules did not load." } });
+            return;
+        }
+        call("getGraphSnapshot", { target: { token: targetToken } }, function (response) {
+            if (!response || !response.ok || !response.snapshot) { callback(response); return; }
+            if (response.snapshot.initialized) { callback(response); return; }
+            call("syncGraphSnapshot", { target: { token: targetToken } }, function (initialized) {
+                if (!initialized || !initialized.ok || !initialized.snapshot || !initialized.snapshot.initialized) {
+                    callback(initialized || { ok: false, error: { code: "graph_snapshot_unconfirmed", message: "The project graph could not be initialized." } });
+                    return;
+                }
+                callback(initialized);
+            });
+        });
+    }
+
+    function getGraphTransactionClient() {
+        if (!graphTransactionClient && window.StarfieldGraphTransactions && window.StarfieldGraphCodec &&
+            window.StarfieldGraphEdits) {
+            graphTransactionClient = window.StarfieldGraphTransactions.create({
+                call: call,
+                codec: window.StarfieldGraphCodec,
+                edits: window.StarfieldGraphEdits
+            });
+        }
+        return graphTransactionClient;
+    }
+
     function applyTopologyEdit(edit) {
-        // P-02B needs a graph-backed, undoable host transaction. Protocol v1 only
-        // exposes flat parameter streams, so never fake a local-only topology edit.
-        var labels = {
-            disconnect: "Disconnect this wire",
-            insertNode: "Insert this node",
-            connect: "Connect these ports",
-            addNode: "Add node",
-            duplicateNodes: "Duplicate selected nodes",
-            deleteNodes: "Delete selected nodes"
-        };
-        var action = edit && labels[edit.type] ? labels[edit.type] : "Edit graph";
-        showError("graph_edit_transport_unavailable", action +
-                  " is unavailable until the graph transaction bridge is implemented.");
+        var client = getGraphTransactionClient();
+        if (!client || !state.targetToken) {
+            showError("graph_edit_transport_unavailable", "The graph transaction bridge did not load.");
+            return;
+        }
+        var targetToken = state.targetToken;
+        refreshEpoch += 1;
+        refreshInFlight = false;
+        state.pending = true;
+        function commitMappedEdit(snapshotResponse) {
+            if (!snapshotResponse || !snapshotResponse.ok || !snapshotResponse.snapshot) {
+                state.pending = false;
+                var loadError = snapshotResponse && snapshotResponse.error ||
+                    { code: "graph_snapshot_unavailable", message: "The project graph snapshot could not be read." };
+                showError(loadError.code, loadError.message);
+                return;
+            }
+            var preparedEdit = edit;
+            try {
+                if (!state.graphMode) {
+                    var sourceGraph = window.StarfieldGraphCodec.fromHex(snapshotResponse.snapshot.graphHex);
+                    preparedEdit = window.StarfieldGraphView.mapLegacyEdit(sourceGraph, edit);
+                }
+            } catch (error) {
+                state.pending = false;
+                showError(error && error.code || "invalid_graph", error && error.message || String(error));
+                return;
+            }
+            client.apply(preparedEdit, function (result) {
+                state.pending = false;
+                if (!result || !result.ok) {
+                    var error = result && result.error || { code: "graph_edit_failed", message: "The graph transaction failed." };
+                    showError(error.code, error.message);
+                    refresh(false, false);
+                    return;
+                }
+                state.graphSnapshot = result.snapshot;
+                clearBanner();
+                refresh(false, false);
+            });
+        }
+        if (state.graphMode && state.graphSnapshot) {
+            commitMappedEdit({ ok: true, snapshot: state.graphSnapshot });
+        } else {
+            loadGraphSnapshot(targetToken, commitMappedEdit);
+        }
     }
 
     function closestElement(target, selector) {
@@ -822,7 +933,8 @@
         var nodeCard = closestElement(event.target, ".graph-node");
         contextEdge = edgePath ? {
             from: edgePath.getAttribute("data-from"),
-            to: edgePath.getAttribute("data-to")
+            to: edgePath.getAttribute("data-to"),
+            edgeId: edgePath.getAttribute("data-edge-id")
         } : null;
         if (nodeCard) {
             var nodeId = nodeCard.getAttribute("data-node-id");
@@ -884,7 +996,8 @@
         } else if (action === "deleteNodes") {
             edit = { type: "deleteNodes", nodeIds: selectedNodeIds() };
         } else if (action === "disconnect" && contextEdge) {
-            edit = { type: "disconnect", from: contextEdge.from, to: contextEdge.to };
+            edit = { type: "disconnect", from: contextEdge.from, to: contextEdge.to,
+                     edgeId: contextEdge.edgeId || undefined };
         }
         hideGraphContextMenu();
         if (edit) requestTopologyEdit(edit);
@@ -921,6 +1034,33 @@
         return null;
     }
 
+    function currentCurveState(kind, nodeId) {
+        if (state.graphMode) {
+            var selectedId = nodeId || state.selectedNodeId;
+            for (var i = 0; i < state.nodes.length; i++) {
+                if (state.nodes[i].id === selectedId) return state.nodes[i].curves;
+            }
+            return null;
+        }
+        return state.curves;
+    }
+
+    function selectedGraphNode(nodeId) {
+        var selectedId = nodeId || state.selectedNodeId;
+        for (var i = 0; i < state.nodes.length; i++) {
+            if (state.nodes[i].id === selectedId) return state.nodes[i];
+        }
+        return null;
+    }
+
+    function graphParameterValue(node, key) {
+        if (!node || !node.graphParameters) return null;
+        for (var i = 0; i < node.graphParameters.length; i++) {
+            if (node.graphParameters[i].key === String(key)) return node.graphParameters[i];
+        }
+        return null;
+    }
+
     function renderInspector() {
         if (!elements.inspectorBody || !elements.inspector) return;
         elements.inspector.hidden = !state.inspectorOpen;
@@ -938,9 +1078,11 @@
             return;
         }
         elements.inspectorTitle.textContent = node.label;
-        elements.inspectorMeta.textContent = node.params.length + " parameters";
+        var kind = nodeKind(node);
+        elements.inspectorMeta.textContent = kind === "particle" || kind === "appearance"
+            ? "Size / Opacity over life" : node.params.length + " parameters";
         if (!node.params.length) {
-            elements.inspectorBody.innerHTML = "<p class=\"inspector-note\">Particle output is transparent. This stage has no editable parameters in protocol v1.</p>";
+            elements.inspectorBody.innerHTML = "<p class=\"inspector-note\">This node has no parameters.</p>";
             shownInspectorNodeId = node.id;
             positionInspector(node.id);
             return;
@@ -948,11 +1090,480 @@
         var grid = document.createElement("div");
         grid.className = "parameter-grid";
         for (var p = 0; p < node.params.length; p++) {
+            if ((kind === "particle" || kind === "appearance") &&
+                (node.params[p].legacyKey === "particle_size_end" || node.params[p].legacyKey === "opacity_end" ||
+                 node.params[p].graphKey === "4" || node.params[p].graphKey === "6")) continue;
             grid.appendChild(renderParameter(node.params[p]));
         }
         elements.inspectorBody.appendChild(grid);
+        var curves = currentCurveState("size", node.id);
+        if ((kind === "particle" || kind === "appearance") && curves) {
+            elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life", curves.size, 100000));
+            elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life", curves.opacity, 1));
+            drawCurvePlot("size");
+            drawCurvePlot("opacity");
+        }
         if (shownInspectorNodeId !== node.id) positionInspector(node.id);
         shownInspectorNodeId = node.id;
+    }
+
+    function renderCurveEditor(kind, label, curve, maximum) {
+        var section = document.createElement("section");
+        section.className = "age-curve-editor";
+        section.dataset.curveKind = kind;
+        var heading = document.createElement("div");
+        heading.className = "age-curve-heading";
+        var title = document.createElement("strong");
+        title.textContent = label;
+        heading.appendChild(title);
+        var actions = document.createElement("div");
+        actions.className = "age-curve-actions";
+        var linear = document.createElement("button");
+        linear.type = "button";
+        linear.textContent = "Linear";
+        linear.title = "Use a straight line between the current start and end values";
+        linear.addEventListener("click", function () {
+            var points = curve.points;
+            applyCurveChanges(kind, [
+                { age: 0, value: points[0].value },
+                { age: 1, value: points[points.length - 1].value }
+            ], false);
+        });
+        actions.appendChild(linear);
+        var remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Remove Point";
+        remove.className = "age-curve-remove";
+        remove.title = "Remove the selected interior control point";
+        remove.addEventListener("click", function () {
+            var curves = currentCurveState(kind);
+            var currentCurve = curves && curves[kind];
+            var selectedIndex = curveSelectedIndex(kind, currentCurve);
+            if (!currentCurve || selectedIndex <= 0 || selectedIndex >= currentCurve.points.length - 1) return;
+            var points = copyCurvePoints(currentCurve.points);
+            points.splice(selectedIndex, 1);
+            selectedCurvePoints[kind] = Math.max(0, selectedIndex - 1);
+            applyCurveChanges(kind, points, true);
+        });
+        actions.appendChild(remove);
+        heading.appendChild(actions);
+        section.appendChild(heading);
+        var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 320 140");
+        svg.setAttribute("preserveAspectRatio", "none");
+        svg.setAttribute("class", "age-curve-plot");
+        svg.dataset.curveKind = kind;
+        svg.dataset.valueMax = String(maximum);
+        svg.addEventListener("pointerdown", function (event) {
+            if (event.button !== 0 || state.pending || closestElement(event.target, ".age-curve-point")) return;
+            addCurvePointFromEvent(kind, event, svg, maximum);
+            if (event.preventDefault) event.preventDefault();
+        });
+        section.appendChild(svg);
+
+        var controls = document.createElement("div");
+        controls.className = "age-curve-controls";
+        var lifeControl = makeCurvePointControl(kind, "age", maximum);
+        var valueControl = makeCurvePointControl(kind, "value", maximum);
+        controls.appendChild(lifeControl);
+        controls.appendChild(valueControl);
+        var navigation = document.createElement("div");
+        navigation.className = "age-curve-navigation";
+        var previous = document.createElement("button");
+        previous.type = "button";
+        previous.className = "age-curve-previous";
+        previous.textContent = "‹";
+        previous.title = "Select previous control point";
+        previous.addEventListener("click", function () {
+            var curves = currentCurveState(kind);
+            var currentCurve = curves && curves[kind];
+            if (!currentCurve) return;
+            selectedCurvePoints[kind] = Math.max(0, curveSelectedIndex(kind, currentCurve) - 1);
+            drawCurvePlot(kind);
+        });
+        navigation.appendChild(previous);
+        var pointIndexLabel = document.createElement("span");
+        pointIndexLabel.className = "age-curve-point-index";
+        pointIndexLabel.setAttribute("aria-live", "polite");
+        navigation.appendChild(pointIndexLabel);
+        var next = document.createElement("button");
+        next.type = "button";
+        next.className = "age-curve-next";
+        next.textContent = "›";
+        next.title = "Select next control point";
+        next.addEventListener("click", function () {
+            var curves = currentCurveState(kind);
+            var currentCurve = curves && curves[kind];
+            if (!currentCurve) return;
+            selectedCurvePoints[kind] = Math.min(currentCurve.points.length - 1,
+                                                   curveSelectedIndex(kind, currentCurve) + 1);
+            drawCurvePlot(kind);
+        });
+        navigation.appendChild(next);
+        controls.appendChild(navigation);
+        section.appendChild(controls);
+        return section;
+    }
+
+    function curveSelectedIndex(kind, curve) {
+        if (!curve || !curve.points || !curve.points.length) return -1;
+        var index = Number(selectedCurvePoints[kind]);
+        if (!isFinite(index)) index = 0;
+        index = Math.max(0, Math.min(curve.points.length - 1, Math.floor(index)));
+        selectedCurvePoints[kind] = index;
+        return index;
+    }
+
+    function makeCurvePointControl(kind, field, maximum) {
+        var wrapper = document.createElement("label");
+        wrapper.className = "age-curve-control";
+        var caption = document.createElement("span");
+        caption.textContent = field === "age" ? "Life" : "Value";
+        wrapper.appendChild(caption);
+        var input = document.createElement("input");
+        input.type = "number";
+        input.className = field === "age" ? "age-curve-life" : "age-curve-value";
+        input.dataset.curveKind = kind;
+        input.dataset.curveField = field;
+        input.dataset.decimals = field === "age" ? "1" : kind === "opacity" ? "3" : "2";
+        input.dataset.scrubStep = field === "age" ? "0.1" : kind === "opacity" ? "0.01" : "0.1";
+        input.dataset.min = "0";
+        input.dataset.max = String(field === "age" ? 100 : maximum);
+        input.min = "0";
+        input.max = input.dataset.max;
+        input.step = field === "age" ? "0.1" : kind === "opacity" ? "0.001" : "0.01";
+        input.title = "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
+        input._curveCommit = function (nextValue) {
+            setCurvePointControl(kind, field, nextValue, maximum);
+        };
+        input.addEventListener("pointerdown", beginNumericScrub);
+        input.addEventListener("change", function () {
+            setCurvePointControl(kind, field, Number(input.value), maximum);
+        });
+        wrapper.appendChild(input);
+        return wrapper;
+    }
+
+    function setCurvePointControl(kind, field, value, maximum) {
+        var curves = currentCurveState(kind);
+        var curve = curves && curves[kind];
+        var selected = curveSelectedIndex(kind, curve);
+        if (!curve || selected < 0 || state.pending || !isFinite(value)) return;
+        var points = copyCurvePoints(curve.points);
+        if (field === "age") {
+            if (selected === 0 || selected === points.length - 1) return;
+            var minAge = points[selected - 1].age * 100 + 0.5;
+            var maxAge = points[selected + 1].age * 100 - 0.5;
+            value = Math.max(minAge, Math.min(maxAge, value));
+            points[selected].age = roundCurveNumber(value / 100, 3);
+        } else {
+            if (curveEndpointIsAnimated(kind, selected)) return;
+            value = Math.max(0, Math.min(maximum, value));
+            points[selected].value = roundCurveNumber(value, kind === "opacity" ? 3 : 2);
+        }
+        applyCurveChanges(kind, points, curve.custom);
+    }
+
+    function copyCurvePoints(points) {
+        var copy = [];
+        for (var i = 0; i < points.length; i++) copy.push({ age: points[i].age, value: points[i].value });
+        return copy;
+    }
+
+    function curvePlotBounds() {
+        return { left: 26, right: 312, top: 10, bottom: 112 };
+    }
+
+    function curvePlotMaximum(kind, maximum, points) {
+        if (kind === "opacity") return 1;
+        var high = 1;
+        for (var i = 0; i < points.length; i++) high = Math.max(high, Number(points[i].value) || 0);
+        return Math.max(10, Math.min(maximum, high * 1.2));
+    }
+
+    function curveEndpointIsAnimated(kind, index, nodeId) {
+        var curves = currentCurveState(kind, nodeId);
+        var curve = curves && curves[kind];
+        if (!curve || (index !== 0 && index !== curve.points.length - 1)) return false;
+        var key = kind === "size"
+            ? (index === 0 ? "particle_size" : "particle_size_end")
+            : (index === 0 ? "opacity" : "opacity_end");
+        if (state.graphMode) {
+            var graphNode = selectedGraphNode(nodeId);
+            var graphKey = kind === "size" ? (index === 0 ? "3" : "4") : (index === 0 ? "5" : "6");
+            var graphParameter = graphParameterValue(graphNode, graphKey);
+            return !!(graphParameter && graphParameter.animated === true);
+        }
+        for (var i = 0; i < state.nodes.length; i++) {
+            for (var p = 0; p < state.nodes[i].params.length; p++) {
+                if (state.nodes[i].params[p].key === key) return state.nodes[i].params[p].animated === true;
+            }
+        }
+        return false;
+    }
+
+    function drawCurvePlot(kind, forcedMaximum) {
+        var plots = elements.inspectorBody ? elements.inspectorBody.querySelectorAll(".age-curve-plot") : [];
+        var plot = null;
+        for (var i = 0; i < plots.length; i++) {
+            if (plots[i].dataset.curveKind === kind) { plot = plots[i]; break; }
+        }
+        var curves = currentCurveState(kind);
+        var curve = curves && curves[kind];
+        if (!plot || !curve) return;
+        var selectedPoint = curveSelectedIndex(kind, curve);
+        while (plot.firstChild) plot.removeChild(plot.firstChild);
+        var bounds = curvePlotBounds();
+        var max = typeof forcedMaximum === "number" ? forcedMaximum :
+                  curvePlotMaximum(kind, Number(plot.dataset.valueMax), curve.points);
+        plot.dataset.displayMaximum = String(max);
+        function px(age) { return bounds.left + age * (bounds.right - bounds.left); }
+        function py(value) { return bounds.bottom - Math.max(0, Math.min(max, value)) / max * (bounds.bottom - bounds.top); }
+        var ns = "http://www.w3.org/2000/svg";
+        var border = document.createElementNS(ns, "rect");
+        border.setAttribute("x", bounds.left); border.setAttribute("y", bounds.top);
+        border.setAttribute("width", bounds.right - bounds.left); border.setAttribute("height", bounds.bottom - bounds.top);
+        border.setAttribute("class", "age-curve-border"); plot.appendChild(border);
+        for (var gridIndex = 1; gridIndex < 4; gridIndex++) {
+            var x = bounds.left + (bounds.right - bounds.left) * gridIndex / 4;
+            var gridLine = document.createElementNS(ns, "line");
+            gridLine.setAttribute("x1", x); gridLine.setAttribute("x2", x);
+            gridLine.setAttribute("y1", bounds.top); gridLine.setAttribute("y2", bounds.bottom);
+            gridLine.setAttribute("class", "age-curve-grid"); plot.appendChild(gridLine);
+            var y = bounds.top + (bounds.bottom - bounds.top) * gridIndex / 4;
+            var horizontal = document.createElementNS(ns, "line");
+            horizontal.setAttribute("x1", bounds.left); horizontal.setAttribute("x2", bounds.right);
+            horizontal.setAttribute("y1", y); horizontal.setAttribute("y2", y);
+            horizontal.setAttribute("class", "age-curve-grid"); plot.appendChild(horizontal);
+        }
+        var path = document.createElementNS(ns, "polyline");
+        var coordinates = [];
+        for (var p = 0; p < curve.points.length; p++) coordinates.push(px(curve.points[p].age) + "," + py(curve.points[p].value));
+        path.setAttribute("points", coordinates.join(" "));
+        path.setAttribute("class", "age-curve-line");
+        plot.appendChild(path);
+        for (var pointIndex = 0; pointIndex < curve.points.length; pointIndex++) {
+            var circle = document.createElementNS(ns, "circle");
+            circle.setAttribute("cx", px(curve.points[pointIndex].age));
+            circle.setAttribute("cy", py(curve.points[pointIndex].value));
+            circle.setAttribute("r", "4.5");
+            circle.setAttribute("class", "age-curve-point" +
+                (selectedPoint === pointIndex ? " selected" : "") +
+                (curveEndpointIsAnimated(kind, pointIndex) ? " locked" : ""));
+            circle.dataset.pointIndex = String(pointIndex);
+            circle.dataset.curveKind = kind;
+            if (curveEndpointIsAnimated(kind, pointIndex)) {
+                circle.setAttribute("aria-label", "Animated endpoint; edit its AE keyframes");
+                circle.setAttribute("title", "This endpoint follows AE keyframes and cannot be changed here.");
+            }
+            circle.addEventListener("pointerdown", beginCurvePointDrag);
+            circle.addEventListener("click", function (event) {
+                selectedCurvePoints[kind] = Number(event.currentTarget.dataset.pointIndex);
+                drawCurvePlot(kind);
+                if (event.stopPropagation) event.stopPropagation();
+            });
+            plot.appendChild(circle);
+        }
+        var zero = document.createElementNS(ns, "text");
+        zero.setAttribute("x", bounds.left); zero.setAttribute("y", "132"); zero.setAttribute("class", "age-curve-axis-label");
+        zero.textContent = "0"; plot.appendChild(zero);
+        var one = document.createElementNS(ns, "text");
+        one.setAttribute("x", bounds.right); one.setAttribute("y", "132"); one.setAttribute("text-anchor", "end");
+        one.setAttribute("class", "age-curve-axis-label"); one.textContent = "Life"; plot.appendChild(one);
+        var maxLabel = document.createElementNS(ns, "text");
+        maxLabel.setAttribute("x", "4"); maxLabel.setAttribute("y", "16"); maxLabel.setAttribute("class", "age-curve-axis-label");
+        maxLabel.textContent = formatParameterNumber(max, kind === "opacity" ? 2 : 0); plot.appendChild(maxLabel);
+        var minLabel = document.createElementNS(ns, "text");
+        minLabel.setAttribute("x", "4"); minLabel.setAttribute("y", String(bounds.bottom)); minLabel.setAttribute("class", "age-curve-axis-label");
+        minLabel.textContent = "0"; plot.appendChild(minLabel);
+        var section = plot.parentNode;
+        var lifeInput = section && section.querySelector(".age-curve-life");
+        var valueInput = section && section.querySelector(".age-curve-value");
+        var previousButton = section && section.querySelector(".age-curve-previous");
+        var nextButton = section && section.querySelector(".age-curve-next");
+        var pointIndexLabel = section && section.querySelector(".age-curve-point-index");
+        var removeButton = section && section.querySelector(".age-curve-remove");
+        if (selectedPoint >= 0 && selectedPoint < curve.points.length) {
+            var selectedAge = curve.points[selectedPoint].age * 100;
+            var animatedEndpoint = curveEndpointIsAnimated(kind, selectedPoint);
+            if (lifeInput) {
+                lifeInput.value = formatParameterNumber(selectedAge, 1);
+                lifeInput.disabled = selectedPoint === 0 || selectedPoint === curve.points.length - 1;
+                lifeInput.dataset.min = selectedPoint > 0
+                    ? String(curve.points[selectedPoint - 1].age * 100 + 0.5) : "0";
+                lifeInput.dataset.max = selectedPoint < curve.points.length - 1
+                    ? String(curve.points[selectedPoint + 1].age * 100 - 0.5) : "100";
+                lifeInput.min = lifeInput.dataset.min;
+                lifeInput.max = lifeInput.dataset.max;
+                lifeInput.title = lifeInput.disabled
+                    ? "Endpoint age is fixed at the beginning or end of life."
+                    : "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
+            }
+            if (valueInput) {
+                valueInput.disabled = animatedEndpoint;
+                valueInput.value = formatParameterNumber(
+                    curve.points[selectedPoint].value, kind === "opacity" ? 3 : 2);
+                valueInput.title = animatedEndpoint
+                ? "This endpoint follows AE keyframes and cannot be changed here."
+                : "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
+            }
+            if (pointIndexLabel) pointIndexLabel.textContent = (selectedPoint + 1) + " / " + curve.points.length;
+            if (previousButton) previousButton.disabled = selectedPoint <= 0;
+            if (nextButton) nextButton.disabled = selectedPoint >= curve.points.length - 1;
+            if (removeButton) removeButton.disabled = selectedPoint <= 0 || selectedPoint >= curve.points.length - 1;
+        }
+    }
+
+    function curvePosition(event, plot, maximum) {
+        var rect = plot.getBoundingClientRect();
+        var bounds = curvePlotBounds();
+        var x = bounds.left + (event.clientX - rect.left) / Math.max(1, rect.width) * 320;
+        var y = bounds.top + (event.clientY - rect.top) / Math.max(1, rect.height) * 140;
+        return {
+            age: Math.max(0, Math.min(1, (x - bounds.left) / (bounds.right - bounds.left))),
+            value: Math.max(0, Math.min(maximum, (bounds.bottom - y) / (bounds.bottom - bounds.top) * maximum))
+        };
+    }
+
+    function addCurvePointFromEvent(kind, event, plot, maximum) {
+        var curves = currentCurveState(kind);
+        var curve = curves && curves[kind];
+        if (!curve) return;
+        if (curve.points.length >= 8) { showError("curve_full", "An over-life curve can contain at most 8 points."); return; }
+        var position = curvePosition(event, plot, curvePlotMaximum(kind, maximum, curve.points));
+        if (position.age <= 0.01 || position.age >= 0.99) return;
+        var points = copyCurvePoints(curve.points);
+        var insertAt = 1;
+        while (insertAt < points.length - 1 && points[insertAt].age < position.age) insertAt += 1;
+        if (position.age - points[insertAt - 1].age < 0.005 || points[insertAt].age - position.age < 0.005) return;
+        points.splice(insertAt, 0, { age: roundCurveNumber(position.age, 3),
+                                     value: roundCurveNumber(position.value, kind === "opacity" ? 3 : 2) });
+        selectedCurvePoints[kind] = insertAt;
+        applyCurveChanges(kind, points, true);
+    }
+
+    function beginCurvePointDrag(event) {
+        if (event.button !== 0 || state.pending || curveDragState) return;
+        var kind = event.currentTarget.dataset.curveKind;
+        var index = Number(event.currentTarget.dataset.pointIndex);
+        var curves = currentCurveState(kind);
+        var curve = curves && curves[kind];
+        if (!curve || !isFinite(index) || index < 0 || index >= curve.points.length) return;
+        selectedCurvePoints[kind] = index;
+        if (curveEndpointIsAnimated(kind, index)) {
+            drawCurvePlot(kind);
+            if (event.stopPropagation) event.stopPropagation();
+            if (event.preventDefault) event.preventDefault();
+            return;
+        }
+        curveDragState = { kind: kind, index: index, nodeId: state.selectedNodeId, pointerId: event.pointerId,
+                           startX: event.clientX, startY: event.clientY,
+                           original: copyCurvePoints(curve.points), moved: false,
+                           valueScale: curvePlotMaximum(kind,
+                               Number(event.currentTarget.parentNode.dataset.valueMax), curve.points) };
+        var plot = event.currentTarget.parentNode;
+        if (plot && typeof plot.setPointerCapture === "function" && event.pointerId !== undefined) {
+            try { plot.setPointerCapture(event.pointerId); } catch (ignored) { /* window handlers remain available */ }
+        }
+        if (event.currentTarget.classList) event.currentTarget.classList.add("selected");
+        if (document.body && document.body.classList) document.body.classList.add("dragging-age-curve");
+        var removeButton = plot.parentNode.querySelector(".age-curve-remove");
+        if (removeButton) removeButton.disabled = index <= 0 || index >= curve.points.length - 1;
+        drawCurvePlot(kind);
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+    }
+
+    function moveCurvePoint(event) {
+        if (event.pointerId !== undefined && curveDragState.pointerId !== undefined &&
+            event.pointerId !== curveDragState.pointerId) return;
+        var dx = event.clientX - curveDragState.startX;
+        var dy = event.clientY - curveDragState.startY;
+        if (!curveDragState.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+        curveDragState.moved = true;
+        var curves = currentCurveState(curveDragState.kind, curveDragState.nodeId);
+        var curve = curves && curves[curveDragState.kind];
+        if (!curve) return;
+        var plot = null;
+        var plots = elements.inspectorBody.querySelectorAll(".age-curve-plot");
+        for (var i = 0; i < plots.length; i++) {
+            if (plots[i].dataset.curveKind === curveDragState.kind) { plot = plots[i]; break; }
+        }
+        if (!plot) return;
+        var position = curvePosition(event, plot, curveDragState.valueScale);
+        var index = curveDragState.index;
+        if (index > 0 && index < curve.points.length - 1) {
+            position.age = Math.max(curve.points[index - 1].age + 0.005,
+                                    Math.min(curve.points[index + 1].age - 0.005, position.age));
+            curve.points[index].age = roundCurveNumber(position.age, 3);
+        }
+        curve.points[index].value = roundCurveNumber(position.value, curveDragState.kind === "opacity" ? 3 : 2);
+        drawCurvePlot(curveDragState.kind, curveDragState.valueScale);
+        if (event.preventDefault) event.preventDefault();
+    }
+
+    function roundCurveNumber(value, decimals) {
+        var scale = Math.pow(10, decimals);
+        return Math.round(value * scale) / scale;
+    }
+
+    function applyCurveChanges(kind, points, custom, nodeId) {
+        if (state.pending || !points || points.length < 2 || points.length > 8) return;
+        if (state.graphMode) {
+            var node = selectedGraphNode(nodeId);
+            var keys = node && node.curveParameterKeys;
+            var curveState = node && node.curves && node.curves[kind];
+            if (!node || !keys || !curveState) return;
+            if (!custom && !curveState.custom &&
+                Math.abs(curveState.points[0].value - points[0].value) < 1e-9 &&
+                Math.abs(curveState.points[curveState.points.length - 1].value - points[points.length - 1].value) < 1e-9) return;
+            var graphChanges = [];
+            var startKey = kind === "size" ? keys.sizeStart : keys.opacityStart;
+            var endKey = kind === "size" ? keys.sizeEnd : keys.opacityEnd;
+            var startParameter = graphParameterValue(node, startKey);
+            var endParameter = graphParameterValue(node, endKey);
+            if (startParameter && Math.abs(Number(startParameter.value) - points[0].value) > 1e-9) {
+                graphChanges.push({ nodeId: node.id, parameterKey: startKey,
+                                    valueType: startParameter.type, value: points[0].value });
+            }
+            if (endParameter && Math.abs(Number(endParameter.value) - points[points.length - 1].value) > 1e-9) {
+                graphChanges.push({ nodeId: node.id, parameterKey: endKey,
+                                    valueType: endParameter.type, value: points[points.length - 1].value });
+            }
+            var curveKey = kind === "size" ? keys.size : keys.opacity;
+            if (custom) {
+                var maximum = kind === "size" ? 100000 : 1;
+                var payload = window.StarfieldGraphView.encodeCurve(points);
+                window.StarfieldGraphView.decodeCurve(payload, 0, maximum, points[0].value,
+                                                       points[points.length - 1].value);
+                graphChanges.push({ nodeId: node.id, parameterKey: curveKey, valueType: 7, value: payload });
+            } else {
+                graphChanges.push({ nodeId: node.id, parameterKey: curveKey, remove: true });
+            }
+            applyTopologyEdit({ type: "setParameters", changes: graphChanges });
+            return;
+        }
+        var prefix = kind === "size" ? "size" : "opacity";
+        var changes = [];
+        for (var point = 0; point < 8; point++) {
+            var value = point < points.length ? points[point] : { age: 0, value: 0 };
+            changes.push({ key: prefix + "_curve_point_" + point + "_age", value: value.age });
+            changes.push({ key: prefix + "_curve_point_" + point + "_value", value: value.value });
+        }
+        var startKey = kind === "size" ? "particle_size" : "opacity";
+        var endKey = kind === "size" ? "particle_size_end" : "opacity_end";
+        if (Math.abs(Number(state.values[startKey]) - points[0].value) > 1e-9) {
+            changes.push({ key: startKey, value: points[0].value });
+        }
+        if (Math.abs(Number(state.values[endKey]) - points[points.length - 1].value) > 1e-9) {
+            changes.push({ key: endKey, value: points[points.length - 1].value });
+        }
+        changes.push({ key: prefix + "_curve_count", value: custom ? points.length : 0 });
+        var nonce = Number(state.curveEditCommit) || 0;
+        changes.push({ key: "curve_edit_commit", value: nonce >= 999999 ? -999999 : nonce + 1 });
+        state.curves[kind] = { custom: !!custom, points: copyCurvePoints(points) };
+        renderInspector();
+        applyChanges(changes);
     }
 
     function positionInspector(nodeId) {
@@ -1033,7 +1644,7 @@
             updateCanvasBounds();
         }
         for (var n = 0; n < state.nodes.length; n++) {
-            if (NODE_TYPES[state.nodes[n].id]) addGraphNode(state.nodes[n]);
+            if (isSupportedNode(state.nodes[n])) addGraphNode(state.nodes[n]);
         }
         renderEdges();
         renderInspector();
@@ -1069,6 +1680,7 @@
         event.stopPropagation();
         capturePointer(event);
         connectionState = { nodeId: nodeId, direction: direction,
+                            portKey: event.currentTarget.getAttribute("data-port-key"),
                             point: canvasPoint(event.clientX, event.clientY) };
         renderEdges();
     }
@@ -1107,7 +1719,7 @@
             elements.selectionBox.style.width = Math.abs(dx) + "px";
             elements.selectionBox.style.height = Math.abs(dy) + "px";
         }
-        if (document.body.classList) document.body.classList.add("marquee-selecting");
+        if (document.body && document.body.classList) document.body.classList.add("marquee-selecting");
         if (event.preventDefault) event.preventDefault();
     }
 
@@ -1149,7 +1761,7 @@
         }
         marqueeState = null;
         if (elements.selectionBox) elements.selectionBox.hidden = true;
-        if (document.body.classList) document.body.classList.remove("marquee-selecting");
+        if (document.body && document.body.classList) document.body.classList.remove("marquee-selecting");
     }
 
     function zoomAt(event) {
@@ -1174,7 +1786,7 @@
         panState = { startX: event.clientX, startY: event.clientY,
                      panX: viewPan.x, panY: viewPan.y };
         elements.graphScroll.classList.add("panning");
-        if (document.body.classList) document.body.classList.add("panning-canvas");
+        if (document.body && document.body.classList) document.body.classList.add("panning-canvas");
     }
 
     function beginMinimapPan(event) {
@@ -1255,6 +1867,7 @@
 
     function moveNodeDrag(event) {
         if (numericScrubState) { moveNumericScrub(event); return; }
+        if (curveDragState) { moveCurvePoint(event); return; }
         if (minimapPanState) { moveViewToMinimapPoint(event); return; }
         if (panState) { updateCanvasPan(event); return; }
         if (inspectorDragState) {
@@ -1281,7 +1894,7 @@
         if (!dragState.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
         dragState.moved = true;
         suppressNextNodeClick = true;
-        if (document.body.classList) document.body.classList.add("dragging-node");
+        if (document.body && document.body.classList) document.body.classList.add("dragging-node");
         if (event.preventDefault) event.preventDefault();
         dx /= zoom;
         dy /= zoom;
@@ -1306,12 +1919,31 @@
             if (event && event.pointerId !== undefined && numericScrubState.pointerId !== event.pointerId) return;
             var scrub = numericScrubState;
             numericScrubState = null;
-            if (document.body.classList) document.body.classList.remove("scrubbing-number");
+            if (document.body && document.body.classList) document.body.classList.remove("scrubbing-number");
             if (event && event.type === "pointercancel") {
                 scrub.input.value = String(scrub.startValue);
             } else if (scrub.moved && Math.abs(scrub.value - scrub.startValue) >= scrub.halfStep) {
                 scrub.input.value = String(scrub.value);
-                onEdit({ target: scrub.input });
+                if (scrub.commit) scrub.commit(scrub.value);
+                else onEdit({ target: scrub.input });
+            }
+            return;
+        }
+        if (curveDragState) {
+            var curveDrag = curveDragState;
+            curveDragState = null;
+            if (document.body && document.body.classList) document.body.classList.remove("dragging-age-curve");
+            if (event && event.type === "pointercancel") {
+                var originalCurves = currentCurveState(curveDrag.kind, curveDrag.nodeId);
+                if (originalCurves && originalCurves[curveDrag.kind]) {
+                    originalCurves[curveDrag.kind].points = curveDrag.original;
+                }
+                drawCurvePlot(curveDrag.kind);
+            } else if (curveDrag.moved) {
+                var editedCurves = currentCurveState(curveDrag.kind, curveDrag.nodeId);
+                if (editedCurves && editedCurves[curveDrag.kind]) {
+                    applyCurveChanges(curveDrag.kind, editedCurves[curveDrag.kind].points, true, curveDrag.nodeId);
+                }
             }
             return;
         }
@@ -1321,7 +1953,7 @@
         if (panState) {
             panState = null;
             if (elements.graphScroll) elements.graphScroll.classList.remove("panning");
-            if (document.body.classList) document.body.classList.remove("panning-canvas");
+            if (document.body && document.body.classList) document.body.classList.remove("panning-canvas");
         }
         if (connectionState) {
             if (event && event.type !== "pointercancel") {
@@ -1332,9 +1964,11 @@
                     if (otherNodeId && otherNodeId !== connectionState.nodeId) {
                         var from = connectionState.direction === "out" ? connectionState.nodeId : otherNodeId;
                         var to = connectionState.direction === "in" ? connectionState.nodeId : otherNodeId;
+                        var outputPort = connectionState.direction === "out" ? connectionState.portKey : port.getAttribute("data-port-key");
+                        var inputPort = connectionState.direction === "in" ? connectionState.portKey : port.getAttribute("data-port-key");
                         if (isTopDownConnection(from, to)) {
                             requestTopologyEdit({ type: "connect", from: from, to: to,
-                                                  outputPort: "out", inputPort: "in" });
+                                                  outputPort: outputPort, inputPort: inputPort });
                         } else {
                             showError("invalid_connection_direction",
                                       "Connections must run from a node's bottom output to the top input of a node below it.");
@@ -1356,7 +1990,7 @@
             var edge = draggedNode ? edgeUnderNode(draggedNode.id) : null;
             if (draggedNode && edge) {
                 requestTopologyEdit({ type: "insertNode", nodeId: draggedNode.id,
-                                      from: edge[0], to: edge[1] });
+                                      edgeId: edge.id, from: edge[0], to: edge[1] });
             }
         } else if (dragState && dragState.moved && event && event.type === "pointercancel") {
             for (var restoreIndex = 0; restoreIndex < dragState.origins.length; restoreIndex++) {
@@ -1371,7 +2005,7 @@
         clearCopyPreviews();
         dragState = null;
         inspectorDragState = null;
-        if (document.body.classList) document.body.classList.remove("dragging-node");
+        if (document.body && document.body.classList) document.body.classList.remove("dragging-node");
         window.setTimeout(function () { suppressNextNodeClick = false; }, 0);
         if (shouldCommitLayout) commitNodeLayout();
     }
@@ -1435,7 +2069,14 @@
         select.dataset.key = parameter.key;
         select.dataset.channel = "";
         select.dataset.decimals = "0";
+        if (parameter.graphNodeId) {
+            select.dataset.graphNodeId = parameter.graphNodeId;
+            select.dataset.graphKey = parameter.graphKey;
+            select.dataset.graphType = String(parameter.graphType);
+            select.disabled = parameter.readonly === true;
+        }
         select.title = "Choose the emitter type";
+        select._graphParameter = parameter;
         select.addEventListener("change", onEdit);
         return select;
     }
@@ -1450,6 +2091,13 @@
         input.dataset.key = parameter.key;
         input.dataset.channel = channel === null ? "" : String(channel);
         input.dataset.decimals = String(decimals);
+        input._graphParameter = parameter;
+        if (parameter.graphNodeId) {
+            input.dataset.graphNodeId = parameter.graphNodeId;
+            input.dataset.graphKey = parameter.graphKey;
+            input.dataset.graphType = String(parameter.graphType);
+            input.disabled = parameter.readonly === true;
+        }
         input.dataset.scrubStep = String(numericScrubStep(parameter, decimals));
         var min = parameter.kind === "color" ? 0 : parameter.min;
         var max = parameter.kind === "color" ? 255 : parameter.max;
@@ -1509,6 +2157,7 @@
             halfStep: 0.5 * Math.pow(10, -decimals),
             min: input.dataset.min === undefined ? -Infinity : Number(input.dataset.min),
             max: input.dataset.max === undefined ? Infinity : Number(input.dataset.max),
+            commit: typeof input._curveCommit === "function" ? input._curveCommit : null,
             moved: false
         };
         capturePointer(event);
@@ -1521,7 +2170,7 @@
         if (!scrub.moved) {
             if (Math.abs(x - scrub.startX) < 3) return;
             scrub.moved = true;
-            if (document.body.classList) document.body.classList.add("scrubbing-number");
+            if (document.body && document.body.classList) document.body.classList.add("scrubbing-number");
         }
         var deltaX = x - scrub.lastX;
         scrub.lastX = x;
@@ -1550,6 +2199,42 @@
             raw = Math.round(raw * scale) / scale;
             input.value = formatParameterNumber(raw, Math.max(0, Math.min(6, Math.floor(decimals))));
         }
+        if (state.graphMode) {
+            var parameter = input._graphParameter;
+            if (!parameter || parameter.readonly || !input.dataset.graphNodeId ||
+                !/^\d+$/.test(input.dataset.graphKey || "")) {
+                showError("parameter_not_editable", "This graph parameter has no editable panel binding.");
+                return;
+            }
+            var minimum = parameter.kind === "color" ? 0 : parameter.min;
+            var maximum = parameter.kind === "color" ? 255 : parameter.max;
+            if (typeof minimum === "number") raw = Math.max(minimum, raw);
+            if (typeof maximum === "number") raw = Math.min(maximum, raw);
+            input.value = formatParameterNumber(raw, isFinite(decimals) ? decimals : 2);
+            var displayValue = Object.prototype.toString.call(parameter.value) === "[object Array]"
+                ? parameter.value.slice() : parameter.value;
+            if (channel === null) displayValue = raw;
+            else displayValue[channel] = raw;
+            var graphValue = window.StarfieldGraphView.parameterToGraphValue(parameter, displayValue);
+            var graphChanges = [{ nodeId: input.dataset.graphNodeId,
+                                  parameterKey: input.dataset.graphKey,
+                                  valueType: Number(input.dataset.graphType), value: graphValue }];
+            if (channel === null && (input.dataset.graphKey === "3" || input.dataset.graphKey === "5")) {
+                var graphNode = selectedGraphNode(input.dataset.graphNodeId);
+                var curveKind = input.dataset.graphKey === "3" ? "size" : "opacity";
+                var curve = graphNode && graphNode.curves && graphNode.curves[curveKind];
+                var curveKeys = graphNode && graphNode.curveParameterKeys;
+                if (curve && curve.custom && curveKeys) {
+                    var updatedPoints = copyCurvePoints(curve.points);
+                    updatedPoints[0].value = Number(graphValue);
+                    graphChanges.push({ nodeId: graphNode.id,
+                        parameterKey: curveKind === "size" ? curveKeys.size : curveKeys.opacity,
+                        valueType: 7, value: window.StarfieldGraphView.encodeCurve(updatedPoints) });
+                }
+            }
+            applyChanges(graphChanges);
+            return;
+        }
         var value = channel === null ? raw : null;
         if (channel !== null) {
             value = state.values[key].slice();
@@ -1560,6 +2245,14 @@
 
     function applyChanges(changes) {
         if (state.pending) return;
+        if (state.graphMode) {
+            if (!changes || !changes.length || !changes[0].nodeId) {
+                showError("graph_parameter_missing", "Graph edits require a node ID and graph parameter key.");
+                return;
+            }
+            applyTopologyEdit({ type: "setParameters", changes: changes });
+            return;
+        }
         // A poll started before this write may return an older snapshot after the
         // write succeeds. Invalidate that response so only the write or a later
         // read can update the panel state.
@@ -1578,27 +2271,66 @@
         });
     }
 
-    function adoptState(response) {
-        var changed = state.targetToken !== response.target.token || state.revision !== response.revision;
+    function adoptState(response, graphSnapshot) {
         var targetChanged = state.targetToken !== response.target.token;
+        var graphChanged = !!graphSnapshot && (!state.graphSnapshot ||
+            state.graphSnapshot.revision !== graphSnapshot.revision ||
+            state.graphSnapshot.graphHex !== graphSnapshot.graphHex);
+        var changed = targetChanged || state.revision !== response.revision || graphChanged ||
+                      state.controlSource !== response.controlSource;
         if (targetChanged) resetViewForTarget();
-        var layoutChanged = response.layoutPersistence === true ? applyProjectNodeLayout(response.layout) : false;
-        state.nodes = response.nodes;
-        state.edges = response.edges || [];
+        var layoutChanged = false;
+        state.controlSource = response.controlSource;
+        state.graphMode = response.controlSource === "Node Graph";
+        state.topologyReady = !!(graphSnapshot && graphSnapshot.initialized);
+        if (state.graphMode && state.topologyReady) {
+            try {
+                var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
+                var view = window.StarfieldGraphView.project(graph);
+                state.graph = graph;
+                state.nodes = view.nodes;
+                state.edges = view.edges;
+                nodePositions = view.positions;
+                state.graphSnapshot = graphSnapshot;
+                state.layoutPersistence = true;
+            } catch (graphError) {
+                state.topologyReady = false;
+                state.nodes = [];
+                state.edges = [];
+                showError(graphError.code || "invalid_graph", graphError.message || String(graphError));
+            }
+        } else if (state.graphMode) {
+            state.graph = null;
+            state.graphSnapshot = null;
+            state.nodes = [];
+            state.edges = [];
+            state.layoutPersistence = true;
+        } else {
+            state.graph = null;
+            state.graphSnapshot = graphSnapshot || null;
+            state.nodes = response.nodes || [];
+            state.edges = response.edges || [];
+            layoutChanged = response.layoutPersistence === true ? applyProjectNodeLayout(response.layout) : false;
+            state.layoutPersistence = response.layoutPersistence === true;
+        }
+        state.curves = response.curves || null;
+        state.curveEditCommit = response.curveEditCommit;
         state.revision = response.revision;
         state.targetToken = response.target.token;
         if (targetChanged) {
             state.frameStatus = null;
             state.liveParticleCount = null;
         }
-        state.layoutPersistence = response.layoutPersistence === true;
         resolvedTarget = true;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
         elements.modeLine.textContent = "Mode: " + response.controlSource;
-        elements.revisionLine.textContent = "Revision: " + response.revision;
+        elements.revisionLine.textContent = "Revision: " + response.revision +
+            (state.graphMode && graphSnapshot ? " / Graph " + graphSnapshot.revision : "");
         elements.resolutionLine.textContent = "Lookup: " + response.resolution +
-            (state.layoutPersistence ? " · Layout: AE project" : " · Layout: session only");
-        if (state.layoutPersistence) {
+            (state.graphMode ? " · Layout: AE graph" : state.layoutPersistence ? " · Layout: AE project" : " · Layout: session only");
+        if (state.graphMode && !state.topologyReady) {
+            if (!elements.banner.classList.contains("error")) showError("graph_snapshot_unavailable", "The canonical graph could not be read from this effect.");
+        } else if (state.graphMode || state.layoutPersistence) {
             clearBanner();
         } else {
             elements.banner.className = "banner";
@@ -1624,10 +2356,10 @@
         var epoch = ++refreshEpoch;
         refreshInFlight = true;
         call("getState", null, function (response) {
-            refreshInFlight = false;
-            if (epoch !== refreshEpoch) return;
-            if (canvasInteractionActive() || state.pending) return;
+            if (epoch !== refreshEpoch) { refreshInFlight = false; return; }
+            if (canvasInteractionActive() || state.pending) { refreshInFlight = false; return; }
             if (!response.ok) {
+                refreshInFlight = false;
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
                 if (autoRetry && isStartupRetryable(error.code)) {
                     var retryIndex = Math.min(startupRetryAttempt, STARTUP_RETRY_DELAYS_MS.length - 1);
@@ -1666,7 +2398,24 @@
             }
             startupRetryAttempt = 0;
             clearBanner();
-            adoptState(response);
+            if (response.controlSource !== "Node Graph") {
+                refreshInFlight = false;
+                adoptState(response, null);
+                return;
+            }
+            loadGraphSnapshot(response.target.token, function (snapshotResponse) {
+                refreshInFlight = false;
+                if (epoch !== refreshEpoch || canvasInteractionActive() || state.pending) return;
+                if (!snapshotResponse || !snapshotResponse.ok || !snapshotResponse.snapshot ||
+                    snapshotResponse.snapshot.initialized !== true) {
+                    var graphError = snapshotResponse && snapshotResponse.error ||
+                        { code: "graph_snapshot_unavailable", message: "The canonical graph could not be read from this effect." };
+                    showError(graphError.code, graphError.message);
+                    adoptState(response, null);
+                    return;
+                }
+                adoptState(response, snapshotResponse.snapshot);
+            });
         });
     }
 

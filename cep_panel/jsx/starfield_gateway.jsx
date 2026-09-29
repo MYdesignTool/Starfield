@@ -19,7 +19,7 @@
     var VERSION = 1;
     var GATEWAY_BUILD = "output-particle-status-1";
     var MATCH_NAME = "org.starfieldfx.particle";
-    var MAX_CHANGES = 32;
+    var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 65536;
     var MAX_GRAPH_BYTES = 24 * 1024;
     var MAX_GRAPH_REVISION = 4294967295;
@@ -50,6 +50,9 @@
         { key: "particle_size", index: 13, name: "Size", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
         { key: "opacity", index: 15, name: "Opacity", kind: "slider", min: 0, max: 1, displayDecimals: 3 },
         { key: "emitter_size", index: 5, name: "Emitter Size", kind: "slider", min: 0, max: 10, displayDecimals: 3 },
+        { key: "emitter_size_x", index: 81, name: "Size X", kind: "slider", min: 0, max: 1000, displayDecimals: 0 },
+        { key: "emitter_size_y", index: 82, name: "Size Y", kind: "slider", min: 0, max: 1000, displayDecimals: 0 },
+        { key: "emitter_size_z", index: 83, name: "Size Z", kind: "slider", min: 0, max: 1000, displayDecimals: 0 },
         { key: "velocity_spread", index: 9, name: "Speed Random", kind: "slider", min: 0, max: 100, displayDecimals: 2 },
         { key: "gravity_x", index: 21, name: "Gravity X", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
         { key: "gravity_y", index: 22, name: "Gravity Y", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
@@ -60,6 +63,25 @@
         { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
         { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, displayDecimals: 3 }
     ];
+
+    // Appended, hidden AE streams store bounded age/value pairs in the project.
+    // A final supervised nonce commits the complete batch to Node Graph mode.
+    function appendCurveBindings(label, prefix, countIndex, firstPointIndex, valueMax, valueDecimals) {
+        BINDINGS.push({ key: prefix + "_curve_count", index: countIndex,
+            name: label + " Curve Count", kind: "slider", min: 0, max: 8, displayDecimals: 0 });
+        for (var point = 0; point < 8; point++) {
+            BINDINGS.push({ key: prefix + "_curve_point_" + point + "_age",
+                index: firstPointIndex + point * 2, name: label + " Curve Point " + point + " Age",
+                kind: "slider", min: 0, max: 1, displayDecimals: 3 });
+            BINDINGS.push({ key: prefix + "_curve_point_" + point + "_value",
+                index: firstPointIndex + point * 2 + 1, name: label + " Curve Point " + point + " Value",
+                kind: "slider", min: 0, max: valueMax, displayDecimals: valueDecimals });
+        }
+    }
+    appendCurveBindings("Size", "size", 45, 46, 100000, 2);
+    appendCurveBindings("Opacity", "opacity", 62, 63, 1, 3);
+    BINDINGS.push({ key: "curve_edit_commit", index: 79, name: "Curve Edit Commit",
+        kind: "slider", min: -1000000, max: 1000000, displayDecimals: 0 });
 
     var LAYOUT_BINDINGS = [
         { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 33, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 235 },
@@ -79,7 +101,8 @@
     var CHAIN = [
         { id: "emitter", label: "Emitter", keys: ["birth_rate", "seed", "particle_lifetime",
                                                   "emitter_shape", "emitter_origin", "velocity_x", "velocity_y",
-                                                  "velocity_z", "emitter_size", "velocity_spread"] },
+                                                  "velocity_z", "emitter_size", "emitter_size_x",
+                                                  "emitter_size_y", "emitter_size_z", "velocity_spread"] },
         { id: "particle", label: "Particle", keys: ["particle_size", "particle_size_end", "opacity",
                                                       "opacity_end", "color_start", "color_end"] },
         { id: "force", label: "Force", keys: ["gravity_x", "gravity_y", "gravity_z", "linear_drag"] },
@@ -523,7 +546,9 @@
         var revision = currentRevision(target, report);
         if (revision === null) return fail("missing_parameter", "A render parameter could not be resolved" +
             (report.missingParameter ? ": " + report.missingParameter : ".") + " Check that the plug-in and panel builds match.");
+        var sourceMode = controlSource(target.effect);
         var nodes = [];
+        var nodeValues = {};
         for (var i = 0; i < CHAIN.length; i++) {
             var node = { id: CHAIN[i].id, label: CHAIN[i].label, params: [] };
             for (var k = 0; k < CHAIN[i].keys.length; k++) {
@@ -532,14 +557,28 @@
                 if (!property) return fail("missing_parameter", "Missing parameter: " + binding.name);
                 var parameter = { key: binding.key, label: binding.name, kind: binding.kind,
                                   value: readValue(property, binding),
-                                  displayDecimals: binding.displayDecimals };
+                                  displayDecimals: binding.displayDecimals,
+                                  animated: property.numKeys > 0 || property.isTimeVarying };
                 if (typeof binding.min === "number") parameter.min = binding.min;
                 if (typeof binding.max === "number") parameter.max = binding.max;
                 if (binding.choices) parameter.choices = binding.choices;
                 node.params.push(parameter);
+                nodeValues[binding.key] = parameter.value;
             }
             nodes.push(node);
         }
+        var curves = {
+            size: readCurve(target.effect, "size", nodeValues.particle_size,
+                            nodeValues.particle_size_end, sourceMode === "AE Controls", report),
+            opacity: readCurve(target.effect, "opacity", nodeValues.opacity,
+                               nodeValues.opacity_end, sourceMode === "AE Controls", report)
+        };
+        if (!curves.size || !curves.opacity) {
+            return fail("invalid_curve", report.invalidCurve || "An over-life curve parameter is invalid.");
+        }
+        var commitBinding = bindingFor("curve_edit_commit");
+        var commitProperty = resolveProperty(target.effect, commitBinding, report);
+        if (!commitProperty) return fail("missing_parameter", "Missing curve commit stream.");
         var layout = {};
         var oldDefaultLayout = {
             emitter: { x: 180, y: 22 }, force: { x: 180, y: 190 },
@@ -566,9 +605,57 @@
         return reply({ ok: true, operation: "getState", requestId: request.requestId || "",
                        target: { token: token, comp: target.comp.name, layer: target.layer.name,
                                  effectIndex: target.effect.propertyIndex ? target.effect.propertyIndex : 0 },
-                       controlSource: controlSource(target.effect), resolution: report.resolution,
-                        revision: revision, nodes: nodes, edges: EDGES, layout: layout,
+                       controlSource: sourceMode, resolution: report.resolution,
+                        revision: revision, nodes: nodes, edges: EDGES, layout: layout, curves: curves,
+                        curveEditCommit: Number(readValue(commitProperty, commitBinding)),
                         layoutPersistence: report.layoutPersistence });
+    }
+
+    function readCurve(effect, prefix, startValue, endValue,
+                       useCurrentEndpoints, report) {
+        var countBinding = bindingFor(prefix + "_curve_count");
+        var countProperty = resolveProperty(effect, countBinding, report);
+        if (!countProperty) return null;
+        var count = Number(readValue(countProperty, countBinding));
+        if (!isFinite(count) || Math.floor(count) !== count || count < 0 || count > 8) {
+            report.invalidCurve = prefix + " curve point count is invalid.";
+            return null;
+        }
+        if (count === 0) {
+            return { custom: false, points: [{ age: 0, value: Number(startValue) },
+                                              { age: 1, value: Number(endValue) }] };
+        }
+        if (count < 2) {
+            report.invalidCurve = prefix + " curve needs at least two endpoints.";
+            return null;
+        }
+        var points = [];
+        for (var i = 0; i < count; i++) {
+            var ageBinding = bindingFor(prefix + "_curve_point_" + i + "_age");
+            var valueBinding = bindingFor(prefix + "_curve_point_" + i + "_value");
+            var ageProperty = resolveProperty(effect, ageBinding, report);
+            var valueProperty = resolveProperty(effect, valueBinding, report);
+            if (!ageProperty || !valueProperty) return null;
+            var age = Number(readValue(ageProperty, ageBinding));
+            var value = Number(readValue(valueProperty, valueBinding));
+            if (!isFinite(age) || !isFinite(value) || age < 0 || age > 1 ||
+                value < 0 || value > valueBinding.max || (i > 0 && age <= points[i - 1].age)) {
+                report.invalidCurve = prefix + " curve contains an invalid or unordered point.";
+                return null;
+            }
+            points.push({ age: age, value: value });
+        }
+        // Scalar endpoint controls may be animated in AE Controls mode. They remain
+        // authoritative at the current comp time while interior knots stay constant.
+        if (useCurrentEndpoints) {
+            points[0].value = Number(startValue);
+            points[points.length - 1].value = Number(endValue);
+        }
+        if (points[0].age !== 0 || points[points.length - 1].age !== 1) {
+            report.invalidCurve = prefix + " curve endpoints must remain at ages 0 and 1.";
+            return null;
+        }
+        return { custom: true, points: points };
     }
 
     function getFrameStatus(request) {

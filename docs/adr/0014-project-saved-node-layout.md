@@ -1,6 +1,6 @@
 # ADR 0014: Store node layout in the AE project
 
-- Status: accepted for implementation; After Effects 2023 host qualification remains open.
+- Status: amended for dynamic graphs; After Effects 2023 host qualification remains open.
 - Date: 2026-09-29.
 - Depends on ADR 0009 and the append-only parameter identity contract in ADR 0001.
 
@@ -9,12 +9,16 @@
 Node positions describe the effect instance's authored graph layout. Saving them in
 CEP `localStorage` makes the arrangement machine-local, separates it from the effect,
 and fails when a project moves to another machine. AE already owns effect parameter
-streams across project save/reopen, effect duplication, and undo.
+streams and arbitrary graph bytes across project save/reopen, effect duplication,
+and undo. The eight revision-7 coordinate streams can only identify four logical
+cards; they cannot represent multiple nodes of the same type or bind positions to
+stable node UUIDs.
 
 The graph itself is stored as `PF_Param_ARBITRARY_DATA`, which the owner's AE 2023
-ExtendScript probe could not read. Layout does not need to share that stream: the
-protocol-v1 panel shows a fixed four-node parameter view, so eight ordinary scalar
-values are sufficient and remain independent of rendering and graph evaluation.
+ExtendScript probe could not read directly. The protocol-v1 fixed view therefore
+uses ordinary scalar streams. Protocol v2 reads and edits the graph through the
+supervised expression carrier (ADR 0013), so node positions can be stored as a
+bounded optional record in the same project-owned graph bytes.
 
 ## Decision
 
@@ -43,8 +47,9 @@ values are sufficient and remain independent of rendering and graph evaluation.
   streams, `getState` still returns the four current default positions and marks project layout
   persistence unavailable. The panel remains usable for that session and clearly reports
   that node moves will not survive panel reload until the matching plug-in is installed.
-- Layout values are not supervised render controls and are not copied into the graph
-  arbitrary-data stream or core `Settings`.
+- Protocol-v1 layout values remain separate from the render graph. Protocol-v2
+  dynamic positions use the optional graph record defined in the amendment below;
+  neither representation affects core render settings.
 
 ## Qualification gate
 
@@ -53,3 +58,22 @@ streams. In AE 2023.5.0 Build 52, qualify name-based reads and `setValue`, save/
 reopen, effect duplication, and undo/redo for a node move. The new parameters append to
 the effect schema; projects without them should receive their declared default layout.
 Do not claim this behavior host-supported until that pass succeeds.
+
+## Dynamic graph layout amendment (2026-09-30)
+
+- Keep the revision-7 eight scalar streams for protocol-v1's four-card projection and
+  old projects. They are not authoritative for protocol-v2 nodes.
+- Protocol v2 stores dynamic card positions in the schema-1 optional graph record
+  `kind=0x8001`, `record_version=1` (see `schema/sequence-format.md`). Each entry is
+  keyed by stable `NodeId` and carries finite signed X/Y coordinates. The record is
+  part of the canonical graph payload owned by AE, not CEP-local state or render data.
+- On graphs with no layout record, the panel derives a deterministic initial layout
+  from graph topology. The first node move or topology edit writes the complete
+  position map in the same bounded graph transaction as node/edge changes. Add and
+  duplicate assign new positions; delete removes entries for deleted IDs; splice
+  moves the inserted node to the dropped position.
+- `SequenceCodec` preserves opaque optional records byte-for-byte while graph edits
+  replace only the layout record they own. Unknown optional records remain inert to
+  the renderer and survive native and CEP round trips.
+- The layout record is valid only when it is unique, bounded, finite, has unique
+  node IDs that exist in the graph, and remains under the existing payload limit.

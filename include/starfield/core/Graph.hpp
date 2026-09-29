@@ -86,6 +86,9 @@ struct GraphEdge {
 struct Graph {
     std::vector<GraphNode> nodes;
     std::vector<GraphEdge> edges;
+    // Optional, length-delimited sequence records are opaque to graph
+    // evaluation but must survive edits and native deserialize/serialize cycles.
+    std::vector<OpaqueBytes> optional_records;
 };
 
 struct PortDescriptor {
@@ -216,6 +219,9 @@ inline constexpr ParameterKey kEmissionAngleY{15};
 inline constexpr ParameterKey kEmissionAngleZ{16};
 inline constexpr ParameterKey kDirectionMode{17};
 inline constexpr ParameterKey kDirectionSpan{18};
+inline constexpr ParameterKey kEmitterSizePercentX{19};
+inline constexpr ParameterKey kEmitterSizePercentY{20};
+inline constexpr ParameterKey kEmitterSizePercentZ{21};
 // Parameter keys are scoped to their node type; force and appearance nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};
@@ -226,6 +232,8 @@ inline constexpr ParameterKey kSizeStart{3};
 inline constexpr ParameterKey kSizeEnd{4};
 inline constexpr ParameterKey kOpacityStart{5};
 inline constexpr ParameterKey kOpacityEnd{6};
+inline constexpr ParameterKey kSizeOverLifeCurve{7};
+inline constexpr ParameterKey kOpacityOverLifeCurve{8};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

@@ -53,10 +53,21 @@ Capture and AE Controls synchronization also refresh the expression mirror befor
 replacing the graph handle. The CEP must perform request-expression write, nonce
 trigger, receipt read, and any rollback in one `app.beginUndoGroup` transaction.
 
-The ExtendScript gateway now has source-level `getGraphSnapshot`, `syncGraphSnapshot`,
-and `submitGraph` entry points. They are not called by the panel yet. The panel still
-needs a schema-1 JavaScript graph codec and graph-driven view/edit model; the carrier
-remains disabled until those pieces and the AE host gates are complete.
+The ExtendScript gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, and
+`submitGraph`. A bounded schema-1 JavaScript codec handles the binary envelope,
+canonical records, parameter values, CRC, and optional-record preservation. It performs
+structural checks only; native graph validation remains authoritative. A pure CEP edit
+planner constructs copy-on-write add, connect/reconnect, disconnect, splice, delete,
+duplicate, move, and parameter-edit operations with stable UUIDs and built-in port keys.
+It enforces direct Emitter-to-Particle links, single-input Particle reconnection, and
+prevents deleting or duplicating Output. `graph_view.js` projects the canonical snapshot
+into the node canvas and maps typed node parameters, the Output particle cap, and optional
+Particle/Appearance curves. The panel loads and initializes a missing snapshot, renders
+the dynamic graph, and routes topology, layout, scalar, color, popup, and curve edits
+through the revision-checked transaction coordinator. Curve edits store an optional
+opaque curve payload and update its scalar endpoints in one graph commit. Codec, planner,
+transaction, graph-view, and startup fake-host tests cover these source paths; AE carrier,
+callback, undo, and save/reopen qualification remains open.
 
 ## Why this is only proposed
 
@@ -78,7 +89,8 @@ initialization, control capture, undo/redo, effect copy/paste, and project reope
 Before accepting this ADR or shipping topology editing:
 
 1. Build the development carrier and transaction plumbing in the current effect;
-   source-level plumbing is now present but has not been installed or exercised in AE.
+   source-level plumbing and panel integration are present but have not been exercised
+   together in AE.
 2. In a disposable AE 2023 project, set and read disabled OneD expressions from
    ExtendScript and verify the snapshot survives save/reopen, undo/redo, and effect
    duplication.

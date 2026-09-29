@@ -1,6 +1,6 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 8. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 10. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
@@ -56,6 +56,7 @@ the per-topic `PF_ParamFlag_START_COLLAPSED`.
 | Emitter | 5 | Emitter Size | `emitter_size` |
 | Emitter | 6/7/8 | Speed X / Speed Y / Speed Z | `velocity.x/y/z` |
 | Emitter | 9 | Speed Random | `velocity_spread` |
+| Emitter Dimensions | 81/82/83 | Size X / Size Y / Size Z (percent) | `emitter_size_percent.x/y/z` |
 | Particle | 12 | Lifetime | `particle_lifetime_seconds` |
 | Particle | 13 | Size | `particle_size` |
 | Particle | 14 | Size Over Life | `particle_size_end` |
@@ -91,6 +92,15 @@ No release has been published, so IDs are still being shaped here; they freeze a
 shared release (ADR 0001). The old 3D-point Velocity stored a different value type, so a
 project saved with revision 1 must be re-authored rather than migrated.
 
+## Manifest revision 10: per-axis emitter dimensions
+
+Revision 10 appends an `Emitter Dimensions` topic at indices 80–84. Visible Size X/Y/Z
+controls occupy indices 81–83 and store percentages of the existing `Emitter Size`
+base extent. Their 100% defaults keep older AE projects visually unchanged. The core
+uses all axes for Box, scales Sphere to an ellipsoid, and uses X/Y for the current
+planar Disc. Point ignores them. Graph keys 19–21 are optional; old schema-1 emitter
+nodes therefore keep 100% on each axis. See ADR 0017.
+
 ## Mapping table
 
 | ID | key | AE control | core field | units and notes |
@@ -120,17 +130,19 @@ project saved with revision 1 must be re-authored rather than migrated.
 
 IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13) and the
 force/appearance controls (17-24) sit after the graph/system parameters until M3-03 adds AE parameter
-groups. Parameter index 0 is AE's implicit input layer, so the effect registers 25 AE parameters: one
-input, twenty-one manifest controls, graph data (14), source mode (15) and capture action (16). Node
-Graph Data is hidden from the Effect Controls panel.
+groups. Parameter index 0 is AE's implicit input layer. Revision 9 appends 34 hidden, non-animated
+curve streams (IDs 45-78) and one supervised commit nonce (79) after the existing 44 parameters.
+These script-visible streams belong to the effect instance and therefore save, duplicate, and undo
+with the AE project. Node Graph Data remains hidden from the Effect Controls panel.
 
-All bound controls are registered with `PF_ParamFlag_SUPERVISE`. In `AE Controls` mode a change is
-ignored by the graph path and the render simply samples the new value. In `Node Graph` mode the effect
+Visible render controls are registered with `PF_ParamFlag_SUPERVISE`. In `AE Controls` mode a change
+is ignored by the graph path and the render samples the new value. In `Node Graph` mode the effect
 rebuilds the canonical graph from the delivered values in the same user-change transaction
 (`user_changed_param` → `sync_graph_from_controls`), which is also the surface the CEP panel writes to
 (ADR 0009). The delivered `params[]` array is the authoritative source during that callback: a
 `PF_CHECKOUT_PARAM` can still return the pre-edit value, so the sync path never uses it for the edited
-control.
+control. Curve-bank slots (45-78) are hidden and are not individually supervised; the panel writes a
+complete bank, then changes ID 79 to commit after every point has arrived.
 
 ## Emitter distributions and per-particle variation (M3-01)
 
@@ -188,6 +200,24 @@ velocities are clamped to ±`kMaxVelocity` (1000 layer heights per second); both
 `PF_ADD_POPUP` values run 1…num_choices while `EmitterShape` is zero-based, so the adapter maps
 `EmitterShape = value - 1` through `core::emitter_shape_from_index()`, which also collapses
 out-of-range values onto `point`. The manifest's `default: 1` means "Point, the first entry".
+
+## Particle over-life curves (ADR 0016)
+
+The CEP Particle inspector draws Size and Opacity as piecewise-linear graphs over normalized particle
+age. Clicking the plot adds an interior point; dragging a point changes its age/value, while endpoint
+ages remain pinned to 0 and 1. The selected point also accepts direct numeric value entry. `Linear`
+removes interior points and returns to the legacy endpoint interpolation; `Remove Point` deletes the
+selected interior point. Each curve is limited to eight points. Size values are full-resolution pixels
+in 0…100,000; opacity values are 0…1.
+
+The AE parameter streams store a point count plus eight fixed age/value slots per curve. Count zero
+keeps old projects on their existing start/end line. Active curves are copied into optional opaque
+Particle/Appearance node parameters by `GraphConstruction.cpp`; `GraphEvaluation.cpp` samples the
+containing line segment using each particle's clamped age fraction. In AE Controls mode, animated
+Size/Opacity endpoint controls replace the first/last ordinate at the sampled render time; interior
+knots remain constant. The CEP editor prevents edits to animated endpoint ordinates and leaves the
+interior knots editable. Node Graph curves keep the existing constant-graph contract. The nested graph
+payload's byte layout and validation rules are specified in ADR 0016.
 
 ## Deterministic emission rules (M2)
 

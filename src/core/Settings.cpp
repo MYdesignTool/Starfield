@@ -1,4 +1,5 @@
 #include "starfield/core/Settings.hpp"
+#include "starfield/core/AgeCurve.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -99,6 +100,22 @@ ValidatedSettings validate_settings(Settings settings) {
     value.emitter_size = clamp(value.emitter_size, 0.0, kMaxEmitterSize,
                                ValidationCode::emitter_size_clamped, "emitter_size", notices);
 
+    value.emitter_size_percent.x = finite_or(value.emitter_size_percent.x, 100.0,
+                                              "emitter_size_percent.x", notices);
+    value.emitter_size_percent.y = finite_or(value.emitter_size_percent.y, 100.0,
+                                              "emitter_size_percent.y", notices);
+    value.emitter_size_percent.z = finite_or(value.emitter_size_percent.z, 100.0,
+                                              "emitter_size_percent.z", notices);
+    value.emitter_size_percent.x = clamp(value.emitter_size_percent.x, 0.0, kMaxEmitterSizePercent,
+                                         ValidationCode::emitter_size_percent_clamped,
+                                         "emitter_size_percent.x", notices);
+    value.emitter_size_percent.y = clamp(value.emitter_size_percent.y, 0.0, kMaxEmitterSizePercent,
+                                         ValidationCode::emitter_size_percent_clamped,
+                                         "emitter_size_percent.y", notices);
+    value.emitter_size_percent.z = clamp(value.emitter_size_percent.z, 0.0, kMaxEmitterSizePercent,
+                                         ValidationCode::emitter_size_percent_clamped,
+                                         "emitter_size_percent.z", notices);
+
     value.velocity_spread = finite_or(value.velocity_spread, 0.0, "velocity_spread", notices);
     value.velocity_spread = clamp(value.velocity_spread, 0.0, kMaxVelocitySpread,
                                   ValidationCode::velocity_spread_clamped, "velocity_spread", notices);
@@ -140,6 +157,13 @@ ValidatedSettings validate_settings(Settings settings) {
                                   "opacity_end", notices);
     value.opacity_end = clamp(value.opacity_end, 0.0, 1.0,
                               ValidationCode::end_opacity_clamped, "opacity_end", notices);
+
+    if (value.size_over_life.count != 0 && !valid_age_curve(value.size_over_life, 0.0, kMaxParticleSize)) {
+        notices.push_back({ValidationCode::age_curve_invalid, "size_over_life"});
+    }
+    if (value.opacity_over_life.count != 0 && !valid_age_curve(value.opacity_over_life, 0.0, 1.0)) {
+        notices.push_back({ValidationCode::age_curve_invalid, "opacity_over_life"});
+    }
 
     // Emission direction model (M3-04). Speed is a magnitude, so it clamps to [0, max];
     // angles wrap into a normal range instead of being clamped away, and the span is a

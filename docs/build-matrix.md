@@ -8,8 +8,48 @@ The four-stage chain (G-03/M3-02) passed 6,196 core checks, the adapter suite
 passed 395 fake-host checks, the panel gateway/startup fake-host checks pass, and the
 explicit May 2023 SDK build succeeds. All four suites were re-run against this working
 tree on 2026-09-28: 6,196 / 395 / gateway / startup, zero failures.
+After the M3-01B parameter expansion, the current adapter fake-host executable reports
+660 checks and zero failures (2026-09-30); the earlier 395- and 657-check results are
+historical.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
+
+## P-02C over-life curve build (2026-09-30)
+
+The May 2023 SDK build includes the project-owned Size/Opacity curve banks, CEP
+curve editor, dynamic graph transaction integration, and the adapter fix that keeps
+AE Controls appearance endpoints enabled during graph projection.
+`artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` SHA-256:
+`4B10C79DE154096B3235BC388A5422BA71A6B3E57F5D030982E64E06C37E7E3D`.
+The paired Core DLL is `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`,
+SHA-256: `249C096401D60292B1650EB4AEC685D5427B7E599559625876602F6D3538FB1B`.
+The build script also updated this checkout's `dist/` copies and content-addressed
+`artifacts/runtime/current.txt`. The core suite passed 9,379 checks, including custom
+curves on Particle branches and legacy Appearance chains; the adapter fake-host suite
+passed 660 checks, including the corrected appearance projection; all seven focused
+panel suites, JavaScript syntax checks, and `git diff --check` passed. The AEX has not
+been copied into the plug-in directory. That directory still had AEX SHA-256
+`EA1F8B15FE1925FEBA357C39A179AD1DF541BD41FCBA2C9F61D9981C444D4169` and pinned Core
+SHA-256 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545` when
+inspected. Its `StarfieldRuntime` junction points to this checkout's `artifacts/runtime`;
+the build selected `StarfieldCore-249C096401D60292.dll` while AfterFX PID 29396 was
+running. Whether that process has loaded the new Core is unverified. No graph, curve,
+undo, or save/reopen host check has been made on this candidate.
+
+## M3-01B per-axis emitter sizes (2026-09-30)
+
+The May 2023 SDK build adds project parameters Size X/Y/Z at 100% defaults and carries
+them through the flat-control graph constructor. Box uses three scaled extents, Sphere
+uses an ellipsoid transform, and Disc uses X/Y in its existing plane. Old graph nodes
+without the optional keys keep 100% dimensions. The paired candidate is
+`artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, SHA-256
+`4B10C79DE154096B3235BC388A5422BA71A6B3E57F5D030982E64E06C37E7E3D`, and
+`artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`, SHA-256
+`249C096401D60292B1650EB4AEC685D5427B7E599559625876602F6D3538FB1B`. This is the
+current combined curve and per-axis candidate. The full build updated the checkout's
+`dist/` pair and runtime manifest. The core suite passes 9,379 checks and the current
+adapter fake-host executable passes 660 checks. AE visual/project-lifecycle checks
+remain open. The AEX has not been copied into AE 2023's plug-in directory.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
@@ -152,7 +192,7 @@ releases its result and allows that DLL to unload. These checks passed on
 
 `tests/graph_parameter_tests.cpp` (`-Adapter`) covers the arbitrary-data callbacks, parameter registration and mapping, the four-stage chain built from the controls, the supervised edit path (Node Graph rewrite, AE Controls isolation, allocation failure), checkout/checkin bookkeeping, and cancellation during host-world copies.
 
-`tests/panel_gateway_tests.js` runs the ExtendScript protocol gateway in a Node fake host and covers multidimensional animation rejection, successful writes, and failed-batch rollback. `tests/panel_startup_tests.js` runs the CEP client in a fake DOM/host and confirms transient startup `no_target` recovers without a manual Refresh. Run these with `node tests/panel_gateway_tests.js` and `node tests/panel_startup_tests.js`. Neither replaces the AE 2023 panel qualification gate.
+`tests/panel_gateway_tests.js` runs the ExtendScript protocol gateway in a Node fake host and covers multidimensional animation rejection, successful writes, and failed-batch rollback. `tests/panel_startup_tests.js` runs the CEP client in a fake DOM/host and confirms transient startup `no_target` recovers without a manual Refresh. The graph codec, edit planner and revision-checked transaction coordinator have focused tests in `tests/panel_graph_codec_tests.js`, `tests/panel_graph_edit_tests.js` and `tests/panel_graph_transaction_tests.js`. Run the panel checks with `node tests/panel_gateway_tests.js`, `node tests/panel_startup_tests.js`, `node tests/panel_graph_codec_tests.js`, `node tests/panel_graph_edit_tests.js` and `node tests/panel_graph_transaction_tests.js`. None replaces the AE 2023 panel qualification gate.
 
 - With CMake available: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 - On the current Windows machine CMake is not installed, so use `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`, which compiles the same sources with the locked MSVC toolset behind a mapped drive letter and runs the executable. Output lands in `artifacts/core-tests/`.

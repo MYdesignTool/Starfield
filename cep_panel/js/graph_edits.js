@@ -1,0 +1,379 @@
+// Pure schema-1 graph edit planner. It preserves canonical graph data and optional
+// records; the native registry remains authoritative for semantic validation.
+(function (root, factory) {
+    var layout = typeof module === "object" && module.exports
+        ? require("./graph_layout.js") : root.StarfieldGraphLayout;
+    var api = factory(layout);
+    if (typeof module === "object" && module.exports) module.exports = api;
+    else root.StarfieldGraphEdits = api;
+}(typeof window !== "undefined" ? window : this, function (layout) {
+    "use strict";
+
+    var TYPES = {
+        emitter: "org.starfieldfx.nodes.emitter",
+        particle: "org.starfieldfx.nodes.particle",
+        force: "org.starfieldfx.nodes.force",
+        appearance: "org.starfieldfx.nodes.appearance",
+        output: "org.starfieldfx.nodes.output"
+    };
+    var PORTS = {
+        "org.starfieldfx.nodes.emitter": { output: "1" },
+        "org.starfieldfx.nodes.particle": { input: "1", output: "2", inputLimit: 1 },
+        "org.starfieldfx.nodes.force": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.appearance": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.output": { input: "1" }
+    };
+    var DEFAULTS = {
+        emitter: [
+            { key: "1", type: 3, value: 1000 }, { key: "2", type: 4, value: 30 },
+            { key: "3", type: 3, value: 1 }, { key: "4", type: 4, value: 2 },
+            { key: "5", type: 3, value: 0 }, { key: "6", type: 5, value: [0, 0, 0] },
+            { key: "7", type: 5, value: [0, 0.3, 0] }, { key: "8", type: 4, value: 10 },
+            { key: "9", type: 4, value: 1 }, { key: "10", type: 4, value: 0.05 },
+            { key: "11", type: 4, value: 0.15 }, { key: "12", type: 4, value: 0 },
+            { key: "13", type: 4, value: 0 }, { key: "14", type: 4, value: 0 },
+            { key: "15", type: 4, value: 0 }, { key: "16", type: 4, value: 0 },
+            { key: "17", type: 3, value: 0 }, { key: "18", type: 4, value: 60 },
+            { key: "19", type: 4, value: 100 }, { key: "20", type: 4, value: 100 },
+            { key: "21", type: 4, value: 100 }
+        ],
+        particle: [
+            { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
+            { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
+            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+        ],
+        force: [
+            { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 }
+        ],
+        appearance: [
+            { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
+            { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
+            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+        ],
+        output: []
+    };
+
+    function fail(code, message) {
+        var result = new Error(message);
+        result.code = code;
+        throw result;
+    }
+
+    function copyValue(value) {
+        if (Object.prototype.toString.call(value) === "[object Array]") {
+            return value.map(copyValue);
+        }
+        if (value instanceof Uint8Array) return new Uint8Array(value);
+        return value;
+    }
+
+    function copyGraph(graph) {
+        if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
+            Object.prototype.toString.call(graph.edges) !== "[object Array]") {
+            fail("invalid_graph", "graph must contain node and edge arrays");
+        }
+        return {
+            version: graph.version,
+            nodes: graph.nodes.map(function (node) {
+                return { id: node.id, type: node.type, schemaVersion: node.schemaVersion,
+                         parameters: node.parameters.map(function (parameter) {
+                             return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                         }) };
+            }),
+            edges: graph.edges.map(function (edge) {
+                return { id: edge.id, sourceNode: edge.sourceNode, sourcePort: edge.sourcePort,
+                         destinationNode: edge.destinationNode, destinationPort: edge.destinationPort };
+            }),
+            optionalRecords: (graph.optionalRecords || []).slice()
+        };
+    }
+
+    function makeId(factory, graph) {
+        var occupied = {};
+        for (var n = 0; n < graph.nodes.length; n++) occupied["$" + graph.nodes[n].id] = true;
+        for (var e = 0; e < graph.edges.length; e++) occupied["$" + graph.edges[e].id] = true;
+        for (var attempt = 0; attempt < 32; attempt++) {
+            var value = factory();
+            if (typeof value !== "string" || !/^[0-9a-fA-F]{32}$/.test(value) || /^0{32}$/.test(value)) {
+                fail("invalid_id_factory", "ID factory must return a non-zero 128-bit UUID in hexadecimal");
+            }
+            value = value.toLowerCase();
+            if (!occupied["$" + value]) return value;
+        }
+        fail("id_collision", "unable to allocate a unique graph UUID");
+    }
+
+    function randomId() {
+        var bytes = new Uint8Array(16);
+        var cryptoObject = typeof window !== "undefined" ? window.crypto : null;
+        if (cryptoObject && typeof cryptoObject.getRandomValues === "function") cryptoObject.getRandomValues(bytes);
+        else {
+            for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        var result = "";
+        for (var b = 0; b < bytes.length; b++) result += (bytes[b] < 16 ? "0" : "") + bytes[b].toString(16);
+        return result;
+    }
+
+    function nodeById(graph, id) {
+        for (var i = 0; i < graph.nodes.length; i++) if (graph.nodes[i].id === id) return graph.nodes[i];
+        return null;
+    }
+
+    function makeNode(kind, id) {
+        if (!Object.prototype.hasOwnProperty.call(TYPES, kind)) fail("unknown_node_type", "unsupported built-in node type");
+        return { id: id, type: TYPES[kind], schemaVersion: 1,
+                 parameters: DEFAULTS[kind].map(function (parameter) {
+                     return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                 }) };
+    }
+
+    function makeEdge(graph, factory, sourceNode, destinationNode, sourcePort, destinationPort) {
+        return { id: makeId(factory, graph), sourceNode: sourceNode, sourcePort: sourcePort,
+                 destinationNode: destinationNode, destinationPort: destinationPort };
+    }
+
+    function validateConnection(graph, sourceId, destinationId, sourcePort, destinationPort) {
+        var source = nodeById(graph, sourceId);
+        var destination = nodeById(graph, destinationId);
+        if (!source || !destination) fail("missing_node", "connection endpoint does not exist");
+        if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
+        var sourceSchema = PORTS[source.type];
+        var destinationSchema = PORTS[destination.type];
+        if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
+            destinationSchema.input !== String(destinationPort)) {
+            fail("invalid_port", "connection must use a compatible built-in output and input port");
+        }
+        if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
+            fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
+        }
+        if (destination.type === TYPES.particle && source.type !== TYPES.emitter) {
+            fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
+        }
+        // Reject a cycle before producing a request. The native validator still checks
+        // the complete graph, including node-specific stage rules and resource limits.
+        var adjacency = {};
+        for (var i = 0; i < graph.edges.length; i++) {
+            var edge = graph.edges[i];
+            (adjacency["$" + edge.sourceNode] || (adjacency["$" + edge.sourceNode] = [])).push(edge.destinationNode);
+        }
+        var pending = [destinationId];
+        var visited = {};
+        while (pending.length) {
+            var current = pending.pop();
+            if (current === sourceId) fail("cycle", "connection would create a cycle");
+            if (visited["$" + current]) continue;
+            visited["$" + current] = true;
+            var next = adjacency["$" + current] || [];
+            for (var j = 0; j < next.length; j++) pending.push(next[j]);
+        }
+        if (destinationSchema.inputLimit === 1) {
+            for (var c = graph.edges.length - 1; c >= 0; c--) {
+                var connected = graph.edges[c];
+                if (connected.destinationNode === destinationId && connected.destinationPort === String(destinationPort)) {
+                    graph.edges.splice(c, 1);
+                }
+            }
+        }
+    }
+
+    function addNode(graph, edit, idFactory, positions) {
+        var id = makeId(idFactory, graph);
+        graph.nodes.push(makeNode(edit.nodeType, id));
+        var fallback = layout.derive(graph)[id];
+        positions[id] = edit.position || fallback;
+        return id;
+    }
+
+    function connect(graph, edit, idFactory) {
+        var source = nodeById(graph, edit.from);
+        var destination = nodeById(graph, edit.to);
+        if (!source || !destination) fail("missing_node", "connection endpoint does not exist");
+        var sourceSchema = PORTS[source.type];
+        var destinationSchema = PORTS[destination.type];
+        if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
+        var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
+        var destinationPort = edit.inputPort === undefined ? destinationSchema.input : String(edit.inputPort);
+        validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
+        graph.edges.push(makeEdge(graph, idFactory, edit.from, edit.to, sourcePort, destinationPort));
+    }
+
+    function disconnect(graph, edit) {
+        var found = -1;
+        for (var i = 0; i < graph.edges.length; i++) {
+            var edge = graph.edges[i];
+            var match = edit.edgeId ? edge.id === edit.edgeId : edge.sourceNode === edit.from && edge.destinationNode === edit.to;
+            if (!match) continue;
+            if (found >= 0) fail("ambiguous_edge", "more than one edge matches; specify the stable edge ID");
+            found = i;
+        }
+        if (found < 0) fail("missing_edge", "edge does not exist");
+        graph.edges.splice(found, 1);
+    }
+
+    function insertNode(graph, edit, idFactory, positions) {
+        var edgeIndex = -1;
+        for (var i = 0; i < graph.edges.length; i++) {
+            var candidate = graph.edges[i];
+            if (edit.edgeId ? candidate.id === edit.edgeId : candidate.sourceNode === edit.from && candidate.destinationNode === edit.to) {
+                if (edgeIndex >= 0) fail("ambiguous_edge", "specify the stable edge ID to insert into a parallel connection");
+                edgeIndex = i;
+            }
+        }
+        if (edgeIndex < 0) fail("missing_edge", "edge to splice does not exist");
+        var previous = graph.edges[edgeIndex];
+        if (!nodeById(graph, previous.sourceNode) || !nodeById(graph, previous.destinationNode)) {
+            fail("missing_node", "edge to splice refers to a node absent from the graph");
+        }
+        var position = edit.position || {
+            x: (positions[previous.sourceNode].x + positions[previous.destinationNode].x) / 2,
+            y: (positions[previous.sourceNode].y + positions[previous.destinationNode].y) / 2
+        };
+        var nodeId = edit.nodeId || null;
+        if (nodeId && (!nodeById(graph, nodeId) || nodeId === previous.sourceNode || nodeId === previous.destinationNode)) {
+            fail("missing_node", "the node to insert must exist and differ from both edge endpoints");
+        }
+        graph.edges.splice(edgeIndex, 1);
+        if (!nodeId) nodeId = addNode(graph, { nodeType: edit.nodeType, position: position }, idFactory, positions);
+        else positions[nodeId] = position;
+        connect(graph, { from: previous.sourceNode, to: nodeId,
+                         outputPort: previous.sourcePort }, idFactory);
+        connect(graph, { from: nodeId, to: previous.destinationNode,
+                         inputPort: previous.destinationPort }, idFactory);
+        return nodeId;
+    }
+
+    function deleteNodes(graph, edit, positions) {
+        if (Object.prototype.toString.call(edit.nodeIds) !== "[object Array]" || !edit.nodeIds.length) {
+            fail("invalid_edit", "deleteNodes requires at least one node ID");
+        }
+        var ids = {};
+        for (var i = 0; i < edit.nodeIds.length; i++) {
+            if (!nodeById(graph, edit.nodeIds[i])) fail("missing_node", "cannot delete a node absent from the graph");
+            ids["$" + edit.nodeIds[i]] = true;
+        }
+        for (var n = 0; n < graph.nodes.length; n++) {
+            if (ids["$" + graph.nodes[n].id] && graph.nodes[n].type === TYPES.output) {
+                fail("required_output", "the required Output node cannot be deleted");
+            }
+        }
+        graph.nodes = graph.nodes.filter(function (node) { return !ids["$" + node.id]; });
+        graph.edges = graph.edges.filter(function (edge) {
+            return !ids["$" + edge.sourceNode] && !ids["$" + edge.destinationNode];
+        });
+        for (var id in ids) {
+            if (Object.prototype.hasOwnProperty.call(ids, id)) delete positions[id.slice(1)];
+        }
+    }
+
+    function duplicateNodes(graph, edit, idFactory, positions) {
+        if (Object.prototype.toString.call(edit.nodeIds) !== "[object Array]" || !edit.nodeIds.length) {
+            fail("invalid_edit", "duplicateNodes requires at least one node ID");
+        }
+        var selected = {};
+        var ids = {};
+        for (var i = 0; i < edit.nodeIds.length; i++) {
+            if (!nodeById(graph, edit.nodeIds[i])) fail("missing_node", "cannot duplicate a node absent from the graph");
+            selected["$" + edit.nodeIds[i]] = true;
+        }
+        var originals = graph.nodes.filter(function (node) { return selected["$" + node.id]; });
+        for (var n = 0; n < originals.length; n++) {
+            if (originals[n].type === TYPES.output) fail("duplicate_output", "Output is unique and cannot be duplicated");
+            var copy = { id: makeId(idFactory, graph), type: originals[n].type,
+                         schemaVersion: originals[n].schemaVersion,
+                         parameters: originals[n].parameters.map(function (parameter) {
+                             return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                         }) };
+            graph.nodes.push(copy);
+            ids["$" + originals[n].id] = copy.id;
+            var originalPosition = positions[originals[n].id];
+            var offset = edit.offset || { x: 28, y: 28 };
+            positions[copy.id] = { x: originalPosition.x + offset.x, y: originalPosition.y + offset.y };
+        }
+        var internalEdges = graph.edges.filter(function (edge) {
+            return selected["$" + edge.sourceNode] && selected["$" + edge.destinationNode];
+        });
+        for (var e = 0; e < internalEdges.length; e++) {
+            var edge = internalEdges[e];
+            graph.edges.push(makeEdge(graph, idFactory, ids["$" + edge.sourceNode], ids["$" + edge.destinationNode],
+                                      edge.sourcePort, edge.destinationPort));
+        }
+        return ids;
+    }
+
+    function moveNodes(graph, edit, positions) {
+        if (!edit.positions || Object.prototype.toString.call(edit.positions) !== "[object Object]") {
+            fail("invalid_edit", "moveNodes requires a node ID to position map");
+        }
+        if (!Object.keys(edit.positions).length) fail("invalid_edit", "moveNodes requires at least one position");
+        for (var id in edit.positions) {
+            if (!Object.prototype.hasOwnProperty.call(edit.positions, id)) continue;
+            if (!nodeById(graph, id)) fail("missing_node", "cannot move a node that is absent from the graph");
+            positions[id] = edit.positions[id];
+        }
+    }
+
+    function setParameters(graph, edit) {
+        if (Object.prototype.toString.call(edit.changes) !== "[object Array]" ||
+            !edit.changes.length || edit.changes.length > 512) {
+            fail("invalid_edit", "setParameters requires between 1 and 512 parameter changes");
+        }
+        for (var i = 0; i < edit.changes.length; i++) {
+            var change = edit.changes[i];
+            if (!change || typeof change.nodeId !== "string" || typeof change.parameterKey !== "string" ||
+                !/^\d+$/.test(change.parameterKey)) {
+                fail("invalid_edit", "parameter changes need a node ID and decimal graph parameter key");
+            }
+            var node = nodeById(graph, change.nodeId);
+            if (!node) fail("missing_node", "cannot edit a node absent from the graph");
+            var found = -1;
+            for (var p = 0; p < node.parameters.length; p++) {
+                if (node.parameters[p].key === change.parameterKey) { found = p; break; }
+            }
+            if (change.remove === true) {
+                if (found < 0) continue;
+                if ((node.type !== TYPES.particle && node.type !== TYPES.appearance) ||
+                    (change.parameterKey !== "7" && change.parameterKey !== "8")) {
+                    fail("invalid_parameter", "only optional over-life curve parameters can be removed");
+                }
+                node.parameters.splice(found, 1);
+                continue;
+            }
+            var value = copyValue(change.value);
+            if (found < 0) {
+                if ((node.type !== TYPES.particle && node.type !== TYPES.appearance) ||
+                    (change.parameterKey !== "7" && change.parameterKey !== "8") ||
+                    change.valueType !== 7 || !(value instanceof Uint8Array)) {
+                    fail("missing_parameter", "the requested graph parameter is not present");
+                }
+                node.parameters.push({ key: change.parameterKey, type: 7, value: value });
+                continue;
+            }
+            if (change.valueType !== node.parameters[found].type) {
+                fail("parameter_type_mismatch", "graph parameter edits must preserve the value type");
+            }
+            node.parameters[found].value = value;
+        }
+    }
+
+    function apply(inputGraph, edit, idFactory) {
+        if (!edit || typeof edit.type !== "string") fail("invalid_edit", "edit type is required");
+        var graph = copyGraph(inputGraph);
+        var positions = layout.resolve(graph);
+        idFactory = idFactory || randomId;
+        if (edit.type === "addNode") addNode(graph, edit, idFactory, positions);
+        else if (edit.type === "connect") connect(graph, edit, idFactory);
+        else if (edit.type === "disconnect") disconnect(graph, edit);
+        else if (edit.type === "insertNode") insertNode(graph, edit, idFactory, positions);
+        else if (edit.type === "deleteNodes") deleteNodes(graph, edit, positions);
+        else if (edit.type === "duplicateNodes") duplicateNodes(graph, edit, idFactory, positions);
+        else if (edit.type === "moveNodes") moveNodes(graph, edit, positions);
+        else if (edit.type === "setParameters") setParameters(graph, edit);
+        else fail("unsupported_edit", "edit operation is not supported");
+        return layout.set(graph, positions);
+    }
+
+    return { types: TYPES, ports: PORTS, apply: apply, randomId: randomId };
+}));

@@ -1,7 +1,7 @@
-# AE adapter (M2/M3-01)
+# AE adapter (M2/M3-01/M3-01B)
 
-The adapter registers 21 render controls plus graph data, source selection and explicit
-capture controls (24 active non-input parameters), declares SmartFX, and renders immutable
+The adapter registers 24 render controls plus graph data, source selection and explicit
+capture controls (27 active non-input parameters), declares SmartFX, and renders immutable
 emitter/force/appearance/output snapshots through the versioned C ABI in
 `StarfieldCore.dll`, which owns the deterministic CPU renderer. Legacy mode preserves animated slider values. The effect writes particles
 over transparent black and does not composite the input layer's pixels. Host types stop at this

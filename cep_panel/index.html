@@ -85,13 +85,17 @@
     <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="appearance">Appearance Override</button>
-    <button type="button" role="menuitem" data-action="addNode" data-node-type="output">Output</button>
     <div class="context-menu-separator"></div>
     <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
     <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected</button>
     <button id="disconnectContextAction" type="button" role="menuitem" data-action="disconnect" hidden>Disconnect This Wire</button>
   </div>
 
+  <script src="js/graph_codec.js"></script>
+  <script src="js/graph_layout.js"></script>
+  <script src="js/graph_edits.js"></script>
+  <script src="js/graph_transactions.js"></script>
+  <script src="js/graph_view.js"></script>
   <script src="js/panel.js"></script>
 </body>
 </html>

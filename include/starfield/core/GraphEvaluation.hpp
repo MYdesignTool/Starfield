@@ -31,6 +31,12 @@ struct EvaluatedGraph {
     const Settings& settings, NodeId emitter, NodeId particle, NodeId output,
     EdgeId emitter_to_particle, EdgeId particle_to_output);
 
+// Construct the current Particle-first chain with a serial force stage:
+// Emitter -> Particle -> Force -> Output.
+[[nodiscard]] Result<Graph> make_emitter_particle_force_output_graph(
+    const Settings& settings, NodeId emitter, NodeId particle, NodeId force, NodeId output,
+    EdgeId emitter_to_particle, EdgeId particle_to_force, EdgeId force_to_output);
+
 // Construct the current single-emitter Alpha chain with one force and one
 // appearance stage. The settings' gravity/drag and age-curve fields are written
 // to their corresponding nodes, not to the emitter node.

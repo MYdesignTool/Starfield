@@ -21,7 +21,7 @@ Maximum total blob size is 64 MiB. Reject truncated data, integer overflow, inco
 
 ## Payload records
 
-Payload is a sequence of length-delimited records. Each record starts with `kind:u16`, `record_version:u16`, and `record_size:u32` (including the 8-byte record prefix). Unknown kinds with the optional bit set (`kind & 0x8000`) may be skipped; unknown required kinds fail cleanly.
+Payload is a sequence of length-delimited records. Each record starts with `kind:u16`, `record_version:u16`, and `record_size:u32` (including the 8-byte record prefix). Unknown kinds with the optional bit set (`kind & 0x8000`) do not affect evaluation, but graph editors and serializers must preserve their complete record bytes across edits. Unknown required kinds fail cleanly. Schema 1 allows up to 4096 optional records; their combined bytes count toward the 64 MiB graph bound.
 
 ### Node record (`kind = 1`, `record_version = 1`)
 
@@ -46,6 +46,18 @@ Fields after the 8-byte record prefix:
 5. `destination_port_key`: `u64`.
 
 Reject duplicate edge IDs, missing endpoint nodes, duplicate input connections where the destination port is single-input, and cycles unless the node schema explicitly declares a delayed-feedback boundary.
+
+### Project node layout (`kind = 0x8001`, `record_version = 1`)
+
+This optional graph-level record stores CEP node-card positions in AE-owned graph
+bytes. Its body begins with `entry_count:u32` followed by `entry_count` entries:
+`node_id:16 bytes`, `x:f64`, `y:f64`. Coordinates are finite and bounded to
+−1,000,000,000…+1,000,000,000. Node IDs must be unique and refer to nodes in the
+same graph. Entries are sorted by NodeId when authored. At most one layout record
+may appear; editors preserve all other optional records unchanged. The renderer and
+graph evaluator ignore this record. Graph topology edits and layout changes are
+committed together so node positions follow save/reopen, effect duplication, and AE
+undo/redo.
 
 ## Migration and AE lifecycle
 

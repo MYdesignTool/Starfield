@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,9 @@ enum class ParameterId : std::uint32_t {
     graph_data = 14,
     control_source = 15,
     capture_controls = 16,
+    emitter_size_x = 17,
+    emitter_size_y = 18,
+    emitter_size_z = 19,
 };
 
 enum class EmitterShape : std::uint8_t {
@@ -46,6 +50,7 @@ inline constexpr std::uint32_t kEmitterShapeCount = 4;
 inline constexpr double kMaxEmitterOffset = 100.0;
 inline constexpr double kMaxVelocity = 1'000.0;
 inline constexpr double kMaxEmitterSize = 10.0;
+inline constexpr double kMaxEmitterSizePercent = 1000.0;
 inline constexpr double kMaxVelocitySpread = 100.0;
 inline constexpr double kMaxGravityMagnitude = 1'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
@@ -58,6 +63,20 @@ struct Vec3 {
     double x{};
     double y{};
     double z{};
+};
+
+inline constexpr std::size_t kMaxAgeCurvePoints = 8;
+
+struct AgeCurvePoint {
+    double age{};
+    double value{};
+};
+
+// A zero point count keeps the schema-1 legacy linear start/end interpolation.
+// Custom curves use normalized particle age (0..1) and fixed bounded storage.
+struct AgeCurve {
+    std::array<AgeCurvePoint, kMaxAgeCurvePoints> points{};
+    std::uint8_t count{};
 };
 
 // How the emission direction is sampled. `directional` uses the Euler angles and the
@@ -81,6 +100,9 @@ struct Settings {
     // Extent of the box/sphere/disc emitters: cube edge length resp. diameter, in
     // layer heights. Ignored by the point emitter.
     double emitter_size{0.05};
+    // Per-axis percentage applied to emitter_size. 100 preserves its prior uniform
+    // extent; kept generic so additional emitter shapes can reuse the same vector.
+    Vec3 emitter_size_percent{100.0, 100.0, 100.0};
     // Per-axis uniform jitter applied to each particle's velocity, in layer heights
     // per second. This is what makes a steady emitter animate: identical particles
     // produce a stationary pattern, varied ones produce visible motion.
@@ -96,6 +118,8 @@ struct Settings {
     Vec3 color_end{1.0, 1.0, 1.0};
     double particle_size_end{10.0};
     double opacity_end{1.0};
+    AgeCurve size_over_life{};
+    AgeCurve opacity_over_life{};
     bool appearance_enabled{false};
     // Emission direction model, aligned with the reference emitter's controls: particles
     // leave at `emission_speed` along an axis built from the Euler angles, sampled inside
@@ -125,6 +149,7 @@ enum class ValidationCode : std::uint8_t {
     emitter_origin_clamped,
     velocity_clamped,
     emitter_size_clamped,
+    emitter_size_percent_clamped,
     velocity_spread_clamped,
     gravity_clamped,
     linear_drag_clamped,
@@ -136,6 +161,7 @@ enum class ValidationCode : std::uint8_t {
     emission_angle_clamped,
     direction_span_clamped,
     direction_mode_replaced,
+    age_curve_invalid,
     non_finite_replaced,
 };
 

@@ -1,0 +1,76 @@
+# ADR 0016: project-owned Particle over-life curves
+
+- Status: accepted for implementation
+- Date: 2026-09-30
+- Scope: AE 2023 CEP authoring, AE parameter persistence, and core Particle/Appearance evaluation
+
+## Context
+
+The current Size Over Life and Opacity Over Life controls store only one end value,
+so the renderer interpolates a straight line from the birth value. The Particle node
+needs a compact, editable curve with a small fixed work and storage bound. AE 2023's
+ExtendScript DOM cannot read or write the effect's `CUSTOM_VALUE` graph parameter;
+the CEP panel therefore has to use ordinary script-visible effect parameters and let
+the native effect rebuild its graph during a supervised parameter change.
+
+## Decision
+
+Each curve uses normalized age `x ∈ [0,1]` and a value in the existing renderer units:
+
+- Size is measured in full-resolution layer pixels, bounded by 0…100,000.
+- Opacity is bounded by 0…1.
+- A curve has two fixed endpoints and zero to six interior knots, for at most eight
+  points. Ages are strictly increasing; the first and last ages must be exactly 0
+  and 1. Evaluation is piecewise linear.
+- The CEP plot adds a point on click, moves points on drag, and allows direct numeric
+  entry for the selected point's Life percentage and value. These numeric fields also
+  support the panel's left/right scrub gesture. Previous/next controls select points;
+  endpoint ages stay pinned and interior ages stay between their neighbors. Interior
+  points can be removed, and `Linear` restores the endpoint-only interpolation.
+- A zero point count means the old `start/end` interpolation. This is the default
+  for all projects created before revision 9, so their appearance is unchanged.
+- Color keeps its existing linear start/end interpolation.
+
+The AE effect appends hidden, non-time-varying scalar streams for both point banks
+(IDs 45–78), followed by a supervised curve-edit nonce (ID 79). The endpoint
+parameters keep their existing IDs and mirror the first and last curve values. CEP
+writes point slots, endpoint mirrors, the active count, and finally the nonce in one
+AE undo group. The nonce is the sole commit trigger for a panel curve edit; after it
+fires, the adapter constructs the canonical graph from the complete bank. Direct AE
+edits to the existing Size, Size Over Life, Opacity, or Opacity Over Life controls
+update the matching active curve endpoint in the same parameter-change callback.
+In AE Controls mode, animated scalar endpoints remain authoritative at the sampled
+render time while interior knots stay constant. The CEP editor locks an animated
+endpoint's ordinate and directs the user to its AE keyframes; interior knots remain
+editable. Node Graph values keep the existing
+constant-value semantics from ADR 0007.
+
+The graph stores an active curve as an optional opaque parameter on Particle and
+Appearance nodes. The nested payload is version 1: a four-byte header containing
+payload version, point count, and two zero reserved bytes, followed by little-endian
+IEEE-754 binary64 age/value pairs. Existing schema-1 graphs that omit the optional
+keys remain valid and use their scalar endpoints. The outer graph codec continues
+to provide the graph-level bounds and CRC.
+
+## Consequences
+
+- Curve authoring and hidden curve-bank persistence use AE project data, so save,
+  duplicate, and undo follow AE's normal parameter behavior. CEP local storage is
+  not authoritative.
+- A new curve changes the serialized graph and requires the updated effect binary;
+  the revision-9 panel reports a missing parameter if paired with an older binary.
+- Parameter IDs and the graph codec's existing scalar keys stay unchanged. Optional
+  curve keys can be ignored by old-schema graphs because they are absent there.
+- This decision does not qualify ExtendScript stream access, callback commit ordering,
+  rendering, undo, or save/reopen in AE. Those remain explicit AE 2023 host gates.
+- The curve editor lives in the CEP Particle inspector. Native Effect Controls retain
+  their existing endpoint parameters for compatibility; direct endpoint edits keep
+  the curve endpoint values synchronized.
+
+## Validation rules
+
+The adapter and core reject active curves with fewer than two or more than eight
+points, non-finite values, out-of-range ages/ordinates, unordered ages, or endpoints
+that move away from 0 and 1. The panel also validates the complete proposed point
+list before it writes any parameter. Unused hidden slots are ignored once the count
+is known.

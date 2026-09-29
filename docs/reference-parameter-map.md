@@ -59,7 +59,7 @@ Our equivalent is the `Render` topic plus the panel.
 | `Speed Random` | 0 | `Speed Random` | Aligned in name; theirs randomizes the scalar speed, ours jitters each axis |
 | `Speed Over Life` | group | — | **Missing** (split into Size/Opacity over life today) |
 | `Inertia` | 0 | `Linear Drag` | Same idea, different name/units (theirs percent-like, ours inverse seconds); rename pending confirmation |
-| `Size X/Y/Z` | 100 / 100 / 100 | `Emitter Size` | Model differs: theirs is a per-axis emitter box in percent, ours a single cube/diameter in layer heights |
+| `Size X/Y/Z` | 100 / 100 / 100 | `Size X/Y/Z` (percent of `Emitter Size`) | Axis controls now match the percentage convention; the existing common base extent remains for compatibility |
 | `Light Size`, `Angle X/Y/Z`, `Direction:`, `Orient X/Y/Z`, `Direction Span` | 0/0/0, 1, 0/0/0, 60 | — | **Missing**: the direction/cone model that replaces our three velocity sliders |
 | `Auxiliary`, `Ring Particles`, `Grid/Path/Layer/Object Properties`, `Time Offset` | — | — | **Missing** (further emitter types) |
 | `Random Seed` | **1000** | `Random Seed` | Ours sits in Render and defaults to 1 |
@@ -77,7 +77,7 @@ Our equivalent is the `Render` topic plus the panel.
 | `Opacity Random` | 0 | — | **Missing** |
 | `Particle Color:` / `Color` / `Color Gradient` / `Color Use:` | 1, [1,1,1,1], —, 1 | `Color Start` / `Color End` | Ours are two endpoints; theirs is one color plus a gradient and a usage mode |
 | `Particle Feather`, `Transfer Mode:`, `Up Axis:` | 0, 1, 3 | — | **Missing** |
-| `Over Life` → `Size`, `Opacity` | groups | `Size Over Life`, `Opacity Over Life` | Ours are linear endpoints; theirs are curves |
+| `Over Life` → `Size`, `Opacity` | groups | Piecewise-linear Size/Opacity curves in the CEP Particle inspector (P-02C) | Core evaluation and project parameter streams are implemented; visual rendering, undo, and save/reopen still need AE 2023 qualification |
 | `Rotation Properties` (Orient To, Angle X/Y/Z, Speed X/Y/Z, Rotation Over Life, Anchor, Limit To 2D) | — | — | **Missing** |
 | `Texture`, `Path`, `Shadow`, `Cloud Properties` | — | — | **Missing** |
 | `Use Model(s):`, `Shift Seed`, `Birth Chance` | 1, 0, 100 | — | **Missing** |
@@ -94,10 +94,11 @@ Our equivalent is the `Render` topic plus the panel.
   the most visible behavioural difference in the emitter section.
 - **Opacity is percent** in the reference UI. Ours is 0..1; aligning means range change plus a
   `/100` in the adapter, and it also affects `Opacity Over Life`.
-- **Over Life uses curves**, not endpoint pairs. Our endpoint approximation should be replaced by
-  a curve parameter when we add one (AE has no built-in gradient parameter, so this needs a
-  custom UI or a keyframed slider pair).
-- **Emitter size is per-axis and percent-based** (`Size X/Y/Z`), not a single cube edge.
+- **Over Life uses curves**, not endpoint pairs. P-02C now authors bounded piecewise-linear
+  curves in CEP and evaluates them in Particle/Appearance; the AE visual and project lifecycle
+  gates remain open.
+- **Emitter size is per-axis and percent-based** (`Size X/Y/Z`). Revision 10 adds these
+  controls while retaining the prior common `Emitter Size` extent as the 100% base.
 
 ## How to regenerate
 

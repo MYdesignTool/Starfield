@@ -6,6 +6,7 @@
 // Build with tests/RunCoreTests.ps1 (MSVC) or CMake's `starfield_core_tests`.
 
 #include "starfield/core/CpuRenderer.hpp"
+#include "starfield/core/AgeCurve.hpp"
 #include "starfield/core/Geometry.hpp"
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
@@ -596,9 +597,32 @@ void test_sequence_codec() {
     CHECK(deserialize_graph(malformed, registry).error().code == SequenceErrorCode::unsupported_record_version);
 
     malformed = encoded.value();
-    append_unknown_record(malformed, 0x8001, 99); // optional unknown record is skipped
+    append_unknown_record(malformed, 0x8001, 99); // optional unknown records survive graph edits
     const auto optional_decode = deserialize_graph(malformed, registry);
     CHECK(optional_decode.has_value());
+    if (optional_decode.has_value()) {
+        CHECK(optional_decode.value().optional_records.size() == 1);
+        if (optional_decode.value().optional_records.size() == 1) {
+            const auto& raw_record = optional_decode.value().optional_records[0];
+            CHECK(raw_record.size() == 8);
+            CHECK(test_read_u16(raw_record, 0) == 0x8001u);
+            CHECK(test_read_u32(raw_record, 4) == raw_record.size());
+            const auto round_trip = serialize_graph(optional_decode.value(), registry);
+            if (!round_trip.has_value()) {
+                std::printf("optional record re-encode failed: %s\n", round_trip.error().detail);
+            }
+            CHECK(round_trip.has_value());
+            if (round_trip.has_value()) CHECK(round_trip.value() == malformed);
+        }
+    }
+
+    Graph malformed_optional_graph = graph;
+    malformed_optional_graph.optional_records.push_back(OpaqueBytes{std::byte{1}, std::byte{0}});
+    const auto malformed_optional_encoded = serialize_graph(malformed_optional_graph, registry);
+    CHECK(!malformed_optional_encoded.has_value());
+    if (!malformed_optional_encoded.has_value()) {
+        CHECK(malformed_optional_encoded.error().code == SequenceErrorCode::malformed_record);
+    }
 
     malformed = encoded.value();
     append_unknown_record(malformed, 3, 1); // required unknown record fails
@@ -679,6 +703,15 @@ void test_settings_validation() {
     CHECK(validated.value.velocity.x == kMaxVelocity);
     CHECK(validated.value.velocity.z == 0.0); // non-finite replaced, then clamped
     CHECK(validated.notices.size() >= 8);
+
+    Settings axis_sizes;
+    axis_sizes.emitter_size_percent = Vec3{
+        std::numeric_limits<double>::quiet_NaN(), 1200.0, -1.0};
+    const ValidatedSettings validated_axis_sizes = validate_settings(axis_sizes);
+    CHECK(validated_axis_sizes.value.emitter_size_percent.x == 100.0);
+    CHECK(validated_axis_sizes.value.emitter_size_percent.y == kMaxEmitterSizePercent);
+    CHECK(validated_axis_sizes.value.emitter_size_percent.z == 0.0);
+    CHECK(validated_axis_sizes.notices.size() == 3);
 }
 
 void test_simulation_emitter_origin() {
@@ -787,6 +820,93 @@ void test_emitter_shapes_and_spread() {
             furthest = std::max(furthest, std::abs(particle.position.x));
         }
         CHECK(furthest > 0.02); // the seeded distribution is not collapsed onto the centre
+    }
+
+    // Per-axis percentages scale the shared emitter extent independently while
+    // preserving the same seeded sample for Box, Sphere, and the XY Disc.
+    Settings dimensioned = settings;
+    dimensioned.velocity = Vec3{};
+    dimensioned.velocity_spread = 0.0;
+    dimensioned.emitter_shape = EmitterShape::box;
+    dimensioned.emitter_size_percent = Vec3{200.0, 50.0, 150.0};
+    const auto box_axes = simulate_particles(validate_settings(dimensioned), 1.0, never);
+    CHECK(box_axes.has_value() && !box_axes.value().empty());
+    if (box_axes.has_value()) {
+        for (const ParticleInstance& particle : box_axes.value()) {
+            CHECK(std::abs(particle.position.x) <= 0.2 + 1e-12);
+            CHECK(std::abs(particle.position.y) <= 0.05 + 1e-12);
+            CHECK(std::abs(particle.position.z) <= 0.15 + 1e-12);
+        }
+    }
+
+    Settings sphere_base = dimensioned;
+    sphere_base.emitter_shape = EmitterShape::sphere;
+    sphere_base.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    Settings sphere_scaled = sphere_base;
+    sphere_scaled.emitter_size_percent = Vec3{200.0, 50.0, 150.0};
+    const auto sphere_unit = simulate_particles(validate_settings(sphere_base), 1.0, never);
+    const auto sphere_ellipsoid = simulate_particles(validate_settings(sphere_scaled), 1.0, never);
+    CHECK(sphere_unit.has_value() && sphere_ellipsoid.has_value());
+    if (sphere_unit.has_value() && sphere_ellipsoid.has_value() &&
+        sphere_unit.value().size() == sphere_ellipsoid.value().size()) {
+        for (std::size_t i = 0; i < sphere_unit.value().size(); ++i) {
+            const Vec3& base = sphere_unit.value()[i].position;
+            const Vec3& scaled = sphere_ellipsoid.value()[i].position;
+            CHECK(std::abs(scaled.x - 2.0 * base.x) < 1e-12);
+            CHECK(std::abs(scaled.y - 0.5 * base.y) < 1e-12);
+            CHECK(std::abs(scaled.z - 1.5 * base.z) < 1e-12);
+        }
+    }
+
+    Settings disc_base = dimensioned;
+    disc_base.emitter_shape = EmitterShape::disc;
+    disc_base.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    Settings disc_scaled = disc_base;
+    disc_scaled.emitter_size_percent = Vec3{200.0, 50.0, 500.0};
+    const auto disc_unit = simulate_particles(validate_settings(disc_base), 1.0, never);
+    const auto disc_ellipse = simulate_particles(validate_settings(disc_scaled), 1.0, never);
+    CHECK(disc_unit.has_value() && disc_ellipse.has_value());
+    if (disc_unit.has_value() && disc_ellipse.has_value() &&
+        disc_unit.value().size() == disc_ellipse.value().size()) {
+        for (std::size_t i = 0; i < disc_unit.value().size(); ++i) {
+            const Vec3& base = disc_unit.value()[i].position;
+            const Vec3& scaled = disc_ellipse.value()[i].position;
+            CHECK(std::abs(scaled.x - 2.0 * base.x) < 1e-12);
+            CHECK(std::abs(scaled.y - 0.5 * base.y) < 1e-12);
+            CHECK(std::abs(scaled.z) < 1e-12); // this shape remains in its XY plane
+        }
+    }
+
+    // Schema-1 emitter nodes written before axis sizes existed remain valid and
+    // evaluate identically to explicit 100% values.
+    Settings graph_settings = dimensioned;
+    graph_settings.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    const auto current_graph = make_emitter_output_graph(
+        graph_settings, NodeId{test_uuid(81)}, NodeId{test_uuid(82)}, EdgeId{test_uuid(83)});
+    CHECK(current_graph.has_value());
+    if (current_graph.has_value()) {
+        Graph legacy_graph = current_graph.value();
+        const auto emitter = std::find_if(legacy_graph.nodes.begin(), legacy_graph.nodes.end(),
+            [](const GraphNode& node) { return node.type_key == graph_keys::kEmitterNode; });
+        CHECK(emitter != legacy_graph.nodes.end());
+        if (emitter != legacy_graph.nodes.end()) {
+            emitter->parameters.erase(std::remove_if(emitter->parameters.begin(), emitter->parameters.end(),
+                [](const NodeParameter& parameter) {
+                    return parameter.key.value >= graph_keys::kEmitterSizePercentX.value &&
+                           parameter.key.value <= graph_keys::kEmitterSizePercentZ.value;
+                }), emitter->parameters.end());
+            const auto current = evaluate_particle_graph(current_graph.value(), RationalTime{1, 1}, never);
+            const auto legacy = evaluate_particle_graph(legacy_graph, RationalTime{1, 1}, never);
+            CHECK(current.has_value() && legacy.has_value());
+            if (current.has_value() && legacy.has_value() &&
+                current.value().particles.size() == legacy.value().particles.size()) {
+                for (std::size_t i = 0; i < current.value().particles.size(); ++i) {
+                    CHECK(current.value().particles[i].position.x == legacy.value().particles[i].position.x);
+                    CHECK(current.value().particles[i].position.y == legacy.value().particles[i].position.y);
+                    CHECK(current.value().particles[i].position.z == legacy.value().particles[i].position.z);
+                }
+            }
+        }
     }
 
     // Velocity spread is bounded per axis, actually applied, and sticks to a particle.
@@ -1292,6 +1412,14 @@ void test_force_and_appearance() {
     settings.opacity = 1.0;
     settings.opacity_end = 0.0;
     settings.appearance_enabled = true;
+    settings.size_over_life.count = 3;
+    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 10.0};
+    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 30.0};
+    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 2.0};
+    settings.opacity_over_life.count = 3;
+    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 1.0};
+    settings.opacity_over_life.points[1] = AgeCurvePoint{0.5, 0.25};
+    settings.opacity_over_life.points[2] = AgeCurvePoint{1.0, 0.0};
 
     auto made = make_emitter_force_appearance_output_graph(settings, emitter, force, appearance, output,
                                                            emitter_to_force, force_to_appearance, appearance_to_output);
@@ -1334,11 +1462,24 @@ void test_force_and_appearance() {
             const double fraction = age / lifetime;
             CHECK(std::abs(particle.position.y - expected_y) < 1e-9);
             CHECK(std::abs(particle.position.x - expected_x) < 1e-9);
-            CHECK(std::abs(particle.size_pixels - (10.0 + (2.0 - 10.0) * fraction)) < 1e-9);
-            CHECK(std::abs(particle.opacity - (1.0 - fraction)) < 1e-9);
+            const double expected_size = fraction <= 0.5
+                ? 10.0 + (30.0 - 10.0) * (fraction / 0.5)
+                : 30.0 + (2.0 - 30.0) * ((fraction - 0.5) / 0.5);
+            const double expected_opacity = fraction <= 0.5
+                ? 1.0 + (0.25 - 1.0) * (fraction / 0.5)
+                : 0.25 + (0.0 - 0.25) * ((fraction - 0.5) / 0.5);
+            CHECK(std::abs(particle.size_pixels - expected_size) < 1e-9);
+            CHECK(std::abs(particle.opacity - expected_opacity) < 1e-9);
             CHECK(std::abs(particle.color.x - (1.0 + (0.6 - 1.0) * fraction)) < 1e-9);
         }
         CHECK(saw_birth); // the slot born exactly at the requested time is visible
+        const auto knot = std::find_if(evaluated.value().particles.begin(), evaluated.value().particles.end(),
+            [](const ParticleInstance& particle) { return std::abs(particle.age_seconds - 1.0) < 1e-12; });
+        CHECK(knot != evaluated.value().particles.end());
+        if (knot != evaluated.value().particles.end()) {
+            CHECK(std::abs(knot->size_pixels - 30.0) < 1e-12);
+            CHECK(std::abs(knot->opacity - 0.25) < 1e-12);
+        }
     }
 
     // Graph and flat paths must agree pixel for pixel when both carry the same
@@ -1500,9 +1641,21 @@ void test_particle_branches_and_ordered_buffer() {
 
     // A second Particle branch has its own appearance. The first branch's
     // downstream Appearance node replaces all three Particle curves.
+    AgeCurve branch_size_curve{};
+    branch_size_curve.count = 3;
+    branch_size_curve.points[0] = AgeCurvePoint{0.0, 9.0};
+    branch_size_curve.points[1] = AgeCurvePoint{0.5, 19.0};
+    branch_size_curve.points[2] = AgeCurvePoint{1.0, 39.0};
+    AgeCurve branch_opacity_curve{};
+    branch_opacity_curve.count = 3;
+    branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 0.1};
+    branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 0.3};
+    branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 0.9};
     graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 1, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
-        {kSizeStart, 9.0}, {kSizeEnd, 19.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 0.9}}});
+        {kSizeStart, 9.0}, {kSizeEnd, 39.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 0.9},
+        {kSizeOverLifeCurve, encode_age_curve(branch_size_curve)},
+        {kOpacityOverLifeCurve, encode_age_curve(branch_opacity_curve)}}});
     graph.nodes.push_back(GraphNode{appearance, kAppearanceNode, 1, {
         {kColorStart, Vec3{1.0, 0.0, 0.0}}, {kColorEnd, Vec3{0.5, 0.0, 0.0}},
         {kSizeStart, 4.0}, {kSizeEnd, 8.0}, {kOpacityStart, 0.2}, {kOpacityEnd, 0.8}}});
@@ -1538,8 +1691,14 @@ void test_particle_branches_and_ordered_buffer() {
         }
         if (odd != result.end()) {
             const double fraction = odd->age_seconds / odd->lifetime_seconds;
-            CHECK(std::abs(odd->size_pixels - (9.0 + 10.0 * fraction)) < 1e-12);
-            CHECK(std::abs(odd->opacity - (0.1 + 0.8 * fraction)) < 1e-12);
+            const double expected_size = fraction <= 0.5
+                ? 9.0 + (19.0 - 9.0) * (fraction / 0.5)
+                : 19.0 + (39.0 - 19.0) * ((fraction - 0.5) / 0.5);
+            const double expected_opacity = fraction <= 0.5
+                ? 0.1 + (0.3 - 0.1) * (fraction / 0.5)
+                : 0.3 + (0.9 - 0.3) * ((fraction - 0.5) / 0.5);
+            CHECK(std::abs(odd->size_pixels - expected_size) < 1e-12);
+            CHECK(std::abs(odd->opacity - expected_opacity) < 1e-12);
             CHECK(odd->color.y > 0.0 && odd->color.x == 0.0 && odd->color.z == 0.0);
         }
     }

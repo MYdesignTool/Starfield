@@ -55,9 +55,24 @@ constexpr A_long kLayoutAppearanceXDiskId = 'lAx0';
 constexpr A_long kLayoutAppearanceYDiskId = 'lAy0';
 constexpr A_long kLayoutOutputXDiskId = 'lOx0';
 constexpr A_long kLayoutOutputYDiskId = 'lOy0';
+constexpr A_long kSizeCurveCountDiskId = 'szct';
+constexpr A_long kOpacityCurveCountDiskId = 'opct';
+constexpr A_long kCurveEditCommitDiskId = 'cvcm';
+constexpr A_long kEmitterSizeTopicDiskId = 'topX';
+constexpr A_long kEmitterSizeXDiskId = 'eszx';
+constexpr A_long kEmitterSizeYDiskId = 'eszy';
+constexpr A_long kEmitterSizeZDiskId = 'eszz';
 
-// Parameter types and host indices in binding order: slot 0..20 map to the manifest
-// controls. Types are stamped into the checked-out PF_ParamDef before
+constexpr A_long curve_point_disk_id(bool opacity, std::size_t point, bool value) noexcept {
+    const auto a = static_cast<std::uint32_t>(opacity ? 'o' : 's');
+    const auto b = static_cast<std::uint32_t>('0' + point);
+    const auto c = static_cast<std::uint32_t>(value ? 'v' : 'a');
+    const auto d = static_cast<std::uint32_t>(value ? 'l' : 'g');
+    return static_cast<A_long>((a << 24u) | (b << 16u) | (c << 8u) | d);
+}
+
+// Parameter types and host indices in binding order: slots 0..20 map to render
+// controls and slots 21..54 map to the hidden curve banks. Types are stamped into the checked-out PF_ParamDef before
 // PF_CHECKOUT_PARAM so the host cannot be confused about how to fill the value
 // union. Hosts that fill by index are unaffected.
 constexpr A_long kParameterIndices[kEffectParameterCount] = {
@@ -82,6 +97,25 @@ constexpr A_long kParameterIndices[kEffectParameterCount] = {
     kColorEndId,            // Color End
     kParticleSizeEndId,     // Size Over Life
     kOpacityEndId,          // Opacity Over Life
+    kSizeCurveCountId,
+    kSizeCurveFirstPointId + 0, kSizeCurveFirstPointId + 1,
+    kSizeCurveFirstPointId + 2, kSizeCurveFirstPointId + 3,
+    kSizeCurveFirstPointId + 4, kSizeCurveFirstPointId + 5,
+    kSizeCurveFirstPointId + 6, kSizeCurveFirstPointId + 7,
+    kSizeCurveFirstPointId + 8, kSizeCurveFirstPointId + 9,
+    kSizeCurveFirstPointId + 10, kSizeCurveFirstPointId + 11,
+    kSizeCurveFirstPointId + 12, kSizeCurveFirstPointId + 13,
+    kSizeCurveFirstPointId + 14, kSizeCurveFirstPointId + 15,
+    kOpacityCurveCountId,
+    kOpacityCurveFirstPointId + 0, kOpacityCurveFirstPointId + 1,
+    kOpacityCurveFirstPointId + 2, kOpacityCurveFirstPointId + 3,
+    kOpacityCurveFirstPointId + 4, kOpacityCurveFirstPointId + 5,
+    kOpacityCurveFirstPointId + 6, kOpacityCurveFirstPointId + 7,
+    kOpacityCurveFirstPointId + 8, kOpacityCurveFirstPointId + 9,
+    kOpacityCurveFirstPointId + 10, kOpacityCurveFirstPointId + 11,
+    kOpacityCurveFirstPointId + 12, kOpacityCurveFirstPointId + 13,
+    kOpacityCurveFirstPointId + 14, kOpacityCurveFirstPointId + 15,
+    kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId,
 };
 constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_FLOAT_SLIDER, /* Max Particles       */
@@ -105,6 +139,17 @@ constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_COLOR,        /* Color End           */
     PF_Param_FLOAT_SLIDER, /* Size Over Life      */
     PF_Param_FLOAT_SLIDER, /* Opacity Over Life   */
+    PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
 };
 
 std::uint32_t to_particle_count(const PF_ParamDef& def) noexcept {
@@ -125,6 +170,15 @@ std::uint32_t to_seed(const PF_ParamDef& def) noexcept {
     }
     if (value >= static_cast<double>(core::kMaxSeed)) {
         return core::kMaxSeed;
+    }
+    return static_cast<std::uint32_t>(value + 0.5);
+}
+
+std::uint32_t to_curve_point_count(const PF_ParamDef& def) noexcept {
+    const double value = static_cast<double>(def.u.fs_d.value);
+    if (!std::isfinite(value) || value <= 0.0) return 0;
+    if (value >= static_cast<double>(core::kMaxAgeCurvePoints)) {
+        return static_cast<std::uint32_t>(core::kMaxAgeCurvePoints);
     }
     return static_cast<std::uint32_t>(value + 0.5);
 }
@@ -220,6 +274,35 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     settings.color_end = to_color(*defs[18]);
     settings.particle_size_end = to_double(*defs[19]);
     settings.opacity_end = to_double(*defs[20]);
+    // AE Controls always expose the full Particle appearance controls. The
+    // compatibility constructor defaults appearance off for old core callers,
+    // so mark the adapter snapshot explicitly before projecting it into a graph.
+    settings.appearance_enabled = true;
+    const std::uint32_t size_count = to_curve_point_count(*defs[21]);
+    settings.size_over_life.count = static_cast<std::uint8_t>(size_count);
+    for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+        settings.size_over_life.points[point].age = to_double(*defs[22 + point * 2]);
+        settings.size_over_life.points[point].value = to_double(*defs[23 + point * 2]);
+    }
+    const std::size_t opacity_count_slot = 38;
+    const std::uint32_t opacity_count = to_curve_point_count(*defs[opacity_count_slot]);
+    settings.opacity_over_life.count = static_cast<std::uint8_t>(opacity_count);
+    for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+        settings.opacity_over_life.points[point].age = to_double(*defs[opacity_count_slot + 1 + point * 2]);
+        settings.opacity_over_life.points[point].value = to_double(*defs[opacity_count_slot + 2 + point * 2]);
+    }
+    // Keep existing animatable endpoints authoritative at the sampled render time;
+    // interior knots remain constant project data.
+    if (size_count >= 2) {
+        settings.size_over_life.points[0].value = settings.particle_size;
+        settings.size_over_life.points[size_count - 1].value = settings.particle_size_end;
+    }
+    if (opacity_count >= 2) {
+        settings.opacity_over_life.points[0].value = settings.opacity;
+        settings.opacity_over_life.points[opacity_count - 1].value = settings.opacity_end;
+    }
+    settings.emitter_size_percent = core::Vec3{
+        to_double(*defs[55]), to_double(*defs[56]), to_double(*defs[57])};
     return settings;
 }
 
@@ -233,10 +316,30 @@ PF_Err add_hidden_layout_coordinate(PF_InData* in_data, PF_ParamDef& def, const 
     def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = disk_id;
-    def.u.fs_d.value = def.u.fs_d.dephault = default_value;
-    def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCoordinateLimit;
-    def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCoordinateLimit;
-    def.u.fs_d.precision = PF_Precision_THOUSANDTHS;
+    def.u.fs_d.value = def.u.fs_d.dephault = static_cast<PF_FpShort>(default_value);
+    def.u.fs_d.valid_min = def.u.fs_d.slider_min = static_cast<PF_FpShort>(-kCoordinateLimit);
+    def.u.fs_d.valid_max = def.u.fs_d.slider_max = static_cast<PF_FpShort>(kCoordinateLimit);
+    def.u.fs_d.precision = static_cast<A_short>(PF_Precision_THOUSANDTHS);
+    def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+    return PF_ADD_PARAM(in_data, -1, &def);
+}
+
+PF_Err add_hidden_curve_slider(PF_InData* in_data, PF_ParamDef& def, const char* name,
+                               A_long disk_id, PF_FpLong minimum, PF_FpLong maximum,
+                               PF_FpLong default_value, A_long precision,
+                               bool supervise = false) noexcept {
+    if (!in_data || !name) return PF_Err_BAD_CALLBACK_PARAM;
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_FLOAT_SLIDER;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY |
+        (supervise ? PF_ParamFlag_SUPERVISE : PF_ParamFlag_NONE);
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+    std::snprintf(def.name, sizeof(def.name), "%s", name);
+    def.uu.id = disk_id;
+    def.u.fs_d.value = def.u.fs_d.dephault = static_cast<PF_FpShort>(default_value);
+    def.u.fs_d.valid_min = def.u.fs_d.slider_min = static_cast<PF_FpShort>(minimum);
+    def.u.fs_d.valid_max = def.u.fs_d.slider_max = static_cast<PF_FpShort>(maximum);
+    def.u.fs_d.precision = static_cast<A_short>(precision);
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
     return PF_ADD_PARAM(in_data, -1, &def);
 }
@@ -496,6 +599,68 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         if (err != PF_Err_NONE) return err;
     }
 
+    // Project-owned normalized-age curve banks. The CEP panel edits these
+    // script-visible scalar streams as one undo group, then changes the commit
+    // nonce so Node Graph mode rebuilds the canonical arbitrary-data graph once.
+    const struct CurveBank {
+        const char* label;
+        const char* short_name;
+        bool opacity;
+        A_long count_id;
+        A_long first_point_id;
+        A_long count_disk_id;
+        PF_FpLong value_max;
+        A_long value_precision;
+    } curve_banks[] = {
+        {"Size", "Size", false, kSizeCurveCountId, kSizeCurveFirstPointId,
+         kSizeCurveCountDiskId, core::kMaxParticleSize, PF_Precision_HUNDREDTHS},
+        {"Opacity", "Opacity", true, kOpacityCurveCountId, kOpacityCurveFirstPointId,
+         kOpacityCurveCountDiskId, 1.0, PF_Precision_THOUSANDTHS},
+    };
+    for (const auto& bank : curve_banks) {
+        char name[sizeof(def.name)]{};
+        std::snprintf(name, sizeof(name), "%s Curve Count", bank.label);
+        err = add_hidden_curve_slider(in_data, def, name, bank.count_disk_id, 0.0,
+                                      static_cast<PF_FpLong>(core::kMaxAgeCurvePoints), 0.0,
+                                      PF_Precision_INTEGER);
+        if (err != PF_Err_NONE) return err;
+        for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+            std::snprintf(name, sizeof(name), "%s Curve Point %u Age", bank.short_name,
+                          static_cast<unsigned int>(point));
+            err = add_hidden_curve_slider(in_data, def, name,
+                curve_point_disk_id(bank.opacity, point, false), 0.0, 1.0, 0.0,
+                PF_Precision_THOUSANDTHS);
+            if (err != PF_Err_NONE) return err;
+            std::snprintf(name, sizeof(name), "%s Curve Point %u Value", bank.short_name,
+                          static_cast<unsigned int>(point));
+            err = add_hidden_curve_slider(in_data, def, name,
+                curve_point_disk_id(bank.opacity, point, true), 0.0, bank.value_max,
+                0.0, bank.value_precision);
+            if (err != PF_Err_NONE) return err;
+        }
+    }
+    err = add_hidden_curve_slider(in_data, def, "Curve Edit Commit", kCurveEditCommitDiskId,
+                                  -1000000.0, 1000000.0, 0.0,
+                                  PF_Precision_INTEGER, true);
+    if (err != PF_Err_NONE) return err;
+
+    // New visible per-axis extents are appended in their own topic so all prior AE
+    // indices remain stable. They scale the existing shared Emitter Size by percent.
+    PF_ADD_TOPICX("Emitter Dimensions", 0, kEmitterSizeTopicDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size X", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                         PF_ParamFlag_SUPERVISE, kEmitterSizeXDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size Y", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                         PF_ParamFlag_SUPERVISE, kEmitterSizeYDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size Z", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                         PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
+    PF_END_TOPIC(kEmitterSizeTopicDiskId);
+
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -716,6 +881,18 @@ PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_Par
     return PF_Err_NONE;
 }
 
+void sync_curve_endpoint(PF_ParamDef* params[], A_long count_id, A_long first_point_id,
+                         bool end, PF_FpLong value) noexcept {
+    if (!params || !params[count_id] || params[count_id]->param_type != PF_Param_FLOAT_SLIDER) return;
+    const std::uint32_t count = to_curve_point_count(*params[count_id]);
+    if (count < 2 || count > core::kMaxAgeCurvePoints) return;
+    const A_long value_index = first_point_id + static_cast<A_long>((end ? count - 1 : 0) * 2 + 1);
+    PF_ParamDef* point_value = params[value_index];
+    if (!point_value || point_value->param_type != PF_Param_FLOAT_SLIDER) return;
+    point_value->u.fs_d.value = value;
+    point_value->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+}
+
 } // namespace
 
 PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
@@ -723,7 +900,29 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
     if (!in_data || !params || !extra) return PF_Err_BAD_CALLBACK_PARAM;
     try {
         if (extra->param_index == kCaptureControlsId) return capture_controls(in_data, out_data, params, extra);
+        const A_long registered = static_cast<A_long>(kTotalEffectParameterCount) + 1;
+        if (in_data->num_params > 0 && in_data->num_params < registered) return PF_Err_NONE;
+        if (extra->param_index == kCurveEditCommitId) {
+            return sync_graph_from_controls(in_data, out_data, params);
+        }
         if (!is_bound_control(extra->param_index)) return PF_Err_NONE;
+        if (extra->param_index == kSizeId && params[kSizeId] &&
+            params[kSizeId]->param_type == PF_Param_FLOAT_SLIDER) {
+            sync_curve_endpoint(params, kSizeCurveCountId, kSizeCurveFirstPointId, false,
+                                params[kSizeId]->u.fs_d.value);
+        } else if (extra->param_index == kParticleSizeEndId && params[kParticleSizeEndId] &&
+                   params[kParticleSizeEndId]->param_type == PF_Param_FLOAT_SLIDER) {
+            sync_curve_endpoint(params, kSizeCurveCountId, kSizeCurveFirstPointId, true,
+                                params[kParticleSizeEndId]->u.fs_d.value);
+        } else if (extra->param_index == kOpacityId && params[kOpacityId] &&
+                   params[kOpacityId]->param_type == PF_Param_FLOAT_SLIDER) {
+            sync_curve_endpoint(params, kOpacityCurveCountId, kOpacityCurveFirstPointId, false,
+                                params[kOpacityId]->u.fs_d.value);
+        } else if (extra->param_index == kOpacityEndId && params[kOpacityEndId] &&
+                   params[kOpacityEndId]->param_type == PF_Param_FLOAT_SLIDER) {
+            sync_curve_endpoint(params, kOpacityCurveCountId, kOpacityCurveFirstPointId, true,
+                                params[kOpacityEndId]->u.fs_d.value);
+        }
         return sync_graph_from_controls(in_data, out_data, params);
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }

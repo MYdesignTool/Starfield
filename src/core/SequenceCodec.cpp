@@ -21,6 +21,7 @@ constexpr std::array<std::byte, 8> kMagic{
 constexpr std::uint16_t kNodeRecordKind = 1;
 constexpr std::uint16_t kEdgeRecordKind = 2;
 constexpr std::uint16_t kRecordVersion = 1;
+constexpr std::size_t kMaxOptionalRecords = 4096;
 
 constexpr std::array<std::uint32_t, 256> make_crc_table() noexcept {
     std::array<std::uint32_t, 256> table{};
@@ -154,6 +155,17 @@ bool add_size(std::uint64_t amount, std::uint64_t& total) noexcept {
     if (total > kMaxGraphPayloadBytes || amount > kMaxGraphPayloadBytes - total) return false;
     total += amount;
     return true;
+}
+
+bool valid_optional_record(const OpaqueBytes& record) noexcept {
+    if (record.size() < 8 || record.size() > std::numeric_limits<std::uint32_t>::max()) return false;
+    Reader header{std::span<const std::byte>(record)};
+    std::uint16_t kind = 0;
+    std::uint16_t version = 0;
+    std::uint32_t declared_size = 0;
+    if (!header.u16(kind) || !header.u16(version) || !header.u32(declared_size)) return false;
+    static_cast<void>(version); // Unknown optional-record versions remain opaque.
+    return (kind & 0x8000u) != 0 && static_cast<std::size_t>(declared_size) == record.size();
 }
 
 std::uint16_t value_type_id(ParameterKind kind) noexcept {
@@ -416,6 +428,19 @@ SequenceResult<OpaqueBytes> serialize_graph(const Graph& graph, const NodeRegist
                 return encode_failure(SequenceErrorCode::size_limit_exceeded, describe(SequenceErrorCode::size_limit_exceeded));
             }
         }
+        if (graph.optional_records.size() > kMaxOptionalRecords) {
+            return encode_failure(SequenceErrorCode::size_limit_exceeded,
+                                 "optional record count exceeds the schema-1 limit");
+        }
+        for (const auto& record : graph.optional_records) {
+            if (!valid_optional_record(record)) {
+                return encode_failure(SequenceErrorCode::malformed_record,
+                                     "preserved optional graph record has an invalid header or size");
+            }
+            if (!add_size(record.size(), total_size)) {
+                return encode_failure(SequenceErrorCode::size_limit_exceeded, describe(SequenceErrorCode::size_limit_exceeded));
+            }
+        }
         const std::uint64_t payload_size = total_size - kSequenceHeaderSize;
         if (payload_size > std::numeric_limits<std::uint32_t>::max()) {
             return encode_failure(SequenceErrorCode::size_limit_exceeded, describe(SequenceErrorCode::size_limit_exceeded));
@@ -443,6 +468,7 @@ SequenceResult<OpaqueBytes> serialize_graph(const Graph& graph, const NodeRegist
         writer.u32(0); // schema 1 flags
         for (const GraphNode* node : nodes) write_node_record(writer, *node);
         for (const GraphEdge* edge : edges) write_edge_record(writer, *edge);
+        for (const auto& record : graph.optional_records) writer.raw(record);
         const auto payload = std::span<const std::byte>(bytes).subspan(kSequenceHeaderSize);
         writer.patch_u32(24, crc32(payload));
         return SequenceResult<OpaqueBytes>::success(std::move(bytes));
@@ -506,6 +532,7 @@ SequenceResult<Graph> deserialize_graph(std::span<const std::byte> bytes, const 
         std::uint32_t parsed_nodes = 0;
         std::uint32_t parsed_edges = 0;
         while (!records.empty()) {
+            const std::size_t record_offset = payload.size() - records.remaining();
             std::uint16_t kind = 0;
             std::uint16_t record_version = 0;
             std::uint32_t record_size = 0;
@@ -545,6 +572,13 @@ SequenceResult<Graph> deserialize_graph(std::span<const std::byte> bytes, const 
             } else if ((kind & 0x8000u) == 0) {
                 return decode_failure(SequenceErrorCode::unsupported_record,
                                       describe(SequenceErrorCode::unsupported_record));
+            } else {
+                if (graph.optional_records.size() >= kMaxOptionalRecords) {
+                    return decode_failure(SequenceErrorCode::size_limit_exceeded,
+                                          "optional record count exceeds the schema-1 limit");
+                }
+                const auto raw_record = payload.subspan(record_offset, record_size);
+                graph.optional_records.emplace_back(raw_record.begin(), raw_record.end());
             }
         }
         if (parsed_nodes != node_count || parsed_edges != edge_count) {

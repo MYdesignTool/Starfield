@@ -1,4 +1,5 @@
 #include "starfield/core/GraphEvaluation.hpp"
+#include "starfield/core/AgeCurve.hpp"
 
 #include <new>
 #include <utility>
@@ -21,7 +22,10 @@ GraphNode make_emitter_node(const Settings& settings, NodeId id) {
         {kEmissionAngleY, settings.emission_angles_degrees.y},
         {kEmissionAngleZ, settings.emission_angles_degrees.z},
         {kDirectionMode, static_cast<std::uint32_t>(settings.direction_mode)},
-        {kDirectionSpan, settings.direction_span_degrees}}};
+        {kDirectionSpan, settings.direction_span_degrees},
+        {kEmitterSizePercentX, settings.emitter_size_percent.x},
+        {kEmitterSizePercentY, settings.emitter_size_percent.y},
+        {kEmitterSizePercentZ, settings.emitter_size_percent.z}}};
 }
 
 Result<Graph> validate_constructed_graph(Graph graph, const char* failure_detail) {
@@ -68,13 +72,21 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         const double size_end = settings.appearance_enabled ? settings.particle_size_end : settings.particle_size;
         const double opacity_end = settings.appearance_enabled ? settings.opacity_end : settings.opacity;
 
+        GraphNode particle_node{particle, kParticleNode, 1, {
+            {kColorStart, color_start}, {kColorEnd, color_end},
+            {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
+            {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};
+        if (settings.size_over_life.count != 0) {
+            particle_node.parameters.push_back({kSizeOverLifeCurve, encode_age_curve(settings.size_over_life)});
+        }
+        if (settings.opacity_over_life.count != 0) {
+            particle_node.parameters.push_back({kOpacityOverLifeCurve, encode_age_curve(settings.opacity_over_life)});
+        }
+
         Graph graph;
         graph.nodes = {
             make_emitter_node(settings, emitter),
-            GraphNode{particle, kParticleNode, 1, {
-                {kColorStart, color_start}, {kColorEnd, color_end},
-                {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
-                {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}},
+            std::move(particle_node),
             GraphNode{output, kOutputNode, 1, {}},
         };
         graph.edges = {
@@ -89,6 +101,37 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
     }
 }
 
+Result<Graph> make_emitter_particle_force_output_graph(
+    const Settings& settings, NodeId emitter, NodeId particle, NodeId force, NodeId output,
+    EdgeId emitter_to_particle, EdgeId particle_to_force, EdgeId force_to_output) {
+    using R = Result<Graph>;
+    try {
+        auto base = make_emitter_particle_output_graph(settings, emitter, particle, output,
+                                                       emitter_to_particle, particle_to_force);
+        if (!base.has_value()) return base;
+        Graph graph = base.take_value();
+        graph.nodes.push_back(GraphNode{force, kForceNode, 1, {
+            {kGravity, settings.gravity}, {kLinearDrag, settings.linear_drag}}});
+
+        // The base constructor provides the stable Emitter -> Particle edge and a
+        // Particle -> Output edge. Replace the latter with the requested serial
+        // Particle -> Force -> Output chain while preserving the caller's IDs.
+        if (graph.edges.size() != 2 || graph.edges[1].source_node != particle ||
+            graph.edges[1].destination_node != output) {
+            return R::failure(ErrorCode::internal_failure, "particle graph did not contain its expected output edge");
+        }
+        graph.edges[1] = GraphEdge{particle_to_force, particle, kParticleParticlesOut,
+                                   force, kForceParticlesIn};
+        graph.edges.push_back(GraphEdge{force_to_output, force, kForceParticlesOut,
+                                        output, kOutputParticles});
+        return validate_constructed_graph(std::move(graph), "particle-force graph validation failed");
+    } catch (const std::bad_alloc&) {
+        return R::failure(ErrorCode::allocation_failed, "particle-force graph allocation failed");
+    } catch (...) {
+        return R::failure(ErrorCode::internal_failure, "particle-force graph construction failed");
+    }
+}
+
 Result<Graph> make_emitter_force_appearance_output_graph(
     const Settings& settings, NodeId emitter, NodeId force, NodeId appearance, NodeId output,
     EdgeId emitter_to_force, EdgeId force_to_appearance, EdgeId appearance_to_output) {
@@ -98,14 +141,21 @@ Result<Graph> make_emitter_force_appearance_output_graph(
             return R::failure(ErrorCode::invalid_request, "cannot create graph from out-of-range settings");
         }
         Graph graph;
+        GraphNode appearance_node{appearance, kAppearanceNode, 1, {
+            {kColorStart, settings.color_start}, {kColorEnd, settings.color_end},
+            {kSizeStart, settings.particle_size}, {kSizeEnd, settings.particle_size_end},
+            {kOpacityStart, settings.opacity}, {kOpacityEnd, settings.opacity_end}}};
+        if (settings.size_over_life.count != 0) {
+            appearance_node.parameters.push_back({kSizeOverLifeCurve, encode_age_curve(settings.size_over_life)});
+        }
+        if (settings.opacity_over_life.count != 0) {
+            appearance_node.parameters.push_back({kOpacityOverLifeCurve, encode_age_curve(settings.opacity_over_life)});
+        }
         graph.nodes = {
             make_emitter_node(settings, emitter),
             GraphNode{force, kForceNode, 1, {
                 {kGravity, settings.gravity}, {kLinearDrag, settings.linear_drag}}},
-            GraphNode{appearance, kAppearanceNode, 1, {
-                {kColorStart, settings.color_start}, {kColorEnd, settings.color_end},
-                {kSizeStart, settings.particle_size}, {kSizeEnd, settings.particle_size_end},
-                {kOpacityStart, settings.opacity}, {kOpacityEnd, settings.opacity_end}}},
+            std::move(appearance_node),
             GraphNode{output, kOutputNode, 1, {}},
         };
         graph.edges = {
