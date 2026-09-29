@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-1";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-2";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var NODE_WIDTH = 220;
@@ -24,6 +24,7 @@
     var resolvedTarget = false;
     var dragState = null;
     var inspectorDragState = null;
+    var numericScrubState = null;
     var marqueeState = null;
     var panState = null;
     var connectionState = null;
@@ -342,7 +343,8 @@
     }
 
     function canvasInteractionActive() {
-        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState);
+        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState ||
+                  numericScrubState);
     }
 
     function commitNodeLayout() {
@@ -1231,6 +1233,7 @@
     }
 
     function moveNodeDrag(event) {
+        if (numericScrubState) { moveNumericScrub(event); return; }
         if (minimapPanState) { moveViewToMinimapPoint(event); return; }
         if (panState) { updateCanvasPan(event); return; }
         if (inspectorDragState) {
@@ -1277,6 +1280,19 @@
     }
 
     function endNodeDrag(event) {
+        if (numericScrubState) {
+            if (event && event.pointerId !== undefined && numericScrubState.pointerId !== event.pointerId) return;
+            var scrub = numericScrubState;
+            numericScrubState = null;
+            if (document.body.classList) document.body.classList.remove("scrubbing-number");
+            if (event && event.type === "pointercancel") {
+                scrub.input.value = String(scrub.startValue);
+            } else if (scrub.moved && Math.abs(scrub.value - scrub.startValue) >= scrub.halfStep) {
+                scrub.input.value = String(scrub.value);
+                onEdit({ target: scrub.input });
+            }
+            return;
+        }
         if (minimapPanState) {
             minimapPanState = null;
         }
@@ -1379,12 +1395,82 @@
     function numberInput(parameter, channel) {
         var input = document.createElement("input");
         input.type = "number";
-        input.step = parameter.kind === "popup" ? "1" : "any";
+        var decimals = Number(parameter.decimals);
+        if (!isFinite(decimals)) decimals = parameter.kind === "popup" || parameter.kind === "color" ? 0 : 2;
+        decimals = Math.max(0, Math.min(6, Math.floor(decimals)));
+        input.step = String(Math.pow(10, -decimals));
         input.value = channel === null ? parameter.value : parameter.value[channel];
         input.dataset.key = parameter.key;
         input.dataset.channel = channel === null ? "" : String(channel);
+        input.dataset.decimals = String(decimals);
+        input.dataset.scrubStep = String(numericScrubStep(parameter, decimals));
+        var min = parameter.kind === "color" ? 0 : parameter.min;
+        var max = parameter.kind === "color" ? 255 : parameter.max;
+        if (typeof min === "number") {
+            input.min = String(min);
+            input.dataset.min = String(min);
+        }
+        if (typeof max === "number") {
+            input.max = String(max);
+            input.dataset.max = String(max);
+        }
+        input.title = "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
+        input.addEventListener("pointerdown", beginNumericScrub);
         input.addEventListener("change", onEdit);
         return input;
+    }
+
+    function numericScrubStep(parameter, decimals) {
+        if (parameter.kind !== "slider" || decimals <= 1) return 1;
+        return Math.pow(10, 1 - decimals);
+    }
+
+    function beginNumericScrub(event) {
+        if (event.button !== 0 || event.isPrimary === false || state.pending || numericScrubState) return;
+        var input = event.currentTarget;
+        var value = Number(input.value);
+        if (!isFinite(value)) return;
+        var step = Number(input.dataset.scrubStep);
+        var decimals = Number(input.dataset.decimals);
+        if (!isFinite(step) || step <= 0) step = 1;
+        if (!isFinite(decimals)) decimals = 2;
+        numericScrubState = {
+            input: input,
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            lastX: event.clientX,
+            startValue: value,
+            rawValue: value,
+            value: value,
+            step: step,
+            decimals: decimals,
+            halfStep: 0.5 * Math.pow(10, -decimals),
+            min: input.dataset.min === undefined ? -Infinity : Number(input.dataset.min),
+            max: input.dataset.max === undefined ? Infinity : Number(input.dataset.max),
+            moved: false
+        };
+        capturePointer(event);
+    }
+
+    function moveNumericScrub(event) {
+        var scrub = numericScrubState;
+        if (!scrub || (event.pointerId !== undefined && scrub.pointerId !== event.pointerId)) return;
+        var x = event.clientX;
+        if (!scrub.moved) {
+            if (Math.abs(x - scrub.startX) < 3) return;
+            scrub.moved = true;
+            if (document.body.classList) document.body.classList.add("scrubbing-number");
+        }
+        var deltaX = x - scrub.lastX;
+        scrub.lastX = x;
+        var speed = event.shiftKey ? 10 : (event.ctrlKey ? 0.1 : 1);
+        scrub.rawValue += deltaX * scrub.step * speed;
+        scrub.rawValue = Math.max(scrub.min, Math.min(scrub.max, scrub.rawValue));
+        var scale = Math.pow(10, scrub.decimals);
+        scrub.value = Math.round(scrub.rawValue * scale) / scale;
+        scrub.value = Math.max(scrub.min, Math.min(scrub.max, scrub.value));
+        scrub.input.value = String(scrub.value);
+        if (event.preventDefault) event.preventDefault();
     }
 
     function onEdit(event) {

@@ -297,11 +297,25 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   white-space: nowrap;
 }
 .param-value { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
-.param-value input { width: 70px; min-width: 0; text-align: right; }
+.param-value input {
+  width: 70px;
+  min-width: 0;
+  text-align: right;
+  color: var(--accent);
+  background: transparent;
+  border-color: transparent;
+  cursor: ew-resize;
+}
+.param-value input:focus {
+  background: var(--panel-2);
+  border-color: var(--accent);
+  cursor: text;
+}
 .param-value.multi input { flex: 0 1 70px; }
 .swatch { flex: 0 0 16px; width: 16px; height: 16px; border: 1px solid var(--line); border-radius: 2px; }
 
 body.dragging-node .node-select { cursor: grabbing; }
 body.dragging-node { user-select: none; }
+body.scrubbing-number, body.scrubbing-number * { user-select: none; cursor: ew-resize !important; }
 body.marquee-selecting { user-select: none; cursor: crosshair; }
 body.panning-canvas { user-select: none; cursor: grabbing; }

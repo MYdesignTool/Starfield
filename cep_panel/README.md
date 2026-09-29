@@ -4,6 +4,8 @@ Dockable After Effects 2023 node editor for the current Alpha chain
 `emitter -> force -> appearance -> output`. It implements protocol v1 of
 [ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel displays a fixed graph
 with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
+Numeric values use AE-style scrub controls: drag left or right to adjust, Shift-drag
+for faster changes, Ctrl-drag for finer changes, or click to type a value directly.
 The current canvas source supports a pinned target, top-down layout, project-saved node
 positions, viewport-wide marquee/group movement, wheel zoom, unrestricted middle-button
 canvas pan with a clipped viewport and no scrollbars, a bottom-left interactive minimap,

@@ -70,6 +70,13 @@ read-only; parameter values and the fixed nodes' saved positions are editable.
 undo group (ADR 0014). Dynamic node creation, deletion,
 reordering, and edge rewiring require a later protocol version.
 
+Each parameter descriptor may include `min`, `max`, and `decimals` edit hints,
+derived from the public parameter manifest. The panel uses them to bound and scale
+AE-style horizontal numeric scrubbing; ordinary clicks still allow direct typing.
+A scrub gesture is coalesced into one `setParameters` request on release, keeping
+the edit within one host undo group. Shift-drag is ten times faster and Ctrl-drag
+is ten times finer. The gateway's binding validation remains authoritative.
+
 Before writing, the gateway requires the target token and non-empty
 `baseRevision` returned by the last `getState`. The target token binds the edit
 to AE's project-root ID, composition ID, layer ID, and effect index; the revision also includes
