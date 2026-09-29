@@ -1,16 +1,18 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: proposed; requires an AE 2023 carrier spike before acceptance.
+- Status: proposed; direct `CUSTOM_VALUE` scripting writes are rejected by AE 2023; expression carrier still requires qualification.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
 ## Context
 
-The owner ran `tools/probe_graph_property.jsx` in AE 23.5x52. The `Node Graph Data`
-effect property reports `PropertyValueType.CUSTOM_VALUE`; reading `.value` throws
-because AE 2023 has not implemented that value type for scripting. The object exposes
-a `setValue` method, but no setter was called. ExtendScript therefore has no verified
-path to read the persisted graph snapshot.
+The owner ran `tools/probe_graph_property.jsx` and `tools/probe_graph_setvalue.jsx`
+in AE 23.5x52. The `Node Graph Data` effect property reports
+`PropertyValueType.CUSTOM_VALUE`; both reading `.value` and calling `.setValue` throw
+the same host error that this value type has not been implemented. The write probe
+used a temporary duplicate and removed it without saving the project. Direct
+ExtendScript reads and writes of the arbitrary-data stream are therefore unavailable
+on the qualified AE 2023 build.
 
 CEP still needs a project-saved snapshot and an edit path into the effect's supervised
 callback. It must not edit pixels, keep the only copy of a graph in browser storage, or
@@ -47,12 +49,12 @@ the carrier is not acceptable.
 ## Why this is only proposed
 
 The official SDK exposes `AEGP_GetExpression` and `AEGP_SetExpression` on ordinary
-streams, and the scripting guide exposes `Property.expression` and `setValue` for
-standard property types. Those API listings do not prove that an effect can safely
-obtain its own expression stream during parameter supervision, that setting the
-expression triggers or joins the commit callback as intended, or that the arbitrary
-graph update and expression change undo together in AE 2023. The owner’s screenshot
-proves only the arbitrary-data read failure.
+streams, and the scripting guide exposes `Property.expression` for standard property
+types. The API listings do not prove that an effect can safely obtain its own
+expression stream during parameter supervision, that setting the expression triggers
+or joins the commit callback as intended, or that the arbitrary-graph update and
+expression change undo together in AE 2023. The owner’s two probes establish that the
+direct `CUSTOM_VALUE` route is unavailable; they do not qualify the expression carrier.
 
 The graph snapshot expression is a second persisted copy. Every code path that changes
 the graph must keep it synchronized, including panel edits, first-open initialization,
@@ -63,8 +65,9 @@ must set a strict encoded-size cap and reject oversized graphs without truncatio
 
 Before accepting this ADR or shipping topology editing:
 
-1. Build a disposable probe effect or a development-only carrier parameter in the
-   current effect, without changing the installed host.
+1. Build the development carrier and transaction plumbing in the current effect,
+   without changing the installed host. Keep the graph callbacks bounded and leave
+   the panel topology gestures guarded until the host gates below pass.
 2. In a disposable AE 2023 project, set and read a disabled OneD expression from
    ExtendScript; verify the exact source survives save/reopen, undo/redo, and effect
    duplication.
