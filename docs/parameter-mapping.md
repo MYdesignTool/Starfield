@@ -177,30 +177,33 @@ The effect sets `PF_OutFlag_I_DO_DIALOG`, so AE shows an `Options` button. Click
 read-only readout (`ae_plugin/Diagnostics.cpp`) that prints exactly what the code receives:
 
 ```text
-SF 0.1.0 AE g4n3e live 59
-layer 3840x2160 ds 1/1,1/1 ref 3840x2160 grid 3840x2160
-org host 1920,1080,1080 px 1920,1080,1080
-org wld l 0.000,0.000,0.000 r 0.000,0.000,0.000
-t 1.000s vel 0.00,0.30,0.00
-cnt 1000 rate 100.00 seed 1 life 2.000
+Core: current DLL
+SF AE g4/3 live59
+L3840x2160 ds1/1,1/1 ref3840x2160 grid3840x2160
+shape0 esz0.050 vspr0.15 sz10.00 not0
+org1920,1080,1080 px1920,1080,1080
+world 0.000,0.000,0.000
+t1.000 vel0.00,0.30,0.00
+cnt1000 rate100.00 seed1 life2.000
 ```
 
-- The label after the version is `AE` when flat controls drive the render or `NG` when the stored
-  graph does. `gn`/`ge` are the evaluated node and edge counts; `live` is the particle count.
-- `layer` / `ds`: what the host reports for this call, with horizontal and vertical preview factors.
+- `AE` means flat controls drive the render; `NG` means the stored graph does. The two numbers
+  after `g` are evaluated node and edge counts; `live` is the particle count.
+- `L` / `ds`: layer size and horizontal/vertical preview factors reported by this call.
 - `ref` / `grid`: what the **last rendered frame** actually used. `ref` is the reference the point
   conversion divided by; `grid` is the pixel grid the core mapped world space onto. The render phase
   records both (`record_render_geometry`), because this readout cannot call `checkout_layer` itself.
   The user's AE 2023.5 Build 52 screenshots confirmed `ref` stays full-size while `grid` follows
   preview resolution.
-- `org host` / `px`: the raw host value and the full-resolution layer pixels after reversing the
+- `org` / `px`: the raw host value and the full-resolution layer pixels after reversing the
   preview factor. At Quarter, `480,270,270` must read back as `1920,1080,1080` in `px`.
-- `org wld l … r …`: the world position this readout computed from the sizes above (`l`) next to the
-  one the last frame computed from its reference (`r`). With one effect instance and AE Controls
-  selected they should agree at Full and Quarter; the emitter center should be `(0,0,0)` in both.
-- `grav`/`col` lines appear only when those values differ from their defaults, and `shape`/`size`/
-  `not` can fall off the end: `PF_OutData::return_msg` holds 255 characters and the writer drops what
-  does not fit. Those controls are visible in the Effect Controls window; the geometry above is not.
+- `world` is the resulting world coordinate. When the current control/graph value differs from
+  the last frame's reference conversion, it expands to `world l… r…` to show both values.
+- `shape` is the zero-based Point/Box/Sphere/Disc index; `esz`, `vspr`, `sz`, and `not` are emitter
+  size, velocity spread, initial particle size, and validation notice count. This line now precedes
+  the origin and optional controls, because AE caps the entire message at 255 characters.
+- `grav`/`col` appear only when values differ from defaults. They can displace the trailing
+  time/count line within AE's message limit; the Effect Controls window has those values.
 
 ### D-05 host measurement and regression
 
@@ -213,8 +216,9 @@ reported `ds 1/1`, `ref/grid 3840x2160`, and origin `1920,1080,1080`. Quarter re
 Quarter values as full-resolution pixels and reported world `(-0.667,0.375,-0.375)`, exactly the
 observed offset. The source fix now applies the reciprocal `1/4` preview factor per axis before using
 the full-resolution reference. The adapter regression pins Full, Quarter, and anisotropic factors;
-Capture and Node Graph synchronization also exercise this shared conversion. A fresh AE run of the
-new build remains required to confirm the on-screen fix.
+Capture and Node Graph synchronization also exercise this shared conversion. AE 2023.5.0 Build 52
+subsequently confirmed Full, Half, Third, and Quarter normalization; the 2026-09-29 Third-resolution
+readout above showed `org952,487,360 px2856,1460,1080` for an off-center point.
 
 ## Motion or position looks wrong: triage
 
@@ -222,7 +226,7 @@ new build remains required to confirm the on-screen fix.
 |---|---|---|
 | `t 0.000s … live 1` | Comp start. Only slot 0 exists by construction | Scrub to t ≥ 1 s, or raise Birth Rate |
 | `org px` differs from the intended location | Point conversion or preview factor mismatch | Compare raw `host`, normalized `px`, and both `ds` axes against the measured AE delivery |
-| `org wld l` differs from `org wld r` | The diagnostic's current settings conversion disagrees with the last rendered frame | Confirm one effect instance and `src AE`; then report the complete readout |
+| `world l` differs from `world r` | The diagnostic's current settings conversion disagrees with the last rendered frame | Confirm one effect instance and `SF AE`; then report the complete readout |
 | `ref 0x0` | The host handed over no full-resolution reference, so conversion falls back to the input dimensions | Record the complete readout; `ds` still normalizes the observed preview-scaled point values |
 | `vel` non-zero but the picture is static | Mapping or compositing ignored the position | Reproduce in `tests/core_tests.cpp`, which pins the origin offset, the point conversion, and the half-resolution mapping |
 | `layer 0x0` | Host geometry was not available | The render phase refuses to guess and reports `internal_failure` |

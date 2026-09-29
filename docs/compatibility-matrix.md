@@ -102,14 +102,18 @@ The superseded monolithic build had a read-only Options button.
 
 The authorized development installation is in
 `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`.
-AE 2023.5.0 Build 52 loaded `StarfieldParticle.aex` SHA-256
+The initial AE 2023.5.0 Build 52 split-build smoke pass loaded
+`StarfieldParticle.aex` SHA-256
 `B7362B01AC0E935D8AD596A70D61690DA4D586EEEC3E939328BA1BDC420069D5`.
+The installed AEX was updated on 2026-09-29 to
+`7BFE7092325C9AEE9E777DEDBFE31D5042249F0A4A78A11B35E23BAE0A1D3EB9`
+for the Options readout; the focused host result is recorded below.
 The pinned fallback `StarfieldCore.dll` is
 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545`.
 `StarfieldRuntime` is a junction to this checkout's ignored `artifacts/runtime/`;
 `current.txt` currently selects `StarfieldCore-095219764514FFCA.dll`, SHA-256
 `095219764514FFCA1A5C3CFD36D78E6C8368ECF32C6C17576A8C26F2FA584564`.
-The live AE process (PID 36424 at the final check) mapped that selected generation.
+The 2026-09-28 live AE process (PID 36424 at that check) mapped that selected generation.
 The prior monolithic AEX remains under `artifacts/disabled/h01-ae2023-crt-before-20260928`.
 
 The first `/MD` split build crashed when opening the project. Dump
@@ -167,11 +171,22 @@ Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-
   over transparent black, never copies its input, and pre-render requests an empty input
   rect, which lets AE skip the upstream instance entirely. Recorded because it is
   user-visible and may need a product decision.
-- **Options readout truncation:** the closing `shape/esz/vspr/size/not` line was missing
-  from every capture. The 255-character `return_msg` budget is consumed by the lines
-  printed before it, so the emitter-shape readout is never visible. Geometry, force and
-  count lines are intact, so the captures above remain usable; the writer needs
-  compacting.
+- **Options readout truncation fixed in AE 2023.5.0 Build 52 (2026-09-29):** the
+  rebuilt AEX SHA-256 `7BFE7092325C9AEE9E777DEDBFE31D5042249F0A4A78A11B35E23BAE0A1D3EB9`
+  was installed over the previous `B7362B01…` AEX after copying that file to
+  `artifacts/disabled/StarfieldParticle-before-options-20260929.aex`. The selected
+  Core generation and pinned fallback DLL were unchanged. In the saved test project,
+  the Third-resolution `Options` dialog showed `SF AE g4/3 live200`,
+  `L3840x2160 ds1/3,1/3 ref3840x2160 grid1280x720`,
+  `shape0 esz0.050 vspr0.15 sz10.00 not0`, `org952,487,360 px2856,1460,1080`,
+  `world 0.433,-0.176,0.000`, and the complete time/count lines. White particles
+  remained visible over the blue lower layer. This confirms the shape line and
+  trailing count line fit for this case; 255 characters can still truncate optional
+  force/color lines or longer numeric values. `Options` left an unsaved marker in AE's
+  title; the session closed with **Don't Save**, and the test project on disk kept its
+  2026-09-28 22:51:45 modification time. Whether `Options` itself dirties the project
+  needs a separate isolated check. AEX-only rollback after AE exits:
+  `Copy-Item -LiteralPath 'artifacts/disabled/StarfieldParticle-before-options-20260929.aex' -Destination 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex' -Force`.
 - **Panel write works; host undo initially left a stale panel value.** Editing `Size` from 10 to 40 in the panel
   updated the AE frame immediately, and Ctrl+Z restored both the value and the picture —
   but the panel kept showing 40 until it re-read host state. The protocol has no push

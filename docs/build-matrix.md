@@ -41,17 +41,20 @@ STL. Both Windows modules now use `/MT` in Release (`/MTd` in Debug), and
 `dumpbin /dependents` lists only `KERNEL32.dll` for each. The rebuilt pair
 passed the host smoke checks recorded in `docs/compatibility-matrix.md`.
 
-Generation bookkeeping, verified by hashing the actual files on 2026-09-28:
-`dist/StarfieldParticle.aex` and `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`
-are both the installed `B7362B01…`. `dist/StarfieldCore.dll` is the generation the last
-full build published (`A4F104B5…`), while `artifacts/runtime/current.txt` selects the
-newer `StarfieldCore-095219764514FFCA.dll` produced by a later `-CoreOnly` run from the
-same tree; each versioned filename matches its own contents exactly. Consequence: a
-release install taken from `dist/` alone would not reproduce the generation the
-development junction currently runs. A rebuild is deliberately avoided while the
-development pair is installed, because rebuilding the `.aex` changes its bytes and
-would invalidate the recorded installed hash; reconcile `dist/` with the selected
-generation in one final full build when this tree is frozen.
+Generation bookkeeping, verified on 2026-09-29: the full May 2023 SDK build for the
+compact Options readout produced `dist/StarfieldParticle.aex`, the build-tree AEX,
+and the installed AEX at SHA-256
+`7BFE7092325C9AEE9E777DEDBFE31D5042249F0A4A78A11B35E23BAE0A1D3EB9`.
+The former installed `B7362B01…` AEX is backed up under
+`artifacts/disabled/StarfieldParticle-before-options-20260929.aex`. The full build
+also published `dist/StarfieldCore.dll` SHA-256
+`095219764514FFCA1A5C3CFD36D78E6C8368ECF32C6C17576A8C26F2FA584564`,
+which matches `artifacts/runtime/current.txt` and its selected versioned DLL. The
+pinned fallback DLL in the host directory still has SHA-256 `A4F104B5…`; the host
+test loaded the selected versioned DLL. `dist/` now reproduces the selected Core
+generation, and the development junction remains active. This AEX-only update was
+qualified for the Options readout in AE 2023.5.0 Build 52; the older hot-reload smoke
+checks remain recorded against `B7362B01…`.
 
 ## Artifact layout
 

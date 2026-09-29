@@ -9,6 +9,7 @@
 #include "starfield/core/ParticleSimulation.hpp"
 
 #include <atomic>
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -122,12 +123,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
-    // PF_OutData::return_msg holds 255 characters (PF_MAX_EFFECT_MSG_LEN) and the writer
-    // silently drops whatever no longer fits. The lines are therefore ordered by
-    // diagnostic value: the render geometry and the emitter origin - the two facts that
-    // decide how a point control's units must be read - come first, and the control
-    // summary that the Effect Controls window shows anyway comes last. At reduced preview
-    // resolution the tail can be cut off; read those controls in the ECW then.
+    // PF_OutData::return_msg holds 255 characters. Keep the stable render identity,
+    // shape and preview geometry ahead of optional controls; avoid printing two
+    // identical world triples on the common path.
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;
@@ -150,7 +148,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
             writer.line("SF 0.1.0 graph evaluation failed: %s\n", evaluated.detail);
             return PF_Err_NONE;
         }
-        writer.line("SF 0.1.0 %s g%llun %llue live %llu\n",
+        writer.line("SF %s g%llu/%llu live%llu\n",
                     control_source == kLegacyControlSource ? "AE" : "NG",
                     static_cast<unsigned long long>(evaluated.node_count),
                     static_cast<unsigned long long>(evaluated.edge_count),
@@ -168,7 +166,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // the preview factor, so `px` below shows their full-resolution interpretation after
     // reversing that factor; the core maps world space onto `grid`.
     const RenderGeometry last = last_render_geometry();
-    writer.line("layer %ldx%ld ds %ld/%lu,%ld/%lu ref %ldx%ld grid %ldx%ld\n",
+    writer.line("L%ldx%ld ds%ld/%lu,%ld/%lu ref%ldx%ld grid%ldx%ld\n",
                 static_cast<long>(in_data->width), static_cast<long>(in_data->height),
                 static_cast<long>(in_data->downsample_x.num), static_cast<unsigned long>(in_data->downsample_x.den),
                 static_cast<long>(in_data->downsample_y.num), static_cast<unsigned long>(in_data->downsample_y.den),
@@ -189,13 +187,17 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     try {
     const core::ValidatedSettings validated = core::validate_settings(settings);
     const core::Vec3& raw_origin = parameters.snapshot().raw_origin();
+    writer.line("shape%u esz%.3f vspr%.2f sz%.2f not%llu\n",
+                static_cast<unsigned>(settings.emitter_shape), settings.emitter_size,
+                settings.velocity_spread, settings.particle_size,
+                static_cast<unsigned long long>(validated.notices.size()));
 
     // The raw host point next to the layer pixels it was read as, which is what
     // identifies a unit mismatch in the host delivery. The first world triple is the one
     // this call computed from the sizes above (the fallback path); the second is what the
     // last rendered frame computed from its full-resolution reference.
     const core::Vec3 layer_pixels = point_control_to_full_resolution_pixels(raw_origin, *in_data);
-    writer.line("org host %.0f,%.0f,%.0f px %.0f,%.0f,%.0f\n", raw_origin.x, raw_origin.y, raw_origin.z,
+    writer.line("org%.0f,%.0f,%.0f px%.0f,%.0f,%.0f\n", raw_origin.x, raw_origin.y, raw_origin.z,
                 layer_pixels.x, layer_pixels.y, layer_pixels.z);
     if (last.valid && last.ref_width > 0 && last.ref_height > 0) {
         core::LayerUnits ref_units;
@@ -205,10 +207,18 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
             ? static_cast<double>(last.par_num) / static_cast<double>(last.par_den) : 1.0;
         const core::Vec3 ref_pixels = point_control_to_full_resolution_pixels(raw_origin, *in_data);
         const core::Vec3 ref_world = core::layer_point_to_world(ref_pixels.x, ref_pixels.y, ref_pixels.z, ref_units);
-        writer.line("org wld l %.3f,%.3f,%.3f r %.3f,%.3f,%.3f\n", settings.emitter_origin.x,
-                    settings.emitter_origin.y, settings.emitter_origin.z, ref_world.x, ref_world.y, ref_world.z);
+        const bool same_world = std::fabs(settings.emitter_origin.x - ref_world.x) < 0.0005 &&
+                                std::fabs(settings.emitter_origin.y - ref_world.y) < 0.0005 &&
+                                std::fabs(settings.emitter_origin.z - ref_world.z) < 0.0005;
+        if (same_world) {
+            writer.line("world %.3f,%.3f,%.3f\n", ref_world.x, ref_world.y, ref_world.z);
+        } else {
+            writer.line("world l%.3f,%.3f,%.3f r%.3f,%.3f,%.3f\n", settings.emitter_origin.x,
+                        settings.emitter_origin.y, settings.emitter_origin.z,
+                        ref_world.x, ref_world.y, ref_world.z);
+        }
     } else {
-        writer.line("org wld l %.3f,%.3f,%.3f r no-frame\n", settings.emitter_origin.x, settings.emitter_origin.y,
+        writer.line("world %.3f,%.3f,%.3f ref:none\n", settings.emitter_origin.x, settings.emitter_origin.y,
                     settings.emitter_origin.z);
     }
 
@@ -230,13 +240,10 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     const double scale = static_cast<double>(in_data->time_scale);
     const double seconds = scale > 0.0 ? static_cast<double>(in_data->current_time) / scale : 0.0;
-    writer.line("t %.3fs vel %.2f,%.2f,%.2f\n", seconds, settings.velocity.x, settings.velocity.y,
+    writer.line("t%.3f vel%.2f,%.2f,%.2f\n", seconds, settings.velocity.x, settings.velocity.y,
                 settings.velocity.z);
-    writer.line("cnt %u rate %.2f seed %u life %.3f\n", settings.particle_count, settings.birth_rate, settings.seed,
+    writer.line("cnt%u rate%.2f seed%u life%.3f\n", settings.particle_count, settings.birth_rate, settings.seed,
                 settings.particle_lifetime_seconds);
-    writer.line("shape %u esz %.3f vspr %.2f size %.2f not %llu\n", static_cast<unsigned>(settings.emitter_shape),
-                settings.emitter_size, settings.velocity_spread, settings.particle_size,
-                static_cast<unsigned long long>(validated.notices.size()));
     return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
