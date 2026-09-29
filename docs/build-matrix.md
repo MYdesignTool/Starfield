@@ -33,8 +33,12 @@ been copied into the plug-in directory. That directory still had AEX SHA-256
 SHA-256 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545` when
 inspected. Its `StarfieldRuntime` junction points to this checkout's `artifacts/runtime`;
 the build selected `StarfieldCore-249C096401D60292.dll` while AfterFX PID 29396 was
-running. Whether that process has loaded the new Core is unverified. No graph, curve,
-undo, or save/reopen host check has been made on this candidate.
+running. A read-only module snapshot confirms that process still has
+`StarfieldCore-095219764514FFCA.dll` loaded. Smart Render uses `acquire_core()` and
+does not poll the manifest after the first load; the Effect Controls Options action
+calls `reload_core()`. The new manifest alone therefore does not switch the running
+generation. No graph, curve, undo, or save/reopen host check has been made on this
+candidate.
 
 ## M3-01B per-axis emitter sizes (2026-09-30)
 
