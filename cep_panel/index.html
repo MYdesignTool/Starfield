@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Starfield Particle Controls</title>
+  <title>Starfield Node Editor</title>
   <link rel="stylesheet" href="css/panel.css" />
 </head>
 <body>
   <header class="bar">
-    <div class="title">Starfield Particle Controls</div>
+    <div class="title">Starfield Node Editor</div>
     <div class="sub" id="targetLine">No target</div>
   </header>
 
@@ -25,8 +25,37 @@
     <button id="refresh" type="button">Refresh</button>
   </section>
 
-  <main id="chain" class="chain" aria-label="Emitter to force to appearance to output chain">
-    <p class="hint">Select one layer carrying Starfield Particle, then press Refresh.</p>
+  <main class="workspace">
+    <section class="graph-pane" aria-label="Particle graph">
+      <div class="section-heading">
+        <span>Graph</span>
+        <span class="section-note">Fixed chain · select a node to edit</span>
+      </div>
+      <div class="graph-scroll">
+        <div class="graph-canvas">
+          <svg id="graphEdges" class="graph-edges" viewBox="0 0 580 320" aria-hidden="true">
+            <defs>
+              <marker id="edgeArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0 L6 3 L0 6 Z" />
+              </marker>
+            </defs>
+            <g id="edgePaths"></g>
+          </svg>
+          <div id="chain" class="graph-nodes" aria-label="Emitter to force to appearance to output chain">
+            <p class="hint">Select one layer carrying Starfield Particle.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="inspector" aria-label="Selected node parameters">
+      <div class="section-heading">
+        <span id="inspectorTitle">Inspector</span>
+        <span id="inspectorMeta" class="section-note">Select a node</span>
+      </div>
+      <div id="inspectorBody" class="inspector-body">
+        <p class="hint">Select a node to inspect its parameters.</p>
+      </div>
+    </section>
   </main>
 
   <footer class="bar footer">

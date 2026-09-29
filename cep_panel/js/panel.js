@@ -1,5 +1,5 @@
-// Starfield Particle Controls panel. Thin client for the ADR 0009 protocol v1: it renders
-// the fixed emitter -> force -> appearance -> output chain, edits the supervised AE
+// Starfield Node Editor panel. Thin client for the ADR 0009 protocol v1: it draws
+// the fixed emitter -> force -> appearance -> output graph, edits the supervised AE
 // parameter streams through the ExtendScript gateway, and never touches the effect's
 // arbitrary-data graph parameter or any host-private state.
 
@@ -71,10 +71,15 @@
         return false;
     };
 
-    var state = { revision: null, targetToken: null, nodes: [], values: {}, pending: false };
+    var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {},
+                  selectedNodeId: "emitter", pending: false };
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
+        edgePaths: document.getElementById("edgePaths"),
+        inspectorTitle: document.getElementById("inspectorTitle"),
+        inspectorMeta: document.getElementById("inspectorMeta"),
+        inspectorBody: document.getElementById("inspectorBody"),
         targetLine: document.getElementById("targetLine"),
         modeLine: document.getElementById("modeLine"),
         revisionLine: document.getElementById("revisionLine"),
@@ -211,53 +216,159 @@
         elements.banner.textContent = "";
     }
 
-    function formatValue(binding, value) {
-        if (binding.kind === "color") return value;
-        if (binding.kind === "point3d") return value;
-        return value;
+    var EDGE_PATHS = {
+        "emitter:force": "M245 76 C278 76 302 76 335 76",
+        "force:appearance": "M445 130 C445 150 445 170 445 190",
+        "appearance:output": "M335 244 C302 244 278 244 245 244"
+    };
+    var NODE_KICKERS = {
+        emitter: "01 / SOURCE", force: "02 / MOTION",
+        appearance: "03 / LOOK", output: "04 / RESULT"
+    };
+
+    function parameterValue(node, key) {
+        for (var i = 0; i < node.params.length; i++) {
+            if (node.params[i].key === key) return node.params[i].value;
+        }
+        return null;
+    }
+
+    function shortNumber(value) {
+        return typeof value === "number" ? String(Math.round(value * 100) / 100) : "–";
+    }
+
+    function nodeSummary(node) {
+        if (node.id === "emitter") {
+            return shortNumber(parameterValue(node, "birth_rate")) + "/s · max " +
+                   shortNumber(parameterValue(node, "particle_count"));
+        }
+        if (node.id === "force") {
+            return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y")) +
+                   " · drag " + shortNumber(parameterValue(node, "linear_drag"));
+        }
+        if (node.id === "appearance") {
+            return "Size " + shortNumber(parameterValue(node, "particle_size")) +
+                   " · opacity " + shortNumber(parameterValue(node, "opacity"));
+        }
+        return "Transparent particle output";
+    }
+
+    function addGraphNode(node) {
+        var card = document.createElement("section");
+        card.className = "graph-node " + node.id +
+                         (state.selectedNodeId === node.id ? " selected" : "");
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "node-select";
+        button.setAttribute("aria-pressed", state.selectedNodeId === node.id ? "true" : "false");
+        button.title = "Inspect " + node.label;
+        var kicker = document.createElement("span");
+        kicker.className = "node-kicker";
+        kicker.textContent = NODE_KICKERS[node.id];
+        var title = document.createElement("span");
+        title.className = "node-title";
+        title.textContent = node.label;
+        var summary = document.createElement("span");
+        summary.className = "node-summary";
+        summary.textContent = nodeSummary(node);
+        button.appendChild(kicker);
+        button.appendChild(title);
+        button.appendChild(summary);
+        button.addEventListener("click", function () {
+            state.selectedNodeId = node.id;
+            render(state);
+        });
+        card.appendChild(button);
+        if (node.id !== "emitter") {
+            var input = document.createElement("span");
+            input.className = "port port-in";
+            input.title = "Input";
+            card.appendChild(input);
+        }
+        if (node.id !== "output") {
+            var output = document.createElement("span");
+            output.className = "port port-out";
+            output.title = "Output";
+            card.appendChild(output);
+        }
+        elements.chain.appendChild(card);
+    }
+
+    function renderEdges() {
+        if (!elements.edgePaths) return;
+        elements.edgePaths.innerHTML = "";
+        for (var i = 0; i < state.edges.length; i++) {
+            var edge = state.edges[i];
+            if (!edge || edge.length !== 2) continue;
+            var pathData = EDGE_PATHS[edge[0] + ":" + edge[1]];
+            if (!pathData) continue;
+            var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("class", "edge");
+            path.setAttribute("d", pathData);
+            elements.edgePaths.appendChild(path);
+        }
+    }
+
+    function renderInspector() {
+        if (!elements.inspectorBody) return;
+        elements.inspectorBody.innerHTML = "";
+        var node = null;
+        for (var i = 0; i < state.nodes.length; i++) {
+            if (state.nodes[i].id === state.selectedNodeId) node = state.nodes[i];
+        }
+        if (!node) {
+            elements.inspectorTitle.textContent = "Inspector";
+            elements.inspectorMeta.textContent = "Select a node";
+            elements.inspectorBody.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle.</p>";
+            return;
+        }
+        elements.inspectorTitle.textContent = node.label;
+        elements.inspectorMeta.textContent = node.params.length + " parameters";
+        if (!node.params.length) {
+            elements.inspectorBody.innerHTML = "<p class=\"inspector-note\">Particle output is transparent. This stage has no editable parameters in protocol v1.</p>";
+            return;
+        }
+        var grid = document.createElement("div");
+        grid.className = "parameter-grid";
+        for (var p = 0; p < node.params.length; p++) {
+            grid.appendChild(renderParameter(node.params[p]));
+        }
+        elements.inspectorBody.appendChild(grid);
     }
 
     function render(state) {
         elements.chain.innerHTML = "";
         state.values = {};
+        if (!state.nodes.length) {
+            elements.chain.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle.</p>";
+            renderEdges();
+            renderInspector();
+            return;
+        }
+        var selectedExists = false;
         for (var i = 0; i < state.nodes.length; i++) {
             var node = state.nodes[i];
-            var box = document.createElement("section");
-            box.className = "node";
-            var head = document.createElement("div");
-            head.className = "node-head";
-            head.textContent = node.label;
-            box.appendChild(head);
-            var body = document.createElement("div");
-            body.className = "node-body";
-            if (!node.params.length) {
-                var empty = document.createElement("div");
-                empty.className = "empty";
-                empty.textContent = "chain output";
-                body.appendChild(empty);
-            }
             for (var p = 0; p < node.params.length; p++) {
-                body.appendChild(renderParameter(node.params[p]));
+                state.values[node.params[p].key] = node.params[p].value;
             }
-            box.appendChild(body);
-            elements.chain.appendChild(box);
-            if (i < state.nodes.length - 1) {
-                var connector = document.createElement("div");
-                connector.className = "connector";
-                connector.textContent = "↓ particles";
-                elements.chain.appendChild(connector);
-            }
+            if (node.id === state.selectedNodeId) selectedExists = true;
         }
+        if (!selectedExists) state.selectedNodeId = state.nodes[0].id;
+        for (var n = 0; n < state.nodes.length; n++) {
+            if (NODE_KICKERS[state.nodes[n].id]) addGraphNode(state.nodes[n]);
+        }
+        renderEdges();
+        renderInspector();
     }
 
     function renderParameter(parameter) {
-        state.values[parameter.key] = parameter.value;
         var label = document.createElement("div");
         label.className = "param-label";
         label.textContent = parameter.label;
         label.title = parameter.key;
         var holder = document.createElement("div");
-        holder.className = "param-value";
+        holder.className = "param-value" +
+                           (parameter.kind === "color" || parameter.kind === "point3d" ? " multi" : "");
 
         if (parameter.kind === "color") {
             var swatch = document.createElement("span");
@@ -276,7 +387,7 @@
             holder.appendChild(numberInput(parameter, null));
         }
         var wrapper = document.createElement("div");
-        wrapper.style.display = "contents";
+        wrapper.className = "parameter-row";
         wrapper.appendChild(label);
         wrapper.appendChild(holder);
         return wrapper;
@@ -328,6 +439,7 @@
 
     function adoptState(response) {
         state.nodes = response.nodes;
+        state.edges = response.edges || [];
         state.revision = response.revision;
         state.targetToken = response.target.token;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
@@ -367,7 +479,11 @@
                 }
                 showError(error.code, error.message);
                 elements.targetLine.textContent = "No target";
-                elements.chain.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle, then press Refresh.</p>";
+                state.revision = null;
+                state.targetToken = null;
+                state.nodes = [];
+                state.edges = [];
+                render(state);
                 return;
             }
             startupRetryAttempt = 0;

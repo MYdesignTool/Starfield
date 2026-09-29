@@ -1,8 +1,10 @@
 # Starfield CEP panel
 
-Dockable After Effects 2023 effect-control panel for the current Alpha chain
+Dockable After Effects 2023 node editor for the current Alpha chain
 `emitter -> force -> appearance -> output`. It implements protocol v1 of
-[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel groups controls by stage,
+[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): the panel displays a fixed graph
+with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
+Topology changes are not part of protocol v1. The panel
 reads and writes the effect's **supervised ordinary parameters** through a namespaced
 ExtendScript gateway, and never touches `Node Graph Data` (the arbitrary-data
 parameter) or any host-private state.
@@ -109,8 +111,8 @@ authorization.
 1. Put `StarfieldParticle.aex` in the AE plug-ins folder (see the repository
    `README.md`) and apply the effect to a layer.
 2. Select exactly one layer that carries the effect. The panel discovers it automatically
-   and shows the emitter, force, appearance, and output sections with their parameters.
-3. Edit a value: the panel validates it, writes it through the gateway in one undo
+   and shows the four connected nodes. Select a node to see its parameters below the graph.
+3. Edit a value in the inspector: the panel validates it, writes it through the gateway in one undo
    group, and the composition updates.
 4. **Example** presets: `Spark`, `Snow`, `Floating Light`, and `Reset Defaults` fill in
    the same values documented in [docs/examples.md](../docs/examples.md). They leave
@@ -154,7 +156,9 @@ waits for that transient condition to clear. No host preference or registry valu
 The owner then observed `Lookup: name` in the footer, a panel `Size` edit updating
 the AE frame, and host undo restoring the picture. Undo initially left the panel
 displaying the prior value; the client now re-reads on focus, and the owner reports
-that values update again. Remaining qualification:
+that values update again. These observations were made on the earlier grouped form.
+The node canvas is implemented in source but has not yet been viewed in the owner's AE dock.
+Remaining qualification:
 
 1. Redo, panel focus refresh after other AE edits, and undo grouping across a batch.
 2. A panel edit in `Node Graph` mode rewrites the stored graph bytes.
