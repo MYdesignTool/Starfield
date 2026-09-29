@@ -1,12 +1,27 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 7. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 8. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
 render checkout and the supervised panel edit, so the two cannot drift apart.
 
-## Manifest revision 7: project-saved node layout (current)
+## Manifest revision 8: graph transaction carrier (current)
+
+Revision 8 appends four hidden ordinary OneD streams for the expression-backed graph
+snapshot, transaction request, supervised commit nonce, and receipt. They are not
+render values. ADR 0013 defines the bounded envelope and callback behavior. Source
+plumbing exists, but callback access, undo, and persistence have not been qualified in
+AE 2023. The first carrier build caps graph payloads at 24 KiB.
+
+| ID / index | key | AE stream | Default | Range |
+|---|---|---|---:|---:|
+| 41 | `graph_snapshot` | Graph Snapshot | 0 | ±1,000,000 |
+| 42 | `graph_edit_request` | Graph Edit Request | 0 | ±1,000,000 |
+| 43 | `graph_edit_commit` | Commit Graph Edit | 0 | ±1,000,000; supervised |
+| 44 | `graph_edit_receipt` | Graph Edit Receipt | 0 | ±1,000,000 |
+
+## Manifest revision 7: project-saved node layout
 
 Revision 7 appends hidden, non-animated float sliders for the four fixed node positions.
 These values are UI metadata owned by the effect instance: AE saves them with the project,

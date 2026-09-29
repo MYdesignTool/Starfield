@@ -9,15 +9,21 @@ positions, viewport-wide marquee/group movement, wheel zoom, unrestricted middle
 canvas pan with a clipped viewport and no scrollbars, a bottom-left interactive minimap,
 Alt-drag copy preview, Ctrl+D, port-to-port
 connection gestures, and a graph context menu. Wire disconnect, insert, connect, add,
-duplicate, and delete commands are routed
-to a guarded topology boundary because the v1 gateway has no graph-backed write
-transaction; they do not change the saved project.
+duplicate, and delete commands remain routed to a guarded topology boundary; the new
+graph carrier gateway endpoints are not connected to the canvas yet, so these actions
+do not change the saved project.
 The panel reads and writes the effect's **supervised render-value parameters** and
 separate hidden layout parameters through a namespaced ExtendScript gateway. If an older
 plug-in build lacks layout streams, the graph still loads at default positions and node
 moves stay in that panel session; the panel reports that project persistence needs the
 matching plug-in build. It never touches `Node Graph Data` (the arbitrary-data parameter)
 or any host-private state.
+
+The gateway now exposes source-level `getGraphSnapshot`, `syncGraphSnapshot`, and
+`submitGraph` operations using ADR 0013's hidden expression carrier. The canvas does not
+call these operations yet, and the AE expression/callback/undo path is not qualified.
+`submitGraph` accepts bounded schema-1 graph bytes as lowercase hex; the effect validates
+the bytes and rejects stale revisions before changing its canonical graph.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
@@ -32,7 +38,7 @@ JavaScript and ExtendScript gateway; the Refresh button only re-queries AE state
 |---|---|
 | `CSXS/manifest.xml` | CEP 11 manifest; host `AEFT [23.0, 99.9]`; panel entry `index.html` |
 | `index.html`, `css/panel.css`, `js/panel.js` | Panel UI and protocol client |
-| `jsx/starfield_gateway.jsx` | `SFLD_getState`, `SFLD_setParameters`, and `SFLD_setNodeLayout` gateway (public AE scripting DOM only) |
+| `jsx/starfield_gateway.jsx` | `SFLD_getState`, `SFLD_setParameters`, `SFLD_setNodeLayout`, and source-level `SFLD_getGraphSnapshot`, `SFLD_syncGraphSnapshot`, `SFLD_submitGraph` endpoints (public AE scripting DOM only) |
 
 No third-party JavaScript is bundled. `js/panel.js` contains a ~10-line CEP bridge
 shim around `window.__adobe_cep__.evalScript`; Adobe's full `CSInterface.js` can be

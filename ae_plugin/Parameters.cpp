@@ -2,6 +2,7 @@
 
 #include "AE_EffectCB.h"
 #include "AE_Macros.h"
+#include "GraphCarrier.hpp"
 #include "Param_Utils.h"
 #include "WorldBridge.hpp"
 
@@ -462,6 +463,39 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         if (err != PF_Err_NONE) return err;
     }
 
+    // ADR 0013 carrier. AE 2023 cannot script the arbitrary graph parameter's
+    // CUSTOM_VALUE, so the panel reads a bounded expression mirror and stages a
+    // complete replacement graph in a separate expression mailbox. Only the
+    // supervised commit stream applies the mailbox; the receipt confirms the nonce.
+    const struct GraphCarrierParameter {
+        const char* name;
+        A_long disk_id;
+        PF_FpLong default_value;
+        bool supervised;
+    } graph_carrier_parameters[] = {
+        {"Graph Snapshot", kGraphSnapshotId, 0.0, false},
+        {"Graph Edit Request", kGraphEditRequestId, 0.0, false},
+        {"Commit Graph Edit", kGraphEditCommitId, 0.0, true},
+        {"Graph Edit Receipt", kGraphEditReceiptId, 0.0, false},
+    };
+    constexpr PF_FpLong kCarrierControlLimit = 1000000.0;
+    for (const auto& carrier : graph_carrier_parameters) {
+        AEFX_CLR_STRUCT(def);
+        def.param_type = PF_Param_FLOAT_SLIDER;
+        def.flags = PF_ParamFlag_CANNOT_TIME_VARY |
+                    (carrier.supervised ? PF_ParamFlag_SUPERVISE : PF_ParamFlag_NONE);
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+        std::snprintf(def.name, sizeof(def.name), "%s", carrier.name);
+        def.uu.id = carrier.disk_id;
+        def.u.fs_d.value = def.u.fs_d.dephault = static_cast<PF_FpShort>(carrier.default_value);
+        def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCarrierControlLimit;
+        def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCarrierControlLimit;
+        def.u.fs_d.precision = PF_Precision_INTEGER;
+        def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+        err = PF_ADD_PARAM(in_data, -1, &def);
+        if (err != PF_Err_NONE) return err;
+    }
+
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -612,6 +646,11 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         PF_ArbitraryH replacement = nullptr;
         const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
         if (created != PF_Err_NONE) return created;
+        const auto mirrored = write_graph_snapshot(in_data, graph.value());
+        if (mirrored != PF_Err_NONE) {
+            in_data->utils->host_dispose_handle(replacement);
+            return mirrored;
+        }
         // All fallible work precedes mutation. The editable parameter value is a
         // host-provided copy; its old handle is replaced, never a render checkout.
         auto& target = *params[kGraphParameterId];
@@ -666,6 +705,11 @@ PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_Par
     PF_ArbitraryH replacement = nullptr;
     const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
     if (created != PF_Err_NONE) return created;
+    const auto mirrored = write_graph_snapshot(in_data, graph.value());
+    if (mirrored != PF_Err_NONE) {
+        in_data->utils->host_dispose_handle(replacement);
+        return mirrored;
+    }
     // Same ownership rule as capture_controls: the host disposes the value we replaced.
     params[kGraphParameterId]->u.arb_d.value = replacement;
     params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;

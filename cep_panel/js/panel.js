@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/layout-compat-2";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-1";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var NODE_WIDTH = 220;

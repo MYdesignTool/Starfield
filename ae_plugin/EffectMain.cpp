@@ -8,6 +8,7 @@
 #include "entry.h"
 
 #include "Diagnostics.hpp"
+#include "GraphCarrier.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "PluginFlags.h"
@@ -42,7 +43,7 @@ PF_Err about(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return PF_Err_NONE;
 }
 
-PF_Err global_setup(PF_OutData* out_data) noexcept {
+PF_Err global_setup(PF_InData* in_data, PF_OutData* out_data) noexcept {
     out_data->my_version = PF_VERSION(STARFIELD_VERSION_MAJOR,
                                       STARFIELD_VERSION_MINOR,
                                       STARFIELD_VERSION_BUG,
@@ -50,6 +51,12 @@ PF_Err global_setup(PF_OutData* out_data) noexcept {
                                       STARFIELD_VERSION_BUILD);
     out_data->out_flags = STARFIELD_OUT_FLAGS;
     out_data->out_flags2 = STARFIELD_OUT_FLAGS2;
+    // AEGP access is reserved for the supervised graph carrier. A missing suite
+    // must not prevent rendering through the ordinary graph path.
+    if (starfield::adapter::register_graph_carrier(in_data) != PF_Err_NONE) {
+        std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                      "Starfield graph editing carrier is unavailable in this host.");
+    }
     return PF_Err_NONE;
 }
 
@@ -74,7 +81,7 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_ABOUT:
             return about(in_data, out_data);
         case PF_Cmd_GLOBAL_SETUP:
-            return global_setup(out_data);
+            return global_setup(in_data, out_data);
         case PF_Cmd_PARAMS_SETUP:
             return starfield::adapter::setup_parameters(in_data, out_data);
         case PF_Cmd_SEQUENCE_SETUP:
@@ -93,6 +100,9 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_ARBITRARY_CALLBACK:
             return starfield::adapter::graph_arbitrary_callback(in_data, static_cast<PF_ArbParamsExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
+            if (const PF_Err carrier_error = starfield::adapter::commit_graph_request(
+                    in_data, out_data, params, static_cast<PF_UserChangedParamExtra*>(extra));
+                carrier_error != PF_Err_NONE) return carrier_error;
             return starfield::adapter::user_changed_param(in_data, out_data, params,
                                                           static_cast<PF_UserChangedParamExtra*>(extra));
         case PF_Cmd_DO_DIALOG:

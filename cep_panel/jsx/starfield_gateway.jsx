@@ -2,23 +2,35 @@
 //
 // Rules this file must keep:
 //   - Only the public AE scripting DOM is used. No sockets, no helper processes,
-//     no direct writes to the effect's arbitrary-data graph parameter.
+//     no direct writes to the effect's arbitrary-data graph parameter. Graph edits
+//     stage a bounded expression mailbox and use the effect's supervised callback.
 //   - Every request is parsed, version-checked and fully validated before any
 //     mutation; a failure rejects the whole change set.
 //   - Render values are ordinary supervised parameters. Node positions use separate
 //     hidden, non-animated ordinary streams owned by the effect instance; they never
 //     enter the renderer's graph or rely on CEP-local persistence.
 //
-// Host qualification status: see docs/compatibility-matrix.md. Name-based property
-// resolution and scripted supervision are AE 2023 gates, not yet verified.
+// Host qualification status: see docs/compatibility-matrix.md. The graph carrier
+// entry points are source-level only; expression scripting, callback acknowledgement,
+// undo and persistence remain AE 2023 gates.
 
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "layout-compat-2";
+    var GATEWAY_BUILD = "graph-carrier-source-1";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 32;
     var MAX_REQUEST_BYTES = 65536;
+    var MAX_GRAPH_BYTES = 24 * 1024;
+    var MAX_GRAPH_REVISION = 4294967295;
+    var MAX_GRAPH_NONCE = 1000000;
+    var graphNonceCounter = 0;
+    var GRAPH_CARRIERS = {
+        snapshot: { index: 41, name: "Graph Snapshot" },
+        request: { index: 42, name: "Graph Edit Request" },
+        commit: { index: 43, name: "Commit Graph Edit" },
+        receipt: { index: 44, name: "Graph Edit Receipt" }
+    };
 
     // One row per bound effect parameter. `index` is the registered parameter index
     // (schema/parameters.json); `name` is the Effect Controls label used for
@@ -321,6 +333,175 @@
         return "p" + projectId + "-c" + compId + "-l" + layerId + "-e" + effectIndex;
     }
 
+    function resolveCarrier(effect, key) {
+        var binding = GRAPH_CARRIERS[key];
+        if (!binding) return null;
+        var property = effect.property(binding.name);
+        if (property) return property;
+        property = effect.property(binding.index);
+        return property && property.name === binding.name ? property : null;
+    }
+
+    function crc32Hex(hex) {
+        var crc = 0xffffffff;
+        for (var i = 0; i < hex.length; i += 2) {
+            crc ^= parseInt(hex.substr(i, 2), 16);
+            for (var bit = 0; bit < 8; bit++) {
+                crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+            }
+        }
+        var text = ((crc ^ 0xffffffff) >>> 0).toString(16);
+        while (text.length < 8) text = "0" + text;
+        return text;
+    }
+
+    function parseGraphSnapshot(expression) {
+        if (typeof expression !== "string" || expression.length === 0) {
+            return { initialized: false };
+        }
+        var match = /^\/\*SFLDSNAP1:([0-9]+):([0-9]+):([0-9a-fA-F]{8}):([0-9a-fA-F]+)\*\/0$/.exec(expression);
+        if (!match) return null;
+        var revision = Number(match[1]);
+        var byteCount = Number(match[2]);
+        var graphHex = match[4].toLowerCase();
+        if (!isFinite(revision) || Math.floor(revision) !== revision || revision < 1 || revision > MAX_GRAPH_REVISION ||
+            !isFinite(byteCount) || Math.floor(byteCount) !== byteCount || byteCount < 32 || byteCount > MAX_GRAPH_BYTES ||
+            graphHex.length !== byteCount * 2 || crc32Hex(graphHex) !== match[3].toLowerCase()) return null;
+        return { initialized: true, revision: revision, byteCount: byteCount, crc32: match[3].toLowerCase(), graphHex: graphHex };
+    }
+
+    function nextGraphNonce(commitProperty, receiptProperty) {
+        var value = ((new Date()).getTime() + (++graphNonceCounter)) % MAX_GRAPH_NONCE;
+        if (value < 1) value = 1;
+        var commitValue = Number(commitProperty.value);
+        var receiptValue = Number(receiptProperty.value);
+        for (var attempts = 0; attempts < 4; attempts++) {
+            if (value !== commitValue && value !== receiptValue && value !== -receiptValue) break;
+            value = value >= MAX_GRAPH_NONCE ? 1 : value + 1;
+        }
+        return value;
+    }
+
+    function graphCarrierTarget(request) {
+        var target = findRequestTarget(request);
+        if (target.error) return { error: target.error };
+        var token = targetToken(target);
+        if (token === null) return { error: { code: "host_error", message: "AE did not provide stable IDs for the project, composition, layer, and effect." } };
+        if (!request.target || request.target.token !== token) {
+            return { error: { code: "stale_target", message: "The pinned effect changed; reload the graph before editing." } };
+        }
+        var properties = {};
+        for (var key in GRAPH_CARRIERS) {
+            if (!Object.prototype.hasOwnProperty.call(GRAPH_CARRIERS, key)) continue;
+            properties[key] = resolveCarrier(target.effect, key);
+            if (!properties[key]) {
+                return { error: { code: "missing_parameter", message: "This plug-in build has no script-visible graph carrier stream: " + GRAPH_CARRIERS[key].name + "." } };
+            }
+        }
+        return { target: target, token: token, properties: properties };
+    }
+
+    function readGraphSnapshot(request) {
+        var resolved = graphCarrierTarget(request);
+        if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        var snapshot = parseGraphSnapshot(resolved.properties.snapshot.expression);
+        if (snapshot === null) return fail("invalid_graph_snapshot", "The stored graph snapshot is malformed or failed its checksum.");
+        return reply({ ok: true, operation: "getGraphSnapshot", requestId: request.requestId || "",
+                       target: { token: resolved.token }, snapshot: snapshot });
+    }
+
+    function triggerGraphCarrier(resolved, expression, undoLabel, requestId, nonce) {
+        var mailbox = resolved.properties.request;
+        var commit = resolved.properties.commit;
+        var receipt = resolved.properties.receipt;
+        var oldExpression = mailbox.expression;
+        var oldExpressionEnabled = mailbox.expressionEnabled;
+        if (typeof nonce !== "number") nonce = nextGraphNonce(commit, receipt);
+        var failed = null;
+        var attemptedCommit = false;
+        var groupOpen = false;
+        try {
+            app.beginUndoGroup(undoLabel);
+            groupOpen = true;
+            mailbox.expression = expression;
+            mailbox.expressionEnabled = false;
+            attemptedCommit = true;
+            commit.setValue(nonce);
+        } catch (error) {
+            failed = error.toString();
+            if (!attemptedCommit) {
+                try {
+                    mailbox.expression = oldExpression;
+                    mailbox.expressionEnabled = oldExpressionEnabled;
+                } catch (rollbackError) {
+                    failed += " Mailbox rollback failed: " + rollbackError.toString();
+                }
+            }
+        } finally {
+            if (groupOpen) {
+                try { app.endUndoGroup(); }
+                catch (endError) { failed = failed || endError.toString(); }
+            }
+        }
+        if (failed) return { ok: false, error: { code: "graph_commit_failed", message: failed },
+                            context: { commitAttempted: attemptedCommit } };
+        var acceptedNonce = Number(receipt.value);
+        if (acceptedNonce !== nonce) {
+            if (acceptedNonce === -nonce) {
+                return { ok: false, error: { code: "graph_commit_rejected", message: "The effect rejected the graph transaction. The existing graph was kept." },
+                         context: { nonce: nonce } };
+            }
+            return { ok: false, error: { code: "graph_commit_unconfirmed", message: "The effect did not acknowledge the graph transaction. Reload the graph before making another edit." },
+                     context: { nonce: nonce } };
+        }
+        return { ok: true, nonce: nonce, requestId: requestId || "" };
+    }
+
+    function syncGraphSnapshot(request) {
+        var resolved = graphCarrierTarget(request);
+        if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
+        var transaction = "/*SFLDSYNC1:" + nonce + "*/0";
+        var receipt = triggerGraphCarrier(resolved, transaction, "Starfield: initialize graph snapshot", request.requestId, nonce);
+        if (!receipt.ok) return reply(receipt);
+        var snapshot = parseGraphSnapshot(resolved.properties.snapshot.expression);
+        if (!snapshot || !snapshot.initialized) return fail("graph_snapshot_unconfirmed", "The effect accepted the request but did not publish a readable graph snapshot.");
+        return reply({ ok: true, operation: "syncGraphSnapshot", requestId: request.requestId || "",
+                       target: { token: resolved.token }, nonce: receipt.nonce, snapshot: snapshot });
+    }
+
+    function submitGraph(request) {
+        var resolved = graphCarrierTarget(request);
+        if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        if (typeof request.baseGraphRevision !== "number" || !isFinite(request.baseGraphRevision) ||
+            Math.floor(request.baseGraphRevision) !== request.baseGraphRevision || request.baseGraphRevision < 1 ||
+            request.baseGraphRevision > MAX_GRAPH_REVISION) {
+            return fail("invalid_request", "baseGraphRevision must be the integer revision from getGraphSnapshot.");
+        }
+        if (typeof request.graphHex !== "string" || request.graphHex.length < 64 || request.graphHex.length > MAX_GRAPH_BYTES * 2 ||
+            request.graphHex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(request.graphHex)) {
+            return fail("invalid_request", "graphHex must contain a complete bounded schema-1 graph payload.");
+        }
+        var graphHex = request.graphHex.toLowerCase();
+        var snapshot = parseGraphSnapshot(resolved.properties.snapshot.expression);
+        if (!snapshot || !snapshot.initialized) return fail("graph_snapshot_uninitialized", "Initialize the graph snapshot before submitting an edit.");
+        if (snapshot.revision !== request.baseGraphRevision) {
+            return fail("stale_graph", "The project graph changed since this edit began; reload before editing.");
+        }
+        var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
+        var byteCount = graphHex.length / 2;
+        var transaction = "/*SFLDTXN1:" + nonce + ":" + snapshot.revision + ":" + byteCount + ":" +
+                          crc32Hex(graphHex) + ":" + graphHex + "*/0";
+        var receipt = triggerGraphCarrier(resolved, transaction, "Starfield: edit graph", request.requestId, nonce);
+        if (!receipt.ok) return reply(receipt);
+        var updated = parseGraphSnapshot(resolved.properties.snapshot.expression);
+        if (!updated || !updated.initialized || updated.revision !== snapshot.revision + 1 || updated.graphHex !== graphHex) {
+            return fail("graph_snapshot_unconfirmed", "The effect acknowledged the edit but the saved graph snapshot did not match it.");
+        }
+        return reply({ ok: true, operation: "submitGraph", requestId: request.requestId || "",
+                       target: { token: resolved.token }, nonce: receipt.nonce, snapshot: updated });
+    }
+
     function controlSource(effect) {
         var property = effect.property("Control Source");
         if (!property) return "unknown";
@@ -613,12 +794,48 @@
         }
     }
 
+    function SFLD_getGraphSnapshot(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "getGraphSnapshot") return fail("unknown_operation", request.operation);
+            return readGraphSnapshot(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
+    function SFLD_syncGraphSnapshot(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "syncGraphSnapshot") return fail("unknown_operation", request.operation);
+            return syncGraphSnapshot(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
+    function SFLD_submitGraph(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "submitGraph") return fail("unknown_operation", request.operation);
+            return submitGraph(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
     host.SFLD_getState = SFLD_getState;
     host.SFLD_setParameters = SFLD_setParameters;
     host.SFLD_setNodeLayout = SFLD_setNodeLayout;
+    host.SFLD_getGraphSnapshot = SFLD_getGraphSnapshot;
+    host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
+    host.SFLD_submitGraph = SFLD_submitGraph;
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
 })();

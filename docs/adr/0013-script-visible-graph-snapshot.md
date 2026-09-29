@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: proposed; direct `CUSTOM_VALUE` scripting writes are rejected by AE 2023; expression carrier still requires qualification.
+- Status: implementation in progress; direct `CUSTOM_VALUE` scripting reads and writes are rejected by AE 2023; expression carrier is not host-qualified.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
@@ -20,31 +20,43 @@ make the renderer query host state.
 
 ## Proposed carrier
 
-Use one hidden, ordinary `PF_Param_FLOAT_SLIDER` property as a script-visible graph
-snapshot envelope. Store an inert, syntactically valid expression comment in its
-`expression` string, for example a versioned `SFLD` header plus base64url graph bytes,
-followed by the numeric literal `0`. Keep expression evaluation disabled so this
-property continues to deliver its ordinary numeric value. Add one hidden supervised
-numeric commit parameter; the panel writes the expression and toggles the commit
-parameter inside one ExtendScript undo group.
+Manifest revision 8 appends four hidden, ordinary `PF_Param_FLOAT_SLIDER` streams:
 
-On `PF_Cmd_USER_CHANGED_PARAM` for the commit parameter, the effect obtains its own
-parameter stream through the effect/stream suites, reads the raw expression text with
-`AEGP_GetExpression`, bounds and decodes the envelope, validates it with the existing
-graph codec, and writes the resulting graph to the existing AE-owned arbitrary-data
-parameter. Render and pre-render continue to use the copied graph snapshot; they do
-not query AEGP. The panel reads the expression property through the normal scripting
-DOM and decodes the same snapshot for display. The arbitrary-data graph remains the
-render cache and its existing project/undo contract stays in place.
+- `Graph Snapshot` (41) is the canonical script-readable mirror. Its expression is an
+  inert comment envelope followed by `0` and is explicitly disabled.
+- `Graph Edit Request` (42) is a write-only expression mailbox. The panel stages a
+  complete replacement graph there.
+- `Commit Graph Edit` (43) is the supervised numeric trigger. Its integer value is a
+  bounded transaction nonce.
+- `Graph Edit Receipt` (44) is the callback acknowledgement. The receipt equals the
+  nonce on success and its negative on rejection.
 
-The envelope must contain a format version, payload length, checksum, stable graph
-revision, and the bounded serialized graph. The commit request includes its base
-revision. The CEP gateway validates the complete envelope before writing it. The
-native callback independently validates all lengths, checksum, schema, IDs, port
-types, cycles, and graph invariants before replacing graph bytes. Failed writes or
-stale revisions must leave the previous graph usable. A native rejection must also be
-detectable by the gateway; if the callback cannot return a reliable acknowledgement,
-the carrier is not acceptable.
+The snapshot text is `/*SFLDSNAP1:<revision>:<byte-count>:<crc32>:<lowercase-hex>*/0`.
+The request is `/*SFLDTXN1:<nonce>:<base-revision>:<byte-count>:<crc32>:<lowercase-hex>*/0`.
+An initial `/*SFLDSYNC1:<nonce>*/0` request asks the callback to hydrate the snapshot
+from the existing arbitrary-data parameter. The binary payload remains the canonical
+schema-1 graph codec; the expression is only a script-visible mirror. The development
+carrier currently caps graph bytes at 24 KiB so the UTF-16 expression and CEP bridge
+stay bounded. The effect never evaluates the payload as code.
+
+On `PF_Cmd_USER_CHANGED_PARAM` for the commit stream, the effect obtains its own
+parameter streams through the AEGP effect/stream suites, reads the request with
+`AEGP_GetExpression`, bounds and checks it, validates the graph with the existing
+codec, and prepares a replacement arbitrary-data handle. It compares the request's
+base revision with the current snapshot revision. Only after validation and allocation
+does it update the expression mirror, canonical graph parameter, Control Source, and
+receipt in the supervised callback. Render and pre-render continue to use the copied
+graph parameter; they never query AEGP. The panel reads/writes ordinary expressions
+through the scripting DOM. The arbitrary-data graph remains the render source of truth.
+
+Capture and AE Controls synchronization also refresh the expression mirror before
+replacing the graph handle. The CEP must perform request-expression write, nonce
+trigger, receipt read, and any rollback in one `app.beginUndoGroup` transaction.
+
+The ExtendScript gateway now has source-level `getGraphSnapshot`, `syncGraphSnapshot`,
+and `submitGraph` entry points. They are not called by the panel yet. The panel still
+needs a schema-1 JavaScript graph codec and graph-driven view/edit model; the carrier
+remains disabled until those pieces and the AE host gates are complete.
 
 ## Why this is only proposed
 
@@ -57,27 +69,26 @@ expression change undo together in AE 2023. The owner’s two probes establish t
 direct `CUSTOM_VALUE` route is unavailable; they do not qualify the expression carrier.
 
 The graph snapshot expression is a second persisted copy. Every code path that changes
-the graph must keep it synchronized, including panel edits, first-open initialization,
-control capture, undo/redo, effect copy/paste, and project reopen. The first version
-must set a strict encoded-size cap and reject oversized graphs without truncation.
+the graph must keep it synchronized, including panel edits, lazy first-open
+initialization, control capture, undo/redo, effect copy/paste, and project reopen. The
+24 KiB development cap must reject oversized graphs without truncation.
 
 ## Required spike and acceptance gates
 
 Before accepting this ADR or shipping topology editing:
 
-1. Build the development carrier and transaction plumbing in the current effect,
-   without changing the installed host. Keep the graph callbacks bounded and leave
-   the panel topology gestures guarded until the host gates below pass.
-2. In a disposable AE 2023 project, set and read a disabled OneD expression from
-   ExtendScript; verify the exact source survives save/reopen, undo/redo, and effect
+1. Build the development carrier and transaction plumbing in the current effect;
+   source-level plumbing is now present but has not been installed or exercised in AE.
+2. In a disposable AE 2023 project, set and read disabled OneD expressions from
+   ExtendScript and verify the snapshot survives save/reopen, undo/redo, and effect
    duplication.
-3. Verify that the supervised commit callback can read that same expression with
-   `AEGP_GetExpression`, decode a bounded sample, and update the graph parameter.
-4. Verify the expression write, commit parameter, and arbitrary-data graph update are
-   one undo step. Verify a failed checksum and stale revision retain the old graph and
-   return a detectable error to the panel.
-5. Verify the render path uses only the graph snapshot and produces the same pixels
-   before and after the carrier edit.
+3. Verify that the supervised callback reads the request with `AEGP_GetExpression`,
+   returns the matching receipt, and updates both graph and snapshot.
+4. Verify the expression write, commit, graph update, Control Source switch, and
+   receipt form one undo step. Verify malformed, stale, invalid, and oversized requests
+   leave the old graph/snapshot intact and return a detectable negative receipt.
+5. Verify the render path uses only the arbitrary-data graph parameter and produces
+   the same pixels before and after a valid carrier edit.
 
 The spike modifies an AE project and runs AE, so it requires the exact per-action host
 authorization described by ADR 0011. Do not install or restart AE as part of the
