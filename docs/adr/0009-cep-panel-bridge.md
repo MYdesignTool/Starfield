@@ -70,12 +70,14 @@ read-only; parameter values and the fixed nodes' saved positions are editable.
 undo group (ADR 0014). Dynamic node creation, deletion,
 reordering, and edge rewiring require a later protocol version.
 
-Each parameter descriptor may include `min`, `max`, and `decimals` edit hints,
-derived from the public parameter manifest. The panel uses them to bound and scale
-AE-style horizontal numeric scrubbing; ordinary clicks still allow direct typing.
-A scrub gesture is coalesced into one `setParameters` request on release, keeping
-the edit within one host undo group. Shift-drag is ten times faster and Ctrl-drag
-is ten times finer. The gateway's binding validation remains authoritative.
+Each parameter descriptor may include `min`, `max`, `displayDecimals`, and ordered
+`choices` edit hints. The panel uses them to format values, populate AE-style popup
+controls, and bound and scale horizontal numeric scrubbing. Direct edits are rounded
+to `displayDecimals`; ordinary clicks still allow typing. A scrub gesture is
+coalesced into one `setParameters` request on release, keeping the edit within one
+host undo group. Shift-drag is ten times faster and Ctrl-drag is ten times finer.
+The gateway's binding validation remains authoritative. Popup choices are ordered
+and map to AE's one-based values.
 
 Before writing, the gateway requires the target token and non-empty
 `baseRevision` returned by the last `getState`. The target token binds the edit

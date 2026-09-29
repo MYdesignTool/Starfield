@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-2";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-3";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var NODE_WIDTH = 220;
@@ -1382,6 +1382,8 @@
             for (var a = 0; a < 3; a++) {
                 holder.appendChild(numberInput(parameter, a));
             }
+        } else if (parameter.kind === "popup") {
+            holder.appendChild(popupInput(parameter));
         } else {
             holder.appendChild(numberInput(parameter, null));
         }
@@ -1392,14 +1394,32 @@
         return wrapper;
     }
 
+    function popupInput(parameter) {
+        var select = document.createElement("select");
+        var choices = parameter.choices && parameter.choices.length ? parameter.choices :
+                      ["Point", "Box", "Sphere", "Disc"];
+        for (var i = 0; i < choices.length; i++) {
+            var option = document.createElement("option");
+            option.value = String(i + 1);
+            option.textContent = choices[i];
+            select.appendChild(option);
+        }
+        select.value = String(parameter.value);
+        select.dataset.key = parameter.key;
+        select.dataset.channel = "";
+        select.dataset.decimals = "0";
+        select.title = "Choose the emitter type";
+        select.addEventListener("change", onEdit);
+        return select;
+    }
+
     function numberInput(parameter, channel) {
         var input = document.createElement("input");
         input.type = "number";
-        var decimals = Number(parameter.decimals);
-        if (!isFinite(decimals)) decimals = parameter.kind === "popup" || parameter.kind === "color" ? 0 : 2;
-        decimals = Math.max(0, Math.min(6, Math.floor(decimals)));
+        var decimals = parameterDecimals(parameter);
         input.step = String(Math.pow(10, -decimals));
-        input.value = channel === null ? parameter.value : parameter.value[channel];
+        var value = channel === null ? parameter.value : parameter.value[channel];
+        input.value = formatParameterNumber(value, decimals);
         input.dataset.key = parameter.key;
         input.dataset.channel = channel === null ? "" : String(channel);
         input.dataset.decimals = String(decimals);
@@ -1418,6 +1438,21 @@
         input.addEventListener("pointerdown", beginNumericScrub);
         input.addEventListener("change", onEdit);
         return input;
+    }
+
+    function parameterDecimals(parameter) {
+        var decimals = Number(parameter.displayDecimals);
+        if (!isFinite(decimals)) decimals = parameter.kind === "popup" || parameter.kind === "color" ? 0 : 2;
+        return Math.max(0, Math.min(6, Math.floor(decimals)));
+    }
+
+    function formatParameterNumber(value, decimals) {
+        var numeric = Number(value);
+        if (!isFinite(numeric)) return String(value);
+        var scale = Math.pow(10, decimals);
+        var rounded = Math.round(numeric * scale) / scale;
+        if (decimals === 0) return String(Math.round(rounded));
+        return rounded.toFixed(decimals);
     }
 
     function numericScrubStep(parameter, decimals) {
@@ -1469,7 +1504,7 @@
         var scale = Math.pow(10, scrub.decimals);
         scrub.value = Math.round(scrub.rawValue * scale) / scale;
         scrub.value = Math.max(scrub.min, Math.min(scrub.max, scrub.value));
-        scrub.input.value = String(scrub.value);
+        scrub.input.value = formatParameterNumber(scrub.value, scrub.decimals);
         if (event.preventDefault) event.preventDefault();
     }
 
@@ -1481,6 +1516,12 @@
         if (!isFinite(raw)) {
             showError("invalid_value", "Enter a finite number.");
             return;
+        }
+        var decimals = Number(input.dataset.decimals);
+        if (isFinite(decimals)) {
+            var scale = Math.pow(10, Math.max(0, Math.min(6, Math.floor(decimals))));
+            raw = Math.round(raw * scale) / scale;
+            input.value = formatParameterNumber(raw, Math.max(0, Math.min(6, Math.floor(decimals))));
         }
         var value = channel === null ? raw : null;
         if (channel !== null) {

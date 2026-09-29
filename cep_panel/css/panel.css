@@ -312,6 +312,7 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   cursor: text;
 }
 .param-value.multi input { flex: 0 1 70px; }
+.param-value select { width: 100%; min-width: 70px; max-width: 170px; }
 .swatch { flex: 0 0 16px; width: 16px; height: 16px; border: 1px solid var(--line); border-radius: 2px; }
 
 body.dragging-node .node-select { cursor: grabbing; }

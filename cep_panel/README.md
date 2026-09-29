@@ -6,6 +6,9 @@ Dockable After Effects 2023 node editor for the current Alpha chain
 with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
 Numeric values use AE-style scrub controls: drag left or right to adjust, Shift-drag
 for faster changes, Ctrl-drag for finer changes, or click to type a value directly.
+The panel formats and commits values at each control's precision (integer
+particles-per-second and origin coordinates, configured precision for other floats)
+and presents emitter type as a named dropdown.
 The current canvas source supports a pinned target, top-down layout, project-saved node
 positions, viewport-wide marquee/group movement, wheel zoom, unrestricted middle-button
 canvas pan with a clipped viewport and no scrollbars, a bottom-left interactive minimap,

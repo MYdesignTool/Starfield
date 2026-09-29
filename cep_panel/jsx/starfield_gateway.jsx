@@ -17,7 +17,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "graph-carrier-source-2";
+    var GATEWAY_BUILD = "graph-carrier-source-3";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 32;
     var MAX_REQUEST_BYTES = 65536;
@@ -34,30 +34,31 @@
 
     // One row per bound effect parameter. `index` is the registered parameter index
     // (schema/parameters.json); `name` is the Effect Controls label used for
-    // resolution. `min`/`max` mirror the manifest bounds so the panel cannot send a
-    // value the effect would have to clamp.
+    // resolution. `min`/`max` mirror the manifest bounds. `displayDecimals` sets
+    // panel edit precision; `choices` supplies popup labels. Host validation remains authoritative.
     var BINDINGS = [
-        { key: "particle_count", index: 27, name: "Max Particles", kind: "slider", min: 0, max: 2000000, decimals: 0 },
-        { key: "birth_rate", index: 3, name: "Particles Per Second", kind: "slider", min: 0, max: 1000000, decimals: 2 },
-        { key: "seed", index: 28, name: "Random Seed", kind: "slider", min: 0, max: 2147483647, decimals: 0 },
-        { key: "particle_lifetime", index: 12, name: "Lifetime", kind: "slider", min: 0, max: 1000000, decimals: 3 },
-        { key: "emitter_shape", index: 2, name: "Type", kind: "popup", min: 1, max: 4, decimals: 0 },
-        { key: "emitter_origin", index: 4, name: "Origin", kind: "point3d", decimals: 2 },
-        { key: "velocity_x", index: 6, name: "Velocity X", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "velocity_y", index: 7, name: "Velocity Y", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "velocity_z", index: 8, name: "Velocity Z", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "particle_size", index: 13, name: "Size", kind: "slider", min: 0, max: 100000, decimals: 2 },
-        { key: "opacity", index: 15, name: "Opacity", kind: "slider", min: 0, max: 1, decimals: 3 },
-        { key: "emitter_size", index: 5, name: "Emitter Size", kind: "slider", min: 0, max: 10, decimals: 3 },
-        { key: "velocity_spread", index: 9, name: "Speed Random", kind: "slider", min: 0, max: 100, decimals: 2 },
-        { key: "gravity_x", index: 21, name: "Gravity X", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "gravity_y", index: 22, name: "Gravity Y", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "gravity_z", index: 23, name: "Gravity Z", kind: "slider", min: -1000, max: 1000, decimals: 2 },
-        { key: "linear_drag", index: 24, name: "Linear Drag", kind: "slider", min: 0, max: 100, decimals: 3 },
-        { key: "color_start", index: 17, name: "Color Start", kind: "color", min: 0, max: 255, decimals: 0 },
-        { key: "color_end", index: 18, name: "Color End", kind: "color", min: 0, max: 255, decimals: 0 },
-        { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000, decimals: 2 },
-        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, decimals: 3 }
+        { key: "particle_count", index: 27, name: "Max Particles", kind: "slider", min: 0, max: 2000000, displayDecimals: 0 },
+        { key: "birth_rate", index: 3, name: "Particles Per Second", kind: "slider", min: 0, max: 1000000, displayDecimals: 0 },
+        { key: "seed", index: 28, name: "Random Seed", kind: "slider", min: 0, max: 2147483647, displayDecimals: 0 },
+        { key: "particle_lifetime", index: 12, name: "Lifetime", kind: "slider", min: 0, max: 1000000, displayDecimals: 3 },
+        { key: "emitter_shape", index: 2, name: "Type", kind: "popup", min: 1, max: 4, displayDecimals: 0,
+          choices: ["Point", "Box", "Sphere", "Disc"] },
+        { key: "emitter_origin", index: 4, name: "Origin", kind: "point3d", displayDecimals: 0 },
+        { key: "velocity_x", index: 6, name: "Velocity X", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "velocity_y", index: 7, name: "Velocity Y", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "velocity_z", index: 8, name: "Velocity Z", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "particle_size", index: 13, name: "Size", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
+        { key: "opacity", index: 15, name: "Opacity", kind: "slider", min: 0, max: 1, displayDecimals: 3 },
+        { key: "emitter_size", index: 5, name: "Emitter Size", kind: "slider", min: 0, max: 10, displayDecimals: 3 },
+        { key: "velocity_spread", index: 9, name: "Speed Random", kind: "slider", min: 0, max: 100, displayDecimals: 2 },
+        { key: "gravity_x", index: 21, name: "Gravity X", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "gravity_y", index: 22, name: "Gravity Y", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "gravity_z", index: 23, name: "Gravity Z", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
+        { key: "linear_drag", index: 24, name: "Linear Drag", kind: "slider", min: 0, max: 100, displayDecimals: 3 },
+        { key: "color_start", index: 17, name: "Color Start", kind: "color", min: 0, max: 255, displayDecimals: 0 },
+        { key: "color_end", index: 18, name: "Color End", kind: "color", min: 0, max: 255, displayDecimals: 0 },
+        { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
+        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, displayDecimals: 3 }
     ];
 
     var LAYOUT_BINDINGS = [
@@ -525,9 +526,11 @@
                 var property = resolveProperty(target.effect, binding, report);
                 if (!property) return fail("missing_parameter", "Missing parameter: " + binding.name);
                 var parameter = { key: binding.key, label: binding.name, kind: binding.kind,
-                                  value: readValue(property, binding), decimals: binding.decimals };
+                                  value: readValue(property, binding),
+                                  displayDecimals: binding.displayDecimals };
                 if (typeof binding.min === "number") parameter.min = binding.min;
                 if (typeof binding.max === "number") parameter.max = binding.max;
+                if (binding.choices) parameter.choices = binding.choices;
                 node.params.push(parameter);
             }
             nodes.push(node);
