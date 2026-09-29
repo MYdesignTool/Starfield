@@ -7,9 +7,10 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/graph-carrier-source-3";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/output-particle-status-1";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
+    var FRAME_STATUS_POLL_INTERVAL_MS = 200;
     var NODE_WIDTH = 110;
     var NODE_HEIGHT = 54;
     var CANVAS_MIN_WIDTH = 580;
@@ -40,6 +41,7 @@
     var viewPan = { x: 0, y: 0 };
     var minimapPanState = null;
     var minimapTransform = null;
+    var frameStatusInFlight = false;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
     // Adobe's full CSInterface library can replace this shim later without changing
@@ -105,7 +107,8 @@
     catch (ignored) { /* target pin remains available for this panel session */ }
     var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {},
                   selectedNodeId: "emitter", selectedNodeIds: {}, inspectorOpen: false, pending: false,
-                  pinnedTargetToken: pinnedTargetToken, layoutPersistence: false };
+                  pinnedTargetToken: pinnedTargetToken, layoutPersistence: false,
+                  frameStatus: null, liveParticleCount: null };
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
@@ -593,8 +596,7 @@
 
     function nodeSummary(node) {
         if (node.id === "emitter") {
-            return shortNumber(parameterValue(node, "birth_rate")) + "/s · max " +
-                   shortNumber(parameterValue(node, "particle_count"));
+            return shortNumber(parameterValue(node, "birth_rate")) + "/s";
         }
         if (node.id === "force") {
             return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y")) +
@@ -604,7 +606,43 @@
             return "Size " + shortNumber(parameterValue(node, "particle_size")) +
                    " · opacity " + shortNumber(parameterValue(node, "opacity"));
         }
-        return "Transparent particle output";
+        var status = state.frameStatus;
+        if (status && status.available === false) return "Live count unavailable";
+        var maxParticles = status ? status.maxParticles : parameterValue(node, "particle_count");
+        var live = state.liveParticleCount === null ? "–" : String(state.liveParticleCount);
+        return "Live " + live + " · Max " + shortNumber(maxParticles);
+    }
+
+    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap) {
+        var time = Number(timeSeconds);
+        var rate = Number(birthRate);
+        var lifetime = Number(lifetimeSeconds);
+        var cap = Math.floor(Number(populationCap));
+        if (!isFinite(time) || !isFinite(rate) || !isFinite(lifetime) || !isFinite(cap) ||
+            time < 0 || rate <= 0 || lifetime <= 0 || cap <= 0) return 0;
+        var lastSlot = Math.floor(time * rate);
+        var firstSlot = Math.floor((time - lifetime) * rate) + 1;
+        if (!isFinite(lastSlot) || !isFinite(firstSlot) || lastSlot > 9007199254740992 ||
+            firstSlot > 9007199254740992) return 0;
+        if (lastSlot < firstSlot) return 0;
+        firstSlot = Math.max(0, firstSlot);
+        return Math.min(cap, lastSlot - firstSlot + 1);
+    }
+
+    function updateFrameStatus() {
+        if (frameStatusInFlight || !resolvedTarget || !state.targetToken || state.pending ||
+            refreshInFlight || !state.nodes.length) return;
+        frameStatusInFlight = true;
+        call("getFrameStatus", null, function (response) {
+            frameStatusInFlight = false;
+            if (!response || !response.ok || response.targetToken !== state.targetToken) return;
+            state.frameStatus = response;
+            state.liveParticleCount = response.available === false ? null :
+                countLiveParticles(response.timeSeconds, response.birthRate,
+                                   response.lifetimeSeconds, response.maxParticles);
+            var output = graphNodeElements.output;
+            if (output && output.summary && output.node) output.summary.textContent = nodeSummary(output.node);
+        });
     }
 
     function addGraphNode(node) {
@@ -616,7 +654,7 @@
                          (state.selectedNodeIds[node.id] ? " selected" : "");
         card.style.left = display.x + "px";
         card.style.top = display.y + "px";
-        var portElements = { card: card, input: null, output: null };
+        var portElements = { card: card, node: node, input: null, output: null, summary: null };
         var button = document.createElement("button");
         button.type = "button";
         button.className = "node-select";
@@ -628,6 +666,7 @@
         var summary = document.createElement("span");
         summary.className = "node-summary";
         summary.textContent = nodeSummary(node);
+        portElements.summary = summary;
         button.appendChild(title);
         button.appendChild(summary);
         button.addEventListener("click", function (event) {
@@ -1188,6 +1227,32 @@
         }
     }
 
+    function clampTopDownGroupDelta(requestedDelta, origins) {
+        var moving = {};
+        var originY = {};
+        for (var i = 0; i < origins.length; i++) {
+            moving[origins[i].id] = true;
+            originY[origins[i].id] = origins[i].y;
+        }
+        var minDelta = -Infinity;
+        var maxDelta = Infinity;
+        for (var e = 0; e < state.edges.length; e++) {
+            var edge = state.edges[e];
+            var fromMoving = !!moving[edge[0]];
+            var toMoving = !!moving[edge[1]];
+            if (fromMoving === toMoving) continue;
+            var fromPosition = nodePositions[edge[0]];
+            var toPosition = nodePositions[edge[1]];
+            if (!fromPosition || !toPosition) continue;
+            var fromY = fromMoving ? originY[edge[0]] : fromPosition.y;
+            var toY = toMoving ? originY[edge[1]] : toPosition.y;
+            if (fromMoving) maxDelta = Math.min(maxDelta, toY - NODE_HEIGHT - 1 - fromY);
+            else minDelta = Math.max(minDelta, fromY + NODE_HEIGHT + 1 - toY);
+        }
+        if (minDelta > maxDelta) return 0;
+        return Math.max(minDelta, Math.min(maxDelta, requestedDelta));
+    }
+
     function moveNodeDrag(event) {
         if (numericScrubState) { moveNumericScrub(event); return; }
         if (minimapPanState) { moveViewToMinimapPoint(event); return; }
@@ -1225,6 +1290,7 @@
             updateCanvasBounds();
             return;
         }
+        dy = clampTopDownGroupDelta(dy, dragState.origins);
         for (var i = 0; i < dragState.origins.length; i++) {
             var origin = dragState.origins[i];
             var position = nodePositions[origin.id];
@@ -1521,6 +1587,10 @@
         state.edges = response.edges || [];
         state.revision = response.revision;
         state.targetToken = response.target.token;
+        if (targetChanged) {
+            state.frameStatus = null;
+            state.liveParticleCount = null;
+        }
         state.layoutPersistence = response.layoutPersistence === true;
         resolvedTarget = true;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
@@ -1536,6 +1606,7 @@
         }
         syncTargetLock();
         if (changed || layoutChanged) render(state);
+        updateFrameStatus();
     }
 
     function isStartupRetryable(code) {
@@ -1577,6 +1648,8 @@
                     state.targetToken = null;
                     state.nodes = [];
                     state.edges = [];
+                    state.frameStatus = null;
+                    state.liveParticleCount = null;
                     render(state);
                     syncTargetLock();
                     return;
@@ -1586,6 +1659,8 @@
                 state.targetToken = null;
                 state.nodes = [];
                 state.edges = [];
+                state.frameStatus = null;
+                state.liveParticleCount = null;
                 render(state);
                 return;
             }
@@ -1675,6 +1750,11 @@
                 (elements.autoRefresh && !elements.autoRefresh.checked)) return;
             refresh(false, false);
         }, TARGET_POLL_INTERVAL_MS);
+        window.setInterval(function () {
+            if (!resolvedTarget || state.pending || document.hidden ||
+                (elements.autoRefresh && !elements.autoRefresh.checked)) return;
+            updateFrameStatus();
+        }, FRAME_STATUS_POLL_INTERVAL_MS);
     }
     if (document.addEventListener) {
         document.addEventListener("visibilitychange", function () {

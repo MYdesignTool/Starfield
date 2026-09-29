@@ -17,7 +17,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "graph-carrier-source-3";
+    var GATEWAY_BUILD = "output-particle-status-1";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 32;
     var MAX_REQUEST_BYTES = 65536;
@@ -77,13 +77,15 @@
     // Protocol v1 is a fixed parameter view, not a live graph snapshot. Display
     // the product's intended stream order while graph-backed editing is qualified.
     var CHAIN = [
-        { id: "emitter", label: "Emitter", keys: ["particle_count", "birth_rate", "seed", "particle_lifetime",
+        { id: "emitter", label: "Emitter", keys: ["birth_rate", "seed", "particle_lifetime",
                                                   "emitter_shape", "emitter_origin", "velocity_x", "velocity_y",
                                                   "velocity_z", "emitter_size", "velocity_spread"] },
         { id: "particle", label: "Particle", keys: ["particle_size", "particle_size_end", "opacity",
                                                       "opacity_end", "color_start", "color_end"] },
         { id: "force", label: "Force", keys: ["gravity_x", "gravity_y", "gravity_z", "linear_drag"] },
-        { id: "output", label: "Output", keys: [] }
+        // Max Particles is a global output budget in the panel. Its public AE parameter
+        // identity remains unchanged; only its node-editor presentation moves here.
+        { id: "output", label: "Output", keys: ["particle_count"] }
     ];
     var EDGES = [["emitter", "particle"], ["particle", "force"], ["force", "output"]];
 
@@ -569,6 +571,40 @@
                         layoutPersistence: report.layoutPersistence });
     }
 
+    function getFrameStatus(request) {
+        var target = findRequestTarget(request);
+        if (target.error) return fail(target.error.code, target.error.message);
+        var token = targetToken(target);
+        if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
+        if (!request.target || request.target.token !== token) {
+            return fail("stale_state", "The selected effect changed since the panel loaded it; refresh before reading frame status.");
+        }
+        if (controlSource(target.effect) !== "AE Controls") {
+            return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
+                           targetToken: token, available: false });
+        }
+        var timeSeconds = Number(target.comp.time);
+        if (!isFinite(timeSeconds)) return fail("host_error", "AE did not provide a finite composition time.");
+
+        function scalarAtTime(key) {
+            var binding = bindingFor(key);
+            var property = binding ? resolveProperty(target.effect, binding, null) : null;
+            if (!property || typeof property.valueAtTime !== "function") return null;
+            var value = Number(property.valueAtTime(timeSeconds, false));
+            return isFinite(value) ? value : null;
+        }
+
+        var birthRate = scalarAtTime("birth_rate");
+        var lifetimeSeconds = scalarAtTime("particle_lifetime");
+        var maxParticles = scalarAtTime("particle_count");
+        if (birthRate === null || lifetimeSeconds === null || maxParticles === null) {
+            return fail("missing_parameter", "AE could not read the emitter rate, lifetime, or output particle cap at the current frame.");
+        }
+        return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
+                       targetToken: token, available: true, timeSeconds: timeSeconds, birthRate: birthRate,
+                       lifetimeSeconds: lifetimeSeconds, maxParticles: maxParticles });
+    }
+
     function setParameters(request) {
         var target = findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
@@ -796,6 +832,17 @@
         }
     }
 
+    function SFLD_getFrameStatus(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "getFrameStatus") return fail("unknown_operation", request.operation);
+            return getFrameStatus(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
     function SFLD_setParameters(requestJson) {
         var request = parseRequest(requestJson);
         if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
@@ -855,6 +902,7 @@
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
     host.SFLD_getState = SFLD_getState;
+    host.SFLD_getFrameStatus = SFLD_getFrameStatus;
     host.SFLD_setParameters = SFLD_setParameters;
     host.SFLD_setNodeLayout = SFLD_setNodeLayout;
     host.SFLD_getGraphSnapshot = SFLD_getGraphSnapshot;

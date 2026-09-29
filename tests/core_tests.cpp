@@ -187,6 +187,26 @@ GraphNode make_test_emitter(std::uint8_t id) {
     return node;
 }
 
+GraphNode make_test_particle(std::uint8_t id) {
+    using namespace graph_keys;
+    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 1, {
+        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
+        {kSizeStart, 8.0}, {kSizeEnd, 8.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}};
+}
+
+GraphNode make_test_force(std::uint8_t id) {
+    using namespace graph_keys;
+    return GraphNode{NodeId{test_uuid(id)}, kForceNode, 1, {
+        {kGravity, Vec3{}}, {kLinearDrag, 0.0}}};
+}
+
+GraphNode make_test_appearance(std::uint8_t id) {
+    using namespace graph_keys;
+    return GraphNode{NodeId{test_uuid(id)}, kAppearanceNode, 1, {
+        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
+        {kSizeStart, 8.0}, {kSizeEnd, 8.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}};
+}
+
 Graph make_basic_graph() {
     using namespace graph_keys;
     Graph graph;
@@ -221,6 +241,19 @@ void test_graph_contract() {
     using namespace graph_keys;
     Graph graph = make_basic_graph();
     CHECK(validate_test_graph(graph).ok());
+
+    Graph staged = graph;
+    staged.nodes.push_back(make_test_particle(3));
+    staged.nodes.push_back(make_test_force(4));
+    staged.nodes.push_back(make_test_appearance(5));
+    CHECK(validate_test_graph(staged).ok()); // isolated editable nodes may wait for a connection
+    CHECK(serialize_graph(staged, particle_node_registry()).has_value());
+
+    Graph partially_connected = graph;
+    partially_connected.nodes.push_back(make_test_particle(3));
+    partially_connected.edges.push_back(GraphEdge{EdgeId{test_uuid(3)}, NodeId{test_uuid(3)},
+        kParticleParticlesOut, NodeId{test_uuid(2)}, kOutputParticles});
+    CHECK(validate_test_graph(partially_connected).error.code == GraphErrorCode::missing_required_input);
 
     // Stable graph identities do not depend on editor/vector ordering.
     Graph reordered = graph;
@@ -1125,6 +1158,9 @@ void test_graph_evaluation() {
             auto graph = made.take_value();
             // Parked emitters validate but do not execute or change the stream.
             graph.nodes.push_back(make_test_emitter(22));
+            graph.nodes.push_back(make_test_particle(23));
+            graph.nodes.push_back(make_test_force(24));
+            graph.nodes.push_back(make_test_appearance(25));
             std::reverse(graph.nodes.begin(), graph.nodes.end());
             for (auto& node : graph.nodes) std::reverse(node.parameters.begin(), node.parameters.end());
             auto snapshot = std::make_shared<const Graph>(graph);

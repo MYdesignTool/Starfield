@@ -52,7 +52,7 @@ Requests and responses are JSON values. The envelope is:
   "protocol": "org.starfieldfx.panel",
   "version": 1,
   "requestId": "caller-generated-id",
-  "operation": "getState | setParameters | setNodeLayout",
+  "operation": "getState | getFrameStatus | setParameters | setNodeLayout",
   "target": { "token": "target-token-from-getState" },
   "baseRevision": "state-token",
   "changes": []
@@ -81,6 +81,17 @@ host undo group. Shift-drag is ten times faster and Ctrl-drag is ten times finer
 The gateway's binding validation remains authoritative. Popup choices are ordered
 and map to AE's one-based values.
 
+`getFrameStatus` is a bounded read-only v1 operation. It samples the target comp's
+current time and the emitter birth rate, lifetime, and global particle cap at that
+time. The panel uses the same half-open lifetime interval and slot cap as the core
+simulation to display the current live-particle total on Output. It polls this
+small status at 200 ms while the panel is visible and automatic refresh is enabled;
+the count can therefore lag a host time change by up to one poll interval. The
+global `particle_count` AE parameter keeps its existing identity and render
+semantics, while its CEP control is grouped under Output for the node-editor UI.
+Because v1 does not expose canonical graph values, the counter reports unavailable
+in Node Graph mode instead of estimating from inactive AE Controls.
+
 Before writing, the gateway requires the target token and non-empty
 `baseRevision` returned by the last `getState`. The target token binds the edit
 to AE's project-root ID, composition ID, layer ID, and effect index; the revision also includes
@@ -92,7 +103,7 @@ rejected without applying the requested changes. The gateway returns a stable
 error code and does not include host pointers or serialized C++ objects.
 
 Version 1 is bounded to 32 changed values and 64 KiB per request. Host scripting
-calls stay short and run only in response to panel actions; they do not perform
+calls stay short; status polling reads four scalar/time values and does not perform
 simulation or rendering.
 
 ### Render and persistence boundary
@@ -225,3 +236,10 @@ existing hidden-stream identities and values. The panel maps those coordinates
 to the Particle card. When all four positions still equal the old untouched
 defaults, the gateway presents the new vertical default layout; manually saved
 positions remain intact and continue to be written to the same AE-owned streams.
+
+Node titles and summaries are centered. Output no longer carries the fixed
+"transparent output" note; its inspector owns the existing global Max Particles
+control, and its summary reports `Live N · Max M`. `Live N` is derived from the
+same time/rate/lifetime/cap slot-range rules used by the portable simulator. This
+is only a presentation grouping: it does not reassign an AE parameter ID or change
+the renderer's global cap contract.

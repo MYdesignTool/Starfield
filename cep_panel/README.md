@@ -7,7 +7,9 @@ with selectable nodes, ports, and connectors; the inspector edits the selected n
 Cards are 110 × 54 pixels, use color by node type, and connect only from a lower output
 port to an upper input port. Reverse or overlapping connections are rejected, and the
 drag preview is only drawn downward. Particle remains the node label for the particle
-appearance controls.
+size, opacity, and color controls. Node labels and summaries are centered. Output
+holds the Max Particles control and shows the live particle total for the comp's current
+time; a lightweight read-only poll updates that total every 200 ms while auto-refresh is on.
 Numeric values use AE-style scrub controls: drag left or right to adjust, Shift-drag
 for faster changes, Ctrl-drag for finer changes, or click to type a value directly.
 The panel formats and commits values at each control's precision (integer
@@ -49,7 +51,7 @@ JavaScript and ExtendScript gateway; the Refresh button only re-queries AE state
 |---|---|
 | `CSXS/manifest.xml` | CEP 11 manifest; host `AEFT [23.0, 99.9]`; panel entry `index.html` |
 | `index.html`, `css/panel.css`, `js/panel.js` | Panel UI and protocol client |
-| `jsx/starfield_gateway.jsx` | `SFLD_getState`, `SFLD_setParameters`, `SFLD_setNodeLayout`, and source-level `SFLD_getGraphSnapshot`, `SFLD_syncGraphSnapshot`, `SFLD_submitGraph` endpoints (public AE scripting DOM only) |
+| `jsx/starfield_gateway.jsx` | `SFLD_getState`, `SFLD_getFrameStatus`, `SFLD_setParameters`, `SFLD_setNodeLayout`, and source-level graph carrier endpoints (public AE scripting DOM only) |
 
 No third-party JavaScript is bundled. `js/panel.js` contains a ~10-line CEP bridge
 shim around `window.__adobe_cep__.evalScript`; Adobe's full `CSInterface.js` can be

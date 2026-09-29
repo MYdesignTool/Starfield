@@ -45,10 +45,12 @@ function createHarness(options = {}) {
     for (const [name, value] of Object.entries(initialValues)) {
         const property = {
             name,
-            value: Array.isArray(value) ? value.slice() : value,
+            value: Array.isArray(value) ? value.slice() :
+                (name === "Control Source" && options.controlSource !== undefined ? options.controlSource : value),
             dimensions: Array.isArray(value) ? value.length : 1,
             numKeys: name === options.animatedName ? 2 : 0,
             isTimeVarying: name === options.animatedName,
+            valueAtTime() { return this.value; },
             setValue(next) {
                 writes.push({ name, value: Array.isArray(next) ? next.slice() : next });
                 if (name === failName && failCount > 0) {
@@ -85,6 +87,7 @@ function createHarness(options = {}) {
     const comp = new CompItem();
     comp.id = 17;
     comp.name = "Test Comp";
+    comp.time = 2.5;
     comp.numLayers = 1;
     comp.layer = index => index === 1 ? layer : null;
 
@@ -119,9 +122,20 @@ function createHarness(options = {}) {
         return JSON.parse(exported.SFLD_setParameters(JSON.stringify(request)));
     }
 
+    function frameStatus() {
+        return JSON.parse(exported.SFLD_getFrameStatus(JSON.stringify({
+            protocol: "org.starfieldfx.panel",
+            version: 1,
+            requestId: "frame-status",
+            operation: "getFrameStatus",
+            target: { token: initialState.target.token }
+        })));
+    }
+
     return {
         initialState,
         call,
+        frameStatus,
         values,
         writes,
         undo,
@@ -142,6 +156,28 @@ function testParticleFlowPresentation() {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
         force: { x: 235, y: 178 }, output: { x: 235, y: 256 }
     });
+}
+
+function testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted() {
+    const host = createHarness({ controlSource: 1 });
+    const emitter = host.initialState.nodes.filter(node => node.id === "emitter")[0];
+    const output = host.initialState.nodes.filter(node => node.id === "output")[0];
+    assert.equal(emitter.params.some(parameter => parameter.key === "particle_count"), false);
+    assert.equal(output.params.length, 1);
+    assert.equal(output.params[0].key, "particle_count");
+
+    const status = host.frameStatus();
+    assert.equal(status.ok, true);
+    assert.equal(status.available, true);
+    assert.equal(status.targetToken, host.initialState.target.token);
+    assert.equal(status.timeSeconds, 2.5);
+    assert.equal(status.birthRate, 100);
+    assert.equal(status.lifetimeSeconds, 2);
+    assert.equal(status.maxParticles, 1000);
+
+    const graphMode = createHarness({ controlSource: 2 }).frameStatus();
+    assert.equal(graphMode.ok, true);
+    assert.equal(graphMode.available, false);
 }
 
 function testVectorAnimationIsProtected() {
@@ -260,6 +296,7 @@ function testStaleBaseRevisionIsRequiredToMatch() {
 }
 
 testParticleFlowPresentation();
+testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted();
 testVectorAnimationIsProtected();
 testFailedBatchRollsBackAndPreservesRawColorAlpha();
 testRollbackFailureIsReported();
