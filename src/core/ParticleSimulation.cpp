@@ -181,7 +181,20 @@ SlotRange live_slot_range(double time_seconds, double birth_rate, double lifetim
 
 Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings, double time_seconds,
                                                         const Cancellation& cancellation) {
+    return simulate_particles_partition(settings, time_seconds, 1, 0, cancellation);
+}
+
+Result<std::vector<ParticleInstance>> simulate_particles_partition(const ValidatedSettings& settings,
+                                                                   double time_seconds,
+                                                                   std::uint32_t partition_count,
+                                                                   std::uint32_t partition_index,
+                                                                   const Cancellation& cancellation) {
     const Settings& values = settings.value;
+
+    if (partition_count == 0 || partition_index >= partition_count) {
+        return Result<std::vector<ParticleInstance>>::failure(ErrorCode::invalid_request,
+                                                             "invalid particle slot partition");
+    }
 
     if (!std::isfinite(time_seconds)) {
         return Result<std::vector<ParticleInstance>>::failure(ErrorCode::invalid_time,
@@ -201,7 +214,15 @@ Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings
 
     const double birth_rate = values.birth_rate;
     const double slots_elapsed = time_seconds * birth_rate;
-    const auto slot_count = static_cast<std::size_t>(range.last - range.first + 1);
+    const std::uint64_t span = range.last - range.first;
+    const std::uint64_t first_remainder = range.first % partition_count;
+    const std::uint64_t offset =
+        (static_cast<std::uint64_t>(partition_index) + partition_count - first_remainder) % partition_count;
+    if (offset > span) {
+        return Result<std::vector<ParticleInstance>>::success({});
+    }
+    const std::uint64_t first_slot = range.first + offset;
+    const auto slot_count = static_cast<std::size_t>((range.last - first_slot) / partition_count + 1);
 
     std::vector<ParticleInstance> particles;
     try {
@@ -218,7 +239,7 @@ Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings
                                                                  "cancelled during particle simulation");
         }
 
-        const auto slot = range.first + static_cast<std::uint64_t>(i);
+        const auto slot = first_slot + static_cast<std::uint64_t>(i) * partition_count;
         // Age is derived from the slot distance instead of `t - k / rate`, which
         // keeps full relative precision for long comps and high birth rates.
         double age = (slots_elapsed - static_cast<double>(slot)) / birth_rate;

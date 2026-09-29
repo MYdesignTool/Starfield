@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <iterator>
 #include <new>
 #include <optional>
 #include <queue>
+#include <utility>
 
 namespace starfield::core {
 namespace {
@@ -25,6 +27,8 @@ struct AppearanceValues {
     double opacity_start{1.0};
     double opacity_end{1.0};
 };
+
+constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
 
 const ParameterValue* find_value(const GraphNode& node, ParameterKey key) noexcept {
     const auto found = std::find_if(node.parameters.begin(), node.parameters.end(),
@@ -135,6 +139,28 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
         validated.value.opacity, validated.value.opacity_end});
 }
 
+void apply_appearance(ParticleInstance& particle, const AppearanceValues& appearance) noexcept {
+    const double age_fraction = particle.lifetime_seconds > 0.0
+        ? std::clamp(particle.age_seconds / particle.lifetime_seconds, 0.0, 1.0) : 0.0;
+    particle.size_pixels = appearance.size_start + (appearance.size_end - appearance.size_start) * age_fraction;
+    particle.opacity = appearance.opacity_start +
+        (appearance.opacity_end - appearance.opacity_start) * age_fraction;
+    particle.color = Vec3{
+        appearance.color_start.x + (appearance.color_end.x - appearance.color_start.x) * age_fraction,
+        appearance.color_start.y + (appearance.color_end.y - appearance.color_start.y) * age_fraction,
+        appearance.color_start.z + (appearance.color_end.z - appearance.color_start.z) * age_fraction};
+}
+
+bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
+    const auto& from = source.type_key;
+    const auto& to = destination.type_key;
+    if (from == kEmitterNode) return to == kParticleNode;
+    if (from == kParticleNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
+    if (from == kForceNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
+    if (from == kAppearanceNode) return to == kOutputNode;
+    return false;
+}
+
 } // namespace
 
 
@@ -168,6 +194,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         std::vector<std::optional<ValidatedSettings>> emitters(count);
         std::vector<std::optional<ForceValues>> forces(count);
         std::vector<std::optional<AppearanceValues>> appearances(count);
+        std::vector<std::optional<AppearanceValues>> particles(count);
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -179,6 +206,10 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 auto value = read_emitter(node);
                 if (!value.has_value()) return R::failure(value.error());
                 emitters[i] = value.take_value();
+            } else if (node.type_key == kParticleNode) {
+                auto value = read_appearance(node);
+                if (!value.has_value()) return R::failure(value.error());
+                particles[i] = value.take_value();
             } else if (node.type_key == kForceNode) {
                 auto value = read_force(node);
                 if (!value.has_value()) return R::failure(value.error());
@@ -201,6 +232,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             incoming[destination].push_back(source);
             outgoing[source].push_back(destination);
         }
+        for (auto& list : incoming) std::sort(list.begin(), list.end());
+        for (auto& list : outgoing) std::sort(list.begin(), list.end());
         std::vector<bool> active(count, false);
         std::vector<std::size_t> pending{output};
         active[output] = true;
@@ -223,76 +256,194 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             if (degrees[i] == 0) ready.push(i);
         }
 
-        EvaluatedGraph result;
-        result.evaluated_nodes.reserve(active_count);
-        Settings render_settings;
-        bool has_emitter = false;
-        int previous_stage = -1;
-        std::uint32_t active_emitter_count = 0;
-        std::uint32_t active_appearance_count = 0;
+        std::vector<std::size_t> topological_order;
+        topological_order.reserve(active_count);
+        std::size_t active_emitter = count;
+        std::vector<std::size_t> active_particles;
         while (!ready.empty()) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph execution cancelled");
             const auto index = ready.top();
             ready.pop();
             const auto& node = *nodes[index];
-            int stage = -1;
-            if (node.type_key == kEmitterNode) stage = 0;
-            else if (node.type_key == kForceNode) stage = 1;
-            else if (node.type_key == kAppearanceNode) stage = 2;
-            else if (node.type_key == kOutputNode) stage = 3;
-            if (stage < previous_stage) {
-                return R::failure(ErrorCode::invalid_request, "active graph stages must be emitter, force, appearance, output");
-            }
-            previous_stage = stage;
-
+            topological_order.push_back(index);
             if (node.type_key == kEmitterNode) {
-                if (++active_emitter_count != 1) {
+                if (active_emitter != count) {
                     return R::failure(ErrorCode::invalid_request, "multiple active emitters are unsupported");
                 }
-                render_settings = emitters[index]->value;
-                has_emitter = true;
-            } else if (node.type_key == kForceNode) {
-                if (!has_emitter) return R::failure(ErrorCode::invalid_request, "force node has no upstream emitter");
-                const auto& force = *forces[index];
-                render_settings.gravity.x += force.gravity.x;
-                render_settings.gravity.y += force.gravity.y;
-                render_settings.gravity.z += force.gravity.z;
-                render_settings.linear_drag += force.linear_drag;
-            } else if (node.type_key == kAppearanceNode) {
-                if (!has_emitter) return R::failure(ErrorCode::invalid_request, "appearance node has no upstream emitter");
-                if (++active_appearance_count != 1) {
-                    return R::failure(ErrorCode::invalid_request, "multiple active appearance nodes are unsupported");
-                }
-                const auto& appearance = *appearances[index];
-                render_settings.color_start = appearance.color_start;
-                render_settings.color_end = appearance.color_end;
-                render_settings.particle_size = appearance.size_start;
-                render_settings.particle_size_end = appearance.size_end;
-                render_settings.opacity = appearance.opacity_start;
-                render_settings.opacity_end = appearance.opacity_end;
-                render_settings.appearance_enabled = true;
-            } else if (!has_emitter) {
-                return R::failure(ErrorCode::invalid_request, "output has no evaluated particle stream");
+                active_emitter = index;
+            } else if (node.type_key == kParticleNode) {
+                active_particles.push_back(index);
             }
-
-            result.evaluated_nodes.push_back(node.id);
             for (const auto destination : outgoing[index]) {
                 if (active[destination] && --degrees[destination] == 0) ready.push(destination);
             }
         }
-        if (result.evaluated_nodes.size() != active_count) {
+        if (topological_order.size() != active_count) {
             return R::failure(ErrorCode::invalid_request, "graph cannot be evaluated in dependency order");
         }
-        if (!has_emitter || active_emitter_count != 1) {
+        if (active_emitter == count) {
             return R::failure(ErrorCode::invalid_request, "active output must have exactly one emitter");
         }
-        const auto bounded = validate_settings(render_settings);
-        if (!bounded.notices.empty()) {
-            return R::failure(ErrorCode::invalid_request, "combined force or appearance values exceed supported bounds");
+
+        EvaluatedGraph result;
+        result.evaluated_nodes.reserve(active_count);
+        for (const std::size_t index : topological_order) result.evaluated_nodes.push_back(nodes[index]->id);
+
+        // Graphs whose active output ancestry predates Particle are interpreted
+        // as one legacy stream. Disconnected/parked Particle nodes stay inert.
+        const bool legacy_graph = active_particles.empty();
+        if (legacy_graph) {
+            Settings render_settings = emitters[active_emitter]->value;
+            std::uint32_t active_appearance_count = 0;
+            int previous_stage = -1;
+            for (const std::size_t index : topological_order) {
+                if (cancellation.is_cancelled()) {
+                    return R::failure(ErrorCode::cancelled, "legacy graph execution cancelled");
+                }
+                const auto& node = *nodes[index];
+                int stage = -1;
+                if (node.type_key == kEmitterNode) stage = 0;
+                else if (node.type_key == kForceNode) stage = 1;
+                else if (node.type_key == kAppearanceNode) stage = 2;
+                else if (node.type_key == kOutputNode) stage = 3;
+                if (stage < previous_stage) {
+                    return R::failure(ErrorCode::invalid_request,
+                                      "legacy graph stages must be emitter, force, appearance, output");
+                }
+                previous_stage = stage;
+                if (node.type_key == kForceNode) {
+                    const auto& force = *forces[index];
+                    render_settings.gravity.x += force.gravity.x;
+                    render_settings.gravity.y += force.gravity.y;
+                    render_settings.gravity.z += force.gravity.z;
+                    render_settings.linear_drag += force.linear_drag;
+                } else if (node.type_key == kAppearanceNode) {
+                    if (++active_appearance_count != 1) {
+                        return R::failure(ErrorCode::invalid_request,
+                                          "legacy graph supports one active appearance node");
+                    }
+                    const auto& appearance = *appearances[index];
+                    render_settings.color_start = appearance.color_start;
+                    render_settings.color_end = appearance.color_end;
+                    render_settings.particle_size = appearance.size_start;
+                    render_settings.particle_size_end = appearance.size_end;
+                    render_settings.opacity = appearance.opacity_start;
+                    render_settings.opacity_end = appearance.opacity_end;
+                    render_settings.appearance_enabled = true;
+                }
+            }
+            const auto bounded = validate_settings(render_settings);
+            if (!bounded.notices.empty()) {
+                return R::failure(ErrorCode::invalid_request,
+                                   "combined legacy force or appearance values exceed supported bounds");
+            }
+            auto evaluated = simulate_particles(bounded, to_seconds(*normalized), cancellation);
+            if (!evaluated.has_value()) return R::failure(evaluated.error());
+            result.particles = evaluated.take_value();
+            return R::success(std::move(result));
         }
-        auto particles = simulate_particles(bounded, to_seconds(*normalized), cancellation);
-        if (!particles.has_value()) return R::failure(particles.error());
-        result.particles = particles.take_value();
+
+        const Settings emitter_settings = emitters[active_emitter]->value;
+        std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
+            return nodes[left]->id < nodes[right]->id;
+        });
+        const std::size_t particle_count = active_particles.size();
+        std::vector<std::size_t> topological_rank(count, count);
+        for (std::size_t rank = 0; rank < topological_order.size(); ++rank) {
+            topological_rank[topological_order[rank]] = rank;
+        }
+
+        for (const auto& edge : graph.edges) {
+            const std::size_t source = index_of(edge.source_node);
+            const std::size_t destination = index_of(edge.destination_node);
+            if (!active[source] || !active[destination]) continue;
+            if (!is_particle_graph_edge(*nodes[source], *nodes[destination])) {
+                return R::failure(ErrorCode::invalid_request, "invalid active Particle graph connection");
+            }
+        }
+        for (const std::size_t particle_index : active_particles) {
+            if (incoming[particle_index].size() != 1 || incoming[particle_index].front() != active_emitter) {
+                return R::failure(ErrorCode::invalid_request,
+                                  "each active Particle node must connect directly to the active emitter");
+            }
+        }
+
+        std::vector<std::uint32_t> visited(count, 0);
+        std::uint64_t traversal_work = 0;
+        for (std::size_t branch = 0; branch < particle_count; ++branch) {
+            if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "particle branch planning cancelled");
+            const std::uint32_t visit_id = static_cast<std::uint32_t>(branch + 1);
+            std::vector<std::size_t> stack{active_particles[branch]};
+            std::vector<std::size_t> branch_forces;
+            std::vector<std::size_t> branch_appearances;
+            visited[active_particles[branch]] = visit_id;
+            while (!stack.empty()) {
+                if (cancellation.is_cancelled()) {
+                    return R::failure(ErrorCode::cancelled, "particle branch traversal cancelled");
+                }
+                if (traversal_work >= kMaxBranchTraversalWork) {
+                    return R::failure(ErrorCode::invalid_request, "graph exceeds the particle-branch evaluation budget");
+                }
+                const std::size_t current = stack.back();
+                stack.pop_back();
+                ++traversal_work;
+                const auto& node = *nodes[current];
+                if (node.type_key == kForceNode) branch_forces.push_back(current);
+                else if (node.type_key == kAppearanceNode) branch_appearances.push_back(current);
+
+                for (const std::size_t destination : outgoing[current]) {
+                    if (traversal_work >= kMaxBranchTraversalWork) {
+                        return R::failure(ErrorCode::invalid_request,
+                                          "graph exceeds the particle-branch evaluation budget");
+                    }
+                    ++traversal_work;
+                    if (active[destination] && visited[destination] != visit_id) {
+                        visited[destination] = visit_id;
+                        stack.push_back(destination);
+                    }
+                }
+            }
+            const auto by_dependency = [&topological_rank](std::size_t left, std::size_t right) {
+                return topological_rank[left] < topological_rank[right];
+            };
+            std::sort(branch_forces.begin(), branch_forces.end(), by_dependency);
+            std::sort(branch_appearances.begin(), branch_appearances.end(), by_dependency);
+            if (branch_appearances.size() > 1) {
+                return R::failure(ErrorCode::invalid_request,
+                                  "one Particle stream cannot have multiple active Appearance overrides");
+            }
+
+            Settings branch_settings = emitter_settings;
+            for (const std::size_t force_index : branch_forces) {
+                if (cancellation.is_cancelled()) {
+                    return R::failure(ErrorCode::cancelled, "force-chain evaluation cancelled");
+                }
+                const auto& force = *forces[force_index];
+                branch_settings.gravity.x += force.gravity.x;
+                branch_settings.gravity.y += force.gravity.y;
+                branch_settings.gravity.z += force.gravity.z;
+                branch_settings.linear_drag += force.linear_drag;
+            }
+            const auto bounded = validate_settings(branch_settings);
+            if (!bounded.notices.empty()) {
+                return R::failure(ErrorCode::invalid_request,
+                                  "combined force values exceed supported bounds");
+            }
+
+            auto branch_result = simulate_particles_partition(
+                bounded, to_seconds(*normalized), static_cast<std::uint32_t>(particle_count),
+                static_cast<std::uint32_t>(branch), cancellation);
+            if (!branch_result.has_value()) return R::failure(branch_result.error());
+            auto branch_particles = branch_result.take_value();
+            const AppearanceValues& particle_look = *particles[active_particles[branch]];
+            for (auto& instance : branch_particles) {
+                apply_appearance(instance, particle_look);
+                if (!branch_appearances.empty()) apply_appearance(instance, *appearances[branch_appearances.front()]);
+                result.particles.push_back(std::move(instance));
+            }
+        }
+        std::sort(result.particles.begin(), result.particles.end(),
+                  [](const ParticleInstance& left, const ParticleInstance& right) { return left.id < right.id; });
         return R::success(std::move(result));
     } catch (const std::bad_alloc&) {
         return R::failure(ErrorCode::allocation_failed, "graph evaluation allocation failed");

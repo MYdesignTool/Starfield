@@ -178,16 +178,19 @@ struct GraphValidationResult {
 // traversed by the renderer.
 [[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
 
-// Stable built-in schemas used by the emitter -> force -> appearance -> output
-// graph (and the legacy emitter -> output subset). Keys in this namespace are
+// Stable built-in schemas used by the emitter -> Particle -> force -> appearance
+// -> output graph (and the legacy graph subsets). Keys in this namespace are
 // graph ParameterKeys and are not AE parameter IDs.
 namespace graph_keys {
 inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-stream";
 inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
+inline constexpr const char* kParticleNode = "org.starfieldfx.nodes.particle";
 inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
 inline constexpr const char* kAppearanceNode = "org.starfieldfx.nodes.appearance";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
 inline constexpr PortKey kEmitterParticles{1};
+inline constexpr PortKey kParticleParticlesIn{1};
+inline constexpr PortKey kParticleParticlesOut{2};
 inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
 inline constexpr PortKey kAppearanceParticlesIn{1};

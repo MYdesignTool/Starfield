@@ -18,10 +18,18 @@ struct EvaluatedGraph {
 [[nodiscard]] Result<EvaluatedGraph> evaluate_particle_graph(
     const Graph& graph, RationalTime time, const Cancellation& cancellation);
 
-// Explicit identities allow the host/editor to own UUID creation. Values must
-// already satisfy the Settings bounds; this helper does not silently clamp them.
+// Legacy compatibility constructor. Explicit identities allow the host/editor
+// to own UUID creation. Values must satisfy Settings bounds; this helper does
+// not silently clamp them or synthesize the later Particle node identity.
 [[nodiscard]] Result<Graph> make_emitter_output_graph(
     const Settings& settings, NodeId emitter, NodeId output, EdgeId connection);
+
+// Construct a schema-1 graph with an explicit Particle node. The Particle node
+// receives the settings' age-curve values; when appearance is disabled, constant
+// emitter size/opacity and white color are used to preserve the current look.
+[[nodiscard]] Result<Graph> make_emitter_particle_output_graph(
+    const Settings& settings, NodeId emitter, NodeId particle, NodeId output,
+    EdgeId emitter_to_particle, EdgeId particle_to_output);
 
 // Construct the current single-emitter Alpha chain with one force and one
 // appearance stage. The settings' gravity/drag and age-curve fields are written

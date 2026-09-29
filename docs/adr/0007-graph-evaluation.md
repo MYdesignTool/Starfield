@@ -1,6 +1,6 @@
 # ADR 0007: deterministic evaluation of graph snapshots
 
-- Status: accepted for G-03's runtime; extended by M3-02 with the force and appearance stages.
+- Status: accepted for G-03's runtime, extended by M3-02 and G-05 (ADR 0015).
 - Date: 2026-09-27.
 - Depends on ADR 0005 (render boundary) and ADR 0006 (graph validation).
 
@@ -21,14 +21,22 @@ This differs intentionally from the legacy host adapter's value-clamping behavio
 Exactly one output is required. Only its ancestors execute. A stable Kahn traversal
 orders dependencies before consumers and independent nodes by UUID, without
 reordering or modifying the graph. Disconnected valid nodes remain editable but do
-not allocate particle streams. The current schemas cover the single-emitter Alpha
-chain emitter -> force -> appearance -> output (the legacy emitter -> output subset
-still evaluates). One active stream is supported: a second active emitter or a second
-active appearance stage is rejected at runtime, and the active stages must appear in
-chain order, so a rewired appearance-before-force graph fails instead of rendering a
-guess. Force values accumulate into the render settings; appearance values override
-the emitter's size/opacity and supply the age-curve endpoints. Merge, branching, and
-multiple-output semantics still need a contract before they can be enabled.
+not allocate particle streams. New graphs use one active emitter and one or more
+Particle nodes directly connected to it. Their age curves define distinct output
+looks, and the emitter's global slots are deterministically partitioned across those
+Particle nodes. Force nodes may form serial chains and parallel DAG branches; each
+reachable force contributes once per Particle stream, and parallel paths merge by
+particle identity. Current gravity and linear drag values are accumulated in stable
+dependency order and integrated once. At most one downstream Appearance override
+may affect each Particle stream. Multiple active emitters and ambiguous appearance
+merges remain errors. The complete branch and compatibility rules are in ADR 0015.
+
+Previously stored schema-1 graphs with no active Particle node in the output
+ancestry keep the prior single-stream emitter/force/appearance interpretation.
+This compatibility path preserves the AE capture graph without rewriting arbitrary
+data or changing sequence schema. New graph constructors and topology transactions
+must create a Particle node. `make_emitter_output_graph` remains explicitly named
+as a legacy compatibility constructor.
 
 Time enters as a signed rational, is normalized, and converts to seconds only at
 the simulation boundary. Schema-1 node parameters are constant values: this work
@@ -44,7 +52,9 @@ The CPU rasterizer consumes each particle's opacity, rather than the fallback
 settings' opacity. This preserves flat-path pixels and allows later appearance
 nodes to modify per-particle opacity without changing the rasterizer contract.
 
-`make_emitter_output_graph` maps all eleven settings fields to stable graph keys.
+`make_emitter_output_graph` maps all eleven settings fields to stable graph keys
+for legacy compatibility. `make_emitter_particle_output_graph` constructs the new
+explicit Particle branch with the current appearance settings.
 `make_emitter_force_appearance_output_graph` does the same for the full chain, writing
 the gravity/drag fields to the force node and the color/size/opacity curves to the
 appearance node (not to the emitter). Callers supply the node/edge identities; neither
@@ -67,6 +77,12 @@ interpolation, stage order and the single-appearance rule are enforced, a
 four-stage graph is round-tripped through the codec, graph/flat pixels must still be
 identical, and a tiny drag value exercises the series branch. Assertion totals include
 repeated parameter combinations, not independent features.
+
+G-05 source implementation was added on 2026-09-29: explicit Particle branches,
+global-slot partitioning, branch-local force accumulation, fan-in deduplication,
+and a bounded traversal budget. All portable core translation units compiled with
+MSVC x64 `/std:c++20 /W4 /permissive- /EHsc` and linked into a static core library;
+the regression suite was not run, and the graph behavior has not been host-qualified.
 
 AE arbitrary-data persistence and snapshot transport are implemented under G-04.
 The CEP-to-ExtendScript bridge is specified in ADR 0009 and implemented in

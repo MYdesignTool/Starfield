@@ -40,4 +40,13 @@ struct ParticleInstance {
                                                                      double time_seconds,
                                                                      const Cancellation& cancellation);
 
+// Evaluate only global emission slots assigned to one deterministic branch.
+// Slot identity, birth time, random streams, and the emitter-wide live cap stay
+// unchanged: slot k is included when k % partition_count == partition_index.
+// This lets graph Particle nodes split one emitter without simulating the full
+// population once per branch.
+[[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles_partition(
+    const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
+    std::uint32_t partition_index, const Cancellation& cancellation);
+
 } // namespace starfield::core

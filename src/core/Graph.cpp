@@ -135,6 +135,7 @@ struct ConnectionRef {
     NodeId node{};
     PortKey port{};
     std::uint32_t maximum{};
+    bool source_is_emitter{false};
 };
 
 const NodeTypeDescriptor* find_type(const std::vector<const NodeTypeDescriptor*>& sorted_types,
@@ -269,7 +270,7 @@ const char* describe(GraphErrorCode code) noexcept {
         case GraphErrorCode::unknown_destination_port: return "edge destination port does not exist";
         case GraphErrorCode::port_direction_mismatch: return "edge connects ports in the wrong direction";
         case GraphErrorCode::port_type_mismatch: return "edge connects incompatible port types";
-        case GraphErrorCode::duplicate_input_connection: return "single-input port has multiple connections";
+        case GraphErrorCode::duplicate_input_connection: return "input port cannot accept these simultaneous connections";
         case GraphErrorCode::too_many_connections: return "port connection limit was exceeded";
         case GraphErrorCode::missing_required_input: return "required input port is not connected";
         case GraphErrorCode::cycle_detected: return "graph contains a same-frame cycle";
@@ -438,7 +439,8 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
             }
 
             connections.push_back(ConnectionRef{edge.destination_node, edge.destination_port,
-                                                destination_port->max_connections});
+                                                destination_port->max_connections,
+                                                source_node.descriptor->type_key == graph_keys::kEmitterNode});
             if (!is_cycle_breaking_input(*destination_node.descriptor, edge.destination_port)) {
                 adjacency[*source_index].push_back(*destination_index);
             }
@@ -456,6 +458,15 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
                 ++last;
             }
             const std::uint32_t maximum = connections[first].maximum;
+            const auto emitter_source_count = std::count_if(
+                connections.begin() + static_cast<std::ptrdiff_t>(first),
+                connections.begin() + static_cast<std::ptrdiff_t>(last),
+                [](const ConnectionRef& connection) { return connection.source_is_emitter; });
+            if (emitter_source_count > 1) {
+                return failure(GraphErrorCode::duplicate_input_connection,
+                               "an input cannot merge multiple emitter streams", connections[first].node, {},
+                               connections[first].port);
+            }
             if (maximum != 0 && last - first > maximum) {
                 const auto code = maximum == 1 ? GraphErrorCode::duplicate_input_connection
                                                : GraphErrorCode::too_many_connections;
@@ -544,16 +555,32 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kDirectionSpan, ParameterKind::float64, false},
     };
 
+    NodeTypeDescriptor particle;
+    particle.type_key = kParticleNode;
+    particle.schema_version = 1;
+    particle.ports = {
+        PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
+    };
+    particle.parameters = {
+        ParameterDescriptor{kColorStart, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kColorEnd, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kSizeStart, ParameterKind::float64, true},
+        ParameterDescriptor{kSizeEnd, ParameterKind::float64, true},
+        ParameterDescriptor{kOpacityStart, ParameterKind::float64, true},
+        ParameterDescriptor{kOpacityEnd, ParameterKind::float64, true},
+    };
+
     NodeTypeDescriptor output;
     output.type_key = kOutputNode;
     output.schema_version = 1;
-    output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 1});
+    output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 0});
 
     NodeTypeDescriptor force;
     force.type_key = kForceNode;
     force.schema_version = 1;
     force.ports = {
-        PortDescriptor{kForceParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kForceParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kForceParticlesOut, PortDirection::output, kParticleStream, false, 0},
     };
     force.parameters = {
@@ -565,7 +592,7 @@ NodeRegistry make_particle_node_registry() {
     appearance.type_key = kAppearanceNode;
     appearance.schema_version = 1;
     appearance.ports = {
-        PortDescriptor{kAppearanceParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kAppearanceParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kAppearanceParticlesOut, PortDirection::output, kParticleStream, false, 0},
     };
     appearance.parameters = {
@@ -578,6 +605,7 @@ NodeRegistry make_particle_node_registry() {
     };
 
     registry.types.push_back(std::move(emitter));
+    registry.types.push_back(std::move(particle));
     registry.types.push_back(std::move(force));
     registry.types.push_back(std::move(appearance));
     registry.types.push_back(std::move(output));
