@@ -260,7 +260,7 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   display: flex;
   flex-direction: column;
   width: min(360px, calc(100% - 24px));
-  max-height: calc(100% - 54px);
+  max-height: calc(100% - 16px);
   border: 1px solid #656b76;
   border-radius: 5px;
   background: #282b31;

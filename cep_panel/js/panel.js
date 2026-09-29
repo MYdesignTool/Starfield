@@ -976,8 +976,27 @@
             position.y + NODE_HEIGHT / 2 < height / 2;
         var left = nodeOnRight ? 8 : width - popupWidth - 8;
         var top = nodeInUpperHalf ? height - popupHeight - 8 : 8;
-        elements.inspector.style.left = Math.max(8, left) + "px";
-        elements.inspector.style.top = Math.max(8, top) + "px";
+        var bounded = clampInspectorPosition(left, top);
+        elements.inspector.style.left = bounded.left + "px";
+        elements.inspector.style.top = bounded.top + "px";
+    }
+
+    function clampInspectorPosition(left, top) {
+        var panelWidth = elements.workspace.clientWidth;
+        var panelHeight = elements.workspace.clientHeight;
+        var maxLeft = Math.max(8, panelWidth - elements.inspector.offsetWidth - 8);
+        var maxTop = Math.max(8, panelHeight - elements.inspector.offsetHeight - 8);
+        return {
+            left: Math.max(8, Math.min(maxLeft, left)),
+            top: Math.max(8, Math.min(maxTop, top))
+        };
+    }
+
+    function clampInspectorToWorkspace() {
+        if (!elements.workspace || !elements.inspector || elements.inspector.hidden) return;
+        var bounded = clampInspectorPosition(elements.inspector.offsetLeft, elements.inspector.offsetTop);
+        elements.inspector.style.left = bounded.left + "px";
+        elements.inspector.style.top = bounded.top + "px";
     }
 
     function render(state) {
@@ -1215,14 +1234,11 @@
         if (minimapPanState) { moveViewToMinimapPoint(event); return; }
         if (panState) { updateCanvasPan(event); return; }
         if (inspectorDragState) {
-            var panelWidth = elements.workspace.clientWidth;
-            var panelHeight = elements.workspace.clientHeight;
             var nextLeft = inspectorDragState.originX + event.clientX - inspectorDragState.startX;
             var nextTop = inspectorDragState.originY + event.clientY - inspectorDragState.startY;
-            nextLeft = Math.max(8, Math.min(panelWidth - elements.inspector.offsetWidth - 8, nextLeft));
-            nextTop = Math.max(8, Math.min(panelHeight - 36, nextTop));
-            elements.inspector.style.left = nextLeft + "px";
-            elements.inspector.style.top = nextTop + "px";
+            var bounded = clampInspectorPosition(nextLeft, nextTop);
+            elements.inspector.style.left = bounded.left + "px";
+            elements.inspector.style.top = bounded.top + "px";
             if (event.preventDefault) event.preventDefault();
             return;
         }
@@ -1548,12 +1564,16 @@
         window.addEventListener("pointercancel", endNodeDrag);
         window.addEventListener("resize", function () {
             updateCanvasBounds();
-            if (state.inspectorOpen) positionInspector(state.selectedNodeId);
+            if (state.inspectorOpen) clampInspectorToWorkspace();
         });
     }
     if (window.ResizeObserver && elements.graphScroll) {
-        var graphViewportObserver = new window.ResizeObserver(updateCanvasBounds);
+        var graphViewportObserver = new window.ResizeObserver(function () {
+            updateCanvasBounds();
+            if (state.inspectorOpen) clampInspectorToWorkspace();
+        });
         graphViewportObserver.observe(elements.graphScroll);
+        if (elements.workspace) graphViewportObserver.observe(elements.workspace);
     }
     if (elements.inspectorDrag) elements.inspectorDrag.addEventListener("pointerdown", beginInspectorDrag);
     if (elements.closeInspector) elements.closeInspector.addEventListener("click", function () {
