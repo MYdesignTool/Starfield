@@ -13,6 +13,7 @@ function graph() {
         nodes: [
             { id: uuid(1), type: edits.types.emitter, schemaVersion: 1, parameters: [
                 { key: "1", type: 3, value: 6400 }, { key: "2", type: 4, value: 60 },
+                { key: "4", type: 4, value: 2 },
                 { key: "5", type: 3, value: 2 }, { key: "6", type: 5, value: [1920, 1080, 1080] }
             ] },
             { id: uuid(2), type: edits.types.particle, schemaVersion: 1, parameters: [
@@ -44,6 +45,40 @@ assert.deepStrictEqual(particle.curves.size.points, [
 assert.strictEqual(output.maxParticles, 6400);
 assert.strictEqual(output.params[0].graphNodeId, source.nodes[0].id,
                    "Output Max Particles control edits the emitter-owned value");
+assert.deepStrictEqual(view.activeEmitterParameters(source), {
+    emitterId: source.nodes[0].id, maxParticles: 6400, birthRate: 60, lifetimeSeconds: 2
+});
+assert.strictEqual(view.countLiveParticles(2.5, 60, 2, 6400), 120,
+                   "graph frame status counts the emitter’s live slots at AE comp time");
+assert.strictEqual(view.countLiveParticles(2.5, 60, 2, 10), 10,
+                   "graph frame status applies the active emitter’s global cap");
+
+var withParkedEmitter = codec.fromHex(codec.toHex(source));
+withParkedEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 1,
+    parameters: [{ key: "1", type: 3, value: 1 }, { key: "2", type: 4, value: 1 },
+                 { key: "4", type: 4, value: 1 }] });
+assert.strictEqual(view.activeEmitterParameters(withParkedEmitter).emitterId, source.nodes[0].id,
+                   "a disconnected emitter does not replace the emitter feeding Output");
+var parkedEmitterOutput = view.project(withParkedEmitter).nodes.filter(function (node) {
+    return node.kind === "output";
+})[0];
+assert.strictEqual(parkedEmitterOutput.maxParticles, 6400,
+                   "Output keeps its cap control bound to the emitter in its active ancestry");
+assert.strictEqual(parkedEmitterOutput.params[0].graphNodeId, source.nodes[0].id);
+
+var withSecondActiveEmitter = codec.fromHex(codec.toHex(source));
+withSecondActiveEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 1,
+    parameters: [{ key: "1", type: 3, value: 100 }, { key: "2", type: 4, value: 20 },
+                 { key: "4", type: 4, value: 3 }] });
+withSecondActiveEmitter.nodes.push({ id: uuid(11), type: edits.types.particle, schemaVersion: 1,
+    parameters: [{ key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
+                 { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
+                 { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }] });
+withSecondActiveEmitter.edges.push(
+    { id: uuid(20), sourceNode: uuid(10), sourcePort: "1", destinationNode: uuid(11), destinationPort: "1" },
+    { id: uuid(21), sourceNode: uuid(11), sourcePort: "2", destinationNode: uuid(3), destinationPort: "1" });
+assert.strictEqual(view.activeEmitterParameters(withSecondActiveEmitter), null,
+                   "frame count fails closed when multiple active emitters are unsupported");
 
 var emitter = projected.nodes.filter(function (node) { return node.kind === "emitter"; })[0];
 var type = emitter.params.filter(function (parameter) { return parameter.graphKey === "5"; })[0];

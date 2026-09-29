@@ -706,12 +706,16 @@
         if (!request.target || request.target.token !== token) {
             return fail("stale_state", "The selected effect changed since the panel loaded it; refresh before reading frame status.");
         }
-        if (controlSource(target.effect) !== "AE Controls") {
-            return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
-                           targetToken: token, available: false });
-        }
         var timeSeconds = Number(target.comp.time);
         if (!isFinite(timeSeconds)) return fail("host_error", "AE did not provide a finite composition time.");
+        if (controlSource(target.effect) !== "AE Controls") {
+            // In Node Graph mode the CEP client resolves the active emitter from the
+            // persisted graph snapshot and combines its constants with AE's current
+            // comp time. Do not report the live count as unavailable merely because
+            // the legacy Effect Controls streams are no longer authoritative.
+            return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
+                           targetToken: token, available: true, graphMode: true, timeSeconds: timeSeconds });
+        }
 
         function scalarAtTime(key) {
             var binding = bindingFor(key);

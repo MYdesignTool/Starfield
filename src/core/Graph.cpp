@@ -389,7 +389,6 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
         std::vector<ConnectionRef> connections;
         connections.reserve(graph.edges.size());
         std::vector<std::vector<std::size_t>> adjacency(nodes.size());
-        std::vector<bool> has_connections(nodes.size(), false);
         for (const auto& edge : graph.edges) edges.push_back(&edge);
         std::sort(edges.begin(), edges.end(), [](const GraphEdge* left, const GraphEdge* right) {
             return left->id < right->id;
@@ -442,8 +441,6 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
             connections.push_back(ConnectionRef{edge.destination_node, edge.destination_port,
                                                 destination_port->max_connections,
                                                 source_node.descriptor->type_key == graph_keys::kEmitterNode});
-            has_connections[*source_index] = true;
-            has_connections[*destination_index] = true;
             if (!is_cycle_breaking_input(*destination_node.descriptor, edge.destination_port)) {
                 adjacency[*source_index].push_back(*destination_index);
             }
@@ -476,25 +473,6 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
                 return failure(code, describe(code), connections[first].node, {}, connections[first].port);
             }
             first = last;
-        }
-
-        for (std::size_t node_index = 0; node_index < nodes.size(); ++node_index) {
-            const NodeRef& node_ref = nodes[node_index];
-            for (const PortDescriptor& port : node_ref.descriptor->ports) {
-                if (port.direction != PortDirection::input || !port.required) continue;
-                const ConnectionRef key{node_ref.node->id, port.key, 0};
-                const auto found = std::lower_bound(connections.begin(), connections.end(), key, before_connection);
-                if (found == connections.end() || found->node != key.node || found->port != key.port) {
-                    // An entirely isolated node can be staged in the editor before
-                    // the user connects it. Once any edge touches the node, all of
-                    // its required inputs must be satisfied. Output is the graph's
-                    // evaluation root and must always remain connected.
-                    if (!has_connections[node_index] &&
-                        node_ref.descriptor->type_key != graph_keys::kOutputNode) continue;
-                    return failure(GraphErrorCode::missing_required_input,
-                                   describe(GraphErrorCode::missing_required_input), node_ref.node->id, {}, port.key);
-                }
-            }
         }
 
         // Iterative DFS avoids recursion on graphs controlled by project data.

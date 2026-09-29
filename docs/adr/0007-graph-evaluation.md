@@ -21,7 +21,10 @@ This differs intentionally from the legacy host adapter's value-clamping behavio
 Exactly one output is required. Only its ancestors execute. A stable Kahn traversal
 orders dependencies before consumers and independent nodes by UUID, without
 reordering or modifying the graph. Disconnected valid nodes remain editable but do
-not allocate particle streams. New graphs use one active emitter and one or more
+not allocate particle streams. If the Output ancestry has no emitter, evaluation
+succeeds with an empty particle stream, so a temporarily disconnected or rewired
+graph renders transparent black. This does not fall back to flat AE controls.
+New graphs use one active emitter and one or more
 Particle nodes directly connected to it. Their age curves define distinct output
 looks, and the emitter's global slots are deterministically partitioned across those
 Particle nodes. Force nodes may form serial chains and parallel DAG branches; each
@@ -31,8 +34,8 @@ dependency order and integrated once. At most one downstream Appearance override
 may affect each Particle stream. Multiple active emitters and ambiguous appearance
 merges remain errors. The complete branch and compatibility rules are in ADR 0015.
 
-Previously stored schema-1 graphs with no active Particle node in the output
-ancestry keep the prior single-stream emitter/force/appearance interpretation.
+Previously stored schema-1 graphs with an active emitter and no active Particle
+node in the output ancestry keep the prior single-stream emitter/force/appearance interpretation.
 This compatibility path preserves the AE capture graph without rewriting arbitrary
 data or changing sequence schema. New graph constructors and topology transactions
 must create a Particle node. `make_emitter_output_graph` remains explicitly named

@@ -238,7 +238,10 @@ function testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted() {
 
     const graphMode = createHarness({ controlSource: 2 }).frameStatus();
     assert.equal(graphMode.ok, true);
-    assert.equal(graphMode.available, false);
+    assert.equal(graphMode.available, true);
+    assert.equal(graphMode.graphMode, true);
+    assert.equal(graphMode.timeSeconds, 2.5,
+                 "Node Graph mode still returns the host comp time for graph-backed live counts");
 }
 
 function testVectorAnimationIsProtected() {

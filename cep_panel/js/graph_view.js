@@ -86,6 +86,74 @@
         return null;
     }
 
+    function activeEmitterParameters(graph) {
+        if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
+            Object.prototype.toString.call(graph.edges) !== "[object Array]") return null;
+        var byId = {};
+        var incoming = {};
+        var outputIds = [];
+        for (var i = 0; i < graph.nodes.length; i++) {
+            var node = graph.nodes[i];
+            if (!node || typeof node.id !== "string" || !node.id) return null;
+            byId["$" + node.id] = node;
+            if (kindFor(node.type) === "output") outputIds.push(node.id);
+        }
+        if (outputIds.length !== 1) return null;
+        for (var e = 0; e < graph.edges.length; e++) {
+            var edge = graph.edges[e];
+            if (!edge || !byId["$" + edge.sourceNode] || !byId["$" + edge.destinationNode]) return null;
+            var destinationKey = "$" + edge.destinationNode;
+            if (!incoming[destinationKey]) incoming[destinationKey] = [];
+            incoming[destinationKey].push(edge.sourceNode);
+        }
+        var active = {};
+        var pending = [outputIds[0]];
+        active["$" + outputIds[0]] = true;
+        while (pending.length) {
+            var current = pending.pop();
+            var sources = incoming["$" + current] || [];
+            for (var s = 0; s < sources.length; s++) {
+                var key = "$" + sources[s];
+                if (!active[key]) { active[key] = true; pending.push(sources[s]); }
+            }
+        }
+        var emitters = [];
+        for (var n = 0; n < graph.nodes.length; n++) {
+            if (kindFor(graph.nodes[n].type) === "emitter" && active["$" + graph.nodes[n].id]) {
+                emitters.push(graph.nodes[n]);
+            }
+        }
+        if (emitters.length !== 1) return null;
+        var emitter = emitters[0];
+        var cap = findParameter(emitter, "1");
+        var rate = findParameter(emitter, "2");
+        var lifetime = findParameter(emitter, "4");
+        if (!cap || !rate || !lifetime) return null;
+        cap = Number(cap.value);
+        rate = Number(rate.value);
+        lifetime = Number(lifetime.value);
+        if (!isFinite(cap) || Math.floor(cap) !== cap || cap < 0 || cap > 2000000 ||
+            !isFinite(rate) || rate < 0 || rate > 1000000 ||
+            !isFinite(lifetime) || lifetime < 0 || lifetime > 1000000) return null;
+        return { emitterId: emitter.id, maxParticles: cap, birthRate: rate, lifetimeSeconds: lifetime };
+    }
+
+    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap) {
+        var time = Number(timeSeconds);
+        var rate = Number(birthRate);
+        var lifetime = Number(lifetimeSeconds);
+        var cap = Math.floor(Number(populationCap));
+        if (!isFinite(time) || !isFinite(rate) || !isFinite(lifetime) || !isFinite(cap) ||
+            time < 0 || rate <= 0 || lifetime <= 0 || cap <= 0) return 0;
+        var lastSlot = Math.floor(time * rate);
+        var firstSlot = Math.floor((time - lifetime) * rate) + 1;
+        if (!isFinite(lastSlot) || !isFinite(firstSlot) || lastSlot > 9007199254740992 ||
+            firstSlot > 9007199254740992) return 0;
+        if (lastSlot < firstSlot) return 0;
+        firstSlot = Math.max(0, firstSlot);
+        return Math.min(cap, lastSlot - firstSlot + 1);
+    }
+
     function graphValueToDisplay(value, spec) {
         if (spec.kind === "popup") return Number(value) + (spec.displayOffset || 0);
         if (spec.kind === "color") return value.map(function (channel) { return channel * spec.scale; });
@@ -210,10 +278,14 @@
         }
         var emitters = nodes.filter(function (node) { return node.kind === "emitter"; });
         var outputs = nodes.filter(function (node) { return node.kind === "output"; });
-        if (emitters.length && outputs.length) {
-            var max = findParameter(graph.nodes.filter(function (node) { return node.id === emitters[0].id; })[0], "1");
+        var activeEmitter = activeEmitterParameters(graph);
+        if (activeEmitter && outputs.length) {
+            var sourceEmitter = graph.nodes.filter(function (node) { return node.id === activeEmitter.emitterId; })[0];
+            var max = sourceEmitter && findParameter(sourceEmitter, "1");
             if (max) {
-                outputs[0].params.push(viewParameter(emitters[0], "emitter", max, SPECS.emitter["1"]));
+                outputs[0].params.push(viewParameter(emitters.filter(function (node) {
+                    return node.id === activeEmitter.emitterId;
+                })[0], "emitter", max, SPECS.emitter["1"]));
                 outputs[0].maxParticles = max.value;
             }
         }
@@ -245,7 +317,9 @@
         return copy;
     }
 
-    return { types: TYPE, project: project, encodeCurve: encodeCurve, decodeCurve: decodeCurve,
+    return { types: TYPE, project: project, activeEmitterParameters: activeEmitterParameters,
+             countLiveParticles: countLiveParticles,
+             encodeCurve: encodeCurve, decodeCurve: decodeCurve,
              mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {
                  if (parameter.kind === "popup") return Number(displayValue) - parameter.displayOffset;
                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });

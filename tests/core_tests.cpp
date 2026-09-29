@@ -252,9 +252,9 @@ void test_graph_contract() {
 
     Graph partially_connected = graph;
     partially_connected.nodes.push_back(make_test_particle(3));
-    partially_connected.edges.push_back(GraphEdge{EdgeId{test_uuid(3)}, NodeId{test_uuid(3)},
-        kParticleParticlesOut, NodeId{test_uuid(2)}, kOutputParticles});
-    CHECK(validate_test_graph(partially_connected).error.code == GraphErrorCode::missing_required_input);
+    partially_connected.edges = {GraphEdge{EdgeId{test_uuid(30)}, NodeId{test_uuid(3)},
+        kParticleParticlesOut, NodeId{test_uuid(2)}, kOutputParticles}};
+    CHECK(validate_test_graph(partially_connected).ok()); // an incomplete required input can be rewired
 
     // Stable graph identities do not depend on editor/vector ordering.
     Graph reordered = graph;
@@ -302,7 +302,7 @@ void test_graph_contract() {
 
     bad = graph;
     bad.edges.clear();
-    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::missing_required_input);
+    CHECK(validate_test_graph(bad).ok()); // disconnected Output is a valid edit state
 
     bad = graph;
     bad.edges[0].id = EdgeId{};
@@ -1336,7 +1336,16 @@ void test_graph_evaluation() {
     rejects(Graph{});
     auto bad = graph;
     bad.edges.clear();
-    rejects(bad);
+    const auto disconnected = evaluate_particle_graph(bad, RationalTime{1, 1}, never);
+    CHECK(disconnected.has_value() && disconnected.value().particles.empty());
+    auto disconnected_request = build_request(Scene{});
+    disconnected_request.graph = std::make_shared<const Graph>(bad);
+    const auto disconnected_pixels = renderer.render(disconnected_request, never);
+    CHECK(disconnected_pixels.has_value());
+    if (disconnected_pixels.has_value()) {
+        CHECK(std::all_of(disconnected_pixels.value().pixels.begin(), disconnected_pixels.value().pixels.end(),
+            [](std::byte value) { return value == std::byte{0}; }));
+    }
     bad = graph;
     bad.nodes[0].parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
     rejects(bad);
@@ -1378,6 +1387,55 @@ void test_graph_evaluation() {
     Settings invalid;
     invalid.opacity = 1.5;
     CHECK(!make_emitter_output_graph(invalid, emitter, output, edge).has_value());
+}
+
+void test_graph_disconnect_and_reconnect() {
+    using namespace graph_keys;
+    const NeverCancelled never;
+    const CpuParticleRenderer renderer;
+    const auto made = make_emitter_particle_force_output_graph(
+        Settings{}, NodeId{test_uuid(101)}, NodeId{test_uuid(102)}, NodeId{test_uuid(103)},
+        NodeId{test_uuid(104)}, EdgeId{test_uuid(105)}, EdgeId{test_uuid(106)}, EdgeId{test_uuid(107)});
+    CHECK(made.has_value());
+    if (!made.has_value()) return;
+    const Graph connected = made.value();
+    const auto rendered = evaluate_particle_graph(connected, RationalTime{1, 1}, never);
+    CHECK(rendered.has_value() && !rendered.value().particles.empty());
+
+    for (std::size_t disconnected_edge = 0; disconnected_edge < connected.edges.size(); ++disconnected_edge) {
+        Graph edited = connected;
+        edited.edges.erase(edited.edges.begin() + static_cast<std::ptrdiff_t>(disconnected_edge));
+        CHECK(validate_graph(edited, particle_node_registry()).ok());
+        const auto encoded = serialize_graph(edited, particle_node_registry());
+        CHECK(encoded.has_value());
+        if (encoded.has_value()) CHECK(deserialize_graph(encoded.value(), particle_node_registry()).has_value());
+
+        const auto dormant = evaluate_particle_graph(edited, RationalTime{1, 1}, never);
+        CHECK(dormant.has_value() && dormant.value().particles.empty());
+        auto request = build_request(Scene{});
+        request.graph = std::make_shared<const Graph>(edited);
+        const auto transparent = renderer.render(request, never);
+        CHECK(transparent.has_value());
+        if (transparent.has_value()) {
+            CHECK(std::all_of(transparent.value().pixels.begin(), transparent.value().pixels.end(),
+                [](std::byte value) { return value == std::byte{0}; }));
+        }
+
+        // Reconnecting the exact edge restores the original deterministic stream.
+        edited.edges.push_back(connected.edges[disconnected_edge]);
+        CHECK(validate_graph(edited, particle_node_registry()).ok());
+        const auto restored = evaluate_particle_graph(edited, RationalTime{1, 1}, never);
+        CHECK(restored.has_value() && !restored.value().particles.empty());
+        if (restored.has_value() && rendered.has_value()) {
+            CHECK(restored.value().particles.size() == rendered.value().particles.size());
+            for (std::size_t i = 0; i < std::min(restored.value().particles.size(), rendered.value().particles.size()); ++i) {
+                CHECK(restored.value().particles[i].id == rendered.value().particles[i].id);
+                CHECK(restored.value().particles[i].position.x == rendered.value().particles[i].position.x);
+                CHECK(restored.value().particles[i].position.y == rendered.value().particles[i].position.y);
+                CHECK(restored.value().particles[i].position.z == rendered.value().particles[i].position.z);
+            }
+        }
+    }
 }
 
 // Regression coverage for the emitter -> force -> appearance -> output chain: the
@@ -1925,6 +1983,7 @@ int main() {
     test_particle_branches_and_ordered_buffer();
     test_force_and_appearance();
     test_graph_evaluation();
+    test_graph_disconnect_and_reconnect();
     test_rational_time();
     test_graph_contract();
     test_sequence_codec();

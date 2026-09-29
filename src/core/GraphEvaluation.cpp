@@ -303,13 +303,16 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         if (topological_order.size() != active_count) {
             return R::failure(ErrorCode::invalid_request, "graph cannot be evaluated in dependency order");
         }
-        if (active_emitter == count) {
-            return R::failure(ErrorCode::invalid_request, "active output must have exactly one emitter");
-        }
-
         EvaluatedGraph result;
         result.evaluated_nodes.reserve(active_count);
         for (const std::size_t index : topological_order) result.evaluated_nodes.push_back(nodes[index]->id);
+
+        // A topology edit can temporarily leave the Output ancestry without an
+        // emitter (for example, while a user disconnects and rewires a chain).
+        // Keep the graph valid and render transparent until a complete source
+        // path is connected again. Structural/type errors are still rejected by
+        // validate_graph above.
+        if (active_emitter == count) return R::success(std::move(result));
 
         // Graphs whose active output ancestry predates Particle are interpreted
         // as one legacy stream. Disconnected/parked Particle nodes stay inert.

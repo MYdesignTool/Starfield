@@ -20,25 +20,22 @@ The May 2023 SDK build includes the project-owned Size/Opacity curve banks, CEP
 curve editor, dynamic graph transaction integration, and the adapter fix that keeps
 AE Controls appearance endpoints enabled during graph projection.
 `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex` SHA-256:
-`4B10C79DE154096B3235BC388A5422BA71A6B3E57F5D030982E64E06C37E7E3D`.
+`8ACF50103F2B00E50291308332091E49DD359D6EEF92FAEE2DBEE4EDE7E9C185`.
 The paired Core DLL is `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`,
-SHA-256: `249C096401D60292B1650EB4AEC685D5427B7E599559625876602F6D3538FB1B`.
+SHA-256: `94A26570D09B9F97838BBE5696CC8DA04934C6430D22AC2E5C8B305CA4B4E46B`.
 The build script also updated this checkout's `dist/` copies and content-addressed
-`artifacts/runtime/current.txt`. The core suite passed 9,379 checks, including custom
-curves on Particle branches and legacy Appearance chains; the adapter fake-host suite
-passed 660 checks, including the corrected appearance projection; all seven focused
-panel suites, JavaScript syntax checks, and `git diff --check` passed. The AEX has not
+`artifacts/runtime/current.txt`. The core suite passed 9,780 checks, including custom
+curves on Particle branches and legacy Appearance chains, plus disconnect/reconnect
+coverage for every edge in the default chain; the adapter fake-host suite passed 660
+checks. The graph-view and panel-gateway suites passed for this update. The AEX has not
 been copied into the plug-in directory. That directory still had AEX SHA-256
 `EA1F8B15FE1925FEBA357C39A179AD1DF541BD41FCBA2C9F61D9981C444D4169` and pinned Core
 SHA-256 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545` when
 inspected. Its `StarfieldRuntime` junction points to this checkout's `artifacts/runtime`;
-the build selected `StarfieldCore-249C096401D60292.dll` while AfterFX PID 29396 was
-running. A read-only module snapshot confirms that process still has
-`StarfieldCore-095219764514FFCA.dll` loaded. Smart Render uses `acquire_core()` and
-does not poll the manifest after the first load; the Effect Controls Options action
-calls `reload_core()`. The new manifest alone therefore does not switch the running
-generation. No graph, curve, undo, or save/reopen host check has been made on this
-candidate.
+the build selected `StarfieldCore-94A26570D09B9F97.dll`. Smart Render uses
+`acquire_core()` and the Effect Controls Options action calls `reload_core()`. No graph,
+curve, undo, or save/reopen host check has been made on this candidate. The plug-in was
+not installed or replaced during this build.
 
 ## M3-01B per-axis emitter sizes (2026-09-30)
 
@@ -47,11 +44,11 @@ them through the flat-control graph constructor. Box uses three scaled extents, 
 uses an ellipsoid transform, and Disc uses X/Y in its existing plane. Old graph nodes
 without the optional keys keep 100% dimensions. The paired candidate is
 `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, SHA-256
-`4B10C79DE154096B3235BC388A5422BA71A6B3E57F5D030982E64E06C37E7E3D`, and
+`8ACF50103F2B00E50291308332091E49DD359D6EEF92FAEE2DBEE4EDE7E9C185`, and
 `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`, SHA-256
-`249C096401D60292B1650EB4AEC685D5427B7E599559625876602F6D3538FB1B`. This is the
+`94A26570D09B9F97838BBE5696CC8DA04934C6430D22AC2E5C8B305CA4B4E46B`. This is the
 current combined curve and per-axis candidate. The full build updated the checkout's
-`dist/` pair and runtime manifest. The core suite passes 9,379 checks and the current
+`dist/` pair and runtime manifest. The core suite passes 9,780 checks and the current
 adapter fake-host executable passes 660 checks. AE visual/project-lifecycle checks
 remain open. The AEX has not been copied into AE 2023's plug-in directory.
 

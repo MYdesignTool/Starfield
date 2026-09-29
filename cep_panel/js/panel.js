@@ -654,22 +654,6 @@
         return "Live " + live + " · Max " + shortNumber(maxParticles);
     }
 
-    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap) {
-        var time = Number(timeSeconds);
-        var rate = Number(birthRate);
-        var lifetime = Number(lifetimeSeconds);
-        var cap = Math.floor(Number(populationCap));
-        if (!isFinite(time) || !isFinite(rate) || !isFinite(lifetime) || !isFinite(cap) ||
-            time < 0 || rate <= 0 || lifetime <= 0 || cap <= 0) return 0;
-        var lastSlot = Math.floor(time * rate);
-        var firstSlot = Math.floor((time - lifetime) * rate) + 1;
-        if (!isFinite(lastSlot) || !isFinite(firstSlot) || lastSlot > 9007199254740992 ||
-            firstSlot > 9007199254740992) return 0;
-        if (lastSlot < firstSlot) return 0;
-        firstSlot = Math.max(0, firstSlot);
-        return Math.min(cap, lastSlot - firstSlot + 1);
-    }
-
     function updateFrameStatus() {
         if (frameStatusInFlight || !resolvedTarget || !state.targetToken || state.pending ||
             refreshInFlight || !state.nodes.length) return;
@@ -677,10 +661,22 @@
         call("getFrameStatus", null, function (response) {
             frameStatusInFlight = false;
             if (!response || !response.ok || response.targetToken !== state.targetToken) return;
-            state.frameStatus = response;
-            state.liveParticleCount = response.available === false ? null :
-                countLiveParticles(response.timeSeconds, response.birthRate,
-                                   response.lifetimeSeconds, response.maxParticles);
+            var status = response;
+            if (state.graphMode) {
+                var emission = window.StarfieldGraphView.activeEmitterParameters(state.graph);
+                if (!emission) {
+                    status = { available: false, targetToken: response.targetToken,
+                               timeSeconds: response.timeSeconds };
+                } else {
+                    status = { available: true, targetToken: response.targetToken,
+                               timeSeconds: response.timeSeconds, birthRate: emission.birthRate,
+                               lifetimeSeconds: emission.lifetimeSeconds, maxParticles: emission.maxParticles };
+                }
+            }
+            state.frameStatus = status;
+            state.liveParticleCount = status.available === false ? null :
+                window.StarfieldGraphView.countLiveParticles(status.timeSeconds, status.birthRate,
+                                                            status.lifetimeSeconds, status.maxParticles);
             var output = null;
             for (var i = 0; i < state.nodes.length; i++) {
                 if (nodeKind(state.nodes[i]) === "output") { output = graphNodeElements[state.nodes[i].id]; break; }
