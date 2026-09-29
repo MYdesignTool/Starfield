@@ -173,6 +173,52 @@ function testParticleFlowPresentation() {
     });
 }
 
+function testCurveBankCommitRoundTrips() {
+    const host = createHarness({ controlSource: 1 });
+    const response = host.call([
+        { key: "particle_size", value: 10 },
+        { key: "particle_size_end", value: 2 },
+        { key: "size_curve_count", value: 3 },
+        { key: "size_curve_point_0_age", value: 0 },
+        { key: "size_curve_point_0_value", value: 10 },
+        { key: "size_curve_point_1_age", value: 0.5 },
+        { key: "size_curve_point_1_value", value: 30 },
+        { key: "size_curve_point_2_age", value: 1 },
+        { key: "size_curve_point_2_value", value: 2 },
+        { key: "curve_edit_commit", value: 1 }
+    ]);
+    assert.equal(response.ok, true);
+    assert.equal(response.curves.size.custom, true);
+    assert.deepEqual(response.curves.size.points, [
+        { age: 0, value: 10 }, { age: 0.5, value: 30 }, { age: 1, value: 2 }
+    ]);
+    assert.equal(host.values["Size Curve Count"].value, 3);
+    assert.equal(host.values["Curve Edit Commit"].value, 1);
+    assert.equal(host.undo.begins, 1, "curve bank and nonce are written in one undo group");
+    assert.equal(host.undo.ends, 1);
+}
+
+function testInvalidCurveBankCommitIsRejectedBeforeWrite() {
+    const host = createHarness({ controlSource: 1 });
+    const response = host.call([
+        { key: "size_curve_count", value: 4 },
+        { key: "size_curve_point_0_age", value: 0 },
+        { key: "size_curve_point_0_value", value: 8 },
+        { key: "size_curve_point_1_age", value: 0.7 },
+        { key: "size_curve_point_1_value", value: 14 },
+        { key: "size_curve_point_2_age", value: 0.6 },
+        { key: "size_curve_point_2_value", value: 18 },
+        { key: "size_curve_point_3_age", value: 1 },
+        { key: "size_curve_point_3_value", value: 4 },
+        { key: "curve_edit_commit", value: 1 }
+    ]);
+    assert.equal(response.ok, false);
+    assert.equal(response.error.code, "invalid_curve");
+    assert.equal(host.writes.length, 0, "malformed curve banks must be rejected before touching AE properties");
+    assert.equal(host.values["Size Curve Count"].value, 0);
+    assert.equal(host.undo.begins, 0, "invalid curve data must not open an undo group");
+}
+
 function testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted() {
     const host = createHarness({ controlSource: 1 });
     const emitter = host.initialState.nodes.filter(node => node.id === "emitter")[0];
@@ -311,6 +357,8 @@ function testStaleBaseRevisionIsRequiredToMatch() {
 }
 
 testParticleFlowPresentation();
+testCurveBankCommitRoundTrips();
+testInvalidCurveBankCommitIsRejectedBeforeWrite();
 testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted();
 testVectorAnimationIsProtected();
 testFailedBatchRollsBackAndPreservesRawColorAlpha();

@@ -658,6 +658,46 @@
         return { custom: true, points: points };
     }
 
+    function validateCurveBankCommit(effect, planned, report) {
+        function valueFor(key) {
+            for (var p = 0; p < planned.length; p++) {
+                if (planned[p].binding.key === key) return planned[p].value;
+            }
+            var binding = bindingFor(key);
+            var property = binding && resolveProperty(effect, binding, report);
+            return property ? readValue(property, binding) : null;
+        }
+
+        var banks = [
+            { prefix: "size", label: "Size", max: 100000 },
+            { prefix: "opacity", label: "Opacity", max: 1 }
+        ];
+        for (var b = 0; b < banks.length; b++) {
+            var bank = banks[b];
+            var count = valueFor(bank.prefix + "_curve_count");
+            if (typeof count !== "number" || !isFinite(count) || Math.floor(count) !== count ||
+                count < 0 || count > 8 || count === 1) {
+                return bank.label + " curve point count must be 0 or an integer from 2 to 8.";
+            }
+            if (count === 0) continue;
+            var previousAge = -1;
+            for (var i = 0; i < count; i++) {
+                var age = valueFor(bank.prefix + "_curve_point_" + i + "_age");
+                var value = valueFor(bank.prefix + "_curve_point_" + i + "_value");
+                if (typeof age !== "number" || !isFinite(age) || age < 0 || age > 1 ||
+                    typeof value !== "number" || !isFinite(value) || value < 0 || value > bank.max ||
+                    (i > 0 && age <= previousAge)) {
+                    return bank.label + " curve contains an invalid or unordered point.";
+                }
+                if ((i === 0 && age !== 0) || (i === count - 1 && age !== 1)) {
+                    return bank.label + " curve endpoints must remain at ages 0 and 1.";
+                }
+                previousAge = age;
+            }
+        }
+        return null;
+    }
+
     function getFrameStatus(request) {
         var target = findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
@@ -740,6 +780,14 @@
             }
             planned.push({ binding: binding, property: property, value: change.value,
                            previousValue: copyHostValue(property.value) });
+        }
+
+        // The nonce is the curve bank's commit marker. Validate both complete banks
+        // against the pending batch before writing any AE property, so a malformed
+        // curve cannot be persisted and only then rejected by the refreshed read.
+        if (seen.curve_edit_commit) {
+            var curveError = validateCurveBankCommit(target.effect, planned, report);
+            if (curveError) return fail("invalid_curve", curveError);
         }
 
         var failed = null;

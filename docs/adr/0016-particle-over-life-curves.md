@@ -71,6 +71,7 @@ to provide the graph-level bounds and CRC.
 
 The adapter and core reject active curves with fewer than two or more than eight
 points, non-finite values, out-of-range ages/ordinates, unordered ages, or endpoints
-that move away from 0 and 1. The panel also validates the complete proposed point
-list before it writes any parameter. Unused hidden slots are ignored once the count
-is known.
+that move away from 0 and 1. The panel validates its proposed point list, and the
+CEP gateway validates both effective point banks again when the nonce is present,
+before opening an undo group or writing host parameters. Unused hidden slots are
+ignored once the count is known.
