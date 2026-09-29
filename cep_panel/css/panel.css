@@ -72,6 +72,15 @@ select, button, input[type="number"], input[type="text"] {
   padding: 3px 5px;
   font: inherit;
 }
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 button { cursor: pointer; }
 button:hover, button:focus-visible { border-color: var(--accent); }
 
