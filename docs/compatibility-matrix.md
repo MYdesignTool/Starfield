@@ -105,9 +105,11 @@ The authorized development installation is in
 The initial AE 2023.5.0 Build 52 split-build smoke pass loaded
 `StarfieldParticle.aex` SHA-256
 `B7362B01AC0E935D8AD596A70D61690DA4D586EEEC3E939328BA1BDC420069D5`.
-The installed AEX was updated on 2026-09-29 to
+The installed AEX was first updated on 2026-09-29 to
 `7BFE7092325C9AEE9E777DEDBFE31D5042249F0A4A78A11B35E23BAE0A1D3EB9`
-for the Options readout; the focused host result is recorded below.
+for the Options readout. It was then updated to
+`AEF074782242E9C76781DDF0FC43C197064F387C38D1AF0FE680490BB7EFC034`
+for strict runtime-manifest parsing; both focused host results are recorded below.
 The pinned fallback `StarfieldCore.dll` is
 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545`.
 `StarfieldRuntime` is a junction to this checkout's ignored `artifacts/runtime/`;
@@ -187,6 +189,23 @@ Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-
   2026-09-28 22:51:45 modification time. Whether `Options` itself dirties the project
   needs a separate isolated check. AEX-only rollback after AE exits:
   `Copy-Item -LiteralPath 'artifacts/disabled/StarfieldParticle-before-options-20260929.aex' -Destination 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex' -Force`.
+- **Two-line runtime manifest rejected in AE 2023.5.0 Build 52 (2026-09-29):**
+  the new installed AEX SHA-256 `AEF074782242E9C76781DDF0FC43C197064F387C38D1AF0FE680490BB7EFC034`
+  was built with the May 2023 SDK and replaced the `7BFE7092…` AEX after backing
+  it up to `artifacts/disabled/StarfieldParticle-before-manifest-20260929.aex`.
+  With two valid DLL basenames on separate lines in `current.txt`, Options showed
+  `Core reload: invalid core runtime manifest filename`; the prior generation
+  and particles over the blue lower layer remained visible. The original
+  one-line manifest was restored (SHA-256
+  `2DB62F2244AF22AB33D2370CD515E188D2C7B384D4FD3AB1152C39EEB17B3F75`),
+  and Options then showed `Core: current DLL` in the same AE process. AE exited
+  normally with **Don't Save**; `testproject.aep` stayed at 106,687 bytes and
+  its 2026-09-28 22:51:45 modification time. The installed AEX hash and manifest
+  hash were rechecked after exit. The Core DLLs and development junction were
+  unchanged. To roll back this AEX after AE exits:
+  `Copy-Item -LiteralPath 'artifacts/disabled/StarfieldParticle-before-manifest-20260929.aex' -Destination 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex' -Force`.
+  This checks malformed-manifest fallback; it does not close the in-flight AE
+  render switch or exact monolith pixel-comparison gates.
 - **Panel write works; host undo initially left a stale panel value.** Editing `Size` from 10 to 40 in the panel
   updated the AE frame immediately, and Ctrl+Z restored both the value and the picture —
   but the panel kept showing 40 until it re-read host state. The protocol has no push

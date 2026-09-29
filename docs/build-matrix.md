@@ -19,7 +19,7 @@ It is backed up under `artifacts/disabled/h01-ae2023-crt-before-20260928`.
 AE 2023.5.0 Build 52 visually confirmed transparent particle output on the preceding
 candidate `D22D43BAD15C5173867907369B2EF3293A3FD601C308158665A1F3FD0AB0816B`.
 
-H-01 AE 2023.5.0 Build 52 host candidate: installed `StarfieldParticle.aex`
+Initial H-01 AE 2023.5.0 Build 52 host candidate: installed `StarfieldParticle.aex`
 SHA-256 `B7362B01AC0E935D8AD596A70D61690DA4D586EEEC3E939328BA1BDC420069D5`
 and pinned `StarfieldCore.dll` SHA-256
 `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545`.
@@ -55,6 +55,17 @@ test loaded the selected versioned DLL. `dist/` now reproduces the selected Core
 generation, and the development junction remains active. This AEX-only update was
 qualified for the Options readout in AE 2023.5.0 Build 52; the older hot-reload smoke
 checks remain recorded against `B7362B01…`.
+
+The subsequent manifest parser build produced and installed `StarfieldParticle.aex`
+SHA-256 `AEF074782242E9C76781DDF0FC43C197064F387C38D1AF0FE680490BB7EFC034`.
+The preceding `7BFE7092…` AEX is backed up as
+`artifacts/disabled/StarfieldParticle-before-manifest-20260929.aex`; after AE exits,
+copying that file over the installed AEX restores it. The selected versioned Core,
+pinned fallback Core and valid `current.txt` were unchanged. The loader harness
+passed with a new two-line manifest rejection case, and AE 2023.5.0 Build 52
+reported the malformed manifest while retaining visible particles. After the valid
+manifest was restored, Options reported `Core: current DLL` in the same AE process.
+See `docs/compatibility-matrix.md` for the exact host scope.
 
 ## Artifact layout
 

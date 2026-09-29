@@ -88,7 +88,10 @@ std::filesystem::path selected_core(std::string& error) {
     std::string filename;
     std::getline(stream, filename);
     if (!filename.empty() && filename.back() == '\r') filename.pop_back();
-    if (!valid_versioned_name(filename) || stream.bad()) {
+    // The manifest is exactly one basename, optionally followed by one line ending.
+    // A second line must not be silently ignored when selecting executable code.
+    if (!valid_versioned_name(filename) || stream.bad() ||
+        stream.peek() != std::char_traits<char>::eof() || stream.bad()) {
         error = "invalid core runtime manifest filename";
         return {};
     }

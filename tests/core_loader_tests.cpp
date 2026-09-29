@@ -73,6 +73,12 @@ int wmain(int argc, wchar_t* argv[]) {
         auto bad = starfield::adapter::reload_core();
         if (!check(static_cast<bool>(bad) && !bad.error.empty() &&
                    bad.generation == current.generation, "bad manifest retains prior core")) return 1;
+        select("StarfieldCore-loader-a.dll\nStarfieldCore-loader-b.dll");
+        auto extra_line = starfield::adapter::reload_core();
+        if (!check(static_cast<bool>(extra_line) &&
+                   extra_line.error.find("invalid core runtime manifest filename") != std::string::npos &&
+                   extra_line.generation == current.generation,
+                   "multi-line manifest retains prior core")) return 1;
         select("StarfieldCore-missing.dll");
         auto missing = starfield::adapter::reload_core();
         if (!check(static_cast<bool>(missing) && !missing.error.empty() &&
@@ -85,6 +91,7 @@ int wmain(int argc, wchar_t* argv[]) {
                    "incompatible DLL retains prior core")) return 1;
         select("StarfieldCore-loader-b.dll");
         bad.generation.reset();
+        extra_line.generation.reset();
         missing.generation.reset();
         incompatible.generation.reset();
         current.generation.reset();

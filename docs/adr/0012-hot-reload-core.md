@@ -25,7 +25,8 @@ small `current.txt` manifest under `artifacts/runtime/`. A one-time, explicitly
 authorized host junction may expose that directory as `StarfieldRuntime` next
 to the installed `.aex`. The Options command manually loads the selected core.
 The manifest is one ASCII basename no longer than 100 bytes matching
-`StarfieldCore-*.dll`; path separators and parent traversal are rejected. If
+`StarfieldCore-*.dll`, optionally followed by one line ending; any additional
+line is rejected. Path separators and parent traversal are rejected. If
 the manifest is absent, the loader tries a pinned `StarfieldCore.dll` next to
 the AEX for a self-contained release. A malformed manifest is an error and
 never silently selects another DLL.

@@ -44,8 +44,10 @@ This backlog is the task source for staged implementation work. Assign one task 
   compositing, emitter shapes, gravity and size changes on the split build. The first
   `/MD` split build crashed in AE's old app-local C++ runtime; `/MT` in both
   modules fixed that observed crash. An in-flight AE render switch and exact
-  image parity with the monolithic binary remain open; hashes and rollback
-  are in `docs/compatibility-matrix.md`.
+  image parity with the monolithic binary remain open. The 2026-09-29 loader
+  parser now rejects a second manifest line; the loader harness and AE 2023.5.0
+  Build 52 confirmed that a malformed manifest retains the prior Core. Current
+  hashes and rollback are in `docs/compatibility-matrix.md`.
 
 | ID | Owner | Work | Done when |
 |---|---|---|---|
