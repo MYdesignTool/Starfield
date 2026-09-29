@@ -67,6 +67,18 @@ reported the malformed manifest while retaining visible particles. After the val
 manifest was restored, Options reported `Core: current DLL` in the same AE process.
 See `docs/compatibility-matrix.md` for the exact host scope.
 
+AE 2023.5.0 Build 52 `aerender` also exported frames 51–53 of `Comp 1` from
+`testproject.aep` as 3840×2160 premultiplied RGBA PSD sequences with MFR off.
+The current split AEX/Core and the prior AE-qualified monolith `D22D43BA…`
+produced identical decoded channel pixels on all three frames. A different Core
+changed 7,818 pixels on frame 51 as a cache control. The tracked
+`tools/Compare-PsdFrames.cjs` compares flattened pixels while ignoring changing
+PSD resource metadata. The actual exports and scratch decode output are ignored
+under `artifacts/reports/h01-parity/`. `aerender` could not write to the Unicode
+checkout path directly, so each run temporarily mapped the checkout to `Z:`
+and removed that mapping afterwards. The original AEX and manifest were restored.
+See `docs/compatibility-matrix.md` for scope, hashes and remaining host gates.
+
 ## Artifact layout
 
 `artifacts/` is Git-ignored and holds only generated files. Every entry is either reproducible from a

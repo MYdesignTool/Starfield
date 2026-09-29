@@ -101,8 +101,10 @@ H-01 separates the AE adapter from the runtime core and adds manual development
 reload. The May 2023 SDK builds both binaries; 6,196 core checks, 395 adapter
 checks and the loader harness pass. The `/MT` split pair is installed in AE
 2023.5.0 Build 52. Full/Quarter hot reload, missing-DLL fallback, 8/16/32-bpc
-visual rendering and save/close/reopen have host evidence; an in-flight AE render
-switch and exact pixel comparison with the monolithic binary remain open. The
+visual rendering and save/close/reopen have host evidence. Three Full-resolution
+8-bpc render-queue frames have exact decoded RGBA parity with the prior
+monolithic binary; an in-flight AE render switch and broader pixel parity
+remain open. The
 prior monolith is backed up for rollback. Half/Third point mapping, split-build
 copy/undo, shapes and basic gravity/size changes also have AE observations. See
 `compatibility-matrix.md`.

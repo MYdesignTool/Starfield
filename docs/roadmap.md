@@ -19,8 +19,9 @@ remain the long-term goal; this Alpha does not complete that goal.
   `.aex` unchanged. AE 2023.5.0 Build 52 confirmed Full/Quarter hot reload
   without a restart, missing-DLL fallback, visual 8/16/32-bpc rendering,
   transparency, and save/close/reopen. The first `/MD` candidate crashed under
-  AE's old app-local C++ runtime; both modules now use `/MT`. An in-flight AE
-  render switch and exact monolithic pixel comparison remain open.
+  AE's old app-local C++ runtime; both modules now use `/MT`. Three Full-resolution
+  8-bpc render-queue frames match the prior monolith's decoded RGBA pixels.
+  An in-flight AE render switch and broader pixel parity remain open.
 
 - **M0 contract work is in place:** parameter manifest, sequence-format specification, build matrix, and ADRs for product identity, time, and pixels/alpha are checked in. The M1 shell uses the selected internal identity `org.starfieldfx.particle`.
 - **M1 implementation is in place:** native entry-point source, official PiPL pipeline, lifecycle dispatch, and legacy pass-through render are present.
@@ -117,7 +118,7 @@ M1 used legacy `PF_Cmd_RENDER` only as a low-risk pass-through load test. M2 has
 
 ## Immediate next work
 
-1. **Continue AE 2023 host qualification.** Full/Half/Third/Quarter centre normalization, Quarter Point playback, save/reopen, effect copy, undo/redo, all bit depths, transparency, lower-layer compositing, shape distinctions, gravity and size changes have host evidence. Still test fresh add/build-1 project load, off-centre positioning, drag/color/opacity curves, control capture, graph-byte persistence, render queue, cancellation, reverse-time frame identity, and an in-flight Core switch.
+1. **Continue AE 2023 host qualification.** Full/Half/Third/Quarter centre normalization, Quarter Point playback, save/reopen, effect copy, undo/redo, all bit depths, transparency, lower-layer compositing, shape distinctions, gravity and size changes have host evidence. The render queue produced three frames with exact sampled monolith parity. Still test fresh add/build-1 project load, off-centre positioning, drag/color/opacity curves, control capture, graph-byte persistence, cancellation, reverse-time frame identity, and an in-flight Core switch.
 2. **Continue CEP panel qualification** using the checklist in `cep_panel/README.md`. Automatic target discovery, a panel `Size` write and host undo updating the picture passed. Verify redo, focus refresh after other host edits, stale-state rejection and Node Graph synchronization.
 3. **Record the three delivery examples** from `docs/examples.md`.
 4. **Grow the graph past the fixed chain:** protocol v2 for create/delete/rewire, then the next node kernels (textures/layer sources, depth, spawn) each tied to an observed reference case.

@@ -204,8 +204,31 @@ Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-
   hash were rechecked after exit. The Core DLLs and development junction were
   unchanged. To roll back this AEX after AE exits:
   `Copy-Item -LiteralPath 'artifacts/disabled/StarfieldParticle-before-manifest-20260929.aex' -Destination 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex' -Force`.
-  This checks malformed-manifest fallback; it does not close the in-flight AE
-  render switch or exact monolith pixel-comparison gates.
+  This checks malformed-manifest fallback; the separate render and parity pass
+  below covers a different H-01 gate.
+- **Render queue and sampled monolith parity passed in AE 2023.5.0 Build 52
+  (2026-09-29):** `aerender.exe` rendered `Comp 1` from
+  `D:\Project\Code\test\testproject.aep`, frames 51–53 at 3840×2160, Full,
+  8 bpc, Best Settings, MFR off, to `Multi-Machine Sequence` PSDs with
+  RGB + Alpha and premultiplied color. The split adapter was
+  `AEF074782242E9C76781DDF0FC43C197064F387C38D1AF0FE680490BB7EFC034`
+  with selected Core `095219764514FFCA…`; the prior AE-qualified monolith was
+  `D22D43BAD15C5173867907369B2EF3293A3FD601C308158665A1F3FD0AB0816B`.
+  `node tools/Compare-PsdFrames.cjs <split.psd> <monolith.psd>` decoded the
+  flattened PackBits RGBA channels and found **zero differing pixels** on each
+  of the three frames. The frames contain 7,900, 7,947 and 8,109 pixels whose
+  RGB differs from the blue background, respectively. PSD file hashes differ
+  because resource metadata differs; decoded channel hashes match. As a cache
+  control, an alternate Core (`ED024907207169D9…`) with the same AEX and frame
+  51 changed 7,818 pixels, showing that `aerender` did not simply reuse the
+  previous normal-Core image. `aerender` reported disk cache **Read Only** and
+  exited without saving the project. The current AEX and one-line manifest were
+  restored and their SHA-256 hashes rechecked; the project size/time stayed
+  106,687 bytes / 2026-09-28 22:51:45. Output frames and command scratch are
+  under ignored `artifacts/reports/h01-parity/`. This proves parity for these
+  rendered frames, not all depths, ROI shapes or parameter combinations. The
+  in-flight AE render switch remains open. AEX-only rollback after AE exits:
+  `Copy-Item -LiteralPath 'artifacts/disabled/StarfieldParticle-before-parity-20260929.aex' -Destination 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex' -Force`.
 - **Panel write works; host undo initially left a stale panel value.** Editing `Size` from 10 to 40 in the panel
   updated the AE frame immediately, and Ctrl+Z restored both the value and the picture —
   but the panel kept showing 40 until it re-read host state. The protocol has no push
@@ -228,10 +251,11 @@ Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-
 
 Repository gates still pass: 6,196 core checks, 395 adapter checks, and the
 two-generation loader harness including a real pinned render and failed-reload
-fallback. `-CoreOnly` leaves the AEX hash unchanged. **Open host gates:** switch
-while an AE render is actually in flight; compare exact frames with the prior
-monolith; exercise repeated switches, reverse-time requests, render queue and
-cancellation. The rollback command (run after AE closes) is
+fallback. `-CoreOnly` leaves the AEX hash unchanged. Three Full-resolution
+render-queue frames now have decoded RGBA parity with the prior monolith.
+**Open host gates:** switch while an AE render is actually in flight; broaden
+pixel parity across depths, ROI and parameters; exercise repeated switches,
+reverse-time requests and cancellation. The rollback command (run after AE closes) is
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Deploy-HotCore.ps1 -Rollback -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins'`.
 Rollback has been prepared and backed up; it has not been exercised, since the
 tested split pair is still installed for development.
@@ -248,8 +272,8 @@ tested split pair is still installed for development.
 | Forces | Each force has isolated enable/disable and stable parameter semantics | Gravity and linear drag are implemented in one force stage. AE 2023.5.0 Build 52 visually confirmed `Gravity Y = -2` changes the trail on the split build; drag and per-force enable/disable remain unqualified or unimplemented respectively |
 | Ages and appearance | Size, opacity, and color follow particle age | Core age curves are covered by tests; AE 2023.5.0 Build 52 visually confirmed a shrinking trail with `Size Over Life = 1`. Opacity and color curve visuals remain open |
 | Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. The CEP screenshot shows no node canvas; P-02A adds a visual fixed topology, while dynamic create/delete/rewire remains P-02B. |
-| Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Core emits premultiplied particles over transparent black. The split build visibly renders at 8/16/32 bpc and on the transparency grid in AE 2023.5.0 Build 52; exact per-pixel comparisons remain open |
-| Reloadable core | A new core algorithm builds and renders in AE without restarting or replacing the AEX | AE 2023.5.0 Build 52 visually confirmed Full/Quarter white → red → white reload with unchanged AEX/process, and missing-DLL fallback. An in-flight AE render switch and exact monolith pixel comparison remain open (H-01) |
+| Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Core emits premultiplied particles over transparent black. The split build visibly renders at 8/16/32 bpc and on the transparency grid in AE 2023.5.0 Build 52; Full-resolution 8-bpc render-queue frames 51–53 have exact decoded RGBA parity with the monolith. Other depths and ROI cases remain open |
+| Reloadable core | A new core algorithm builds and renders in AE without restarting or replacing the AEX | AE 2023.5.0 Build 52 visually confirmed Full/Quarter white → red → white reload with unchanged AEX/process, missing-DLL fallback, and sampled monolith frame parity. An in-flight AE render switch remains open (H-01) |
 | Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Full/Half/Third/Quarter centre normalization is host-confirmed in AE 2023.5.0 Build 52; Quarter playback advances visibly. Exact reverse-time image comparison remains open |
 | Compositing | Effect output contains particles with transparent pixels; the input layer's solid color is not copied | AE 2023.5.0 Build 52 confirmed the transparency grid and a lower solid visible between particles on the split build. Two instances stacked on one layer display only the topmost effect under the current input-independent contract |
 | Color management | Working-space conversion through documented AE suites | Not started; M2 performs no conversion (ADR 0005) |

@@ -43,8 +43,11 @@ This backlog is the task source for staged implementation work. Assign one task 
   owner checks covered effect copy/undo, Half/Third geometry, lower-layer
   compositing, emitter shapes, gravity and size changes on the split build. The first
   `/MD` split build crashed in AE's old app-local C++ runtime; `/MT` in both
-  modules fixed that observed crash. An in-flight AE render switch and exact
-  image parity with the monolithic binary remain open. The 2026-09-29 loader
+  modules fixed that observed crash. AE `aerender` exported three Full-resolution
+  8-bpc frames from both the current split pair and the earlier AE-qualified
+  monolith; decoded RGBA pixels matched exactly at frames 51–53, and an
+  alternate-color Core changed frame 51 as a cache control. Broader pixel parity
+  and an in-flight AE render switch remain open. The 2026-09-29 loader
   parser now rejects a second manifest line; the loader harness and AE 2023.5.0
   Build 52 confirmed that a malformed manifest retains the prior Core. Current
   hashes and rollback are in `docs/compatibility-matrix.md`.
