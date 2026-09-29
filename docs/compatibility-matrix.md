@@ -245,9 +245,10 @@ Extension acceptance pass on the same `/MT` split pair (owner-operated, 2026-09-
   out at the frame's time; with `Node Graph` it reads the stored bytes, which hold
   constants. Animation and Node Graph mode are therefore mutually exclusive today, and
   graph-side history needs M3-03's contract.
-- The owner's verdict on the panel surface: **the node graph is not implemented yet.**
-  It renders four bordered stage cards with a `↓ particles` text connector and no ports,
-  no drawn edges and no pan/zoom, so P-02A stays open.
+- The owner's verdict on the panel surface at this checkpoint: the tested panel was
+  still a parameter form rather than a node canvas. The later P-02A source now draws ports,
+  routed connectors, draggable node cards, and a floating properties window; that revision
+  has not yet been viewed in AE. It remains a fixed four-stage view until P-02B.
 
 Repository gates still pass: 6,196 core checks, 395 adapter checks, and the
 two-generation loader harness including a real pinned render and failed-reload
@@ -271,7 +272,7 @@ tested split pair is still installed for development.
 | Random Seed | Changing the seed changes the rendered pixels | Implemented (M3-01): the seed now keys every per-particle stream. Host confirmation pending |
 | Forces | Each force has isolated enable/disable and stable parameter semantics | Gravity and linear drag are implemented in one force stage. AE 2023.5.0 Build 52 visually confirmed `Gravity Y = -2` changes the trail on the split build; drag and per-force enable/disable remain unqualified or unimplemented respectively |
 | Ages and appearance | Size, opacity, and color follow particle age | Core age curves are covered by tests; AE 2023.5.0 Build 52 visually confirmed a shrinking trail with `Size Over Life = 1`. Opacity and color curve visuals remain open |
-| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Graph model/codec/evaluator handle the emitter → force → appearance → output chain, including stage-order enforcement, single-emitter and single-appearance rules, and graph/flat pixel parity. P-02A now implements the visual fixed topology in source; the earlier CEP screenshot predates it. Dynamic create/delete/rewire remains P-02B. |
+| Nodes | Graph connections validate cycles, missing inputs, and invalid references without crashing | Current runtime supports the emitter → force → appearance → output chain, including stage-order enforcement, one active emitter/appearance and graph/flat pixel parity. CEP source now draws selectable, draggable cards with routed connectors and a movable properties window; the updated UI has not been viewed in AE. Add/delete/rewire and the owner's Particle fan-out plus serial/parallel force rules remain G-05/P-02B. |
 | Rendering | Alpha, premultiplication, color depth, rowbytes, ROI, and downsample are explicit | Core emits premultiplied particles over transparent black. The split build visibly renders at 8/16/32 bpc and on the transparency grid in AE 2023.5.0 Build 52; Full-resolution 8-bpc render-queue frames 51–53 have exact decoded RGBA parity with the monolith. Other depths and ROI cases remain open |
 | Reloadable core | A new core algorithm builds and renders in AE without restarting or replacing the AEX | AE 2023.5.0 Build 52 visually confirmed Full/Quarter white → red → white reload with unchanged AEX/process, missing-DLL fallback, and sampled monolith frame parity. An in-flight AE render switch remains open (H-01) |
 | Preview resolution | The same frame at Full/Half/Quarter puts particles in the same comp positions | Full/Half/Third/Quarter centre normalization is host-confirmed in AE 2023.5.0 Build 52; Quarter playback advances visibly. Exact reverse-time image comparison remains open |
@@ -280,7 +281,7 @@ tested split pair is still installed for development.
 | Control shape | Positions use point controls, rates use scalar sliders | Emitter Origin is a 3D point and X/Y/Z velocity are sliders; AE 2023.5.0 Build 52 exercised these controls on the split build. Capture and stored graph bytes need separate qualification |
 | Emitter origin | The point control places the emitter and the render agrees with it | The split build's Full/Half/Third/Quarter readouts normalize the centre to `[1920,1080,1080]`; off-centre visual parity remains open |
 | Point-control scaling | AE point values map to the same layer position at Full and Quarter | Host readouts confirm preview-scaled raw points normalize to the same comp coordinates at Full/Half/Third/Quarter in AE 2023.5.0 Build 52 |
-| CEP node canvas | The dockable panel visibly presents nodes, ports, and connectors | Implemented in source as four selectable cards, ports and connectors, plus a selected-node inspector. AE owner-sized dock view and parameter edit on this new UI have not yet been observed; the prior screenshot shows the older grouped form |
+| CEP node canvas | The dockable panel visibly presents nodes, ports, connectors, movable layout and editable node properties | Source implements four selectable cards, dynamically routed connectors, session-local node dragging, automatic target polling, and a movable floating properties window. The owner-sized AE view and edits on this revision remain unobserved; protocol v1 remains fixed-topology |
 | Persistence | Save/reopen, effect copy and undo preserve graph identity and values | On the split build, save/close/reopen retained visible Node Graph mode and values; Ctrl+D, same-name paste, undo/redo passed. A byte-level stored-graph comparison and build-1 migration remain open. Capture samples current-time constants and does not convert animation tracks |
 | Concurrency | Repeated concurrent renders return identical pixels and never mutate shared state | Not advertised (no MFR flag); the core render is a pure function of one request, which M6 must audit before claiming support |
 | Cancellation | A host abort stops a long render predictably | Implemented through `PF_ABORT` polling in the simulation and rasterizer; unverified in a host |

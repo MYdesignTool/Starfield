@@ -111,8 +111,11 @@ authorization.
 1. Put `StarfieldParticle.aex` in the AE plug-ins folder (see the repository
    `README.md`) and apply the effect to a layer.
 2. Select exactly one layer that carries the effect. The panel discovers it automatically
-   and shows the four connected nodes. Select a node to see its parameters below the graph.
-3. Edit a value in the inspector: the panel validates it, writes it through the gateway in one undo
+   and shows the four connected nodes. Drag a node card to arrange the canvas; layout is local
+   to the open panel session. Click a node to open its floating properties window. The checked
+   **Refresh Automatically** option re-reads the selected AE target while the panel is visible;
+   **Refresh** remains available for an immediate manual read.
+3. Edit a value in the floating inspector: the panel validates it, writes it through the gateway in one undo
    group, and the composition updates.
 4. **Example** presets: `Spark`, `Snow`, `Floating Light`, and `Reset Defaults` fill in
    the same values documented in [docs/examples.md](../docs/examples.md). They leave
@@ -157,7 +160,11 @@ The owner then observed `Lookup: name` in the footer, a panel `Size` edit updati
 the AE frame, and host undo restoring the picture. Undo initially left the panel
 displaying the prior value; the client now re-reads on focus, and the owner reports
 that values update again. These observations were made on the earlier grouped form.
-The node canvas is implemented in source but has not yet been viewed in the owner's AE dock.
+The draggable canvas, floating inspector, and target polling are implemented in source,
+but this UI revision has not yet been viewed in the owner's AE dock. The current canvas
+still shows the fixed four-stage topology: it does not create, delete, or reconnect nodes.
+Those actions need the graph-backed transaction contract in P-02B; protocol v1 only edits
+the supervised parameter streams.
 Remaining qualification:
 
 1. Redo, panel focus refresh after other AE edits, and undo grouping across a batch.

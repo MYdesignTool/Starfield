@@ -23,9 +23,12 @@
       <option value="defaults">Reset Defaults</option>
     </select>
     <button id="refresh" type="button">Refresh</button>
+    <label class="auto-refresh" title="Poll the selected AE layer and effect while the panel is open">
+      <input id="autoRefresh" type="checkbox" checked /> Refresh Automatically
+    </label>
   </section>
 
-  <main class="workspace">
+  <main id="workspace" class="workspace">
     <section class="graph-pane" aria-label="Particle graph">
       <div class="section-heading">
         <span>Graph</span>
@@ -47,15 +50,18 @@
         </div>
       </div>
     </section>
-    <section class="inspector" aria-label="Selected node parameters">
-      <div class="section-heading">
-        <span id="inspectorTitle">Inspector</span>
-        <span id="inspectorMeta" class="section-note">Select a node</span>
+    <aside id="inspector" class="floating-inspector" aria-label="Selected node parameters" hidden>
+      <div id="inspectorDrag" class="inspector-head">
+        <div class="inspector-heading">
+          <span id="inspectorTitle">Node</span>
+          <span id="inspectorMeta" class="section-note"></span>
+        </div>
+        <button id="closeInspector" class="inspector-close" type="button" aria-label="Close node properties">×</button>
       </div>
       <div id="inspectorBody" class="inspector-body">
         <p class="hint">Select a node to inspect its parameters.</p>
       </div>
-    </section>
+    </aside>
   </main>
 
   <footer class="bar footer">

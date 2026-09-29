@@ -8,9 +8,21 @@
 
     var REQUEST_TIMEOUT_MS = 8000;
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
+    var TARGET_POLL_INTERVAL_MS = 1200;
+    var NODE_WIDTH = 220;
+    var NODE_HEIGHT = 108;
+    var CANVAS_MIN_WIDTH = 580;
+    var CANVAS_MIN_HEIGHT = 320;
     var startupRetryAttempt = 0;
     var startupRetryTimer = null;
     var refreshEpoch = 0;
+    var refreshInFlight = false;
+    var resolvedTarget = false;
+    var dragState = null;
+    var inspectorDragState = null;
+    var nodePositions = {};
+    var graphNodeElements = {};
+    var shownInspectorNodeId = null;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
     // Adobe's full CSInterface library can replace this shim later without changing
@@ -72,20 +84,27 @@
     };
 
     var state = { revision: null, targetToken: null, nodes: [], edges: [], values: {},
-                  selectedNodeId: "emitter", pending: false };
+                  selectedNodeId: "emitter", inspectorOpen: false, pending: false };
     var elements = {
         banner: document.getElementById("banner"),
         chain: document.getElementById("chain"),
+        workspace: document.getElementById("workspace"),
+        graphCanvas: document.querySelector ? document.querySelector(".graph-canvas") : null,
+        graphEdges: document.getElementById("graphEdges"),
         edgePaths: document.getElementById("edgePaths"),
         inspectorTitle: document.getElementById("inspectorTitle"),
         inspectorMeta: document.getElementById("inspectorMeta"),
         inspectorBody: document.getElementById("inspectorBody"),
+        inspector: document.getElementById("inspector"),
+        inspectorDrag: document.getElementById("inspectorDrag"),
+        closeInspector: document.getElementById("closeInspector"),
         targetLine: document.getElementById("targetLine"),
         modeLine: document.getElementById("modeLine"),
         revisionLine: document.getElementById("revisionLine"),
         resolutionLine: document.getElementById("resolutionLine"),
         preset: document.getElementById("preset"),
-        refresh: document.getElementById("refresh")
+        refresh: document.getElementById("refresh"),
+        autoRefresh: document.getElementById("autoRefresh")
     };
 
     function requestId() {
@@ -216,15 +235,110 @@
         elements.banner.textContent = "";
     }
 
-    var EDGE_PATHS = {
-        "emitter:force": "M245 76 C278 76 302 76 335 76",
-        "force:appearance": "M445 130 C445 150 445 170 445 190",
-        "appearance:output": "M335 244 C302 244 278 244 245 244"
-    };
     var NODE_KICKERS = {
         emitter: "01 / SOURCE", force: "02 / MOTION",
         appearance: "03 / LOOK", output: "04 / RESULT"
     };
+    var DEFAULT_NODE_POSITIONS = {
+        emitter: { x: 25, y: 22 }, force: { x: 335, y: 22 },
+        appearance: { x: 335, y: 190 }, output: { x: 25, y: 190 }
+    };
+
+    function positionFor(node, index) {
+        if (!nodePositions[node.id]) {
+            var preset = DEFAULT_NODE_POSITIONS[node.id];
+            nodePositions[node.id] = preset ? { x: preset.x, y: preset.y } : {
+                x: 25 + (index % 2) * 310,
+                y: 22 + Math.floor(index / 2) * 168
+            };
+        }
+        return nodePositions[node.id];
+    }
+
+    function updateCanvasBounds() {
+        if (!elements.graphCanvas) return;
+        var width = CANVAS_MIN_WIDTH;
+        var height = CANVAS_MIN_HEIGHT;
+        for (var i = 0; i < state.nodes.length; i++) {
+            if (!NODE_KICKERS[state.nodes[i].id]) continue;
+            var position = positionFor(state.nodes[i], i);
+            width = Math.max(width, position.x + NODE_WIDTH + 25);
+            height = Math.max(height, position.y + NODE_HEIGHT + 22);
+        }
+        elements.graphCanvas.style.width = width + "px";
+        elements.graphCanvas.style.height = height + "px";
+        if (elements.graphEdges) elements.graphEdges.setAttribute("viewBox", "0 0 " + width + " " + height);
+    }
+
+    function chooseSide(dx, dy, fallback) {
+        if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? "right" : "left";
+        if (Math.abs(dy) > 0) return dy >= 0 ? "bottom" : "top";
+        return fallback;
+    }
+
+    function computePortSides() {
+        var vectors = {};
+        for (var i = 0; i < state.edges.length; i++) {
+            var edge = state.edges[i];
+            if (!edge || edge.length !== 2 || !nodePositions[edge[0]] || !nodePositions[edge[1]]) continue;
+            var source = nodePositions[edge[0]];
+            var destination = nodePositions[edge[1]];
+            var sourceCenterX = source.x + NODE_WIDTH / 2;
+            var sourceCenterY = source.y + NODE_HEIGHT / 2;
+            var destinationCenterX = destination.x + NODE_WIDTH / 2;
+            var destinationCenterY = destination.y + NODE_HEIGHT / 2;
+            if (!vectors[edge[0]]) vectors[edge[0]] = { outX: 0, outY: 0, inX: 0, inY: 0 };
+            if (!vectors[edge[1]]) vectors[edge[1]] = { outX: 0, outY: 0, inX: 0, inY: 0 };
+            vectors[edge[0]].outX += destinationCenterX - sourceCenterX;
+            vectors[edge[0]].outY += destinationCenterY - sourceCenterY;
+            vectors[edge[1]].inX += sourceCenterX - destinationCenterX;
+            vectors[edge[1]].inY += sourceCenterY - destinationCenterY;
+        }
+        var sides = {};
+        for (var nodeId in nodePositions) {
+            if (!Object.prototype.hasOwnProperty.call(nodePositions, nodeId)) continue;
+            var vector = vectors[nodeId] || {};
+            sides[nodeId] = {
+                output: chooseSide(vector.outX || 0, vector.outY || 0, "right"),
+                input: chooseSide(vector.inX || 0, vector.inY || 0, "left")
+            };
+        }
+        return sides;
+    }
+
+    function portPoint(nodeId, side) {
+        var position = nodePositions[nodeId];
+        if (!position) return null;
+        if (side === "right") return { x: position.x + NODE_WIDTH, y: position.y + NODE_HEIGHT / 2 };
+        if (side === "left") return { x: position.x, y: position.y + NODE_HEIGHT / 2 };
+        if (side === "bottom") return { x: position.x + NODE_WIDTH / 2, y: position.y + NODE_HEIGHT };
+        return { x: position.x + NODE_WIDTH / 2, y: position.y };
+    }
+
+    function edgePath(edge, sides) {
+        var startSide = sides[edge[0]] ? sides[edge[0]].output : "right";
+        var endSide = sides[edge[1]] ? sides[edge[1]].input : "left";
+        var start = portPoint(edge[0], startSide);
+        var end = portPoint(edge[1], endSide);
+        if (!start || !end) return null;
+        var distance = Math.max(42, Math.min(180,
+            (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) * 0.45));
+        var vectors = {
+            right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
+            bottom: { x: 0, y: 1 }, top: { x: 0, y: -1 }
+        };
+        var first = vectors[startSide];
+        var second = vectors[endSide];
+        return "M" + start.x + " " + start.y + " C" + (start.x + first.x * distance) + " " +
+               (start.y + first.y * distance) + " " + (end.x + second.x * distance) + " " +
+               (end.y + second.y * distance) + " " + end.x + " " + end.y;
+    }
+
+    function placePort(port, side) {
+        if (!port) return;
+        port.style.left = side === "left" ? "-6px" : side === "right" ? (NODE_WIDTH - 4) + "px" : "calc(50% - 5px)";
+        port.style.top = side === "top" ? "-6px" : side === "bottom" ? (NODE_HEIGHT - 4) + "px" : "calc(50% - 5px)";
+    }
 
     function parameterValue(node, key) {
         for (var i = 0; i < node.params.length; i++) {
@@ -255,8 +369,12 @@
 
     function addGraphNode(node) {
         var card = document.createElement("section");
+        var position = positionFor(node, state.nodes.indexOf(node));
         card.className = "graph-node " + node.id +
                          (state.selectedNodeId === node.id ? " selected" : "");
+        card.style.left = position.x + "px";
+        card.style.top = position.y + "px";
+        var portElements = { card: card, input: null, output: null };
         var button = document.createElement("button");
         button.type = "button";
         button.className = "node-select";
@@ -276,7 +394,12 @@
         button.appendChild(summary);
         button.addEventListener("click", function () {
             state.selectedNodeId = node.id;
+            state.inspectorOpen = true;
             render(state);
+            refresh(false, false);
+        });
+        button.addEventListener("pointerdown", function (event) {
+            beginNodeDrag(node.id, event, card);
         });
         card.appendChild(button);
         if (node.id !== "emitter") {
@@ -284,23 +407,33 @@
             input.className = "port port-in";
             input.title = "Input";
             card.appendChild(input);
+            portElements.input = input;
         }
         if (node.id !== "output") {
             var output = document.createElement("span");
             output.className = "port port-out";
             output.title = "Output";
             card.appendChild(output);
+            portElements.output = output;
         }
         elements.chain.appendChild(card);
+        graphNodeElements[node.id] = portElements;
     }
 
     function renderEdges() {
         if (!elements.edgePaths) return;
         elements.edgePaths.innerHTML = "";
+        var sides = computePortSides();
+        for (var nodeId in graphNodeElements) {
+            if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
+            var nodeSides = sides[nodeId] || { input: "left", output: "right" };
+            placePort(graphNodeElements[nodeId].input, nodeSides.input);
+            placePort(graphNodeElements[nodeId].output, nodeSides.output);
+        }
         for (var i = 0; i < state.edges.length; i++) {
             var edge = state.edges[i];
             if (!edge || edge.length !== 2) continue;
-            var pathData = EDGE_PATHS[edge[0] + ":" + edge[1]];
+            var pathData = edgePath(edge, sides);
             if (!pathData) continue;
             var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
             path.setAttribute("class", "edge");
@@ -310,7 +443,9 @@
     }
 
     function renderInspector() {
-        if (!elements.inspectorBody) return;
+        if (!elements.inspectorBody || !elements.inspector) return;
+        elements.inspector.hidden = !state.inspectorOpen;
+        if (!state.inspectorOpen) { shownInspectorNodeId = null; return; }
         elements.inspectorBody.innerHTML = "";
         var node = null;
         for (var i = 0; i < state.nodes.length; i++) {
@@ -320,12 +455,15 @@
             elements.inspectorTitle.textContent = "Inspector";
             elements.inspectorMeta.textContent = "Select a node";
             elements.inspectorBody.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle.</p>";
+            shownInspectorNodeId = null;
             return;
         }
         elements.inspectorTitle.textContent = node.label;
         elements.inspectorMeta.textContent = node.params.length + " parameters";
         if (!node.params.length) {
             elements.inspectorBody.innerHTML = "<p class=\"inspector-note\">Particle output is transparent. This stage has no editable parameters in protocol v1.</p>";
+            shownInspectorNodeId = node.id;
+            positionInspector(node.id);
             return;
         }
         var grid = document.createElement("div");
@@ -334,10 +472,28 @@
             grid.appendChild(renderParameter(node.params[p]));
         }
         elements.inspectorBody.appendChild(grid);
+        if (shownInspectorNodeId !== node.id) positionInspector(node.id);
+        shownInspectorNodeId = node.id;
+    }
+
+    function positionInspector(nodeId) {
+        var position = nodePositions[nodeId];
+        if (!position || !elements.workspace || !elements.inspector) return;
+        var width = elements.workspace.clientWidth;
+        var height = elements.workspace.clientHeight;
+        var popupWidth = elements.inspector.offsetWidth;
+        var popupHeight = elements.inspector.offsetHeight;
+        var nodeOnRight = position.x + NODE_WIDTH / 2 > width / 2;
+        var nodeInUpperHalf = position.y + NODE_HEIGHT / 2 < height / 2;
+        var left = nodeOnRight ? 8 : width - popupWidth - 8;
+        var top = nodeInUpperHalf ? height - popupHeight - 8 : 8;
+        elements.inspector.style.left = Math.max(8, left) + "px";
+        elements.inspector.style.top = Math.max(8, top) + "px";
     }
 
     function render(state) {
         elements.chain.innerHTML = "";
+        graphNodeElements = {};
         state.values = {};
         if (!state.nodes.length) {
             elements.chain.innerHTML = "<p class=\"hint\">Select one layer carrying Starfield Particle.</p>";
@@ -354,11 +510,65 @@
             if (node.id === state.selectedNodeId) selectedExists = true;
         }
         if (!selectedExists) state.selectedNodeId = state.nodes[0].id;
+        updateCanvasBounds();
         for (var n = 0; n < state.nodes.length; n++) {
             if (NODE_KICKERS[state.nodes[n].id]) addGraphNode(state.nodes[n]);
         }
         renderEdges();
         renderInspector();
+    }
+
+    function beginNodeDrag(nodeId, event, card) {
+        if (event.button !== 0 || event.isPrimary === false) return;
+        var position = positionFor({ id: nodeId }, 0);
+        dragState = { nodeId: nodeId, card: card, startX: event.clientX, startY: event.clientY,
+                      originX: position.x, originY: position.y, moved: false };
+    }
+
+    function moveNodeDrag(event) {
+        if (inspectorDragState) {
+            var panelWidth = elements.workspace.clientWidth;
+            var panelHeight = elements.workspace.clientHeight;
+            var nextLeft = inspectorDragState.originX + event.clientX - inspectorDragState.startX;
+            var nextTop = inspectorDragState.originY + event.clientY - inspectorDragState.startY;
+            nextLeft = Math.max(8, Math.min(panelWidth - elements.inspector.offsetWidth - 8, nextLeft));
+            nextTop = Math.max(8, Math.min(panelHeight - 36, nextTop));
+            elements.inspector.style.left = nextLeft + "px";
+            elements.inspector.style.top = nextTop + "px";
+            if (event.preventDefault) event.preventDefault();
+            return;
+        }
+        if (!dragState) return;
+        var dx = event.clientX - dragState.startX;
+        var dy = event.clientY - dragState.startY;
+        if (!dragState.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+        dragState.moved = true;
+        if (document.body.classList) document.body.classList.add("dragging-node");
+        if (event.preventDefault) event.preventDefault();
+        var position = nodePositions[dragState.nodeId];
+        position.x = Math.max(12, Math.min(12000, dragState.originX + dx));
+        position.y = Math.max(12, Math.min(12000, dragState.originY + dy));
+        dragState.card.style.left = position.x + "px";
+        dragState.card.style.top = position.y + "px";
+        updateCanvasBounds();
+        renderEdges();
+    }
+
+    function endNodeDrag() {
+        dragState = null;
+        inspectorDragState = null;
+        if (document.body.classList) document.body.classList.remove("dragging-node");
+    }
+
+    function beginInspectorDrag(event) {
+        if (event.button !== 0 || event.isPrimary === false || !elements.inspector) return;
+        if (event.target === elements.closeInspector) return;
+        inspectorDragState = {
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: elements.inspector.offsetLeft,
+            originY: elements.inspector.offsetTop
+        };
     }
 
     function renderParameter(parameter) {
@@ -423,6 +633,10 @@
 
     function applyChanges(changes) {
         if (state.pending) return;
+        // A poll started before this write may return an older snapshot after the
+        // write succeeds. Invalidate that response so only the write or a later
+        // read can update the panel state.
+        refreshEpoch += 1;
         state.pending = true;
         call("setParameters", { changes: changes }, function (response) {
             state.pending = false;
@@ -438,15 +652,17 @@
     }
 
     function adoptState(response) {
+        var changed = state.targetToken !== response.target.token || state.revision !== response.revision;
         state.nodes = response.nodes;
         state.edges = response.edges || [];
         state.revision = response.revision;
         state.targetToken = response.target.token;
+        resolvedTarget = true;
         elements.targetLine.textContent = response.target.comp + " / " + response.target.layer;
         elements.modeLine.textContent = "Mode: " + response.controlSource;
         elements.revisionLine.textContent = "Revision: " + response.revision;
         elements.resolutionLine.textContent = "Lookup: " + response.resolution;
-        render(response);
+        if (changed) render(state);
     }
 
     function isStartupRetryable(code) {
@@ -455,13 +671,16 @@
     }
 
     function refresh(autoRetry, resetRetryBudget) {
+        if (refreshInFlight || state.pending) return;
         if (startupRetryTimer !== null) {
             window.clearTimeout(startupRetryTimer);
             startupRetryTimer = null;
         }
         if (resetRetryBudget) startupRetryAttempt = 0;
         var epoch = ++refreshEpoch;
+        refreshInFlight = true;
         call("getState", null, function (response) {
+            refreshInFlight = false;
             if (epoch !== refreshEpoch) return;
             if (!response.ok) {
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
@@ -502,8 +721,36 @@
     // the Effect Controls window. The protocol has no push channel, so without this the
     // panel keeps displaying whatever it last adopted (host-side undo left a stale 40 on
     // screen). Re-read whenever the panel regains focus, but never race a pending write.
-    window.addEventListener("focus", function () {
-        if (!state.pending) refresh(false, false);
+    if (window.addEventListener) {
+        window.addEventListener("focus", function () { refresh(false, false); });
+        window.addEventListener("pointermove", moveNodeDrag);
+        window.addEventListener("pointerup", endNodeDrag);
+        window.addEventListener("pointercancel", endNodeDrag);
+        window.addEventListener("resize", function () {
+            if (state.inspectorOpen) positionInspector(state.selectedNodeId);
+        });
+    }
+    if (elements.inspectorDrag) elements.inspectorDrag.addEventListener("pointerdown", beginInspectorDrag);
+    if (elements.closeInspector) elements.closeInspector.addEventListener("click", function () {
+        state.inspectorOpen = false;
+        elements.inspector.hidden = true;
+        shownInspectorNodeId = null;
+    });
+    if (window.setInterval) {
+        window.setInterval(function () {
+            if (!resolvedTarget || state.pending || document.hidden ||
+                (elements.autoRefresh && !elements.autoRefresh.checked)) return;
+            refresh(false, false);
+        }, TARGET_POLL_INTERVAL_MS);
+    }
+    if (document.addEventListener) {
+        document.addEventListener("visibilitychange", function () {
+            if (!document.hidden && resolvedTarget &&
+                (!elements.autoRefresh || elements.autoRefresh.checked)) refresh(false, false);
+        });
+    }
+    if (elements.autoRefresh) elements.autoRefresh.addEventListener("change", function () {
+        if (elements.autoRefresh.checked && resolvedTarget) refresh(false, false);
     });
 
     elements.preset.addEventListener("change", function () {
