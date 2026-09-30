@@ -380,6 +380,11 @@
         return true;
     }
 
+    function graphSnapshotChanged(previous, next) {
+        return !!next && (!previous || previous.revision !== next.revision ||
+                          previous.graphHex !== next.graphHex);
+    }
+
     function mapLegacyEdit(graph, edit) {
         var projected = project(graph);
         var firstByKind = {};
@@ -399,6 +404,7 @@
     }
 
     return { types: TYPE, project: project, samePositions: samePositions,
+             graphSnapshotChanged: graphSnapshotChanged,
              activeEmitterParameters: activeEmitterParameters,
              countLiveParticles: countLiveParticles,
              encodeCurve: encodeCurve, decodeCurve: decodeCurve,

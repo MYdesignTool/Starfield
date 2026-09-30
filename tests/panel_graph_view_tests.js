@@ -38,6 +38,12 @@ var customCurve = view.encodeCurve([{ age: 0, value: 10 }, { age: 0.4, value: 24
 source.nodes[1].parameters.push({ key: "7", type: 7, value: customCurve });
 source = codec.fromHex(codec.toHex(source));
 var projected = view.project(source);
+var edgeEditSnapshot = { revision: 9, graphHex: "updated-edge-graph" };
+assert.strictEqual(view.graphSnapshotChanged({ revision: 8, graphHex: "original-graph" }, edgeEditSnapshot), true,
+                   "an edge-only commit changes the graph snapshot even when every node position stays fixed");
+assert.strictEqual(view.graphSnapshotChanged(edgeEditSnapshot,
+    { revision: 9, graphHex: "updated-edge-graph" }), false,
+"an unchanged snapshot should not trigger an unnecessary graph redraw");
 assert.strictEqual(view.samePositions(projected.positions, projected.positions), true,
                    "matching canonical layouts should not force a redraw");
 var draggedPositions = JSON.parse(JSON.stringify(projected.positions));

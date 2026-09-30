@@ -896,7 +896,6 @@
                     refresh(false, false);
                     return;
                 }
-                state.graphSnapshot = result.snapshot;
                 clearBanner();
                 refresh(false, false);
             });
@@ -2321,9 +2320,7 @@
 
     function adoptState(response, graphSnapshot) {
         var targetChanged = state.targetToken !== response.target.token;
-        var graphChanged = !!graphSnapshot && (!state.graphSnapshot ||
-            state.graphSnapshot.revision !== graphSnapshot.revision ||
-            state.graphSnapshot.graphHex !== graphSnapshot.graphHex);
+        var graphChanged = window.StarfieldGraphView.graphSnapshotChanged(state.graphSnapshot, graphSnapshot);
         var graphLayoutChanged = false;
         var changed = targetChanged || state.revision !== response.revision || graphChanged ||
                       state.controlSource !== response.controlSource;
