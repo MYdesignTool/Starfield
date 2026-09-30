@@ -38,6 +38,12 @@ var customCurve = view.encodeCurve([{ age: 0, value: 10 }, { age: 0.4, value: 24
 source.nodes[1].parameters.push({ key: "7", type: 7, value: customCurve });
 source = codec.fromHex(codec.toHex(source));
 var projected = view.project(source);
+assert.strictEqual(view.samePositions(projected.positions, projected.positions), true,
+                   "matching canonical layouts should not force a redraw");
+var draggedPositions = JSON.parse(JSON.stringify(projected.positions));
+draggedPositions[uuid(2)].x += 80;
+assert.strictEqual(view.samePositions(draggedPositions, projected.positions), false,
+                   "a rejected drag must detect the transient layout and redraw from the saved graph");
 var particle = projected.nodes.filter(function (node) { return node.kind === "particle"; })[0];
 var output = projected.nodes.filter(function (node) { return node.kind === "output"; })[0];
 assert.strictEqual(particle.label, "Particle");

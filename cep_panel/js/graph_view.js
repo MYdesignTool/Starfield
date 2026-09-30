@@ -364,6 +364,22 @@
         return { graph: graph, nodes: nodes, edges: edges, positions: positions };
     }
 
+    function samePositions(left, right) {
+        if (!left || !right || Object.prototype.toString.call(left) !== "[object Object]" ||
+            Object.prototype.toString.call(right) !== "[object Object]") return false;
+        var leftIds = Object.keys(left);
+        var rightIds = Object.keys(right);
+        if (leftIds.length !== rightIds.length) return false;
+        for (var i = 0; i < leftIds.length; i++) {
+            var id = leftIds[i];
+            var a = left[id];
+            var b = right[id];
+            if (!Object.prototype.hasOwnProperty.call(right, id) || !a || !b ||
+                a.x !== b.x || a.y !== b.y) return false;
+        }
+        return true;
+    }
+
     function mapLegacyEdit(graph, edit) {
         var projected = project(graph);
         var firstByKind = {};
@@ -382,7 +398,8 @@
         return copy;
     }
 
-    return { types: TYPE, project: project, activeEmitterParameters: activeEmitterParameters,
+    return { types: TYPE, project: project, samePositions: samePositions,
+             activeEmitterParameters: activeEmitterParameters,
              countLiveParticles: countLiveParticles,
              encodeCurve: encodeCurve, decodeCurve: decodeCurve,
              mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {

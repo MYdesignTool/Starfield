@@ -2324,6 +2324,7 @@
         var graphChanged = !!graphSnapshot && (!state.graphSnapshot ||
             state.graphSnapshot.revision !== graphSnapshot.revision ||
             state.graphSnapshot.graphHex !== graphSnapshot.graphHex);
+        var graphLayoutChanged = false;
         var changed = targetChanged || state.revision !== response.revision || graphChanged ||
                       state.controlSource !== response.controlSource;
         if (targetChanged) resetViewForTarget();
@@ -2335,6 +2336,7 @@
             try {
                 var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
                 var view = window.StarfieldGraphView.project(graph);
+                graphLayoutChanged = !window.StarfieldGraphView.samePositions(nodePositions, view.positions);
                 state.graph = graph;
                 state.nodes = view.nodes;
                 state.edges = view.edges;
@@ -2385,7 +2387,7 @@
             elements.banner.textContent = "This plug-in build lacks node-layout streams. The graph uses default positions; update the plug-in to save node moves in the AE project.";
         }
         syncTargetLock();
-        if (changed || layoutChanged) render(state);
+        if (changed || layoutChanged || graphLayoutChanged) render(state);
         updateFrameStatus();
     }
 
