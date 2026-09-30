@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: implementation in progress; direct `CUSTOM_VALUE` scripting reads and writes are rejected by AE 2023; expression carrier is not host-qualified.
+- Status: experimental prototype; AE 2023 host acceptance is open, and the owner reports node addition/removal still unavailable. Preferred topology authoring direction is reopened in ADR 0019.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
