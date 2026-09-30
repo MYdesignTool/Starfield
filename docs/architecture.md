@@ -29,7 +29,7 @@ identity is mixed into the SmartFX cache key.
 
 ## Render contract
 
-1. SmartFX pre-render checks out input metadata for layer bounds/reference geometry and time-varying values, determines the output/ROI, and constructs an immutable `RenderRequest`. Particle rendering does not consume input pixels; it writes premultiplied particle color over transparent black (ADR 0005).
+1. SmartFX pre-render checks out input metadata for layer bounds/reference geometry and time-varying values, determines the output/ROI, and constructs an immutable `RenderRequest`. Particle rendering does not consume input pixels; the core composites into a premultiplied staging buffer and encodes the requested output alpha mode. The current AE adapter candidate requests straight-alpha output pending focused AE 2023 confirmation (ADR 0005).
 2. The core validates all external values, evaluates the graph deterministically for the requested rational time, and returns an owned staging buffer or a typed error.
 3. The adapter copies pixels to the host output while checkouts are valid, then releases every checkout on every exit path.
 
