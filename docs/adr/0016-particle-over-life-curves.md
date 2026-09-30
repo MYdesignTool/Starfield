@@ -24,7 +24,9 @@ Each curve uses normalized age `x ∈ [0,1]` and a value in the existing rendere
   and 1. Evaluation is piecewise linear.
 - The CEP plot converts pointer positions through the SVG screen transform before
   adding or moving points, so CSS scale and border width do not shift the hit location.
-  It adds a point on click, moves points on drag, and allows direct numeric
+  Clicking within 10 screen pixels of a segment inserts a knot on that segment, keeping
+  the current shape until the new knot is moved. Clicking farther away uses the pointer's
+  value. The plot moves points on drag and allows direct numeric
   entry for the selected point's Life percentage and value. These numeric fields also
   support the panel's left/right scrub gesture. Previous/next controls select points;
   endpoint ages stay pinned and interior ages stay between their neighbors. Interior

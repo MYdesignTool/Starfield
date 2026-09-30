@@ -1223,7 +1223,7 @@
         var wrapper = document.createElement("label");
         wrapper.className = "age-curve-control";
         var caption = document.createElement("span");
-        caption.textContent = field === "age" ? "Life" : "Value";
+        caption.textContent = field === "age" ? "Life" : kind === "size" ? "Value (px)" : "Value";
         wrapper.appendChild(caption);
         var input = document.createElement("input");
         input.type = "number";
@@ -1456,12 +1456,28 @@
         var curve = curves && curves[kind];
         if (!curve) return;
         if (curve.points.length >= 8) { showError("curve_full", "An over-life curve can contain at most 8 points."); return; }
-        var position = curvePosition(event, plot, curvePlotMaximum(kind, maximum, curve.points));
+        var displayMaximum = curvePlotMaximum(kind, maximum, curve.points);
+        var position = curvePosition(event, plot, displayMaximum);
         if (position.age <= 0.01 || position.age >= 0.99) return;
         var points = copyCurvePoints(curve.points);
         var insertAt = 1;
         while (insertAt < points.length - 1 && points[insertAt].age < position.age) insertAt += 1;
         if (position.age - points[insertAt - 1].age < 0.005 || points[insertAt].age - position.age < 0.005) return;
+        // Clicking close to an existing segment should insert a knot on that segment,
+        // preserving the current curve. The user can then drag the new point to reshape it.
+        var left = points[insertAt - 1];
+        var right = points[insertAt];
+        var span = right.age - left.age;
+        var amount = span > 0 ? (position.age - left.age) / span : 0;
+        var onCurveValue = left.value + (right.value - left.value) * amount;
+        var bounds = curvePlotBounds();
+        var verticalDistance = Math.abs(position.value - onCurveValue) /
+            displayMaximum * (bounds.bottom - bounds.top);
+        var rect = plot.getBoundingClientRect();
+        var screenScaleY = rect.height / 140;
+        if (isFinite(screenScaleY) && verticalDistance * screenScaleY <= 10) {
+            position.value = onCurveValue;
+        }
         points.splice(insertAt, 0, { age: roundCurveNumber(position.age, 3),
                                      value: roundCurveNumber(position.value, kind === "opacity" ? 3 : 2) });
         selectedCurvePoints[kind] = insertAt;
