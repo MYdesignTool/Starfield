@@ -62,6 +62,9 @@ constexpr A_long kEmitterSizeTopicDiskId = 'topX';
 constexpr A_long kEmitterSizeXDiskId = 'eszx';
 constexpr A_long kEmitterSizeYDiskId = 'eszy';
 constexpr A_long kEmitterSizeZDiskId = 'eszz';
+constexpr A_long kParticleVariationTopicDiskId = 'topV';
+constexpr A_long kParticleSizeRandomDiskId = 'szrd';
+constexpr A_long kOpacityRandomDiskId = 'oprd';
 
 constexpr A_long curve_point_disk_id(bool opacity, std::size_t point, bool value) noexcept {
     const auto a = static_cast<std::uint32_t>(opacity ? 'o' : 's');
@@ -72,7 +75,8 @@ constexpr A_long curve_point_disk_id(bool opacity, std::size_t point, bool value
 }
 
 // Parameter types and host indices in binding order: slots 0..20 map to render
-// controls and slots 21..54 map to the hidden curve banks. Types are stamped into the checked-out PF_ParamDef before
+// controls and slots 21..54 map to the hidden curve banks, 55..57 to emitter
+// dimensions, and 58..59 to Particle random variation. Types are stamped into the checked-out PF_ParamDef before
 // PF_CHECKOUT_PARAM so the host cannot be confused about how to fill the value
 // union. Hosts that fill by index are unaffected.
 constexpr A_long kParameterIndices[kEffectParameterCount] = {
@@ -116,6 +120,7 @@ constexpr A_long kParameterIndices[kEffectParameterCount] = {
     kOpacityCurveFirstPointId + 12, kOpacityCurveFirstPointId + 13,
     kOpacityCurveFirstPointId + 14, kOpacityCurveFirstPointId + 15,
     kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId,
+    kParticleSizeRandomId, kOpacityRandomId,
 };
 constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_FLOAT_SLIDER, /* Max Particles       */
@@ -150,6 +155,7 @@ constexpr A_long kParameterTypes[kEffectParameterCount] = {
     PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
     PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
     PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
+    PF_Param_FLOAT_SLIDER, PF_Param_FLOAT_SLIDER,
 };
 
 std::uint32_t to_particle_count(const PF_ParamDef& def) noexcept {
@@ -303,6 +309,8 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     }
     settings.emitter_size_percent = core::Vec3{
         to_double(*defs[55]), to_double(*defs[56]), to_double(*defs[57])};
+    settings.particle_size_random_percent = to_double(*defs[58]);
+    settings.opacity_random_percent = to_double(*defs[59]);
     return settings;
 }
 
@@ -660,6 +668,18 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                          PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                          PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
     PF_END_TOPIC(kEmitterSizeTopicDiskId);
+
+    // Revision 11 appends variation controls without shifting any released index.
+    PF_ADD_TOPICX("Particle Variation", 0, kParticleVariationTopicDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Size Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
+                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                         PF_ParamFlag_SUPERVISE, kParticleSizeRandomDiskId);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Opacity Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
+                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                         PF_ParamFlag_SUPERVISE, kOpacityRandomDiskId);
+    PF_END_TOPIC(kParticleVariationTopicDiskId);
 
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;

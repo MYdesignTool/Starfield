@@ -36,6 +36,11 @@ function idFactory() { return uuid(nextId++); }
 function edgeTo(value, nodeId) { return value.edges.filter(function (edge) { return edge.destinationNode === nodeId; }); }
 
 var original = graph();
+var newParticle = edits.apply(original, { type: "addNode", nodeType: "particle" }, idFactory).nodes[4];
+assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
+    return parameter.key === "9" || parameter.key === "10";
+}).map(function (parameter) { return parameter.value; }), [0, 0],
+"new Particle nodes include zero-default random variation controls");
 var particleId = original.nodes[1].id;
 var forceId = original.nodes[2].id;
 var outputId = original.nodes[3].id;

@@ -48,7 +48,9 @@
             "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, legacyKey: "particle_size" },
             "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, legacyKey: "particle_size_end" },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity_end" }
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity_end" },
+            "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "particle_size_random" },
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "opacity_random" }
         },
         appearance: {
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
@@ -56,7 +58,9 @@
             "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000 },
             "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000 },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1 },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1 }
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1 },
+            "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100 },
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100 }
         },
         force: {
             "1": { label: "Gravity", kind: "point3d", decimals: 2, min: -1000, max: 1000,
@@ -255,6 +259,14 @@
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 node.params.push(viewParameter(node, kind, graphParameter, spec));
+            }
+            if (kind === "particle" || kind === "appearance") {
+                ["9", "10"].forEach(function (key) {
+                    if (!findParameter(source, key)) {
+                        node.params.push(viewParameter(node, kind,
+                            { key: key, type: 4, value: 0 }, specs[key]));
+                    }
+                });
             }
             if (node.curveParameterKeys) {
                 var sizeStart = findParameter(source, "3");

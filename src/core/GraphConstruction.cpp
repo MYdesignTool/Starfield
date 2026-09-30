@@ -82,6 +82,12 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         if (settings.opacity_over_life.count != 0) {
             particle_node.parameters.push_back({kOpacityOverLifeCurve, encode_age_curve(settings.opacity_over_life)});
         }
+        if (settings.particle_size_random_percent != 0.0) {
+            particle_node.parameters.push_back({kSizeRandom, settings.particle_size_random_percent});
+        }
+        if (settings.opacity_random_percent != 0.0) {
+            particle_node.parameters.push_back({kOpacityRandom, settings.opacity_random_percent});
+        }
 
         Graph graph;
         graph.nodes = {
@@ -150,6 +156,12 @@ Result<Graph> make_emitter_force_appearance_output_graph(
         }
         if (settings.opacity_over_life.count != 0) {
             appearance_node.parameters.push_back({kOpacityOverLifeCurve, encode_age_curve(settings.opacity_over_life)});
+        }
+        if (settings.particle_size_random_percent != 0.0) {
+            appearance_node.parameters.push_back({kSizeRandom, settings.particle_size_random_percent});
+        }
+        if (settings.opacity_random_percent != 0.0) {
+            appearance_node.parameters.push_back({kOpacityRandom, settings.opacity_random_percent});
         }
         graph.nodes = {
             make_emitter_node(settings, emitter),

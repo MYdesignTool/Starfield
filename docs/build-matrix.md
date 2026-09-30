@@ -4,15 +4,26 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The four-stage chain (G-03/M3-02) passed 6,196 core checks, the adapter suite
-passed 395 fake-host checks, the panel gateway/startup fake-host checks pass, and the
-explicit May 2023 SDK build succeeds. All four suites were re-run against this working
-tree on 2026-09-28: 6,196 / 395 / gateway / startup, zero failures.
-After the M3-01B parameter expansion, the current adapter fake-host executable reports
-660 checks and zero failures (2026-09-30); the earlier 395- and 657-check results are
-historical.
+The current revision-11 core suite passes 11,082 checks, the adapter fake-host suite
+passes 676 checks, and the panel graph-view/edit, gateway and startup checks pass.
+The May 2023 SDK candidate builds successfully; its hashes and qualification status
+are recorded below. Earlier 6,196/395/660-check results are historical.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
+
+## M3-05 Particle variation build (2026-09-30)
+
+The May 2023 SDK build appends the revision-11 Size Random and Opacity Random controls,
+their Particle/Appearance graph values, and stable per-particle attenuation after the
+age curves. The candidate AEX SHA-256 is
+`D367A3830A23F312E1D3150DBB392ADDF9E5073A182E40836AAA86458A188E6D`; the paired Core
+DLL SHA-256 is
+`D77BD11088A5D54B479FDA19FFED5183F8E8D85CC4490D0AB931F74B1678CC97`. The runtime
+manifest selects `StarfieldCore-D77BD11088A5D54B.dll`. The build updated the workspace's
+ignored `dist/` and runtime copies; it did not replace the installed AE plug-in. The
+core suite passed 11,082 checks, the adapter fake-host suite passed 676 checks, and the
+graph-view, graph-edit, gateway, and startup CEP checks passed. The AEX has not been
+qualified in AE 2023; visible variation, undo, and save/reopen remain owner checks.
 
 ## P-02C over-life curve build (2026-09-30)
 

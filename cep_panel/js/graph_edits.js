@@ -40,7 +40,8 @@
         particle: [
             { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
             { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
+            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 }
@@ -48,7 +49,8 @@
         appearance: [
             { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
             { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
+            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
         output: []
     };

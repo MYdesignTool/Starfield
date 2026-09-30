@@ -96,6 +96,17 @@ ValidatedSettings validate_settings(Settings settings) {
     value.opacity = clamp(value.opacity, 0.0, 1.0,
                           ValidationCode::opacity_clamped, "opacity", notices);
 
+    value.particle_size_random_percent = finite_or(value.particle_size_random_percent, 0.0,
+                                                    "particle_size_random_percent", notices);
+    value.particle_size_random_percent = clamp(value.particle_size_random_percent, 0.0,
+        kMaxParticleRandomPercent, ValidationCode::particle_size_random_clamped,
+        "particle_size_random_percent", notices);
+    value.opacity_random_percent = finite_or(value.opacity_random_percent, 0.0,
+                                              "opacity_random_percent", notices);
+    value.opacity_random_percent = clamp(value.opacity_random_percent, 0.0,
+        kMaxParticleRandomPercent, ValidationCode::opacity_random_clamped,
+        "opacity_random_percent", notices);
+
     value.emitter_size = finite_or(value.emitter_size, 0.05, "emitter_size", notices);
     value.emitter_size = clamp(value.emitter_size, 0.0, kMaxEmitterSize,
                                ValidationCode::emitter_size_clamped, "emitter_size", notices);

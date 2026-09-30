@@ -704,6 +704,19 @@ void test_settings_validation() {
     CHECK(validated.value.velocity.z == 0.0); // non-finite replaced, then clamped
     CHECK(validated.notices.size() >= 8);
 
+    Settings variation;
+    variation.particle_size_random_percent = 120.0;
+    variation.opacity_random_percent = -1.0;
+    const auto bounded_variation = validate_settings(variation);
+    CHECK(bounded_variation.value.particle_size_random_percent == 100.0);
+    CHECK(bounded_variation.value.opacity_random_percent == 0.0);
+    CHECK(bounded_variation.notices.size() == 2);
+    variation.particle_size_random_percent = std::numeric_limits<double>::quiet_NaN();
+    variation.opacity_random_percent = std::numeric_limits<double>::infinity();
+    const auto finite_variation = validate_settings(variation);
+    CHECK(finite_variation.value.particle_size_random_percent == 0.0);
+    CHECK(finite_variation.value.opacity_random_percent == 0.0);
+
     Settings axis_sizes;
     axis_sizes.emitter_size_percent = Vec3{
         std::numeric_limits<double>::quiet_NaN(), 1200.0, -1.0};
@@ -769,6 +782,134 @@ void test_random_streams() {
         const double symmetric = symmetric_value(1, id, RandomPurpose::position_x);
         CHECK(unit >= 0.0 && unit < 1.0);
         CHECK(symmetric >= -1.0 && symmetric < 1.0);
+    }
+}
+
+void test_particle_randomness() {
+    using namespace graph_keys;
+    const NeverCancelled never;
+    Settings settings;
+    settings.particle_count = 256;
+    settings.birth_rate = 256.0;
+    settings.particle_lifetime_seconds = 2.0;
+    settings.seed = 811;
+    settings.particle_size = 20.0;
+    settings.particle_size_end = 4.0;
+    settings.opacity = 0.8;
+    settings.opacity_end = 0.1;
+    settings.appearance_enabled = true;
+    settings.particle_size_random_percent = 70.0;
+    settings.opacity_random_percent = 35.0;
+    settings.size_over_life.count = 3;
+    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 20.0};
+    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 10.0};
+    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 4.0};
+    settings.opacity_over_life.count = 2;
+    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 0.8};
+    settings.opacity_over_life.points[1] = AgeCurvePoint{1.0, 0.1};
+
+    const auto validated = validate_settings(settings);
+    const auto early = simulate_particles(validated, 0.5, never);
+    const auto late = simulate_particles(validated, 1.5, never);
+    const auto early_again = simulate_particles(validated, 0.5, never);
+    CHECK(early.has_value() && late.has_value() && early_again.has_value());
+    if (!early.has_value() || !late.has_value() || !early_again.has_value()) return;
+    CHECK(early.value().size() == early_again.value().size());
+    if (early.value().size() == early_again.value().size()) {
+        for (std::size_t i = 0; i < early.value().size(); ++i) {
+            CHECK(early.value()[i].id == early_again.value()[i].id);
+            CHECK(early.value()[i].size_pixels == early_again.value()[i].size_pixels);
+            CHECK(early.value()[i].opacity == early_again.value()[i].opacity);
+        }
+    }
+
+    double first_size_factor = -1.0;
+    double first_opacity_factor = -1.0;
+    bool size_varies_between_particles = false;
+    bool opacity_varies_between_particles = false;
+    for (const auto& particle : early.value()) {
+        const double age_fraction = particle.age_seconds / settings.particle_lifetime_seconds;
+        const double base_size = evaluate_age_curve(settings.size_over_life, age_fraction,
+                                                    settings.particle_size, settings.particle_size_end);
+        const double base_opacity = evaluate_age_curve(settings.opacity_over_life, age_fraction,
+                                                       settings.opacity, settings.opacity_end);
+        const double size_factor = 1.0 - settings.particle_size_random_percent / 100.0 *
+            unit_value(settings.seed, particle.id, RandomPurpose::size);
+        const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
+            unit_value(settings.seed, particle.id, RandomPurpose::opacity);
+        CHECK(std::abs(particle.size_pixels - base_size * size_factor) < 1e-10);
+        CHECK(std::abs(particle.opacity - base_opacity * opacity_factor) < 1e-10);
+        if (base_size > 0.0 && base_opacity > 0.0) {
+            const double measured_size_factor = particle.size_pixels / base_size;
+            const double measured_opacity_factor = particle.opacity / base_opacity;
+            if (first_size_factor < 0.0) {
+                first_size_factor = measured_size_factor;
+                first_opacity_factor = measured_opacity_factor;
+            } else {
+                size_varies_between_particles |= std::abs(measured_size_factor - first_size_factor) > 1e-6;
+                opacity_varies_between_particles |= std::abs(measured_opacity_factor - first_opacity_factor) > 1e-6;
+            }
+        }
+    }
+    CHECK(size_varies_between_particles && opacity_varies_between_particles);
+
+    // The same stable particle ID retains its random proportion while its age curve advances.
+    for (const auto& particle : late.value()) {
+        const auto earlier = std::find_if(early.value().begin(), early.value().end(),
+            [&particle](const ParticleInstance& candidate) { return candidate.id == particle.id; });
+        if (earlier == early.value().end()) continue;
+        const double early_fraction = earlier->age_seconds / earlier->lifetime_seconds;
+        const double late_fraction = particle.age_seconds / particle.lifetime_seconds;
+        const double early_size_base = evaluate_age_curve(settings.size_over_life, early_fraction,
+            settings.particle_size, settings.particle_size_end);
+        const double late_size_base = evaluate_age_curve(settings.size_over_life, late_fraction,
+            settings.particle_size, settings.particle_size_end);
+        const double early_opacity_base = evaluate_age_curve(settings.opacity_over_life, early_fraction,
+            settings.opacity, settings.opacity_end);
+        const double late_opacity_base = evaluate_age_curve(settings.opacity_over_life, late_fraction,
+            settings.opacity, settings.opacity_end);
+        if (early_size_base > 0.0 && late_size_base > 0.0) {
+            CHECK(std::abs(earlier->size_pixels / early_size_base - particle.size_pixels / late_size_base) < 1e-12);
+        }
+        if (early_opacity_base > 0.0 && late_opacity_base > 0.0) {
+            CHECK(std::abs(earlier->opacity / early_opacity_base - particle.opacity / late_opacity_base) < 1e-12);
+        }
+    }
+
+    const NodeId emitter{test_uuid(81)}, particle{test_uuid(82)}, output{test_uuid(83)};
+    const auto graph_result = make_emitter_particle_output_graph(settings, emitter, particle, output,
+        EdgeId{test_uuid(84)}, EdgeId{test_uuid(85)});
+    CHECK(graph_result.has_value());
+    if (!graph_result.has_value()) return;
+    auto graph = graph_result.value();
+    const auto graph_render = evaluate_particle_graph(graph, RationalTime{1, 2}, never);
+    CHECK(graph_render.has_value() && graph_render.value().particles.size() == early.value().size());
+    if (graph_render.has_value()) {
+        for (std::size_t i = 0; i < std::min(graph_render.value().particles.size(), early.value().size()); ++i) {
+            CHECK(graph_render.value().particles[i].id == early.value()[i].id);
+            CHECK(std::abs(graph_render.value().particles[i].size_pixels - early.value()[i].size_pixels) < 1e-12);
+            CHECK(std::abs(graph_render.value().particles[i].opacity - early.value()[i].opacity) < 1e-12);
+        }
+    }
+
+    // Optional variation keys missing from an older Particle graph mean zero variation.
+    auto particle_node = std::find_if(graph.nodes.begin(), graph.nodes.end(),
+        [](const GraphNode& node) { return node.type_key == kParticleNode; });
+    CHECK(particle_node != graph.nodes.end());
+    if (particle_node == graph.nodes.end()) return;
+    particle_node->parameters.erase(std::remove_if(particle_node->parameters.begin(), particle_node->parameters.end(),
+        [](const NodeParameter& value) { return value.key == kSizeRandom || value.key == kOpacityRandom; }),
+        particle_node->parameters.end());
+    const auto no_variation = evaluate_particle_graph(graph, RationalTime{1, 2}, never);
+    CHECK(no_variation.has_value() && !no_variation.value().particles.empty());
+    if (no_variation.has_value()) {
+        for (const auto& value : no_variation.value().particles) {
+            const double age_fraction = value.age_seconds / value.lifetime_seconds;
+            CHECK(std::abs(value.size_pixels - evaluate_age_curve(settings.size_over_life, age_fraction,
+                settings.particle_size, settings.particle_size_end)) < 1e-12);
+            CHECK(std::abs(value.opacity - evaluate_age_curve(settings.opacity_over_life, age_fraction,
+                settings.opacity, settings.opacity_end)) < 1e-12);
+        }
     }
 }
 
@@ -1469,6 +1610,8 @@ void test_force_and_appearance() {
     settings.particle_size_end = 2.0;
     settings.opacity = 1.0;
     settings.opacity_end = 0.0;
+    settings.particle_size_random_percent = 50.0;
+    settings.opacity_random_percent = 20.0;
     settings.appearance_enabled = true;
     settings.size_over_life.count = 3;
     settings.size_over_life.points[0] = AgeCurvePoint{0.0, 10.0};
@@ -1526,8 +1669,12 @@ void test_force_and_appearance() {
             const double expected_opacity = fraction <= 0.5
                 ? 1.0 + (0.25 - 1.0) * (fraction / 0.5)
                 : 0.25 + (0.0 - 0.25) * ((fraction - 0.5) / 0.5);
-            CHECK(std::abs(particle.size_pixels - expected_size) < 1e-9);
-            CHECK(std::abs(particle.opacity - expected_opacity) < 1e-9);
+            const double size_factor = 1.0 - settings.particle_size_random_percent / 100.0 *
+                unit_value(settings.seed, particle.id, RandomPurpose::size);
+            const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
+                unit_value(settings.seed, particle.id, RandomPurpose::opacity);
+            CHECK(std::abs(particle.size_pixels - expected_size * size_factor) < 1e-9);
+            CHECK(std::abs(particle.opacity - expected_opacity * opacity_factor) < 1e-9);
             CHECK(std::abs(particle.color.x - (1.0 + (0.6 - 1.0) * fraction)) < 1e-9);
         }
         CHECK(saw_birth); // the slot born exactly at the requested time is visible
@@ -1535,8 +1682,12 @@ void test_force_and_appearance() {
             [](const ParticleInstance& particle) { return std::abs(particle.age_seconds - 1.0) < 1e-12; });
         CHECK(knot != evaluated.value().particles.end());
         if (knot != evaluated.value().particles.end()) {
-            CHECK(std::abs(knot->size_pixels - 30.0) < 1e-12);
-            CHECK(std::abs(knot->opacity - 0.25) < 1e-12);
+            const double size_factor = 1.0 - settings.particle_size_random_percent / 100.0 *
+                unit_value(settings.seed, knot->id, RandomPurpose::size);
+            const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
+                unit_value(settings.seed, knot->id, RandomPurpose::opacity);
+            CHECK(std::abs(knot->size_pixels - 30.0 * size_factor) < 1e-12);
+            CHECK(std::abs(knot->opacity - 0.25 * opacity_factor) < 1e-12);
         }
     }
 
@@ -1990,6 +2141,7 @@ int main() {
     test_layer_point_conversion();
     test_settings_validation();
     test_random_streams();
+    test_particle_randomness();
     test_simulation_emitter_origin();
     test_emitter_shapes_and_spread();
     test_simulation_boundaries();

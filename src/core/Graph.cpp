@@ -563,6 +563,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacityEnd, ParameterKind::float64, true},
         ParameterDescriptor{kSizeOverLifeCurve, ParameterKind::opaque_bytes, false},
         ParameterDescriptor{kOpacityOverLifeCurve, ParameterKind::opaque_bytes, false},
+        ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor output;
@@ -598,6 +600,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacityEnd, ParameterKind::float64, true},
         ParameterDescriptor{kSizeOverLifeCurve, ParameterKind::opaque_bytes, false},
         ParameterDescriptor{kOpacityOverLifeCurve, ParameterKind::opaque_bytes, false},
+        ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
     };
 
     registry.types.push_back(std::move(emitter));

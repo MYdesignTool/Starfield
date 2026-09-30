@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
-  "schemaVersion": 10,
-  "revisionNote": "Pre-release revision 10 (2026-09-30). Appended the Emitter Dimensions topic and three visible Size X/Y/Z percentage controls (IDs 80-84) while preserving the existing common Emitter Size. The axis values default to 100%, so existing and new projects retain uniform dimensions (ADR 0017). Revision 9 appended 34 hidden project streams for bounded Size and Opacity age curves and one supervised curve-edit commit nonce (ADR 0016). Earlier parameter indices remain unchanged. Revision 8 appended graph carrier streams (ADR 0013); revision 7 appended project-saved node positions; revision 6 reorganized topic controls. IDs are never renumbered after release.",
+  "schemaVersion": 11,
+  "revisionNote": "Pre-release revision 11 (2026-09-30). Appended the Particle Variation topic with supervised Size Random and Opacity Random percentage controls (IDs 85-88). Both default to 0%, preserving existing output. Revision 10 appended the Emitter Dimensions topic and three visible Size X/Y/Z percentage controls (IDs 80-84); those default to 100% and preserve prior geometry (ADR 0017). Revision 9 appended 34 hidden project streams for bounded Size and Opacity age curves and one supervised curve-edit commit nonce (ADR 0016). Earlier parameter indices remain unchanged. Revision 8 appended graph carrier streams (ADR 0013); revision 7 appended project-saved node positions; revision 6 reorganized topic controls. IDs are never renumbered after release.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -98,13 +98,17 @@
     { "id": 81, "key": "emitter_size_x", "label": "Size X", "type": "float_slider", "default": 100, "min": 0, "max": 1000, "decimals": 0, "unit": "percent_of_emitter_size", "note": "Per-axis extent percentage applied to Emitter Size. Box uses X/Y/Z; Sphere scales to an ellipsoid." },
     { "id": 82, "key": "emitter_size_y", "label": "Size Y", "type": "float_slider", "default": 100, "min": 0, "max": 1000, "decimals": 0, "unit": "percent_of_emitter_size", "note": "Per-axis extent percentage applied to Emitter Size. Disc uses X/Y in its plane." },
     { "id": 83, "key": "emitter_size_z", "label": "Size Z", "type": "float_slider", "default": 100, "min": 0, "max": 1000, "decimals": 0, "unit": "percent_of_emitter_size", "note": "Per-axis extent percentage applied to Emitter Size. Ignored by Point and the current planar Disc." },
-    { "id": 84, "key": "topic_emitter_dimensions_end", "label": "", "type": "topic_end" }
+    { "id": 84, "key": "topic_emitter_dimensions_end", "label": "", "type": "topic_end" },
+    { "id": 85, "key": "topic_particle_variation", "label": "Particle Variation", "type": "topic", "collapsed": false },
+    { "id": 86, "key": "particle_size_random", "label": "Size Random", "type": "float_slider", "default": 0, "min": 0, "max": 100, "decimals": 0, "unit": "percent", "note": "Stable per-particle attenuation of evaluated Size Over Life. 100% varies from nearly zero to the curve value (ADR 0018)." },
+    { "id": 87, "key": "opacity_random", "label": "Opacity Random", "type": "float_slider", "default": 0, "min": 0, "max": 100, "decimals": 0, "unit": "percent", "note": "Stable per-particle attenuation of evaluated Opacity Over Life. 100% varies from nearly zero to the curve value (ADR 0018)." },
+    { "id": 88, "key": "topic_particle_variation_end", "label": "", "type": "topic_end" }
   ],
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Add IDs for new controls. Removed controls become hidden compatibility parameters when old project data needs them. Revision 7 appends hidden layout streams; revision 8 appends graph transaction carrier streams; revision 9 appends project-owned Size/Opacity curve banks and a supervised commit stream; revision 10 appends per-axis emitter percentages. Defaults of 100% preserve prior geometry and missing graph keys inherit 100%.",
+    "migrationPolicy": "Add IDs for new controls. Removed controls become hidden compatibility parameters when old project data needs them. Revision 7 appends hidden layout streams; revision 8 appends graph transaction carrier streams; revision 9 appends project-owned Size/Opacity curve banks and a supervised commit stream; revision 10 appends per-axis emitter percentages; revision 11 appends Size/Opacity Random percentages. Defaults of 100% preserve prior geometry and missing emitter-size keys inherit 100%; defaults of 0% and missing variation keys preserve prior appearance.",
     "hostInputIndex": 0,
     "topicGroups": "Topic markers are parameters and occupy parameter indices. PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG must stay set, otherwise AE collapses every group regardless of the per-topic PF_ParamFlag_START_COLLAPSED value.",
-    "controlSupervision": "Visible render controls are supervised. While Control Source is Node Graph, edits rewrite the canonical arbitrary graph from delivered values in the same undoable user-change transaction (ADR 0009). Curve-bank IDs 45-78 are hidden and unsupervised; the CEP writes a complete bank and changes supervised ID 79 to commit. Size X/Y/Z at indices 81-83 use the same supervised graph update path. In AE Controls mode, render controls are sampled directly and the stored graph is never touched."
+    "controlSupervision": "Visible render controls are supervised. While Control Source is Node Graph, edits rewrite the canonical arbitrary graph from delivered values in the same undoable user-change transaction (ADR 0009). Curve-bank IDs 45-78 are hidden and unsupervised; the CEP writes a complete bank and changes supervised ID 79 to commit. Size X/Y/Z at indices 81-83 and Size/Opacity Random at 86-87 use the same supervised graph update path. In AE Controls mode, render controls are sampled directly and the stored graph is never touched."
   }
 }

@@ -242,6 +242,8 @@ void test_parameters(PF_InData& host) {
     parameters[kEmitterSizeXId].u.fs_d.value = 250.0;
     parameters[kEmitterSizeYId].u.fs_d.value = 75.0;
     parameters[kEmitterSizeZId].u.fs_d.value = 150.0;
+    parameters[kParticleSizeRandomId].u.fs_d.value = 65.0;
+    parameters[kOpacityRandomId].u.fs_d.value = 35.0;
     parameters[kControlSourceId].u.pd.value = kLegacyControlSource;
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(checked_out.empty() && last_time == host.current_time && active_source == kLegacyControlSource);
@@ -294,10 +296,14 @@ void test_parameters(PF_InData& host) {
         const auto* color_start = find_value(*particle_node, core::graph_keys::kColorStart);
         const auto* size_end = find_value(*particle_node, core::graph_keys::kSizeEnd);
         const auto* opacity_end = find_value(*particle_node, core::graph_keys::kOpacityEnd);
+        const auto* size_random = find_value(*particle_node, core::graph_keys::kSizeRandom);
+        const auto* opacity_random = find_value(*particle_node, core::graph_keys::kOpacityRandom);
         CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).x == 1.0);
         CHECK(color_start != nullptr && std::get<core::Vec3>(*color_start).y == 0.0);
         CHECK(size_end != nullptr && std::get<double>(*size_end) == 2.0);
         CHECK(opacity_end != nullptr && std::get<double>(*opacity_end) == 0.25);
+        CHECK(size_random != nullptr && std::get<double>(*size_random) == 65.0);
+        CHECK(opacity_random != nullptr && std::get<double>(*opacity_random) == 35.0);
     }
     std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
     for (std::size_t i = 0; i < pointers.size(); ++i) pointers[i] = &parameters[i];

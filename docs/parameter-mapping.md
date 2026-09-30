@@ -1,6 +1,6 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 10. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 11. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
@@ -100,6 +100,20 @@ base extent. Their 100% defaults keep older AE projects visually unchanged. The 
 uses all axes for Box, scales Sphere to an ellipsoid, and uses X/Y for the current
 planar Disc. Point ignores them. Graph keys 19–21 are optional; old schema-1 emitter
 nodes therefore keep 100% on each axis. See ADR 0017.
+
+## Manifest revision 11: Particle variation
+
+Revision 11 appends the Particle Variation topic and supervised Size Random and Opacity
+Random controls at indices 86–87. Both are integer percentages from 0 to 100 and default
+to 0. The core applies a stable, independent per-particle factor after each Size/Opacity
+age curve; missing graph keys also mean 0. This keeps older graph output unchanged without
+a graph-version migration layer. The exact random distribution used by Stardust has not
+been confirmed. See ADR 0018.
+
+| ID | key | AE control | core field | units and notes |
+|---|---|---|---|---|
+| 86 | `particle_size_random` | Size Random | `Settings::particle_size_random_percent` | Integer percent 0…100; stable seeded attenuation after Size Over Life. |
+| 87 | `opacity_random` | Opacity Random | `Settings::opacity_random_percent` | Integer percent 0…100; independent stable seeded attenuation after Opacity Over Life. |
 
 ## Mapping table
 

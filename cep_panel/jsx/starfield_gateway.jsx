@@ -17,7 +17,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "output-particle-status-1";
+    var GATEWAY_BUILD = "particle-variation-1";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 65536;
@@ -61,7 +61,9 @@
         { key: "color_start", index: 17, name: "Color Start", kind: "color", min: 0, max: 255, displayDecimals: 0 },
         { key: "color_end", index: 18, name: "Color End", kind: "color", min: 0, max: 255, displayDecimals: 0 },
         { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
-        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, displayDecimals: 3 }
+        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, displayDecimals: 3 },
+        { key: "particle_size_random", index: 86, name: "Size Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 },
+        { key: "opacity_random", index: 87, name: "Opacity Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 }
     ];
 
     // Appended, hidden AE streams store bounded age/value pairs in the project.
@@ -104,7 +106,8 @@
                                                   "velocity_z", "emitter_size", "emitter_size_x",
                                                   "emitter_size_y", "emitter_size_z", "velocity_spread"] },
         { id: "particle", label: "Particle", keys: ["particle_size", "particle_size_end", "opacity",
-                                                      "opacity_end", "color_start", "color_end"] },
+                                                      "opacity_end", "particle_size_random", "opacity_random",
+                                                      "color_start", "color_end"] },
         { id: "force", label: "Force", keys: ["gravity_x", "gravity_y", "gravity_z", "linear_drag"] },
         // Max Particles is a global output budget in the panel. Its public AE parameter
         // identity remains unchanged; only its node-editor presentation moves here.

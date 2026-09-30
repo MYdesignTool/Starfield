@@ -234,6 +234,8 @@ inline constexpr ParameterKey kOpacityStart{5};
 inline constexpr ParameterKey kOpacityEnd{6};
 inline constexpr ParameterKey kSizeOverLifeCurve{7};
 inline constexpr ParameterKey kOpacityOverLifeCurve{8};
+inline constexpr ParameterKey kSizeRandom{9};
+inline constexpr ParameterKey kOpacityRandom{10};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

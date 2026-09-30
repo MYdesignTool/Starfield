@@ -72,9 +72,9 @@ Our equivalent is the `Render` topic plus the panel.
 | `Life (Seconds)` | **2** | `Lifetime` | Aligned in meaning and default |
 | `Life Random` | 0 | — | **Missing** |
 | `Size (Pixels)` / `Size Y (Pixels)` | **10** / 10 | `Size` | Default aligned to 10 in this change; their Y size allows non-square sprites, ours are round |
-| `Size Random`, `Use Texture Ratio`, `Ignore Perspective` | 0, 1, 0 | — | **Missing** (size random is a planned addition) |
+| `Size Random`, `Use Texture Ratio`, `Ignore Perspective` | 0, 1, 0 | `Size Random` (Particle node / AE index 86) | Deterministic seeded per-particle variation is implemented; exact distribution parity and AE host behavior remain to be qualified. Texture ratio and perspective options are missing. |
 | `Opacity` (percent) | **100** | `Opacity` (0..1) | Value matches; unit differs — theirs is percent, ours normalized. Aligning to percent is queued |
-| `Opacity Random` | 0 | — | **Missing** |
+| `Opacity Random` | 0 | `Opacity Random` (Particle node / AE index 87) | Independent deterministic seeded variation is implemented; exact reference distribution and AE host behavior remain to be qualified. |
 | `Particle Color:` / `Color` / `Color Gradient` / `Color Use:` | 1, [1,1,1,1], —, 1 | `Color Start` / `Color End` | Ours are two endpoints; theirs is one color plus a gradient and a usage mode |
 | `Particle Feather`, `Transfer Mode:`, `Up Axis:` | 0, 1, 3 | — | **Missing** |
 | `Over Life` → `Size`, `Opacity` | groups | Piecewise-linear Size/Opacity curves in the CEP Particle inspector (P-02C) | Core evaluation and project parameter streams are implemented; visual rendering, undo, and save/reopen still need AE 2023 qualification |

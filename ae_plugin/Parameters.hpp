@@ -20,11 +20,14 @@ namespace starfield::adapter {
 // indices below are not contiguous. AE's implicit input layer occupies parameter index
 // 0, so the effect registers one more parameter than kTotalEffectParameterCount.
 // Manifest revision 6 renumbered everything for the grouping; revisions 7–9 append
-// layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions.
+// layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions;
+// revision 11 appends particle-variation controls.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
-inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount + kEmitterSizeParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 84; // controls + topics + project metadata
+inline constexpr std::size_t kParticleVariationParameterCount = 2;
+inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
+    kEmitterSizeParameterCount + kParticleVariationParameterCount;
+inline constexpr std::size_t kTotalEffectParameterCount = 88; // controls + topics + project metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -72,6 +75,8 @@ inline constexpr A_long kCurveEditCommitId = 79;
 inline constexpr A_long kEmitterSizeXId = 81;
 inline constexpr A_long kEmitterSizeYId = 82;
 inline constexpr A_long kEmitterSizeZId = 83;
+inline constexpr A_long kParticleSizeRandomId = 86;
+inline constexpr A_long kOpacityRandomId = 87;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

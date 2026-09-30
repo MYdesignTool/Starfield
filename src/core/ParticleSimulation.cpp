@@ -246,6 +246,15 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
         particle.color = Vec3{1.0, 1.0, 1.0};
     }
 
+    // Appearance variation scales the evaluated age curves, so each particle keeps
+    // one stable proportion across frames while its curve value changes with age.
+    particle.size_pixels *= 1.0 -
+        (values.particle_size_random_percent / 100.0) *
+        unit_value(values.seed, slot, RandomPurpose::size);
+    particle.opacity *= 1.0 -
+        (values.opacity_random_percent / 100.0) *
+        unit_value(values.seed, slot, RandomPurpose::opacity);
+
     // Per-particle birth offset and velocity come from deterministic streams keyed
     // by (seed, id, purpose). This variation is what makes a steady emitter move:
     // with identical particles, births continuously replace the particles that

@@ -38,6 +38,11 @@ var projected = view.project(source);
 var particle = projected.nodes.filter(function (node) { return node.kind === "particle"; })[0];
 var output = projected.nodes.filter(function (node) { return node.kind === "output"; })[0];
 assert.strictEqual(particle.label, "Particle");
+assert.deepStrictEqual(particle.params.filter(function (parameter) {
+    return parameter.graphKey === "9" || parameter.graphKey === "10";
+}).map(function (parameter) { return [parameter.label, parameter.value, parameter.max]; }), [
+    ["Size Random", 0, 100], ["Opacity Random", 0, 100]
+], "legacy graphs project optional variation controls with zero defaults");
 assert.strictEqual(particle.curves.size.custom, true);
 assert.deepStrictEqual(particle.curves.size.points, [
     { age: 0, value: 10 }, { age: 0.4, value: 24 }, { age: 1, value: 2 }
@@ -90,6 +95,14 @@ assert.deepStrictEqual(view.parameterToGraphValue(color, [255, 127.5, 0]), [1, 0
 var wrongCurveType = graph();
 wrongCurveType.nodes[1].parameters.push({ key: "7", type: 4, value: 0 });
 assert.throws(function () { view.project(wrongCurveType); }, /opaque value type/i);
+
+var variedGraph = codec.fromHex(codec.toHex(graph()));
+var variedParticle = variedGraph.nodes.filter(function (node) { return node.type === edits.types.particle; })[0];
+variedParticle.parameters.push({ key: "9", type: 4, value: 65 }, { key: "10", type: 4, value: 30 });
+variedGraph = codec.fromHex(codec.toHex(variedGraph));
+variedParticle = view.project(variedGraph).nodes.filter(function (node) { return node.kind === "particle"; })[0];
+assert.strictEqual(variedParticle.params.filter(function (parameter) { return parameter.graphKey === "9"; })[0].value, 65);
+assert.strictEqual(variedParticle.params.filter(function (parameter) { return parameter.graphKey === "10"; })[0].value, 30);
 
 var oldAliasEdit = view.mapLegacyEdit(graph(), { type: "deleteNodes", nodeIds: ["particle"] });
 assert.strictEqual(oldAliasEdit.nodeIds[0], uuid(2), "legacy canvas node IDs map to stable graph UUIDs");

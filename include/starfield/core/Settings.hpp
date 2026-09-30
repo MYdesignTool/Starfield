@@ -29,6 +29,8 @@ enum class ParameterId : std::uint32_t {
     emitter_size_x = 17,
     emitter_size_y = 18,
     emitter_size_z = 19,
+    particle_size_random = 20,
+    opacity_random = 21,
 };
 
 enum class EmitterShape : std::uint8_t {
@@ -44,6 +46,7 @@ inline constexpr std::uint32_t kMaxParticleCount = 2'000'000;
 inline constexpr double kMaxBirthRate = 1'000'000.0;
 inline constexpr double kMaxLifetimeSeconds = 1'000'000.0;
 inline constexpr double kMaxParticleSize = 100'000.0;
+inline constexpr double kMaxParticleRandomPercent = 100.0;
 inline constexpr std::uint32_t kMaxSeed = 2'147'483'647;
 inline constexpr std::uint32_t kEmitterShapeCount = 4;
 // World-space movement bounds, in layer heights and layer heights per second.
@@ -97,6 +100,10 @@ struct Settings {
     Vec3 velocity{0.0, 0.3, 0.0};
     double particle_size{10.0};
     double opacity{1.0};
+    // Per-particle attenuation after age curves. Zero keeps the exact base value;
+    // 100% can attenuate it toward zero using the particle's stable random stream.
+    double particle_size_random_percent{0.0};
+    double opacity_random_percent{0.0};
     // Extent of the box/sphere/disc emitters: cube edge length resp. diameter, in
     // layer heights. Ignored by the point emitter.
     double emitter_size{0.05};
@@ -145,6 +152,8 @@ enum class ValidationCode : std::uint8_t {
     lifetime_clamped,
     size_clamped,
     opacity_clamped,
+    particle_size_random_clamped,
+    opacity_random_clamped,
     emitter_shape_replaced,
     emitter_origin_clamped,
     velocity_clamped,
