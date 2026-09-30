@@ -501,10 +501,10 @@ The installed hash matches the candidate. AE is closed and has not loaded it yet
 Graph add/copy/delete, automatic node creation, undo, persistence, and native
 Effect Parade deletion remain host checks. Revision 14 now adds a project-owned
 readiness marker and source reconciliation that removes a manually deleted node
-and its incident edges from the graph. The new candidate is built but not
-installed; the installed mailbox-fix AEX predates the marker. To roll back the
-previous deployment, while AE is closed, copy the backup AEX above back to the
-plug-in path.
+and its incident edges from the graph. The revision-14 main AEX is installed;
+the previously installed mailbox-fix AEX is backed up at
+`artifacts/disabled/p02d-node-delete-sync-20260930/StarfieldParticle.aex`. To roll
+back, while AE is closed, restore that backup to the plug-in path.
 
 ## Local SDK inputs
 
@@ -523,8 +523,8 @@ The build compiles schema revision 14, including hidden renderer parameter
 `9B3D75B2AA9E1EC1DED90F0993DCB7E66DD28FFC91DDB11968E656C1D9204017`.
 The build used `-NoRuntimePublish`, so the selected Core DLL did not change.
 MSVC emitted existing C4819 code-page warnings for non-ASCII comments in
-`Parameters.hpp`; compilation and PiPL generation succeeded. The candidate is
-not installed or loaded in AE.
+`Parameters.hpp`; compilation and PiPL generation succeeded. The candidate was
+installed at `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex` after confirming AE was closed. Its installed hash matches the build. The previous AEX was backed up under `artifacts/disabled/p02d-node-delete-sync-20260930/`; AE remains closed and has not loaded the new build.
 
 Focused verification passed: `panel_native_node_gateway_tests.js`,
 `panel_graph_transaction_tests.js`, `panel_startup_tests.js`, the adapter suite
