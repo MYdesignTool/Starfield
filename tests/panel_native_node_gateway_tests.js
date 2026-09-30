@@ -206,6 +206,7 @@ assert.equal(undo.ends, 3);
 const particleId = "00112233445566778899aabbccddeeff";
 const secondParticleId = "102132435465768798a9bacbdcedfe0f";
 const forceId = "ffeeddccbbaa00998877665544330001";
+const secondForceId = "0011ffeeddccbbaa9988776655443322";
 const particle = { id: particleId, type: "org.starfieldfx.nodes.particle", schemaVersion: 2, parameters: [
     { key: "1", type: 5, value: [0.25, 0.5, 0.75] }, { key: "2", type: 5, value: [1, 1, 1] },
     { key: "3", type: 4, value: 32 }, { key: "4", type: 4, value: 75 },
@@ -221,6 +222,9 @@ secondParticle.parameters.find(parameter => parameter.key === "11").value = 2.5;
 const force = { id: forceId, type: "org.starfieldfx.nodes.force", schemaVersion: 1, parameters: [
     { key: "1", type: 5, value: [0, -2, 0] }, { key: "2", type: 4, value: 0.25 }
 ] };
+const secondForce = { id: secondForceId, type: force.type, schemaVersion: force.schemaVersion, parameters: [
+    { key: "1", type: 5, value: [1, 0, 0] }, { key: "2", type: 4, value: 0.5 }
+] };
 const invalidParticle = { id: particleId, type: particle.type, schemaVersion: particle.schemaVersion,
     parameters: [{ key: "999", type: 4, value: 1 }] };
 const failedParticleAdd = invoke("ensureNodeEffects", {
@@ -229,14 +233,14 @@ const failedParticleAdd = invoke("ensureNodeEffects", {
 assert.equal(failedParticleAdd.ok, false, "unsupported node controls reject a partial effect creation");
 assert.equal(paradeItems.length, 2, "a failed node initialization removes its partially created effect");
 
-const mixedNodes = [nodes[1], particle, secondParticle, force];
+const mixedNodes = [nodes[1], particle, secondParticle, force, secondForce];
 const mixed = invoke("ensureNodeEffects", {
     baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: mixedNodes
 });
 assert.equal(mixed.ok, true, mixed.error && mixed.error.message);
 assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
     "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle",
-    "org.starfieldfx.node.particle", "org.starfieldfx.node.force"
+    "org.starfieldfx.node.particle", "org.starfieldfx.node.force", "org.starfieldfx.node.force"
 ]);
 assert.deepEqual(Array.from(paradeItems[2].property("Color Start").value), [0.25, 0.5, 0.75, 1]);
 assert.equal(paradeItems[2].property("Size").value, 32);
@@ -246,6 +250,9 @@ assert.equal(paradeItems[3].property("Lifetime").value, 2.5);
 assert.equal(paradeItems[3].property("Node UUID 0").value, 0x1021);
 assert.deepEqual(Array.from(paradeItems[4].property("Gravity").value), [0, -2, 0]);
 assert.equal(paradeItems[4].property("Linear Drag").value, 0.25);
+assert.deepEqual(Array.from(paradeItems[5].property("Gravity").value), [1, 0, 0]);
+assert.equal(paradeItems[5].property("Linear Drag").value, 0.5);
+assert.equal(paradeItems[5].property("Node UUID 0").value, 0x0011);
 assert.equal(paradeItems[2].property("Node UUID 0").value, 0x0011,
     "the same identity can be retried after a failed partial creation");
 
@@ -255,21 +262,26 @@ const outputRejected = invoke("ensureNodeEffects", {
         type: "org.starfieldfx.nodes.output", schemaVersion: 1, parameters: [] }])
 });
 assert.equal(outputRejected.ok, false, "Output stays virtual and is not materialized as an AEX");
-assert.equal(paradeItems.length, 5);
+assert.equal(paradeItems.length, 6);
 
 const removeForce = invoke("submitGraph", {
     baseGraphRevision: 5, baseNodeManifest: mixedNodes,
-    nodeManifest: [nodes[1], particle, secondParticle], graphHex: finalGraphHex
+    nodeManifest: [nodes[1], particle, secondParticle, secondForce], graphHex: finalGraphHex
 });
 assert.equal(removeForce.ok, true, removeForce.error && removeForce.error.message);
 assert.equal(removeForce.snapshot.revision, 6);
 assert.equal(removeForce.snapshot.graphHex, finalGraphHex);
 assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
-    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle", "org.starfieldfx.node.particle"
+    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle", "org.starfieldfx.node.particle",
+    "org.starfieldfx.node.force"
 ]);
 assert.equal(paradeItems[2].property("Size").value, 32, "Particle values survive an unrelated Force deletion");
 assert.equal(paradeItems[3].property("Size").value, 64, "the second Particle retains its independent value");
+assert.deepEqual(Array.from(paradeItems[4].property("Gravity").value), [1, 0, 0],
+    "deleting one Force preserves the other Force's independent vector");
+assert.equal(paradeItems[4].property("Linear Drag").value, 0.5);
+assert.equal(paradeItems[4].property("Node UUID 0").value, 0x0011);
 assert.equal(undo.begins, 6);
 assert.equal(undo.ends, 6);
 
-console.log("Native node gateway checks passed (Emitter/Particle/Force modules, two independent Particle instances, failed-add cleanup and retry, emitter dimensions, duplicate-ID rejection, Output exclusion, graph commit and deletion).");
+console.log("Native node gateway checks passed (Emitter, two independent Particle and two Force instances, failed-add cleanup and retry, emitter dimensions, duplicate-ID rejection, Output exclusion, graph commit and selective deletion).");
