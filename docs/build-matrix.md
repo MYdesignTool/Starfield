@@ -181,14 +181,17 @@ warning from `Parameters.hpp`. The four node AEX candidates in `dist/` are:
 | `StarfieldAppearance.aex` | `0AF3A3C450E5B092DA462D11FD9DD71F5716F14D01FFD0C6F16ECCD9D5502CBF` |
 | `StarfieldForce.aex` | `E755C294E0B5654F662132E4AECE3490A701B982D054A8BB493E01825711EF5E` |
 
-This candidate is not installed. Do not copy the main renderer or Core from
-this full build: their output hashes differ from the currently selected pair
-and they contain no change required by this menu-visibility task. The build used
-`-NoRuntimePublish`; `artifacts/runtime/current.txt` still selects
-`StarfieldCore-55B877A8F66D3576.dll`. The current installed main AEX is still
-`3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`; current
-node-module hashes are recorded in `compatibility-matrix.md`. Installation and
-the AE menu/add-by-match-name check are pending.
+The four node AEX candidates were installed on 2026-09-30 into
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins` after
+backing up the replaced modules under
+`artifacts/disabled/p02d-hide-node-menu-20260930/`. Installed SHA-256 values
+matched the table above. AE was closed during replacement and has not loaded
+this candidate yet, so menu visibility and CEP add-by-match-name behavior still
+need an AE 2023 host check. The main renderer and Core were not copied: this
+full build's outputs differ and contain no change required by the menu task.
+The build used `-NoRuntimePublish`; `artifacts/runtime/current.txt` still
+selects `StarfieldCore-55B877A8F66D3576.dll`, and the installed main AEX remains
+`3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`.
 
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
