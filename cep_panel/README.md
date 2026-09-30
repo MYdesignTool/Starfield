@@ -1,9 +1,9 @@
 # Starfield CEP panel
 
-Dockable After Effects 2023 node editor for the current top-down parameter view
-`Emitter -> Particle -> Force -> Output`. It implements protocol v1 of
-[ADR 0009](../docs/adr/0009-cep-panel-bridge.md): this is a fixed display projection
-with selectable nodes, ports, and connectors; the inspector edits the selected node's values.
+Dockable After Effects 2023 node editor for the top-down `Emitter -> Particle -> Force -> Output`
+graph. The legacy AE Controls view uses protocol v1 of [ADR 0009](../docs/adr/0009-cep-panel-bridge.md).
+Node Graph mode projects the canonical graph through the bounded expression carrier in
+[ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md); the inspector edits the selected node.
 Cards are 110 × 54 pixels, use color by node type, and connect only from a lower output
 port to an upper input port. Reverse or overlapping connections are rejected, and the
 drag preview is only drawn downward. Particle remains the node label for the particle
@@ -15,28 +15,29 @@ for faster changes, Ctrl-drag for finer changes, or click to type a value direct
 The panel formats and commits values at each control's precision (integer
 particles-per-second and origin coordinates, configured precision for other floats)
 and presents emitter type as a named dropdown.
-The current canvas source supports a pinned target, top-down layout, project-saved node
+The canvas supports a pinned target, top-down layout, project-saved node
 positions, viewport-wide marquee/group movement, wheel zoom, unrestricted middle-button
 canvas pan with a clipped viewport and no scrollbars, a bottom-left interactive minimap,
 Alt-drag copy preview, Ctrl+D, port-to-port
-connection gestures, and a graph context menu. Wire disconnect, insert, connect, add,
-duplicate, and delete commands remain routed to a guarded topology boundary; the new
-graph carrier gateway endpoints are not connected to the canvas yet, so these actions
-do not change the saved project.
-The panel reads and writes the effect's **supervised render-value parameters** and
-separate hidden layout parameters through a namespaced ExtendScript gateway. The visual
-projection is not the canonical graph snapshot; topology actions stay guarded until the
-graph-backed transaction bridge qualifies. If an older
-plug-in build lacks layout streams, the graph still loads at default positions and node
-moves stay in that panel session; the panel reports that project persistence needs the
-matching plug-in build. It never touches `Node Graph Data` (the arbitrary-data parameter)
-or any host-private state.
+connection gestures, and a graph context menu. Disconnect, insert, connect, add,
+duplicate, and delete commands use a copy-on-write edit planner and a bounded,
+revision-checked transaction coordinator. Dynamic card positions are stored in the graph's
+project-owned optional layout record; the older eight layout streams remain only for the
+four-card view.
+The panel reads and writes the effect's **supervised render-value parameters** through a
+namespaced ExtendScript gateway. In Node Graph mode, it gets the canonical graph snapshot,
+applies the requested edit, then submits the replacement graph through the supervised
+expression carrier. It never writes the arbitrary-data `Node Graph Data` property directly
+or accesses host-private state. Fake-host tests cover the edit planner, revision transaction,
+and dynamic graph projection; the expression/callback, undo, save/reopen, stale-write, and
+render paths remain unqualified in AE 2023.
 
-The gateway now exposes source-level `getGraphSnapshot`, `syncGraphSnapshot`, and
-`submitGraph` operations using ADR 0013's hidden expression carrier. The canvas does not
-call these operations yet, and the AE expression/callback/undo path is not qualified.
-`submitGraph` accepts bounded schema-1 graph bytes as lowercase hex; the effect validates
-the bytes and rejects stale revisions before changing its canonical graph.
+The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, and `submitGraph` through
+ADR 0013's hidden expression carrier. The canvas calls these operations through the
+transaction coordinator. `submitGraph` accepts bounded schema-1 graph bytes as lowercase
+hex; the effect validates the bytes and rejects stale revisions before changing its
+canonical graph. This integration exists in source but has not yet passed the AE 2023
+host qualification gates below.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
@@ -142,17 +143,17 @@ authorization.
 1. Put `StarfieldParticle.aex` in the AE plug-ins folder (see the repository
    `README.md`) and apply the effect to a layer.
 2. Select exactly one layer that carries the effect. The panel discovers it automatically
-    and shows the four connected nodes. Drag node cards freely, including left/up past the
-    original canvas origin. Node positions are stored in hidden AE effect parameters and travel
-    with the project and duplicated effect when the revision-7 plug-in is installed; older
-    effect builds use default positions. Pan and zoom are transient view state. Drag empty
-    canvas anywhere in the viewport to marquee-select, move the middle mouse button to pan, and scroll
-    to zoom at the cursor. Use the bottom-left minimap to inspect the whole graph and click or
+    and shows the effect's current graph. In Node Graph mode, add, connect/reconnect, disconnect,
+    splice, duplicate, delete, move, and supported parameter edits submit graph transactions.
+    Dynamic node positions travel with the project in the graph layout record; the protocol-v1
+    four-card view uses the revision-7 layout streams. Pan and zoom are transient view state. Drag
+    empty canvas anywhere in the viewport to marquee-select, move the middle mouse button to pan, and
+    scroll to zoom at the cursor. Use the bottom-left minimap to inspect the whole graph and click or
     drag it to navigate. Alt-drag previews a duplicate; Ctrl+D and the
-   right-click menu expose graph operations. Since the AE 2023 script API cannot read the
-   graph's `CUSTOM_VALUE`, topology operations currently report that the graph transaction
-   bridge is unavailable and leave the project topology unchanged. Node moves are written to
-   AE in one undo group when the matching layout streams exist. Click a node to open its floating
+    right-click menu expose graph operations. AE 2023 cannot script-read the graph's
+   `CUSTOM_VALUE`, so the panel uses ADR 0013's ordinary expression carrier instead. Source
+   integration is present, but the supervised callback and one-step undo/save-reopen behavior
+   still need qualification with the matching AEX. Click a node to open its floating
    properties window. The proposed carrier and its qualification gate are documented in
    [ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md). The checked
    **Refresh Automatically** option re-reads the selected AE target while the panel is visible;
