@@ -1384,6 +1384,11 @@ void test_renderer_requested_alpha_mode() {
         CHECK(std::abs(channel32(output32.value(), 32, 32, 0) - 1.0f) < 1e-6f);
         CHECK(std::abs(channel32(output32.value(), 32, 32, 3) - 0.5f) < 1e-6f);
     }
+
+    request.frame.alpha_mode = static_cast<AlphaMode>(2);
+    const auto invalid_mode = renderer.render(request, never);
+    CHECK(!invalid_mode.has_value());
+    if (!invalid_mode.has_value()) CHECK(invalid_mode.error().code == ErrorCode::unsupported_format);
 }
 
 void test_renderer_formats_and_limits() {

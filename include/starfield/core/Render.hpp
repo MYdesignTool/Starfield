@@ -127,6 +127,7 @@ struct FrameSpec {
     RationalTime frame_duration{};
     PixelFormat format{PixelFormat::rgba8};
     ColorSpace color_space{ColorSpace::ae_working_space};
+    // Requested encoding for the generated output pixels; compositing stays premultiplied internally.
     AlphaMode alpha_mode{AlphaMode::premultiplied};
     double pixel_aspect_ratio{1.0};
     Quality quality{Quality::full};
@@ -140,6 +141,7 @@ struct PixelBuffer {
     std::uint32_t row_bytes{0};
     PixelFormat format{PixelFormat::rgba8};
     ColorSpace color_space{ColorSpace::ae_working_space};
+    // Encoding used for the returned pixel bytes.
     AlphaMode alpha_mode{AlphaMode::premultiplied};
     // Placement of pixel (0, 0) inside FrameSpec's frame grid.
     std::int32_t origin_x{0};

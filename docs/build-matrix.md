@@ -91,11 +91,12 @@ The renderer now encodes its premultiplied internal accumulation in the requeste
 `FrameSpec::alpha_mode`. The AE adapter candidate requests straight output after the
 previous paired build rendered white particles darker than an opaque blue lower layer
 (background sample `[0,108,255,255]`; particle sample `[16,98,209,255]`). Core tests
-passed 11,887 checks, including requested straight output at 8/16/32 bpc; the May 2023
+passed 11,889 checks, including requested straight output at 8/16/32 bpc and rejection
+of an invalid alpha-mode enum; the May 2023
 SDK build succeeded. Candidate AEX SHA-256 is
-`AE577C692F4EDA5B1C502CE8536FC7D5A1941B18B5626103698BD36219F5B046`; paired Core
-SHA-256 is `DCC15626AD24667BBB3724892A3EC65BB43E9D6718DD6AD40A1C2FC3F6A2B7E0`, and
-runtime `current.txt` selects `StarfieldCore-DCC15626AD24667B.dll`.
+`E1F155B8BE0ECEC8FA5A06ADE74C8A00E0420FD8E4F4AC2C5D1F0228CEF7AE95`; paired Core
+SHA-256 is `0C37D709166AF8DD3E5244F87B36DAC5035B788E8067FEC35B4A0979167C4DFA`, and
+runtime `current.txt` selects `StarfieldCore-0C37D709166AF8DD.dll`.
 
 The host still has the earlier AEX SHA-256 `1DBAA183…` at the plug-in root. Its
 `StarfieldRuntime` Junction selects the new Core, but that AEX still requests
@@ -108,7 +109,7 @@ Read-only AE 2023 plug-in path audit (2026-09-30): the only discovered
 `StarfieldParticle.aex` is at `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`
 with SHA-256 `1DBAA183…`. The root `Plug-ins\StarfieldRuntime` Junction points to
 this checkout's `artifacts/runtime`, and `current.txt` selects
-`StarfieldCore-DCC15626AD24667B.dll`. The plugin `dist` child path is absent. AE was
+`StarfieldCore-0C37D709166AF8DD.dll`. The plugin `dist` child path is absent. AE was
 not running during this audit.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.

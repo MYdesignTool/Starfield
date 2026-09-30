@@ -57,6 +57,9 @@ Result<FrameSpec> validate_frame(FrameSpec frame) noexcept {
     if (bytes_per_pixel(frame.format) == 0) {
         return Result<FrameSpec>::failure(ErrorCode::unsupported_format, "unknown pixel format");
     }
+    if (frame.alpha_mode != AlphaMode::straight && frame.alpha_mode != AlphaMode::premultiplied) {
+        return Result<FrameSpec>::failure(ErrorCode::unsupported_format, "unknown alpha mode");
+    }
 
     const auto time = make_rational(frame.time.value, frame.time.scale);
     if (!time.has_value()) {
