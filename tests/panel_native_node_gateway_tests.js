@@ -61,17 +61,30 @@ let activeGraphRevision = 4;
 
 const rendererProperties = {};
 const nodeEffectsReady = scalar("Node Effects Ready", 0);
+nodeEffectsReady.propertyIndex = 89;
 const snapshot = scalar("Graph Snapshot", null);
+snapshot.propertyIndex = 41;
 snapshot.expression = snapshotExpression(4, graphHex);
 const mailbox = scalar("Graph Edit Request", "");
+mailbox.propertyIndex = 90;
 mailbox.expression = "";
 mailbox.expressionEnabled = true;
 mailbox.canSetExpression = true;
+// A revision-14 project can retain a same-name carrier at index 42. The gateway
+// must resolve the revision-15 request by its registered index, not this stale name.
+const staleMailbox = scalar("Graph Edit Request", "stale-expression");
+staleMailbox.propertyIndex = 42;
+staleMailbox.expression = "stale-expression";
+staleMailbox.expressionEnabled = false;
+staleMailbox.canSetExpression = false;
 const legacyMailbox = scalar("Graph Edit Request (Legacy)", "legacy-expression");
+legacyMailbox.propertyIndex = 42;
 legacyMailbox.expression = "legacy-expression";
 legacyMailbox.expressionEnabled = false;
 const receipt = scalar("Graph Edit Receipt", 0);
+receipt.propertyIndex = 44;
 const commit = scalar("Commit Graph Edit", 0);
+commit.propertyIndex = 43;
 commit.setValue = function (nonce) {
     this.value = nonce;
     const match = /^\/\*SFLDTXN1:([0-9]+):([0-9]+):([0-9]+):([0-9a-f]{8}):([0-9a-f]+)\*\/0$/.exec(mailbox.expression);
@@ -91,12 +104,22 @@ Object.assign(rendererProperties, {
     "Commit Graph Edit": commit,
     "Graph Edit Receipt": receipt
 });
+const rendererIndexProperties = {
+    41: snapshot,
+    42: legacyMailbox,
+    43: commit,
+    44: receipt,
+    89: nodeEffectsReady,
+    90: mailbox
+};
+let activeRequestPresent = true;
 
 const renderer = {
     matchName: "org.starfieldfx.particle",
     property(nameOrIndex) {
-        if (nameOrIndex === "Graph Edit Request") return null;
-        if (nameOrIndex === 90) return mailbox;
+        if (nameOrIndex === "Graph Edit Request") return staleMailbox;
+        if (nameOrIndex === 90) return activeRequestPresent ? mailbox : null;
+        if (typeof nameOrIndex === "number") return rendererIndexProperties[nameOrIndex] || null;
         return rendererProperties[nameOrIndex] || null;
     }
 };
@@ -215,6 +238,17 @@ assert.equal(paradeItems.length, paradeCountBeforeUnsupportedCarrier,
     "an unsupported graph mailbox is rejected before adding or removing node effects");
 assert.equal(undo.begins, 1, "mailbox capability rejection does not open an undo group");
 mailbox.canSetExpression = true;
+const paradeCountBeforeMissingCarrier = paradeItems.length;
+activeRequestPresent = false;
+const missingActiveCarrier = invoke("submitGraph", {
+    baseGraphRevision: 4, baseNodeManifest: nodes, nodeManifest: [nodes[1]], graphHex: changedGraphHex
+});
+assert.equal(missingActiveCarrier.ok, false);
+assert.equal(missingActiveCarrier.error.code, "missing_parameter");
+assert.match(missingActiveCarrier.error.message, /Graph Edit Request.*index 90/);
+assert.equal(paradeItems.length, paradeCountBeforeMissingCarrier,
+    "the same-name legacy property cannot substitute when the revision-15 slot is absent");
+activeRequestPresent = true;
 
 const committed = invoke("submitGraph", {
     baseGraphRevision: 4,
@@ -227,6 +261,8 @@ assert.equal(committed.snapshot.revision, 5);
 assert.equal(committed.snapshot.graphHex, changedGraphHex);
 assert.equal(legacyMailbox.expression, "legacy-expression",
     "graph transactions use the appended request carrier, leaving the old project slot untouched");
+assert.equal(staleMailbox.expression, "stale-expression",
+    "a same-name legacy property at index 42 is not used as the active revision-15 request carrier");
 assert.equal(paradeItems.length, 2, "deleting a graph node removes all AE effects carrying its identity");
 assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
 assert.equal(undo.begins, 2, "only the graph transaction opens an undo group");

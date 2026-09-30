@@ -17,7 +17,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-1";
+    var GATEWAY_BUILD = "native-node-sync-2";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -667,10 +667,18 @@
     function resolveCarrier(effect, key) {
         var binding = GRAPH_CARRIERS[key];
         if (!binding) return null;
-        var property = effect.property(binding.name);
-        if (property) return property;
-        property = effect.property(binding.index);
-        return property && property.name === binding.name ? property : null;
+        // Resolve the registered slot first. Revision 15 deliberately reuses the
+        // old request property's label at a new index; in projects that retain the
+        // old parameter name, effect.property(name) can otherwise return index 42
+        // and hide the active request at index 90.
+        var property = effect.property(binding.index);
+        if (property && property.name === binding.name && property.propertyIndex === binding.index) {
+            return property;
+        }
+        // Some AE builds resolve a named child but expose it through a PropertyGroup
+        // wrapper. Accept that path only when it proves the same registered slot.
+        property = effect.property(binding.name);
+        return property && property.name === binding.name && property.propertyIndex === binding.index ? property : null;
     }
 
     function crc32Hex(hex) {
@@ -726,7 +734,8 @@
             if (!Object.prototype.hasOwnProperty.call(GRAPH_CARRIERS, key)) continue;
             properties[key] = resolveCarrier(target.effect, key);
             if (!properties[key]) {
-                return { error: { code: "missing_parameter", message: "This plug-in build has no script-visible graph carrier stream: " + GRAPH_CARRIERS[key].name + "." } };
+                return { error: { code: "missing_parameter", message: "This effect instance does not expose " +
+                    GRAPH_CARRIERS[key].name + " at registered parameter index " + GRAPH_CARRIERS[key].index + "." } };
             }
         }
         return { target: target, token: token, properties: properties };
@@ -747,7 +756,7 @@
         var receipt = resolved.properties.receipt;
         if (!mailbox || mailbox.canSetExpression !== true) {
             return { ok: false, error: { code: "graph_carrier_unsupported",
-                message: "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter." } };
+                message: "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable." } };
         }
         var oldExpression = mailbox.expression;
         var oldExpressionEnabled = mailbox.expressionEnabled;
@@ -798,7 +807,7 @@
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
         if (resolved.properties.request.canSetExpression !== true) {
-            return fail("graph_carrier_unsupported", "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter.");
+            return fail("graph_carrier_unsupported", "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable.");
         }
         var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
         var transaction = "/*SFLDSYNC1:" + nonce + "*/0";
@@ -872,7 +881,7 @@
         // write the mailbox must leave both the graph snapshot and Effect Parade
         // untouched, instead of failing after structural edits have begun.
         if (resolved.properties.request.canSetExpression !== true) {
-            return fail("graph_carrier_unsupported", "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter.");
+            return fail("graph_carrier_unsupported", "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable.");
         }
         if (typeof request.baseGraphRevision !== "number" || !isFinite(request.baseGraphRevision) ||
             Math.floor(request.baseGraphRevision) !== request.baseGraphRevision || request.baseGraphRevision < 1 ||

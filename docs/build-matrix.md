@@ -563,3 +563,18 @@ It is installed at the AE 2023 plug-in path. The revision-14 AEX is backed up at
 Core DLL hash matches the build, so Core was not replaced. AE is closed and has
 not loaded revision 15; retry one node copy/add operation, then check deletion
 and reconnect only if the carrier is accepted.
+
+## P-02B carrier lookup correction (CEP source, 2026-09-30)
+
+The gateway previously resolved the carrier by display name before its registered
+parameter index. Since revision 15 reuses the old request label at a new index,
+an effect instance retaining the earlier name could cause the gateway to inspect
+the legacy request at index 42. Carrier resolution now checks the registered
+index first and verifies `propertyIndex`; the name fallback is accepted only for
+that same index. If index 90 is absent, the gateway reports the missing registered
+slot instead of using a same-name legacy property.
+
+The focused native-node gateway fake-host test passes with the stale-name collision
+and missing-index cases. This is CEP-only and does not require another AEX build or
+replacement. AE 2023 still needs to confirm the real property mapping and expression
+capability in the owner's project.

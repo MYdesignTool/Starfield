@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: experimental prototype; AE 2023 host acceptance is open. The owner retested the revision-14 candidate and AE still reported `canSetExpression=false` for the request stream. The cause is not confirmed; revision 15 appends a fresh request stream at index 90 and keeps index 42 as an inert legacy slot. The panel checks the new stream's capability before any topology mutation. Preferred topology authoring direction is reopened in ADR 0019.
+- Status: experimental prototype; AE 2023 host acceptance is open. Revision 15 appends a fresh request stream at index 90 and keeps index 42 as an inert legacy slot. A source audit found that the CEP resolver preferred the old display name before checking the registered index; an existing effect instance could therefore resolve a same-name request from index 42. The resolver now requires the expected index and `propertyIndex`, and a fake-host regression covers that collision. AE must still confirm the real property's index and expression capability. Preferred topology authoring direction is reopened in ADR 0019.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
@@ -54,6 +54,10 @@ receipt in the supervised callback. Render and pre-render continue to use the co
 graph parameter; they never query AEGP. The panel reads/writes ordinary expressions
 through the scripting DOM. The arbitrary-data graph remains the render source of truth.
 
+Carrier lookup is index-first and accepts a name lookup only if its
+`propertyIndex` matches the registered index. The old request label at index 42
+must not shadow the active request at index 90.
+
 Capture and AE Controls synchronization also refresh the expression mirror before
 replacing the graph handle. The CEP must perform request-expression write, nonce
 trigger, receipt read, and any rollback in one `app.beginUndoGroup` transaction.
@@ -101,9 +105,10 @@ Before accepting this ADR or shipping topology editing:
 1. Build the development carrier and transaction plumbing in the current effect;
    source-level plumbing and panel integration are present but have not been exercised
    together in AE.
-2. In a disposable AE 2023 project, set and read disabled OneD expressions from
-   ExtendScript and verify the snapshot survives save/reopen, undo/redo, and effect
-   duplication.
+2. In a disposable AE 2023 project, verify the gateway resolves registered
+   property index 90 even when a stale property at index 42 has the same display
+   name. Set and read disabled OneD expressions from ExtendScript and verify the
+   snapshot survives save/reopen, undo/redo, and effect duplication.
 3. Verify that the supervised callback reads the request with `AEGP_GetExpression`,
    returns the matching receipt, and updates both graph and snapshot.
 4. Verify the expression write, commit, graph update, Control Source switch, and
