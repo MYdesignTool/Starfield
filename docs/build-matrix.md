@@ -85,6 +85,16 @@ replaced. Core tests pass 11,874 checks, the adapter fake-host suite passes 676 
 and panel graph-view, gateway, and startup checks pass. AE visual/project-lifecycle
 qualification remains open.
 
+Read-only AE 2023 plug-in path audit (2026-09-30): the only discovered
+`StarfieldParticle.aex` is under `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\dist`
+with SHA-256 `8ACF5010…`; its sibling pinned Core is `94A26570…`. The nested
+`dist\StarfieldRuntime` path does not exist. The root `Plug-ins\StarfieldRuntime`
+Junction points to this checkout's `artifacts/runtime` and selects Core generation
+`6E660BB1…`, but `CoreLoader` resolves runtime paths relative to the loaded AEX, so
+the nested copy falls back to its pinned Core. The current `1DBAA183…` AEX / `6E660BB1…`
+Core pair is built but has not been installed at the canonical plug-in root. AE was
+not running during this read-only audit; no host files were changed.
+
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 
 Superseded monolithic artifact: plug-in build 2 / packed version `0x8002`,
