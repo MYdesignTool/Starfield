@@ -27,7 +27,7 @@
     var graphNonceCounter = 0;
     var GRAPH_CARRIERS = {
         snapshot: { index: 41, name: "Graph Snapshot" },
-        request: { index: 42, name: "Graph Edit Request" },
+        request: { index: 90, name: "Graph Edit Request" },
         commit: { index: 43, name: "Commit Graph Edit" },
         receipt: { index: 44, name: "Graph Edit Receipt" },
         nodeEffectsReady: { index: 89, name: "Node Effects Ready" }

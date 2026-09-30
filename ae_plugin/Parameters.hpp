@@ -22,13 +22,14 @@ namespace starfield::adapter {
 // Manifest revision 6 renumbered everything for the grouping; revisions 7–9 append
 // layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions;
 // revision 11 appends particle-variation controls; revision 14 appends native-node
-// materialization state used to distinguish bootstrap from Effect Parade deletion.
+// materialization state; revision 15 appends a fresh expression-capable graph request
+// stream because AE still reported the original request stream as non-expressionable.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 89; // controls + topics + project metadata
+inline constexpr std::size_t kTotalEffectParameterCount = 90; // controls + topics + project metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -65,7 +66,7 @@ inline constexpr A_long kLayoutAppearanceYId = 38;
 inline constexpr A_long kLayoutOutputXId = 39;
 inline constexpr A_long kLayoutOutputYId = 40;
 inline constexpr A_long kGraphSnapshotId = 41;
-inline constexpr A_long kGraphEditRequestId = 42;
+inline constexpr A_long kLegacyGraphEditRequestId = 42;
 inline constexpr A_long kGraphEditCommitId = 43;
 inline constexpr A_long kGraphEditReceiptId = 44;
 inline constexpr A_long kSizeCurveCountId = 45;
@@ -79,6 +80,7 @@ inline constexpr A_long kEmitterSizeZId = 83;
 inline constexpr A_long kParticleSizeRandomId = 86;
 inline constexpr A_long kOpacityRandomId = 87;
 inline constexpr A_long kNodeEffectsReadyId = 89;
+inline constexpr A_long kGraphEditRequestId = 90;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

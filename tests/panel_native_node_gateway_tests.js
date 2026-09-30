@@ -67,6 +67,9 @@ const mailbox = scalar("Graph Edit Request", "");
 mailbox.expression = "";
 mailbox.expressionEnabled = true;
 mailbox.canSetExpression = true;
+const legacyMailbox = scalar("Graph Edit Request (Legacy)", "legacy-expression");
+legacyMailbox.expression = "legacy-expression";
+legacyMailbox.expressionEnabled = false;
 const receipt = scalar("Graph Edit Receipt", 0);
 const commit = scalar("Commit Graph Edit", 0);
 commit.setValue = function (nonce) {
@@ -84,14 +87,18 @@ commit.setValue = function (nonce) {
 Object.assign(rendererProperties, {
     "Node Effects Ready": nodeEffectsReady,
     "Graph Snapshot": snapshot,
-    "Graph Edit Request": mailbox,
+    "Graph Edit Request (Legacy)": legacyMailbox,
     "Commit Graph Edit": commit,
     "Graph Edit Receipt": receipt
 });
 
 const renderer = {
     matchName: "org.starfieldfx.particle",
-    property(name) { return rendererProperties[name] || null; }
+    property(nameOrIndex) {
+        if (nameOrIndex === "Graph Edit Request") return null;
+        if (nameOrIndex === 90) return mailbox;
+        return rendererProperties[nameOrIndex] || null;
+    }
 };
 
 const paradeItems = [renderer];
@@ -218,6 +225,8 @@ const committed = invoke("submitGraph", {
 assert.equal(committed.ok, true, committed.error && committed.error.message);
 assert.equal(committed.snapshot.revision, 5);
 assert.equal(committed.snapshot.graphHex, changedGraphHex);
+assert.equal(legacyMailbox.expression, "legacy-expression",
+    "graph transactions use the appended request carrier, leaving the old project slot untouched");
 assert.equal(paradeItems.length, 2, "deleting a graph node removes all AE effects carrying its identity");
 assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
 assert.equal(undo.begins, 2, "only the graph transaction opens an undo group");

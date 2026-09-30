@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: experimental prototype; AE 2023 host acceptance is open. The owner observed graph commits failing because `Graph Edit Request` did not allow expressions. Source now marks that one carrier expression-capable and checks the scripting capability before any topology mutation; the rebuilt candidate still needs an AE host pass. Preferred topology authoring direction is reopened in ADR 0019.
+- Status: experimental prototype; AE 2023 host acceptance is open. The owner retested the revision-14 candidate and AE still reported `canSetExpression=false` for the request stream. The cause is not confirmed; revision 15 appends a fresh request stream at index 90 and keeps index 42 as an inert legacy slot. The panel checks the new stream's capability before any topology mutation. Preferred topology authoring direction is reopened in ADR 0019.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
@@ -20,15 +20,17 @@ make the renderer query host state.
 
 ## Proposed carrier
 
-Manifest revision 8 appends four hidden, ordinary `PF_Param_FLOAT_SLIDER` streams:
+Manifest revision 8 appends four hidden, ordinary `PF_Param_FLOAT_SLIDER` streams. Revision 15 appends a replacement request stream because the owner still observed the old stream as non-expressionable after the first source fix:
 
 - `Graph Snapshot` (41) is the canonical script-readable mirror. Its expression is an
   inert comment envelope followed by `0` and is explicitly disabled.
-- `Graph Edit Request` (42) is a write-only expression mailbox. It must not set
-  `PF_ParamFlag_CANNOT_TIME_VARY`: AE's scripting DOM otherwise rejects writes to
-  `Property.expression` and `Property.expressionEnabled`. It stays hidden and the
-  expression is disabled after staging, so it is not used as an animated control.
-  The panel stages a complete replacement graph there.
+- `Graph Edit Request (Legacy)` (42) is retained as an unused, hidden project slot.
+  The revision-14 candidate removed `PF_ParamFlag_CANNOT_TIME_VARY` from this
+  parameter, but AE still reported `canSetExpression=false` during the owner's retest.
+- `Graph Edit Request` (90) is the active write-only expression mailbox. It must not
+  set `PF_ParamFlag_CANNOT_TIME_VARY`. It stays hidden and the expression is disabled
+  after staging, so it is not used as an animated control. The panel stages a complete
+  replacement graph there.
 - `Commit Graph Edit` (43) is the supervised numeric trigger. Its integer value is a
   bounded transaction nonce.
 - `Graph Edit Receipt` (44) is the callback acknowledgement. The receipt equals the
@@ -55,7 +57,8 @@ through the scripting DOM. The arbitrary-data graph remains the render source of
 Capture and AE Controls synchronization also refresh the expression mirror before
 replacing the graph handle. The CEP must perform request-expression write, nonce
 trigger, receipt read, and any rollback in one `app.beginUndoGroup` transaction.
-Before changing node effects, the gateway checks `Graph Edit Request.canSetExpression`;
+Before changing node effects, the gateway checks the revision-15
+`Graph Edit Request` at index 90 for `canSetExpression`;
 if the host returns false or does not expose that capability, it rejects the
 operation before opening an undo group or mutating the Effect Parade.
 

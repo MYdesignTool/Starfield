@@ -546,3 +546,20 @@ focused graph transaction suite passes with regressions for graph-only undo,
 restoration, and a stale inspection; it verifies that neither conflict submits
 a second or stale graph edit. Since the undo guard is session-local, save/reopen
 while graph and native effects disagree still needs a host test.
+
+## P-02B fresh graph request carrier (revision 15, 2026-09-30)
+
+The owner still saw `canSetExpression=false` on the request stream after the
+revision-14 candidate was installed. The cause is unconfirmed. Revision 15 keeps
+index 42 as an inert legacy slot and appends a new active request at index 90.
+The CEP gateway and native graph callback both target index 90.
+
+The May 2023 SDK Release build passed. The focused
+`panel_native_node_gateway_tests.js` check and adapter fake-host suite passed
+(689 adapter checks, 0 failures). Main AEX SHA-256:
+`EFAEE26451AC42B68D7FAFDD22A710514EA3A7E65BC5276CD7FE6B5493447DB7`.
+It is installed at the AE 2023 plug-in path. The revision-14 AEX is backed up at
+`artifacts/disabled/p02b-carrier-v15-20260930/StarfieldParticle.aex`. The selected
+Core DLL hash matches the build, so Core was not replaced. AE is closed and has
+not loaded revision 15; retry one node copy/add operation, then check deletion
+and reconnect only if the carrier is accepted.

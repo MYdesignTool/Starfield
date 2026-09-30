@@ -584,7 +584,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         bool supervised;
     } graph_carrier_parameters[] = {
         {"Graph Snapshot", kGraphSnapshotId, 0.0, false},
-        {"Graph Edit Request", kGraphEditRequestId, 0.0, false},
+        {"Graph Edit Request (Legacy)", kLegacyGraphEditRequestId, 0.0, false},
         {"Commit Graph Edit", kGraphEditCommitId, 0.0, true},
         {"Graph Edit Receipt", kGraphEditReceiptId, 0.0, false},
     };
@@ -592,11 +592,10 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     for (const auto& carrier : graph_carrier_parameters) {
         AEFX_CLR_STRUCT(def);
         def.param_type = PF_Param_FLOAT_SLIDER;
-        // ExtendScript can write an expression only to a time-varying-capable
-        // property. The request stream carries a disabled inert expression, so it
-        // must remain expression-capable even though it is hidden from users.
-        def.flags = (carrier.disk_id == kGraphEditRequestId ? PF_ParamFlag_NONE :
-                     PF_ParamFlag_CANNOT_TIME_VARY) |
+        // The old request stream (index 42) is retained as an inert project slot.
+        // The active request stream is appended at index 90 below, which gives
+        // existing AE projects a newly registered property capability record.
+        def.flags = PF_ParamFlag_CANNOT_TIME_VARY |
                     (carrier.supervised ? PF_ParamFlag_SUPERVISE : PF_ParamFlag_NONE);
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
         std::snprintf(def.name, sizeof(def.name), "%s", carrier.name);
@@ -696,6 +695,25 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
     def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
     def.u.fs_d.valid_max = def.u.fs_d.slider_max = 1.0;
+    def.u.fs_d.precision = PF_Precision_INTEGER;
+    def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
+
+    // Revision 15: AE continued reporting canSetExpression=false for the request
+    // stream originally registered at index 42, even after that stream's source
+    // flags became expression-capable. Give transactions a new, appended stream so
+    // old project metadata at index 42 cannot block graph edits. This remains hidden
+    // and unsupervised; only Commit Graph Edit runs the validated graph callback.
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_FLOAT_SLIDER;
+    def.flags = PF_ParamFlag_NONE;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+    std::snprintf(def.name, sizeof(def.name), "Graph Edit Request");
+    def.uu.id = kGraphEditRequestId;
+    def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
+    def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCarrierControlLimit;
+    def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCarrierControlLimit;
     def.u.fs_d.precision = PF_Precision_INTEGER;
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
     err = PF_ADD_PARAM(in_data, -1, &def);

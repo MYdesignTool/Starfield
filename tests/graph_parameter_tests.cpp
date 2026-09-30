@@ -212,6 +212,16 @@ void test_parameters(PF_InData& host) {
     CHECK(node_effects_ready.u.fs_d.dephault == 0.0 &&
           node_effects_ready.u.fs_d.valid_min == 0.0 &&
           node_effects_ready.u.fs_d.valid_max == 1.0);
+    const auto& legacy_graph_request = registered[kLegacyGraphEditRequestId - 1];
+    CHECK(legacy_graph_request.param_type == PF_Param_FLOAT_SLIDER);
+    CHECK((legacy_graph_request.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    CHECK((legacy_graph_request.ui_flags & PF_PUI_INVISIBLE) != 0);
+    const auto& graph_request = registered[kGraphEditRequestId - 1];
+    CHECK(graph_request.param_type == PF_Param_FLOAT_SLIDER);
+    CHECK(graph_request.flags == 0);
+    CHECK((graph_request.ui_flags & PF_PUI_INVISIBLE) != 0);
+    CHECK(graph_request.u.fs_d.valid_min == -1000000.0 &&
+          graph_request.u.fs_d.valid_max == 1000000.0);
     for (std::size_t i = 1; i <= kTotalEffectParameterCount; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;
