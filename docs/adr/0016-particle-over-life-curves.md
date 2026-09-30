@@ -72,9 +72,11 @@ to provide the graph-level bounds and CRC.
 - The curve editor lives in the CEP Particle inspector. Native Effect Controls retain
   their existing endpoint parameters for compatibility; direct endpoint edits keep
   the curve endpoint values synchronized.
-- Size controls and the Size Over Life curve display their unit as layer pixels. The
-  Particle Size and curve ordinates remain bounded at 100,000 px; emitter-axis Size
-  controls remain percentages and are a separate parameter family.
+- Particle Size and the Size Over Life curve use full-resolution layer pixels and
+  remain bounded at 100,000 px. Emitter Size X/Y/Z are also direct full-resolution
+  layer-pixel dimensions, with a 100,000 px bound; their pre-release percentage
+  interpretation was dropped by owner direction (ADR 0017). Disc Size remains a
+  separate layer-height diameter control.
 
 ## Validation rules
 
