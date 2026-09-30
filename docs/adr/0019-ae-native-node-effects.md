@@ -92,6 +92,10 @@ native effect instances are missing. The CEP transaction client then submits a
 revision-checked `deleteNodes` edit against the main effect's saved graph. The
 graph edit also removes incident edges. This reverse reconciliation runs on the
 panel refresh path and does not query sibling effects from rendering callbacks.
+Before pruning, the client rereads the graph and requires the revision to match
+the revision returned by the native-effect inspection; the graph commit then
+performs its own revision check. A stale inspection cannot delete from a newer
+graph state.
 
 Direct Effect Parade deletion and the resulting graph cleanup are separate AE
 operations, so this source design does not yet claim single-step undo for a

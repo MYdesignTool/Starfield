@@ -59,7 +59,9 @@ function createHarness(initialGraph, options) {
                 return;
             }
             if (operation === "ensureNodeEffects") {
-                callback({ ok: true, operation: operation, graphRevision: extra.baseGraphRevision,
+                callback({ ok: true, operation: operation,
+                           graphRevision: options.ensureGraphRevision === undefined ?
+                               extra.baseGraphRevision : options.ensureGraphRevision,
                            target: { token: "target-1" },
                            missingNodeIds: options.missingNodeIds || [] });
                 return;
@@ -146,6 +148,19 @@ assert.strictEqual(undoCompleteReply.ok, true,
                    "restoring the native AE effect clears the temporary undo conflict");
 assert.strictEqual(externalDeleteHarness.calls.length, 5,
                    "restoration only checks node effects and does not prune graph state");
+
+var staleNativeDeleteHarness = createHarness(source, {
+    missingNodeIds: [deletedNodeId], ensureGraphRevision: 7
+});
+var staleNativeDeleteReply;
+staleNativeDeleteHarness.client.ensureNativeEffects(staleNativeDeleteHarness.snapshot(), "target-1", function (response) {
+    staleNativeDeleteReply = response;
+});
+assert.strictEqual(staleNativeDeleteReply.ok, false,
+                   "a stale node-effect inspection must not delete from a newer graph snapshot");
+assert.strictEqual(staleNativeDeleteReply.error.code, "stale_graph");
+assert.strictEqual(staleNativeDeleteHarness.calls.length, 2,
+                   "stale reconciliation reads the latest snapshot but never submits the stale deletion");
 
 var uninitialized = createHarness(source, { getSnapshot: function () {
     return { ok: true, snapshot: { initialized: false }, target: { token: "target-1" } };

@@ -72,12 +72,16 @@
             return String(targetToken) + "|" + String(nodeId);
         }
 
-        function apply(edit, callback, targetToken) {
+        function apply(edit, callback, targetToken, expectedRevision) {
             if (typeof callback !== "function") throw new Error("graph transaction callback is required");
             var pinnedTarget = targetToken ? { target: { token: targetToken } } : null;
             call("getGraphSnapshot", pinnedTarget, function (response) {
                 if (!response || response.ok !== true) { callback(response || failure("bad_response", "No snapshot response.")); return; }
                 var base = response.snapshot;
+                if (typeof expectedRevision === "number" && base.revision !== expectedRevision) {
+                    callback(failure("stale_graph", "The project graph changed after node-effect inspection; refresh before reconciling."));
+                    return;
+                }
                 var graph;
                 var graphHex;
                 try {
@@ -172,7 +176,7 @@
                         callback({ ok: true, operation: "reconcileNativeNodeDeletion",
                             target: reconciled.target, snapshot: reconciled.snapshot,
                             removedNodeIds: ensured.missingNodeIds.slice() });
-                    }, targetToken);
+                    }, targetToken, ensured.graphRevision);
                 });
         }
 

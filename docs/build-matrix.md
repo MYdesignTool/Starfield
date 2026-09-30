@@ -538,9 +538,11 @@ The CEP transaction client now remembers which native Effect Parade deletions it
 has already reconciled during the current panel session. If AE undo restores a
 graph node before restoring its native effect, refresh reports
 `native_node_undo_conflict` and does not submit a second graph deletion. The
-guard clears when the native effect reappears. This is CEP-only source and does
-not require replacing the installed AEX. The focused graph transaction suite
-passes with a regression that simulates graph-only undo, verifies no second
-submit, then verifies effect restoration clears the conflict. Since the guard is
-session-local, save/reopen while graph and native effects disagree still needs a
-host test.
+guard clears when the native effect reappears. Reconciliation also rereads the
+graph and compares its revision to the one inspected before submitting the
+deletion, so an intervening graph edit cannot be pruned using stale information.
+This is CEP-only source and does not require replacing the installed AEX. The
+focused graph transaction suite passes with regressions for graph-only undo,
+restoration, and a stale inspection; it verifies that neither conflict submits
+a second or stale graph edit. Since the undo guard is session-local, save/reopen
+while graph and native effects disagree still needs a host test.
