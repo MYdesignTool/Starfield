@@ -29,7 +29,8 @@
         snapshot: { index: 41, name: "Graph Snapshot" },
         request: { index: 42, name: "Graph Edit Request" },
         commit: { index: 43, name: "Commit Graph Edit" },
-        receipt: { index: 44, name: "Graph Edit Receipt" }
+        receipt: { index: 44, name: "Graph Edit Receipt" },
+        nodeEffectsReady: { index: 89, name: "Node Effects Ready" }
     };
     var NATIVE_NODE_TYPES = {
         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
@@ -820,11 +821,11 @@
         var nodes;
         try { nodes = validateNodeManifest(request.nodeManifest); }
         catch (manifestError) { return fail("invalid_node_manifest", manifestError.toString()); }
-        var needsAdd = false;
+        var missingNodeIds = [];
         try {
             for (var check = 0; check < nodes.length; check++) {
                 var existing = nodeEffectById(resolved.target.layer, nodes[check].id);
-                if (!existing) { needsAdd = true; continue; }
+                if (!existing) { missingNodeIds.push(nodes[check].id); continue; }
                 if (nativeNodeTypeByMatch(existing.matchName) !== nodes[check].type) {
                     return fail("node_effect_sync_failed", "A node identity is already used by a different effect type.");
                 }
@@ -832,7 +833,16 @@
         } catch (lookupError) {
             return fail("node_effect_sync_failed", lookupError.toString());
         }
-        if (!needsAdd) {
+        // Once the project marker says the graph's node effects were materialized,
+        // a missing effect is an intentional Effect Parade deletion. Report it to
+        // the CEP transaction client so it can remove the node and incident edges
+        // from the saved graph instead of silently recreating the effect.
+        if (Number(resolved.properties.nodeEffectsReady.value) === 1 && missingNodeIds.length) {
+            return reply({ ok: true, operation: "ensureNodeEffects", requestId: request.requestId || "",
+                           target: { token: resolved.token }, graphRevision: current.revision,
+                           count: nodes.length, missingNodeIds: missingNodeIds });
+        }
+        if (Number(resolved.properties.nodeEffectsReady.value) === 1) {
             return reply({ ok: true, operation: "ensureNodeEffects", requestId: request.requestId || "",
                            target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length });
         }
@@ -841,6 +851,9 @@
             app.beginUndoGroup("Starfield: create node effects");
             groupOpen = true;
             ensureNativeNodeEffects(resolved.target.layer, nodes, false);
+            // Mark only after every effect was found or created successfully. This
+            // value lives in the AE project, so the distinction survives reopen.
+            resolved.properties.nodeEffectsReady.setValue(1);
         } catch (error) {
             return fail("node_effect_sync_failed", error.toString());
         } finally {

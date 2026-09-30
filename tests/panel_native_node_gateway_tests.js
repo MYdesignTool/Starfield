@@ -60,6 +60,7 @@ const nodeIds = ["11223344556677889900aabbccddeeff", "ffeeddccbbaa00998877665544
 let activeGraphRevision = 4;
 
 const rendererProperties = {};
+const nodeEffectsReady = scalar("Node Effects Ready", 0);
 const snapshot = scalar("Graph Snapshot", null);
 snapshot.expression = snapshotExpression(4, graphHex);
 const mailbox = scalar("Graph Edit Request", "");
@@ -81,6 +82,7 @@ commit.setValue = function (nonce) {
     receipt.value = nonce;
 };
 Object.assign(rendererProperties, {
+    "Node Effects Ready": nodeEffectsReady,
     "Graph Snapshot": snapshot,
     "Graph Edit Request": mailbox,
     "Commit Graph Edit": commit,
@@ -160,6 +162,7 @@ assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
 ]);
 assert.equal(paradeItems[1].property("Particles Per Second").value, 24);
 assert.equal(paradeItems[2].property("Particles Per Second").value, 48);
+assert.equal(nodeEffectsReady.value, 1, "successful bootstrap is persisted on the main effect");
 assert.deepEqual(["Size X", "Size Y", "Size Z"].map(name => paradeItems[1].property(name).value), [320, 180, 90]);
 assert.deepEqual(["Size X", "Size Y", "Size Z"].map(name => paradeItems[2].property(name).value), [640, 360, 180]);
 assert.deepEqual(paradeItems.slice(1).map(effect => effect.name), [
@@ -220,6 +223,15 @@ assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
 assert.equal(undo.begins, 2, "only the graph transaction opens an undo group");
 assert.equal(undo.ends, 2);
 
+paradeItems[1].remove();
+const externallyDeleted = invoke("ensureNodeEffects", {
+    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: [nodes[1]]
+});
+assert.equal(externallyDeleted.ok, true);
+assert.deepEqual(externallyDeleted.missingNodeIds, [nodeIds[1]],
+    "after bootstrap, a missing Effect Parade module is reported as a graph deletion");
+assert.equal(paradeItems.length, 1, "refresh does not silently recreate a manually deleted node effect");
+
 // The project-owned node manifest can materialize distinct native module types,
 // preserve their typed values, and remove exactly the node omitted by a later edit.
 const particleId = "00112233445566778899aabbccddeeff";
@@ -246,17 +258,20 @@ const secondForce = { id: secondForceId, type: force.type, schemaVersion: force.
 ] };
 const invalidParticle = { id: particleId, type: particle.type, schemaVersion: particle.schemaVersion,
     parameters: [{ key: "999", type: 4, value: 1 }] };
-const failedParticleAdd = invoke("ensureNodeEffects", {
-    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: [nodes[1], invalidParticle]
+const failedParticleAdd = invoke("submitGraph", {
+    baseGraphRevision: 5, baseNodeManifest: [nodes[1]], graphHex: finalGraphHex,
+    nodeManifest: [nodes[1], invalidParticle]
 });
 assert.equal(failedParticleAdd.ok, false, "unsupported node controls reject a partial effect creation");
 assert.equal(paradeItems.length, 2, "a failed node initialization removes its partially created effect");
 
 const mixedNodes = [nodes[1], particle, secondParticle, force, secondForce];
-const mixed = invoke("ensureNodeEffects", {
-    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: mixedNodes
+const mixed = invoke("submitGraph", {
+    baseGraphRevision: 5, baseNodeManifest: [nodes[1]], graphHex: finalGraphHex,
+    nodeManifest: mixedNodes
 });
 assert.equal(mixed.ok, true, mixed.error && mixed.error.message);
+assert.equal(mixed.snapshot.revision, 6);
 assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
     "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle",
     "org.starfieldfx.node.particle", "org.starfieldfx.node.force", "org.starfieldfx.node.force"
@@ -276,7 +291,7 @@ assert.equal(paradeItems[2].property("Node UUID 0").value, 0x0011,
     "the same identity can be retried after a failed partial creation");
 
 const outputRejected = invoke("ensureNodeEffects", {
-    baseGraphRevision: 5, graphHex: changedGraphHex,
+    baseGraphRevision: 6, graphHex: finalGraphHex,
     nodeManifest: mixedNodes.concat([{ id: "00000000000000000000000000000104",
         type: "org.starfieldfx.nodes.output", schemaVersion: 1, parameters: [] }])
 });
@@ -284,12 +299,12 @@ assert.equal(outputRejected.ok, false, "Output stays virtual and is not material
 assert.equal(paradeItems.length, 6);
 
 const removeForce = invoke("submitGraph", {
-    baseGraphRevision: 5, baseNodeManifest: mixedNodes,
-    nodeManifest: [nodes[1], particle, secondParticle, secondForce], graphHex: finalGraphHex
+    baseGraphRevision: 6, baseNodeManifest: mixedNodes,
+    nodeManifest: [nodes[1], particle, secondParticle, secondForce], graphHex: changedGraphHex
 });
 assert.equal(removeForce.ok, true, removeForce.error && removeForce.error.message);
-assert.equal(removeForce.snapshot.revision, 6);
-assert.equal(removeForce.snapshot.graphHex, finalGraphHex);
+assert.equal(removeForce.snapshot.revision, 7);
+assert.equal(removeForce.snapshot.graphHex, changedGraphHex);
 assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
     "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle", "org.starfieldfx.node.particle",
     "org.starfieldfx.node.force"

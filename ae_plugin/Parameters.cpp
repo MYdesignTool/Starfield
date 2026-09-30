@@ -684,6 +684,23 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                          PF_ParamFlag_SUPERVISE, kOpacityRandomDiskId);
     PF_END_TOPIC(kParticleVariationTopicDiskId);
 
+    // This project-owned marker distinguishes first-time node materialization
+    // from a node effect removed later in AE's Effect Parade. It is deliberately
+    // unsupervised: the CEP updates it inside the same undo group as node creation.
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_FLOAT_SLIDER;
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+    std::snprintf(def.name, sizeof(def.name), "Node Effects Ready");
+    def.uu.id = kNodeEffectsReadyId;
+    def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
+    def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
+    def.u.fs_d.valid_max = def.u.fs_d.slider_max = 1.0;
+    def.u.fs_d.precision = PF_Precision_INTEGER;
+    def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+    err = PF_ADD_PARAM(in_data, -1, &def);
+    if (err != PF_Err_NONE) return err;
+
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }

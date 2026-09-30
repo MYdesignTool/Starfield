@@ -64,9 +64,10 @@
         var maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
         var idFactory = options.idFactory;
 
-        function apply(edit, callback) {
+        function apply(edit, callback, targetToken) {
             if (typeof callback !== "function") throw new Error("graph transaction callback is required");
-            call("getGraphSnapshot", null, function (response) {
+            var pinnedTarget = targetToken ? { target: { token: targetToken } } : null;
+            call("getGraphSnapshot", pinnedTarget, function (response) {
                 if (!response || response.ok !== true) { callback(response || failure("bad_response", "No snapshot response.")); return; }
                 var base = response.snapshot;
                 var graph;
@@ -84,8 +85,10 @@
                                      error && error.message ? error.message : String(error)));
                     return;
                 }
-                call("submitGraph", { baseGraphRevision: base.revision, graphHex: graphHex,
-                    baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated) }, function (committed) {
+                var transaction = { baseGraphRevision: base.revision, graphHex: graphHex,
+                    baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated) };
+                if (targetToken) transaction.target = { token: targetToken };
+                call("submitGraph", transaction, function (committed) {
                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
                     var saved = committed.snapshot;
                     try {
@@ -118,7 +121,20 @@
             }
             call("ensureNodeEffects", { target: { token: targetToken },
                 baseGraphRevision: snapshot.revision, graphHex: snapshot.graphHex,
-                nodeManifest: nativeNodeManifest(graph) }, callback);
+                nodeManifest: nativeNodeManifest(graph) }, function (ensured) {
+                    if (!ensured || ensured.ok !== true ||
+                        Object.prototype.toString.call(ensured.missingNodeIds) !== "[object Array]" ||
+                        ensured.missingNodeIds.length === 0) {
+                        callback(ensured);
+                        return;
+                    }
+                    apply({ type: "deleteNodes", nodeIds: ensured.missingNodeIds }, function (reconciled) {
+                        if (!reconciled || reconciled.ok !== true) { callback(reconciled); return; }
+                        callback({ ok: true, operation: "reconcileNativeNodeDeletion",
+                            target: reconciled.target, snapshot: reconciled.snapshot,
+                            removedNodeIds: ensured.missingNodeIds.slice() });
+                    }, targetToken);
+                });
         }
 
         return { apply: apply, ensureNativeEffects: ensureNativeEffects };

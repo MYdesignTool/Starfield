@@ -205,6 +205,13 @@ void test_parameters(PF_InData& host) {
     // animated, and the two flags this used to carry were never part of the contract.
     CHECK(registered[kGraphParameterId - 1].flags == 0);
     CHECK(registered[kGraphParameterId - 1].u.arb_d.value == nullptr);
+    const auto& node_effects_ready = registered[kNodeEffectsReadyId - 1];
+    CHECK(node_effects_ready.param_type == PF_Param_FLOAT_SLIDER);
+    CHECK((node_effects_ready.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    CHECK((node_effects_ready.ui_flags & PF_PUI_INVISIBLE) != 0);
+    CHECK(node_effects_ready.u.fs_d.dephault == 0.0 &&
+          node_effects_ready.u.fs_d.valid_min == 0.0 &&
+          node_effects_ready.u.fs_d.valid_max == 1.0);
     for (std::size_t i = 1; i <= kTotalEffectParameterCount; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;

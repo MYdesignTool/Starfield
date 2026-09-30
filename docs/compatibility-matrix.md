@@ -309,3 +309,19 @@ tested split pair is still installed for development.
 | Bounded work | Extreme settings fail with a typed error instead of hanging the host | Implemented (`work_limit_exceeded` + manifest caps); the specific budget is a provisional constant pending M6 profiling |
 | Presets | Import/export validates version and rejects malformed or oversized data | Not started as file import/export (M4-03). The three delivery examples ship as documented recipes and panel presets; the graph codec already provides the bounded, versioned container a preset will use |
 | Panel | UI state synchronizes through a versioned protocol and tolerates disconnect/restart | Protocol v1 implemented in `cep_panel/` with bounded requests, typed errors and stale-state rejection; reads/writes go through supervised parameter streams (ADR 0009). Host qualification is the open gate; file import/export presets remain M4-03 |
+
+### P-02D reverse deletion reconciliation candidate (2026-09-30)
+
+The May 2023 SDK x64 Release build includes schema revision 14 and the hidden
+project marker `Node Effects Ready` (parameter ID 89). Focused gateway,
+transaction, and startup suites pass; the AE adapter fake-host suite passes 682
+checks. Main AEX candidate SHA-256:
+`9B3D75B2AA9E1EC1DED90F0993DCB7E66DD28FFC91DDB11968E656C1D9204017`.
+
+The candidate is built but not installed or loaded. The currently installed
+mailbox-fix AEX predates the marker. After deployment, AE 2023 must verify first
+materialization, manual Effect Controls deletion pruning the matching graph node
+and incident edges, undo/redo without repeated pruning, and save/close/reopen.
+The graph cleanup after a manual Effect Parade deletion is a separate undoable
+transaction; its interaction with the native deletion's undo record is not yet
+qualified.

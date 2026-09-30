@@ -21,13 +21,14 @@ namespace starfield::adapter {
 // 0, so the effect registers one more parameter than kTotalEffectParameterCount.
 // Manifest revision 6 renumbered everything for the grouping; revisions 7–9 append
 // layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions;
-// revision 11 appends particle-variation controls.
+// revision 11 appends particle-variation controls; revision 14 appends native-node
+// materialization state used to distinguish bootstrap from Effect Parade deletion.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 88; // controls + topics + project metadata
+inline constexpr std::size_t kTotalEffectParameterCount = 89; // controls + topics + project metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -77,6 +78,7 @@ inline constexpr A_long kEmitterSizeYId = 82;
 inline constexpr A_long kEmitterSizeZId = 83;
 inline constexpr A_long kParticleSizeRandomId = 86;
 inline constexpr A_long kOpacityRandomId = 87;
+inline constexpr A_long kNodeEffectsReadyId = 89;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

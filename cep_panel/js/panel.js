@@ -833,6 +833,9 @@
                 if (!client || !client.ensureNativeEffects) { callback(snapshotResponse); return; }
                 client.ensureNativeEffects(snapshotResponse.snapshot, targetToken, function (ensured) {
                     if (!ensured || !ensured.ok) { callback(ensured || snapshotResponse); return; }
+                    if (ensured.snapshot) {
+                        snapshotResponse = Object.assign({}, snapshotResponse, { snapshot: ensured.snapshot });
+                    }
                     callback(snapshotResponse);
                 });
             }

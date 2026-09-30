@@ -499,10 +499,35 @@ After the owner authorized closing AE, PID 22800 was ended without saving and th
 candidate was copied into `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`.
 The installed hash matches the candidate. AE is closed and has not loaded it yet.
 Graph add/copy/delete, automatic node creation, undo, persistence, and native
-Effect Parade deletion remain host checks; reverse synchronization from manually
-deleting an AEX to the CEP graph is still not implemented. To roll back, while AE
-is closed, copy the backup AEX above back to the plug-in path.
+Effect Parade deletion remain host checks. Revision 14 now adds a project-owned
+readiness marker and source reconciliation that removes a manually deleted node
+and its incident edges from the graph. The new candidate is built but not
+installed; the installed mailbox-fix AEX predates the marker. To roll back the
+previous deployment, while AE is closed, copy the backup AEX above back to the
+plug-in path.
 
 ## Local SDK inputs
 
 The SDK is provided by the developer from Adobe Developer Console. Configure a local SDK path (do not commit SDK files). The plug-in build consumes Adobe headers and the official PiPL conversion tools from that tree. `ae_plugin/BuildWindows.ps1` maps the checkout to a temporary drive during the build to avoid legacy PiPL tool failures on paths containing spaces or non-ASCII characters. We do not provide placeholder SDK headers or a replacement PiPL compiler.
+
+## P-02D reverse deletion reconciliation build (2026-09-30)
+
+The May 2023 SDK Release build succeeded with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023 -NoRuntimePublish
+```
+
+The build compiles schema revision 14, including hidden renderer parameter
+`Node Effects Ready` (ID 89). Main AEX SHA-256:
+`9B3D75B2AA9E1EC1DED90F0993DCB7E66DD28FFC91DDB11968E656C1D9204017`.
+The build used `-NoRuntimePublish`, so the selected Core DLL did not change.
+MSVC emitted existing C4819 code-page warnings for non-ASCII comments in
+`Parameters.hpp`; compilation and PiPL generation succeeded. The candidate is
+not installed or loaded in AE.
+
+Focused verification passed: `panel_native_node_gateway_tests.js`,
+`panel_graph_transaction_tests.js`, `panel_startup_tests.js`, the adapter suite
+(682 checks, 0 failures), and `git diff --check`. Host verification remains open
+for first materialization, manual node-effect deletion, undo/redo reconciliation,
+and project reopen.

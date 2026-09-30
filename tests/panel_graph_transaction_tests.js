@@ -60,7 +60,8 @@ function createHarness(initialGraph, options) {
             }
             if (operation === "ensureNodeEffects") {
                 callback({ ok: true, operation: operation, graphRevision: extra.baseGraphRevision,
-                           target: { token: "target-1" } });
+                           target: { token: "target-1" },
+                           missingNodeIds: options.missingNodeIds || [] });
                 return;
             }
             callback({ ok: false, error: { code: "unexpected_operation", message: operation } });
@@ -101,6 +102,26 @@ assert.strictEqual(ensureHarness.calls.length, 1);
 assert.strictEqual(ensureHarness.calls[0].operation, "ensureNodeEffects");
 assert.strictEqual(ensureHarness.calls[0].extra.nodeManifest.length, 2,
                    "startup reconciliation creates editable native nodes only; Output is the main effect");
+
+var deletedNodeId = uuid(2);
+var externalDeleteHarness = createHarness(source, { missingNodeIds: [deletedNodeId] });
+var externalDeleteReply;
+externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
+    externalDeleteReply = response;
+});
+assert.strictEqual(externalDeleteReply.ok, true);
+assert.strictEqual(externalDeleteReply.operation, "reconcileNativeNodeDeletion");
+assert.deepStrictEqual(externalDeleteReply.removedNodeIds, [deletedNodeId]);
+assert.strictEqual(externalDeleteReply.snapshot.revision, 9,
+                   "external Effect Parade deletion commits one new saved graph revision");
+var externallyPrunedGraph = codec.fromHex(externalDeleteReply.snapshot.graphHex);
+assert.deepStrictEqual(externallyPrunedGraph.nodes.map(function (node) { return node.id; }), [uuid(1), uuid(3)]);
+assert.strictEqual(externallyPrunedGraph.edges.length, 0,
+                   "external node deletion also removes its incident graph edges");
+assert.strictEqual(externalDeleteHarness.calls[1].operation, "getGraphSnapshot");
+assert.strictEqual(externalDeleteHarness.calls[2].operation, "submitGraph");
+assert.deepStrictEqual(externalDeleteHarness.calls[2].extra.target, { token: "target-1" },
+                       "the deletion reconciliation stays pinned to the inspected AE effect");
 
 var uninitialized = createHarness(source, { getSnapshot: function () {
     return { ok: true, snapshot: { initialized: false }, target: { token: "target-1" } };

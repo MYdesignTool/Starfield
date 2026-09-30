@@ -1,6 +1,6 @@
 # ADR 0019: AE-native effect instances own node records
 
-- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX; AE 2023 synchronization acceptance is pending. The gateway now rejects duplicate native node UUIDs and removes all same-UUID effects when deleting that graph node.
+- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX. AE 2023 synchronization acceptance is pending. The gateway rejects duplicate native node UUIDs, removes all same-UUID effects when deleting a graph node, and can reconcile direct Effect Parade deletion after initial node materialization.
 - Date: 2026-09-30.
 - Depends on ADRs 0006–0013 and 0015.
 
@@ -77,6 +77,28 @@ project-persistent node ID.
    fresh development schema; migration from the current in-development graph
    format is not required.
 
+### Initial materialization and direct Effect Parade deletion
+
+The main renderer appends hidden, non-animated parameter ID 89, `Node Effects
+Ready`, to the project. Its default value is 0. During the first successful
+panel synchronization, the gateway creates any native node effects missing from
+the graph manifest and sets the marker to 1 in the same AE undo group. This
+distinguishes a new project that still needs bootstrap from a later deliberate
+deletion in Effect Controls; without project-owned state, every refresh would
+recreate manually deleted nodes.
+
+After the marker is 1, the gateway reports graph node IDs whose corresponding
+native effect instances are missing. The CEP transaction client then submits a
+revision-checked `deleteNodes` edit against the main effect's saved graph. The
+graph edit also removes incident edges. This reverse reconciliation runs on the
+panel refresh path and does not query sibling effects from rendering callbacks.
+
+Direct Effect Parade deletion and the resulting graph cleanup are separate AE
+operations, so this source design does not yet claim single-step undo for a
+manual deletion. AE 2023 qualification must check the undo stack, refresh after
+undo/redo, and save/reopen; if undo causes a missing node to be pruned again,
+reconciliation needs an explicit conflict state instead of silently retrying.
+
 P-02C's Size/Opacity curves and other non-scalar node values must also end up
 owned by the corresponding Particle effect. The prototype may start with scalar
 fields, but P-02B must not resume until the curve payload has a bounded,
@@ -151,6 +173,10 @@ The spike is successful only when all of these work in AE 2023:
 - The same graph bytes survive reopen and the panel reconstructs editable node
   instances plus the fixed Output terminal from the project without an
   incidental manual Refresh.
+- After the first materialization, deleting a native node effect from Effect
+  Controls removes the matching graph node and incident edges. Test deletion,
+  undo/redo, panel refresh, and save/reopen as separate host gates before calling
+  reverse synchronization accepted.
 
 If the callback cannot update the main effect's graph snapshot atomically with an edit,
 implement a native graph coordinator that explicitly tracks AE undo and cache
