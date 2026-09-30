@@ -96,6 +96,19 @@ assert.deepStrictEqual(harness.calls[1].extra.baseNodeManifest[0].parameters.fil
 assert.strictEqual(reply.snapshot.revision, 9);
 assert.strictEqual(codec.fromHex(reply.graphHex).nodes.length, 4);
 
+var duplicateWireHarness = createHarness(source);
+var duplicateWireReply;
+duplicateWireHarness.client.apply({ type: "connect", from: uuid(2), to: uuid(3) }, function (response) {
+    duplicateWireReply = response;
+});
+assert.strictEqual(duplicateWireReply.ok, true);
+assert.strictEqual(duplicateWireReply.noOp, true, "an existing wire is acknowledged as a no-op");
+assert.strictEqual(duplicateWireHarness.calls.length, 1,
+                   "an identical connection must not call submitGraph or create an AE undo record");
+assert.strictEqual(duplicateWireHarness.snapshot().revision, 8,
+                   "an identical connection does not advance the project graph revision");
+assert.strictEqual(duplicateWireHarness.snapshot().graphHex, codec.toHex(source));
+
 var ensureHarness = createHarness(source);
 var ensureReply;
 ensureHarness.client.ensureNativeEffects(ensureHarness.snapshot(), "target-1", function (response) {

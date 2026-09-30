@@ -85,6 +85,24 @@ assert.strictEqual(edgeTo(forceFanIn, forceId).length, 2, "Force input supports 
 
 var reconnect = edits.apply(original, { type: "connect", from: original.nodes[0].id, to: particleId }, idFactory);
 assert.strictEqual(edgeTo(reconnect, particleId).length, 1, "Particle input reconnect replaces the old source edge");
+assert.strictEqual(edgeTo(reconnect, particleId)[0].id, edgeTo(original, particleId)[0].id,
+                   "reconnecting the identical Emitter wire preserves its stable edge ID");
+var repeatedForceOutput = edits.apply(original, { type: "connect", from: forceId, to: outputId }, idFactory);
+assert.strictEqual(repeatedForceOutput.edges.length, original.edges.length,
+                   "connecting an existing multi-input wire must not add a duplicate edge");
+assert.strictEqual(edgeTo(repeatedForceOutput, outputId).filter(function (edge) {
+    return edge.sourceNode === forceId;
+})[0].id, edgeTo(original, outputId).filter(function (edge) {
+    return edge.sourceNode === forceId;
+})[0].id, "repeating a wire preserves its stable edge ID");
+var alternateEmitter = edits.apply(original, { type: "addNode", nodeType: "emitter" }, idFactory);
+var alternateEmitterId = alternateEmitter.nodes[4].id;
+alternateEmitter = edits.apply(alternateEmitter, {
+    type: "connect", from: alternateEmitterId, to: particleId
+}, idFactory);
+assert.strictEqual(edgeTo(alternateEmitter, particleId).length, 1,
+                   "reconnecting a single-input Particle still removes its prior source");
+assert.strictEqual(edgeTo(alternateEmitter, particleId)[0].sourceNode, alternateEmitterId);
 
 var inserted = edits.apply(original, { type: "insertNode", from: particleId, to: forceId, nodeType: "force" }, idFactory);
 var insertedId = inserted.nodes[4].id;

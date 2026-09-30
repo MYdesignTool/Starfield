@@ -97,6 +97,14 @@
                                      error && error.message ? error.message : String(error)));
                     return;
                 }
+                // Reconnecting an already-present wire is idempotent. Avoid an AE
+                // graph revision and empty undo record for this one no-op gesture.
+                // Other operations may carry native-effect reconciliation side effects.
+                if (edit.type === "connect" && graphHex === String(base.graphHex).toLowerCase()) {
+                    callback({ ok: true, operation: "submitGraph", target: response.target,
+                               snapshot: base, graphHex: graphHex, noOp: true });
+                    return;
+                }
                 var transaction = { baseGraphRevision: base.revision, graphHex: graphHex,
                     baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated) };
                 if (targetToken) transaction.target = { token: targetToken };

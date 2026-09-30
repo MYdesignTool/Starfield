@@ -173,14 +173,6 @@
             var next = adjacency["$" + current] || [];
             for (var j = 0; j < next.length; j++) pending.push(next[j]);
         }
-        if (destinationSchema.inputLimit === 1) {
-            for (var c = graph.edges.length - 1; c >= 0; c--) {
-                var connected = graph.edges[c];
-                if (connected.destinationNode === destinationId && connected.destinationPort === String(destinationPort)) {
-                    graph.edges.splice(c, 1);
-                }
-            }
-        }
     }
 
     function addNode(graph, edit, idFactory, positions) {
@@ -201,7 +193,23 @@
         var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
         var destinationPort = edit.inputPort === undefined ? destinationSchema.input : String(edit.inputPort);
         validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
+        for (var i = 0; i < graph.edges.length; i++) {
+            var existing = graph.edges[i];
+            if (existing.sourceNode === edit.from && existing.sourcePort === sourcePort &&
+                existing.destinationNode === edit.to && existing.destinationPort === destinationPort) {
+                return true;
+            }
+        }
+        if (destinationSchema.inputLimit === 1) {
+            for (var c = graph.edges.length - 1; c >= 0; c--) {
+                var connected = graph.edges[c];
+                if (connected.destinationNode === edit.to && connected.destinationPort === destinationPort) {
+                    graph.edges.splice(c, 1);
+                }
+            }
+        }
         graph.edges.push(makeEdge(graph, idFactory, edit.from, edit.to, sourcePort, destinationPort));
+        return false;
     }
 
     function disconnect(graph, edit) {
@@ -403,7 +411,9 @@
         var positions = layout.resolve(graph);
         idFactory = idFactory || randomId;
         if (edit.type === "addNode") addNode(graph, edit, idFactory, positions);
-        else if (edit.type === "connect") connect(graph, edit, idFactory);
+        else if (edit.type === "connect") {
+            if (connect(graph, edit, idFactory)) return graph;
+        }
         else if (edit.type === "disconnect") disconnect(graph, edit);
         else if (edit.type === "insertNode") insertNode(graph, edit, idFactory, positions);
         else if (edit.type === "deleteNodes") deleteNodes(graph, edit, positions);
