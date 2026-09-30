@@ -2410,11 +2410,6 @@
             }
             startupRetryAttempt = 0;
             clearBanner();
-            if (response.controlSource !== "Node Graph") {
-                refreshInFlight = false;
-                adoptState(response, null);
-                return;
-            }
             loadGraphSnapshot(response.target.token, function (snapshotResponse) {
                 refreshInFlight = false;
                 if (epoch !== refreshEpoch || canvasInteractionActive() || state.pending) return;
@@ -2426,7 +2421,10 @@
                     adoptState(response, null);
                     return;
                 }
-                adoptState(response, snapshotResponse.snapshot);
+                // The first graph sync also materializes the node AEX records.
+                // Keep that lifecycle active in AE Controls mode; only Node Graph
+                // mode projects the canonical topology into the editable canvas.
+                adoptState(response, response.controlSource === "Node Graph" ? snapshotResponse.snapshot : null);
             });
         });
     }
@@ -2507,7 +2505,7 @@
     });
     if (window.setInterval) {
         window.setInterval(function () {
-            if (!resolvedTarget || state.pending || document.hidden ||
+            if (state.pending || document.hidden ||
                 (elements.autoRefresh && !elements.autoRefresh.checked)) return;
             refresh(false, false);
         }, TARGET_POLL_INTERVAL_MS);
@@ -2519,12 +2517,12 @@
     }
     if (document.addEventListener) {
         document.addEventListener("visibilitychange", function () {
-            if (!document.hidden && resolvedTarget &&
+            if (!document.hidden &&
                 (!elements.autoRefresh || elements.autoRefresh.checked)) refresh(false, false);
         });
     }
     if (elements.autoRefresh) elements.autoRefresh.addEventListener("change", function () {
-        if (elements.autoRefresh.checked && resolvedTarget) refresh(false, false);
+        if (elements.autoRefresh.checked) refresh(false, false);
     });
 
     elements.preset.addEventListener("change", function () {

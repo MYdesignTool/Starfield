@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: experimental prototype; AE 2023 host acceptance is open, and the owner reports node addition/removal still unavailable. Preferred topology authoring direction is reopened in ADR 0019.
+- Status: experimental prototype; AE 2023 host acceptance is open. The owner observed graph commits failing because `Graph Edit Request` did not allow expressions. Source now marks that one carrier expression-capable and checks the scripting capability before any topology mutation; the rebuilt candidate still needs an AE host pass. Preferred topology authoring direction is reopened in ADR 0019.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
@@ -24,8 +24,11 @@ Manifest revision 8 appends four hidden, ordinary `PF_Param_FLOAT_SLIDER` stream
 
 - `Graph Snapshot` (41) is the canonical script-readable mirror. Its expression is an
   inert comment envelope followed by `0` and is explicitly disabled.
-- `Graph Edit Request` (42) is a write-only expression mailbox. The panel stages a
-  complete replacement graph there.
+- `Graph Edit Request` (42) is a write-only expression mailbox. It must not set
+  `PF_ParamFlag_CANNOT_TIME_VARY`: AE's scripting DOM otherwise rejects writes to
+  `Property.expression` and `Property.expressionEnabled`. It stays hidden and the
+  expression is disabled after staging, so it is not used as an animated control.
+  The panel stages a complete replacement graph there.
 - `Commit Graph Edit` (43) is the supervised numeric trigger. Its integer value is a
   bounded transaction nonce.
 - `Graph Edit Receipt` (44) is the callback acknowledgement. The receipt equals the
@@ -52,6 +55,9 @@ through the scripting DOM. The arbitrary-data graph remains the render source of
 Capture and AE Controls synchronization also refresh the expression mirror before
 replacing the graph handle. The CEP must perform request-expression write, nonce
 trigger, receipt read, and any rollback in one `app.beginUndoGroup` transaction.
+Before changing node effects, the gateway checks `Graph Edit Request.canSetExpression`;
+if the host returns false or does not expose that capability, it rejects the
+operation before opening an undo group or mutating the Effect Parade.
 
 The ExtendScript gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, and
 `submitGraph`. A bounded schema-1 JavaScript codec handles the binary envelope,
@@ -65,9 +71,10 @@ into the node canvas and maps typed node parameters, the Output particle cap, an
 Particle/Appearance curves. The panel loads and initializes a missing snapshot, renders
 the dynamic graph, and routes topology, layout, scalar, color, popup, and curve edits
 through the revision-checked transaction coordinator. Curve edits store an optional
-opaque curve payload and update its scalar endpoints in one graph commit. Codec, planner,
-transaction, graph-view, and startup fake-host tests cover these source paths; AE carrier,
-callback, undo, and save/reopen qualification remains open.
+opaque curve payload and update its scalar endpoints in one graph commit. In AE Controls
+mode, loading the graph snapshot also materializes its native node effects; target discovery
+continues while no target is selected. These source paths have focused fake-host coverage,
+but are not host qualification. AE carrier, callback, undo, and save/reopen checks remain open.
 
 ## Why this is only proposed
 

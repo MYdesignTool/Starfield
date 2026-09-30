@@ -592,7 +592,11 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     for (const auto& carrier : graph_carrier_parameters) {
         AEFX_CLR_STRUCT(def);
         def.param_type = PF_Param_FLOAT_SLIDER;
-        def.flags = PF_ParamFlag_CANNOT_TIME_VARY |
+        // ExtendScript can write an expression only to a time-varying-capable
+        // property. The request stream carries a disabled inert expression, so it
+        // must remain expression-capable even though it is hidden from users.
+        def.flags = (carrier.disk_id == kGraphEditRequestId ? PF_ParamFlag_NONE :
+                     PF_ParamFlag_CANNOT_TIME_VARY) |
                     (carrier.supervised ? PF_ParamFlag_SUPERVISE : PF_ParamFlag_NONE);
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
         std::snprintf(def.name, sizeof(def.name), "%s", carrier.name);

@@ -472,6 +472,34 @@ For reproducible project builds, pin exact stable releases (not floating `latest
 
 Only mark a cell supported after installing/loading the signed test artifact, applying it to a project, rendering, and exercising save/reopen. A successful compile is not host compatibility evidence.
 
+## P-02D graph mailbox capability fix (2026-09-30)
+
+The owner's node-copy attempt showed `graph_commit_failed` because AE rejected
+writes to `Graph Edit Request.expression` and `.expressionEnabled`. The request
+parameter had been marked `PF_ParamFlag_CANNOT_TIME_VARY`, which made the hidden
+mailbox unavailable to the CEP scripting setter. The source now leaves only this
+request stream expression-capable; its expression remains disabled after use.
+The gateway checks `canSetExpression` before changing node effects and fails
+without opening an undo group if the running host cannot write the mailbox.
+
+Panel refresh now loads the saved graph snapshot in either control mode, so the
+initial sync can materialize native node effects while the canvas remains editable
+only in Node Graph mode. Target discovery continues polling while no layer/effect
+is selected, allowing the panel to notice a newly applied main effect without
+manual Refresh. Repeated refreshes skip an empty undo group once all node effects
+already exist.
+
+The May 2023 SDK x64 Release build passed. Focused `panel_native_node_gateway`
+and `panel_startup` suites passed, along with `git diff --check`. The build used
+`-NoRuntimePublish`; the Core selector is unchanged. The main AEX candidate is
+SHA-256 `6301092C5D0E7A4C9B3FC646488A3F364BF76A97FF5115B75DCE83C1F1B22897`.
+The installed main AEX remains `3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`.
+AE 2023 was running as PID 22800 when checked, so this candidate has not been
+copied into the plug-in directory or loaded by AE. Graph add/copy/delete,
+automatic node creation, undo, persistence, and native Effect Parade deletion
+remain host checks; reverse synchronization from manually deleting an AEX to the
+CEP graph is still not implemented.
+
 ## Local SDK inputs
 
 The SDK is provided by the developer from Adobe Developer Console. Configure a local SDK path (do not commit SDK files). The plug-in build consumes Adobe headers and the official PiPL conversion tools from that tree. `ae_plugin/BuildWindows.ps1` maps the checkout to a temporary drive during the build to avoid legacy PiPL tool failures on paths containing spaces or non-ASCII characters. We do not provide placeholder SDK headers or a replacement PiPL compiler.

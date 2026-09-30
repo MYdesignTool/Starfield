@@ -744,6 +744,10 @@
         var mailbox = resolved.properties.request;
         var commit = resolved.properties.commit;
         var receipt = resolved.properties.receipt;
+        if (!mailbox || mailbox.canSetExpression !== true) {
+            return { ok: false, error: { code: "graph_carrier_unsupported",
+                message: "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter." } };
+        }
         var oldExpression = mailbox.expression;
         var oldExpressionEnabled = mailbox.expressionEnabled;
         if (typeof nonce !== "number") nonce = nextGraphNonce(commit, receipt);
@@ -792,6 +796,9 @@
     function syncGraphSnapshot(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        if (resolved.properties.request.canSetExpression !== true) {
+            return fail("graph_carrier_unsupported", "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter.");
+        }
         var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
         var transaction = "/*SFLDSYNC1:" + nonce + "*/0";
         var receipt = triggerGraphCarrier(resolved, transaction, "Starfield: initialize graph snapshot", request.requestId, nonce);
@@ -813,6 +820,22 @@
         var nodes;
         try { nodes = validateNodeManifest(request.nodeManifest); }
         catch (manifestError) { return fail("invalid_node_manifest", manifestError.toString()); }
+        var needsAdd = false;
+        try {
+            for (var check = 0; check < nodes.length; check++) {
+                var existing = nodeEffectById(resolved.target.layer, nodes[check].id);
+                if (!existing) { needsAdd = true; continue; }
+                if (nativeNodeTypeByMatch(existing.matchName) !== nodes[check].type) {
+                    return fail("node_effect_sync_failed", "A node identity is already used by a different effect type.");
+                }
+            }
+        } catch (lookupError) {
+            return fail("node_effect_sync_failed", lookupError.toString());
+        }
+        if (!needsAdd) {
+            return reply({ ok: true, operation: "ensureNodeEffects", requestId: request.requestId || "",
+                           target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length });
+        }
         var groupOpen = false;
         try {
             app.beginUndoGroup("Starfield: create node effects");
@@ -832,6 +855,12 @@
     function submitGraph(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        // Check this before adding or removing any node effects. A host that cannot
+        // write the mailbox must leave both the graph snapshot and Effect Parade
+        // untouched, instead of failing after structural edits have begun.
+        if (resolved.properties.request.canSetExpression !== true) {
+            return fail("graph_carrier_unsupported", "After Effects does not allow expressions on Graph Edit Request. Rebuild the main effect with the expression-capable carrier parameter.");
+        }
         if (typeof request.baseGraphRevision !== "number" || !isFinite(request.baseGraphRevision) ||
             Math.floor(request.baseGraphRevision) !== request.baseGraphRevision || request.baseGraphRevision < 1 ||
             request.baseGraphRevision > MAX_GRAPH_REVISION) {

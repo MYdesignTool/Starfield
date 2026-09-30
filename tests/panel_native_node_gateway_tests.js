@@ -65,6 +65,7 @@ snapshot.expression = snapshotExpression(4, graphHex);
 const mailbox = scalar("Graph Edit Request", "");
 mailbox.expression = "";
 mailbox.expressionEnabled = true;
+mailbox.canSetExpression = true;
 const receipt = scalar("Graph Edit Receipt", 0);
 const commit = scalar("Commit Graph Edit", 0);
 commit.setValue = function (nonce) {
@@ -172,6 +173,9 @@ assert.deepEqual(paradeItems.slice(1).map(effect =>
 ]);
 assert.equal(undo.begins, 1);
 assert.equal(undo.ends, 1);
+const unchanged = invoke("ensureNodeEffects", { baseGraphRevision: 4, graphHex, nodeManifest: nodes });
+assert.equal(unchanged.ok, true);
+assert.equal(undo.begins, 1, "automatic refresh does not add empty undo groups once node effects exist");
 
 // AE-level Ctrl+D copies hidden identity streams verbatim. A graph-owned node
 // lookup must reject that ambiguous state rather than silently choosing one.
@@ -187,6 +191,21 @@ assert.equal(ambiguous.ok, false);
 assert.match(ambiguous.error.message, /share node identity/i,
     "duplicate native effect identities are reported instead of binding the first match");
 
+const paradeCountBeforeUnsupportedCarrier = paradeItems.length;
+mailbox.canSetExpression = false;
+const unsupportedCarrier = invoke("submitGraph", {
+    baseGraphRevision: 4,
+    baseNodeManifest: nodes,
+    nodeManifest: [nodes[1]],
+    graphHex: changedGraphHex
+});
+assert.equal(unsupportedCarrier.ok, false);
+assert.equal(unsupportedCarrier.error.code, "graph_carrier_unsupported");
+assert.equal(paradeItems.length, paradeCountBeforeUnsupportedCarrier,
+    "an unsupported graph mailbox is rejected before adding or removing node effects");
+assert.equal(undo.begins, 1, "mailbox capability rejection does not open an undo group");
+mailbox.canSetExpression = true;
+
 const committed = invoke("submitGraph", {
     baseGraphRevision: 4,
     baseNodeManifest: nodes,
@@ -198,8 +217,8 @@ assert.equal(committed.snapshot.revision, 5);
 assert.equal(committed.snapshot.graphHex, changedGraphHex);
 assert.equal(paradeItems.length, 2, "deleting a graph node removes all AE effects carrying its identity");
 assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
-assert.equal(undo.begins, 3, "the rejected duplicate reconciliation still closes one undo group");
-assert.equal(undo.ends, 3);
+assert.equal(undo.begins, 2, "only the graph transaction opens an undo group");
+assert.equal(undo.ends, 2);
 
 // The project-owned node manifest can materialize distinct native module types,
 // preserve their typed values, and remove exactly the node omitted by a later edit.
@@ -281,7 +300,7 @@ assert.deepEqual(Array.from(paradeItems[4].property("Gravity").value), [1, 0, 0]
     "deleting one Force preserves the other Force's independent vector");
 assert.equal(paradeItems[4].property("Linear Drag").value, 0.5);
 assert.equal(paradeItems[4].property("Node UUID 0").value, 0x0011);
-assert.equal(undo.begins, 6);
-assert.equal(undo.ends, 6);
+assert.equal(undo.begins, 5);
+assert.equal(undo.ends, 5);
 
 console.log("Native node gateway checks passed (Emitter, two independent Particle and two Force instances, failed-add cleanup and retry, emitter dimensions, duplicate-ID rejection, Output exclusion, graph commit and selective deletion).");
