@@ -314,12 +314,29 @@
             var offset = edit.offset || { x: 28, y: 28 };
             positions[copy.id] = { x: originalPosition.x + offset.x, y: originalPosition.y + offset.y };
         }
-        var internalEdges = graph.edges.filter(function (edge) {
-            return selected["$" + edge.sourceNode] && selected["$" + edge.destinationNode];
-        });
-        for (var e = 0; e < internalEdges.length; e++) {
-            var edge = internalEdges[e];
-            graph.edges.push(makeEdge(graph, idFactory, ids["$" + edge.sourceNode], ids["$" + edge.destinationNode],
+        var originalEdges = graph.edges.slice();
+        for (var e = 0; e < originalEdges.length; e++) {
+            var edge = originalEdges[e];
+            var sourceSelected = selected["$" + edge.sourceNode] === true;
+            var destinationSelected = selected["$" + edge.destinationNode] === true;
+            if (!sourceSelected && !destinationSelected) continue;
+            var source = nodeById(graph, edge.sourceNode);
+            var destination = nodeById(graph, edge.destinationNode);
+            if (!source || !destination || source.type === TYPES.appearance || destination.type === TYPES.appearance) {
+                // Multiple Appearance overrides on one stream are outside the graph
+                // contract, so copied paths touching an Appearance stay disconnected.
+                continue;
+            }
+
+            var copiedSource = sourceSelected ? ids["$" + edge.sourceNode] : edge.sourceNode;
+            var copiedDestination = destinationSelected ? ids["$" + edge.destinationNode] : edge.destinationNode;
+            if (source.type === TYPES.emitter) {
+                // Emitter copies stay disconnected. When a Particle is also copied,
+                // keep its duplicated branch fed by the original single active Emitter.
+                if (!destinationSelected) continue;
+                copiedSource = edge.sourceNode;
+            }
+            graph.edges.push(makeEdge(graph, idFactory, copiedSource, copiedDestination,
                                       edge.sourcePort, edge.destinationPort));
         }
         return ids;

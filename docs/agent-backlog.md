@@ -197,6 +197,13 @@ position into the splice transaction and includes other moved selection position
 that same edit. A focused CEP edit test checks the exact node drop coordinate, grouped
 layout, and codec round-trip. The AE carrier and gesture still need host qualification.
 
+P-02B duplication follow-up (2026-09-30): Alt-drag and Ctrl+D use the same graph
+duplication policy from ADR 0019. Particle and Force copies retain compatible links;
+Emitter copies stay disconnected, Appearance copies stay disconnected, and links
+between selected nodes are redirected to their copies. Focused planner coverage checks
+copied branches reaching the existing Output. AE effect creation, undo, cache update,
+and save/reopen remain unqualified.
+
 ## Wave C — MVP controls and behavior families (after Wave G)
 
 | ID | Work | Dependencies | Main ownership | Gate |

@@ -51,8 +51,8 @@ project-persistent node ID.
    four 32-bit values that exceed the exact integer range of a 32-bit float.
    The graph compiler maps node effects to core UUIDs; it must not use display names, effect
    indices, or session-only stream IDs as persistent IDs. Duplicating a node
-   must allocate a fresh identity and apply a defined link policy; the prototype
-   must prove this before enabling Ctrl+D for node effects.
+   allocates a fresh identity and follows the link policy below; AE host behavior
+   still must be qualified before Ctrl+D is treated as accepted for node effects.
 3. **Compile before rendering.** A host-side graph synchronizer enumerates node
    effect instances on the UI/edit path, reads their standard parameter streams,
    validates the resulting graph, and writes an immutable compiled snapshot to
@@ -79,6 +79,23 @@ owned by the corresponding Particle effect. The prototype may start with scalar
 fields, but P-02B must not resume until the curve payload has a bounded,
 project-persisted per-node representation and the renderer snapshot compiles it
 without leaving a second editable source of truth.
+
+### Node duplication link policy
+
+- Emitter copies are always disconnected so duplication cannot add a second
+  active emission source. If an Emitter and its Particle are copied together,
+  the copied Particle remains connected to the original Emitter.
+- Particle and Force copies retain compatible incoming and outgoing links to
+  unselected nodes. Links between selected nodes are redirected to their copies.
+  Edges touching an Appearance are not copied because multiple Appearance
+  overrides on one stream remain outside the graph contract. This lets a copied
+  Particle branch reach the existing Output and lets compatible Force copies
+  preserve their stream position.
+- Appearance copies are disconnected. Multiple Appearance overrides on one
+  stream have no defined precedence, so users must explicitly reconnect a copy
+  after deciding how that branch should be evaluated.
+- Alt-drag and Ctrl+D use the same graph edit and link policy. CEP planner
+  coverage does not qualify AE effect creation, undo, cache update, or reopen.
 
 The CEP graph's Duplicate command creates new graph UUIDs and materializes new AE
 effects. If an effect is copied directly in Effect Parade, the copied UUID makes

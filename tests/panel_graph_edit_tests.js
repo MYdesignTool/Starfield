@@ -144,11 +144,51 @@ assert.strictEqual(editedParticle.parameters.some(function (parameter) { return 
 
 var duplicated = edits.apply(original, { type: "duplicateNodes", nodeIds: [particleId, forceId] }, idFactory);
 assert.strictEqual(duplicated.nodes.length, 6);
-assert.strictEqual(duplicated.edges.length, 4, "duplicate copies only internal edges");
+assert.strictEqual(duplicated.edges.length, 6, "duplicate preserves compatible incoming, internal, and outgoing links");
 assert.strictEqual(duplicated.edges.filter(function (edge) { return edge.sourceNode === particleId; }).length, 1);
 var duplicateLayout = layout.get(duplicated);
 assert.deepStrictEqual(duplicateLayout[duplicated.nodes[4].id], { x: 263, y: 150 });
 assert.deepStrictEqual(duplicateLayout[duplicated.nodes[5].id], { x: 263, y: 250 });
+var copiedParticleId = duplicated.nodes[4].id;
+var copiedForceId = duplicated.nodes[5].id;
+assert.ok(duplicated.edges.some(function (edge) {
+    return edge.sourceNode === original.nodes[0].id && edge.destinationNode === copiedParticleId;
+}), "copied Particle keeps its external Emitter input");
+assert.ok(duplicated.edges.some(function (edge) {
+    return edge.sourceNode === copiedParticleId && edge.destinationNode === copiedForceId;
+}), "links between copied nodes point to their copies");
+assert.ok(duplicated.edges.some(function (edge) {
+    return edge.sourceNode === copiedForceId && edge.destinationNode === outputId;
+}), "copied Force keeps its compatible Output link");
+assert.strictEqual(edgeTo(duplicated, outputId).length, 2, "both force branches reach the fixed Output terminal");
+
+var duplicatedParticle = edits.apply(original, { type: "duplicateNodes", nodeIds: [particleId] }, idFactory);
+var copiedParticleOnlyId = duplicatedParticle.nodes[4].id;
+assert.ok(duplicatedParticle.edges.some(function (edge) {
+    return edge.sourceNode === original.nodes[0].id && edge.destinationNode === copiedParticleOnlyId;
+}), "duplicating a Particle preserves its compatible external input");
+assert.ok(duplicatedParticle.edges.some(function (edge) {
+    return edge.sourceNode === copiedParticleOnlyId && edge.destinationNode === forceId;
+}), "duplicating a Particle preserves its compatible external output");
+
+var duplicatedEmitter = edits.apply(original, { type: "duplicateNodes", nodeIds: [original.nodes[0].id] }, idFactory);
+var copiedEmitterId = duplicatedEmitter.nodes[4].id;
+assert.strictEqual(duplicatedEmitter.edges.length, original.edges.length, "an Emitter copy stays disconnected");
+assert.strictEqual(duplicatedEmitter.edges.some(function (edge) {
+    return edge.sourceNode === copiedEmitterId || edge.destinationNode === copiedEmitterId;
+}), false, "an Emitter copy does not create a second active source");
+
+var appearanceGraph = edits.apply(original, { type: "addNode", nodeType: "appearance" }, idFactory);
+var appearanceId = appearanceGraph.nodes[4].id;
+appearanceGraph = edits.apply(appearanceGraph, { type: "connect", from: forceId, to: appearanceId }, idFactory);
+appearanceGraph = edits.apply(appearanceGraph, { type: "connect", from: appearanceId, to: outputId }, idFactory);
+var duplicatedAppearance = edits.apply(appearanceGraph, {
+    type: "duplicateNodes", nodeIds: [appearanceId]
+}, idFactory);
+var copiedAppearanceId = duplicatedAppearance.nodes[5].id;
+assert.strictEqual(duplicatedAppearance.edges.some(function (edge) {
+    return edge.sourceNode === copiedAppearanceId || edge.destinationNode === copiedAppearanceId;
+}), false, "an Appearance copy is disconnected until its override precedence is chosen");
 
 var moved = edits.apply(original, {
     type: "moveNodes", positions: { [forceId]: { x: -260, y: 610 } }
