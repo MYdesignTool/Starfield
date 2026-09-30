@@ -41,7 +41,7 @@ function nodeControls() {
         "Emission Angle Z": 0, "Direction": 1, "Direction Span": 60
     };
     for (let i = 0; i < 8; i++) values["Node UUID " + i] = 0;
-    values["Graph Sync Revision"] = 0;
+    values["Panel Sync Guard"] = 0;
     return Object.keys(values).reduce((result, name) => {
         result[name] = scalar(name, values[name]);
         return result;

@@ -48,7 +48,8 @@ PF_Err add_group(PF_InData* in_data, const char* name, A_long id, bool end) noex
 PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
                   PF_FpLong minimum, PF_FpLong maximum, PF_FpLong initial,
                   A_short precision = PF_Precision_HUNDREDTHS,
-                  PF_ParamFlags flags = PF_ParamFlag_SUPERVISE,
+                  PF_ParamFlags flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY |
+                                        PF_ParamFlag_CANNOT_INTERP,
                   A_long ui_flags = PF_PUI_NONE) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
@@ -74,7 +75,7 @@ PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
-    def.flags = PF_ParamFlag_SUPERVISE;
+    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.pd.num_choices = choice_count;
@@ -88,7 +89,7 @@ PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POINT_3D;
-    def.flags = PF_ParamFlag_SUPERVISE;
+    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = x;
@@ -101,7 +102,7 @@ PF_Err add_color(PF_InData* in_data, const char* name, A_long id) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_COLOR;
-    def.flags = PF_ParamFlag_SUPERVISE;
+    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.cd.value = PF_Pixel{255, 255, 255, 255};
@@ -124,7 +125,7 @@ PF_Err add_node_identity(PF_InData* in_data) noexcept {
                                         PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
     }
-    return add_slider(in_data, "Graph Sync Revision", fourcc('g', 's', 'y', 'n'),
+    return add_slider(in_data, "Panel Sync Guard", fourcc('g', 's', 'y', 'n'),
                       0.0, 2147483647.0, 0.0, PF_Precision_INTEGER,
                       PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
@@ -297,7 +298,7 @@ PF_Err render_passthrough(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef
 }
 
 PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
-                PF_ParamDef* params[], PF_LayerDef* output) noexcept {
+                PF_ParamDef* params[], PF_LayerDef* output, void* extra) noexcept {
     if (!out_data) return PF_Err_BAD_CALLBACK_PARAM;
     switch (command) {
         case PF_Cmd_GLOBAL_SETUP:
@@ -306,6 +307,10 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                                               STARFIELD_VERSION_BUILD);
             out_data->out_flags = STARFIELD_NODE_OUT_FLAGS;
             out_data->out_flags2 = STARFIELD_NODE_OUT_FLAGS2;
+            if (register_node_graph_sync(in_data) != PF_Err_NONE) {
+                std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                              "Starfield node parameter synchronization is unavailable.");
+            }
             return PF_Err_NONE;
         case PF_Cmd_PARAMS_SETUP:
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
@@ -328,14 +333,18 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);
+        case PF_Cmd_USER_CHANGED_PARAM:
+            if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
+            return sync_node_graph_parameter(in_data, out_data, params,
+                static_cast<const PF_UserChangedParamExtra*>(extra));
         default:
             return PF_Err_NONE;
     }
 }
 
 PF_Err guarded(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
-               PF_ParamDef* params[], PF_LayerDef* output) noexcept {
-    try { return dispatch(command, in_data, out_data, params, output); }
+               PF_ParamDef* params[], PF_LayerDef* output, void* extra) noexcept {
+    try { return dispatch(command, in_data, out_data, params, output, extra); }
     catch (PF_Err error) { return error; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
@@ -343,6 +352,6 @@ PF_Err guarded(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
 } // namespace
 
 extern "C" DllExport PF_Err EffectMain(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
-                                        PF_ParamDef* params[], PF_LayerDef* output, void*) {
-    return guarded(command, in_data, out_data, params, output);
+                                        PF_ParamDef* params[], PF_LayerDef* output, void* extra) {
+    return guarded(command, in_data, out_data, params, output, extra);
 }

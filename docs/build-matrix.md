@@ -99,6 +99,40 @@ render response remain host gates. The read-only rollback report is
 append `-Rollback` to restore the backed-up main AEX and Core selector and move
 the newly added node AEX files into the backup folder.
 
+## P-02D direct node-control synchronization source candidate (2026-09-30)
+
+The latest source prototype forwards a node effect's constant parameter edit
+through `PF_Cmd_USER_CHANGED_PARAM` to the main renderer's supervised graph
+callback. CEP batch writes raise a node-local guard to avoid committing each
+intermediate field. Node controls are marked non-time-varying to match the
+constant-value graph contract. Output remains a visible logical terminal owned
+by `StarfieldParticle.aex`; no Output module exists in `dist/`.
+
+The May 2023 SDK x64 Release build passed. The focused native-node gateway check
+passed for Emitter creation, independent values, dimensions, duplicate-ID
+rejection, duplicate cleanup, and graph commit. This candidate was built with
+`-NoRuntimePublish`; the Core hash matches the selected runtime, so no runtime
+selector change was needed. With AE closed, the five AEX files were backed up
+under `artifacts/disabled/p02d-direct-node-sync-20260930/` and the candidate
+files copied to the AE 2023 plug-in directory. Installed hashes match this
+table; AE has not yet loaded or exercised the candidate. Its hashes are:
+
+| Artifact | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `91889136D24DA756CF181756D1426B8BA0D6BFB63234FAE21BC053FE3DB9F546` |
+| `StarfieldCore.dll` | `55B877A8F66D357649CD72938FB883A3C9F5CF584A07ED516E7494828D7C918E` |
+| `StarfieldEmitter.aex` | `99EAA591F53C520DE07CE29AD905D2DAD18616976445BB68EA0B8849BDD611CC` |
+| `StarfieldParticleNode.aex` | `4557DADACEA74E1F5114D5653C80A2D257FEDFE08EE2DE382136D9FBEEC28680` |
+| `StarfieldForce.aex` | `E4826E794D2F01E9BB626F50A8047A5F2CBCCF788FCD122E8BB4C73DC176E0D8` |
+| `StarfieldAppearance.aex` | `06A6FD566826854AD80A1B31FB9F3B46020740CBE42BF71AF4FD2D671217C555` |
+
+AE callback delivery, cache/render response, undo, and project-reopen behavior
+remain unqualified. To undo this deployment while AE is closed, copy the five
+same-named files from
+`artifacts/disabled/p02d-direct-node-sync-20260930/` back to
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\`.
+The compiler emitted the existing C4819 code-page warning for non-ASCII text
+in `Parameters.hpp`; the build completed successfully.
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
 The May 2023 SDK full build includes per-Particle lifetime in explicit graph

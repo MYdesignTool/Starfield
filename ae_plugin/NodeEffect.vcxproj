@@ -48,7 +48,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel><TreatWarningAsError>false</TreatWarningAsError><SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;$(NodeKindDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\Win;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\Win;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><ExceptionHandling>Sync</ExceptionHandling>
       <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
@@ -59,11 +59,12 @@
   <ItemGroup>
     <ClCompile Include="NodeEffectMain.cpp" />
     <ClCompile Include="NodeEffects.cpp" />
+    <ClCompile Include="NodeGraphSync.cpp" />
     <CustomBuild Include="$(NodePiPL)">
       <Message>Generating $(NodeKind) node PiPL resource</Message>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName STARFIELD_NODE_OUT_FLAGS -OutFlags2Name STARFIELD_NODE_OUT_FLAGS2</Command>
       <Outputs>$(IntDir)StarfieldPiPL.rr;$(IntDir)StarfieldPiPL.rrc;$(IntDir)StarfieldPiPL.rc</Outputs>
-      <AdditionalInputs>$(MSBuildProjectDirectory)\NodeEffectFlags.h;$(MSBuildProjectDirectory)\PluginVersion.h;$(MSBuildProjectDirectory)\NodeEffectMain.cpp;$(MSBuildProjectDirectory)\NodeEffects.cpp;$(MSBuildProjectDirectory)\NodeEffects.hpp</AdditionalInputs>
+      <AdditionalInputs>$(MSBuildProjectDirectory)\NodeEffectFlags.h;$(MSBuildProjectDirectory)\PluginVersion.h;$(MSBuildProjectDirectory)\NodeEffectMain.cpp;$(MSBuildProjectDirectory)\NodeEffects.cpp;$(MSBuildProjectDirectory)\NodeEffects.hpp;$(MSBuildProjectDirectory)\NodeGraphSync.cpp;$(MSBuildProjectDirectory)\NodeGraphSync.hpp</AdditionalInputs>
     </CustomBuild>
     <ResourceCompile Include="$(IntDir)StarfieldPiPL.rc" />
   </ItemGroup>

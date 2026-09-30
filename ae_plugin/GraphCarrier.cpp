@@ -2,11 +2,13 @@
 
 #include "AE_GeneralPlug.h"
 #include "GraphParameter.hpp"
+#include "NodeGraphSync.hpp"
 #include "Parameters.hpp"
 #include "SPBasic.h"
 #include "starfield/core/SequenceCodec.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <charconv>
 #include <cmath>
@@ -158,6 +160,83 @@ struct TransactionRequest {
     std::uint64_t base_revision{0};
     core::OpaqueBytes bytes;
 };
+
+struct NodeEditRequest {
+    A_long nonce{0};
+    core::NodeId node{};
+    core::ParameterKey key{};
+    core::ParameterValue value{};
+};
+
+bool parse_finite_double(std::string_view text, double& value) noexcept {
+    if (text.empty()) return false;
+    double parsed = 0.0;
+    const auto result = std::from_chars(text.data(), text.data() + text.size(), parsed,
+                                        std::chars_format::general);
+    if (result.ec != std::errc{} || result.ptr != text.data() + text.size() || !std::isfinite(parsed)) return false;
+    value = parsed;
+    return true;
+}
+
+bool parse_node_edit_request(std::string_view expression, NodeEditRequest& request) noexcept {
+    constexpr std::string_view prefix = node_sync::kRequestPrefix;
+    constexpr std::string_view suffix = node_sync::kRequestSuffix;
+    if (!expression.starts_with(prefix) || !expression.ends_with(suffix) ||
+        expression.size() > node_sync::kMaxRequestBytes) return false;
+    expression.remove_prefix(prefix.size());
+    expression.remove_suffix(suffix.size());
+    std::array<std::string_view, 5> fields{};
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        const auto separator = expression.find(':');
+        if (i + 1 == fields.size()) {
+            if (separator != std::string_view::npos) return false;
+            fields[i] = expression;
+        } else {
+            if (separator == std::string_view::npos) return false;
+            fields[i] = expression.substr(0, separator);
+            expression.remove_prefix(separator + 1);
+        }
+    }
+    A_long nonce = 0;
+    std::uint64_t key = 0;
+    if (!parse_unsigned(fields[0], nonce) || nonce < 0 || nonce > node_sync::kMaxNonce ||
+        fields[1].size() != 32 || !parse_unsigned(fields[2], key) || key == 0 || fields[3].size() != 1) return false;
+    NodeEditRequest parsed{};
+    parsed.nonce = nonce;
+    parsed.key = core::ParameterKey{key};
+    for (std::size_t i = 0; i < parsed.node.value.bytes.size(); ++i) {
+        const int high = hex_digit(fields[1][2u * i]);
+        const int low = hex_digit(fields[1][2u * i + 1u]);
+        if (high < 0 || low < 0) return false;
+        parsed.node.value.bytes[i] = static_cast<std::uint8_t>((high << 4) | low);
+    }
+    if (parsed.node.value.is_zero()) return false;
+
+    const char kind = fields[3].front();
+    if (kind == static_cast<char>(node_sync::ValueKind::float64)) {
+        double value = 0.0;
+        if (!parse_finite_double(fields[4], value)) return false;
+        parsed.value = value;
+    } else if (kind == static_cast<char>(node_sync::ValueKind::uint32)) {
+        std::uint32_t value = 0;
+        if (!parse_unsigned(fields[4], value)) return false;
+        parsed.value = value;
+    } else if (kind == static_cast<char>(node_sync::ValueKind::vector3)) {
+        const auto first = fields[4].find(',');
+        const auto second = first == std::string_view::npos ? first : fields[4].find(',', first + 1);
+        if (first == std::string_view::npos || second == std::string_view::npos ||
+            fields[4].find(',', second + 1) != std::string_view::npos) return false;
+        core::Vec3 value{};
+        if (!parse_finite_double(fields[4].substr(0, first), value.x) ||
+            !parse_finite_double(fields[4].substr(first + 1, second - first - 1), value.y) ||
+            !parse_finite_double(fields[4].substr(second + 1), value.z)) return false;
+        parsed.value = value;
+    } else {
+        return false;
+    }
+    request = std::move(parsed);
+    return true;
+}
 
 bool parse_sync_request(std::string_view expression, TransactionRequest& request) noexcept {
     if (!expression.starts_with(kSyncPrefix) || !expression.ends_with(kExpressionSuffix)) return false;
@@ -379,6 +458,62 @@ PF_Err read_current_snapshot(PF_InData* in_data, std::uint64_t& revision,
     return decode_payload(expression, kSnapshotPrefix, revision, bytes) ? PF_Err_NONE : PF_Err_BAD_CALLBACK_PARAM;
 }
 
+PF_Err commit_node_parameter_edit(PF_InData* in_data, PF_OutData* out_data,
+                                  PF_ParamDef* params[], const NodeEditRequest& request,
+                                  A_long nonce) {
+    const auto reject_edit = [&](const char* message, PF_Err error = PF_Err_NONE) {
+        if (nonce != 0) return reject_request(out_data, params, nonce, message, error);
+        if (out_data && message) {
+            std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                          "Starfield node parameter edit rejected: %s", message);
+        }
+        return error != PF_Err_NONE ? error : PF_Err_BAD_CALLBACK_PARAM;
+    };
+    if (request.nonce != nonce) return reject_edit("node edit nonce does not match");
+    if (!params[kGraphParameterId] || params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
+        !params[kGraphParameterId]->u.arb_d.value || !params[kControlSourceId] ||
+        params[kControlSourceId]->param_type != PF_Param_POPUP) {
+        return reject_edit("node edit graph parameters are unavailable");
+    }
+
+    auto decoded = read_graph_parameter(in_data, params[kGraphParameterId]->u.arb_d.value);
+    if (!decoded.has_value()) return reject_edit("stored node graph is invalid");
+    core::Graph graph = decoded.take_value();
+    auto node = std::find_if(graph.nodes.begin(), graph.nodes.end(), [&](const core::GraphNode& candidate) {
+        return candidate.id == request.node;
+    });
+    if (node == graph.nodes.end()) return reject_edit("edited node no longer exists in the graph");
+    auto parameter = std::find_if(node->parameters.begin(), node->parameters.end(), [&](const core::NodeParameter& candidate) {
+        return candidate.key == request.key;
+    });
+    if (parameter == node->parameters.end()) {
+        return reject_edit("edited parameter is not present in the node graph");
+    }
+    parameter->value = request.value;
+    const auto validation = core::validate_graph(graph, core::particle_node_registry());
+    if (!validation) return reject_edit("edited node parameter failed graph validation");
+
+    PF_ArbitraryH replacement = nullptr;
+    const PF_Err created = create_graph_parameter(in_data, graph, &replacement);
+    if (created != PF_Err_NONE) return reject_edit("edited graph allocation failed", created);
+    A_long revision = 0;
+    const PF_Err snapshot_error = write_graph_snapshot(in_data, graph, &revision);
+    if (snapshot_error != PF_Err_NONE) {
+        in_data->utils->host_dispose_handle(replacement);
+        return reject_edit("edited graph snapshot write failed", snapshot_error);
+    }
+
+    // The node's parameter edit is the user action. Changing these renderer
+    // streams from this supervised callback keeps the compiled graph on the
+    // same AE undo/cache path as the node control edit.
+    params[kGraphParameterId]->u.arb_d.value = replacement;
+    params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+    params[kControlSourceId]->u.pd.value = kNodeControlSource;
+    params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+    if (nonce != 0) set_receipt(params, nonce);
+    return PF_Err_NONE;
+}
+
 } // namespace
 
 PF_Err register_graph_carrier(PF_InData* in_data) noexcept {
@@ -429,7 +564,7 @@ PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
     A_long nonce = 0;
     if (!params[kGraphEditCommitId] || params[kGraphEditCommitId]->param_type != PF_Param_FLOAT_SLIDER ||
         !std::isfinite(params[kGraphEditCommitId]->u.fs_d.value) ||
-        params[kGraphEditCommitId]->u.fs_d.value < 1.0 ||
+        params[kGraphEditCommitId]->u.fs_d.value < 0.0 ||
         params[kGraphEditCommitId]->u.fs_d.value > kMaxTransactionNonce ||
         std::floor(params[kGraphEditCommitId]->u.fs_d.value) != params[kGraphEditCommitId]->u.fs_d.value) {
         return reject_request(out_data, params, 1, "invalid transaction nonce");
@@ -450,6 +585,12 @@ PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
         std::string request_expression;
         const PF_Err read_request = read_parameter_expression(in_data, kGraphEditRequestId, request_expression);
         if (read_request != PF_Err_NONE) return reject_request(out_data, params, nonce, "request expression is unavailable");
+
+        NodeEditRequest node_request{};
+        if (parse_node_edit_request(request_expression, node_request)) {
+            return commit_node_parameter_edit(in_data, out_data, params, node_request, nonce);
+        }
+        if (nonce < 1) return reject_request(out_data, params, 1, "invalid transaction nonce");
 
         TransactionRequest request;
         if (parse_sync_request(request_expression, request)) {

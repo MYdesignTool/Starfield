@@ -494,57 +494,62 @@
     }
 
     function setNodeParameters(effect, node) {
-        var type = node.type;
-        for (var i = 0; i < node.parameters.length; i++) {
-            var parameter = node.parameters[i];
-            var key = String(parameter.key);
-            var value = parameter.value;
-            if (type === "org.starfieldfx.nodes.emitter") {
-                if (key === "2") setNodeControl(effect, "Particles Per Second", value);
-                else if (key === "3") setNodeControl(effect, "Random Seed", value);
-                else if (key === "5") setNodeControl(effect, "Type", Number(value) + 1);
-                else if (key === "6") setNodeControl(effect, "Origin", value);
-                else if (key === "7") {
-                    setNodeControl(effect, "Velocity X", value[0]);
-                    setNodeControl(effect, "Velocity Y", value[1]);
-                    setNodeControl(effect, "Velocity Z", value[2]);
-                } else if (key === "8") setNodeControl(effect, "Particle Size", value);
-                else if (key === "9") setNodeControl(effect, "Opacity", value);
-                else if (key === "10") setNodeControl(effect, "Disc Size", value);
-                else if (key === "11") setNodeControl(effect, "Speed Random", value);
-                else if (key === "12") setNodeControl(effect, "Emission Speed", value);
-                else if (key === "13") setNodeControl(effect, "Emission Speed Random", value);
-                else if (key === "14") setNodeControl(effect, "Emission Angle X", value);
-                else if (key === "15") setNodeControl(effect, "Emission Angle Y", value);
-                else if (key === "16") setNodeControl(effect, "Emission Angle Z", value);
-                else if (key === "17") setNodeControl(effect, "Direction", Number(value) + 1);
-                else if (key === "18") setNodeControl(effect, "Direction Span", value);
-                else if (key === "19") setNodeControl(effect, "Size X", value);
-                else if (key === "20") setNodeControl(effect, "Size Y", value);
-                else if (key === "21") setNodeControl(effect, "Size Z", value);
-                else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
-            } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
-                if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
-                    [value[0], value[1], value[2], 1]);
-                else if (key === "3") setNodeControl(effect, "Size", value);
-                else if (key === "4") setNodeControl(effect, "Size Over Life", value);
-                else if (key === "5") setNodeControl(effect, "Opacity", value);
-                else if (key === "6") setNodeControl(effect, "Opacity Over Life", value);
-                else if (key === "7") writeNodeCurve(effect, "Size", value);
-                else if (key === "8") writeNodeCurve(effect, "Opacity", value);
-                else if (key === "9") setNodeControl(effect, "Size Random", value);
-                else if (key === "10") setNodeControl(effect, "Opacity Random", value);
-                else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Lifetime", value);
-                else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
-            } else if (type === "org.starfieldfx.nodes.force") {
-                if (key === "1") setNodeControl(effect, "Gravity", value);
-                else if (key === "2") setNodeControl(effect, "Linear Drag", value);
-                else throw new Error("Force graph parameter is not mapped to an AE control: " + key);
+        setNodeControl(effect, "Panel Sync Guard", 1);
+        try {
+            var type = node.type;
+            for (var i = 0; i < node.parameters.length; i++) {
+                var parameter = node.parameters[i];
+                var key = String(parameter.key);
+                var value = parameter.value;
+                if (type === "org.starfieldfx.nodes.emitter") {
+                    if (key === "2") setNodeControl(effect, "Particles Per Second", value);
+                    else if (key === "3") setNodeControl(effect, "Random Seed", value);
+                    else if (key === "5") setNodeControl(effect, "Type", Number(value) + 1);
+                    else if (key === "6") setNodeControl(effect, "Origin", value);
+                    else if (key === "7") {
+                        setNodeControl(effect, "Velocity X", value[0]);
+                        setNodeControl(effect, "Velocity Y", value[1]);
+                        setNodeControl(effect, "Velocity Z", value[2]);
+                    } else if (key === "8") setNodeControl(effect, "Particle Size", value);
+                    else if (key === "9") setNodeControl(effect, "Opacity", value);
+                    else if (key === "10") setNodeControl(effect, "Disc Size", value);
+                    else if (key === "11") setNodeControl(effect, "Speed Random", value);
+                    else if (key === "12") setNodeControl(effect, "Emission Speed", value);
+                    else if (key === "13") setNodeControl(effect, "Emission Speed Random", value);
+                    else if (key === "14") setNodeControl(effect, "Emission Angle X", value);
+                    else if (key === "15") setNodeControl(effect, "Emission Angle Y", value);
+                    else if (key === "16") setNodeControl(effect, "Emission Angle Z", value);
+                    else if (key === "17") setNodeControl(effect, "Direction", Number(value) + 1);
+                    else if (key === "18") setNodeControl(effect, "Direction Span", value);
+                    else if (key === "19") setNodeControl(effect, "Size X", value);
+                    else if (key === "20") setNodeControl(effect, "Size Y", value);
+                    else if (key === "21") setNodeControl(effect, "Size Z", value);
+                    else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+                } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
+                    if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
+                        [value[0], value[1], value[2], 1]);
+                    else if (key === "3") setNodeControl(effect, "Size", value);
+                    else if (key === "4") setNodeControl(effect, "Size Over Life", value);
+                    else if (key === "5") setNodeControl(effect, "Opacity", value);
+                    else if (key === "6") setNodeControl(effect, "Opacity Over Life", value);
+                    else if (key === "7") writeNodeCurve(effect, "Size", value);
+                    else if (key === "8") writeNodeCurve(effect, "Opacity", value);
+                    else if (key === "9") setNodeControl(effect, "Size Random", value);
+                    else if (key === "10") setNodeControl(effect, "Opacity Random", value);
+                    else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Lifetime", value);
+                    else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
+                } else if (type === "org.starfieldfx.nodes.force") {
+                    if (key === "1") setNodeControl(effect, "Gravity", value);
+                    else if (key === "2") setNodeControl(effect, "Linear Drag", value);
+                    else throw new Error("Force graph parameter is not mapped to an AE control: " + key);
+                }
             }
-        }
-        if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
-            if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
-            if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
+            if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
+                if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
+                if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
+            }
+        } finally {
+            setNodeControl(effect, "Panel Sync Guard", 0);
         }
     }
 

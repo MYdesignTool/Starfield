@@ -95,11 +95,18 @@ independent parameter schema.
 
 Before replacing P-02B's transaction plumbing, prove one Emitter module and one
 Particle module as a narrow AE 2023 prototype alongside the existing Starfield
-Particle renderer. The likely native route is for a node's
-`PF_Cmd_USER_CHANGED_PARAM` to request a UI-thread graph compile through the AE
-effect communication path, then write the compiled graph snapshot to the main
-Starfield Particle effect inside the same host edit/undo operation. The exact
-callback and stream update mechanism is intentionally not declared proven here.
+Particle renderer. The source candidate routes a node's
+`PF_Cmd_USER_CHANGED_PARAM` through the existing hidden request-expression stream
+and calls the main renderer's `PF_Cmd_USER_CHANGED_PARAM` with
+`AEGP_EffectCallGeneric`. The renderer then updates its own arbitrary graph data
+and snapshot. The panel raises a hidden per-node guard while it writes a batch
+of scripted node controls, so intermediate values do not trigger individual
+commits. This is only a source-level hypothesis until AE 2023 confirms the
+callback context, cache refresh, and undo behavior.
+
+Node-effect values currently serialize as constants. Their editable controls
+are marked non-time-varying until graph animation has a dedicated contract;
+keyframe and expression evaluation is not part of this synchronization spike.
 
 The spike is successful only when all of these work in AE 2023:
 
