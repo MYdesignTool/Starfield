@@ -1847,6 +1847,9 @@ void test_particle_branches_and_ordered_buffer() {
     CHECK(made.has_value());
     if (!made.has_value()) return;
     Graph graph = made.take_value();
+    graph.nodes[1].parameters.push_back({kParticleLifetimeSeconds, 0.9});
+    CHECK(std::none_of(graph.nodes[0].parameters.begin(), graph.nodes[0].parameters.end(),
+                       [](const NodeParameter& parameter) { return parameter.key == kLifetimeSeconds; }));
 
     // A second Particle branch has its own appearance. The first branch's
     // downstream Appearance node replaces all three Particle curves.
@@ -1863,6 +1866,7 @@ void test_particle_branches_and_ordered_buffer() {
     graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 1, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
         {kSizeStart, 9.0}, {kSizeEnd, 39.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 0.9},
+        {kParticleLifetimeSeconds, 1.0},
         {kSizeOverLifeCurve, encode_age_curve(branch_size_curve)},
         {kOpacityOverLifeCurve, encode_age_curve(branch_opacity_curve)}}});
     graph.nodes.push_back(GraphNode{appearance, kAppearanceNode, 1, {
@@ -1909,6 +1913,23 @@ void test_particle_branches_and_ordered_buffer() {
             CHECK(std::abs(odd->size_pixels - expected_size) < 1e-12);
             CHECK(std::abs(odd->opacity - expected_opacity) < 1e-12);
             CHECK(odd->color.y > 0.0 && odd->color.x == 0.0 && odd->color.z == 0.0);
+        }
+    }
+
+    const auto independently_expired = evaluate_particle_graph(graph, RationalTime{39, 20}, never);
+    CHECK(independently_expired.has_value());
+    if (independently_expired.has_value()) {
+        const auto& particles = independently_expired.value().particles;
+        CHECK(particles.size() == 9);
+        CHECK(std::none_of(particles.begin(), particles.end(), [](const ParticleInstance& particle) {
+            return particle.id == 10;
+        }));
+        for (const auto& particle : particles) {
+            CHECK(particle.id == 11 || particle.id == 12 || particle.id == 13 || particle.id == 14 ||
+                  particle.id == 15 || particle.id == 16 || particle.id == 17 || particle.id == 18 ||
+                  particle.id == 19);
+            const double expected_lifetime = particle.id % 2 == 0 ? 0.9 : 1.0;
+            CHECK(particle.lifetime_seconds == expected_lifetime);
         }
     }
 

@@ -236,6 +236,8 @@ inline constexpr ParameterKey kSizeOverLifeCurve{7};
 inline constexpr ParameterKey kOpacityOverLifeCurve{8};
 inline constexpr ParameterKey kSizeRandom{9};
 inline constexpr ParameterKey kOpacityRandom{10};
+// Particle branch lifetime is distinct from the retained legacy emitter key.
+inline constexpr ParameterKey kParticleLifetimeSeconds{11};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

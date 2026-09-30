@@ -218,11 +218,13 @@ out-of-range values onto `point`. The manifest's `default: 1` means "Point, the 
 ## Particle over-life curves (ADR 0016)
 
 The CEP Particle inspector draws Size and Opacity as piecewise-linear graphs over normalized particle
-age. Clicking the plot adds an interior point; dragging a point changes its age/value, while endpoint
-ages remain pinned to 0 and 1. The selected point also accepts direct numeric value entry. `Linear`
-removes interior points and returns to the legacy endpoint interpolation; `Remove Point` deletes the
-selected interior point. Each curve is limited to eight points. Size values are full-resolution pixels
-in 0…100,000; opacity values are 0…1.
+age. Pointer coordinates are converted through the SVG screen transform before hit testing. Clicking
+the plot adds an interior point; dragging a point changes its age/value, while endpoint ages remain
+pinned to 0 and 1. The selected point also accepts direct numeric value entry. The interpolation
+selector describes the segment algorithm: Linear is implemented, and selecting it never changes the
+stored knots. Bezier remains a future option. `Remove Point` deletes the selected interior point. Each
+curve is limited to eight points. Size values are full-resolution layer pixels in 0…100,000 px;
+opacity values are 0…1. CEP Size fields display `px`; Emitter Size X/Y/Z remain percentages.
 
 The AE parameter streams store a point count plus eight fixed age/value slots per curve. Count zero
 keeps old projects on their existing start/end line. Active curves are copied into optional opaque
@@ -232,6 +234,14 @@ Size/Opacity endpoint controls replace the first/last ordinate at the sampled re
 knots remain constant. The CEP editor prevents edits to animated endpoint ordinates and leaves the
 interior knots editable. Node Graph curves keep the existing constant-graph contract. The nested graph
 payload's byte layout and validation rules are specified in ADR 0016.
+
+Graph ownership follows the visible node layout. Newly authored explicit-Particle graphs store
+Lifetime on each Particle node (optional graph key 11, seconds); the Emitter stores only global birth
+rate, seed, and cap. Candidate emission slots are bounded using the longest active Particle lifetime,
+then each branch expires its own slots and the output is compacted in stable global-ID order. The AE
+Effect Controls Lifetime stream remains parameter ID 12 and is projected onto the Particle node.
+Emitter graph key 4 remains only for the legacy no-Particle stream; older explicit-Particle graphs
+that lack key 11 inherit that value until edited. See ADR 0015.
 
 ## Deterministic emission rules (M2)
 

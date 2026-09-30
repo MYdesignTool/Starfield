@@ -101,11 +101,11 @@
     // Protocol v1 is a fixed parameter view, not a live graph snapshot. Display
     // the product's intended stream order while graph-backed editing is qualified.
     var CHAIN = [
-        { id: "emitter", label: "Emitter", keys: ["birth_rate", "seed", "particle_lifetime",
+        { id: "emitter", label: "Emitter", keys: ["birth_rate", "seed",
                                                   "emitter_shape", "emitter_origin", "velocity_x", "velocity_y",
                                                   "velocity_z", "emitter_size", "emitter_size_x",
                                                   "emitter_size_y", "emitter_size_z", "velocity_spread"] },
-        { id: "particle", label: "Particle", keys: ["particle_size", "particle_size_end", "opacity",
+        { id: "particle", label: "Particle", keys: ["particle_lifetime", "particle_size", "particle_size_end", "opacity",
                                                       "opacity_end", "particle_size_random", "opacity_random",
                                                       "color_start", "color_end"] },
         { id: "force", label: "Force", keys: ["gravity_x", "gravity_y", "gravity_z", "linear_drag"] },

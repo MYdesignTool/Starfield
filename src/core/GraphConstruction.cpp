@@ -8,10 +8,10 @@ namespace starfield::core {
 namespace {
 using namespace graph_keys;
 
-GraphNode make_emitter_node(const Settings& settings, NodeId id) {
-    return GraphNode{id, kEmitterNode, 1, {
+GraphNode make_emitter_node(const Settings& settings, NodeId id, bool include_legacy_lifetime) {
+    GraphNode node{id, kEmitterNode, 1, {
         {kParticleCount, settings.particle_count}, {kBirthRate, settings.birth_rate},
-        {kSeed, settings.seed}, {kLifetimeSeconds, settings.particle_lifetime_seconds},
+        {kSeed, settings.seed},
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},
         {kEmitterOrigin, settings.emitter_origin}, {kVelocity, settings.velocity},
         {kParticleSize, settings.particle_size}, {kOpacity, settings.opacity},
@@ -26,6 +26,11 @@ GraphNode make_emitter_node(const Settings& settings, NodeId id) {
         {kEmitterSizePercentX, settings.emitter_size_percent.x},
         {kEmitterSizePercentY, settings.emitter_size_percent.y},
         {kEmitterSizePercentZ, settings.emitter_size_percent.z}}};
+    if (include_legacy_lifetime) {
+        node.parameters.insert(node.parameters.begin() + 3,
+                               NodeParameter{kLifetimeSeconds, settings.particle_lifetime_seconds});
+    }
+    return node;
 }
 
 Result<Graph> validate_constructed_graph(Graph graph, const char* failure_detail) {
@@ -48,7 +53,7 @@ Result<Graph> make_emitter_output_graph(const Settings& settings, NodeId emitter
             return R::failure(ErrorCode::invalid_request, "cannot create graph from out-of-range settings");
         }
         Graph graph;
-        graph.nodes = {make_emitter_node(settings, emitter), GraphNode{output, kOutputNode, 1, {}}};
+        graph.nodes = {make_emitter_node(settings, emitter, true), GraphNode{output, kOutputNode, 1, {}}};
         graph.edges = {GraphEdge{connection, emitter, kEmitterParticles, output, kOutputParticles}};
         return validate_constructed_graph(std::move(graph), "default graph validation failed");
     } catch (const std::bad_alloc&) {
@@ -88,10 +93,11 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         if (settings.opacity_random_percent != 0.0) {
             particle_node.parameters.push_back({kOpacityRandom, settings.opacity_random_percent});
         }
+        particle_node.parameters.push_back({kParticleLifetimeSeconds, settings.particle_lifetime_seconds});
 
         Graph graph;
         graph.nodes = {
-            make_emitter_node(settings, emitter),
+            make_emitter_node(settings, emitter, false),
             std::move(particle_node),
             GraphNode{output, kOutputNode, 1, {}},
         };
@@ -164,7 +170,7 @@ Result<Graph> make_emitter_force_appearance_output_graph(
             appearance_node.parameters.push_back({kOpacityRandom, settings.opacity_random_percent});
         }
         graph.nodes = {
-            make_emitter_node(settings, emitter),
+            make_emitter_node(settings, emitter, true),
             GraphNode{force, kForceNode, 1, {
                 {kGravity, settings.gravity}, {kLinearDrag, settings.linear_drag}}},
             std::move(appearance_node),

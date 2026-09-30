@@ -28,6 +28,7 @@ struct AppearanceValues {
     double size_end{8.0};
     double opacity_start{1.0};
     double opacity_end{1.0};
+    double lifetime_seconds{2.0};
     double size_random_percent{0.0};
     double opacity_random_percent{0.0};
     AgeCurve size_curve{};
@@ -137,6 +138,9 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     settings.particle_size_end = std::get<double>(*size_end);
     settings.opacity = std::get<double>(*opacity_start);
     settings.opacity_end = std::get<double>(*opacity_end);
+    if (const auto* lifetime = find_value(node, kParticleLifetimeSeconds)) {
+        settings.particle_lifetime_seconds = std::get<double>(*lifetime);
+    }
     if (const auto* size_random = find_value(node, kSizeRandom)) {
         settings.particle_size_random_percent = std::get<double>(*size_random);
     }
@@ -166,6 +170,7 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
         validated.value.color_start, validated.value.color_end,
         validated.value.particle_size, validated.value.particle_size_end,
         validated.value.opacity, validated.value.opacity_end,
+        validated.value.particle_lifetime_seconds,
         validated.value.particle_size_random_percent, validated.value.opacity_random_percent,
         validated.value.size_over_life, validated.value.opacity_over_life});
 }
@@ -389,9 +394,6 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
 
         const ValidatedSettings& validated_emitter = *emitters[active_emitter];
         const Settings& emitter_settings = validated_emitter.value;
-        const auto live_slots_result = live_particle_slot_range(validated_emitter, to_seconds(*normalized));
-        if (!live_slots_result.has_value()) return R::failure(live_slots_result.error());
-        const ParticleSlotRange live_slots = live_slots_result.value();
         std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
             return nodes[left]->id < nodes[right]->id;
         });
@@ -416,9 +418,38 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             }
         }
 
+        // Emission slots are globally capped and stable, while each Particle branch
+        // can retire its assigned slots at its own lifetime. Generate the bounded
+        // candidate interval using the longest active branch, then compact expired
+        // branch slots in global-ID order below.
+        std::vector<double> branch_lifetimes(particle_count, 0.0);
+        double candidate_lifetime = 0.0;
+        for (std::size_t branch = 0; branch < particle_count; ++branch) {
+            const GraphNode& particle_node = *nodes[active_particles[branch]];
+            double lifetime = particles[active_particles[branch]]->lifetime_seconds;
+            // Schema-1 graphs created before Particle owned Lifetime stored it on
+            // Emitter. Keep that narrow fallback while all newly built graphs write
+            // the branch value on Particle.
+            if (!find_value(particle_node, kParticleLifetimeSeconds)) {
+                lifetime = emitter_settings.particle_lifetime_seconds;
+            }
+            branch_lifetimes[branch] = lifetime;
+            candidate_lifetime = std::max(candidate_lifetime, lifetime);
+        }
+        Settings slot_settings = emitter_settings;
+        slot_settings.particle_lifetime_seconds = candidate_lifetime;
+        const auto bounded_slots = validate_settings(slot_settings);
+        if (!bounded_slots.notices.empty()) {
+            return R::failure(ErrorCode::invalid_request,
+                              "Particle lifetime values exceed supported bounds");
+        }
+        const auto live_slots_result = live_particle_slot_range(bounded_slots, to_seconds(*normalized));
+        if (!live_slots_result.has_value()) return R::failure(live_slots_result.error());
+        const ParticleSlotRange live_slots = live_slots_result.value();
+
         std::vector<std::uint32_t> visited(count, 0);
         std::vector<std::size_t> branch_appearance(particle_count, count);
-        result.particles.resize(static_cast<std::size_t>(live_slots.count));
+        std::vector<ParticleInstance> staged_particles(static_cast<std::size_t>(live_slots.count));
         std::uint64_t traversal_work = 0;
         for (std::size_t branch = 0; branch < particle_count; ++branch) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "particle branch planning cancelled");
@@ -464,7 +495,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             }
             if (!branch_appearances.empty()) branch_appearance[branch] = branch_appearances.front();
 
-            Settings branch_settings = emitter_settings;
+            Settings branch_settings = slot_settings;
             for (const std::size_t force_index : branch_forces) {
                 if (cancellation.is_cancelled()) {
                     return R::failure(ErrorCode::cancelled, "force-chain evaluation cancelled");
@@ -483,18 +514,22 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
 
             const auto branch_result = simulate_particles_partition_into(
                 bounded, to_seconds(*normalized), static_cast<std::uint32_t>(particle_count),
-                static_cast<std::uint32_t>(branch), result.particles, cancellation);
+                static_cast<std::uint32_t>(branch), staged_particles, cancellation);
             if (!branch_result.has_value()) return R::failure(branch_result.error());
         }
 
         // Particle appearance is the default for its stream; a downstream Appearance
         // replaces it. Resolve that precedence once, after branch simulation.
-        for (auto& instance : result.particles) {
+        result.particles.reserve(staged_particles.size());
+        for (auto& instance : staged_particles) {
             const std::size_t branch = static_cast<std::size_t>(instance.id % particle_count);
+            if (instance.age_seconds >= branch_lifetimes[branch]) continue;
+            instance.lifetime_seconds = branch_lifetimes[branch];
             const std::size_t override_index = branch_appearance[branch];
             const AppearanceValues& appearance = override_index == count
                 ? *particles[active_particles[branch]] : *appearances[override_index];
             apply_appearance(instance, appearance, emitter_settings.seed);
+            result.particles.push_back(std::move(instance));
         }
         return R::success(std::move(result));
     } catch (const std::bad_alloc&) {

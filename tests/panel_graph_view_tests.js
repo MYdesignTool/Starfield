@@ -38,6 +38,12 @@ var projected = view.project(source);
 var particle = projected.nodes.filter(function (node) { return node.kind === "particle"; })[0];
 var output = projected.nodes.filter(function (node) { return node.kind === "output"; })[0];
 assert.strictEqual(particle.label, "Particle");
+assert.strictEqual(particle.params[0].graphKey, "11",
+                   "Particle lifetime appears before appearance controls in the inspector");
+assert.strictEqual(particle.params[0].value, 2,
+                   "an older Particle graph projects the legacy emitter lifetime onto Particle");
+assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "3"; })[0].unit, "px");
+assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "4"; })[0].unit, "px");
 assert.deepStrictEqual(particle.params.filter(function (parameter) {
     return parameter.graphKey === "9" || parameter.graphKey === "10";
 }).map(function (parameter) { return [parameter.label, parameter.value, parameter.max]; }), [
@@ -51,12 +57,35 @@ assert.strictEqual(output.maxParticles, 6400);
 assert.strictEqual(output.params[0].graphNodeId, source.nodes[0].id,
                    "Output Max Particles control edits the emitter-owned value");
 assert.deepStrictEqual(view.activeEmitterParameters(source), {
-    emitterId: source.nodes[0].id, maxParticles: 6400, birthRate: 60, lifetimeSeconds: 2
+    emitterId: source.nodes[0].id, maxParticles: 6400, birthRate: 60, lifetimeSeconds: 2,
+    branchLifetimes: [2]
 });
 assert.strictEqual(view.countLiveParticles(2.5, 60, 2, 6400), 120,
                    "graph frame status counts the emitter’s live slots at AE comp time");
 assert.strictEqual(view.countLiveParticles(2.5, 60, 2, 10), 10,
                    "graph frame status applies the active emitter’s global cap");
+
+var independentLifetimes = codec.fromHex(codec.toHex(graph()));
+var longerParticle = JSON.parse(JSON.stringify(independentLifetimes.nodes[1]));
+longerParticle.id = uuid(4);
+longerParticle.parameters = longerParticle.parameters.filter(function (parameter) {
+    return parameter.key !== "7";
+});
+longerParticle.parameters.push({ key: "11", type: 4, value: 3 });
+independentLifetimes.nodes[1].parameters.push({ key: "11", type: 4, value: 1 });
+independentLifetimes.nodes.push(longerParticle);
+independentLifetimes.edges.push(
+    { id: uuid(13), sourceNode: uuid(1), sourcePort: "1", destinationNode: uuid(4), destinationPort: "1" },
+    { id: uuid(14), sourceNode: uuid(4), sourcePort: "2", destinationNode: uuid(3), destinationPort: "1" }
+);
+independentLifetimes = codec.fromHex(codec.toHex(independentLifetimes));
+var lifetimeSummary = view.activeEmitterParameters(independentLifetimes);
+assert.deepStrictEqual(lifetimeSummary.branchLifetimes, [1, 3],
+                       "active Particle nodes report their own lifetimes in stable ID order");
+assert.strictEqual(lifetimeSummary.lifetimeSeconds, 3,
+                   "the frame-count window uses the longest active branch lifetime");
+assert.strictEqual(view.countLiveParticles(2.5, 2, 3, 100, lifetimeSummary.branchLifetimes), 4,
+                   "live count expires each modulo-assigned Particle branch independently");
 
 var withParkedEmitter = codec.fromHex(codec.toHex(source));
 withParkedEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 1,

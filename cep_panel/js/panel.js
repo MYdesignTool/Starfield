@@ -670,13 +670,15 @@
                 } else {
                     status = { available: true, targetToken: response.targetToken,
                                timeSeconds: response.timeSeconds, birthRate: emission.birthRate,
-                               lifetimeSeconds: emission.lifetimeSeconds, maxParticles: emission.maxParticles };
+                               lifetimeSeconds: emission.lifetimeSeconds, branchLifetimes: emission.branchLifetimes,
+                               maxParticles: emission.maxParticles };
                 }
             }
             state.frameStatus = status;
             state.liveParticleCount = status.available === false ? null :
                 window.StarfieldGraphView.countLiveParticles(status.timeSeconds, status.birthRate,
-                                                            status.lifetimeSeconds, status.maxParticles);
+                                                            status.lifetimeSeconds, status.maxParticles,
+                                                            status.branchLifetimes);
             var output = null;
             for (var i = 0; i < state.nodes.length; i++) {
                 if (nodeKind(state.nodes[i]) === "output") { output = graphNodeElements[state.nodes[i].id]; break; }
@@ -1094,7 +1096,7 @@
         elements.inspectorBody.appendChild(grid);
         var curves = currentCurveState("size", node.id);
         if ((kind === "particle" || kind === "appearance") && curves) {
-            elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life", curves.size, 100000));
+            elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life (px)", curves.size, 100000));
             elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life", curves.opacity, 1));
             drawCurvePlot("size");
             drawCurvePlot("opacity");
@@ -1114,18 +1116,25 @@
         heading.appendChild(title);
         var actions = document.createElement("div");
         actions.className = "age-curve-actions";
-        var linear = document.createElement("button");
-        linear.type = "button";
+        var interpolationLabel = document.createElement("span");
+        interpolationLabel.className = "age-curve-mode-label";
+        interpolationLabel.textContent = "Interpolation";
+        actions.appendChild(interpolationLabel);
+        var interpolation = document.createElement("select");
+        interpolation.className = "age-curve-interpolation";
+        interpolation.setAttribute("aria-label", "Curve interpolation mode");
+        interpolation.title = "Controls how adjacent points are interpolated. Bezier editing will be added later.";
+        var linear = document.createElement("option");
+        linear.value = "linear";
         linear.textContent = "Linear";
-        linear.title = "Use a straight line between the current start and end values";
-        linear.addEventListener("click", function () {
-            var points = curve.points;
-            applyCurveChanges(kind, [
-                { age: 0, value: points[0].value },
-                { age: 1, value: points[points.length - 1].value }
-            ], false);
-        });
-        actions.appendChild(linear);
+        linear.selected = true;
+        interpolation.appendChild(linear);
+        var bezier = document.createElement("option");
+        bezier.value = "bezier";
+        bezier.textContent = "Bezier (planned)";
+        bezier.disabled = true;
+        interpolation.appendChild(bezier);
+        actions.appendChild(interpolation);
         var remove = document.createElement("button");
         remove.type = "button";
         remove.textContent = "Remove Point";
@@ -1411,10 +1420,31 @@
     }
 
     function curvePosition(event, plot, maximum) {
-        var rect = plot.getBoundingClientRect();
         var bounds = curvePlotBounds();
-        var x = bounds.left + (event.clientX - rect.left) / Math.max(1, rect.width) * 320;
-        var y = bounds.top + (event.clientY - rect.top) / Math.max(1, rect.height) * 140;
+        var x = NaN;
+        var y = NaN;
+        if (typeof plot.createSVGPoint === "function" && typeof plot.getScreenCTM === "function") {
+            try {
+                var point = plot.createSVGPoint();
+                point.x = event.clientX;
+                point.y = event.clientY;
+                var matrix = plot.getScreenCTM();
+                if (matrix && typeof matrix.inverse === "function") {
+                    var local = point.matrixTransform(matrix.inverse());
+                    x = local.x;
+                    y = local.y;
+                }
+            } catch (ignored) { /* use the scaled-viewport fallback below */ }
+        }
+        if (!isFinite(x) || !isFinite(y)) {
+            var rect = plot.getBoundingClientRect();
+            var width = Math.max(1, plot.clientWidth || rect.width);
+            var height = Math.max(1, plot.clientHeight || rect.height);
+            var left = rect.left + (plot.clientLeft || 0);
+            var top = rect.top + (plot.clientTop || 0);
+            x = (event.clientX - left) / width * 320;
+            y = (event.clientY - top) / height * 140;
+        }
         return {
             age: Math.max(0, Math.min(1, (x - bounds.left) / (bounds.right - bounds.left))),
             value: Math.max(0, Math.min(maximum, (bounds.bottom - y) / (bounds.bottom - bounds.top) * maximum))
@@ -2043,6 +2073,12 @@
             holder.appendChild(popupInput(parameter));
         } else {
             holder.appendChild(numberInput(parameter, null));
+            if (parameter.unit) {
+                var unit = document.createElement("span");
+                unit.className = "param-unit";
+                unit.textContent = parameter.unit;
+                holder.appendChild(unit);
+            }
         }
         var wrapper = document.createElement("div");
         wrapper.className = "parameter-row";

@@ -22,11 +22,15 @@ Each curve uses normalized age `x ∈ [0,1]` and a value in the existing rendere
 - A curve has two fixed endpoints and zero to six interior knots, for at most eight
   points. Ages are strictly increasing; the first and last ages must be exactly 0
   and 1. Evaluation is piecewise linear.
-- The CEP plot adds a point on click, moves points on drag, and allows direct numeric
+- The CEP plot converts pointer positions through the SVG screen transform before
+  adding or moving points, so CSS scale and border width do not shift the hit location.
+  It adds a point on click, moves points on drag, and allows direct numeric
   entry for the selected point's Life percentage and value. These numeric fields also
   support the panel's left/right scrub gesture. Previous/next controls select points;
   endpoint ages stay pinned and interior ages stay between their neighbors. Interior
-  points can be removed, and `Linear` restores the endpoint-only interpolation.
+  points can be removed. The interpolation control selects the algorithm between
+  adjacent knots; `Linear` never removes or resets knots. Piecewise linear is the
+  only implemented algorithm. Bezier remains a later interpolation option.
 - A zero point count means the old `start/end` interpolation. This is the default
   for all projects created before revision 9, so their appearance is unchanged.
 - Color keeps its existing linear start/end interpolation.
@@ -66,6 +70,9 @@ to provide the graph-level bounds and CRC.
 - The curve editor lives in the CEP Particle inspector. Native Effect Controls retain
   their existing endpoint parameters for compatibility; direct endpoint edits keep
   the curve endpoint values synchronized.
+- Size controls and the Size Over Life curve display their unit as layer pixels. The
+  Particle Size and curve ordinates remain bounded at 100,000 px; emitter-axis Size
+  controls remain percentages and are a separate parameter family.
 
 ## Validation rules
 

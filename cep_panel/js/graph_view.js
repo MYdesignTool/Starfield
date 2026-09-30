@@ -20,13 +20,12 @@
             "1": { label: "Max Particles", kind: "slider", decimals: 0, min: 0, max: 2000000, legacyKey: "particle_count" },
             "2": { label: "Particles Per Second", kind: "slider", decimals: 0, min: 0, max: 1000000, legacyKey: "birth_rate" },
             "3": { label: "Random Seed", kind: "slider", decimals: 0, min: 0, max: 2147483647, legacyKey: "seed" },
-            "4": { label: "Lifetime", kind: "slider", decimals: 3, min: 0, max: 1000000, legacyKey: "particle_lifetime" },
             "5": { label: "Type", kind: "popup", decimals: 0, min: 1, max: 4, displayOffset: 1,
                   choices: ["Point", "Box", "Sphere", "Disc"], legacyKey: "emitter_shape" },
             "6": { label: "Origin", kind: "point3d", decimals: 3, min: -100, max: 100, legacyKey: "emitter_origin" },
             "7": { label: "Velocity", kind: "point3d", decimals: 2, min: -1000, max: 1000,
                   legacyKeys: ["velocity_x", "velocity_y", "velocity_z"] },
-            "8": { label: "Particle Size", kind: "slider", decimals: 2, min: 0, max: 100000, legacyKey: "particle_size" },
+            "8": { label: "Particle Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
             "9": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
             "10": { label: "Emitter Size", kind: "slider", decimals: 3, min: 0, max: 10, legacyKey: "emitter_size" },
             "11": { label: "Speed Random", kind: "slider", decimals: 2, min: 0, max: 100, legacyKey: "velocity_spread" },
@@ -45,18 +44,19 @@
         particle: {
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
             "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_end" },
-            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, legacyKey: "particle_size" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, legacyKey: "particle_size_end" },
+            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size_end" },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
             "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity_end" },
             "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "particle_size_random" },
-            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "opacity_random" }
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "opacity_random" },
+            "11": { label: "Lifetime", kind: "slider", decimals: 3, min: 0, max: 1000000, legacyKey: "particle_lifetime" }
         },
         appearance: {
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
             "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
-            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000 },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000 },
+            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px" },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1 },
             "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1 },
             "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100 },
@@ -122,27 +122,46 @@
             }
         }
         var emitters = [];
+        var particles = [];
         for (var n = 0; n < graph.nodes.length; n++) {
             if (kindFor(graph.nodes[n].type) === "emitter" && active["$" + graph.nodes[n].id]) {
                 emitters.push(graph.nodes[n]);
+            } else if (kindFor(graph.nodes[n].type) === "particle" && active["$" + graph.nodes[n].id]) {
+                particles.push(graph.nodes[n]);
             }
         }
         if (emitters.length !== 1) return null;
         var emitter = emitters[0];
         var cap = findParameter(emitter, "1");
         var rate = findParameter(emitter, "2");
-        var lifetime = findParameter(emitter, "4");
-        if (!cap || !rate || !lifetime) return null;
+        var legacyLifetime = findParameter(emitter, "4");
+        if (!cap || !rate) return null;
         cap = Number(cap.value);
         rate = Number(rate.value);
-        lifetime = Number(lifetime.value);
         if (!isFinite(cap) || Math.floor(cap) !== cap || cap < 0 || cap > 2000000 ||
-            !isFinite(rate) || rate < 0 || rate > 1000000 ||
-            !isFinite(lifetime) || lifetime < 0 || lifetime > 1000000) return null;
-        return { emitterId: emitter.id, maxParticles: cap, birthRate: rate, lifetimeSeconds: lifetime };
+            !isFinite(rate) || rate < 0 || rate > 1000000) return null;
+        particles.sort(function (left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; });
+        var branchLifetimes = [];
+        if (particles.length) {
+            for (var p = 0; p < particles.length; p++) {
+                var branchLifetime = findParameter(particles[p], "11");
+                branchLifetime = branchLifetime ? Number(branchLifetime.value) :
+                    (legacyLifetime ? Number(legacyLifetime.value) : 2);
+                if (!isFinite(branchLifetime) || branchLifetime < 0 || branchLifetime > 1000000) return null;
+                branchLifetimes.push(branchLifetime);
+            }
+        } else {
+            branchLifetimes.push(legacyLifetime ? Number(legacyLifetime.value) : 2);
+        }
+        var lifetime = 0;
+        for (var life = 0; life < branchLifetimes.length; life++) {
+            lifetime = Math.max(lifetime, branchLifetimes[life]);
+        }
+        return { emitterId: emitter.id, maxParticles: cap, birthRate: rate,
+                 lifetimeSeconds: lifetime, branchLifetimes: branchLifetimes };
     }
 
-    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap) {
+    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap, branchLifetimes) {
         var time = Number(timeSeconds);
         var rate = Number(birthRate);
         var lifetime = Number(lifetimeSeconds);
@@ -155,7 +174,24 @@
             firstSlot > 9007199254740992) return 0;
         if (lastSlot < firstSlot) return 0;
         firstSlot = Math.max(0, firstSlot);
-        return Math.min(cap, lastSlot - firstSlot + 1);
+        var alive = lastSlot - firstSlot + 1;
+        if (alive > cap) {
+            firstSlot = lastSlot - cap + 1;
+            alive = cap;
+        }
+        if (!branchLifetimes || !branchLifetimes.length) return alive;
+        var count = 0;
+        for (var branch = 0; branch < branchLifetimes.length; branch++) {
+            var branchLife = Number(branchLifetimes[branch]);
+            if (!isFinite(branchLife) || branchLife <= 0) continue;
+            var branchFirst = Math.max(firstSlot, Math.floor((time - branchLife) * rate) + 1);
+            var offset = (branch - (branchFirst % branchLifetimes.length) + branchLifetimes.length) % branchLifetimes.length;
+            var firstAssigned = branchFirst + offset;
+            if (firstAssigned <= lastSlot) {
+                count += Math.floor((lastSlot - firstAssigned) / branchLifetimes.length) + 1;
+            }
+        }
+        return count;
     }
 
     function graphValueToDisplay(value, spec) {
@@ -177,6 +213,7 @@
             min: spec && typeof spec.min === "number" ? spec.min : undefined,
             max: spec && typeof spec.max === "number" ? spec.max : undefined,
             choices: spec && spec.choices ? spec.choices.slice() : undefined,
+            unit: spec && spec.unit ? spec.unit : undefined,
             legacyKey: spec ? spec.legacyKey : undefined,
             legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
             displayScale: spec && spec.scale ? spec.scale : 1,
@@ -238,6 +275,7 @@
         var nodes = [];
         var positions = layoutOverride || layout.resolve(graph);
         var byId = {};
+        var activeEmitter = activeEmitterParameters(graph);
         for (var i = 0; i < graph.nodes.length; i++) {
             var source = graph.nodes[i];
             var kind = kindFor(source.type);
@@ -257,6 +295,7 @@
                 if (kind === "particle" || kind === "appearance") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
                 }
+                if (kind === "emitter" && graphParameter.key === "4") continue;
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 node.params.push(viewParameter(node, kind, graphParameter, spec));
             }
@@ -266,6 +305,21 @@
                         node.params.push(viewParameter(node, kind,
                             { key: key, type: 4, value: 0 }, specs[key]));
                     }
+                });
+            }
+            if (kind === "particle" && !findParameter(source, "11")) {
+                var sourceEmitter = activeEmitter && graph.nodes.filter(function (candidate) {
+                    return candidate.id === activeEmitter.emitterId;
+                })[0];
+                var priorLifetime = sourceEmitter && findParameter(sourceEmitter, "4");
+                node.params.push(viewParameter(node, kind,
+                    { key: "11", type: 4, value: priorLifetime ? priorLifetime.value : 2 }, specs["11"]));
+            }
+            if (kind === "particle") {
+                var particleOrder = { "11": 0, "3": 1, "4": 2, "5": 3, "6": 4,
+                                      "1": 5, "2": 6, "9": 7, "10": 8 };
+                node.params.sort(function (left, right) {
+                    return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });
             }
             if (node.curveParameterKeys) {
@@ -290,7 +344,6 @@
         }
         var emitters = nodes.filter(function (node) { return node.kind === "emitter"; });
         var outputs = nodes.filter(function (node) { return node.kind === "output"; });
-        var activeEmitter = activeEmitterParameters(graph);
         if (activeEmitter && outputs.length) {
             var sourceEmitter = graph.nodes.filter(function (node) { return node.id === activeEmitter.emitterId; })[0];
             var max = sourceEmitter && findParameter(sourceEmitter, "1");

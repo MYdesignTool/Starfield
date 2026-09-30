@@ -21,3 +21,13 @@ Host working-space conversions go through documented AE color-management suites 
 - Pixel aspect and downsample are resolved by the adapter into `FrameSpec` (see ADR 0005); the
   core never re-derives them from display assumptions.
 - M2 performs no color-space conversion; see ADR 0005 for that scoped decision.
+
+## Reopened host qualification (2026-09-30)
+
+The owner supplied a new AE screenshot in which nominally white particles appear dark against a
+saturated-blue composition during translucent portions of their lifetime. This reopens the
+lower-layer alpha qualification despite the earlier visual pass. Source inspection still shows one
+premultiplied source-over accumulation in `CpuRenderer` followed by direct channel writes in the AE
+bridge; it does not identify a duplicate premultiplication. Keep the existing alpha mode until the
+paired candidate is compared over the transparency grid and an opaque blue layer, preferably with
+the same frame's decoded RGBA values available. The M3-06 candidate does not change the alpha path.

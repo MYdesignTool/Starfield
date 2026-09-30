@@ -11,6 +11,27 @@ are recorded below. Earlier 6,196/395/660-check results are historical.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
 
+## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
+
+The May 2023 SDK full build includes per-Particle lifetime in explicit graph
+evaluation, the CEP Particle inspector mapping, pixel-unit labels for Size and
+Size Over Life, transformed SVG pointer coordinates, and a non-destructive
+interpolation selector. Candidate AEX SHA-256:
+`062130857B58B83EDA03358F85E352DADE4B76921356F845DEC7B89A97490481`.
+Paired Core DLL SHA-256:
+`5783F369984611AD3B3843AB28B0841AB1C4754E4330FC13E40E1C753C8E2E14`;
+runtime manifest selects `StarfieldCore-5783F369984611AD.dll`. The build updated
+this checkout's ignored artifacts, runtime, and `dist/` copies; the copies match
+the candidate hashes. No AEX or Core file was installed into AE. No test suite
+was run for this task. The owner's report of dark translucent white particles
+over a blue background remains open for AE qualification; source inspection found
+the core applies premultiplied alpha once and the adapter copies those channels
+to AE's pixel structs, so the output contract is unchanged pending that check.
+The core suite passed 11,082 checks before adding a focused per-Particle lifetime
+assertion; the updated graph-view, graph-edit, graph-transaction, and gateway
+checks passed. Automatic review blocked rerunning the core suite after that test
+file edit, so the new assertion still needs execution.
+
 ## M3-05 Particle variation build (2026-09-30)
 
 The May 2023 SDK build appends the revision-11 Size Random and Opacity Random controls,

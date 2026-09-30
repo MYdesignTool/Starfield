@@ -523,7 +523,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
         ParameterDescriptor{kBirthRate, ParameterKind::float64, true},
         ParameterDescriptor{kSeed, ParameterKind::uint32, true},
-        ParameterDescriptor{kLifetimeSeconds, ParameterKind::float64, true},
+        // Key 4 is retained for the legacy Emitter -> ... -> Output path only.
+        ParameterDescriptor{kLifetimeSeconds, ParameterKind::float64, false},
         ParameterDescriptor{kEmitterShape, ParameterKind::uint32, true},
         ParameterDescriptor{kEmitterOrigin, ParameterKind::vector3_float64, true},
         ParameterDescriptor{kVelocity, ParameterKind::vector3_float64, true},
@@ -565,6 +566,7 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacityOverLifeCurve, ParameterKind::opaque_bytes, false},
         ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
         ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleLifetimeSeconds, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor output;

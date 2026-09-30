@@ -69,6 +69,12 @@ extent to transparent black before copying the core output. This behavior was vi
 AE against the transparency grid on 2026-09-28; testing a lower composition layer behind the
 particle layer remains a separate visual check.
 
+On 2026-09-30 the owner reported that white particles look dark against a blue lower layer during
+translucent portions of their lifetime. That conflicts with the earlier lower-layer visual check,
+so compositing remains open for this opacity case. `CpuRenderer` still computes premultiplied
+source-over once and the AE bridge writes the channels directly. M3-06 leaves the contract unchanged
+until the current paired candidate is compared over the transparency grid and opaque blue layer.
+
 ## Color
 
 M2 performs no color-space conversion. Particle colors are accumulated in the declared
