@@ -99,9 +99,9 @@ render response remain host gates. The read-only rollback report is
 append `-Rollback` to restore the backed-up main AEX and Core selector and move
 the newly added node AEX files into the backup folder.
 
-## P-02D direct node-control synchronization source candidate (2026-09-30)
+## P-02D initial direct node-control synchronization candidate (2026-09-30)
 
-The latest source prototype forwards a node effect's constant parameter edit
+The initial source prototype forwards a node effect's constant parameter edit
 through `PF_Cmd_USER_CHANGED_PARAM` to the main renderer's supervised graph
 callback. CEP batch writes raise a node-local guard to avoid committing each
 intermediate field. Node controls are marked non-time-varying to match the
@@ -133,6 +133,33 @@ same-named files from
 `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\`.
 The compiler emitted the existing C4819 code-page warning for non-ASCII text
 in `Parameters.hpp`; the build completed successfully.
+## P-02D retained graph-commit nonce correction (2026-09-30)
+
+Review found that CEP leaves its last graph transaction nonce in the hidden
+`Graph Edit Commit` parameter. Native node edits carry a separate zero-nonce
+request, but the main effect previously rejected them against that retained CEP
+nonce before inspecting the request envelope. The main renderer now recognizes
+the node request first and only applies the retained commit nonce to ordinary
+CEP graph transactions.
+
+The May 2023 SDK x64 Release build passed. With AE closed, only the rebuilt main
+renderer AEX was copied into the plug-in directory; the four node AEX files and
+Core DLL/selector were left as installed by the previous candidate. The old
+main AEX is backed up at
+`artifacts/disabled/p02d-node-nonce-fix-20260930/StarfieldParticle.aex`.
+
+| Artifact | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF` |
+| Previous `StarfieldParticle.aex` backup | `91889136D24DA756CF181756D1426B8BA0D6BFB63234FAE21BC053FE3DB9F546` |
+
+AE has not loaded this fix. An `aerender` probe against the authorized test
+project found neither a comp named `Comp 1` nor a saved render-queue item at
+index 1, so no frame was rendered; its temporary output was removed. A comp name
+is needed for the next host render check. To roll back while AE is closed, copy
+the backup AEX above to
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`.
+
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
 The May 2023 SDK full build includes per-Particle lifetime in explicit graph

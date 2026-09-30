@@ -561,35 +561,39 @@ PF_Err write_graph_snapshot(PF_InData* in_data, const core::Graph& graph,
 PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
                             PF_UserChangedParamExtra* extra) noexcept {
     if (!in_data || !params || !extra || extra->param_index != kGraphEditCommitId) return PF_Err_NONE;
-    A_long nonce = 0;
-    if (!params[kGraphEditCommitId] || params[kGraphEditCommitId]->param_type != PF_Param_FLOAT_SLIDER ||
-        !std::isfinite(params[kGraphEditCommitId]->u.fs_d.value) ||
-        params[kGraphEditCommitId]->u.fs_d.value < 0.0 ||
-        params[kGraphEditCommitId]->u.fs_d.value > kMaxTransactionNonce ||
-        std::floor(params[kGraphEditCommitId]->u.fs_d.value) != params[kGraphEditCommitId]->u.fs_d.value) {
-        return reject_request(out_data, params, 1, "invalid transaction nonce");
-    }
-    nonce = static_cast<A_long>(params[kGraphEditCommitId]->u.fs_d.value);
 
-    if (!params[kGraphSnapshotId] || !params[kGraphEditRequestId] || !params[kGraphEditReceiptId] ||
-        params[kGraphSnapshotId]->param_type != PF_Param_FLOAT_SLIDER ||
-        params[kGraphEditRequestId]->param_type != PF_Param_FLOAT_SLIDER ||
-        params[kGraphEditReceiptId]->param_type != PF_Param_FLOAT_SLIDER ||
-        !params[kGraphParameterId] || params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
-        !params[kGraphParameterId]->u.arb_d.value || !params[kControlSourceId] ||
-        params[kControlSourceId]->param_type != PF_Param_POPUP) {
-        return reject_request(out_data, params, nonce, "carrier parameters are unavailable");
-    }
-
+    A_long nonce = 1;
     try {
         std::string request_expression;
         const PF_Err read_request = read_parameter_expression(in_data, kGraphEditRequestId, request_expression);
-        if (read_request != PF_Err_NONE) return reject_request(out_data, params, nonce, "request expression is unavailable");
-
         NodeEditRequest node_request{};
-        if (parse_node_edit_request(request_expression, node_request)) {
-            return commit_node_parameter_edit(in_data, out_data, params, node_request, nonce);
+        if (read_request == PF_Err_NONE && parse_node_edit_request(request_expression, node_request)) {
+            // Native node edits use their own zero-nonce request envelope. The
+            // graph transaction slider retains the previous CEP nonce, so it
+            // must not gate a node-originated edit.
+            return commit_node_parameter_edit(in_data, out_data, params, node_request, 0);
         }
+
+        if (!params[kGraphEditCommitId] || params[kGraphEditCommitId]->param_type != PF_Param_FLOAT_SLIDER ||
+            !std::isfinite(params[kGraphEditCommitId]->u.fs_d.value) ||
+            params[kGraphEditCommitId]->u.fs_d.value < 0.0 ||
+            params[kGraphEditCommitId]->u.fs_d.value > kMaxTransactionNonce ||
+            std::floor(params[kGraphEditCommitId]->u.fs_d.value) != params[kGraphEditCommitId]->u.fs_d.value) {
+            return reject_request(out_data, params, 1, "invalid transaction nonce");
+        }
+        nonce = static_cast<A_long>(params[kGraphEditCommitId]->u.fs_d.value);
+
+        if (!params[kGraphSnapshotId] || !params[kGraphEditRequestId] || !params[kGraphEditReceiptId] ||
+            params[kGraphSnapshotId]->param_type != PF_Param_FLOAT_SLIDER ||
+            params[kGraphEditRequestId]->param_type != PF_Param_FLOAT_SLIDER ||
+            params[kGraphEditReceiptId]->param_type != PF_Param_FLOAT_SLIDER ||
+            !params[kGraphParameterId] || params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
+            !params[kGraphParameterId]->u.arb_d.value || !params[kControlSourceId] ||
+            params[kControlSourceId]->param_type != PF_Param_POPUP) {
+            return reject_request(out_data, params, nonce, "carrier parameters are unavailable");
+        }
+
+        if (read_request != PF_Err_NONE) return reject_request(out_data, params, nonce, "request expression is unavailable");
         if (nonce < 1) return reject_request(out_data, params, 1, "invalid transaction nonce");
 
         TransactionRequest request;

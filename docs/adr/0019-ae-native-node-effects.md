@@ -101,8 +101,10 @@ and calls the main renderer's `PF_Cmd_USER_CHANGED_PARAM` with
 `AEGP_EffectCallGeneric`. The renderer then updates its own arbitrary graph data
 and snapshot. The panel raises a hidden per-node guard while it writes a batch
 of scripted node controls, so intermediate values do not trigger individual
-commits. This is only a source-level hypothesis until AE 2023 confirms the
-callback context, cache refresh, and undo behavior.
+commits. The renderer recognizes these zero-nonce node requests before checking
+the graph transaction slider, because that slider retains the last CEP nonce.
+This is only a source-level hypothesis until AE 2023 confirms callback
+delivery, cache refresh, and undo behavior.
 
 Node-effect values currently serialize as constants. Their editable controls
 are marked non-time-varying until graph animation has a dedicated contract;
