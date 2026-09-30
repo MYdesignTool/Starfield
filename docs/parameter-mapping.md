@@ -1,6 +1,6 @@
 # Parameter bridge: schema → AE control → core settings
 
-Task: M2-02, revised by manifest revision 11. `schema/parameters.json` owns the IDs,
+Task: M2-02, revised by manifest revision 13. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after
 `validate_settings`. One conversion path (`settings_from_controls`) serves both the
@@ -59,9 +59,9 @@ the per-topic `PF_ParamFlag_START_COLLAPSED`.
 | Emitter Dimensions | 81/82/83 | Size X / Size Y / Size Z (full-resolution layer px) | `emitter_size_pixels.x/y/z` |
 | Particle | 12 | Lifetime | `particle_lifetime_seconds` |
 | Particle | 13 | Size | `particle_size` |
-| Particle | 14 | Size Over Life | `particle_size_end` |
+| Particle | 14 | Size Over Life (final percentage) | `particle_size_end` |
 | Particle | 15 | Opacity | `opacity` |
-| Particle | 16 | Opacity Over Life | `opacity_end` |
+| Particle | 16 | Opacity Over Life (final percentage) | `opacity_end` |
 | Particle | 17/18 | Color Start / Color End | `color_start` / `color_end` |
 | Physics (collapsed) | 21/22/23 | Gravity X / Y / Z | `gravity.x/y/z` |
 | Physics (collapsed) | 24 | Linear Drag | `linear_drag` |
@@ -141,8 +141,8 @@ been confirmed. See ADR 0018.
 | 20 | `linear_drag` | Float Slider, THOUSANDTHS, 0…100 (slider 0…10), default 0 | `Settings::linear_drag` | Force node. Inverse seconds, solved in closed form with gravity. |
 | 21 | `color_start` | Color, default white | `Settings::color_start` | Appearance node birth color. AE delivers 8-bit channels; the adapter maps `channel / 255` to working-space 0..1 (no color-space conversion, ADR 0005). Alpha comes from Opacity. |
 | 22 | `color_end` | Color, default white | `Settings::color_end` | Appearance node color as age approaches lifetime. Equal to Color Start by default, so defaults change nothing. |
-| 23 | `particle_size_end` | Float Slider, HUNDREDTHS, 0…100000, default 8 | `Settings::particle_size_end` | Appearance node size reached at the end of life; `particle_size` is the birth value. Equal by default. |
-| 24 | `opacity_end` | Float Slider, THOUSANDTHS, 0…1, default 1 | `Settings::opacity_end` | Appearance node opacity reached at the end of life; `opacity` is the birth value. Equal by default. |
+| 23 | `particle_size_end` | Float Slider, TENTHS, 0…100, default 100 | `Settings::particle_size_end` | Final Size Over Life ordinate as a percentage of base `particle_size`; curve points also use 0…100%. |
+| 24 | `opacity_end` | Float Slider, TENTHS, 0…100, default 100 | `Settings::opacity_end` | Final Opacity Over Life ordinate as a percentage of base `opacity`; curve points also use 0…100%. |
 
 IDs are append-only; the UI order currently follows ID order, so the emitter controls (12, 13) and the
 force/appearance controls (17-24) sit after the graph/system parameters until M3-03 adds AE parameter
@@ -225,25 +225,27 @@ the plot adds an interior point; dragging a point changes its age/value, while e
 pinned to 0 and 1. The selected point also accepts direct numeric value entry. The interpolation
 selector describes the segment algorithm: Linear is implemented, and selecting it never changes the
 stored knots. Bezier remains a future option. `Remove Point` deletes the selected interior point. Each
-curve is limited to eight points. Size values are full-resolution layer pixels in 0…100,000 px;
-opacity values are 0…1. CEP Particle Size and emitter Size X/Y/Z fields display `px`.
+curve is limited to eight points. Both curve value axes are fixed at 0…100%: Size multiplies the
+base Particle Size (in full-resolution layer pixels), and Opacity multiplies the base Opacity
+(0…1). CEP labels both curve values as `%`; Particle Size and emitter Size X/Y/Z display `px`.
 
 The AE parameter streams store a point count plus eight fixed age/value slots per curve. Count zero
-keeps old projects on their existing start/end line. Active curves are copied into optional opaque
+uses the straight 100%-to-final-percentage line. Active curves are copied into optional opaque
 Particle/Appearance node parameters by `GraphConstruction.cpp`; `GraphEvaluation.cpp` samples the
 containing line segment using each particle's clamped age fraction. In AE Controls mode, animated
-Size/Opacity endpoint controls replace the first/last ordinate at the sampled render time; interior
-knots remain constant. The CEP editor prevents edits to animated endpoint ordinates and leaves the
-interior knots editable. Node Graph curves keep the existing constant-graph contract. The nested graph
+only the final curve percentage is mirrored to the Size/Opacity endpoint control at the sampled
+render time; the first ordinate stays in the curve bank and base Size/Opacity never modify curve
+points. The CEP editor prevents edits to an animated final ordinate and leaves interior knots editable.
+Node Graph curves keep the existing constant-graph contract. The nested graph
 payload's byte layout and validation rules are specified in ADR 0016.
 
-Graph ownership follows the visible node layout. Newly authored explicit-Particle graphs store
-Lifetime on each Particle node (optional graph key 11, seconds); the Emitter stores only global birth
-rate, seed, and cap. Candidate emission slots are bounded using the longest active Particle lifetime,
-then each branch expires its own slots and the output is compacted in stable global-ID order. The AE
-Effect Controls Lifetime stream remains parameter ID 12 and is projected onto the Particle node.
-Emitter graph key 4 remains only for the legacy no-Particle stream; older explicit-Particle graphs
-that lack key 11 inherit that value until edited. See ADR 0015.
+Graph ownership follows the visible node layout. Emitter schema 2 stores global birth rate, seed,
+and cap, and has no Lifetime parameter. Particle schema 2 requires Lifetime at graph key 11, in
+seconds. Candidate emission slots are bounded using the longest active Particle lifetime, then each
+branch expires its own slots and the output is compacted in stable global-ID order. The AE Effect
+Controls Lifetime stream remains parameter ID 12 and is projected onto each new Particle node.
+Pre-release Emitter/Particle node schema 1 snapshots are intentionally unsupported; there is no
+project migration path during development. See ADR 0015.
 
 ## Deterministic emission rules (M2)
 

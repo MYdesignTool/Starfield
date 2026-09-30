@@ -60,8 +60,8 @@
         { key: "linear_drag", index: 24, name: "Linear Drag", kind: "slider", min: 0, max: 100, displayDecimals: 3 },
         { key: "color_start", index: 17, name: "Color Start", kind: "color", min: 0, max: 255, displayDecimals: 0 },
         { key: "color_end", index: 18, name: "Color End", kind: "color", min: 0, max: 255, displayDecimals: 0 },
-        { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
-        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 1, displayDecimals: 3 },
+        { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100, displayDecimals: 1 },
+        { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 100, displayDecimals: 1 },
         { key: "particle_size_random", index: 86, name: "Size Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 },
         { key: "opacity_random", index: 87, name: "Opacity Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 }
     ];
@@ -80,8 +80,8 @@
                 kind: "slider", min: 0, max: valueMax, displayDecimals: valueDecimals });
         }
     }
-    appendCurveBindings("Size", "size", 45, 46, 100000, 2);
-    appendCurveBindings("Opacity", "opacity", 62, 63, 1, 3);
+    appendCurveBindings("Size", "size", 45, 46, 100, 1);
+    appendCurveBindings("Opacity", "opacity", 62, 63, 100, 1);
     BINDINGS.push({ key: "curve_edit_commit", index: 79, name: "Curve Edit Commit",
         kind: "slider", min: -1000000, max: 1000000, displayDecimals: 0 });
 
@@ -571,9 +571,9 @@
             nodes.push(node);
         }
         var curves = {
-            size: readCurve(target.effect, "size", nodeValues.particle_size,
+            size: readCurve(target.effect, "size", 100,
                             nodeValues.particle_size_end, sourceMode === "AE Controls", report),
-            opacity: readCurve(target.effect, "opacity", nodeValues.opacity,
+            opacity: readCurve(target.effect, "opacity", 100,
                                nodeValues.opacity_end, sourceMode === "AE Controls", report)
         };
         if (!curves.size || !curves.opacity) {
@@ -651,7 +651,6 @@
         // Scalar endpoint controls may be animated in AE Controls mode. They remain
         // authoritative at the current comp time while interior knots stay constant.
         if (useCurrentEndpoints) {
-            points[0].value = Number(startValue);
             points[points.length - 1].value = Number(endValue);
         }
         if (points[0].age !== 0 || points[points.length - 1].age !== 1) {
@@ -672,8 +671,8 @@
         }
 
         var banks = [
-            { prefix: "size", label: "Size", max: 100000 },
-            { prefix: "opacity", label: "Opacity", max: 1 }
+            { prefix: "size", label: "Size", max: 100 },
+            { prefix: "opacity", label: "Opacity", max: 100 }
         ];
         for (var b = 0; b < banks.length; b++) {
             var bank = banks[b];

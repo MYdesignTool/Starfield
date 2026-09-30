@@ -10,18 +10,19 @@ function graph() {
     return {
         version: 1,
         nodes: [
-            { id: uuid(1), type: edits.types.emitter, schemaVersion: 1, parameters: [
+            { id: uuid(1), type: edits.types.emitter, schemaVersion: 2, parameters: [
                 { key: "1", type: 3, value: 1000 }, { key: "2", type: 4, value: 30 },
-                { key: "3", type: 3, value: 1 }, { key: "4", type: 4, value: 2 },
+                { key: "3", type: 3, value: 1 },
                 { key: "5", type: 3, value: 1 }, { key: "6", type: 5, value: [0, 0, 0] },
                 { key: "7", type: 5, value: [0, 0.3, 0] }, { key: "8", type: 4, value: 10 },
                 { key: "9", type: 4, value: 1 }, { key: "10", type: 4, value: 0.05 },
                 { key: "11", type: 4, value: 0.15 }
             ] },
-            { id: uuid(2), type: edits.types.particle, schemaVersion: 1, parameters: [
+            { id: uuid(2), type: edits.types.particle, schemaVersion: 2, parameters: [
                 { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
                 { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
+                { key: "11", type: 4, value: 2 }
             ] },
             { id: uuid(3), type: edits.types.output, schemaVersion: 1, parameters: [] }
         ],

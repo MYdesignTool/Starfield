@@ -15,10 +15,11 @@ the native effect rebuild its graph during a supervised parameter change.
 
 ## Decision
 
-Each curve uses normalized age `x ∈ [0,1]` and a value in the existing renderer units:
-
-- Size is measured in full-resolution layer pixels, bounded by 0…100,000.
-- Opacity is bounded by 0…1.
+Each curve uses normalized age `x ∈ [0,1]` and an ordinate in percent, bounded by
+0…100. Both plots always use that fixed vertical range. The Size curve percentage
+multiplies the Particle node's base Size in full-resolution layer pixels; the
+Opacity curve percentage multiplies its base Opacity in 0…1. The rendered values
+remain pixels and unit opacity, respectively.
 - A curve has two fixed endpoints and zero to six interior knots, for at most eight
   points. Ages are strictly increasing; the first and last ages must be exactly 0
   and 1. Evaluation is piecewise linear.
@@ -33,29 +34,30 @@ Each curve uses normalized age `x ∈ [0,1]` and a value in the existing rendere
   points can be removed. The interpolation control selects the algorithm between
   adjacent knots; `Linear` never removes or resets knots. Piecewise linear is the
   only implemented algorithm. Bezier remains a later interpolation option.
-- A zero point count means the old `start/end` interpolation. This is the default
-  for all projects created before revision 9, so their appearance is unchanged.
+- A zero point count means a linear curve from 100% at birth to the endpoint
+  percentage at the end of life. Endpoint controls default to 100%.
 - Color keeps its existing linear start/end interpolation.
 
 The AE effect appends hidden, non-time-varying scalar streams for both point banks
-(IDs 45–78), followed by a supervised curve-edit nonce (ID 79). The endpoint
-parameters keep their existing IDs and mirror the first and last curve values. CEP
-writes point slots, endpoint mirrors, the active count, and finally the nonce in one
-AE undo group. The nonce is the sole commit trigger for a panel curve edit; after it
-fires, the adapter constructs the canonical graph from the complete bank. Direct AE
-edits to the existing Size, Size Over Life, Opacity, or Opacity Over Life controls
-update the matching active curve endpoint in the same parameter-change callback.
-In AE Controls mode, animated scalar endpoints remain authoritative at the sampled
-render time while interior knots stay constant. The CEP editor locks an animated
-endpoint's ordinate and directs the user to its AE keyframes; interior knots remain
-editable. Node Graph values keep the existing
+(IDs 45–78), followed by a supervised curve-edit nonce (ID 79). Endpoint parameters
+14 and 16 mirror only the final curve percentage; the first curve percentage remains
+in the project curve bank or graph payload. CEP writes point slots, final endpoint
+mirrors, the active count, and finally the nonce in one AE undo group. The nonce is
+the sole commit trigger for a panel curve edit; after it fires, the adapter constructs
+the canonical graph from the complete bank. Editing base Size or Opacity does not
+change curve ordinates. Editing an endpoint control updates only the final active
+curve point in the same parameter-change callback. In AE Controls mode, animated
+endpoint percentages remain authoritative at the sampled render time while interior
+knots and the first ordinate stay constant project data. The CEP editor locks an
+animated final ordinate and directs the user to its AE keyframes; interior knots
+remain editable. Node Graph values keep the existing
 constant-value semantics from ADR 0007.
 
 The graph stores an active curve as an optional opaque parameter on Particle and
 Appearance nodes. The nested payload is version 1: a four-byte header containing
 payload version, point count, and two zero reserved bytes, followed by little-endian
-IEEE-754 binary64 age/value pairs. Existing schema-1 graphs that omit the optional
-keys remain valid and use their scalar endpoints. The outer graph codec continues
+IEEE-754 binary64 age/value pairs. A missing optional key means the straight-line
+curve from 100% to the stored endpoint percentage. The outer graph codec continues
 to provide the graph-level bounds and CRC.
 
 ## Consequences
@@ -65,15 +67,15 @@ to provide the graph-level bounds and CRC.
   not authoritative.
 - A new curve changes the serialized graph and requires the updated effect binary;
   the revision-9 panel reports a missing parameter if paired with an older binary.
-- Parameter IDs and the graph codec's existing scalar keys stay unchanged. Optional
-  curve keys can be ignored by old-schema graphs because they are absent there.
+- Parameter IDs and the graph codec's existing scalar keys stay unchanged; this is
+  a pre-release semantic revision with no old-project migration requirement.
 - This decision does not qualify ExtendScript stream access, callback commit ordering,
   rendering, undo, or save/reopen in AE. Those remain explicit AE 2023 host gates.
 - The curve editor lives in the CEP Particle inspector. Native Effect Controls retain
-  their existing endpoint parameters for compatibility; direct endpoint edits keep
-  the curve endpoint values synchronized.
-- Particle Size and the Size Over Life curve use full-resolution layer pixels and
-  remain bounded at 100,000 px. Emitter Size X/Y/Z are also direct full-resolution
+  the endpoint parameters; they expose the final curve percentages, while Size and
+  Opacity remain independent base controls.
+- Particle Size is a full-resolution layer-pixel value bounded at 100,000 px; both
+  over-life curves are bounded percentages. Emitter Size X/Y/Z are also direct full-resolution
   layer-pixel dimensions, with a 100,000 px bound; their pre-release percentage
   interpretation was dropped by owner direction (ADR 0017). Disc Size remains a
   separate layer-height diameter control.

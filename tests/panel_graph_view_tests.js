@@ -7,22 +7,22 @@ var codec = require("../cep_panel/js/graph_codec.js");
 
 function uuid(n) { return ("00000000000000000000000000000000" + n.toString(16)).slice(-32); }
 function graph() {
-    var points = [{ age: 0, value: 10 }, { age: 0.4, value: 24 }, { age: 1, value: 2 }];
+    var points = [{ age: 0, value: 100 }, { age: 0.4, value: 60 }, { age: 1, value: 20 }];
     return {
         version: 1,
         nodes: [
-            { id: uuid(1), type: edits.types.emitter, schemaVersion: 1, parameters: [
+            { id: uuid(1), type: edits.types.emitter, schemaVersion: 2, parameters: [
                 { key: "1", type: 3, value: 6400 }, { key: "2", type: 4, value: 60 },
-                { key: "4", type: 4, value: 2 },
                 { key: "5", type: 3, value: 2 }, { key: "6", type: 5, value: [1920, 1080, 1080] },
                 { key: "10", type: 4, value: 0.05 },
                 { key: "19", type: 4, value: 1920 }, { key: "20", type: 4, value: 1080 },
                 { key: "21", type: 4, value: 720 }
             ] },
-            { id: uuid(2), type: edits.types.particle, schemaVersion: 1, parameters: [
+            { id: uuid(2), type: edits.types.particle, schemaVersion: 2, parameters: [
                 { key: "1", type: 5, value: [1, 0.5, 0] }, { key: "2", type: 5, value: [0, 0.25, 1] },
-                { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 2 },
-                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 0 }
+                { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 20 },
+                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 0 },
+                { key: "11", type: 4, value: 2 }
             ] },
             { id: uuid(3), type: edits.types.output, schemaVersion: 1, parameters: [] }
         ],
@@ -34,7 +34,7 @@ function graph() {
 }
 
 var source = graph();
-var customCurve = view.encodeCurve([{ age: 0, value: 10 }, { age: 0.4, value: 24 }, { age: 1, value: 2 }]);
+var customCurve = view.encodeCurve([{ age: 0, value: 100 }, { age: 0.4, value: 60 }, { age: 1, value: 20 }]);
 source.nodes[1].parameters.push({ key: "7", type: 7, value: customCurve });
 source = codec.fromHex(codec.toHex(source));
 var projected = view.project(source);
@@ -56,17 +56,20 @@ assert.strictEqual(particle.label, "Particle");
 assert.strictEqual(particle.params[0].graphKey, "11",
                    "Particle lifetime appears before appearance controls in the inspector");
 assert.strictEqual(particle.params[0].value, 2,
-                   "an older Particle graph projects the legacy emitter lifetime onto Particle");
+                   "Particle lifetime is read from the Particle node");
 assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "3"; })[0].unit, "px");
-assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "4"; })[0].unit, "px");
+assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "4"; })[0].unit, "%");
+assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "4"; })[0].max, 100);
+assert.strictEqual(particle.params.filter(function (parameter) { return parameter.graphKey === "6"; })[0].max, 100,
+                   "both curve endpoint controls share the fixed percent range");
 assert.deepStrictEqual(particle.params.filter(function (parameter) {
     return parameter.graphKey === "9" || parameter.graphKey === "10";
 }).map(function (parameter) { return [parameter.label, parameter.value, parameter.max]; }), [
     ["Size Random", 0, 100], ["Opacity Random", 0, 100]
-], "legacy graphs project optional variation controls with zero defaults");
+], "Particle nodes project optional variation controls with zero defaults");
 assert.strictEqual(particle.curves.size.custom, true);
 assert.deepStrictEqual(particle.curves.size.points, [
-    { age: 0, value: 10 }, { age: 0.4, value: 24 }, { age: 1, value: 2 }
+    { age: 0, value: 100 }, { age: 0.4, value: 60 }, { age: 1, value: 20 }
 ]);
 assert.strictEqual(output.maxParticles, 6400);
 assert.strictEqual(output.params[0].graphNodeId, source.nodes[0].id,
@@ -86,8 +89,12 @@ longerParticle.id = uuid(4);
 longerParticle.parameters = longerParticle.parameters.filter(function (parameter) {
     return parameter.key !== "7";
 });
-longerParticle.parameters.push({ key: "11", type: 4, value: 3 });
-independentLifetimes.nodes[1].parameters.push({ key: "11", type: 4, value: 1 });
+longerParticle.parameters.forEach(function (parameter) {
+    if (parameter.key === "11") parameter.value = 3;
+});
+independentLifetimes.nodes[1].parameters.forEach(function (parameter) {
+    if (parameter.key === "11") parameter.value = 1;
+});
 independentLifetimes.nodes.push(longerParticle);
 independentLifetimes.edges.push(
     { id: uuid(13), sourceNode: uuid(1), sourcePort: "1", destinationNode: uuid(4), destinationPort: "1" },
@@ -103,9 +110,8 @@ assert.strictEqual(view.countLiveParticles(2.5, 2, 3, 100, lifetimeSummary.branc
                    "live count expires each modulo-assigned Particle branch independently");
 
 var withParkedEmitter = codec.fromHex(codec.toHex(source));
-withParkedEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 1,
-    parameters: [{ key: "1", type: 3, value: 1 }, { key: "2", type: 4, value: 1 },
-                 { key: "4", type: 4, value: 1 }] });
+withParkedEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 2,
+    parameters: [{ key: "1", type: 3, value: 1 }, { key: "2", type: 4, value: 1 }] });
 assert.strictEqual(view.activeEmitterParameters(withParkedEmitter).emitterId, source.nodes[0].id,
                    "a disconnected emitter does not replace the emitter feeding Output");
 var parkedEmitterOutput = view.project(withParkedEmitter).nodes.filter(function (node) {
@@ -116,13 +122,13 @@ assert.strictEqual(parkedEmitterOutput.maxParticles, 6400,
 assert.strictEqual(parkedEmitterOutput.params[0].graphNodeId, source.nodes[0].id);
 
 var withSecondActiveEmitter = codec.fromHex(codec.toHex(source));
-withSecondActiveEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 1,
-    parameters: [{ key: "1", type: 3, value: 100 }, { key: "2", type: 4, value: 20 },
-                 { key: "4", type: 4, value: 3 }] });
-withSecondActiveEmitter.nodes.push({ id: uuid(11), type: edits.types.particle, schemaVersion: 1,
+withSecondActiveEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 2,
+    parameters: [{ key: "1", type: 3, value: 100 }, { key: "2", type: 4, value: 20 }] });
+withSecondActiveEmitter.nodes.push({ id: uuid(11), type: edits.types.particle, schemaVersion: 2,
     parameters: [{ key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
                  { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-                 { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }] });
+                 { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
+                 { key: "11", type: 4, value: 3 }] });
 withSecondActiveEmitter.edges.push(
     { id: uuid(20), sourceNode: uuid(10), sourcePort: "1", destinationNode: uuid(11), destinationPort: "1" },
     { id: uuid(21), sourceNode: uuid(11), sourcePort: "2", destinationNode: uuid(3), destinationPort: "1" });

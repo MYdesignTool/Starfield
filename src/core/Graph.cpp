@@ -517,14 +517,12 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor emitter;
     emitter.type_key = kEmitterNode;
-    emitter.schema_version = 1;
+    emitter.schema_version = 2;
     emitter.ports.push_back(PortDescriptor{kEmitterParticles, PortDirection::output, kParticleStream, false, 0});
     emitter.parameters = {
         ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
         ParameterDescriptor{kBirthRate, ParameterKind::float64, true},
         ParameterDescriptor{kSeed, ParameterKind::uint32, true},
-        // Key 4 is retained for the legacy Emitter -> ... -> Output path only.
-        ParameterDescriptor{kLifetimeSeconds, ParameterKind::float64, false},
         ParameterDescriptor{kEmitterShape, ParameterKind::uint32, true},
         ParameterDescriptor{kEmitterOrigin, ParameterKind::vector3_float64, true},
         ParameterDescriptor{kVelocity, ParameterKind::vector3_float64, true},
@@ -550,7 +548,7 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor particle;
     particle.type_key = kParticleNode;
-    particle.schema_version = 1;
+    particle.schema_version = 2;
     particle.ports = {
         PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 1},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
@@ -566,7 +564,7 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacityOverLifeCurve, ParameterKind::opaque_bytes, false},
         ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
         ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
-        ParameterDescriptor{kParticleLifetimeSeconds, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleLifetimeSeconds, ParameterKind::float64, true},
     };
 
     NodeTypeDescriptor output;

@@ -11,13 +11,14 @@ function graph() {
     return {
         version: 1,
         nodes: [
-            { id: emitter, type: edits.types.emitter, schemaVersion: 1, parameters: [
+            { id: emitter, type: edits.types.emitter, schemaVersion: 2, parameters: [
                 { key: "1", type: 3, value: 500 }, { key: "6", type: 5, value: [1, 2, 3] }
             ] },
-            { id: particle, type: edits.types.particle, schemaVersion: 1, parameters: [
+            { id: particle, type: edits.types.particle, schemaVersion: 2, parameters: [
                 { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
                 { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 }
+                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
+                { key: "11", type: 4, value: 2 }
             ] },
             { id: force, type: edits.types.force, schemaVersion: 1, parameters: [] },
             { id: output, type: edits.types.output, schemaVersion: 1, parameters: [] }
@@ -41,6 +42,14 @@ assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
     return parameter.key === "9" || parameter.key === "10";
 }).map(function (parameter) { return parameter.value; }), [0, 0],
 "new Particle nodes include zero-default random variation controls");
+assert.strictEqual(newParticle.schemaVersion, 2, "new Particle nodes use the current node schema");
+assert.strictEqual(newParticle.parameters.filter(function (parameter) {
+    return parameter.key === "11";
+})[0].value, 2, "new Particle nodes own their lifetime");
+assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
+    return parameter.key === "4" || parameter.key === "6";
+}).map(function (parameter) { return parameter.value; }), [100, 100],
+"new Particle nodes start with neutral 100% Size and Opacity curves");
 var particleId = original.nodes[1].id;
 var forceId = original.nodes[2].id;
 var outputId = original.nodes[3].id;
@@ -138,6 +147,11 @@ var moved = edits.apply(original, {
     type: "moveNodes", positions: { [forceId]: { x: -260, y: 610 } }
 }, idFactory);
 assert.deepStrictEqual(layout.get(moved)[forceId], { x: -260, y: 610 });
+var forceMovedAboveParticle = edits.apply(original, {
+    type: "moveNodes", positions: { [forceId]: { x: 180, y: -420 } }
+}, idFactory);
+assert.deepStrictEqual(layout.get(forceMovedAboveParticle)[forceId], { x: 180, y: -420 },
+                       "visual node placement can cross the graph flow direction without changing connections");
 assert.throws(function () {
     edits.apply(original, { type: "moveNodes", positions: { [uuid(90)]: { x: 0, y: 0 } } }, idFactory);
 }, /absent from the graph/i);

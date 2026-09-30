@@ -297,14 +297,13 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
         settings.opacity_over_life.points[point].age = to_double(*defs[opacity_count_slot + 1 + point * 2]);
         settings.opacity_over_life.points[point].value = to_double(*defs[opacity_count_slot + 2 + point * 2]);
     }
-    // Keep existing animatable endpoints authoritative at the sampled render time;
-    // interior knots remain constant project data.
+    // Base Size/Opacity are independent from the normalized curve ordinates.
+    // The visible endpoint controls mirror only the curve's final percentage;
+    // point zero and all interior knots remain project curve-bank values.
     if (size_count >= 2) {
-        settings.size_over_life.points[0].value = settings.particle_size;
         settings.size_over_life.points[size_count - 1].value = settings.particle_size_end;
     }
     if (opacity_count >= 2) {
-        settings.opacity_over_life.points[0].value = settings.opacity;
         settings.opacity_over_life.points[opacity_count - 1].value = settings.opacity_end;
     }
     settings.emitter_size_pixels = core::Vec3{
@@ -453,7 +452,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100000.0f, 0.0f, 100000.0f, 10.0f, PF_Precision_HUNDREDTHS,
+    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
 
     AEFX_CLR_STRUCT(def);
@@ -461,7 +460,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Opacity Over Life", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
+    PF_ADD_FLOAT_SLIDERX("Opacity Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
 
     // PF_ADD_COLOR does not clear the struct or touch flags; set them explicitly.
@@ -621,9 +620,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         A_long value_precision;
     } curve_banks[] = {
         {"Size", "Size", false, kSizeCurveCountId, kSizeCurveFirstPointId,
-         kSizeCurveCountDiskId, core::kMaxParticleSize, PF_Precision_HUNDREDTHS},
+         kSizeCurveCountDiskId, 100.0, PF_Precision_TENTHS},
         {"Opacity", "Opacity", true, kOpacityCurveCountId, kOpacityCurveFirstPointId,
-         kOpacityCurveCountDiskId, 1.0, PF_Precision_THOUSANDTHS},
+         kOpacityCurveCountDiskId, 100.0, PF_Precision_TENTHS},
     };
     for (const auto& bank : curve_banks) {
         char name[sizeof(def.name)]{};
@@ -926,18 +925,10 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
             return sync_graph_from_controls(in_data, out_data, params);
         }
         if (!is_bound_control(extra->param_index)) return PF_Err_NONE;
-        if (extra->param_index == kSizeId && params[kSizeId] &&
-            params[kSizeId]->param_type == PF_Param_FLOAT_SLIDER) {
-            sync_curve_endpoint(params, kSizeCurveCountId, kSizeCurveFirstPointId, false,
-                                params[kSizeId]->u.fs_d.value);
-        } else if (extra->param_index == kParticleSizeEndId && params[kParticleSizeEndId] &&
+        if (extra->param_index == kParticleSizeEndId && params[kParticleSizeEndId] &&
                    params[kParticleSizeEndId]->param_type == PF_Param_FLOAT_SLIDER) {
             sync_curve_endpoint(params, kSizeCurveCountId, kSizeCurveFirstPointId, true,
                                 params[kParticleSizeEndId]->u.fs_d.value);
-        } else if (extra->param_index == kOpacityId && params[kOpacityId] &&
-                   params[kOpacityId]->param_type == PF_Param_FLOAT_SLIDER) {
-            sync_curve_endpoint(params, kOpacityCurveCountId, kOpacityCurveFirstPointId, false,
-                                params[kOpacityId]->u.fs_d.value);
         } else if (extra->param_index == kOpacityEndId && params[kOpacityEndId] &&
                    params[kOpacityEndId]->param_type == PF_Param_FLOAT_SLIDER) {
             sync_curve_endpoint(params, kOpacityCurveCountId, kOpacityCurveFirstPointId, true,

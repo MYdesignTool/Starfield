@@ -230,9 +230,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
                     settings.linear_drag);
     }
     if (settings.color_start.x != settings.color_end.x || settings.color_start.y != settings.color_end.y ||
-        settings.color_start.z != settings.color_end.z || settings.particle_size != settings.particle_size_end ||
-        settings.opacity != settings.opacity_end) {
-        writer.line("col %.2f,%.2f,%.2f>%.2f,%.2f,%.2f sz %.2f>%.2f op %.2f>%.2f\n",
+        settings.color_start.z != settings.color_end.z || settings.particle_size_end != 100.0 ||
+        settings.opacity_end != 100.0) {
+        writer.line("col %.2f,%.2f,%.2f>%.2f,%.2f,%.2f size %.2fpx curve %.1f%% op %.3f curve %.1f%%\n",
                     settings.color_start.x, settings.color_start.y, settings.color_start.z,
                     settings.color_end.x, settings.color_end.y, settings.color_end.z,
                     settings.particle_size, settings.particle_size_end, settings.opacity, settings.opacity_end);

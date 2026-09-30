@@ -171,12 +171,11 @@ GraphNode make_test_emitter(std::uint8_t id) {
     GraphNode node;
     node.id = NodeId{test_uuid(id)};
     node.type_key = kEmitterNode;
-    node.schema_version = 1;
+    node.schema_version = 2;
     node.parameters = {
         {kParticleCount, std::uint32_t{100}},
         {kBirthRate, 30.0},
         {kSeed, std::uint32_t{1}},
-        {kLifetimeSeconds, 2.0},
         {kEmitterShape, std::uint32_t{0}},
         {kEmitterOrigin, Vec3{}},
         {kVelocity, Vec3{0.0, 0.3, 0.0}},
@@ -190,9 +189,10 @@ GraphNode make_test_emitter(std::uint8_t id) {
 
 GraphNode make_test_particle(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 1, {
+    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 2, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 8.0}, {kSizeEnd, 8.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}};
+        {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0},
+        {kParticleLifetimeSeconds, 2.0}}};
 }
 
 GraphNode make_test_force(std::uint8_t id) {
@@ -205,7 +205,7 @@ GraphNode make_test_appearance(std::uint8_t id) {
     using namespace graph_keys;
     return GraphNode{NodeId{test_uuid(id)}, kAppearanceNode, 1, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 8.0}, {kSizeEnd, 8.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}};
+        {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0}}};
 }
 
 Graph make_basic_graph() {
@@ -277,7 +277,7 @@ void test_graph_contract() {
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_node_type);
 
     bad = graph;
-    bad.nodes[0].schema_version = 2;
+    bad.nodes[0].schema_version = 3;
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unsupported_node_version);
 
     bad = graph;
@@ -686,6 +686,8 @@ void test_settings_validation() {
     settings.seed = kMaxSeed + 5;
     settings.opacity = 2.0;
     settings.particle_size = -1.0;
+    settings.particle_size_end = 120.0;
+    settings.opacity_end = -5.0;
     settings.emitter_shape = static_cast<EmitterShape>(9);
     settings.emitter_origin = Vec3{1.0e6, -1.0e6, 0.0};
     settings.velocity = Vec3{1.0e9, 0.0, std::numeric_limits<double>::infinity()};
@@ -697,6 +699,8 @@ void test_settings_validation() {
     CHECK(validated.value.seed == kMaxSeed);
     CHECK(validated.value.opacity == 1.0);
     CHECK(validated.value.particle_size == 0.0);
+    CHECK(validated.value.particle_size_end == 100.0);
+    CHECK(validated.value.opacity_end == 0.0);
     CHECK(validated.value.emitter_shape == EmitterShape::point);
     CHECK(validated.value.emitter_origin.x == kMaxEmitterOffset);
     CHECK(validated.value.emitter_origin.y == -kMaxEmitterOffset);
@@ -794,19 +798,19 @@ void test_particle_randomness() {
     settings.particle_lifetime_seconds = 2.0;
     settings.seed = 811;
     settings.particle_size = 20.0;
-    settings.particle_size_end = 4.0;
+    settings.particle_size_end = 20.0;
     settings.opacity = 0.8;
-    settings.opacity_end = 0.1;
+    settings.opacity_end = 12.5;
     settings.appearance_enabled = true;
     settings.particle_size_random_percent = 70.0;
     settings.opacity_random_percent = 35.0;
     settings.size_over_life.count = 3;
-    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 20.0};
-    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 10.0};
-    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 4.0};
+    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 100.0};
+    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 50.0};
+    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 20.0};
     settings.opacity_over_life.count = 2;
-    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 0.8};
-    settings.opacity_over_life.points[1] = AgeCurvePoint{1.0, 0.1};
+    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 100.0};
+    settings.opacity_over_life.points[1] = AgeCurvePoint{1.0, 12.5};
 
     const auto validated = validate_settings(settings);
     const auto early = simulate_particles(validated, 0.5, never);
@@ -829,10 +833,10 @@ void test_particle_randomness() {
     bool opacity_varies_between_particles = false;
     for (const auto& particle : early.value()) {
         const double age_fraction = particle.age_seconds / settings.particle_lifetime_seconds;
-        const double base_size = evaluate_age_curve(settings.size_over_life, age_fraction,
-                                                    settings.particle_size, settings.particle_size_end);
-        const double base_opacity = evaluate_age_curve(settings.opacity_over_life, age_fraction,
-                                                       settings.opacity, settings.opacity_end);
+        const double base_size = settings.particle_size * evaluate_age_curve(
+            settings.size_over_life, age_fraction, 100.0, settings.particle_size_end) / 100.0;
+        const double base_opacity = settings.opacity * evaluate_age_curve(
+            settings.opacity_over_life, age_fraction, 100.0, settings.opacity_end) / 100.0;
         const double size_factor = 1.0 - settings.particle_size_random_percent / 100.0 *
             unit_value(settings.seed, particle.id, RandomPurpose::size);
         const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
@@ -860,14 +864,14 @@ void test_particle_randomness() {
         if (earlier == early.value().end()) continue;
         const double early_fraction = earlier->age_seconds / earlier->lifetime_seconds;
         const double late_fraction = particle.age_seconds / particle.lifetime_seconds;
-        const double early_size_base = evaluate_age_curve(settings.size_over_life, early_fraction,
-            settings.particle_size, settings.particle_size_end);
-        const double late_size_base = evaluate_age_curve(settings.size_over_life, late_fraction,
-            settings.particle_size, settings.particle_size_end);
-        const double early_opacity_base = evaluate_age_curve(settings.opacity_over_life, early_fraction,
-            settings.opacity, settings.opacity_end);
-        const double late_opacity_base = evaluate_age_curve(settings.opacity_over_life, late_fraction,
-            settings.opacity, settings.opacity_end);
+        const double early_size_base = settings.particle_size * evaluate_age_curve(
+            settings.size_over_life, early_fraction, 100.0, settings.particle_size_end) / 100.0;
+        const double late_size_base = settings.particle_size * evaluate_age_curve(
+            settings.size_over_life, late_fraction, 100.0, settings.particle_size_end) / 100.0;
+        const double early_opacity_base = settings.opacity * evaluate_age_curve(
+            settings.opacity_over_life, early_fraction, 100.0, settings.opacity_end) / 100.0;
+        const double late_opacity_base = settings.opacity * evaluate_age_curve(
+            settings.opacity_over_life, late_fraction, 100.0, settings.opacity_end) / 100.0;
         if (early_size_base > 0.0 && late_size_base > 0.0) {
             CHECK(std::abs(earlier->size_pixels / early_size_base - particle.size_pixels / late_size_base) < 1e-12);
         }
@@ -905,10 +909,10 @@ void test_particle_randomness() {
     if (no_variation.has_value()) {
         for (const auto& value : no_variation.value().particles) {
             const double age_fraction = value.age_seconds / value.lifetime_seconds;
-            CHECK(std::abs(value.size_pixels - evaluate_age_curve(settings.size_over_life, age_fraction,
-                settings.particle_size, settings.particle_size_end)) < 1e-12);
-            CHECK(std::abs(value.opacity - evaluate_age_curve(settings.opacity_over_life, age_fraction,
-                settings.opacity, settings.opacity_end)) < 1e-12);
+            CHECK(std::abs(value.size_pixels - settings.particle_size * evaluate_age_curve(
+                settings.size_over_life, age_fraction, 100.0, settings.particle_size_end) / 100.0) < 1e-12);
+            CHECK(std::abs(value.opacity - settings.opacity * evaluate_age_curve(
+                settings.opacity_over_life, age_fraction, 100.0, settings.opacity_end) / 100.0) < 1e-12);
         }
     }
 }
@@ -1025,15 +1029,16 @@ void test_emitter_shapes_and_spread() {
     // current graph constructors.
     Settings graph_settings = dimensioned;
     graph_settings.emitter_size_pixels = Vec3{100.0, 100.0, 100.0};
-    const auto current_graph = make_emitter_output_graph(
-        graph_settings, NodeId{test_uuid(81)}, NodeId{test_uuid(82)}, EdgeId{test_uuid(83)});
+    const auto current_graph = make_emitter_particle_output_graph(
+        graph_settings, NodeId{test_uuid(81)}, NodeId{test_uuid(82)}, NodeId{test_uuid(84)},
+        EdgeId{test_uuid(83)}, EdgeId{test_uuid(85)});
     CHECK(current_graph.has_value());
     if (current_graph.has_value()) {
-        Graph legacy_graph = current_graph.value();
-        const auto emitter = std::find_if(legacy_graph.nodes.begin(), legacy_graph.nodes.end(),
+        Graph graph_without_dimensions = current_graph.value();
+        const auto emitter = std::find_if(graph_without_dimensions.nodes.begin(), graph_without_dimensions.nodes.end(),
             [](const GraphNode& node) { return node.type_key == graph_keys::kEmitterNode; });
-        CHECK(emitter != legacy_graph.nodes.end());
-        if (emitter != legacy_graph.nodes.end()) {
+        CHECK(emitter != graph_without_dimensions.nodes.end());
+        if (emitter != graph_without_dimensions.nodes.end()) {
             emitter->parameters.erase(std::remove_if(emitter->parameters.begin(), emitter->parameters.end(),
                 [](const NodeParameter& parameter) {
                     return parameter.key.value >= graph_keys::kEmitterSizeX.value &&
@@ -1041,15 +1046,15 @@ void test_emitter_shapes_and_spread() {
                 }), emitter->parameters.end());
             const auto current = evaluate_particle_graph(current_graph.value(), RationalTime{1, 1}, never,
                                                          square_layer);
-            const auto legacy = evaluate_particle_graph(legacy_graph, RationalTime{1, 1}, never,
-                                                        square_layer);
-            CHECK(current.has_value() && legacy.has_value());
-            if (current.has_value() && legacy.has_value() &&
-                current.value().particles.size() == legacy.value().particles.size()) {
+            const auto without_dimensions = evaluate_particle_graph(
+                graph_without_dimensions, RationalTime{1, 1}, never, square_layer);
+            CHECK(current.has_value() && without_dimensions.has_value());
+            if (current.has_value() && without_dimensions.has_value() &&
+                current.value().particles.size() == without_dimensions.value().particles.size()) {
                 for (std::size_t i = 0; i < current.value().particles.size(); ++i) {
-                    CHECK(current.value().particles[i].position.x == legacy.value().particles[i].position.x);
-                    CHECK(current.value().particles[i].position.y == legacy.value().particles[i].position.y);
-                    CHECK(current.value().particles[i].position.z == legacy.value().particles[i].position.z);
+                    CHECK(current.value().particles[i].position.x == without_dimensions.value().particles[i].position.x);
+                    CHECK(current.value().particles[i].position.y == without_dimensions.value().particles[i].position.y);
+                    CHECK(current.value().particles[i].position.z == without_dimensions.value().particles[i].position.z);
                 }
             }
         }
@@ -1469,6 +1474,7 @@ void test_graph_evaluation() {
     const NeverCancelled never;
     const CpuParticleRenderer renderer;
     const NodeId emitter{test_uuid(9)};
+    const NodeId particle{test_uuid(8)};
     const NodeId output{test_uuid(1)}; // dependency order must beat UUID order
     const EdgeId edge{test_uuid(7)};
 
@@ -1483,7 +1489,8 @@ void test_graph_evaluation() {
             scene.settings.emitter_origin = Vec3{0.1, 0.05, 0.2};
             scene.format = format;
             scene.pixel_aspect = 1.2;
-            auto made = make_emitter_output_graph(scene.settings, emitter, output, edge);
+            auto made = make_emitter_particle_output_graph(
+                scene.settings, emitter, particle, output, EdgeId{test_uuid(6)}, edge);
             CHECK(made.has_value());
             if (!made.has_value()) continue;
             auto graph = made.take_value();
@@ -1515,7 +1522,9 @@ void test_graph_evaluation() {
                 }
                 const auto evaluated = evaluate_particle_graph(graph, time, never);
                 CHECK(evaluated.has_value());
-                if (evaluated.has_value()) CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, output}));
+                if (evaluated.has_value()) {
+                    CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, particle, output}));
+                }
                 // Half-resolution cropped output follows the same graph boundary.
                 flat.frame.frame_width = request.frame.frame_width = 32;
                 flat.frame.frame_height = request.frame.frame_height = 32;
@@ -1531,7 +1540,8 @@ void test_graph_evaluation() {
         }
     }
 
-    auto made = make_emitter_output_graph(Settings{}, emitter, output, edge);
+    auto made = make_emitter_particle_output_graph(
+        Settings{}, emitter, particle, output, EdgeId{test_uuid(6)}, edge);
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const Graph graph = made.take_value();
@@ -1557,6 +1567,25 @@ void test_graph_evaluation() {
         CHECK(std::all_of(disconnected_pixels.value().pixels.begin(), disconnected_pixels.value().pixels.end(),
             [](std::byte value) { return value == std::byte{0}; }));
     }
+    bad = graph;
+    bad.edges = {GraphEdge{EdgeId{test_uuid(80)}, emitter, kEmitterParticles, output, kOutputParticles}};
+    const auto missing_particle = evaluate_particle_graph(bad, RationalTime{1, 1}, never);
+    CHECK(missing_particle.has_value() && missing_particle.value().particles.empty());
+    auto missing_particle_request = build_request(Scene{});
+    missing_particle_request.graph = std::make_shared<const Graph>(bad);
+    const auto missing_particle_pixels = renderer.render(missing_particle_request, never);
+    CHECK(missing_particle_pixels.has_value());
+    if (missing_particle_pixels.has_value()) {
+        CHECK(std::all_of(missing_particle_pixels.value().pixels.begin(), missing_particle_pixels.value().pixels.end(),
+            [](std::byte value) { return value == std::byte{0}; }));
+    }
+    bad = graph;
+    bad.nodes.push_back(make_test_force(81));
+    bad.edges = {
+        GraphEdge{EdgeId{test_uuid(82)}, emitter, kEmitterParticles, bad.nodes.back().id, kForceParticlesIn},
+        GraphEdge{EdgeId{test_uuid(83)}, bad.nodes.back().id, kForceParticlesOut, output, kOutputParticles},
+    };
+    rejects(bad); // a Force path cannot emit without a connected Particle node
     bad = graph;
     bad.nodes[0].parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
     rejects(bad);
@@ -1594,10 +1623,12 @@ void test_graph_evaluation() {
         CHECK(!result.has_value());
         if (!result.has_value()) CHECK(result.error().code == ErrorCode::cancelled);
     }
-    CHECK(!make_emitter_output_graph(Settings{}, emitter, emitter, edge).has_value());
+    CHECK(!make_emitter_particle_output_graph(Settings{}, emitter, emitter, output,
+                                               EdgeId{test_uuid(6)}, edge).has_value());
     Settings invalid;
     invalid.opacity = 1.5;
-    CHECK(!make_emitter_output_graph(invalid, emitter, output, edge).has_value());
+    CHECK(!make_emitter_particle_output_graph(invalid, emitter, particle, output,
+                                              EdgeId{test_uuid(6)}, edge).has_value());
 }
 
 void test_graph_disconnect_and_reconnect() {
@@ -1649,7 +1680,7 @@ void test_graph_disconnect_and_reconnect() {
     }
 }
 
-// Regression coverage for the emitter -> force -> appearance -> output chain: the
+// Regression coverage for the emitter -> Particle -> force -> appearance -> output chain: the
 // closed-form gravity/drag integration, age-driven size/opacity/color, stage-order
 // enforcement, and graph/flat pixel parity. Added with the force/appearance kernels.
 void test_force_and_appearance() {
@@ -1657,12 +1688,14 @@ void test_force_and_appearance() {
     const NeverCancelled never;
     const CpuParticleRenderer renderer;
     const NodeId emitter{test_uuid(9)};
+    const NodeId particle{test_uuid(5)};
     const NodeId force{test_uuid(4)};
     const NodeId appearance{test_uuid(6)};
     const NodeId output{test_uuid(1)};
-    const EdgeId emitter_to_force{test_uuid(10)};
-    const EdgeId force_to_appearance{test_uuid(11)};
-    const EdgeId appearance_to_output{test_uuid(12)};
+    const EdgeId emitter_to_particle{test_uuid(10)};
+    const EdgeId particle_to_force{test_uuid(11)};
+    const EdgeId force_to_appearance{test_uuid(12)};
+    const EdgeId appearance_to_output{test_uuid(13)};
 
     Settings settings;
     settings.particle_count = 256;
@@ -1677,30 +1710,31 @@ void test_force_and_appearance() {
     settings.color_start = Vec3{1.0, 0.8, 0.2};
     settings.color_end = Vec3{0.6, 0.1, 0.05};
     settings.particle_size = 10.0;
-    settings.particle_size_end = 2.0;
+    settings.particle_size_end = 20.0;
     settings.opacity = 1.0;
     settings.opacity_end = 0.0;
     settings.particle_size_random_percent = 50.0;
     settings.opacity_random_percent = 20.0;
     settings.appearance_enabled = true;
     settings.size_over_life.count = 3;
-    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 10.0};
-    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 30.0};
-    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 2.0};
+    settings.size_over_life.points[0] = AgeCurvePoint{0.0, 100.0};
+    settings.size_over_life.points[1] = AgeCurvePoint{0.5, 50.0};
+    settings.size_over_life.points[2] = AgeCurvePoint{1.0, 20.0};
     settings.opacity_over_life.count = 3;
-    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 1.0};
-    settings.opacity_over_life.points[1] = AgeCurvePoint{0.5, 0.25};
+    settings.opacity_over_life.points[0] = AgeCurvePoint{0.0, 100.0};
+    settings.opacity_over_life.points[1] = AgeCurvePoint{0.5, 25.0};
     settings.opacity_over_life.points[2] = AgeCurvePoint{1.0, 0.0};
 
-    auto made = make_emitter_force_appearance_output_graph(settings, emitter, force, appearance, output,
-                                                           emitter_to_force, force_to_appearance, appearance_to_output);
+    auto made = make_emitter_particle_force_appearance_output_graph(
+        settings, emitter, particle, force, appearance, output, emitter_to_particle,
+        particle_to_force, force_to_appearance, appearance_to_output);
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const Graph graph = made.take_value();
     const auto graph_validation = validate_graph(graph, particle_node_registry());
     CHECK(graph_validation.ok());
 
-    // A four-stage graph survives the bounded codec byte for byte.
+    // The five-stage graph survives the bounded codec byte for byte.
     const auto serialized = serialize_graph(graph, particle_node_registry());
     CHECK(serialized.has_value());
     if (serialized.has_value()) {
@@ -1717,7 +1751,7 @@ void test_force_and_appearance() {
     CHECK(evaluated.has_value());
     if (evaluated.has_value()) {
         // Stage order follows dependencies, not UUIDs.
-        CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, force, appearance, output}));
+        CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, particle, force, appearance, output}));
         const double k = settings.linear_drag;
         bool saw_birth = false;
         for (const auto& particle : evaluated.value().particles) {
@@ -1734,12 +1768,14 @@ void test_force_and_appearance() {
             const double fraction = age / lifetime;
             CHECK(std::abs(particle.position.y - expected_y) < 1e-9);
             CHECK(std::abs(particle.position.x - expected_x) < 1e-9);
-            const double expected_size = fraction <= 0.5
-                ? 10.0 + (30.0 - 10.0) * (fraction / 0.5)
-                : 30.0 + (2.0 - 30.0) * ((fraction - 0.5) / 0.5);
-            const double expected_opacity = fraction <= 0.5
-                ? 1.0 + (0.25 - 1.0) * (fraction / 0.5)
-                : 0.25 + (0.0 - 0.25) * ((fraction - 0.5) / 0.5);
+            const double size_percent = fraction <= 0.5
+                ? 100.0 + (50.0 - 100.0) * (fraction / 0.5)
+                : 50.0 + (20.0 - 50.0) * ((fraction - 0.5) / 0.5);
+            const double opacity_percent = fraction <= 0.5
+                ? 100.0 + (25.0 - 100.0) * (fraction / 0.5)
+                : 25.0 + (0.0 - 25.0) * ((fraction - 0.5) / 0.5);
+            const double expected_size = settings.particle_size * size_percent / 100.0;
+            const double expected_opacity = settings.opacity * opacity_percent / 100.0;
             const double size_factor = 1.0 - settings.particle_size_random_percent / 100.0 *
                 unit_value(settings.seed, particle.id, RandomPurpose::size);
             const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
@@ -1757,7 +1793,7 @@ void test_force_and_appearance() {
                 unit_value(settings.seed, knot->id, RandomPurpose::size);
             const double opacity_factor = 1.0 - settings.opacity_random_percent / 100.0 *
                 unit_value(settings.seed, knot->id, RandomPurpose::opacity);
-            CHECK(std::abs(knot->size_pixels - 30.0 * size_factor) < 1e-12);
+            CHECK(std::abs(knot->size_pixels - 5.0 * size_factor) < 1e-12);
             CHECK(std::abs(knot->opacity - 0.25 * opacity_factor) < 1e-12);
         }
     }
@@ -1794,7 +1830,8 @@ void test_force_and_appearance() {
     // Stage order is enforced, not assumed: appearance before force is rejected.
     Graph swapped = graph;
     swapped.edges = {
-        GraphEdge{emitter_to_force, emitter, kEmitterParticles, appearance, kAppearanceParticlesIn},
+        GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},
+        GraphEdge{particle_to_force, particle, kParticleParticlesOut, appearance, kAppearanceParticlesIn},
         GraphEdge{force_to_appearance, appearance, kAppearanceParticlesOut, force, kForceParticlesIn},
         GraphEdge{appearance_to_output, force, kForceParticlesOut, output, kOutputParticles},
     };
@@ -1810,12 +1847,10 @@ void test_force_and_appearance() {
     chained.nodes.push_back(GraphNode{second_appearance, kAppearanceNode, 1, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
         {kSizeStart, 4.0}, {kSizeEnd, 4.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}});
-    chained.edges = {
-        GraphEdge{emitter_to_force, emitter, kEmitterParticles, force, kForceParticlesIn},
-        GraphEdge{force_to_appearance, force, kForceParticlesOut, appearance, kAppearanceParticlesIn},
-        GraphEdge{second_edge, appearance, kAppearanceParticlesOut, second_appearance, kAppearanceParticlesIn},
-        GraphEdge{appearance_to_output, second_appearance, kAppearanceParticlesOut, output, kOutputParticles},
-    };
+    chained.edges[3] = GraphEdge{second_edge, appearance, kAppearanceParticlesOut,
+                                 second_appearance, kAppearanceParticlesIn};
+    chained.edges.push_back(GraphEdge{appearance_to_output, second_appearance,
+                                      kAppearanceParticlesOut, output, kOutputParticles});
     CHECK(validate_graph(chained, particle_node_registry()).ok());
     const auto two_appearances = evaluate_particle_graph(chained, time, never);
     CHECK(!two_appearances.has_value());
@@ -1836,8 +1871,9 @@ void test_force_and_appearance() {
     // A tiny drag exercises the series branch and must stay near the no-drag limit.
     Settings tiny = settings;
     tiny.linear_drag = 1e-5;
-    const auto tiny_graph = make_emitter_force_appearance_output_graph(
-        tiny, emitter, force, appearance, output, emitter_to_force, force_to_appearance, appearance_to_output);
+    const auto tiny_graph = make_emitter_particle_force_appearance_output_graph(
+        tiny, emitter, particle, force, appearance, output, emitter_to_particle,
+        particle_to_force, force_to_appearance, appearance_to_output);
     CHECK(tiny_graph.has_value());
     if (tiny_graph.has_value()) {
         const auto tiny_result = evaluate_particle_graph(tiny_graph.value(), time, never);
@@ -1853,12 +1889,14 @@ void test_force_and_appearance() {
     }
 
     // Identity collisions and out-of-range settings fail at construction time.
-    CHECK(!make_emitter_force_appearance_output_graph(settings, emitter, emitter, appearance, output,
-                                                      emitter_to_force, force_to_appearance, appearance_to_output).has_value());
+    CHECK(!make_emitter_particle_force_appearance_output_graph(
+        settings, emitter, emitter, force, appearance, output, emitter_to_particle,
+        particle_to_force, force_to_appearance, appearance_to_output).has_value());
     Settings invalid;
     invalid.opacity = 1.5;
-    CHECK(!make_emitter_force_appearance_output_graph(invalid, emitter, force, appearance, output,
-                                                      emitter_to_force, force_to_appearance, appearance_to_output).has_value());
+    CHECK(!make_emitter_particle_force_appearance_output_graph(
+        invalid, emitter, particle, force, appearance, output, emitter_to_particle,
+        particle_to_force, force_to_appearance, appearance_to_output).has_value());
 }
 
 void test_particle_branches_and_ordered_buffer() {
@@ -1925,29 +1963,29 @@ void test_particle_branches_and_ordered_buffer() {
     CHECK(particle_lifetime != graph.nodes[1].parameters.end());
     if (particle_lifetime != graph.nodes[1].parameters.end()) particle_lifetime->value = 0.9;
     CHECK(std::none_of(graph.nodes[0].parameters.begin(), graph.nodes[0].parameters.end(),
-                       [](const NodeParameter& parameter) { return parameter.key == kLifetimeSeconds; }));
+                       [](const NodeParameter& parameter) { return parameter.key.value == 4; }));
 
     // A second Particle branch has its own appearance. The first branch's
     // downstream Appearance node replaces all three Particle curves.
     AgeCurve branch_size_curve{};
     branch_size_curve.count = 3;
-    branch_size_curve.points[0] = AgeCurvePoint{0.0, 9.0};
-    branch_size_curve.points[1] = AgeCurvePoint{0.5, 19.0};
-    branch_size_curve.points[2] = AgeCurvePoint{1.0, 39.0};
+    branch_size_curve.points[0] = AgeCurvePoint{0.0, 100.0};
+    branch_size_curve.points[1] = AgeCurvePoint{0.5, 50.0};
+    branch_size_curve.points[2] = AgeCurvePoint{1.0, 25.0};
     AgeCurve branch_opacity_curve{};
     branch_opacity_curve.count = 3;
-    branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 0.1};
-    branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 0.3};
-    branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 0.9};
-    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 1, {
+    branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 100.0};
+    branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 50.0};
+    branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 25.0};
+    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 2, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
-        {kSizeStart, 9.0}, {kSizeEnd, 39.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 0.9},
+        {kSizeStart, 9.0}, {kSizeEnd, 25.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 25.0},
         {kParticleLifetimeSeconds, 1.0},
         {kSizeOverLifeCurve, encode_age_curve(branch_size_curve)},
         {kOpacityOverLifeCurve, encode_age_curve(branch_opacity_curve)}}});
     graph.nodes.push_back(GraphNode{appearance, kAppearanceNode, 1, {
         {kColorStart, Vec3{1.0, 0.0, 0.0}}, {kColorEnd, Vec3{0.5, 0.0, 0.0}},
-        {kSizeStart, 4.0}, {kSizeEnd, 8.0}, {kOpacityStart, 0.2}, {kOpacityEnd, 0.8}}});
+        {kSizeStart, 4.0}, {kSizeEnd, 100.0}, {kOpacityStart, 0.2}, {kOpacityEnd, 100.0}}});
     graph.edges[1] = GraphEdge{EdgeId{test_uuid(11)}, particle_a, kParticleParticlesOut,
                                appearance, kAppearanceParticlesIn};
     graph.edges.push_back(GraphEdge{EdgeId{test_uuid(12)}, appearance, kAppearanceParticlesOut,
@@ -1973,19 +2011,21 @@ void test_particle_branches_and_ordered_buffer() {
         CHECK(even != result.end() && odd != result.end());
         if (even != result.end()) {
             const double fraction = even->age_seconds / even->lifetime_seconds;
-            CHECK(std::abs(even->size_pixels - (4.0 + 4.0 * fraction)) < 1e-12);
-            CHECK(std::abs(even->opacity - (0.2 + 0.6 * fraction)) < 1e-12);
+            CHECK(std::abs(even->size_pixels - 4.0) < 1e-12);
+            CHECK(std::abs(even->opacity - 0.2) < 1e-12);
             CHECK(std::abs(even->color.x - (1.0 - 0.5 * fraction)) < 1e-12);
             CHECK(even->color.y == 0.0 && even->color.z == 0.0);
         }
         if (odd != result.end()) {
             const double fraction = odd->age_seconds / odd->lifetime_seconds;
-            const double expected_size = fraction <= 0.5
-                ? 9.0 + (19.0 - 9.0) * (fraction / 0.5)
-                : 19.0 + (39.0 - 19.0) * ((fraction - 0.5) / 0.5);
-            const double expected_opacity = fraction <= 0.5
-                ? 0.1 + (0.3 - 0.1) * (fraction / 0.5)
-                : 0.3 + (0.9 - 0.3) * ((fraction - 0.5) / 0.5);
+            const double size_percent = fraction <= 0.5
+                ? 100.0 + (50.0 - 100.0) * (fraction / 0.5)
+                : 50.0 + (25.0 - 50.0) * ((fraction - 0.5) / 0.5);
+            const double opacity_percent = fraction <= 0.5
+                ? 100.0 + (50.0 - 100.0) * (fraction / 0.5)
+                : 50.0 + (25.0 - 50.0) * ((fraction - 0.5) / 0.5);
+            const double expected_size = 9.0 * size_percent / 100.0;
+            const double expected_opacity = 0.1 * opacity_percent / 100.0;
             CHECK(std::abs(odd->size_pixels - expected_size) < 1e-12);
             CHECK(std::abs(odd->opacity - expected_opacity) < 1e-12);
             CHECK(odd->color.y > 0.0 && odd->color.x == 0.0 && odd->color.z == 0.0);
@@ -2040,6 +2080,38 @@ void test_particle_branches_and_ordered_buffer() {
     if (!rejected_appearance_bypass.has_value()) {
         CHECK(rejected_appearance_bypass.error().code == ErrorCode::invalid_request);
         CHECK(std::strcmp(rejected_appearance_bypass.error().detail, "invalid active Particle graph connection") == 0);
+    }
+
+    // A disconnected Force can be active through Output beside a valid Particle
+    // branch; reject it rather than accepting the graph and silently dropping it.
+    Graph orphan_force = graph;
+    orphan_force.nodes.push_back(GraphNode{bypass_force, kForceNode, 1, {
+        {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
+    orphan_force.edges.push_back(GraphEdge{EdgeId{test_uuid(36)}, bypass_force,
+                                           kForceParticlesOut, output, kOutputParticles});
+    CHECK(validate_graph(orphan_force, particle_node_registry()).ok());
+    const auto rejected_orphan_force = evaluate_particle_graph(orphan_force, RationalTime{5, 4}, never);
+    CHECK(!rejected_orphan_force.has_value());
+    if (!rejected_orphan_force.has_value()) {
+        CHECK(rejected_orphan_force.error().code == ErrorCode::invalid_request);
+        CHECK(std::strcmp(rejected_orphan_force.error().detail,
+                          "every active Force/Appearance path must descend from a Particle node") == 0);
+    }
+
+    Graph orphan_appearance = graph;
+    orphan_appearance.nodes.push_back(GraphNode{bypass_appearance, kAppearanceNode, 1, {
+        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
+        {kSizeStart, 1.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0}}});
+    orphan_appearance.edges.push_back(GraphEdge{EdgeId{test_uuid(37)}, bypass_appearance,
+                                                kAppearanceParticlesOut, output, kOutputParticles});
+    CHECK(validate_graph(orphan_appearance, particle_node_registry()).ok());
+    const auto rejected_orphan_appearance = evaluate_particle_graph(orphan_appearance,
+                                                                     RationalTime{5, 4}, never);
+    CHECK(!rejected_orphan_appearance.has_value());
+    if (!rejected_orphan_appearance.has_value()) {
+        CHECK(rejected_orphan_appearance.error().code == ErrorCode::invalid_request);
+        CHECK(std::strcmp(rejected_orphan_appearance.error().detail,
+                          "every active Force/Appearance path must descend from a Particle node") == 0);
     }
 }
 
@@ -2172,8 +2244,9 @@ void test_core_plugin_api() {
     CHECK(api.abi_version == SF_CORE_ABI_VERSION && api.render && api.release_render_result && api.inspect);
 
     const Settings settings{};
-    auto made = make_emitter_output_graph(settings, NodeId{test_uuid(41)}, NodeId{test_uuid(42)},
-                                          EdgeId{test_uuid(43)});
+    auto made = make_emitter_particle_output_graph(
+        settings, NodeId{test_uuid(41)}, NodeId{test_uuid(42)}, NodeId{test_uuid(43)},
+        EdgeId{test_uuid(44)}, EdgeId{test_uuid(45)});
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const auto encoded = serialize_graph(made.value(), particle_node_registry());
@@ -2211,7 +2284,7 @@ void test_core_plugin_api() {
     SfCoreInspectResult inspection{};
     inspection.struct_size = sizeof(inspection);
     CHECK(api.inspect(&inspect_request, &inspection) == SF_CORE_OK);
-    CHECK(inspection.node_count == 2 && inspection.edge_count == 1 &&
+    CHECK(inspection.node_count == 3 && inspection.edge_count == 2 &&
           inspection.live_particle_count > 0);
 
     api.release_render_result(&result);

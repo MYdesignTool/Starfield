@@ -160,19 +160,19 @@ ValidatedSettings validate_settings(Settings settings) {
     validate_color(value.color_start, "color_start");
     validate_color(value.color_end, "color_end");
 
-    value.particle_size_end = finite_or(value.particle_size_end, value.particle_size,
+    value.particle_size_end = finite_or(value.particle_size_end, 100.0,
                                         "particle_size_end", notices);
-    value.particle_size_end = clamp(value.particle_size_end, 0.0, kMaxParticleSize,
+    value.particle_size_end = clamp(value.particle_size_end, 0.0, 100.0,
                                     ValidationCode::end_size_clamped, "particle_size_end", notices);
-    value.opacity_end = finite_or(value.opacity_end, value.opacity,
+    value.opacity_end = finite_or(value.opacity_end, 100.0,
                                   "opacity_end", notices);
-    value.opacity_end = clamp(value.opacity_end, 0.0, 1.0,
+    value.opacity_end = clamp(value.opacity_end, 0.0, 100.0,
                               ValidationCode::end_opacity_clamped, "opacity_end", notices);
 
-    if (value.size_over_life.count != 0 && !valid_age_curve(value.size_over_life, 0.0, kMaxParticleSize)) {
+    if (value.size_over_life.count != 0 && !valid_age_curve(value.size_over_life, 0.0, 100.0)) {
         notices.push_back({ValidationCode::age_curve_invalid, "size_over_life"});
     }
-    if (value.opacity_over_life.count != 0 && !valid_age_curve(value.opacity_over_life, 0.0, 1.0)) {
+    if (value.opacity_over_life.count != 0 && !valid_age_curve(value.opacity_over_life, 0.0, 100.0)) {
         notices.push_back({ValidationCode::age_curve_invalid, "opacity_over_life"});
     }
 

@@ -32,14 +32,18 @@ reachable force contributes once per Particle stream, and parallel paths merge b
 particle identity. Current gravity and linear drag values are accumulated in stable
 dependency order and integrated once. At most one downstream Appearance override
 may affect each Particle stream. Multiple active emitters and ambiguous appearance
-merges remain errors. The complete branch and compatibility rules are in ADR 0015.
+merges remain errors. Size and Opacity are the Particle base values; their over-life
+curves contain percentages that multiply those values. Both curve ordinates are
+bounded 0…100. The complete branch and compatibility rules are in ADR 0015.
 
-Previously stored schema-1 graphs with an active emitter and no active Particle
-node in the output ancestry keep the prior single-stream emitter/force/appearance interpretation.
-This compatibility path preserves the AE capture graph without rewriting arbitrary
-data or changing sequence schema. New graph constructors and topology transactions
-must create a Particle node. `make_emitter_output_graph` remains explicitly named
-as a legacy compatibility constructor.
+An active Emitter without an active Particle node does not emit: a direct
+Emitter-to-Output connection evaluates to an empty stream, while active Force or
+Appearance bypass paths fail with `invalid_request`. Emitter and Particle node
+schemas were advanced to version 2 during pre-release development: Emitter no
+longer stores lifetime, and Particle requires its own lifetime value. Version-1
+node snapshots are intentionally unsupported; there is no old-project migration
+path. Every graph constructor and topology transaction must create or retain an
+Emitter -> Particle path.
 
 Time enters as a signed rational, is normalized, and converts to seconds only at
 the simulation boundary. Schema-1 node parameters are constant values: this work
@@ -55,16 +59,14 @@ The CPU rasterizer consumes each particle's opacity, rather than the fallback
 settings' opacity. This preserves flat-path pixels and allows later appearance
 nodes to modify per-particle opacity without changing the rasterizer contract.
 
-`make_emitter_output_graph` maps all eleven settings fields to stable graph keys
-for legacy compatibility. `make_emitter_particle_output_graph` constructs the new
-explicit Particle branch with the current appearance settings.
-`make_emitter_force_appearance_output_graph` does the same for the full chain, writing
-the gravity/drag fields to the force node and the color/size/opacity curves to the
-appearance node (not to the emitter). Callers supply the node/edge identities; neither
-helper derives them from AE parameter IDs, and duplicate or zero identities are
-rejected. The graph parameter keys are scoped per node type, so force and appearance
-reuse small local key ranges without aliasing emitter parameters. These are
-construction primitives, not an AE migration or persistence implementation.
+`make_emitter_particle_output_graph` constructs the required source branch and
+stores lifetime on Particle. `make_emitter_particle_force_appearance_output_graph`
+builds the full chain, writing gravity/drag to Force and the optional appearance
+override to Appearance. Callers supply node/edge identities; constructors never
+derive them from AE parameter IDs, and duplicate or zero identities are rejected.
+Parameter keys are scoped by node type, so Force and Appearance can reuse small
+local key ranges without aliasing Emitter values. These are construction
+primitives, not a host migration or persistence implementation.
 
 ## Evidence and remaining work
 

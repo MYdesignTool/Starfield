@@ -235,10 +235,12 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
     const double age_fraction = values.particle_lifetime_seconds > 0.0
         ? std::clamp(age / values.particle_lifetime_seconds, 0.0, 1.0) : 0.0;
     if (values.appearance_enabled) {
-        particle.size_pixels = evaluate_age_curve(values.size_over_life, age_fraction,
-                                                  values.particle_size, values.particle_size_end);
-        particle.opacity = evaluate_age_curve(values.opacity_over_life, age_fraction,
-                                              values.opacity, values.opacity_end);
+        const double size_percent = evaluate_age_curve(values.size_over_life, age_fraction,
+                                                       100.0, values.particle_size_end);
+        const double opacity_percent = evaluate_age_curve(values.opacity_over_life, age_fraction,
+                                                          100.0, values.opacity_end);
+        particle.size_pixels = values.particle_size * (size_percent / 100.0);
+        particle.opacity = values.opacity * (opacity_percent / 100.0);
         particle.color = Vec3{
             values.color_start.x + (values.color_end.x - values.color_start.x) * age_fraction,
             values.color_start.y + (values.color_end.y - values.color_start.y) * age_fraction,

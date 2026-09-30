@@ -45,9 +45,9 @@
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
             "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_end" },
             "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size_end" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%", legacyKey: "particle_size_end" },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity_end" },
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%", legacyKey: "opacity_end" },
             "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "particle_size_random" },
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "opacity_random" },
             "11": { label: "Lifetime", kind: "slider", decimals: 3, min: 0, max: 1000000, legacyKey: "particle_lifetime" }
@@ -56,9 +56,9 @@
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
             "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
             "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%" },
             "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1 },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 3, min: 0, max: 1 },
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%" },
             "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100 },
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100 }
         },
@@ -134,7 +134,6 @@
         var emitter = emitters[0];
         var cap = findParameter(emitter, "1");
         var rate = findParameter(emitter, "2");
-        var legacyLifetime = findParameter(emitter, "4");
         if (!cap || !rate) return null;
         cap = Number(cap.value);
         rate = Number(rate.value);
@@ -142,16 +141,12 @@
             !isFinite(rate) || rate < 0 || rate > 1000000) return null;
         particles.sort(function (left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; });
         var branchLifetimes = [];
-        if (particles.length) {
-            for (var p = 0; p < particles.length; p++) {
-                var branchLifetime = findParameter(particles[p], "11");
-                branchLifetime = branchLifetime ? Number(branchLifetime.value) :
-                    (legacyLifetime ? Number(legacyLifetime.value) : 2);
-                if (!isFinite(branchLifetime) || branchLifetime < 0 || branchLifetime > 1000000) return null;
-                branchLifetimes.push(branchLifetime);
-            }
-        } else {
-            branchLifetimes.push(legacyLifetime ? Number(legacyLifetime.value) : 2);
+        for (var p = 0; p < particles.length; p++) {
+            var branchLifetime = findParameter(particles[p], "11");
+            if (!branchLifetime) return null;
+            branchLifetime = Number(branchLifetime.value);
+            if (!isFinite(branchLifetime) || branchLifetime < 0 || branchLifetime > 1000000) return null;
+            branchLifetimes.push(branchLifetime);
         }
         var lifetime = 0;
         for (var life = 0; life < branchLifetimes.length; life++) {
@@ -295,7 +290,6 @@
                 if (kind === "particle" || kind === "appearance") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
                 }
-                if (kind === "emitter" && graphParameter.key === "4") continue;
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 node.params.push(viewParameter(node, kind, graphParameter, spec));
             }
@@ -307,14 +301,6 @@
                     }
                 });
             }
-            if (kind === "particle" && !findParameter(source, "11")) {
-                var sourceEmitter = activeEmitter && graph.nodes.filter(function (candidate) {
-                    return candidate.id === activeEmitter.emitterId;
-                })[0];
-                var priorLifetime = sourceEmitter && findParameter(sourceEmitter, "4");
-                node.params.push(viewParameter(node, kind,
-                    { key: "11", type: 4, value: priorLifetime ? priorLifetime.value : 2 }, specs["11"]));
-            }
             if (kind === "particle") {
                 var particleOrder = { "11": 0, "3": 1, "4": 2, "5": 3, "6": 4,
                                       "1": 5, "2": 6, "9": 7, "10": 8 };
@@ -323,9 +309,7 @@
                 });
             }
             if (node.curveParameterKeys) {
-                var sizeStart = findParameter(source, "3");
                 var sizeEnd = findParameter(source, "4");
-                var opacityStart = findParameter(source, "5");
                 var opacityEnd = findParameter(source, "6");
                 var sizeCurve = findParameter(source, "7");
                 var opacityCurve = findParameter(source, "8");
@@ -333,10 +317,10 @@
                     fail("invalid_curve", "over-life curve graph parameters must use the opaque value type");
                 }
                 node.curves = {
-                    size: decodeCurve(sizeCurve && sizeCurve.value, 0, 100000,
-                                      sizeStart ? sizeStart.value : 10, sizeEnd ? sizeEnd.value : 10),
-                    opacity: decodeCurve(opacityCurve && opacityCurve.value, 0, 1,
-                                         opacityStart ? opacityStart.value : 1, opacityEnd ? opacityEnd.value : 1)
+                    size: decodeCurve(sizeCurve && sizeCurve.value, 0, 100,
+                                      100, sizeEnd ? sizeEnd.value : 100),
+                    opacity: decodeCurve(opacityCurve && opacityCurve.value, 0, 100,
+                                         100, opacityEnd ? opacityEnd.value : 100)
                 };
             }
             node.position = positions[node.id] || { x: 235, y: 22 + i * 100 };

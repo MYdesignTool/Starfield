@@ -97,14 +97,20 @@ int wmain(int argc, wchar_t* argv[]) {
         current.generation.reset();
 
         starfield::core::Uuid128 emitter_uuid{};
+        starfield::core::Uuid128 particle_uuid{};
         starfield::core::Uuid128 output_uuid{};
-        starfield::core::Uuid128 edge_uuid{};
+        starfield::core::Uuid128 emitter_particle_edge_uuid{};
+        starfield::core::Uuid128 particle_output_edge_uuid{};
         emitter_uuid.bytes[0] = 1;
-        output_uuid.bytes[0] = 2;
-        edge_uuid.bytes[0] = 3;
-        const auto graph = starfield::core::make_emitter_output_graph(
+        particle_uuid.bytes[0] = 2;
+        output_uuid.bytes[0] = 3;
+        emitter_particle_edge_uuid.bytes[0] = 4;
+        particle_output_edge_uuid.bytes[0] = 5;
+        const auto graph = starfield::core::make_emitter_particle_output_graph(
             starfield::core::Settings{}, starfield::core::NodeId{emitter_uuid},
-            starfield::core::NodeId{output_uuid}, starfield::core::EdgeId{edge_uuid});
+            starfield::core::NodeId{particle_uuid}, starfield::core::NodeId{output_uuid},
+            starfield::core::EdgeId{emitter_particle_edge_uuid},
+            starfield::core::EdgeId{particle_output_edge_uuid});
         if (!check(graph.has_value(), "construct render graph for live switch")) return 1;
         const auto bytes = starfield::core::serialize_graph(
             graph.value(), starfield::core::particle_node_registry());

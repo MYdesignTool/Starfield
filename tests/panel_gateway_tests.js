@@ -37,8 +37,8 @@ const initialValues = {
     "Linear Drag": 0,
     "Color Start": [1, 1, 1, 0.25],
     "Color End": [1, 1, 1, 1],
-    "Size Over Life": 8,
-    "Opacity Over Life": 1,
+    "Size Over Life": 100,
+    "Opacity Over Life": 100,
     "Control Source": 2
 };
 
@@ -60,11 +60,13 @@ function createHarness(options = {}) {
     let failName = options.failName || null;
     let failCount = options.failCount || 0;
     for (const [name, value] of Object.entries(initialValues)) {
+        const initial = options.initialValues && Object.prototype.hasOwnProperty.call(options.initialValues, name)
+            ? options.initialValues[name] : value;
         const property = {
             name,
-            value: Array.isArray(value) ? value.slice() :
-                (name === "Control Source" && options.controlSource !== undefined ? options.controlSource : value),
-            dimensions: Array.isArray(value) ? value.length : 1,
+            value: Array.isArray(initial) ? initial.slice() :
+                (name === "Control Source" && options.controlSource !== undefined ? options.controlSource : initial),
+            dimensions: Array.isArray(initial) ? initial.length : 1,
             numKeys: name === options.animatedName ? 2 : 0,
             isTimeVarying: name === options.animatedName,
             valueAtTime() { return this.value; },
@@ -179,25 +181,67 @@ function testCurveBankCommitRoundTrips() {
     const host = createHarness({ controlSource: 1 });
     const response = host.call([
         { key: "particle_size", value: 10 },
-        { key: "particle_size_end", value: 2 },
+        { key: "particle_size_end", value: 25 },
         { key: "size_curve_count", value: 3 },
         { key: "size_curve_point_0_age", value: 0 },
-        { key: "size_curve_point_0_value", value: 10 },
+        { key: "size_curve_point_0_value", value: 100 },
         { key: "size_curve_point_1_age", value: 0.5 },
-        { key: "size_curve_point_1_value", value: 30 },
+        { key: "size_curve_point_1_value", value: 50 },
         { key: "size_curve_point_2_age", value: 1 },
-        { key: "size_curve_point_2_value", value: 2 },
+        { key: "size_curve_point_2_value", value: 25 },
         { key: "curve_edit_commit", value: 1 }
     ]);
     assert.equal(response.ok, true);
     assert.equal(response.curves.size.custom, true);
     assert.deepEqual(response.curves.size.points, [
-        { age: 0, value: 10 }, { age: 0.5, value: 30 }, { age: 1, value: 2 }
+        { age: 0, value: 100 }, { age: 0.5, value: 50 }, { age: 1, value: 25 }
     ]);
+    const particle = response.nodes.find(node => node.id === "particle");
+    assert.equal(particle.params.find(parameter => parameter.key === "particle_size").value, 10,
+                 "base pixel size stays independent from the first curve percentage");
+    assert.equal(particle.params.find(parameter => parameter.key === "particle_size_end").value, 25,
+                 "endpoint control stores the final curve percentage");
     assert.equal(host.values["Size Curve Count"].value, 3);
     assert.equal(host.values["Curve Edit Commit"].value, 1);
     assert.equal(host.undo.begins, 1, "curve bank and nonce are written in one undo group");
     assert.equal(host.undo.ends, 1);
+}
+
+function testSizeCurveEditPreservesOpacityCurve() {
+    const opacityCurve = {
+        "Opacity Over Life": 70,
+        "Opacity Curve Count": 3,
+        "Opacity Curve Point 0 Age": 0,
+        "Opacity Curve Point 0 Value": 100,
+        "Opacity Curve Point 1 Age": 0.45,
+        "Opacity Curve Point 1 Value": 25,
+        "Opacity Curve Point 2 Age": 1,
+        "Opacity Curve Point 2 Value": 70
+    };
+    const host = createHarness({ controlSource: 1, initialValues: opacityCurve });
+    assert.equal(host.initialState.ok, true,
+                 "Opacity curve percentages above 1 are valid when the panel reads state");
+    assert.deepEqual(host.initialState.curves.opacity.points, [
+        { age: 0, value: 100 }, { age: 0.45, value: 25 }, { age: 1, value: 70 }
+    ]);
+    const response = host.call([
+        { key: "size_curve_count", value: 3 },
+        { key: "size_curve_point_0_age", value: 0 },
+        { key: "size_curve_point_0_value", value: 100 },
+        { key: "size_curve_point_1_age", value: 0.5 },
+        { key: "size_curve_point_1_value", value: 40 },
+        { key: "size_curve_point_2_age", value: 1 },
+        { key: "size_curve_point_2_value", value: 20 },
+        { key: "particle_size_end", value: 20 },
+        { key: "curve_edit_commit", value: 1 }
+    ]);
+    assert.equal(response.ok, true, "editing Size accepts the existing independent Opacity curve");
+    assert.equal(host.values["Opacity Curve Count"].value, 3);
+    assert.equal(host.values["Opacity Curve Point 1 Value"].value, 25,
+                 "editing Size does not rewrite an Opacity knot");
+    assert.deepEqual(response.curves.opacity.points, [
+        { age: 0, value: 100 }, { age: 0.45, value: 25 }, { age: 1, value: 70 }
+    ], "Opacity remains unchanged after the Size curve transaction");
 }
 
 function testInvalidCurveBankCommitIsRejectedBeforeWrite() {
@@ -363,6 +407,7 @@ function testStaleBaseRevisionIsRequiredToMatch() {
 
 testParticleFlowPresentation();
 testCurveBankCommitRoundTrips();
+testSizeCurveEditPreservesOpacityCurve();
 testInvalidCurveBankCommitIsRejectedBeforeWrite();
 testOutputOwnsGlobalCapPresentationAndFrameStatusIsTargeted();
 testVectorAnimationIsProtected();

@@ -19,12 +19,6 @@ struct EvaluatedGraph {
     const Graph& graph, RationalTime time, const Cancellation& cancellation,
     EmitterDimensionContext dimension_context = {});
 
-// Legacy compatibility constructor. Explicit identities allow the host/editor
-// to own UUID creation. Values must satisfy Settings bounds; this helper does
-// not silently clamp them or synthesize the later Particle node identity.
-[[nodiscard]] Result<Graph> make_emitter_output_graph(
-    const Settings& settings, NodeId emitter, NodeId output, EdgeId connection);
-
 // Construct a schema-1 graph with an explicit Particle node. The Particle node
 // receives the settings' age-curve values; when appearance is disabled, constant
 // emitter size/opacity and white color are used to preserve the current look.
@@ -41,8 +35,9 @@ struct EvaluatedGraph {
 // Construct the current single-emitter Alpha chain with one force and one
 // appearance stage. The settings' gravity/drag and age-curve fields are written
 // to their corresponding nodes, not to the emitter node.
-[[nodiscard]] Result<Graph> make_emitter_force_appearance_output_graph(
-    const Settings& settings, NodeId emitter, NodeId force, NodeId appearance, NodeId output,
-    EdgeId emitter_to_force, EdgeId force_to_appearance, EdgeId appearance_to_output);
+[[nodiscard]] Result<Graph> make_emitter_particle_force_appearance_output_graph(
+    const Settings& settings, NodeId emitter, NodeId particle, NodeId force,
+    NodeId appearance, NodeId output, EdgeId emitter_to_particle,
+    EdgeId particle_to_force, EdgeId force_to_appearance, EdgeId appearance_to_output);
 
 } // namespace starfield::core

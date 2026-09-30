@@ -4,12 +4,36 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The current revision-11 core suite passes 11,082 checks, the adapter fake-host suite
-passes 676 checks, and the panel graph-view/edit, gateway and startup checks pass.
-The May 2023 SDK candidate builds successfully; its hashes and qualification status
-are recorded below. Earlier 6,196/395/660-check results are historical.
+The current revision-13 core suite passes 11,905 checks. Panel graph-view, graph-edit,
+graph-transaction, gateway, and startup checks pass. The May 2023 SDK candidate builds
+successfully; its hashes and host qualification status are recorded below. Earlier
+6,196/395/660-check results are historical. The adapter fake-host count of 676 predates
+revision 13 and has not been rerun from this checkout.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
+
+## M3-06 revision-13 percentage-curve candidate (2026-09-30)
+
+The current candidate implements per-Particle lifetime, fixed 0–100% Size and
+Opacity curves that multiply their independent base values, and straight-alpha
+encoding at the AE render boundary. Base Size remains in full-resolution pixels;
+base Opacity remains in 0…1. Curve point zero is retained from the project bank and
+is not overwritten by either base control. A second adapter issue was found during
+the follow-up review: the CEP gateway had declared the hidden Size and Opacity point
+streams with pre-release ranges of 100000 and 1. Both now use the same 0–100 range,
+and a gateway regression confirms that editing Size preserves an existing Opacity
+curve with ordinates above 1.
+
+The May 2023 SDK full build produced `dist/StarfieldParticle.aex`, SHA-256
+`B646EF14937700FB31CBA8A957076899231A4D472C9EF6A1DAB460FBB4426560`, and
+`dist/StarfieldCore.dll`, SHA-256
+`DEF5B7804EBEB6653EE70A4F5B13EC95F14366184D35839DFB5A5B5EA4999F2B`.
+`artifacts/runtime/current.txt` selects `StarfieldCore-DEF5B7804EBEB665.dll`.
+Core tests passed 11,905 checks. The panel graph-view, graph-edit, graph-transaction,
+gateway, and startup suites passed; `git diff --check` passed. The native adapter was
+compiled as part of the successful build. AE was not modified or used for this
+candidate. In particular, straight-alpha compositing, branch lifetime, and curve
+save/undo behavior still need the owner’s AE 2023 pass.
 
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 

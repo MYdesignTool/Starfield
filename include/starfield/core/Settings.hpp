@@ -82,7 +82,7 @@ struct AgeCurvePoint {
     double value{};
 };
 
-// A zero point count keeps the schema-1 legacy linear start/end interpolation.
+// A zero point count uses a straight 100%-to-end-percentage fallback.
 // Custom curves use normalized particle age (0..1) and fixed bounded storage.
 struct AgeCurve {
     std::array<AgeCurvePoint, kMaxAgeCurvePoints> points{};
@@ -126,12 +126,12 @@ struct Settings {
     Vec3 gravity{};
     double linear_drag{0.0};
     // Linear age curves. `particle_size` and `opacity` are the birth values;
-    // these end values are reached as age approaches lifetime. Color is stored
+    // the curve ordinates are percentages of these base values. Color is stored
     // as three working-space channel values; alpha is controlled by opacity.
     Vec3 color_start{1.0, 1.0, 1.0};
     Vec3 color_end{1.0, 1.0, 1.0};
-    double particle_size_end{10.0};
-    double opacity_end{1.0};
+    double particle_size_end{100.0};
+    double opacity_end{100.0};
     AgeCurve size_over_life{};
     AgeCurve opacity_over_life{};
     bool appearance_enabled{false};

@@ -202,7 +202,6 @@ inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};
 inline constexpr ParameterKey kSeed{3};
-inline constexpr ParameterKey kLifetimeSeconds{4};
 inline constexpr ParameterKey kEmitterShape{5};
 inline constexpr ParameterKey kEmitterOrigin{6};
 inline constexpr ParameterKey kVelocity{7};

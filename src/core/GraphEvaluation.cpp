@@ -25,9 +25,9 @@ struct AppearanceValues {
     Vec3 color_start{1.0, 1.0, 1.0};
     Vec3 color_end{1.0, 1.0, 1.0};
     double size_start{8.0};
-    double size_end{8.0};
+    double size_end{100.0};
     double opacity_start{1.0};
-    double opacity_end{1.0};
+    double opacity_end{100.0};
     double lifetime_seconds{2.0};
     double size_random_percent{0.0};
     double opacity_random_percent{0.0};
@@ -51,7 +51,6 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
             case kParticleCount.value: settings.particle_count = std::get<std::uint32_t>(parameter.value); break;
             case kBirthRate.value: settings.birth_rate = std::get<double>(parameter.value); break;
             case kSeed.value: settings.seed = std::get<std::uint32_t>(parameter.value); break;
-            case kLifetimeSeconds.value: settings.particle_lifetime_seconds = std::get<double>(parameter.value); break;
             case kEmitterShape.value: {
                 const auto shape = std::get<std::uint32_t>(parameter.value);
                 if (shape >= kEmitterShapeCount) {
@@ -90,11 +89,9 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
             case kEmitterSizeZ.value: settings.emitter_size_pixels.z = std::get<double>(parameter.value); break;
             case kParticleSize.value:
                 settings.particle_size = std::get<double>(parameter.value);
-                settings.particle_size_end = settings.particle_size;
                 break;
             case kOpacity.value:
                 settings.opacity = std::get<double>(parameter.value);
-                settings.opacity_end = settings.opacity;
                 break;
             case kEmitterSize.value: settings.emitter_size = std::get<double>(parameter.value); break;
             case kVelocitySpread.value: settings.velocity_spread = std::get<double>(parameter.value); break;
@@ -152,13 +149,13 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     const auto* opacity_curve = find_value(node, kOpacityOverLifeCurve);
     if (size_curve) {
         const auto* bytes = std::get_if<OpaqueBytes>(size_curve);
-        if (!bytes || !decode_age_curve(*bytes, settings.size_over_life, 0.0, kMaxParticleSize)) {
+        if (!bytes || !decode_age_curve(*bytes, settings.size_over_life, 0.0, 100.0)) {
             return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance size curve is invalid");
         }
     }
     if (opacity_curve) {
         const auto* bytes = std::get_if<OpaqueBytes>(opacity_curve);
-        if (!bytes || !decode_age_curve(*bytes, settings.opacity_over_life, 0.0, 1.0)) {
+        if (!bytes || !decode_age_curve(*bytes, settings.opacity_over_life, 0.0, 100.0)) {
             return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance opacity curve is invalid");
         }
     }
@@ -179,10 +176,12 @@ void apply_appearance(ParticleInstance& particle, const AppearanceValues& appear
                       std::uint32_t seed) noexcept {
     const double age_fraction = particle.lifetime_seconds > 0.0
         ? std::clamp(particle.age_seconds / particle.lifetime_seconds, 0.0, 1.0) : 0.0;
-    particle.size_pixels = evaluate_age_curve(appearance.size_curve, age_fraction,
-                                              appearance.size_start, appearance.size_end);
-    particle.opacity = evaluate_age_curve(appearance.opacity_curve, age_fraction,
-                                          appearance.opacity_start, appearance.opacity_end);
+    const double size_percent = evaluate_age_curve(appearance.size_curve, age_fraction,
+                                                   100.0, appearance.size_end);
+    const double opacity_percent = evaluate_age_curve(appearance.opacity_curve, age_fraction,
+                                                      100.0, appearance.opacity_end);
+    particle.size_pixels = appearance.size_start * (size_percent / 100.0);
+    particle.opacity = appearance.opacity_start * (opacity_percent / 100.0);
     particle.size_pixels *= 1.0 - (appearance.size_random_percent / 100.0) *
         unit_value(seed, particle.id, RandomPurpose::size);
     particle.opacity *= 1.0 - (appearance.opacity_random_percent / 100.0) *
@@ -341,62 +340,17 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         // validate_graph above.
         if (active_emitter == count) return R::success(std::move(result));
 
-        // Graphs whose active output ancestry predates Particle are interpreted
-        // as one legacy stream. Disconnected/parked Particle nodes stay inert.
-        const bool legacy_graph = active_particles.empty();
-        if (legacy_graph) {
-            Settings render_settings = emitters[active_emitter]->value;
-            std::uint32_t active_appearance_count = 0;
-            int previous_stage = -1;
+        // An emitter without an active Particle branch is an incomplete graph,
+        // not an implicit single-stream renderer. Keep direct Emitter -> Output
+        // rewires transparent and reject active force/appearance bypasses.
+        if (active_particles.empty()) {
             for (const std::size_t index : topological_order) {
-                if (cancellation.is_cancelled()) {
-                    return R::failure(ErrorCode::cancelled, "legacy graph execution cancelled");
-                }
-                const auto& node = *nodes[index];
-                int stage = -1;
-                if (node.type_key == kEmitterNode) stage = 0;
-                else if (node.type_key == kForceNode) stage = 1;
-                else if (node.type_key == kAppearanceNode) stage = 2;
-                else if (node.type_key == kOutputNode) stage = 3;
-                if (stage < previous_stage) {
+                const auto type = nodes[index]->type_key;
+                if (type == kForceNode || type == kAppearanceNode) {
                     return R::failure(ErrorCode::invalid_request,
-                                      "legacy graph stages must be emitter, force, appearance, output");
-                }
-                previous_stage = stage;
-                if (node.type_key == kForceNode) {
-                    const auto& force = *forces[index];
-                    render_settings.gravity.x += force.gravity.x;
-                    render_settings.gravity.y += force.gravity.y;
-                    render_settings.gravity.z += force.gravity.z;
-                    render_settings.linear_drag += force.linear_drag;
-                } else if (node.type_key == kAppearanceNode) {
-                    if (++active_appearance_count != 1) {
-                        return R::failure(ErrorCode::invalid_request,
-                                          "legacy graph supports one active appearance node");
-                    }
-                    const auto& appearance = *appearances[index];
-                    render_settings.color_start = appearance.color_start;
-                    render_settings.color_end = appearance.color_end;
-                    render_settings.particle_size = appearance.size_start;
-                    render_settings.particle_size_end = appearance.size_end;
-                    render_settings.opacity = appearance.opacity_start;
-                    render_settings.opacity_end = appearance.opacity_end;
-                    render_settings.size_over_life = appearance.size_curve;
-                    render_settings.opacity_over_life = appearance.opacity_curve;
-                    render_settings.particle_size_random_percent = appearance.size_random_percent;
-                    render_settings.opacity_random_percent = appearance.opacity_random_percent;
-                    render_settings.appearance_enabled = true;
+                                      "active Force/Appearance paths require a connected Particle node");
                 }
             }
-            const auto bounded = validate_settings(render_settings);
-            if (!bounded.notices.empty()) {
-                return R::failure(ErrorCode::invalid_request,
-                                   "combined legacy force or appearance values exceed supported bounds");
-            }
-            auto evaluated = simulate_particles(bounded, to_seconds(*normalized), cancellation,
-                                                dimension_context);
-            if (!evaluated.has_value()) return R::failure(evaluated.error());
-            result.particles = evaluated.take_value();
             return R::success(std::move(result));
         }
 
@@ -426,6 +380,26 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             }
         }
 
+        // An active Force/Appearance node may be included in Output's ancestry
+        // without being reachable from any Particle stream (for example, a
+        // disconnected Force wired directly to Output beside a valid branch).
+        // Reject that topology instead of silently dropping its effect.
+        std::vector<bool> has_particle_source(count, false);
+        for (const std::size_t index : topological_order) {
+            if (nodes[index]->type_key == kParticleNode) {
+                has_particle_source[index] = true;
+            } else {
+                for (const std::size_t source : incoming[index]) {
+                    has_particle_source[index] = has_particle_source[index] || has_particle_source[source];
+                }
+            }
+            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key == kAppearanceNode) &&
+                !has_particle_source[index]) {
+                return R::failure(ErrorCode::invalid_request,
+                                  "every active Force/Appearance path must descend from a Particle node");
+            }
+        }
+
         // Emission slots are globally capped and stable, while each Particle branch
         // can retire its assigned slots at its own lifetime. Generate the bounded
         // candidate interval using the longest active branch, then compact expired
@@ -433,14 +407,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         std::vector<double> branch_lifetimes(particle_count, 0.0);
         double candidate_lifetime = 0.0;
         for (std::size_t branch = 0; branch < particle_count; ++branch) {
-            const GraphNode& particle_node = *nodes[active_particles[branch]];
             double lifetime = particles[active_particles[branch]]->lifetime_seconds;
-            // Schema-1 graphs created before Particle owned Lifetime stored it on
-            // Emitter. Keep that narrow fallback while all newly built graphs write
-            // the branch value on Particle.
-            if (!find_value(particle_node, kParticleLifetimeSeconds)) {
-                lifetime = emitter_settings.particle_lifetime_seconds;
-            }
             branch_lifetimes[branch] = lifetime;
             candidate_lifetime = std::max(candidate_lifetime, lifetime);
         }

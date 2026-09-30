@@ -69,6 +69,8 @@ const document = {
     addEventListener() {}
 };
 
+const graphViewSource = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "graph_view.js"), "utf8");
+vm.runInNewContext(graphViewSource, { window, document, Date, Math, JSON, String, Number, isFinite });
 const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "panel.js"), "utf8");
 vm.runInNewContext(source, { window, document, Date, Math, JSON, String, Number, isFinite });
 

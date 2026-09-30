@@ -65,7 +65,7 @@
             velocity_x: 0, velocity_y: 0.3, velocity_z: 0, emitter_size: 0.05,
             emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.15,
             gravity_x: 0, gravity_y: 0, gravity_z: 0, linear_drag: 0,
-            particle_size: 8, particle_size_end: 8, opacity: 1, opacity_end: 1,
+            particle_size: 8, particle_size_end: 100, opacity: 1, opacity_end: 100,
             color_start: [255, 255, 255], color_end: [255, 255, 255]
         },
         spark: {
@@ -73,7 +73,7 @@
             velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0,
             emitter_size_x: 16, emitter_size_y: 16, emitter_size_z: 16, velocity_spread: 1.1,
             gravity_x: 0, gravity_y: -2.6, gravity_z: 0, linear_drag: 0.9,
-            particle_size: 3.2, particle_size_end: 0.6, opacity: 1, opacity_end: 0,
+            particle_size: 3.2, particle_size_end: 18.8, opacity: 1, opacity_end: 0,
             color_start: [255, 240, 180], color_end: [255, 90, 20]
         },
         snow: {
@@ -81,7 +81,7 @@
             velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1,
             emitter_size_x: 2160, emitter_size_y: 1080, emitter_size_z: 2160, velocity_spread: 0.35,
             gravity_x: 0, gravity_y: -0.05, gravity_z: 0, linear_drag: 0.15,
-            particle_size: 4.5, particle_size_end: 4.5, opacity: 0.9, opacity_end: 0.75,
+            particle_size: 4.5, particle_size_end: 100, opacity: 0.9, opacity_end: 83.3,
             color_start: [235, 245, 255], color_end: [200, 215, 235]
         },
         floating_light: {
@@ -89,7 +89,7 @@
             velocity_x: 0, velocity_y: 0.16, velocity_z: 0, emitter_size: 0.9,
             emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.4,
             gravity_x: 0, gravity_y: 0.06, gravity_z: 0, linear_drag: 0.35,
-            particle_size: 14, particle_size_end: 3, opacity: 0.85, opacity_end: 0,
+            particle_size: 14, particle_size_end: 21.4, opacity: 0.85, opacity_end: 0,
             color_start: [255, 232, 150], color_end: [255, 140, 60]
         }
     };
@@ -591,12 +591,6 @@
         return { x: display.x + NODE_WIDTH / 2, y: display.y };
     }
 
-    function isTopDownConnection(fromNodeId, toNodeId) {
-        var from = nodePositions[fromNodeId];
-        var to = nodePositions[toNodeId];
-        return !!(from && to && to.y > from.y + NODE_HEIGHT);
-    }
-
     function edgePath(edge, sides) {
         var startSide = sides[edge[0]] ? sides[edge[0]].output : "bottom";
         var endSide = sides[edge[1]] ? sides[edge[1]].input : "top";
@@ -806,19 +800,17 @@
             if (fixedPoint) {
                 var start = connectionState.direction === "out" ? fixedPoint : connectionState.point;
                 var end = connectionState.direction === "out" ? connectionState.point : fixedPoint;
-                if (end.y > start.y) {
-                    var bend = Math.max(12, Math.min(80, (end.y - start.y) * 0.45));
-                    var c1x = start.x;
-                    var c1y = start.y + bend;
-                    var c2x = end.x;
-                    var c2y = end.y - bend;
-                    var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    preview.setAttribute("class", "edge-preview");
-                    preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
-                        c2x + " " + c2y + " " + end.x + " " + end.y);
-                    preview.setAttribute("aria-hidden", "true");
-                    elements.edgePaths.appendChild(preview);
-                }
+                var bend = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
+                var c1x = start.x;
+                var c1y = start.y + bend;
+                var c2x = end.x;
+                var c2y = end.y - bend;
+                var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                preview.setAttribute("class", "edge-preview");
+                preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
+                    c2x + " " + c2y + " " + end.x + " " + end.y);
+                preview.setAttribute("aria-hidden", "true");
+                elements.edgePaths.appendChild(preview);
             }
         }
     }
@@ -1095,8 +1087,8 @@
         elements.inspectorBody.appendChild(grid);
         var curves = currentCurveState("size", node.id);
         if ((kind === "particle" || kind === "appearance") && curves) {
-            elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life (px)", curves.size, 100000));
-            elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life", curves.opacity, 1));
+            elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life (%)", curves.size, 100));
+            elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life (%)", curves.opacity, 100));
             drawCurvePlot("size");
             drawCurvePlot("opacity");
         }
@@ -1222,20 +1214,20 @@
         var wrapper = document.createElement("label");
         wrapper.className = "age-curve-control";
         var caption = document.createElement("span");
-        caption.textContent = field === "age" ? "Life" : kind === "size" ? "Value (px)" : "Value";
+        caption.textContent = field === "age" ? "Life" : "Value (%)";
         wrapper.appendChild(caption);
         var input = document.createElement("input");
         input.type = "number";
         input.className = field === "age" ? "age-curve-life" : "age-curve-value";
         input.dataset.curveKind = kind;
         input.dataset.curveField = field;
-        input.dataset.decimals = field === "age" ? "1" : kind === "opacity" ? "3" : "2";
-        input.dataset.scrubStep = field === "age" ? "0.1" : kind === "opacity" ? "0.01" : "0.1";
+        input.dataset.decimals = field === "age" ? "1" : "1";
+        input.dataset.scrubStep = field === "age" ? "0.1" : "1";
         input.dataset.min = "0";
         input.dataset.max = String(field === "age" ? 100 : maximum);
         input.min = "0";
         input.max = input.dataset.max;
-        input.step = field === "age" ? "0.1" : kind === "opacity" ? "0.001" : "0.01";
+        input.step = field === "age" ? "0.1" : "0.1";
         input.title = "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
         input._curveCommit = function (nextValue) {
             setCurvePointControl(kind, field, nextValue, maximum);
@@ -1279,22 +1271,17 @@
     }
 
     function curvePlotMaximum(kind, maximum, points) {
-        if (kind === "opacity") return 1;
-        var high = 1;
-        for (var i = 0; i < points.length; i++) high = Math.max(high, Number(points[i].value) || 0);
-        return Math.max(10, Math.min(maximum, high * 1.2));
+        return 100;
     }
 
     function curveEndpointIsAnimated(kind, index, nodeId) {
         var curves = currentCurveState(kind, nodeId);
         var curve = curves && curves[kind];
-        if (!curve || (index !== 0 && index !== curve.points.length - 1)) return false;
-        var key = kind === "size"
-            ? (index === 0 ? "particle_size" : "particle_size_end")
-            : (index === 0 ? "opacity" : "opacity_end");
+        if (!curve || index !== curve.points.length - 1 || index === 0) return false;
+        var key = kind === "size" ? "particle_size_end" : "opacity_end";
         if (state.graphMode) {
             var graphNode = selectedGraphNode(nodeId);
-            var graphKey = kind === "size" ? (index === 0 ? "3" : "4") : (index === 0 ? "5" : "6");
+            var graphKey = kind === "size" ? "4" : "6";
             var graphParameter = graphParameterValue(graphNode, graphKey);
             return !!(graphParameter && graphParameter.animated === true);
         }
@@ -1376,7 +1363,7 @@
         one.setAttribute("class", "age-curve-axis-label"); one.textContent = "Life"; plot.appendChild(one);
         var maxLabel = document.createElementNS(ns, "text");
         maxLabel.setAttribute("x", "4"); maxLabel.setAttribute("y", "16"); maxLabel.setAttribute("class", "age-curve-axis-label");
-        maxLabel.textContent = formatParameterNumber(max, kind === "opacity" ? 2 : 0); plot.appendChild(maxLabel);
+        maxLabel.textContent = "100"; plot.appendChild(maxLabel);
         var minLabel = document.createElementNS(ns, "text");
         minLabel.setAttribute("x", "4"); minLabel.setAttribute("y", String(bounds.bottom)); minLabel.setAttribute("class", "age-curve-axis-label");
         minLabel.textContent = "0"; plot.appendChild(minLabel);
@@ -1405,8 +1392,7 @@
             }
             if (valueInput) {
                 valueInput.disabled = animatedEndpoint;
-                valueInput.value = formatParameterNumber(
-                    curve.points[selectedPoint].value, kind === "opacity" ? 3 : 2);
+                valueInput.value = formatParameterNumber(curve.points[selectedPoint].value, 1);
                 valueInput.title = animatedEndpoint
                 ? "This endpoint follows AE keyframes and cannot be changed here."
                 : "Drag left or right to adjust · Shift: faster · Ctrl: finer · Click to type";
@@ -1478,7 +1464,7 @@
             position.value = onCurveValue;
         }
         points.splice(insertAt, 0, { age: roundCurveNumber(position.age, 3),
-                                     value: roundCurveNumber(position.value, kind === "opacity" ? 3 : 2) });
+                                     value: roundCurveNumber(position.value, 1) });
         selectedCurvePoints[kind] = insertAt;
         applyCurveChanges(kind, points, true);
     }
@@ -1538,7 +1524,7 @@
                                     Math.min(curve.points[index + 1].age - 0.005, position.age));
             curve.points[index].age = roundCurveNumber(position.age, 3);
         }
-        curve.points[index].value = roundCurveNumber(position.value, curveDragState.kind === "opacity" ? 3 : 2);
+        curve.points[index].value = roundCurveNumber(position.value, 1);
         drawCurvePlot(curveDragState.kind, curveDragState.valueScale);
         if (event.preventDefault) event.preventDefault();
     }
@@ -1559,21 +1545,15 @@
                 Math.abs(curveState.points[0].value - points[0].value) < 1e-9 &&
                 Math.abs(curveState.points[curveState.points.length - 1].value - points[points.length - 1].value) < 1e-9) return;
             var graphChanges = [];
-            var startKey = kind === "size" ? keys.sizeStart : keys.opacityStart;
             var endKey = kind === "size" ? keys.sizeEnd : keys.opacityEnd;
-            var startParameter = graphParameterValue(node, startKey);
             var endParameter = graphParameterValue(node, endKey);
-            if (startParameter && Math.abs(Number(startParameter.value) - points[0].value) > 1e-9) {
-                graphChanges.push({ nodeId: node.id, parameterKey: startKey,
-                                    valueType: startParameter.type, value: points[0].value });
-            }
             if (endParameter && Math.abs(Number(endParameter.value) - points[points.length - 1].value) > 1e-9) {
                 graphChanges.push({ nodeId: node.id, parameterKey: endKey,
                                     valueType: endParameter.type, value: points[points.length - 1].value });
             }
             var curveKey = kind === "size" ? keys.size : keys.opacity;
             if (custom) {
-                var maximum = kind === "size" ? 100000 : 1;
+                var maximum = 100;
                 var payload = window.StarfieldGraphView.encodeCurve(points);
                 window.StarfieldGraphView.decodeCurve(payload, 0, maximum, points[0].value,
                                                        points[points.length - 1].value);
@@ -1591,11 +1571,7 @@
             changes.push({ key: prefix + "_curve_point_" + point + "_age", value: value.age });
             changes.push({ key: prefix + "_curve_point_" + point + "_value", value: value.value });
         }
-        var startKey = kind === "size" ? "particle_size" : "opacity";
         var endKey = kind === "size" ? "particle_size_end" : "opacity_end";
-        if (Math.abs(Number(state.values[startKey]) - points[0].value) > 1e-9) {
-            changes.push({ key: startKey, value: points[0].value });
-        }
         if (Math.abs(Number(state.values[endKey]) - points[points.length - 1].value) > 1e-9) {
             changes.push({ key: endKey, value: points[points.length - 1].value });
         }
@@ -1880,32 +1856,6 @@
         }
     }
 
-    function clampTopDownGroupDelta(requestedDelta, origins) {
-        var moving = {};
-        var originY = {};
-        for (var i = 0; i < origins.length; i++) {
-            moving[origins[i].id] = true;
-            originY[origins[i].id] = origins[i].y;
-        }
-        var minDelta = -Infinity;
-        var maxDelta = Infinity;
-        for (var e = 0; e < state.edges.length; e++) {
-            var edge = state.edges[e];
-            var fromMoving = !!moving[edge[0]];
-            var toMoving = !!moving[edge[1]];
-            if (fromMoving === toMoving) continue;
-            var fromPosition = nodePositions[edge[0]];
-            var toPosition = nodePositions[edge[1]];
-            if (!fromPosition || !toPosition) continue;
-            var fromY = fromMoving ? originY[edge[0]] : fromPosition.y;
-            var toY = toMoving ? originY[edge[1]] : toPosition.y;
-            if (fromMoving) maxDelta = Math.min(maxDelta, toY - NODE_HEIGHT - 1 - fromY);
-            else minDelta = Math.max(minDelta, fromY + NODE_HEIGHT + 1 - toY);
-        }
-        if (minDelta > maxDelta) return 0;
-        return Math.max(minDelta, Math.min(maxDelta, requestedDelta));
-    }
-
     function moveNodeDrag(event) {
         if (numericScrubState) { moveNumericScrub(event); return; }
         if (curveDragState) { moveCurvePoint(event); return; }
@@ -1944,7 +1894,6 @@
             updateCanvasBounds();
             return;
         }
-        dy = clampTopDownGroupDelta(dy, dragState.origins);
         for (var i = 0; i < dragState.origins.length; i++) {
             var origin = dragState.origins[i];
             var position = nodePositions[origin.id];
@@ -2007,13 +1956,11 @@
                         var to = connectionState.direction === "in" ? connectionState.nodeId : otherNodeId;
                         var outputPort = connectionState.direction === "out" ? connectionState.portKey : port.getAttribute("data-port-key");
                         var inputPort = connectionState.direction === "in" ? connectionState.portKey : port.getAttribute("data-port-key");
-                        if (isTopDownConnection(from, to)) {
-                            requestTopologyEdit({ type: "connect", from: from, to: to,
-                                                  outputPort: outputPort, inputPort: inputPort });
-                        } else {
-                            showError("invalid_connection_direction",
-                                      "Connections must run from a node's bottom output to the top input of a node below it.");
-                        }
+                        // Port direction defines particle flow. Card positions are
+                        // presentation only, so a valid output may connect to a node
+                        // drawn above it.
+                        requestTopologyEdit({ type: "connect", from: from, to: to,
+                                              outputPort: outputPort, inputPort: inputPort });
                     }
                 }
             }
