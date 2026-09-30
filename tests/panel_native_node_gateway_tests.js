@@ -38,7 +38,12 @@ function nodeControls() {
         "Velocity Z": 0, "Disc Size": 0.05, "Speed Random": 0.15,
         "Size X": 100, "Size Y": 100, "Size Z": 100, "Emission Speed": 0,
         "Emission Speed Random": 0, "Emission Angle X": 0, "Emission Angle Y": 0,
-        "Emission Angle Z": 0, "Direction": 1, "Direction Span": 60
+        "Emission Angle Z": 0, "Direction": 1, "Direction Span": 60,
+        "Color Start": [255, 255, 255, 1], "Color End": [255, 255, 255, 1],
+        "Size": 10, "Size Over Life": 100, "Opacity Over Life": 100,
+        "Size Random": 0, "Opacity Random": 0, "Lifetime": 2,
+        "Size Curve Count": 0, "Opacity Curve Count": 0,
+        "Gravity": [0, 0, 0], "Linear Drag": 0
     };
     for (let i = 0; i < 8; i++) values["Node UUID " + i] = 0;
     values["Panel Sync Guard"] = 0;
@@ -50,7 +55,9 @@ function nodeControls() {
 
 const graphHex = "01".repeat(32);
 const changedGraphHex = "02".repeat(32);
+const finalGraphHex = "03".repeat(32);
 const nodeIds = ["11223344556677889900aabbccddeeff", "ffeeddccbbaa00998877665544332211"];
+let activeGraphRevision = 4;
 
 const rendererProperties = {};
 const snapshot = scalar("Graph Snapshot", null);
@@ -63,12 +70,13 @@ const commit = scalar("Commit Graph Edit", 0);
 commit.setValue = function (nonce) {
     this.value = nonce;
     const match = /^\/\*SFLDTXN1:([0-9]+):([0-9]+):([0-9]+):([0-9a-f]{8}):([0-9a-f]+)\*\/0$/.exec(mailbox.expression);
-    if (!match || Number(match[1]) !== nonce || Number(match[2]) !== 4 ||
+    if (!match || Number(match[1]) !== nonce || Number(match[2]) !== activeGraphRevision ||
         Number(match[3]) !== match[5].length / 2 || crc32Hex(match[5]) !== match[4]) {
         receipt.value = -nonce;
         return;
     }
-    snapshot.expression = snapshotExpression(5, match[5]);
+    activeGraphRevision++;
+    snapshot.expression = snapshotExpression(activeGraphRevision, match[5]);
     receipt.value = nonce;
 };
 Object.assign(rendererProperties, {
@@ -193,4 +201,54 @@ assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
 assert.equal(undo.begins, 3, "the rejected duplicate reconciliation still closes one undo group");
 assert.equal(undo.ends, 3);
 
-console.log("Native node gateway checks passed (Emitter create, independent values, dimensions, duplicate-ID rejection, duplicate cleanup, graph commit).");
+// The project-owned node manifest can materialize distinct native module types,
+// preserve their typed values, and remove exactly the node omitted by a later edit.
+const particleId = "00112233445566778899aabbccddeeff";
+const forceId = "ffeeddccbbaa00998877665544330001";
+const particle = { id: particleId, type: "org.starfieldfx.nodes.particle", schemaVersion: 2, parameters: [
+    { key: "1", type: 5, value: [0.25, 0.5, 0.75] }, { key: "2", type: 5, value: [1, 1, 1] },
+    { key: "3", type: 4, value: 32 }, { key: "4", type: 4, value: 75 },
+    { key: "5", type: 4, value: 0.8 }, { key: "6", type: 4, value: 60 },
+    { key: "9", type: 4, value: 15 }, { key: "10", type: 4, value: 25 },
+    { key: "11", type: 4, value: 4.5 }
+] };
+const force = { id: forceId, type: "org.starfieldfx.nodes.force", schemaVersion: 1, parameters: [
+    { key: "1", type: 5, value: [0, -2, 0] }, { key: "2", type: 4, value: 0.25 }
+] };
+const mixedNodes = [nodes[1], particle, force];
+const mixed = invoke("ensureNodeEffects", {
+    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: mixedNodes
+});
+assert.equal(mixed.ok, true, mixed.error && mixed.error.message);
+assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
+    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle", "org.starfieldfx.node.force"
+]);
+assert.deepEqual(Array.from(paradeItems[2].property("Color Start").value), [0.25, 0.5, 0.75, 1]);
+assert.equal(paradeItems[2].property("Size").value, 32);
+assert.equal(paradeItems[2].property("Lifetime").value, 4.5);
+assert.deepEqual(Array.from(paradeItems[3].property("Gravity").value), [0, -2, 0]);
+assert.equal(paradeItems[3].property("Linear Drag").value, 0.25);
+
+const outputRejected = invoke("ensureNodeEffects", {
+    baseGraphRevision: 5, graphHex: changedGraphHex,
+    nodeManifest: mixedNodes.concat([{ id: "00000000000000000000000000000104",
+        type: "org.starfieldfx.nodes.output", schemaVersion: 1, parameters: [] }])
+});
+assert.equal(outputRejected.ok, false, "Output stays virtual and is not materialized as an AEX");
+assert.equal(paradeItems.length, 4);
+
+const removeForce = invoke("submitGraph", {
+    baseGraphRevision: 5, baseNodeManifest: mixedNodes,
+    nodeManifest: [nodes[1], particle], graphHex: finalGraphHex
+});
+assert.equal(removeForce.ok, true, removeForce.error && removeForce.error.message);
+assert.equal(removeForce.snapshot.revision, 6);
+assert.equal(removeForce.snapshot.graphHex, finalGraphHex);
+assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
+    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle"
+]);
+assert.equal(paradeItems[2].property("Size").value, 32, "Particle values survive an unrelated Force deletion");
+assert.equal(undo.begins, 5);
+assert.equal(undo.ends, 5);
+
+console.log("Native node gateway checks passed (Emitter/Particle/Force modules, independent values and dimensions, duplicate-ID rejection, Output exclusion, graph commit and deletion).");
