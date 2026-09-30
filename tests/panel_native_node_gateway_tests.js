@@ -215,6 +215,14 @@ const particle = { id: particleId, type: "org.starfieldfx.nodes.particle", schem
 const force = { id: forceId, type: "org.starfieldfx.nodes.force", schemaVersion: 1, parameters: [
     { key: "1", type: 5, value: [0, -2, 0] }, { key: "2", type: 4, value: 0.25 }
 ] };
+const invalidParticle = { id: particleId, type: particle.type, schemaVersion: particle.schemaVersion,
+    parameters: [{ key: "999", type: 4, value: 1 }] };
+const failedParticleAdd = invoke("ensureNodeEffects", {
+    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: [nodes[1], invalidParticle]
+});
+assert.equal(failedParticleAdd.ok, false, "unsupported node controls reject a partial effect creation");
+assert.equal(paradeItems.length, 2, "a failed node initialization removes its partially created effect");
+
 const mixedNodes = [nodes[1], particle, force];
 const mixed = invoke("ensureNodeEffects", {
     baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: mixedNodes
@@ -228,6 +236,8 @@ assert.equal(paradeItems[2].property("Size").value, 32);
 assert.equal(paradeItems[2].property("Lifetime").value, 4.5);
 assert.deepEqual(Array.from(paradeItems[3].property("Gravity").value), [0, -2, 0]);
 assert.equal(paradeItems[3].property("Linear Drag").value, 0.25);
+assert.equal(paradeItems[2].property("Node UUID 0").value, 0x0011,
+    "the same identity can be retried after a failed partial creation");
 
 const outputRejected = invoke("ensureNodeEffects", {
     baseGraphRevision: 5, graphHex: changedGraphHex,
@@ -248,7 +258,7 @@ assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
     "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle"
 ]);
 assert.equal(paradeItems[2].property("Size").value, 32, "Particle values survive an unrelated Force deletion");
-assert.equal(undo.begins, 5);
-assert.equal(undo.ends, 5);
+assert.equal(undo.begins, 6);
+assert.equal(undo.ends, 6);
 
-console.log("Native node gateway checks passed (Emitter/Particle/Force modules, independent values and dimensions, duplicate-ID rejection, Output exclusion, graph commit and deletion).");
+console.log("Native node gateway checks passed (Emitter/Particle/Force modules, failed-add cleanup and retry, independent values and dimensions, duplicate-ID rejection, Output exclusion, graph commit and deletion).");

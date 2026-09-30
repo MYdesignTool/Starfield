@@ -582,11 +582,29 @@
         var spec = nativeNodeType(node.type);
         var parade = layer.property("ADBE Effect Parade");
         if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
+        var previousCount = parade.numProperties;
         var effect = parade.addProperty(spec.matchName);
         if (!effect) throw new Error("AE did not create the " + spec.label + " effect instance.");
-        effect.name = spec.label + " " + node.id.substr(0, 6);
-        setNodeIdentity(effect, node.id);
-        setNodeParameters(effect, node);
+        try {
+            effect.name = spec.label + " " + node.id.substr(0, 6);
+            setNodeIdentity(effect, node.id);
+            setNodeParameters(effect, node);
+        } catch (error) {
+            if (typeof effect.remove !== "function") {
+                throw new Error(error.toString() + " AE could not remove the partially initialized node effect.");
+            }
+            try {
+                effect.remove();
+                var currentParade = layer.property("ADBE Effect Parade");
+                if (!currentParade || currentParade.numProperties !== previousCount) {
+                    throw new Error("AE did not remove the partially initialized node effect.");
+                }
+            } catch (rollbackError) {
+                throw new Error(error.toString() + " Removing the partially initialized node effect failed: " +
+                                rollbackError.toString());
+            }
+            throw error;
+        }
     }
 
     function ensureNativeNodeEffects(layer, nodes, writeExisting) {
