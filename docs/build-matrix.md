@@ -82,10 +82,12 @@ The May 2023 SDK x64 Release build produced these artifacts:
 
 Core tests passed 11,909 checks; adapter fake-host tests passed 678 checks; all
 seven focused CEP codec, edit, graph-view, transaction, native-node gateway,
-gateway, and startup suites passed. The native-node fake host exercises two
-independent Emitter instances, dimensions, UUID streams, deletion, and graph
-commit. The full build used `-NoRuntimePublish`; the build itself left
-`artifacts/runtime/current.txt` unchanged. The owner-authorized deployment then
+gateway, and startup suites passed. The latest native-node fake-host regression
+exercises two independent Emitter and Particle instances, two Force instances,
+emitter dimensions, UUID streams, failed-add cleanup/retry, Output exclusion,
+selective deletion, and graph commit. The full build used `-NoRuntimePublish`;
+the build itself left `artifacts/runtime/current.txt` unchanged. The
+owner-authorized deployment then
 backed up the prior main AEX and runtime selector under
 `artifacts/disabled/p02d-node-sync-20260930/`, copied the five AEX files into
 `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`, and selected
