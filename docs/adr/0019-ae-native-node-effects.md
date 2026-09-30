@@ -29,11 +29,14 @@ project-persistent node ID.
 
 ## Decision
 
-1. **Editable nodes are AE effect instances.** Provide distinct thin AE effect
-   modules for each editable node family. The panel creates and removes Emitter,
-   Particle, Force, and later node instances in the layer's Effect Parade. Each
-   instance owns its ordinary AE parameter streams, so repeated nodes keep
-   independent saved values and native AE undo/copy behavior.
+1. **Editable nodes are internal AE effect instances.** Provide distinct thin AE
+   modules for each editable node family, with `PF_OutFlag_I_AM_OBSOLETE` so they
+   are not listed as standalone choices in the Effects menu. CEP creates and
+   removes Emitter, Particle, Force, and later node instances by stable match
+   name in the layer's Effect Parade. Each instance owns ordinary AE parameter
+   streams, so repeated nodes keep independent saved values and native AE
+   undo/copy behavior. AE 2023 must confirm that the hidden modules remain
+   script-addable and that saved instances reopen normally.
 2. **The existing Starfield Particle effect is the Output.** Do not add a
    separate Output effect instance. Keep one fixed, visible Output terminal in
    the CEP graph and bind it to the layer's main Starfield Particle render
@@ -134,6 +137,8 @@ The spike is successful only when all of these work in AE 2023:
   type keeps separate parameter values. The graph always displays one Output
   terminal bound to the existing main render effect; no Output effect is added
   to the Effect Controls stack.
+- The AE Effects menu offers only the main Starfield renderer; CEP can still add
+  each hidden node module by match name.
 - Changing either node's native AE controls or CEP inspector parameters updates
   the rendered result without pressing Refresh or reopening the panel.
 - One edit plus its compiled graph snapshot is one undo step. Undo/redo, Ctrl+D,
@@ -160,4 +165,5 @@ render-time sibling-effect queries.
 - [After Effects C++ SDK Guide: AEGP Effect Suite](https://ae-plugins.docsforadobe.dev/aegps/aegp-suites/) — effect enumeration, parameter streams, and session-unique stream IDs.
 - [After Effects C++ SDK Guide: Effect use of AEGP suites](https://ae-plugins.docsforadobe.dev/aegps/cheating-effect-usage-of-aegp-suites/) — cache dependency warning.
 - [After Effects C++ SDK Guide: PiPL Resources](https://ae-plugins.docsforadobe.dev/intro/pipl-resources/) — multiple PiPL behavior and one-effect-per-module recommendation.
+- [After Effects C++ SDK Guide: PF_OutData](https://ae-plugins.docsforadobe.dev/effect-basics/PF_OutData/) — `PF_OutFlag_I_AM_OBSOLETE` keeps an effect usable in existing projects while omitting it from the Effects menu.
 - ADR 0011 still governs every install, process, or other host-level change.

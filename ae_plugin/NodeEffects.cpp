@@ -12,7 +12,9 @@
 
 namespace {
 
-static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT));
+static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
+                                          PF_OutFlag_DEEP_COLOR_AWARE |
+                                          PF_OutFlag_PIX_INDEPENDENT));
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == PF_OutFlag2_FLOAT_COLOR_AWARE);
 
 enum class NodeEffectKind { emitter, particle, appearance, force };

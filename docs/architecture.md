@@ -14,10 +14,10 @@ The native effect is the product boundary. The AE SDK adapter translates selecto
 After Effects
   ├─ StarfieldParticle.aex       main render effect, graph persistence,
   │                              SmartFX snapshots, host pixels and DLL loader
-  ├─ StarfieldEmitter.aex        repeatable, project-saved Emitter node controls
-  ├─ StarfieldParticleNode.aex   repeatable, project-saved Particle node controls
-  ├─ StarfieldAppearance.aex    repeatable, project-saved Appearance node controls
-  ├─ StarfieldForce.aex          repeatable, project-saved Force node controls
+  ├─ StarfieldEmitter.aex        internal, menu-hidden Emitter node controls
+  ├─ StarfieldParticleNode.aex   internal, menu-hidden Particle node controls
+  ├─ StarfieldAppearance.aex    internal, menu-hidden Appearance node controls
+  ├─ StarfieldForce.aex          internal, menu-hidden Force node controls
   └─ StarfieldCore.dll           graph evaluation, deterministic simulation,
                                  CPU renderer and later backends
 ```
@@ -26,8 +26,12 @@ The node AEX modules hold independent AE parameter streams; they do not render
 particles. The existing `StarfieldParticle.aex` remains the only renderer and owns
 the canonical graph snapshot. The graph's fixed visible Output terminal is the
 panel representation of that main effect; no separate Output AEX is built.
+Node AEX modules set `PF_OutFlag_I_AM_OBSOLETE` so they are not offered as
+standalone effects in AE's Effects menu. The CEP bridge still adds them by stable
+match name to persist independent node values; AE 2023 must confirm that this
+scripted creation path works while the modules are hidden from the menu.
 
-Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. A graph transaction creates/removes the corresponding node AEX instances, writes their values, and commits the canonical graph snapshot to the main effect in one undo group. The Output terminal and its global controls remain on the main effect. Direct editing of node AEX parameter streams in Effect Controls is not yet synchronized back into the graph; the host-side synchronization and undo path remains an AE 2023 qualification gate. The panel never shares C++ object layouts with the effect, and render code never queries sibling effects or panel state.
+Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. A graph transaction creates/removes the corresponding node AEX instances, writes their values, and commits the canonical graph snapshot to the main effect in one undo group. The Output terminal and its global controls remain on the main effect. Direct node-control edits have a supervised graph-sync source path, but callback delivery, cache/render response, undo and save/reopen remain AE 2023 qualification gates. The panel never shares C++ object layouts with the effect, and render code never queries sibling effects or panel state.
 
 ADR 0012 defines the runtime C ABI and versioned development DLLs. The AE
 adapter still owns graph serialization and control-to-graph construction because
@@ -129,4 +133,4 @@ prior monolith is backed up for rollback. Half/Third point mapping, split-build
 copy/undo, shapes and basic gravity/size changes also have AE observations. See
 `compatibility-matrix.md`.
 
-M0/M1, M2 rendering, M3-01/M3-01B/M3-02 core behavior, G-01–G-05, and the CEP graph view/transaction source are present. P-02D wires CEP graph transactions to separate editable node AEX instances and the main effect's graph snapshot. A source prototype now routes direct node-control edits through a supervised graph callback. The matching AEX candidate has been copied into the AE 2023 plug-in directory while AE is closed; callback delivery, undo/cache behavior and rendered response remain unqualified until it is loaded. P-02C routes graph-mode over-life curves through the same carrier and retains the AE Controls curve-bank path. The fixed visible CEP Output terminal is backed by the main Starfield Particle effect and is not a separate AEX. ADR 0014 defines the current UUID-keyed project graph-layout record. Startup discovery retries transient conditions until the target is available, with delay capped at 5 seconds. The current single effect registers 27 render/control streams, eight dormant layout streams, four graph-carrier streams, ten topic markers, 34 hidden curve-bank streams, and AE's implicit input (85 total indices including input). Owner testing confirms time consistency; AE visually confirmed 8/16/32-bpc output and transparent particles with the split build. Graph history/animation, MFR, and GPU remain open.
+M0/M1, M2 rendering, M3-01/M3-01B/M3-02 core behavior, G-01–G-05, and the CEP graph view/transaction source are present. P-02D wires CEP graph transactions to per-node AEX instances and the main effect's graph snapshot. A source prototype routes direct node-control edits through a supervised graph callback; the main AEX candidate for that callback is deployed, but its host behavior remains unqualified. The four node AEXs currently installed in AE still use the prior menu-visible build; a menu-hidden replacement candidate is built but awaits installation and AE 2023 verification. P-02C routes graph-mode over-life curves through the same carrier and retains the AE Controls curve-bank path. The fixed visible CEP Output terminal is backed by the main Starfield Particle effect and is not a separate AEX. ADR 0014 defines the current UUID-keyed project graph-layout record. Startup discovery retries transient conditions until the target is available, with delay capped at 5 seconds. The current single effect registers 27 render/control streams, eight dormant layout streams, four graph-carrier streams, ten topic markers, 34 hidden curve-bank streams, and AE's implicit input (85 total indices including input). Owner testing confirms time consistency; AE visually confirmed 8/16/32-bpc output and transparent particles with the split build. Graph history/animation, MFR, and GPU remain open.

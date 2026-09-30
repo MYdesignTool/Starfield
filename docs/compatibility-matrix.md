@@ -28,6 +28,17 @@ Use this file to turn observed behavior into requirements before implementing ea
 | M2 preview-resolution emitter origin | AE 2023.5.0 Build 52 | **Full/Half/Third/Quarter centre normalization passed** | Corrected-candidate Full/Quarter readouts and H-01 Half/Third readouts all normalize raw points to `[1920,1080,1080]`. Quarter playback placed the trail near the expected centre. Off-centre, anisotropic and exact image comparisons remain open. |
 | Newer AE families | Deferred by owner direction | Deferred | No current adaptation or qualification work |
 
+### P-02D hidden node-module candidate (built, not installed)
+
+On 2026-09-30, the May 2023 SDK build passed with `PF_OutFlag_I_AM_OBSOLETE`
+set on the four node modules in both PiPL and runtime flags. The local AE 2023
+SDK says these effects stay out of the Effects menu while remaining available
+for existing project instances. The candidate hashes are recorded in
+`docs/build-matrix.md`. It has not been copied to the AE plug-in directory, and
+AE has not tested whether CEP can add a new hidden module by match name. The
+currently installed main AEX and `StarfieldCore-55B877A8F66D3576.dll` selector
+were not changed by this build.
+
 ### Fixed suspect: the plug-in freed a host-owned handle
 
 `capture_controls` and the Node Graph sync path replaced the graph parameter's value and then

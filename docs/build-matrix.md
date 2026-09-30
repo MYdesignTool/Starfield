@@ -162,6 +162,34 @@ is needed for the next host render check. To roll back while AE is closed, copy
 the backup AEX above to
 `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`.
 
+## P-02D hide internal node modules from the Effects menu (2026-09-30)
+
+The four node modules now set `PF_OutFlag_I_AM_OBSOLETE` in both their PiPL
+resources and `PF_Cmd_GLOBAL_SETUP` response. The May 2023 SDK documents this as
+keeping an effect out of the AE Effects menu while still invoking existing
+instances. A compile-time flag assertion and the PiPL generation guard both
+passed. CEP continues to request nodes by their stable match names; adding a
+new hidden node through that path is an AE 2023 host gate.
+
+The May 2023 SDK x64 Release build completed with the existing C4819 code-page
+warning from `Parameters.hpp`. The four node AEX candidates in `dist/` are:
+
+| Artifact | SHA-256 |
+|---|---|
+| `StarfieldEmitter.aex` | `16C9FA717264D445BB7ECBFEE92920DC318D3774212FDA4364E8D1E72B0A9494` |
+| `StarfieldParticleNode.aex` | `2439EBE6550A3369D4EBB3894931CFEDFA7544F64DC9DAF5D55CC130E65E9169` |
+| `StarfieldAppearance.aex` | `0AF3A3C450E5B092DA462D11FD9DD71F5716F14D01FFD0C6F16ECCD9D5502CBF` |
+| `StarfieldForce.aex` | `E755C294E0B5654F662132E4AECE3490A701B982D054A8BB493E01825711EF5E` |
+
+This candidate is not installed. Do not copy the main renderer or Core from
+this full build: their output hashes differ from the currently selected pair
+and they contain no change required by this menu-visibility task. The build used
+`-NoRuntimePublish`; `artifacts/runtime/current.txt` still selects
+`StarfieldCore-55B877A8F66D3576.dll`. The current installed main AEX is still
+`3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`; current
+node-module hashes are recorded in `compatibility-matrix.md`. Installation and
+the AE menu/add-by-match-name check are pending.
+
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
 The May 2023 SDK full build includes per-Particle lifetime in explicit graph
