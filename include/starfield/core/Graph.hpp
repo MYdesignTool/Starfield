@@ -182,7 +182,7 @@ struct GraphValidationResult {
 [[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
 
 // Stable built-in schemas used by the emitter -> Particle -> force -> appearance
-// -> output graph (and the legacy graph subsets). Keys in this namespace are
+// -> Output graph. Output carries the renderer-wide particle cap. Keys in this namespace are
 // graph ParameterKeys and are not AE parameter IDs.
 namespace graph_keys {
 inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-stream";

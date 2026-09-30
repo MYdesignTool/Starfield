@@ -4,11 +4,10 @@
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The current revision-13 core suite passes 11,905 checks. Panel graph-view, graph-edit,
-graph-transaction, gateway, and startup checks pass. The May 2023 SDK candidate builds
-successfully; its hashes and host qualification status are recorded below. Earlier
-6,196/395/660-check results are historical. The adapter fake-host count of 676 predates
-revision 13 and has not been rerun from this checkout.
+The current candidate passes 11,909 core checks, 678 adapter fake-host checks, and seven
+focused CEP graph codec/edit/view/transaction, native-node gateway, gateway, and startup suites.
+The May 2023 SDK build succeeds; candidate hashes and host qualification status are
+recorded below. Earlier counts are historical.
 Newer SDK/host adaptation is deferred. The older dual-SDK evidence below is
 historical and does not qualify the current binary on newer hosts.
 
@@ -34,6 +33,62 @@ gateway, and startup suites passed; `git diff --check` passed. The native adapte
 compiled as part of the successful build. AE was not modified or used for this
 candidate. In particular, straight-alpha compositing, branch lifetime, and curve
 save/undo behavior still need the owner’s AE 2023 pass.
+
+## P-02D initial native node module packaging (2026-09-30)
+
+The full May 2023 SDK build now also produces three separate node AEX files:
+`StarfieldEmitter.aex`, `StarfieldParticleNode.aex`, and `StarfieldForce.aex`.
+Each module contains one PiPL/match name and a transparent pass-through callback;
+the build verifies PiPL/runtime version and flags. The main
+`StarfieldParticle.aex` remains the renderer and graph Output, with no separate
+Output AEX. Max Particles is now owned by the fixed Output graph node (Output schema
+2); Emitter schema 3 no longer stores it. Evaluation validates this Output value
+and applies it as the global particle cap. CEP exposes the field in the Output
+inspector and graph edits target the Output node. Focused regressions confirm the
+captured value is stored on Output and the core respects its cap.
+
+The current full build produced `StarfieldParticle.aex`, SHA-256
+`CF6E08544CE81495932DDA3CD0B240C29A899E5EC435303D3170FA48555F616D`, and
+`StarfieldCore.dll`, SHA-256
+`55B877A8F66D357649CD72938FB883A3C9F5CF584A07ED516E7494828D7C918E`.
+Emitter, Particle, and Force node module hashes are recorded in
+`docs/compatibility-matrix.md`. Core tests pass 11,909 checks; adapter fake-host
+tests pass 678 checks; graph-view, graph-edit, graph-transaction, gateway, and
+startup tests pass. The build used `-NoRuntimePublish`, so it did not change
+`artifacts/runtime/current.txt`. No candidate files were installed in AE 2023.
+
+This initial packaging candidate predates the CEP transaction wiring below.
+
+## P-02D node synchronization source candidate (2026-09-30)
+
+The current source adds/removes native Emitter, Particle, Appearance, and Force
+effect instances from revision-checked CEP graph transactions, writes each
+editable node's controls, and commits the canonical snapshot to the main
+Starfield Particle effect inside one undo group. The fixed Output terminal stays
+visible in the graph, is omitted from the native-node manifest, and has no AEX.
+The pinned target token uses project/comp/layer IDs, so adding node effects does
+not change it when AE renumbers the Effect Parade.
+
+The May 2023 SDK x64 Release build produced these artifacts:
+
+| Artifact | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `CF6E08544CE81495932DDA3CD0B240C29A899E5EC435303D3170FA48555F616D` |
+| `StarfieldCore.dll` | `55B877A8F66D357649CD72938FB883A3C9F5CF584A07ED516E7494828D7C918E` |
+| `StarfieldEmitter.aex` | `CC19F9DED39165FB904ECB726AC0624045D4F2649D85D84BC387DB821F4F5FC7` |
+| `StarfieldParticleNode.aex` | `31BA2D394E7C8628D77A9648C7D775A8B8EA09485CCF8BD520AB7240986057D7` |
+| `StarfieldAppearance.aex` | `70709CCB724CEF7FBF43CF5118BEEF042744278703137B3F67F469F1F703586A` |
+| `StarfieldForce.aex` | `CF6796CCF026ED1BBFD41CF98847C8A9E838139C81F112D6F7D364F7CC8DA7EE` |
+
+Core tests passed 11,909 checks; adapter fake-host tests passed 678 checks; all
+seven focused CEP codec, edit, graph-view, transaction, native-node gateway,
+gateway, and startup suites passed. The native-node fake host exercises two
+independent Emitter instances, dimensions, UUID streams, deletion, and graph
+commit. The full build used `-NoRuntimePublish`; `artifacts/runtime/current.txt`
+was unchanged. `dist/` is a regular repository directory, not a junction, and no
+files were installed into AE 2023. The owner has not yet loaded this candidate.
+Effect Parade operations, direct native Effect Controls edits, undo/redo,
+duplicate identity, save/reopen, and immediate render response remain host gates.
 
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
@@ -226,7 +281,7 @@ command in this file or an externally produced input that must not be edited.
 | `core-dll/2023/` | Separately built `StarfieldCore.dll` and intermediates | `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -CoreOnly` |
 | `runtime/` | Content-addressed `StarfieldCore-<SHA16>.dll` files and atomic `current.txt` selection for manual hot reload | Either full or `-CoreOnly` build |
 | `loader-tests/` | Loader harness and its workspace-local simulated runtime directory | Build `tests/CoreLoaderTests.vcxproj`, then run it with `dist/StarfieldCore.dll` and `dist/StarfieldParticle.aex` |
-| `../dist/` | Paired installation files: `dist/StarfieldParticle.aex` and `dist/StarfieldCore.dll` with matching PDBs | Full build; `-CoreOnly` intentionally does not update the release pair |
+| `../dist/` | Main renderer/Core pair plus `StarfieldEmitter.aex`, `StarfieldParticleNode.aex`, `StarfieldAppearance.aex`, and `StarfieldForce.aex` node modules, with matching PDBs | Full build; `-CoreOnly` intentionally does not update AEX files |
 | `disabled/` | Rollback binaries, renamed with a timestamp, for example `20260927-232930-StarfieldParticle.aex` (build before the force/appearance controls shipped) | Previous build, kept on purpose |
 | `core-tests/`, `adapter-tests/` | Test executables and their object files, so the suites link incrementally: `artifacts/core-tests/core_tests.exe` (core) and `artifacts/adapter-tests/core_tests.exe` (`-Adapter`, fake host) | `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 [-Adapter]` |
 | `reports/` | Captured readouts and parameter dumps, for example `dump_report.txt` from the scripting-DOM dump | `tools/dump_effect_parameters.jsx` inside After Effects |
@@ -277,7 +332,7 @@ releases its result and allows that DLL to unload. These checks passed on
 
 `tests/graph_parameter_tests.cpp` (`-Adapter`) covers the arbitrary-data callbacks, parameter registration and mapping, the four-stage chain built from the controls, the supervised edit path (Node Graph rewrite, AE Controls isolation, allocation failure), checkout/checkin bookkeeping, and cancellation during host-world copies.
 
-`tests/panel_gateway_tests.js` runs the ExtendScript protocol gateway in a Node fake host and covers multidimensional animation rejection, successful writes, and failed-batch rollback. `tests/panel_startup_tests.js` runs the CEP client in a fake DOM/host and confirms transient startup `no_target` recovers without a manual Refresh. The graph codec, edit planner and revision-checked transaction coordinator have focused tests in `tests/panel_graph_codec_tests.js`, `tests/panel_graph_edit_tests.js` and `tests/panel_graph_transaction_tests.js`. Run the panel checks with `node tests/panel_gateway_tests.js`, `node tests/panel_startup_tests.js`, `node tests/panel_graph_codec_tests.js`, `node tests/panel_graph_edit_tests.js` and `node tests/panel_graph_transaction_tests.js`. None replaces the AE 2023 panel qualification gate.
+`tests/panel_gateway_tests.js` runs the ExtendScript protocol gateway in a Node fake host and covers multidimensional animation rejection, successful writes, and failed-batch rollback. `tests/panel_native_node_gateway_tests.js` exercises node AEX creation/removal, independent values, emitter dimensions, identity streams, and graph commit. `tests/panel_startup_tests.js` runs the CEP client in a fake DOM/host and confirms transient startup `no_target` recovers without a manual Refresh. The graph codec, edit planner, projection and revision-checked transaction coordinator have focused tests in `tests/panel_graph_codec_tests.js`, `tests/panel_graph_edit_tests.js`, `tests/panel_graph_view_tests.js` and `tests/panel_graph_transaction_tests.js`. Run the panel checks with `node tests/panel_graph_codec_tests.js`, `node tests/panel_graph_edit_tests.js`, `node tests/panel_graph_view_tests.js`, `node tests/panel_graph_transaction_tests.js`, `node tests/panel_native_node_gateway_tests.js`, `node tests/panel_gateway_tests.js` and `node tests/panel_startup_tests.js`. None replaces the AE 2023 panel qualification gate.
 
 - With CMake available: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 - On the current Windows machine CMake is not installed, so use `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`, which compiles the same sources with the locked MSVC toolset behind a mapped drive letter and runs the executable. Output lands in `artifacts/core-tests/`.

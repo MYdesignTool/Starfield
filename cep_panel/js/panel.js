@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/particle-variation-1";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-1";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -828,13 +828,21 @@
         }
         call("getGraphSnapshot", { target: { token: targetToken } }, function (response) {
             if (!response || !response.ok || !response.snapshot) { callback(response); return; }
-            if (response.snapshot.initialized) { callback(response); return; }
+            function ensureNodeEffects(snapshotResponse) {
+                var client = getGraphTransactionClient();
+                if (!client || !client.ensureNativeEffects) { callback(snapshotResponse); return; }
+                client.ensureNativeEffects(snapshotResponse.snapshot, targetToken, function (ensured) {
+                    if (!ensured || !ensured.ok) { callback(ensured || snapshotResponse); return; }
+                    callback(snapshotResponse);
+                });
+            }
+            if (response.snapshot.initialized) { ensureNodeEffects(response); return; }
             call("syncGraphSnapshot", { target: { token: targetToken } }, function (initialized) {
                 if (!initialized || !initialized.ok || !initialized.snapshot || !initialized.snapshot.initialized) {
                     callback(initialized || { ok: false, error: { code: "graph_snapshot_unconfirmed", message: "The project graph could not be initialized." } });
                     return;
                 }
-                callback(initialized);
+                ensureNodeEffects(initialized);
             });
         });
     }

@@ -1,6 +1,6 @@
 # ADR 0019: AE-native effect instances own node records
 
-- Status: proposed; owner direction is to investigate per-node AE effects, synchronization spike pending.
+- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX; AE 2023 synchronization acceptance is pending.
 - Date: 2026-09-30.
 - Depends on ADRs 0006–0013 and 0015.
 
@@ -27,20 +27,32 @@ control rendering, because AE may not invalidate cached output when those
 external values change. AE's unique stream ID is session-unique, so it is not a
 project-persistent node ID.
 
-## Proposed architecture
+## Decision
 
-1. **A node is an AE effect instance.** Provide distinct thin AE effect modules
-   for the renderer/output and each node family. The panel creates and removes
-   node instances in the layer's Effect Parade. Each instance owns its ordinary
-   AE parameter streams, so each Emitter, Particle, and Force has independent
-   saved values and native AE undo/copy behavior.
-2. **Keep the renderer singular.** One Starfield Output/renderer effect owns the
-   graph topology, edges, and layout in its project-saved graph record. Each
-   node module owns that node's editable parameter values and a persisted node
-   identity. The graph compiler maps node effects to core UUIDs; it must not use
-   display names, effect indices, or session-only stream IDs as persistent IDs.
-   Duplicating a node must allocate a fresh identity and apply a defined link
-   policy; the prototype must prove this before enabling Ctrl+D for node effects.
+1. **Editable nodes are AE effect instances.** Provide distinct thin AE effect
+   modules for each editable node family. The panel creates and removes Emitter,
+   Particle, Force, and later node instances in the layer's Effect Parade. Each
+   instance owns its ordinary AE parameter streams, so repeated nodes keep
+   independent saved values and native AE undo/copy behavior.
+2. **The existing Starfield Particle effect is the Output.** Do not add a
+   separate Output effect instance. Keep one fixed, visible Output terminal in
+   the CEP graph and bind it to the layer's main Starfield Particle render
+   effect. This terminal is the graph-facing representation of that effect: it
+   participates in connections and graph evaluation, but is never created,
+   duplicated, or removed as an independent AE effect. Global render controls
+   such as Max Particles remain owned by the main effect and are exposed from
+   the Output inspector; they are not copied into emitter node effects. The
+   fixed terminal stores its cap in the graph snapshot owned by the main effect.
+   The graph compiler combines those global controls with editable node records
+   when it builds the snapshot. The main effect owns the graph topology, edges,
+   layout, and compiled graph snapshot. Editable node
+   modules own their node values and persisted identities. Store the 128-bit
+   identity as eight exact 16-bit chunks in script-visible scalar streams, not
+   four 32-bit values that exceed the exact integer range of a 32-bit float.
+   The graph compiler maps node effects to core UUIDs; it must not use display names, effect
+   indices, or session-only stream IDs as persistent IDs. Duplicating a node
+   must allocate a fresh identity and apply a defined link policy; the prototype
+   must prove this before enabling Ctrl+D for node effects.
 3. **Compile before rendering.** A host-side graph synchronizer enumerates node
    effect instances on the UI/edit path, reads their standard parameter streams,
    validates the resulting graph, and writes an immutable compiled snapshot to
@@ -53,7 +65,7 @@ project-persistent node ID.
    synchronized. The synchronization write must participate in AE's undo and
    cache invalidation model. A stale or invalid graph must fail visibly without
    rendering stale particles.
-5. **Keep the runtime hot path.** The thin node/output AEX modules share the
+5. **Keep the runtime hot path.** The main renderer and thin node AEX modules share the
    reloadable `StarfieldCore.dll`. Core algorithm changes remain Core-only
    builds; only changes to an AE module's parameter/UI contract require replacing
    that module.
@@ -75,19 +87,21 @@ independent parameter schema.
 
 ## Synchronization spike
 
-Before replacing P-02B's transaction plumbing, prove one Emitter module, one
-Particle module, and the Output renderer as a narrow AE 2023 prototype. The
-likely native route is for a node's `PF_Cmd_USER_CHANGED_PARAM` to request a
-UI-thread graph compile through the AE effect communication path, then write the
-compiled graph snapshot to the Output effect inside the same host edit/undo
-operation. The exact callback and stream update mechanism is intentionally not
-declared proven here.
+Before replacing P-02B's transaction plumbing, prove one Emitter module and one
+Particle module as a narrow AE 2023 prototype alongside the existing Starfield
+Particle renderer. The likely native route is for a node's
+`PF_Cmd_USER_CHANGED_PARAM` to request a UI-thread graph compile through the AE
+effect communication path, then write the compiled graph snapshot to the main
+Starfield Particle effect inside the same host edit/undo operation. The exact
+callback and stream update mechanism is intentionally not declared proven here.
 
 The spike is successful only when all of these work in AE 2023:
 
 - The panel can add two Particle instances and remove either one. Adding a node
   changes the Effect Controls stack immediately; adding a second of the same
-  type keeps separate parameter values.
+  type keeps separate parameter values. The graph always displays one Output
+  terminal bound to the existing main render effect; no Output effect is added
+  to the Effect Controls stack.
 - Changing either node's native AE controls or CEP inspector parameters updates
   the rendered result without pressing Refresh or reopening the panel.
 - One edit plus its compiled graph snapshot is one undo step. Undo/redo, Ctrl+D,
@@ -95,12 +109,13 @@ The spike is successful only when all of these work in AE 2023:
   rendered output coherent.
 - Duplicating an effect instance cannot leave two nodes with the same persistent
   ID or silently redirect existing graph edges.
-- Render and pre-render read only the Output effect's owned snapshot; no AEGP
+- Render and pre-render read only the main effect's owned snapshot; no AEGP
   enumeration of peer effects occurs on the render path.
-- The same graph bytes survive reopen and the panel reconstructs node instances
-  from the project without an incidental manual Refresh.
+- The same graph bytes survive reopen and the panel reconstructs editable node
+  instances plus the fixed Output terminal from the project without an
+  incidental manual Refresh.
 
-If the callback cannot update the Output snapshot atomically with an edit,
+If the callback cannot update the main effect's graph snapshot atomically with an edit,
 implement a native graph coordinator that explicitly tracks AE undo and cache
 invalidation before resuming general graph operations. Do not fall back to
 render-time sibling-effect queries.

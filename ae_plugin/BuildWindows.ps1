@@ -4,6 +4,7 @@ param(
     [string]$SdkPath = 'AdobeSDK\May2023_AfterEffectsSDK',
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '2023',
     [switch]$CoreOnly,
+    [switch]$NoRuntimePublish,
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 
@@ -22,8 +23,11 @@ $adapterInputs = @(
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
     'ae_plugin\WorldBridge.cpp', 'ae_plugin\WorldBridge.hpp',
-    'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h',
+    'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h', 'ae_plugin\BuildPiPL.ps1',
     'ae_plugin\StarfieldPiPL.r', 'ae_plugin\Starfield.vcxproj',
+    'ae_plugin\NodeEffectFlags.h', 'ae_plugin\NodeEffectMain.cpp',
+    'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeEffect.vcxproj',
+    'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeAppearancePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
@@ -82,12 +86,26 @@ try {
     $arguments += '/v:minimal'
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
+
+    foreach ($nodeKind in @('Emitter', 'Particle', 'Appearance', 'Force')) {
+        $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
+        $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"
+        $nodeArguments = @(
+            (Join-Path $drive 'ae_plugin\NodeEffect.vcxproj'), '/t:Build', '/m',
+            "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:NodeKind=$nodeKind",
+            "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath", "/p:OutDir=$nodeOutputDir\", "/p:IntDir=$nodeIntermediateDir\",
+            '/v:minimal'
+        )
+        & $MSBuildPath @nodeArguments
+        if ($LASTEXITCODE -ne 0) { throw "$nodeKind node effect MSBuild failed with exit code $LASTEXITCODE" }
+    }
     [IO.File]::WriteAllText($fingerprintPath, $adapterFingerprint, [Text.Encoding]::ASCII)
     }
 
     # Runtime publication is last: a failed build must leave the currently
-    # selected DLL unchanged. Filenames are content-addressed, so a mapped
-    # generation is never overwritten.
+    # selected DLL unchanged. Use NoRuntimePublish for an uninstalled candidate
+    # so the AE plug-in's runtime junction keeps selecting its current generation.
+    if (-not $NoRuntimePublish) {
     $runtimeDir = Join-Path $repositoryRoot 'artifacts\runtime'
     New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
     $builtCoreHash = (Get-FileHash -LiteralPath $builtCore -Algorithm SHA256).Hash
@@ -124,6 +142,10 @@ try {
         if (Test-Path -LiteralPath $manifestTemp) { Remove-Item -LiteralPath $manifestTemp }
         if (Test-Path -LiteralPath $manifestBackup) { Remove-Item -LiteralPath $manifestBackup }
     }
+    Write-Host "Selected runtime core: $runtimeCore" -ForegroundColor Green
+    } else {
+        Write-Host 'Runtime selection unchanged (-NoRuntimePublish).' -ForegroundColor Yellow
+    }
 
     # Publish a plainly named copy where a person can find it. MSBuild's OutDir is
     # artifacts/plugin/<label>/<platform>/<configuration>/, which is the right place to keep
@@ -140,6 +162,16 @@ try {
         }
         Write-Host ''
         Write-Host "Installable build: $(Join-Path $publishedDir 'StarfieldParticle.aex')" -ForegroundColor Green
+        foreach ($nodeModule in @('StarfieldEmitter', 'StarfieldParticleNode', 'StarfieldAppearance', 'StarfieldForce')) {
+            $builtNodeAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\$nodeModule.aex"
+            if (-not (Test-Path -LiteralPath $builtNodeAex)) { throw "Node build reported success but $builtNodeAex is missing." }
+            Copy-Item -LiteralPath $builtNodeAex -Destination (Join-Path $publishedDir "$nodeModule.aex") -Force
+            $builtNodePdb = [IO.Path]::ChangeExtension($builtNodeAex, '.pdb')
+            if (Test-Path -LiteralPath $builtNodePdb) {
+                Copy-Item -LiteralPath $builtNodePdb -Destination (Join-Path $publishedDir "$nodeModule.pdb") -Force
+            }
+            Write-Host "Node module: $(Join-Path $publishedDir "$nodeModule.aex")" -ForegroundColor Green
+        }
         Copy-Item -LiteralPath $builtCore -Destination (Join-Path $publishedDir 'StarfieldCore.dll') -Force
         $builtCorePdb = [IO.Path]::ChangeExtension($builtCore, '.pdb')
         if (Test-Path -LiteralPath $builtCorePdb) {
@@ -147,7 +179,6 @@ try {
         }
         Write-Host "Core DLL: $(Join-Path $publishedDir 'StarfieldCore.dll')" -ForegroundColor Green
     }
-    Write-Host "Selected runtime core: $runtimeCore" -ForegroundColor Green
 }
 finally {
     & $env:ComSpec /d /c "subst $drive /d" | Out-Null

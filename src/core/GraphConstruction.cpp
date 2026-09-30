@@ -9,8 +9,8 @@ namespace {
 using namespace graph_keys;
 
 GraphNode make_emitter_node(const Settings& settings, NodeId id) {
-    GraphNode node{id, kEmitterNode, 2, {
-        {kParticleCount, settings.particle_count}, {kBirthRate, settings.birth_rate},
+    GraphNode node{id, kEmitterNode, 3, {
+        {kBirthRate, settings.birth_rate},
         {kSeed, settings.seed},
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},
         {kEmitterOrigin, settings.emitter_origin}, {kVelocity, settings.velocity},
@@ -78,7 +78,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         graph.nodes = {
             make_emitter_node(settings, emitter),
             std::move(particle_node),
-            GraphNode{output, kOutputNode, 1, {}},
+            GraphNode{output, kOutputNode, 2, {{kParticleCount, settings.particle_count}}},
         };
         graph.edges = {
             GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},

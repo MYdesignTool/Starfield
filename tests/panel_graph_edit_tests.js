@@ -11,8 +11,8 @@ function graph() {
     return {
         version: 1,
         nodes: [
-            { id: emitter, type: edits.types.emitter, schemaVersion: 2, parameters: [
-                { key: "1", type: 3, value: 500 }, { key: "6", type: 5, value: [1, 2, 3] }
+            { id: emitter, type: edits.types.emitter, schemaVersion: 3, parameters: [
+                { key: "2", type: 4, value: 500 }, { key: "6", type: 5, value: [1, 2, 3] }
             ] },
             { id: particle, type: edits.types.particle, schemaVersion: 2, parameters: [
                 { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
@@ -21,7 +21,9 @@ function graph() {
                 { key: "11", type: 4, value: 2 }
             ] },
             { id: force, type: edits.types.force, schemaVersion: 1, parameters: [] },
-            { id: output, type: edits.types.output, schemaVersion: 1, parameters: [] }
+            { id: output, type: edits.types.output, schemaVersion: 2, parameters: [
+                { key: "1", type: 3, value: 1000 }
+            ] }
         ],
         edges: [
             { id: uuid(11), sourceNode: emitter, sourcePort: "1", destinationNode: particle, destinationPort: "1" },
@@ -53,6 +55,11 @@ assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
 var particleId = original.nodes[1].id;
 var forceId = original.nodes[2].id;
 var outputId = original.nodes[3].id;
+var updatedOutput = edits.apply(original, { type: "setParameters", changes: [
+    { nodeId: outputId, parameterKey: "1", valueType: 3, value: 2500 }
+] }, idFactory);
+assert.strictEqual(updatedOutput.nodes[3].parameters[0].value, 2500,
+                   "Output Max Particles is edited on the main renderer's logical terminal");
 var addedForce = edits.apply(original, { type: "addNode", nodeType: "force" }, idFactory);
 assert.strictEqual(addedForce.nodes.length, 5);
 assert.strictEqual(original.nodes.length, 4, "edit planner must not mutate its input");

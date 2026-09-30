@@ -17,7 +17,6 @@
     };
     var SPECS = {
         emitter: {
-            "1": { label: "Max Particles", kind: "slider", decimals: 0, min: 0, max: 2000000, legacyKey: "particle_count" },
             "2": { label: "Particles Per Second", kind: "slider", decimals: 0, min: 0, max: 1000000, legacyKey: "birth_rate" },
             "3": { label: "Random Seed", kind: "slider", decimals: 0, min: 0, max: 2147483647, legacyKey: "seed" },
             "5": { label: "Type", kind: "popup", decimals: 0, min: 1, max: 4, displayOffset: 1,
@@ -67,7 +66,9 @@
                   legacyKeys: ["gravity_x", "gravity_y", "gravity_z"] },
             "2": { label: "Linear Drag", kind: "slider", decimals: 3, min: 0, max: 100, legacyKey: "linear_drag" }
         },
-        output: {}
+        output: {
+            "1": { label: "Max Particles", kind: "slider", decimals: 0, min: 0, max: 2000000, legacyKey: "particle_count" }
+        }
     };
     var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
                    appearance: "Appearance", output: "Output" };
@@ -132,7 +133,8 @@
         }
         if (emitters.length !== 1) return null;
         var emitter = emitters[0];
-        var cap = findParameter(emitter, "1");
+        var output = byId["$" + outputIds[0]];
+        var cap = findParameter(output, "1");
         var rate = findParameter(emitter, "2");
         if (!cap || !rate) return null;
         cap = Number(cap.value);
@@ -270,7 +272,6 @@
         var nodes = [];
         var positions = layoutOverride || layout.resolve(graph);
         var byId = {};
-        var activeEmitter = activeEmitterParameters(graph);
         for (var i = 0; i < graph.nodes.length; i++) {
             var source = graph.nodes[i];
             var kind = kindFor(source.type);
@@ -328,15 +329,11 @@
         }
         var emitters = nodes.filter(function (node) { return node.kind === "emitter"; });
         var outputs = nodes.filter(function (node) { return node.kind === "output"; });
-        if (activeEmitter && outputs.length) {
-            var sourceEmitter = graph.nodes.filter(function (node) { return node.id === activeEmitter.emitterId; })[0];
-            var max = sourceEmitter && findParameter(sourceEmitter, "1");
-            if (max) {
-                outputs[0].params.push(viewParameter(emitters.filter(function (node) {
-                    return node.id === activeEmitter.emitterId;
-                })[0], "emitter", max, SPECS.emitter["1"]));
-                outputs[0].maxParticles = max.value;
-            }
+        if (outputs.length) {
+            var maxParticles = findParameter(graph.nodes.filter(function (node) {
+                return node.id === outputs[0].id;
+            })[0], "1");
+            if (maxParticles) outputs[0].maxParticles = maxParticles.value;
         }
         var edges = graph.edges.map(function (edge) {
             var pair = [edge.sourceNode, edge.destinationNode];

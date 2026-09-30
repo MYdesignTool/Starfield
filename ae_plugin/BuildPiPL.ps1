@@ -1,10 +1,16 @@
 param(
     [Parameter(Mandatory = $true)][string]$SdkRoot,
     [Parameter(Mandatory = $true)][string]$IntermediateDir,
-    [Parameter(Mandatory = $true)][string]$ResourceSource
+    [Parameter(Mandatory = $true)][string]$ResourceSource,
+    [string]$FlagHeaderPath = '',
+    [string]$VersionHeaderPath = '',
+    [string]$OutFlagsName = 'STARFIELD_OUT_FLAGS',
+    [string]$OutFlags2Name = 'STARFIELD_OUT_FLAGS2'
 )
 
 $ErrorActionPreference = 'Continue'
+if (-not $FlagHeaderPath) { $FlagHeaderPath = Join-Path $PSScriptRoot 'PluginFlags.h' }
+if (-not $VersionHeaderPath) { $VersionHeaderPath = Join-Path $PSScriptRoot 'PluginVersion.h' }
 $null = New-Item -ItemType Directory -Force -Path $IntermediateDir
 $headerDir = Join-Path $SdkRoot 'Examples\Headers'
 $toolPath = Join-Path $SdkRoot 'Examples\Resources\PiPLtool.exe'
@@ -36,15 +42,14 @@ if ($toolExitCode -ne 0) { throw "Adobe PiPL resource pipeline failed with exit 
 $generatedRc = Join-Path $IntermediateDir 'StarfieldPiPL.rc'
 if (-not (Test-Path -LiteralPath $generatedRc)) { throw "PiPL pipeline did not produce $generatedRc" }
 
-$headerDir = Split-Path -Parent $ResourceSource
-$flagText = [System.IO.File]::ReadAllText((Join-Path $headerDir 'PluginFlags.h'))
-$versionText = [System.IO.File]::ReadAllText((Join-Path $headerDir 'PluginVersion.h'))
+$flagText = [System.IO.File]::ReadAllText($FlagHeaderPath)
+$versionText = [System.IO.File]::ReadAllText($VersionHeaderPath)
 $resourceText = [System.IO.File]::ReadAllText($generatedRc)
 
 foreach ($entry in @(
-        @{ Name = 'STARFIELD_OUT_FLAGS'; Text = $flagText; Source = 'PluginFlags.h' },
-        @{ Name = 'STARFIELD_OUT_FLAGS2'; Text = $flagText; Source = 'PluginFlags.h' },
-        @{ Name = 'STARFIELD_VERSION_PACKED'; Text = $versionText; Source = 'PluginVersion.h' })) {
+        @{ Name = $OutFlagsName; Text = $flagText; Source = $FlagHeaderPath },
+        @{ Name = $OutFlags2Name; Text = $flagText; Source = $FlagHeaderPath },
+        @{ Name = 'STARFIELD_VERSION_PACKED'; Text = $versionText; Source = $VersionHeaderPath })) {
     $match = [regex]::Match($entry.Text, "#define\s+$($entry.Name)\s+(0x[0-9A-Fa-f]+|\d+)")
     if (-not $match.Success) { throw "Could not read $($entry.Name) from $($entry.Source)" }
 

@@ -171,9 +171,8 @@ GraphNode make_test_emitter(std::uint8_t id) {
     GraphNode node;
     node.id = NodeId{test_uuid(id)};
     node.type_key = kEmitterNode;
-    node.schema_version = 2;
+    node.schema_version = 3;
     node.parameters = {
-        {kParticleCount, std::uint32_t{100}},
         {kBirthRate, 30.0},
         {kSeed, std::uint32_t{1}},
         {kEmitterShape, std::uint32_t{0}},
@@ -185,6 +184,12 @@ GraphNode make_test_emitter(std::uint8_t id) {
         {kVelocitySpread, 0.15},
     };
     return node;
+}
+
+GraphNode make_test_output(std::uint8_t id, std::uint32_t particle_count = 100) {
+    using namespace graph_keys;
+    return GraphNode{NodeId{test_uuid(id)}, kOutputNode, 2, {
+        {kParticleCount, particle_count}}};
 }
 
 GraphNode make_test_particle(std::uint8_t id) {
@@ -212,11 +217,7 @@ Graph make_basic_graph() {
     using namespace graph_keys;
     Graph graph;
     graph.nodes.push_back(make_test_emitter(1));
-    GraphNode output;
-    output.id = NodeId{test_uuid(2)};
-    output.type_key = kOutputNode;
-    output.schema_version = 1;
-    graph.nodes.push_back(std::move(output));
+    graph.nodes.push_back(make_test_output(2));
     graph.edges.push_back(GraphEdge{EdgeId{test_uuid(1)}, NodeId{test_uuid(1)}, kEmitterParticles,
                                     NodeId{test_uuid(2)}, kOutputParticles});
     return graph;
@@ -277,7 +278,7 @@ void test_graph_contract() {
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_node_type);
 
     bad = graph;
-    bad.nodes[0].schema_version = 3;
+    bad.nodes[0].schema_version = 4;
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unsupported_node_version);
 
     bad = graph;
@@ -293,11 +294,11 @@ void test_graph_contract() {
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::missing_required_parameter);
 
     bad = graph;
-    bad.nodes[0].parameters[0].value = 100.0;
+    bad.nodes[0].parameters[0].value = std::uint32_t{100};
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::parameter_type_mismatch);
 
     bad = graph;
-    bad.nodes[0].parameters[1].value = std::numeric_limits<double>::infinity();
+    bad.nodes[0].parameters[0].value = std::numeric_limits<double>::infinity();
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::invalid_parameter_value);
 
     bad = graph;
@@ -1545,6 +1546,26 @@ void test_graph_evaluation() {
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const Graph graph = made.take_value();
+    Graph output_capped = graph;
+    const auto output_node = std::find_if(output_capped.nodes.begin(), output_capped.nodes.end(),
+        [](const GraphNode& node) { return node.type_key == kOutputNode; });
+    CHECK(output_node != output_capped.nodes.end());
+    if (output_node != output_capped.nodes.end()) {
+        const auto cap = std::find_if(output_node->parameters.begin(), output_node->parameters.end(),
+            [](const NodeParameter& parameter) { return parameter.key == kParticleCount; });
+        CHECK(cap != output_node->parameters.end());
+        if (cap != output_node->parameters.end()) cap->value = std::uint32_t{2};
+    }
+    const auto capped_evaluation = evaluate_particle_graph(output_capped, RationalTime{1, 1}, never);
+    CHECK(capped_evaluation.has_value() && capped_evaluation.value().particles.size() == 2);
+    Graph uncapped_output = graph;
+    const auto uncapped_node = std::find_if(uncapped_output.nodes.begin(), uncapped_output.nodes.end(),
+        [](const GraphNode& node) { return node.type_key == kOutputNode; });
+    if (uncapped_node != uncapped_output.nodes.end() && !uncapped_node->parameters.empty()) {
+        uncapped_node->parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
+    }
+    const auto invalid_output_cap = evaluate_particle_graph(uncapped_output, RationalTime{1, 1}, never);
+    CHECK(!invalid_output_cap.has_value() && invalid_output_cap.error().code == ErrorCode::invalid_request);
     const auto rejects = [&](const Graph& bad, ErrorCode code = ErrorCode::invalid_request) {
         const auto result = evaluate_particle_graph(bad, RationalTime{1, 1}, never);
         CHECK(!result.has_value());
@@ -1587,10 +1608,10 @@ void test_graph_evaluation() {
     };
     rejects(bad); // a Force path cannot emit without a connected Particle node
     bad = graph;
-    bad.nodes[0].parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
+    bad.nodes[1].parameters[0].value = std::uint32_t{kMaxParticleCount + 1};
     rejects(bad);
     bad = graph;
-    bad.nodes[0].parameters[4].value = std::uint32_t{256}; // must not wrap uint8 enum
+    bad.nodes[0].parameters[2].value = std::uint32_t{256}; // must not wrap uint8 enum
     rejects(bad);
     bad = graph;
     bad.nodes[0].parameters[8].value = -0.5;
@@ -1599,7 +1620,7 @@ void test_graph_evaluation() {
     bad.nodes[0].parameters[1].value = std::numeric_limits<double>::infinity();
     rejects(bad);
     bad = graph;
-    bad.nodes.push_back(GraphNode{NodeId{test_uuid(3)}, kOutputNode, 1, {}});
+    bad.nodes.push_back(make_test_output(3));
     bad.edges.push_back(GraphEdge{EdgeId{test_uuid(8)}, emitter, kEmitterParticles, bad.nodes.back().id, kOutputParticles});
     CHECK(validate_graph(bad, particle_node_registry()).ok());
     rejects(bad); // structurally legal, but ambiguous output selection

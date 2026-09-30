@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{1B95A3D7-7B31-4414-A4B2-F82D4D650A20}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>StarfieldNodeEffect</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <STARFIELD_AE_SDK_ROOT Condition="'$(STARFIELD_AE_SDK_ROOT)' == ''">$(MSBuildProjectDirectory)\..\AdobeSDK\May2023_AfterEffectsSDK</STARFIELD_AE_SDK_ROOT>
+    <NodeKind Condition="'$(NodeKind)' == ''">Emitter</NodeKind>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><PlatformToolset>v145</PlatformToolset><CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><PlatformToolset>v145</PlatformToolset><WholeProgramOptimization>true</WholeProgramOptimization><CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)..\artifacts\plugin\2023\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\artifacts\plugin\2023\obj\$(Platform)\$(Configuration)\node-$(NodeKind)\</IntDir>
+    <TargetExt>.aex</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Emitter'">
+    <TargetName>StarfieldEmitter</TargetName><NodePiPL>NodeEmitterPiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_EMITTER</NodeKindDefine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Particle'">
+    <TargetName>StarfieldParticleNode</TargetName><NodePiPL>NodeParticlePiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_PARTICLE</NodeKindDefine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Appearance'">
+    <TargetName>StarfieldAppearance</TargetName><NodePiPL>NodeAppearancePiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_APPEARANCE</NodeKindDefine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Force'">
+    <TargetName>StarfieldForce</TargetName><NodePiPL>NodeForcePiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_FORCE</NodeKindDefine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NodePiPL)'==''">
+    <NodeKindError>NodeKind must be Emitter, Particle, Appearance, or Force.</NodeKindError>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel><TreatWarningAsError>false</TreatWarningAsError><SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;$(NodeKindDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\Win;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
+    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><TargetMachine>MachineX64</TargetMachine></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="NodeEffectMain.cpp" />
+    <ClCompile Include="NodeEffects.cpp" />
+    <CustomBuild Include="$(NodePiPL)">
+      <Message>Generating $(NodeKind) node PiPL resource</Message>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName STARFIELD_NODE_OUT_FLAGS -OutFlags2Name STARFIELD_NODE_OUT_FLAGS2</Command>
+      <Outputs>$(IntDir)StarfieldPiPL.rr;$(IntDir)StarfieldPiPL.rrc;$(IntDir)StarfieldPiPL.rc</Outputs>
+      <AdditionalInputs>$(MSBuildProjectDirectory)\NodeEffectFlags.h;$(MSBuildProjectDirectory)\PluginVersion.h;$(MSBuildProjectDirectory)\NodeEffectMain.cpp;$(MSBuildProjectDirectory)\NodeEffects.cpp;$(MSBuildProjectDirectory)\NodeEffects.hpp</AdditionalInputs>
+    </CustomBuild>
+    <ResourceCompile Include="$(IntDir)StarfieldPiPL.rc" />
+  </ItemGroup>
+  <Target Name="ValidateNodeKind" BeforeTargets="PrepareForBuild" Condition="'$(NodePiPL)'==''">
+    <Error Text="$(NodeKindError)" />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

@@ -53,8 +53,9 @@ struct ParticleSlotRange {
                                                                      EmitterDimensionContext dimension_context = {});
 
 // Evaluate only global emission slots assigned to one deterministic branch.
-// Slot identity, birth time, random streams, and the emitter-wide live cap stay
-// unchanged: slot k is included when k % partition_count == partition_index.
+// Slot identity, birth time, and random streams stay unchanged: slot k is
+// included when k % partition_count == partition_index. Output applies the
+// global live-particle cap before every branch uses this partition.
 // This lets graph Particle nodes split one emitter without simulating the full
 // population once per branch.
 [[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles_partition(
@@ -62,7 +63,7 @@ struct ParticleSlotRange {
     std::uint32_t partition_index, const Cancellation& cancellation,
     EmitterDimensionContext dimension_context = {});
 
-// Return the bounded global slot interval used by every branch of an emitter.
+// Return the bounded global slot interval selected by Output for every branch.
 [[nodiscard]] Result<ParticleSlotRange> live_particle_slot_range(
     const ValidatedSettings& settings, double time_seconds);
 

@@ -270,6 +270,13 @@ void test_parameters(PF_InData& host) {
     CHECK(force_node != snapshot->nodes.end() && particle_node != snapshot->nodes.end() &&
           output_node != snapshot->nodes.end() &&
           emitter_node != snapshot->nodes.end());
+    if (output_node != snapshot->nodes.end()) {
+        const auto* particle_cap = find_value(*output_node, core::graph_keys::kParticleCount);
+        CHECK(particle_cap != nullptr && std::get<std::uint32_t>(*particle_cap) == 20);
+    }
+    if (emitter_node != snapshot->nodes.end()) {
+        CHECK(find_value(*emitter_node, core::graph_keys::kParticleCount) == nullptr);
+    }
     if (snapshot->nodes.size() == 4 && snapshot->edges.size() == 3) {
         CHECK(snapshot->edges[0].source_node == emitter_node->id &&
               snapshot->edges[0].destination_node == particle_node->id);

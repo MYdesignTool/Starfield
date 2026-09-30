@@ -28,6 +28,31 @@
         return codec.fromHex(snapshot.graphHex);
     }
 
+    function jsonValue(value) {
+        if (Object.prototype.toString.call(value) === "[object Array]" ||
+            Object.prototype.toString.call(value) === "[object Uint8Array]") {
+            var result = [];
+            for (var i = 0; i < value.length; i++) result.push(jsonValue(value[i]));
+            return result;
+        }
+        return value;
+    }
+
+    function nativeNodeManifest(graph) {
+        var result = [];
+        for (var i = 0; i < graph.nodes.length; i++) {
+            var node = graph.nodes[i];
+            // Output is the graph-facing view of the owning Starfield Particle
+            // renderer, not an independently materialized AE node effect.
+            if (node.type === "org.starfieldfx.nodes.output") continue;
+            result.push({ id: node.id, type: node.type, schemaVersion: node.schemaVersion,
+                parameters: node.parameters.map(function (parameter) {
+                    return { key: String(parameter.key), type: parameter.type, value: jsonValue(parameter.value) };
+                }) });
+        }
+        return result;
+    }
+
     function create(options) {
         options = options || {};
         if (typeof options.call !== "function" || !options.codec || !options.edits) {
@@ -59,7 +84,8 @@
                                      error && error.message ? error.message : String(error)));
                     return;
                 }
-                call("submitGraph", { baseGraphRevision: base.revision, graphHex: graphHex }, function (committed) {
+                call("submitGraph", { baseGraphRevision: base.revision, graphHex: graphHex,
+                    baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated) }, function (committed) {
                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
                     var saved = committed.snapshot;
                     try {
@@ -80,7 +106,22 @@
             });
         }
 
-        return { apply: apply };
+        function ensureNativeEffects(snapshot, targetToken, callback) {
+            if (typeof callback !== "function") throw new Error("node-effect callback is required");
+            var graph;
+            try {
+                graph = validateSnapshot(snapshot, codec, maxBytes);
+            } catch (error) {
+                callback(failure(error && error.code ? error.code : "invalid_graph_snapshot",
+                                 error && error.message ? error.message : String(error)));
+                return;
+            }
+            call("ensureNodeEffects", { target: { token: targetToken },
+                baseGraphRevision: snapshot.revision, graphHex: snapshot.graphHex,
+                nodeManifest: nativeNodeManifest(graph) }, callback);
+        }
+
+        return { apply: apply, ensureNativeEffects: ensureNativeEffects };
     }
 
     return { create: create, defaultMaxBytes: DEFAULT_MAX_BYTES };

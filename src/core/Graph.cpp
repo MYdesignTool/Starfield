@@ -517,10 +517,9 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor emitter;
     emitter.type_key = kEmitterNode;
-    emitter.schema_version = 2;
+    emitter.schema_version = 3;
     emitter.ports.push_back(PortDescriptor{kEmitterParticles, PortDirection::output, kParticleStream, false, 0});
     emitter.parameters = {
-        ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
         ParameterDescriptor{kBirthRate, ParameterKind::float64, true},
         ParameterDescriptor{kSeed, ParameterKind::uint32, true},
         ParameterDescriptor{kEmitterShape, ParameterKind::uint32, true},
@@ -569,8 +568,11 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor output;
     output.type_key = kOutputNode;
-    output.schema_version = 1;
+    output.schema_version = 2;
     output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 0});
+    output.parameters = {
+        ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
+    };
 
     NodeTypeDescriptor force;
     force.type_key = kForceNode;

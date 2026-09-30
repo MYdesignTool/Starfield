@@ -24,20 +24,26 @@ duplicate, and delete commands use a copy-on-write edit planner and a bounded,
 revision-checked transaction coordinator. Dynamic card positions are stored in the graph's
 project-owned optional layout record; the older eight layout streams remain only for the
 four-card view.
-The panel reads and writes the effect's **supervised render-value parameters** through a
-namespaced ExtendScript gateway. In Node Graph mode, it gets the canonical graph snapshot,
-applies the requested edit, then submits the replacement graph through the supervised
-expression carrier. It never writes the arbitrary-data `Node Graph Data` property directly
-or accesses host-private state. Fake-host tests cover the edit planner, revision transaction,
-and dynamic graph projection; the expression/callback, undo, save/reopen, stale-write, and
-render paths remain unqualified in AE 2023.
+The panel reads and writes **supervised render-value parameters** through a namespaced
+ExtendScript gateway. In Node Graph mode, it gets the canonical graph snapshot, plans a
+revision-checked edit, creates/removes the matching Emitter, Particle, Appearance, or Force
+AEX instances, writes their values, and submits the replacement graph through the main
+renderer effect's supervised expression carrier in one AE undo group. The fixed Output
+terminal is backed by the main renderer and is omitted from the node-effect manifest. The
+panel never writes the arbitrary-data `Node Graph Data` property directly or accesses
+host-private state. Editing a node AEX's controls directly in Effect Controls does not yet
+recompile the graph. Fake-host tests cover graph planning, manifests, two independent native
+Emitter instances, dimensions, identity streams, deletion, gateway startup, and projection;
+Effect Parade edits, callback/undo, save/reopen, and render response remain unqualified in
+AE 2023.
 
-The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, and `submitGraph` through
-ADR 0013's hidden expression carrier. The canvas calls these operations through the
-transaction coordinator. `submitGraph` accepts bounded schema-1 graph bytes as lowercase
-hex; the effect validates the bytes and rejects stale revisions before changing its
-canonical graph. This integration exists in source but has not yet passed the AE 2023
-host qualification gates below.
+The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, `ensureNodeEffects`, and
+`submitGraph`. Graph reads and commits use ADR 0013's hidden expression carrier;
+`ensureNodeEffects` materializes missing editable node instances from the project graph.
+`submitGraph` accepts bounded schema-1 graph bytes as lowercase hex, reconciles native node
+instances and values, then asks the main effect to validate and persist the graph. This
+integration passes fake-host tests and builds against the May 2023 SDK, but has not yet
+passed its AE 2023 host qualification gates below.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
@@ -153,7 +159,9 @@ authorization.
     right-click menu expose graph operations. AE 2023 cannot script-read the graph's
    `CUSTOM_VALUE`, so the panel uses ADR 0013's ordinary expression carrier instead. Source
    integration is present, but the supervised callback and one-step undo/save-reopen behavior
-   still need qualification with the matching AEX. Click a node to open its floating
+   still need qualification with the matching AEX. P-02D's Emitter, Particle, and Force AEX
+   modules currently build as pass-through prototypes; the graph actions are not yet wired to
+   create/remove those AE effects or compile their values into the renderer. Click a node to open its floating
    properties window. The proposed carrier and its qualification gate are documented in
    [ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md). The checked
    **Refresh Automatically** option re-reads the selected AE target while the panel is visible;

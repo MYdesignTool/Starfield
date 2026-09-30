@@ -17,10 +17,10 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "particle-variation-1";
+    var GATEWAY_BUILD = "native-node-sync-1";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
-    var MAX_REQUEST_BYTES = 65536;
+    var MAX_REQUEST_BYTES = 262144;
     var MAX_GRAPH_BYTES = 24 * 1024;
     var MAX_GRAPH_REVISION = 4294967295;
     var MAX_GRAPH_NONCE = 1000000;
@@ -30,6 +30,12 @@
         request: { index: 42, name: "Graph Edit Request" },
         commit: { index: 43, name: "Commit Graph Edit" },
         receipt: { index: 44, name: "Graph Edit Receipt" }
+    };
+    var NATIVE_NODE_TYPES = {
+        "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
+        "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
+        "org.starfieldfx.nodes.appearance": { kind: "appearance", label: "Appearance", matchName: "org.starfieldfx.node.appearance" },
+        "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" }
     };
 
     // One row per bound effect parameter. `index` is the registered parameter index
@@ -185,7 +191,7 @@
     function findTargetByToken(token) {
         if (!app.project) return { error: { code: "no_project", message: "No project is open." } };
         if (typeof token !== "string") return { error: { code: "invalid_request", message: "A pinned target token is required." } };
-        var match = /^p([0-9]+)-c([0-9]+)-l([0-9]+)-e([0-9]+)$/.exec(token);
+        var match = /^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(token);
         if (!match) return { error: { code: "invalid_request", message: "The pinned target token is malformed." } };
         if (!app.project.rootFolder || String(app.project.rootFolder.id) !== match[1]) {
             return { error: { code: "stale_target", message: "The pinned effect belongs to a different project. Unlock it to follow the current selection." } };
@@ -202,11 +208,11 @@
             if (String(candidate.id) === match[3]) { layer = candidate; break; }
         }
         if (!layer) return { error: { code: "stale_target", message: "The pinned layer no longer exists." } };
-        var parade = layer.property("ADBE Effect Parade");
-        var effect = parade ? parade.property(Number(match[4])) : null;
-        if (!effect || effect.matchName !== MATCH_NAME) {
-            return { error: { code: "stale_target", message: "The pinned Starfield effect no longer exists at that location." } };
+        if (effectCount(layer) !== 1) {
+            return { error: { code: "stale_target", message: "The pinned layer no longer has exactly one Starfield Particle effect." } };
         }
+        var effect = findEffect(layer);
+        if (!effect) return { error: { code: "stale_target", message: "The pinned Starfield effect no longer exists." } };
         return { comp: comp, layer: layer, effect: effect };
     }
 
@@ -347,22 +353,266 @@
         return (hash >>> 0).toString(16);
     }
 
-    // AE 2023 exposes persistent Item.id and Layer.id values (both were added
-    // before AE 2023); the effect's propertyIndex distinguishes its instance on
-    // the layer. The project root ID prevents an open-project switch from reusing
-    // a token when two projects happen to reuse item IDs. The panel treats this
-    // string as an opaque echo token.
+    // The layer is constrained to one Starfield Particle instance by findTarget.
+    // Do not include Effect Parade propertyIndex: adding/removing node AEX instances
+    // changes that index and would invalidate the pinned renderer target.
     function targetToken(target) {
         if (!target || !target.comp || !target.layer || !target.effect || !app.project || !app.project.rootFolder) return null;
         var projectId = Number(app.project.rootFolder.id);
         var compId = Number(target.comp.id);
         var layerId = Number(target.layer.id);
-        var effectIndex = Number(target.effect.propertyIndex);
         if (!isFinite(projectId) || Math.floor(projectId) !== projectId || projectId < 0 ||
             !isFinite(compId) || Math.floor(compId) !== compId || compId < 0 ||
-            !isFinite(layerId) || Math.floor(layerId) !== layerId || layerId < 0 ||
-            !isFinite(effectIndex) || Math.floor(effectIndex) !== effectIndex || effectIndex < 1) return null;
-        return "p" + projectId + "-c" + compId + "-l" + layerId + "-e" + effectIndex;
+            !isFinite(layerId) || Math.floor(layerId) !== layerId || layerId < 0) return null;
+        return "p" + projectId + "-c" + compId + "-l" + layerId;
+    }
+
+    function nativeNodeType(type) {
+        return Object.prototype.hasOwnProperty.call(NATIVE_NODE_TYPES, type) ? NATIVE_NODE_TYPES[type] : null;
+    }
+
+    function findEffectProperty(effect, name) {
+        if (!effect) return null;
+        try {
+            var direct = effect.property(name);
+            if (direct && direct.name === name) return direct;
+        } catch (ignored) { /* recurse through parameter groups */ }
+        var count = 0;
+        try { count = Number(effect.numProperties) || 0; } catch (ignoredCount) { count = 0; }
+        for (var i = 1; i <= count; i++) {
+            var child = null;
+            try { child = effect.property(i); } catch (ignoredChild) { child = null; }
+            if (!child) continue;
+            if (child.name === name) return child;
+            var nested = findEffectProperty(child, name);
+            if (nested) return nested;
+        }
+        return null;
+    }
+
+    function nodeIdentity(effect) {
+        var result = "";
+        for (var i = 0; i < 8; i++) {
+            var property = findEffectProperty(effect, "Node UUID " + i);
+            if (!property) return null;
+            var value = Number(property.value);
+            if (!isFinite(value) || Math.floor(value) !== value || value < 0 || value > 65535) return null;
+            var part = value.toString(16);
+            while (part.length < 4) part = "0" + part;
+            result += part;
+        }
+        return result === "00000000000000000000000000000000" ? null : result;
+    }
+
+    function setNodeIdentity(effect, id) {
+        for (var i = 0; i < 8; i++) {
+            var property = findEffectProperty(effect, "Node UUID " + i);
+            if (!property) throw new Error("Node identity streams are missing from the node effect.");
+            property.setValue(parseInt(id.substr(i * 4, 4), 16));
+        }
+    }
+
+    function nodeEffectById(layer, id) {
+        var parade = layer.property("ADBE Effect Parade");
+        if (!parade) return null;
+        for (var i = 1; i <= parade.numProperties; i++) {
+            var effect = parade.property(i);
+            if (!effect || !nativeNodeTypeByMatch(effect.matchName)) continue;
+            if (nodeIdentity(effect) === id) return effect;
+        }
+        return null;
+    }
+
+    function nativeNodeTypeByMatch(matchName) {
+        for (var type in NATIVE_NODE_TYPES) {
+            if (Object.prototype.hasOwnProperty.call(NATIVE_NODE_TYPES, type) &&
+                NATIVE_NODE_TYPES[type].matchName === matchName) return type;
+        }
+        return null;
+    }
+
+    function setNodeControl(effect, name, value) {
+        var property = findEffectProperty(effect, name);
+        if (!property || typeof property.setValue !== "function") {
+            throw new Error("Node effect parameter is missing: " + name);
+        }
+        property.setValue(value);
+    }
+
+    function readGraphFloat64(bytes, offset) {
+        var sign = (bytes[offset + 7] & 128) ? -1 : 1;
+        var exponent = ((bytes[offset + 7] & 127) << 4) | (bytes[offset + 6] >> 4);
+        var mantissa = (bytes[offset + 6] & 15) * 281474976710656 + bytes[offset + 5] * 1099511627776 +
+            bytes[offset + 4] * 4294967296 + bytes[offset + 3] * 16777216 + bytes[offset + 2] * 65536 +
+            bytes[offset + 1] * 256 + bytes[offset];
+        if (exponent === 2047) throw new Error("A curve contains a non-finite graph value.");
+        var value = exponent === 0 ? mantissa * Math.pow(2, -1074) : (1 + mantissa / 4503599627370496) * Math.pow(2, exponent - 1023);
+        value *= sign;
+        if (!isFinite(value)) throw new Error("A curve contains a non-finite graph value.");
+        return value;
+    }
+
+    function writeNodeCurve(effect, label, bytes) {
+        var points = [];
+        if (bytes !== null && bytes !== undefined) {
+            if (!(bytes instanceof Array) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 8 ||
+                bytes.length !== 4 + bytes[1] * 16) throw new Error(label + " curve payload is malformed.");
+            for (var i = 0; i < bytes[1]; i++) {
+                var age = readGraphFloat64(bytes, 4 + i * 16);
+                var value = readGraphFloat64(bytes, 12 + i * 16);
+                if (age < 0 || age > 1 || value < 0 || value > 100 || (i && age <= points[i - 1].age)) {
+                    throw new Error(label + " curve point is outside its supported range.");
+                }
+                points.push({ age: age, value: value });
+            }
+            if (points[0].age !== 0 || points[points.length - 1].age !== 1) {
+                throw new Error(label + " curve endpoints must remain at 0 and 100 percent life.");
+            }
+        }
+        setNodeControl(effect, label + " Curve Count", points.length);
+        for (var p = 0; p < points.length; p++) {
+            setNodeControl(effect, label + " Curve " + p + " Age", points[p].age);
+            setNodeControl(effect, label + " Curve " + p + " Value", points[p].value);
+        }
+    }
+
+    function nodeParameter(node, key) {
+        for (var i = 0; i < node.parameters.length; i++) {
+            if (String(node.parameters[i].key) === String(key)) return node.parameters[i];
+        }
+        return null;
+    }
+
+    function setNodeParameters(effect, node) {
+        var type = node.type;
+        for (var i = 0; i < node.parameters.length; i++) {
+            var parameter = node.parameters[i];
+            var key = String(parameter.key);
+            var value = parameter.value;
+            if (type === "org.starfieldfx.nodes.emitter") {
+                if (key === "2") setNodeControl(effect, "Particles Per Second", value);
+                else if (key === "3") setNodeControl(effect, "Random Seed", value);
+                else if (key === "5") setNodeControl(effect, "Type", Number(value) + 1);
+                else if (key === "6") setNodeControl(effect, "Origin", value);
+                else if (key === "7") {
+                    setNodeControl(effect, "Velocity X", value[0]);
+                    setNodeControl(effect, "Velocity Y", value[1]);
+                    setNodeControl(effect, "Velocity Z", value[2]);
+                } else if (key === "8") setNodeControl(effect, "Particle Size", value);
+                else if (key === "9") setNodeControl(effect, "Opacity", value);
+                else if (key === "10") setNodeControl(effect, "Disc Size", value);
+                else if (key === "11") setNodeControl(effect, "Speed Random", value);
+                else if (key === "12") setNodeControl(effect, "Emission Speed", value);
+                else if (key === "13") setNodeControl(effect, "Emission Speed Random", value);
+                else if (key === "14") setNodeControl(effect, "Emission Angle X", value);
+                else if (key === "15") setNodeControl(effect, "Emission Angle Y", value);
+                else if (key === "16") setNodeControl(effect, "Emission Angle Z", value);
+                else if (key === "17") setNodeControl(effect, "Direction", Number(value) + 1);
+                else if (key === "18") setNodeControl(effect, "Direction Span", value);
+                else if (key === "19") setNodeControl(effect, "Size X", value);
+                else if (key === "20") setNodeControl(effect, "Size Y", value);
+                else if (key === "21") setNodeControl(effect, "Size Z", value);
+                else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+            } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
+                if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
+                    [value[0], value[1], value[2], 1]);
+                else if (key === "3") setNodeControl(effect, "Size", value);
+                else if (key === "4") setNodeControl(effect, "Size Over Life", value);
+                else if (key === "5") setNodeControl(effect, "Opacity", value);
+                else if (key === "6") setNodeControl(effect, "Opacity Over Life", value);
+                else if (key === "7") writeNodeCurve(effect, "Size", value);
+                else if (key === "8") writeNodeCurve(effect, "Opacity", value);
+                else if (key === "9") setNodeControl(effect, "Size Random", value);
+                else if (key === "10") setNodeControl(effect, "Opacity Random", value);
+                else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Lifetime", value);
+                else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
+            } else if (type === "org.starfieldfx.nodes.force") {
+                if (key === "1") setNodeControl(effect, "Gravity", value);
+                else if (key === "2") setNodeControl(effect, "Linear Drag", value);
+                else throw new Error("Force graph parameter is not mapped to an AE control: " + key);
+            }
+        }
+        if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
+            if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
+            if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
+        }
+    }
+
+    function validateNodeManifest(nodes) {
+        if (!(nodes instanceof Array) || nodes.length > 4096) throw new Error("node manifest is missing or exceeds its limit.");
+        var seen = {};
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            if (!node || typeof node.id !== "string" || !/^[0-9a-fA-F]{32}$/.test(node.id) ||
+                !nativeNodeType(node.type) || !(node.parameters instanceof Array) || node.parameters.length > 64 ||
+                typeof node.schemaVersion !== "number" || node.schemaVersion < 1 || Math.floor(node.schemaVersion) !== node.schemaVersion) {
+                throw new Error("node manifest contains an invalid node record.");
+            }
+            node.id = node.id.toLowerCase();
+            if (seen["$" + node.id]) throw new Error("node manifest contains duplicate node identities.");
+            seen["$" + node.id] = true;
+            var keys = {};
+            for (var p = 0; p < node.parameters.length; p++) {
+                var parameter = node.parameters[p];
+                if (!parameter || !/^\d+$/.test(String(parameter.key)) || keys["$" + parameter.key]) {
+                    throw new Error("node manifest contains an invalid or duplicate parameter key.");
+                }
+                keys["$" + parameter.key] = true;
+            }
+        }
+        return nodes;
+    }
+
+    function addNativeNode(layer, node) {
+        var spec = nativeNodeType(node.type);
+        var parade = layer.property("ADBE Effect Parade");
+        if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
+        var effect = parade.addProperty(spec.matchName);
+        if (!effect) throw new Error("AE did not create the " + spec.label + " effect instance.");
+        effect.name = spec.label + " " + node.id.substr(0, 6);
+        setNodeIdentity(effect, node.id);
+        setNodeParameters(effect, node);
+    }
+
+    function ensureNativeNodeEffects(layer, nodes, writeExisting) {
+        validateNodeManifest(nodes);
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            var effect = nodeEffectById(layer, node.id);
+            if (!effect) addNativeNode(layer, node);
+            else {
+                var existingType = nativeNodeTypeByMatch(effect.matchName);
+                if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
+                if (writeExisting) setNodeParameters(effect, node);
+            }
+        }
+    }
+
+    function removeNativeNodeEffects(layer, ids) {
+        for (var i = 0; i < ids.length; i++) {
+            var effect = nodeEffectById(layer, ids[i]);
+            if (effect && typeof effect.remove === "function") effect.remove();
+        }
+    }
+
+    function nodeIds(nodes) {
+        var ids = {};
+        for (var i = 0; i < nodes.length; i++) ids["$" + nodes[i].id] = true;
+        return ids;
+    }
+
+    function removedNodeIds(previous, next) {
+        var desired = nodeIds(next);
+        var removed = [];
+        for (var i = 0; i < previous.length; i++) if (!desired["$" + previous[i].id]) removed.push(previous[i].id);
+        return removed;
+    }
+
+    function addedNodeIds(previous, next) {
+        var old = nodeIds(previous);
+        var added = [];
+        for (var i = 0; i < next.length; i++) if (!old["$" + next[i].id]) added.push(next[i].id);
+        return added;
     }
 
     function resolveCarrier(effect, key) {
@@ -442,7 +692,7 @@
                        target: { token: resolved.token }, snapshot: snapshot });
     }
 
-    function triggerGraphCarrier(resolved, expression, undoLabel, requestId, nonce) {
+    function triggerGraphCarrier(resolved, expression, undoLabel, requestId, nonce, manageUndoGroup) {
         var mailbox = resolved.properties.request;
         var commit = resolved.properties.commit;
         var receipt = resolved.properties.receipt;
@@ -453,8 +703,10 @@
         var attemptedCommit = false;
         var groupOpen = false;
         try {
-            app.beginUndoGroup(undoLabel);
-            groupOpen = true;
+            if (manageUndoGroup !== false) {
+                app.beginUndoGroup(undoLabel);
+                groupOpen = true;
+            }
             mailbox.expression = expression;
             mailbox.expressionEnabled = false;
             attemptedCommit = true;
@@ -502,6 +754,33 @@
                        target: { token: resolved.token }, nonce: receipt.nonce, snapshot: snapshot });
     }
 
+    function ensureNodeEffects(request) {
+        var resolved = graphCarrierTarget(request);
+        if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        var current = parseGraphSnapshot(resolved.properties.snapshot.expression);
+        if (!current || !current.initialized || current.revision !== request.baseGraphRevision ||
+            current.graphHex !== String(request.graphHex || "").toLowerCase()) {
+            return fail("stale_graph", "The project graph changed before its AE node effects could be reconciled.");
+        }
+        var nodes;
+        try { nodes = validateNodeManifest(request.nodeManifest); }
+        catch (manifestError) { return fail("invalid_node_manifest", manifestError.toString()); }
+        var groupOpen = false;
+        try {
+            app.beginUndoGroup("Starfield: create node effects");
+            groupOpen = true;
+            ensureNativeNodeEffects(resolved.target.layer, nodes, false);
+        } catch (error) {
+            return fail("node_effect_sync_failed", error.toString());
+        } finally {
+            if (groupOpen) {
+                try { app.endUndoGroup(); } catch (ignored) { /* preserve the host error above */ }
+            }
+        }
+        return reply({ ok: true, operation: "ensureNodeEffects", requestId: request.requestId || "",
+                       target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length });
+    }
+
     function submitGraph(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
@@ -520,18 +799,54 @@
         if (snapshot.revision !== request.baseGraphRevision) {
             return fail("stale_graph", "The project graph changed since this edit began; reload before editing.");
         }
-        var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
-        var byteCount = graphHex.length / 2;
-        var transaction = "/*SFLDTXN1:" + nonce + ":" + snapshot.revision + ":" + byteCount + ":" +
-                          crc32Hex(graphHex) + ":" + graphHex + "*/0";
-        var receipt = triggerGraphCarrier(resolved, transaction, "Starfield: edit graph", request.requestId, nonce);
-        if (!receipt.ok) return reply(receipt);
-        var updated = parseGraphSnapshot(resolved.properties.snapshot.expression);
-        if (!updated || !updated.initialized || updated.revision !== snapshot.revision + 1 || updated.graphHex !== graphHex) {
-            return fail("graph_snapshot_unconfirmed", "The effect acknowledged the edit but the saved graph snapshot did not match it.");
+        var previousNodes;
+        var desiredNodes;
+        try {
+            previousNodes = validateNodeManifest(request.baseNodeManifest);
+            desiredNodes = validateNodeManifest(request.nodeManifest);
+        } catch (manifestError) {
+            return fail("invalid_node_manifest", manifestError.toString());
         }
-        return reply({ ok: true, operation: "submitGraph", requestId: request.requestId || "",
-                       target: { token: resolved.token }, nonce: receipt.nonce, snapshot: updated });
+        var groupOpen = false;
+        var result = null;
+        try {
+            app.beginUndoGroup("Starfield: edit graph and nodes");
+            groupOpen = true;
+            ensureNativeNodeEffects(resolved.target.layer, desiredNodes, true);
+            removeNativeNodeEffects(resolved.target.layer, removedNodeIds(previousNodes, desiredNodes));
+
+            // Effect Parade structural edits invalidate indexed-group references. Resolve
+            // the pinned renderer and all carrier streams again after changing the parade.
+            var fresh = graphCarrierTarget(request);
+            if (fresh.error) throw new Error(fresh.error.message);
+            var nonce = nextGraphNonce(fresh.properties.commit, fresh.properties.receipt);
+            var byteCount = graphHex.length / 2;
+            var transaction = "/*SFLDTXN1:" + nonce + ":" + snapshot.revision + ":" + byteCount + ":" +
+                              crc32Hex(graphHex) + ":" + graphHex + "*/0";
+            var receipt = triggerGraphCarrier(fresh, transaction, "Starfield: edit graph", request.requestId, nonce, false);
+            if (!receipt.ok) throw new Error(receipt.error && receipt.error.message || "The graph carrier rejected the edit.");
+            var updated = parseGraphSnapshot(fresh.properties.snapshot.expression);
+            if (!updated || !updated.initialized || updated.revision !== snapshot.revision + 1 || updated.graphHex !== graphHex) {
+                throw new Error("The host acknowledgement did not match the saved graph snapshot.");
+            }
+            result = { ok: true, operation: "submitGraph", requestId: request.requestId || "",
+                       target: { token: fresh.token }, nonce: receipt.nonce, snapshot: updated };
+        } catch (error) {
+            var rollbackMessage = "";
+            try {
+                ensureNativeNodeEffects(resolved.target.layer, previousNodes, true);
+                removeNativeNodeEffects(resolved.target.layer, addedNodeIds(previousNodes, desiredNodes));
+            } catch (rollbackError) { rollbackMessage = " Node-effect rollback failed: " + rollbackError.toString(); }
+            result = { ok: false, error: { code: "graph_commit_failed", message: error.toString() + rollbackMessage } };
+        } finally {
+            if (groupOpen) {
+                try { app.endUndoGroup(); }
+                catch (endError) {
+                    if (result && result.ok) result = { ok: false, error: { code: "graph_commit_failed", message: endError.toString() } };
+                }
+            }
+        }
+        return reply(result);
     }
 
     function controlSource(effect) {
@@ -1039,6 +1354,17 @@
         }
     }
 
+    function SFLD_ensureNodeEffects(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
+        try {
+            if (request.operation !== "ensureNodeEffects") return fail("unknown_operation", request.operation);
+            return ensureNodeEffects(request);
+        } catch (error) {
+            return fail("host_error", error.toString());
+        }
+    }
+
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
@@ -1049,6 +1375,7 @@
     host.SFLD_getGraphSnapshot = SFLD_getGraphSnapshot;
     host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
     host.SFLD_submitGraph = SFLD_submitGraph;
+    host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
 })();

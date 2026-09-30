@@ -239,12 +239,14 @@ points. The CEP editor prevents edits to an animated final ordinate and leaves i
 Node Graph curves keep the existing constant-graph contract. The nested graph
 payload's byte layout and validation rules are specified in ADR 0016.
 
-Graph ownership follows the visible node layout. Emitter schema 2 stores global birth rate, seed,
-and cap, and has no Lifetime parameter. Particle schema 2 requires Lifetime at graph key 11, in
+Graph ownership follows the visible node layout. Emitter schema 3 stores birth rate and seed,
+and has no Lifetime or Max Particles parameter. Output schema 2 stores the global Max Particles
+cap in the main renderer's graph snapshot; it is visible in the Output inspector and has no
+separate AE effect instance. Particle schema 2 requires Lifetime at graph key 11, in
 seconds. Candidate emission slots are bounded using the longest active Particle lifetime, then each
 branch expires its own slots and the output is compacted in stable global-ID order. The AE Effect
 Controls Lifetime stream remains parameter ID 12 and is projected onto each new Particle node.
-Pre-release Emitter/Particle node schema 1 snapshots are intentionally unsupported; there is no
+Pre-release Emitter schema 1–2, Particle schema 1, and Output schema 1 snapshots are intentionally unsupported; there is no
 project migration path during development. See ADR 0015.
 
 ## Deterministic emission rules (M2)

@@ -48,7 +48,6 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
     Settings settings;
     for (const NodeParameter& parameter : node.parameters) {
         switch (parameter.key.value) {
-            case kParticleCount.value: settings.particle_count = std::get<std::uint32_t>(parameter.value); break;
             case kBirthRate.value: settings.birth_rate = std::get<double>(parameter.value); break;
             case kSeed.value: settings.seed = std::get<std::uint32_t>(parameter.value); break;
             case kEmitterShape.value: {
@@ -239,6 +238,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
 
         const std::size_t count = nodes.size();
         std::size_t output = count;
+        std::uint32_t output_particle_count = 1000;
         std::vector<std::optional<ValidatedSettings>> emitters(count);
         std::vector<std::optional<ForceValues>> forces(count);
         std::vector<std::optional<AppearanceValues>> appearances(count);
@@ -250,6 +250,17 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             if (node.type_key == kOutputNode) {
                 if (output != count) return R::failure(ErrorCode::invalid_request, "graph requires exactly one output");
                 output = i;
+                const auto* particle_count = find_value(node, kParticleCount);
+                if (!particle_count) {
+                    return R::failure(ErrorCode::invalid_request, "output node is missing the Max Particles value");
+                }
+                Settings output_settings;
+                output_settings.particle_count = std::get<std::uint32_t>(*particle_count);
+                auto validated_output = validate_settings(output_settings);
+                if (!validated_output.notices.empty()) {
+                    return R::failure(ErrorCode::invalid_request, "output Max Particles is outside supported bounds");
+                }
+                output_particle_count = validated_output.value.particle_count;
             } else if (node.type_key == kEmitterNode) {
                 auto value = read_emitter(node);
                 if (!value.has_value()) return R::failure(value.error());
@@ -355,7 +366,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         }
 
         const ValidatedSettings& validated_emitter = *emitters[active_emitter];
-        const Settings& emitter_settings = validated_emitter.value;
+        Settings emitter_settings = validated_emitter.value;
+        emitter_settings.particle_count = output_particle_count;
         std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
             return nodes[left]->id < nodes[right]->id;
         });

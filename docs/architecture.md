@@ -12,13 +12,22 @@ The native effect is the product boundary. The AE SDK adapter translates selecto
 
 ```text
 After Effects
-  └─ StarfieldParticle.aex   PiPL, selectors, AE parameters, graph persistence,
-       │                     SmartFX snapshots, host pixels and DLL loader
-       └─ StarfieldCore.dll graph evaluation, deterministic simulation,
-                             CPU renderer and later backends
+  ├─ StarfieldParticle.aex       main render effect, graph persistence,
+  │                              SmartFX snapshots, host pixels and DLL loader
+  ├─ StarfieldEmitter.aex        repeatable, project-saved Emitter node controls
+  ├─ StarfieldParticleNode.aex   repeatable, project-saved Particle node controls
+  ├─ StarfieldAppearance.aex    repeatable, project-saved Appearance node controls
+  ├─ StarfieldForce.aex          repeatable, project-saved Force node controls
+  └─ StarfieldCore.dll           graph evaluation, deterministic simulation,
+                                 CPU renderer and later backends
 ```
 
-Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. It edits supervised, script-visible AE parameter streams; the effect turns those changes into the canonical arbitrary-data graph during `PF_Cmd_USER_CHANGED_PARAM`. The panel never shares C++ object layouts with the effect, and render code never queries panel or AEGP state.
+The node AEX modules hold independent AE parameter streams; they do not render
+particles. The existing `StarfieldParticle.aex` remains the only renderer and owns
+the canonical graph snapshot. The graph's fixed visible Output terminal is the
+panel representation of that main effect; no separate Output AEX is built.
+
+Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. A graph transaction creates/removes the corresponding node AEX instances, writes their values, and commits the canonical graph snapshot to the main effect in one undo group. The Output terminal and its global controls remain on the main effect. Direct editing of node AEX parameter streams in Effect Controls is not yet synchronized back into the graph; the host-side synchronization and undo path remains an AE 2023 qualification gate. The panel never shares C++ object layouts with the effect, and render code never queries sibling effects or panel state.
 
 ADR 0012 defines the runtime C ABI and versioned development DLLs. The AE
 adapter still owns graph serialization and control-to-graph construction because
@@ -36,9 +45,10 @@ identity is mixed into the SmartFX cache key.
 Particle state must be reproducible from graph parameters, seed, and absolute time. Do not advance a process-global simulation by “one frame”; AE can request frames out of order, repeatedly, or concurrently. Random streams should be derived from stable particle IDs and the effect seed. Frame time remains rational through the adapter and is converted once at the simulation boundary.
 
 Each Particle node owns its lifetime and retires only the particle slots assigned
-to its branch. Emitter schema 2 has no lifetime parameter; Particle schema 2
-requires its own lifetime. Output applies one global Max Particles cap and
-keeps stable particle-ID ordering across branches. Particle Size is a base diameter
+to its branch. Emitter schema 3 has no lifetime or Max Particles parameter; Particle
+schema 2 requires its own lifetime. Output schema 2 stores one global Max Particles
+cap in the main effect's graph snapshot and keeps stable particle-ID ordering across
+branches. Particle Size is a base diameter
 in full-resolution layer pixels (bounded at 100000 px). Size Over Life and Opacity
 Over Life each use a fixed 0–100% curve that multiplies the corresponding base
 value. Box and Sphere emitter dimensions are direct full-resolution layer pixels converted through frame
@@ -100,9 +110,9 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 1. **Complete in code:** M0/M1 contracts and the AE 2023 Windows x64 shell.
 2. **Complete in code; host gate open:** M2 SmartFX transport, ROI, pixel-format adapters, and deterministic CPU rendering. See M2-06 in `compatibility-matrix.md`.
-3. **Implemented in core and controls:** M3-01 seeded emitters, M3-01B direct-pixel Box/Sphere dimensions, and M3-02 gravity, drag, and age curves. P-02C adds bounded Size/Opacity polylines. M3-06 makes Particle own lifetime and makes curve interpolation selection non-destructive; a render reproduced dark translucent particles over blue, so AE currently requests straight-alpha output pending focused host confirmation. AE curve, lifetime, and compositing checks remain open. G-05 provides Particle branches and parallel force merges; its focused source and host regression gates remain open.
-4. **Graph authoring architecture reopened:** G-01–G-05 provide the host-independent graph model, codec, persistence contract, and Particle/branch evaluation. P-02B's CEP canvas and transaction planner are present in source, including node add/connect/reconnect/disconnect/splice/delete/duplicate/move, typed edits, saved positions, marquee selection, zoom/pan/minimap, Alt-drag copy, Ctrl+D, and the custom context menu. The owner reports node addition and removal still fail in AE; source implementation is not user-visible completion. ADR 0013's expression carrier remains an unqualified prototype. The observed Stardust inventory uses separate AE control-effect instances with per-instance IDs. Proposed ADR 0019 and P-02D define a native-effect prototype: each node is an independently persisted AE effect, while one Output effect consumes a compiled graph snapshot. Qualify UI-thread synchronization, undo, copy/duplicate identity, save/reopen, and cache updates before resuming P-02B. Never query sibling effects from render callbacks.
-5. **Remaining Alpha work:** complete P-02D's per-node effect synchronization spike before resuming P-02B/P-02C host integration; qualify the current core build and G-05 behavior, define animation/history, and prioritize depth/projection, source types, and presets from observed behavior.
+3. **Implemented in core and controls:** M3-01 seeded emitters, M3-01B direct-pixel Box/Sphere dimensions, and M3-02 gravity, drag, and age curves. P-02C adds bounded Size/Opacity polylines. M3-06 makes Particle own lifetime and makes curve interpolation selection non-destructive; a render reproduced dark translucent particles over blue, so AE currently requests straight-alpha output pending focused host confirmation. AE curve, lifetime, and compositing checks remain open. G-05 provides Particle branches and parallel force merges, with focused core and adapter regression coverage; AE qualification remains open.
+4. **Graph authoring architecture reopened:** G-01–G-05 provide the host-independent graph model, codec, persistence contract, and Particle/branch evaluation. P-02B's CEP canvas and transaction planner cover node add/connect/reconnect/disconnect/splice/delete/duplicate/move, typed edits, saved positions, selection, zoom/pan/minimap and context actions. P-02D now has source integration that adds/removes per-node Emitter, Particle, Appearance, and Force AEX instances and commits the graph snapshot to the main renderer. The fixed Output terminal stays visible in CEP, is backed by the main Starfield Particle effect, and has no standalone AEX. The node target no longer depends on Effect Parade indices. Fake-host suites and the AE 2023 SDK build pass, but the owner has not qualified this integration in AE. Direct native Effect Controls edits, undo/redo, duplicate identity, save/reopen and immediate rendered response remain host gates. Never query sibling effects from render callbacks.
+5. **Remaining Alpha work:** complete P-02D's per-node effect synchronization spike before resuming P-02B/P-02C host integration; qualify the current build and G-05 behavior in AE, define animation/history, and prioritize depth/projection, source types, and presets from observed behavior.
 6. Keep MFR, Compute Cache, and GPU work behind separate concurrency/performance evidence and host-specific decisions.
 
 ## Current scope
@@ -119,4 +129,4 @@ prior monolith is backed up for rollback. Half/Third point mapping, split-build
 copy/undo, shapes and basic gravity/size changes also have AE observations. See
 `compatibility-matrix.md`.
 
-M0/M1, M2 rendering, M3-01/M3-01B/M3-02 core behavior, G-01–G-05, and the CEP graph view/transaction source are present. The owner reports that dynamic node addition/removal still does not work in AE, so P-02B is not delivered despite its source implementation. P-02C routes graph-mode over-life curves through the same prototype carrier and retains the AE Controls curve-bank path. Proposed ADR 0019/P-02D move node values into separate AE effect instances and keep the renderer snapshot as compiled project data; callback synchronization, undo, copy/duplicate identity, save/reopen, and render-cache behavior are the next proof points. ADR 0014 defines the current UUID-keyed project graph-layout record. Startup discovery retries transient conditions until the target is available, with delay capped at 5 seconds. The current single effect registers 27 render/control streams, eight dormant layout streams, four graph-carrier streams, ten topic markers, 34 hidden curve-bank streams, and AE's implicit input (85 total indices including input). Owner testing confirms time consistency; AE visually confirmed 8/16/32-bpc output and transparent particles with the split build. Graph history/animation, MFR, and GPU remain open.
+M0/M1, M2 rendering, M3-01/M3-01B/M3-02 core behavior, G-01–G-05, and the CEP graph view/transaction source are present. P-02D now wires CEP graph transactions to separate editable node AEX instances and the main effect's graph snapshot; the AE 2023 host pass has not yet exercised the complete path. P-02C routes graph-mode over-life curves through the same carrier and retains the AE Controls curve-bank path. The fixed visible CEP Output terminal is backed by the main Starfield Particle effect and is not a separate AEX. Direct edits to node AEX controls and the host undo/duplicate/save/render gates remain open. ADR 0014 defines the current UUID-keyed project graph-layout record. Startup discovery retries transient conditions until the target is available, with delay capped at 5 seconds. The current single effect registers 27 render/control streams, eight dormant layout streams, four graph-carrier streams, ten topic markers, 34 hidden curve-bank streams, and AE's implicit input (85 total indices including input). Owner testing confirms time consistency; AE visually confirmed 8/16/32-bpc output and transparent particles with the split build. Graph history/animation, MFR, and GPU remain open.

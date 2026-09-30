@@ -16,7 +16,7 @@
         appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 2, particle: 2, force: 1, appearance: 1, output: 1 };
+    var SCHEMA_VERSIONS = { emitter: 3, particle: 2, force: 1, appearance: 1, output: 2 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2", inputLimit: 1 },
@@ -26,7 +26,7 @@
     };
     var DEFAULTS = {
         emitter: [
-            { key: "1", type: 3, value: 1000 }, { key: "2", type: 4, value: 30 },
+            { key: "2", type: 4, value: 30 },
             { key: "3", type: 3, value: 1 },
             { key: "5", type: 3, value: 0 }, { key: "6", type: 5, value: [0, 0, 0] },
             { key: "7", type: 5, value: [0, 0.3, 0] }, { key: "8", type: 4, value: 10 },
@@ -54,7 +54,7 @@
             { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 100 },
             { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
-        output: []
+        output: [{ key: "1", type: 3, value: 1000 }]
     };
 
     function fail(code, message) {
