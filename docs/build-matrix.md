@@ -84,11 +84,20 @@ Core tests passed 11,909 checks; adapter fake-host tests passed 678 checks; all
 seven focused CEP codec, edit, graph-view, transaction, native-node gateway,
 gateway, and startup suites passed. The native-node fake host exercises two
 independent Emitter instances, dimensions, UUID streams, deletion, and graph
-commit. The full build used `-NoRuntimePublish`; `artifacts/runtime/current.txt`
-was unchanged. `dist/` is a regular repository directory, not a junction, and no
-files were installed into AE 2023. The owner has not yet loaded this candidate.
-Effect Parade operations, direct native Effect Controls edits, undo/redo,
-duplicate identity, save/reopen, and immediate render response remain host gates.
+commit. The full build used `-NoRuntimePublish`; the build itself left
+`artifacts/runtime/current.txt` unchanged. The owner-authorized deployment then
+backed up the prior main AEX and runtime selector under
+`artifacts/disabled/p02d-node-sync-20260930/`, copied the five AEX files into
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`, and selected
+`StarfieldCore-55B877A8F66D3576.dll` through the existing `StarfieldRuntime`
+junction. Installed hashes match the table. AE remains closed, so this candidate
+has not yet been loaded or host-tested. Effect Parade operations, direct native
+Effect Controls edits, undo/redo, duplicate identity, save/reopen, and immediate
+render response remain host gates. The read-only rollback report is
+`powershell -ExecutionPolicy Bypass -File tools/Rollback-P02D-Candidate.ps1
+-PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins'`;
+append `-Rollback` to restore the backed-up main AEX and Core selector and move
+the newly added node AEX files into the backup folder.
 
 ## M3-06 Particle lifetime and curve authoring candidate (2026-09-30)
 
