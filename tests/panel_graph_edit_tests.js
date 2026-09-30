@@ -78,9 +78,14 @@ assert.strictEqual(inserted.edges.length, 4);
 assert.deepStrictEqual(layout.get(inserted)[insertedId], { x: 235, y: 172 },
                        "a spliced node is placed between its endpoints");
 
-var reused = edits.apply(addedForce, {
-    type: "insertNode", nodeId: addedForce.nodes[4].id, from: particleId, to: forceId
-}, idFactory);
+var dropPosition = { x: 462, y: 188 };
+var movedGroupPosition = { x: -360, y: 158 };
+var spliceEdge = [particleId, forceId];
+spliceEdge.id = uuid(12);
+var spliceEdit = edits.createInsertEdit(addedForce.nodes[4].id,
+    spliceEdge, dropPosition,
+    { [particleId]: movedGroupPosition });
+var reused = edits.apply(addedForce, spliceEdit, idFactory);
 assert.strictEqual(reused.nodes.length, 5, "wire insertion reuses the dragged node");
 assert.ok(reused.edges.some(function (edge) {
     return edge.sourceNode === particleId && edge.destinationNode === addedForce.nodes[4].id;
@@ -88,6 +93,12 @@ assert.ok(reused.edges.some(function (edge) {
 assert.ok(reused.edges.some(function (edge) {
     return edge.sourceNode === addedForce.nodes[4].id && edge.destinationNode === forceId;
 }));
+assert.deepStrictEqual(layout.get(reused)[addedForce.nodes[4].id], dropPosition,
+                       "wire insertion retains the dragged node's actual drop position");
+assert.deepStrictEqual(layout.get(reused)[particleId], movedGroupPosition,
+                       "wire insertion commits the rest of a moved selection in the same graph edit");
+assert.deepStrictEqual(layout.get(codec.fromHex(codec.toHex(reused)))[addedForce.nodes[4].id], dropPosition,
+                       "the inserted node's drop position survives graph serialization");
 
 var disconnected = edits.apply(original, { type: "disconnect", edgeId: uuid(12) }, idFactory);
 assert.strictEqual(disconnected.edges.length, 2);

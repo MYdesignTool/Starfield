@@ -240,11 +240,29 @@
         graph.edges.splice(edgeIndex, 1);
         if (!nodeId) nodeId = addNode(graph, { nodeType: edit.nodeType, position: position }, idFactory, positions);
         else positions[nodeId] = position;
+        if (edit.layout !== undefined) moveNodes(graph, { positions: edit.layout }, positions);
         connect(graph, { from: previous.sourceNode, to: nodeId,
                          outputPort: previous.sourcePort }, idFactory);
         connect(graph, { from: nodeId, to: previous.destinationNode,
                          inputPort: previous.destinationPort }, idFactory);
         return nodeId;
+    }
+
+    function createInsertEdit(nodeId, edge, position, layoutPositions) {
+        if (typeof nodeId !== "string" || !nodeId || !edge || Object.prototype.toString.call(edge) !== "[object Array]" ||
+            edge.length !== 2 || !position || !isFinite(Number(position.x)) || !isFinite(Number(position.y))) {
+            fail("invalid_edit", "insert edit requires a node, an edge, and a finite drop position");
+        }
+        var edit = { type: "insertNode", nodeId: nodeId, edgeId: edge.id || undefined,
+                     from: edge[0], to: edge[1],
+                     position: { x: Number(position.x), y: Number(position.y) } };
+        if (layoutPositions !== undefined) {
+            if (!layoutPositions || Object.prototype.toString.call(layoutPositions) !== "[object Object]") {
+                fail("invalid_edit", "insert edit layout must be a node ID position map");
+            }
+            if (Object.keys(layoutPositions).length) edit.layout = layoutPositions;
+        }
+        return edit;
     }
 
     function deleteNodes(graph, edit, positions) {
@@ -377,5 +395,5 @@
         return layout.set(graph, positions);
     }
 
-    return { types: TYPES, ports: PORTS, apply: apply, randomId: randomId };
+    return { types: TYPES, ports: PORTS, apply: apply, createInsertEdit: createInsertEdit, randomId: randomId };
 }));

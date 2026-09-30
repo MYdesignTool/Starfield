@@ -2030,8 +2030,18 @@
             var draggedNode = state.nodes.filter(function (node) { return node.id === dragState.nodeId; })[0];
             var edge = draggedNode ? edgeUnderNode(draggedNode.id) : null;
             if (draggedNode && edge) {
-                requestTopologyEdit({ type: "insertNode", nodeId: draggedNode.id,
-                                      edgeId: edge.id, from: edge[0], to: edge[1] });
+                var dropPosition = nodePositions[draggedNode.id];
+                var groupPositions = {};
+                for (var movedIndex = 0; movedIndex < dragState.origins.length; movedIndex++) {
+                    var movedNodeId = dragState.origins[movedIndex].id;
+                    if (movedNodeId === draggedNode.id || !nodePositions[movedNodeId]) continue;
+                    groupPositions[movedNodeId] = {
+                        x: Number(nodePositions[movedNodeId].x),
+                        y: Number(nodePositions[movedNodeId].y)
+                    };
+                }
+                requestTopologyEdit(window.StarfieldGraphEdits.createInsertEdit(
+                    draggedNode.id, edge, dropPosition, groupPositions));
             }
         } else if (dragState && dragState.moved && event && event.type === "pointercancel") {
             for (var restoreIndex = 0; restoreIndex < dragState.origins.length; restoreIndex++) {
