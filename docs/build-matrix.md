@@ -493,12 +493,15 @@ The May 2023 SDK x64 Release build passed. Focused `panel_native_node_gateway`
 and `panel_startup` suites passed, along with `git diff --check`. The build used
 `-NoRuntimePublish`; the Core selector is unchanged. The main AEX candidate is
 SHA-256 `6301092C5D0E7A4C9B3FC646488A3F364BF76A97FF5115B75DCE83C1F1B22897`.
-The installed main AEX remains `3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`.
-AE 2023 was running as PID 22800 when checked, so this candidate has not been
-copied into the plug-in directory or loaded by AE. Graph add/copy/delete,
-automatic node creation, undo, persistence, and native Effect Parade deletion
-remain host checks; reverse synchronization from manually deleting an AEX to the
-CEP graph is still not implemented.
+The previous installed main AEX (`3277A6F65567D58E67CD64F4C72AB7603CB38BC0720CC9CF3C5EAB4F0ACCAFEF`)
+was renamed to `artifacts/disabled/p02d-mailbox-fix-20260930/StarfieldParticle.aex`.
+After the owner authorized closing AE, PID 22800 was ended without saving and the
+candidate was copied into `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`.
+The installed hash matches the candidate. AE is closed and has not loaded it yet.
+Graph add/copy/delete, automatic node creation, undo, persistence, and native
+Effect Parade deletion remain host checks; reverse synchronization from manually
+deleting an AEX to the CEP graph is still not implemented. To roll back, while AE
+is closed, copy the backup AEX above back to the plug-in path.
 
 ## Local SDK inputs
 
