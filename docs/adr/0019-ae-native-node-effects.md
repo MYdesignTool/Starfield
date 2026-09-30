@@ -95,9 +95,14 @@ panel refresh path and does not query sibling effects from rendering callbacks.
 
 Direct Effect Parade deletion and the resulting graph cleanup are separate AE
 operations, so this source design does not yet claim single-step undo for a
-manual deletion. AE 2023 qualification must check the undo stack, refresh after
-undo/redo, and save/reopen; if undo causes a missing node to be pruned again,
-reconciliation needs an explicit conflict state instead of silently retrying.
+manual deletion. The CEP transaction client now keeps a session-local guard for
+each reconciled deletion. If undo restores the graph node while its AE effect is
+still missing, the panel surfaces `native_node_undo_conflict` and pauses
+automatic pruning for that node; restoring the AE effect clears the guard. This
+prevents refresh from repeatedly consuming an undo. The guard is transient, so
+the graph/effect pair must be coherent before closing or reloading the panel.
+AE 2023 qualification must still check the undo stack, refresh after undo/redo,
+and save/reopen.
 
 P-02C's Size/Opacity curves and other non-scalar node values must also end up
 owned by the corresponding Particle effect. The prototype may start with scalar

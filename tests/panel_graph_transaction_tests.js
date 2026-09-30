@@ -67,7 +67,9 @@ function createHarness(initialGraph, options) {
             callback({ ok: false, error: { code: "unexpected_operation", message: operation } });
         }
     });
-    return { client: client, calls: calls, snapshot: function () { return snapshot; } };
+    return { client: client, calls: calls, snapshot: function () { return snapshot; },
+             replaceSnapshot: function (value) { snapshot = value; },
+             setMissingNodeIds: function (value) { options.missingNodeIds = value; } };
 }
 
 var source = graph();
@@ -122,6 +124,28 @@ assert.strictEqual(externalDeleteHarness.calls[1].operation, "getGraphSnapshot")
 assert.strictEqual(externalDeleteHarness.calls[2].operation, "submitGraph");
 assert.deepStrictEqual(externalDeleteHarness.calls[2].extra.target, { token: "target-1" },
                        "the deletion reconciliation stays pinned to the inspected AE effect");
+
+externalDeleteHarness.replaceSnapshot({ initialized: true, revision: 8, graphHex: codec.toHex(source) });
+var undoConflictReply;
+externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
+    undoConflictReply = response;
+});
+assert.strictEqual(undoConflictReply.ok, false,
+                   "undoing only the graph prune must not trigger another automatic prune");
+assert.strictEqual(undoConflictReply.error.code, "native_node_undo_conflict");
+assert.deepStrictEqual(undoConflictReply.missingNodeIds, [deletedNodeId]);
+assert.strictEqual(externalDeleteHarness.calls.length, 4,
+                   "the conflict is surfaced without submitting another graph transaction");
+
+externalDeleteHarness.setMissingNodeIds([]);
+var undoCompleteReply;
+externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
+    undoCompleteReply = response;
+});
+assert.strictEqual(undoCompleteReply.ok, true,
+                   "restoring the native AE effect clears the temporary undo conflict");
+assert.strictEqual(externalDeleteHarness.calls.length, 5,
+                   "restoration only checks node effects and does not prune graph state");
 
 var uninitialized = createHarness(source, { getSnapshot: function () {
     return { ok: true, snapshot: { initialized: false }, target: { token: "target-1" } };

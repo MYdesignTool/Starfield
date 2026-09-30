@@ -63,6 +63,14 @@
         var edits = options.edits;
         var maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
         var idFactory = options.idFactory;
+        // Manual Effect Parade deletion and graph pruning are separate AE undo
+        // records. If the user undoes only the graph prune, keep the restored
+        // graph node visible as a conflict instead of pruning it again forever.
+        var reconciledNativeDeletions = Object.create(null);
+
+        function deletionKey(targetToken, nodeId) {
+            return String(targetToken) + "|" + String(nodeId);
+        }
 
         function apply(edit, callback, targetToken) {
             if (typeof callback !== "function") throw new Error("graph transaction callback is required");
@@ -123,13 +131,44 @@
                 baseGraphRevision: snapshot.revision, graphHex: snapshot.graphHex,
                 nodeManifest: nativeNodeManifest(graph) }, function (ensured) {
                     if (!ensured || ensured.ok !== true ||
-                        Object.prototype.toString.call(ensured.missingNodeIds) !== "[object Array]" ||
-                        ensured.missingNodeIds.length === 0) {
+                        Object.prototype.toString.call(ensured.missingNodeIds) !== "[object Array]") {
                         callback(ensured);
                         return;
                     }
+
+                    var missing = Object.create(null);
+                    for (var missingIndex = 0; missingIndex < ensured.missingNodeIds.length; missingIndex++) {
+                        missing[String(ensured.missingNodeIds[missingIndex])] = true;
+                    }
+                    var manifest = nativeNodeManifest(graph);
+                    for (var nodeIndex = 0; nodeIndex < manifest.length; nodeIndex++) {
+                        var currentId = String(manifest[nodeIndex].id);
+                        if (!missing[currentId]) delete reconciledNativeDeletions[deletionKey(targetToken, currentId)];
+                    }
+
+                    var blocked = [];
+                    for (var checkIndex = 0; checkIndex < ensured.missingNodeIds.length; checkIndex++) {
+                        var missingId = String(ensured.missingNodeIds[checkIndex]);
+                        if (reconciledNativeDeletions[deletionKey(targetToken, missingId)]) blocked.push(missingId);
+                    }
+                    if (blocked.length) {
+                        var undoConflict = failure("native_node_undo_conflict",
+                            "Undo restored graph node(s) " + blocked.join(", ") +
+                            " while their AE effects are still deleted. Restore the missing effect or redo the graph deletion; automatic pruning is paused.");
+                        undoConflict.missingNodeIds = blocked;
+                        callback(undoConflict);
+                        return;
+                    }
+                    if (ensured.missingNodeIds.length === 0) {
+                        callback(ensured);
+                        return;
+                    }
+
                     apply({ type: "deleteNodes", nodeIds: ensured.missingNodeIds }, function (reconciled) {
                         if (!reconciled || reconciled.ok !== true) { callback(reconciled); return; }
+                        for (var deletedIndex = 0; deletedIndex < ensured.missingNodeIds.length; deletedIndex++) {
+                            reconciledNativeDeletions[deletionKey(targetToken, ensured.missingNodeIds[deletedIndex])] = true;
+                        }
                         callback({ ok: true, operation: "reconcileNativeNodeDeletion",
                             target: reconciled.target, snapshot: reconciled.snapshot,
                             removedNodeIds: ensured.missingNodeIds.slice() });
