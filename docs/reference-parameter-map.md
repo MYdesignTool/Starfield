@@ -59,7 +59,7 @@ Our equivalent is the `Render` topic plus the panel.
 | `Speed Random` | 0 | `Speed Random` | Aligned in name; theirs randomizes the scalar speed, ours jitters each axis |
 | `Speed Over Life` | group | — | **Missing** (split into Size/Opacity over life today) |
 | `Inertia` | 0 | `Linear Drag` | Same idea, different name/units (theirs percent-like, ours inverse seconds); rename pending confirmation |
-| `Size X/Y/Z` | 100 / 100 / 100 | `Size X/Y/Z` (percent of `Emitter Size`) | Axis controls now match the percentage convention; the existing common base extent remains for compatibility |
+| `Size X/Y/Z` | 100 / 100 / 100 | `Size X/Y/Z` (direct layer pixels) | The owner specifies direct dimensions, not percentages; current core uses these on Box and Sphere |
 | `Light Size`, `Angle X/Y/Z`, `Direction:`, `Orient X/Y/Z`, `Direction Span` | 0/0/0, 1, 0/0/0, 60 | — | **Missing**: the direction/cone model that replaces our three velocity sliders |
 | `Auxiliary`, `Ring Particles`, `Grid/Path/Layer/Object Properties`, `Time Offset` | — | — | **Missing** (further emitter types) |
 | `Random Seed` | **1000** | `Random Seed` | Ours sits in Render and defaults to 1 |
@@ -97,8 +97,8 @@ Our equivalent is the `Render` topic plus the panel.
 - **Over Life uses curves**, not endpoint pairs. P-02C now authors bounded piecewise-linear
   curves in CEP and evaluates them in Particle/Appearance; the AE visual and project lifecycle
   gates remain open.
-- **Emitter size is per-axis and percent-based** (`Size X/Y/Z`). Revision 10 adds these
-  controls while retaining the prior common `Emitter Size` extent as the 100% base.
+- **Emitter dimensions are direct pixels** (`Size X/Y/Z`). Revision 12 uses these
+  direct values for Box and Sphere; `Disc Size` remains a separate layer-height diameter.
 
 ## How to regenerate
 

@@ -27,7 +27,7 @@
                   legacyKeys: ["velocity_x", "velocity_y", "velocity_z"] },
             "8": { label: "Particle Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
             "9": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
-            "10": { label: "Emitter Size", kind: "slider", decimals: 3, min: 0, max: 10, legacyKey: "emitter_size" },
+            "10": { label: "Disc Size", kind: "slider", decimals: 3, min: 0, max: 10, legacyKey: "emitter_size" },
             "11": { label: "Speed Random", kind: "slider", decimals: 2, min: 0, max: 100, legacyKey: "velocity_spread" },
             "12": { label: "Emission Speed", kind: "slider", decimals: 2, min: 0, max: 1000 },
             "13": { label: "Emission Speed Random", kind: "slider", decimals: 2, min: 0, max: 1000 },
@@ -37,9 +37,9 @@
             "17": { label: "Direction Mode", kind: "popup", decimals: 0, min: 1, max: 2, displayOffset: 1,
                    choices: ["Directional", "Uniform"] },
             "18": { label: "Direction Span", kind: "slider", decimals: 1, min: 0, max: 180 },
-            "19": { label: "Size X", kind: "slider", decimals: 0, min: 0, max: 1000, legacyKey: "emitter_size_x" },
-            "20": { label: "Size Y", kind: "slider", decimals: 0, min: 0, max: 1000, legacyKey: "emitter_size_y" },
-            "21": { label: "Size Z", kind: "slider", decimals: 0, min: 0, max: 1000, legacyKey: "emitter_size_z" }
+            "19": { label: "Size X", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
+            "20": { label: "Size Y", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
+            "21": { label: "Size Z", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" }
         },
         particle: {
             "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_start" },

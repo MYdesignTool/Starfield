@@ -307,7 +307,7 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
         settings.opacity_over_life.points[0].value = settings.opacity;
         settings.opacity_over_life.points[opacity_count - 1].value = settings.opacity_end;
     }
-    settings.emitter_size_percent = core::Vec3{
+    settings.emitter_size_pixels = core::Vec3{
         to_double(*defs[55]), to_double(*defs[56]), to_double(*defs[57])};
     settings.particle_size_random_percent = to_double(*defs[58]);
     settings.opacity_random_percent = to_double(*defs[59]);
@@ -418,7 +418,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (err != PF_Err_NONE) return err;
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Emitter Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
+    PF_ADD_FLOAT_SLIDERX("Disc Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
 
     // Velocity, not Speed: the reference emitter has a single scalar Speed plus a direction
@@ -652,19 +652,19 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                                   PF_Precision_INTEGER, true);
     if (err != PF_Err_NONE) return err;
 
-    // New visible per-axis extents are appended in their own topic so all prior AE
-    // indices remain stable. They scale the existing shared Emitter Size by percent.
+    // New direct full-resolution pixel dimensions are appended in their own topic
+    // so all earlier AE indices remain stable. Box/Sphere read their X/Y/Z values.
     PF_ADD_TOPICX("Emitter Dimensions", 0, kEmitterSizeTopicDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size X", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+    PF_ADD_FLOAT_SLIDERX("Size X", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
                          PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                          PF_ParamFlag_SUPERVISE, kEmitterSizeXDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Y", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+    PF_ADD_FLOAT_SLIDERX("Size Y", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
                          PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                          PF_ParamFlag_SUPERVISE, kEmitterSizeYDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Z", 0.0f, 1000.0f, 0.0f, 1000.0f, 100.0f,
+    PF_ADD_FLOAT_SLIDERX("Size Z", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
                          PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                          PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
     PF_END_TOPIC(kEmitterSizeTopicDiskId);

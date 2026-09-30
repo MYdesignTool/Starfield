@@ -13,42 +13,44 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-// Deterministic per-particle birth offset for the selected emitter shape. `extent`
-// is the shared edge/diameter in layer heights; percentages scale its axes without
-// changing the existing uniform-size case.
-Vec3 birth_offset(EmitterShape shape, double extent, const Vec3& size_percent,
-                  std::uint32_t seed, std::uint64_t id) noexcept {
-    const double half = 0.5 * extent;
-    if (!(half > 0.0)) {
-        return Vec3{};
-    }
-    const double half_x = half * size_percent.x / 100.0;
-    const double half_y = half * size_percent.y / 100.0;
-    const double half_z = half * size_percent.z / 100.0;
-
+// Convert direct full-resolution layer-pixel dimensions into canonical world
+// units (layer heights). X includes pixel aspect; Y and Z use square world units.
+Vec3 birth_offset(EmitterShape shape, double disc_extent, const Vec3& size_pixels,
+                  const EmitterDimensionContext& dimensions, std::uint32_t seed,
+                  std::uint64_t id) noexcept {
     switch (shape) {
-        case EmitterShape::box:
+        case EmitterShape::box: {
+            const double half_x = 0.5 * size_pixels.x * dimensions.pixel_aspect_ratio /
+                                  dimensions.layer_height_pixels;
+            const double half_y = 0.5 * size_pixels.y / dimensions.layer_height_pixels;
+            const double half_z = 0.5 * size_pixels.z / dimensions.layer_height_pixels;
             return Vec3{symmetric_value(seed, id, RandomPurpose::position_x) * half_x,
                         symmetric_value(seed, id, RandomPurpose::position_y) * half_y,
                         symmetric_value(seed, id, RandomPurpose::position_z) * half_z};
+        }
         case EmitterShape::sphere: {
-            // Uniform inside a sphere by cube-root radius and isotropic direction,
-            // followed by an axis transform to an ellipsoid.
-            const double radius = half * std::cbrt(unit_value(seed, id, RandomPurpose::position_x));
+            // Uniform inside an ellipsoid by sampling a unit sphere, then applying
+            // direct per-axis pixel radii in canonical world units.
+            const double radius = std::cbrt(unit_value(seed, id, RandomPurpose::position_x));
             const double cos_theta = symmetric_value(seed, id, RandomPurpose::position_y);
             const double sin_theta = std::sqrt(std::max(0.0, 1.0 - cos_theta * cos_theta));
             const double phi = unit_value(seed, id, RandomPurpose::position_z) * 2.0 * kPi;
-            return Vec3{radius * sin_theta * std::cos(phi) * (size_percent.x / 100.0),
-                        radius * sin_theta * std::sin(phi) * (size_percent.y / 100.0),
-                        radius * cos_theta * (size_percent.z / 100.0)};
+            return Vec3{radius * sin_theta * std::cos(phi) *
+                            (0.5 * size_pixels.x * dimensions.pixel_aspect_ratio /
+                             dimensions.layer_height_pixels),
+                        radius * sin_theta * std::sin(phi) *
+                            (0.5 * size_pixels.y / dimensions.layer_height_pixels),
+                        radius * cos_theta *
+                            (0.5 * size_pixels.z / dimensions.layer_height_pixels)};
         }
         case EmitterShape::disc: {
-            // Uniform over the XY area, then scaled to an ellipse. Z is intentionally
-            // unused until the disc shape has a defined depth model.
+            // Disc retains its dedicated diameter in layer heights. Z is unused
+            // until this shape has a defined depth model.
+            const double half = 0.5 * disc_extent;
+            if (!(half > 0.0)) return Vec3{};
             const double radius = half * std::sqrt(unit_value(seed, id, RandomPurpose::position_x));
             const double angle = unit_value(seed, id, RandomPurpose::position_y) * 2.0 * kPi;
-            return Vec3{radius * std::cos(angle) * (size_percent.x / 100.0),
-                        radius * std::sin(angle) * (size_percent.y / 100.0), 0.0};
+            return Vec3{radius * std::cos(angle), radius * std::sin(angle), 0.0};
         }
         case EmitterShape::point:
             break;
@@ -216,7 +218,8 @@ PartitionRange partition_range(ParticleSlotRange range, std::uint32_t partition_
     return PartitionRange{first_slot, (last_slot - first_slot) / partition_count + 1};
 }
 
-ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed, std::uint64_t slot) noexcept {
+ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed, std::uint64_t slot,
+                                   const EmitterDimensionContext& dimension_context) noexcept {
     ParticleInstance particle;
     const double birth_rate = values.birth_rate;
     // Age is derived from the slot distance instead of `t - k / rate`, which
@@ -260,7 +263,7 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
     // with identical particles, births continuously replace the particles that
     // leave, so a correctly computed sequence still looks frozen on playback.
     const Vec3 birth = birth_offset(values.emitter_shape, values.emitter_size,
-                                    values.emitter_size_percent, values.seed, slot);
+                                    values.emitter_size_pixels, dimension_context, values.seed, slot);
     Vec3 particle_velocity = values.velocity;
     // Emission direction model (M3-04): a per-particle direction on the cone (or the
     // sphere) times the emitted speed. Independent streams keep every frame identical
@@ -297,7 +300,9 @@ template <typename StoreParticle>
 Result<std::size_t> simulate_partition(const ValidatedSettings& settings, double time_seconds,
                                        std::uint32_t partition_count,
                                        ParticleSlotRange live_range, PartitionRange assigned_range,
-                                       const Cancellation& cancellation, StoreParticle&& store_particle) {
+                                       const Cancellation& cancellation,
+                                       const EmitterDimensionContext& dimension_context,
+                                       StoreParticle&& store_particle) {
     const std::size_t slot_count = static_cast<std::size_t>(assigned_range.count);
     const double slots_elapsed = time_seconds * settings.value.birth_rate;
     for (std::size_t i = 0; i < slot_count; ++i) {
@@ -309,7 +314,7 @@ Result<std::size_t> simulate_partition(const ValidatedSettings& settings, double
         const std::uint64_t slot = assigned_range.first_slot +
             static_cast<std::uint64_t>(i) * partition_count;
         store_particle(i, slot, live_range.first_slot,
-                       evaluate_particle(settings.value, slots_elapsed, slot));
+                       evaluate_particle(settings.value, slots_elapsed, slot, dimension_context));
     }
     return Result<std::size_t>::success(slot_count);
 }
@@ -317,15 +322,24 @@ Result<std::size_t> simulate_partition(const ValidatedSettings& settings, double
 } // namespace
 
 Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings, double time_seconds,
-                                                        const Cancellation& cancellation) {
-    return simulate_particles_partition(settings, time_seconds, 1, 0, cancellation);
+                                                        const Cancellation& cancellation,
+                                                        EmitterDimensionContext dimension_context) {
+    return simulate_particles_partition(settings, time_seconds, 1, 0, cancellation, dimension_context);
 }
 
 Result<std::vector<ParticleInstance>> simulate_particles_partition(const ValidatedSettings& settings,
                                                                    double time_seconds,
                                                                    std::uint32_t partition_count,
                                                                    std::uint32_t partition_index,
-                                                                   const Cancellation& cancellation) {
+                                                                   const Cancellation& cancellation,
+                                                                   EmitterDimensionContext dimension_context) {
+    if (!std::isfinite(dimension_context.layer_height_pixels) ||
+        !(dimension_context.layer_height_pixels > 0.0) ||
+        !std::isfinite(dimension_context.pixel_aspect_ratio) ||
+        !(dimension_context.pixel_aspect_ratio > 0.0)) {
+        return Result<std::vector<ParticleInstance>>::failure(
+            ErrorCode::invalid_request, "invalid emitter dimension context");
+    }
     if (partition_count == 0 || partition_index >= partition_count) {
         return Result<std::vector<ParticleInstance>>::failure(ErrorCode::invalid_request,
                                                              "invalid particle slot partition");
@@ -346,7 +360,7 @@ Result<std::vector<ParticleInstance>> simulate_particles_partition(const Validat
     }
 
     auto filled = simulate_partition(settings, time_seconds, partition_count,
-        live_range, assigned_range, cancellation,
+        live_range, assigned_range, cancellation, dimension_context,
         [&particles](std::size_t index, std::uint64_t, std::uint64_t, ParticleInstance particle) {
             particles[index] = std::move(particle);
         });
@@ -363,7 +377,15 @@ Result<std::size_t> simulate_particles_partition_into(const ValidatedSettings& s
                                                       std::uint32_t partition_count,
                                                       std::uint32_t partition_index,
                                                       std::span<ParticleInstance> destination,
-                                                      const Cancellation& cancellation) {
+                                                      const Cancellation& cancellation,
+                                                      EmitterDimensionContext dimension_context) {
+    if (!std::isfinite(dimension_context.layer_height_pixels) ||
+        !(dimension_context.layer_height_pixels > 0.0) ||
+        !std::isfinite(dimension_context.pixel_aspect_ratio) ||
+        !(dimension_context.pixel_aspect_ratio > 0.0)) {
+        return Result<std::size_t>::failure(ErrorCode::invalid_request,
+                                            "invalid emitter dimension context");
+    }
     if (partition_count == 0 || partition_index >= partition_count) {
         return Result<std::size_t>::failure(ErrorCode::invalid_request,
                                             "invalid particle slot partition");
@@ -379,7 +401,7 @@ Result<std::size_t> simulate_particles_partition_into(const ValidatedSettings& s
 
     const PartitionRange assigned_range = partition_range(live_range, partition_count, partition_index);
     return simulate_partition(settings, time_seconds, partition_count,
-        live_range, assigned_range, cancellation,
+        live_range, assigned_range, cancellation, dimension_context,
         [destination, first_slot = live_range.first_slot](std::size_t, std::uint64_t slot,
                                                           std::uint64_t, ParticleInstance particle) {
             destination[static_cast<std::size_t>(slot - first_slot)] = std::move(particle);

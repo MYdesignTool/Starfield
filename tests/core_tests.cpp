@@ -718,12 +718,12 @@ void test_settings_validation() {
     CHECK(finite_variation.value.opacity_random_percent == 0.0);
 
     Settings axis_sizes;
-    axis_sizes.emitter_size_percent = Vec3{
-        std::numeric_limits<double>::quiet_NaN(), 1200.0, -1.0};
+    axis_sizes.emitter_size_pixels = Vec3{
+        std::numeric_limits<double>::quiet_NaN(), 120000.0, -1.0};
     const ValidatedSettings validated_axis_sizes = validate_settings(axis_sizes);
-    CHECK(validated_axis_sizes.value.emitter_size_percent.x == 100.0);
-    CHECK(validated_axis_sizes.value.emitter_size_percent.y == kMaxEmitterSizePercent);
-    CHECK(validated_axis_sizes.value.emitter_size_percent.z == 0.0);
+    CHECK(validated_axis_sizes.value.emitter_size_pixels.x == 100.0);
+    CHECK(validated_axis_sizes.value.emitter_size_pixels.y == kMaxEmitterSizePixels);
+    CHECK(validated_axis_sizes.value.emitter_size_pixels.z == 0.0);
     CHECK(validated_axis_sizes.notices.size() == 3);
 }
 
@@ -923,6 +923,7 @@ void test_emitter_shapes_and_spread() {
     settings.emitter_size = 0.2; // half extent 0.1 layer heights
     settings.velocity = Vec3{0.0, 0.3, 0.0};
     settings.velocity_spread = 0.2;
+    const EmitterDimensionContext square_layer{1000.0, 1.0};
 
     // Point without spread reproduces the closed-form behaviour M2 shipped.
     Settings flat = settings;
@@ -944,7 +945,9 @@ void test_emitter_shapes_and_spread() {
         shaped.emitter_shape = shape;
         shaped.velocity = Vec3{0.0, 0.0, 0.0}; // isolate the birth distribution
         shaped.velocity_spread = 0.0;
-        const auto particles = simulate_particles(validate_settings(shaped), 1.0, never);
+        shaped.emitter_size_pixels = Vec3{200.0, 200.0, 200.0};
+        const auto particles = simulate_particles(validate_settings(shaped), 1.0, never,
+                                                  square_layer);
         CHECK(particles.has_value());
         if (!particles.has_value()) {
             continue;
@@ -963,14 +966,14 @@ void test_emitter_shapes_and_spread() {
         CHECK(furthest > 0.02); // the seeded distribution is not collapsed onto the centre
     }
 
-    // Per-axis percentages scale the shared emitter extent independently while
-    // preserving the same seeded sample for Box, Sphere, and the XY Disc.
+    // Box/Sphere dimensions are direct full-resolution pixels. The host frame's
+    // layer height and pixel aspect convert them to canonical world units.
     Settings dimensioned = settings;
     dimensioned.velocity = Vec3{};
     dimensioned.velocity_spread = 0.0;
     dimensioned.emitter_shape = EmitterShape::box;
-    dimensioned.emitter_size_percent = Vec3{200.0, 50.0, 150.0};
-    const auto box_axes = simulate_particles(validate_settings(dimensioned), 1.0, never);
+    dimensioned.emitter_size_pixels = Vec3{400.0, 100.0, 300.0};
+    const auto box_axes = simulate_particles(validate_settings(dimensioned), 1.0, never, square_layer);
     CHECK(box_axes.has_value() && !box_axes.value().empty());
     if (box_axes.has_value()) {
         for (const ParticleInstance& particle : box_axes.value()) {
@@ -982,11 +985,11 @@ void test_emitter_shapes_and_spread() {
 
     Settings sphere_base = dimensioned;
     sphere_base.emitter_shape = EmitterShape::sphere;
-    sphere_base.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    sphere_base.emitter_size_pixels = Vec3{200.0, 200.0, 200.0};
     Settings sphere_scaled = sphere_base;
-    sphere_scaled.emitter_size_percent = Vec3{200.0, 50.0, 150.0};
-    const auto sphere_unit = simulate_particles(validate_settings(sphere_base), 1.0, never);
-    const auto sphere_ellipsoid = simulate_particles(validate_settings(sphere_scaled), 1.0, never);
+    sphere_scaled.emitter_size_pixels = Vec3{400.0, 100.0, 300.0};
+    const auto sphere_unit = simulate_particles(validate_settings(sphere_base), 1.0, never, square_layer);
+    const auto sphere_ellipsoid = simulate_particles(validate_settings(sphere_scaled), 1.0, never, square_layer);
     CHECK(sphere_unit.has_value() && sphere_ellipsoid.has_value());
     if (sphere_unit.has_value() && sphere_ellipsoid.has_value() &&
         sphere_unit.value().size() == sphere_ellipsoid.value().size()) {
@@ -1001,27 +1004,27 @@ void test_emitter_shapes_and_spread() {
 
     Settings disc_base = dimensioned;
     disc_base.emitter_shape = EmitterShape::disc;
-    disc_base.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    disc_base.emitter_size_pixels = Vec3{100.0, 100.0, 100.0};
     Settings disc_scaled = disc_base;
-    disc_scaled.emitter_size_percent = Vec3{200.0, 50.0, 500.0};
-    const auto disc_unit = simulate_particles(validate_settings(disc_base), 1.0, never);
-    const auto disc_ellipse = simulate_particles(validate_settings(disc_scaled), 1.0, never);
+    disc_scaled.emitter_size_pixels = Vec3{2000.0, 500.0, 5000.0};
+    const auto disc_unit = simulate_particles(validate_settings(disc_base), 1.0, never, square_layer);
+    const auto disc_ellipse = simulate_particles(validate_settings(disc_scaled), 1.0, never, square_layer);
     CHECK(disc_unit.has_value() && disc_ellipse.has_value());
     if (disc_unit.has_value() && disc_ellipse.has_value() &&
         disc_unit.value().size() == disc_ellipse.value().size()) {
         for (std::size_t i = 0; i < disc_unit.value().size(); ++i) {
             const Vec3& base = disc_unit.value()[i].position;
             const Vec3& scaled = disc_ellipse.value()[i].position;
-            CHECK(std::abs(scaled.x - 2.0 * base.x) < 1e-12);
-            CHECK(std::abs(scaled.y - 0.5 * base.y) < 1e-12);
+            CHECK(scaled.x == base.x);
+            CHECK(scaled.y == base.y);
             CHECK(std::abs(scaled.z) < 1e-12); // this shape remains in its XY plane
         }
     }
 
-    // Schema-1 emitter nodes written before axis sizes existed remain valid and
-    // evaluate identically to explicit 100% values.
+    // Missing optional per-axis values use the same 100 px defaults written by
+    // current graph constructors.
     Settings graph_settings = dimensioned;
-    graph_settings.emitter_size_percent = Vec3{100.0, 100.0, 100.0};
+    graph_settings.emitter_size_pixels = Vec3{100.0, 100.0, 100.0};
     const auto current_graph = make_emitter_output_graph(
         graph_settings, NodeId{test_uuid(81)}, NodeId{test_uuid(82)}, EdgeId{test_uuid(83)});
     CHECK(current_graph.has_value());
@@ -1033,11 +1036,13 @@ void test_emitter_shapes_and_spread() {
         if (emitter != legacy_graph.nodes.end()) {
             emitter->parameters.erase(std::remove_if(emitter->parameters.begin(), emitter->parameters.end(),
                 [](const NodeParameter& parameter) {
-                    return parameter.key.value >= graph_keys::kEmitterSizePercentX.value &&
-                           parameter.key.value <= graph_keys::kEmitterSizePercentZ.value;
+                    return parameter.key.value >= graph_keys::kEmitterSizeX.value &&
+                           parameter.key.value <= graph_keys::kEmitterSizeZ.value;
                 }), emitter->parameters.end());
-            const auto current = evaluate_particle_graph(current_graph.value(), RationalTime{1, 1}, never);
-            const auto legacy = evaluate_particle_graph(legacy_graph, RationalTime{1, 1}, never);
+            const auto current = evaluate_particle_graph(current_graph.value(), RationalTime{1, 1}, never,
+                                                         square_layer);
+            const auto legacy = evaluate_particle_graph(legacy_graph, RationalTime{1, 1}, never,
+                                                        square_layer);
             CHECK(current.has_value() && legacy.has_value());
             if (current.has_value() && legacy.has_value() &&
                 current.value().particles.size() == legacy.value().particles.size()) {
@@ -1047,6 +1052,21 @@ void test_emitter_shapes_and_spread() {
                     CHECK(current.value().particles[i].position.z == legacy.value().particles[i].position.z);
                 }
             }
+        }
+    }
+
+    // X dimensions use pixel aspect; Y and Z remain measured against layer height.
+    Settings aspect_settings = dimensioned;
+    aspect_settings.emitter_shape = EmitterShape::box;
+    aspect_settings.emitter_size_pixels = Vec3{200.0, 200.0, 200.0};
+    const auto anamorphic = simulate_particles(validate_settings(aspect_settings), 1.0, never,
+                                               EmitterDimensionContext{1000.0, 2.0});
+    CHECK(anamorphic.has_value() && !anamorphic.value().empty());
+    if (anamorphic.has_value()) {
+        for (const ParticleInstance& particle : anamorphic.value()) {
+            CHECK(std::abs(particle.position.x) <= 0.2 + 1e-12);
+            CHECK(std::abs(particle.position.y) <= 0.1 + 1e-12);
+            CHECK(std::abs(particle.position.z) <= 0.1 + 1e-12);
         }
     }
 
@@ -1627,7 +1647,8 @@ void test_force_and_appearance() {
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const Graph graph = made.take_value();
-    CHECK(validate_graph(graph, particle_node_registry()).ok());
+    const auto graph_validation = validate_graph(graph, particle_node_registry());
+    CHECK(graph_validation.ok());
 
     // A four-stage graph survives the bounded codec byte for byte.
     const auto serialized = serialize_graph(graph, particle_node_registry());
@@ -1847,7 +1868,12 @@ void test_particle_branches_and_ordered_buffer() {
     CHECK(made.has_value());
     if (!made.has_value()) return;
     Graph graph = made.take_value();
-    graph.nodes[1].parameters.push_back({kParticleLifetimeSeconds, 0.9});
+    const auto particle_lifetime = std::find_if(graph.nodes[1].parameters.begin(),
+        graph.nodes[1].parameters.end(), [](const NodeParameter& parameter) {
+            return parameter.key == kParticleLifetimeSeconds;
+        });
+    CHECK(particle_lifetime != graph.nodes[1].parameters.end());
+    if (particle_lifetime != graph.nodes[1].parameters.end()) particle_lifetime->value = 0.9;
     CHECK(std::none_of(graph.nodes[0].parameters.begin(), graph.nodes[0].parameters.end(),
                        [](const NodeParameter& parameter) { return parameter.key == kLifetimeSeconds; }));
 

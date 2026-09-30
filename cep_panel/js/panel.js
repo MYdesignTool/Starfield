@@ -71,7 +71,7 @@
         spark: {
             particle_count: 4000, birth_rate: 220, seed: 7, particle_lifetime: 1.1, emitter_shape: 1,
             velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0,
-            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 1.1,
+            emitter_size_x: 16, emitter_size_y: 16, emitter_size_z: 16, velocity_spread: 1.1,
             gravity_x: 0, gravity_y: -2.6, gravity_z: 0, linear_drag: 0.9,
             particle_size: 3.2, particle_size_end: 0.6, opacity: 1, opacity_end: 0,
             color_start: [255, 240, 180], color_end: [255, 90, 20]
@@ -79,7 +79,7 @@
         snow: {
             particle_count: 2500, birth_rate: 90, seed: 21, particle_lifetime: 6.5, emitter_shape: 2,
             velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1,
-            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.35,
+            emitter_size_x: 2160, emitter_size_y: 1080, emitter_size_z: 2160, velocity_spread: 0.35,
             gravity_x: 0, gravity_y: -0.05, gravity_z: 0, linear_drag: 0.15,
             particle_size: 4.5, particle_size_end: 4.5, opacity: 0.9, opacity_end: 0.75,
             color_start: [235, 245, 255], color_end: [200, 215, 235]

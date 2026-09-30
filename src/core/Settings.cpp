@@ -111,21 +111,21 @@ ValidatedSettings validate_settings(Settings settings) {
     value.emitter_size = clamp(value.emitter_size, 0.0, kMaxEmitterSize,
                                ValidationCode::emitter_size_clamped, "emitter_size", notices);
 
-    value.emitter_size_percent.x = finite_or(value.emitter_size_percent.x, 100.0,
-                                              "emitter_size_percent.x", notices);
-    value.emitter_size_percent.y = finite_or(value.emitter_size_percent.y, 100.0,
-                                              "emitter_size_percent.y", notices);
-    value.emitter_size_percent.z = finite_or(value.emitter_size_percent.z, 100.0,
-                                              "emitter_size_percent.z", notices);
-    value.emitter_size_percent.x = clamp(value.emitter_size_percent.x, 0.0, kMaxEmitterSizePercent,
-                                         ValidationCode::emitter_size_percent_clamped,
-                                         "emitter_size_percent.x", notices);
-    value.emitter_size_percent.y = clamp(value.emitter_size_percent.y, 0.0, kMaxEmitterSizePercent,
-                                         ValidationCode::emitter_size_percent_clamped,
-                                         "emitter_size_percent.y", notices);
-    value.emitter_size_percent.z = clamp(value.emitter_size_percent.z, 0.0, kMaxEmitterSizePercent,
-                                         ValidationCode::emitter_size_percent_clamped,
-                                         "emitter_size_percent.z", notices);
+    value.emitter_size_pixels.x = finite_or(value.emitter_size_pixels.x, 100.0,
+                                             "emitter_size_pixels.x", notices);
+    value.emitter_size_pixels.y = finite_or(value.emitter_size_pixels.y, 100.0,
+                                             "emitter_size_pixels.y", notices);
+    value.emitter_size_pixels.z = finite_or(value.emitter_size_pixels.z, 100.0,
+                                             "emitter_size_pixels.z", notices);
+    value.emitter_size_pixels.x = clamp(value.emitter_size_pixels.x, 0.0, kMaxEmitterSizePixels,
+                                        ValidationCode::emitter_size_pixels_clamped,
+                                        "emitter_size_pixels.x", notices);
+    value.emitter_size_pixels.y = clamp(value.emitter_size_pixels.y, 0.0, kMaxEmitterSizePixels,
+                                        ValidationCode::emitter_size_pixels_clamped,
+                                        "emitter_size_pixels.y", notices);
+    value.emitter_size_pixels.z = clamp(value.emitter_size_pixels.z, 0.0, kMaxEmitterSizePixels,
+                                        ValidationCode::emitter_size_pixels_clamped,
+                                        "emitter_size_pixels.z", notices);
 
     value.velocity_spread = finite_or(value.velocity_spread, 0.0, "velocity_spread", notices);
     value.velocity_spread = clamp(value.velocity_spread, 0.0, kMaxVelocitySpread,

@@ -85,9 +85,9 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
                 break;
             }
             case kDirectionSpan.value: settings.direction_span_degrees = std::get<double>(parameter.value); break;
-            case kEmitterSizePercentX.value: settings.emitter_size_percent.x = std::get<double>(parameter.value); break;
-            case kEmitterSizePercentY.value: settings.emitter_size_percent.y = std::get<double>(parameter.value); break;
-            case kEmitterSizePercentZ.value: settings.emitter_size_percent.z = std::get<double>(parameter.value); break;
+            case kEmitterSizeX.value: settings.emitter_size_pixels.x = std::get<double>(parameter.value); break;
+            case kEmitterSizeY.value: settings.emitter_size_pixels.y = std::get<double>(parameter.value); break;
+            case kEmitterSizeZ.value: settings.emitter_size_pixels.z = std::get<double>(parameter.value); break;
             case kParticleSize.value:
                 settings.particle_size = std::get<double>(parameter.value);
                 settings.particle_size_end = settings.particle_size;
@@ -207,9 +207,16 @@ bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destinatio
 
 
 Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
-                                               const Cancellation& cancellation) {
+                                               const Cancellation& cancellation,
+                                               EmitterDimensionContext dimension_context) {
     using R = Result<EvaluatedGraph>;
     if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph evaluation cancelled");
+    if (!std::isfinite(dimension_context.layer_height_pixels) ||
+        !(dimension_context.layer_height_pixels > 0.0) ||
+        !std::isfinite(dimension_context.pixel_aspect_ratio) ||
+        !(dimension_context.pixel_aspect_ratio > 0.0)) {
+        return R::failure(ErrorCode::invalid_request, "invalid emitter dimension context");
+    }
     const auto normalized = make_rational(time.value, time.scale);
     if (!normalized) return R::failure(ErrorCode::invalid_time, "invalid graph evaluation time");
     try {
@@ -386,7 +393,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 return R::failure(ErrorCode::invalid_request,
                                    "combined legacy force or appearance values exceed supported bounds");
             }
-            auto evaluated = simulate_particles(bounded, to_seconds(*normalized), cancellation);
+            auto evaluated = simulate_particles(bounded, to_seconds(*normalized), cancellation,
+                                                dimension_context);
             if (!evaluated.has_value()) return R::failure(evaluated.error());
             result.particles = evaluated.take_value();
             return R::success(std::move(result));
@@ -514,7 +522,8 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
 
             const auto branch_result = simulate_particles_partition_into(
                 bounded, to_seconds(*normalized), static_cast<std::uint32_t>(particle_count),
-                static_cast<std::uint32_t>(branch), staged_particles, cancellation);
+                static_cast<std::uint32_t>(branch), staged_particles, cancellation,
+                dimension_context);
             if (!branch_result.has_value()) return R::failure(branch_result.error());
         }
 

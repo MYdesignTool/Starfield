@@ -16,8 +16,11 @@ control's default centre.
 | Birth Rate | 220 | 90 | 14 |
 | Random Seed | 7 | 21 | 3 |
 | Particle Lifetime | 1.1 | 6.5 | 9 |
-| Emitter Shape | Point | Box | Sphere |
-| Emitter Size | 0 | 1.1 | 0.9 |
+| Emitter Shape | Box | Sphere | Disc |
+| Disc Size | 0 | 0.05 | 0.9 |
+| Size X | 16 | 2160 | 100 |
+| Size Y | 16 | 1080 | 100 |
+| Size Z | 16 | 2160 | 100 |
 | Velocity X | 0 | 0.06 | 0 |
 | Velocity Y | 1.6 | -0.14 | 0.16 |
 | Velocity Z | 0 | 0 | 0 |

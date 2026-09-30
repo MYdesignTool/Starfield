@@ -53,7 +53,7 @@ inline constexpr std::uint32_t kEmitterShapeCount = 4;
 inline constexpr double kMaxEmitterOffset = 100.0;
 inline constexpr double kMaxVelocity = 1'000.0;
 inline constexpr double kMaxEmitterSize = 10.0;
-inline constexpr double kMaxEmitterSizePercent = 1000.0;
+inline constexpr double kMaxEmitterSizePixels = 100'000.0;
 inline constexpr double kMaxVelocitySpread = 100.0;
 inline constexpr double kMaxGravityMagnitude = 1'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
@@ -66,6 +66,13 @@ struct Vec3 {
     double x{};
     double y{};
     double z{};
+};
+
+// Converts full-resolution layer-pixel emitter dimensions to canonical world
+// coordinates (one world unit equals one layer height). X accounts for pixel aspect.
+struct EmitterDimensionContext {
+    double layer_height_pixels{1.0};
+    double pixel_aspect_ratio{1.0};
 };
 
 inline constexpr std::size_t kMaxAgeCurvePoints = 8;
@@ -104,12 +111,12 @@ struct Settings {
     // 100% can attenuate it toward zero using the particle's stable random stream.
     double particle_size_random_percent{0.0};
     double opacity_random_percent{0.0};
-    // Extent of the box/sphere/disc emitters: cube edge length resp. diameter, in
-    // layer heights. Ignored by the point emitter.
+    // Diameter/edge of the legacy Disc emitter in layer heights. Box and Sphere use
+    // the direct per-axis dimensions below; Point ignores both fields.
     double emitter_size{0.05};
-    // Per-axis percentage applied to emitter_size. 100 preserves its prior uniform
-    // extent; kept generic so additional emitter shapes can reuse the same vector.
-    Vec3 emitter_size_percent{100.0, 100.0, 100.0};
+    // Direct full-resolution layer-pixel dimensions used by Box and Sphere. Other
+    // emitter shapes can adopt the same vector when their geometry is implemented.
+    Vec3 emitter_size_pixels{100.0, 100.0, 100.0};
     // Per-axis uniform jitter applied to each particle's velocity, in layer heights
     // per second. This is what makes a steady emitter animate: identical particles
     // produce a stationary pattern, varied ones produce visible motion.
@@ -158,7 +165,7 @@ enum class ValidationCode : std::uint8_t {
     emitter_origin_clamped,
     velocity_clamped,
     emitter_size_clamped,
-    emitter_size_percent_clamped,
+    emitter_size_pixels_clamped,
     velocity_spread_clamped,
     gravity_clamped,
     linear_drag_clamped,

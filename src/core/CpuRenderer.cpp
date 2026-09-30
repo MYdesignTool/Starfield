@@ -151,12 +151,16 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     }
 
     const auto particles = [&]() -> Result<std::vector<ParticleInstance>> {
+        const EmitterDimensionContext dimension_context{
+            static_cast<double>(frame.layer_height), frame.pixel_aspect_ratio};
         if (request.graph) {
-            auto evaluated = evaluate_particle_graph(*request.graph, frame.time, cancellation);
+            auto evaluated = evaluate_particle_graph(*request.graph, frame.time, cancellation,
+                                                     dimension_context);
             if (!evaluated.has_value()) return Result<std::vector<ParticleInstance>>::failure(evaluated.error());
             return Result<std::vector<ParticleInstance>>::success(std::move(evaluated.take_value().particles));
         }
-        return simulate_particles(request.settings, to_seconds(frame.time), cancellation);
+        return simulate_particles(request.settings, to_seconds(frame.time), cancellation,
+                                  dimension_context);
     }();
     if (!particles.has_value()) {
         return OutputResult::failure(particles.error());

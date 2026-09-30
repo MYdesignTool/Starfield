@@ -69,20 +69,21 @@ the build selected `StarfieldCore-94A26570D09B9F97.dll`. Smart Render uses
 curve, undo, or save/reopen host check has been made on this candidate. The plug-in was
 not installed or replaced during this build.
 
-## M3-01B per-axis emitter sizes (2026-09-30)
+## M3-01B direct emitter dimensions (2026-09-30)
 
-The May 2023 SDK build adds project parameters Size X/Y/Z at 100% defaults and carries
-them through the flat-control graph constructor. Box uses three scaled extents, Sphere
-uses an ellipsoid transform, and Disc uses X/Y in its existing plane. Old graph nodes
-without the optional keys keep 100% dimensions. The paired candidate is
+Pre-release manifest revision 12 uses direct full-resolution layer-pixel Size X/Y/Z
+values (0–100000, default 100 px) for Box and Sphere. The `Disc Size` control retains
+the planar Disc diameter; Point and Disc ignore the axis dimensions. `CpuRenderer`
+passes layer height and pixel aspect to the core, which converts the dimensions to
+canonical world units before sampling. The paired May 2023 SDK candidate is
 `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`, SHA-256
-`8ACF50103F2B00E50291308332091E49DD359D6EEF92FAEE2DBEE4EDE7E9C185`, and
+`1DBAA18313010837BC24977962D8E4299BF11702B4C3D928CC0A7084F702DA78`, and
 `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`, SHA-256
-`94A26570D09B9F97838BBE5696CC8DA04934C6430D22AC2E5C8B305CA4B4E46B`. This is the
-current combined curve and per-axis candidate. The full build updated the checkout's
-`dist/` pair and runtime manifest. The core suite passes 9,780 checks and the current
-adapter fake-host executable passes 660 checks. AE visual/project-lifecycle checks
-remain open. The AEX has not been copied into AE 2023's plug-in directory.
+`6E660BB1C4369D07DA4F6383531A7CEE85BC0A10C722FD98D6F66F33F26FABFA`. The full build
+updated the checkout's `dist/` pair and runtime manifest; no host plug-in file was
+replaced. Core tests pass 11,874 checks, the adapter fake-host suite passes 676 checks,
+and panel graph-view, gateway, and startup checks pass. AE visual/project-lifecycle
+qualification remains open.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 

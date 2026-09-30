@@ -14,7 +14,10 @@ function graph() {
             { id: uuid(1), type: edits.types.emitter, schemaVersion: 1, parameters: [
                 { key: "1", type: 3, value: 6400 }, { key: "2", type: 4, value: 60 },
                 { key: "4", type: 4, value: 2 },
-                { key: "5", type: 3, value: 2 }, { key: "6", type: 5, value: [1920, 1080, 1080] }
+                { key: "5", type: 3, value: 2 }, { key: "6", type: 5, value: [1920, 1080, 1080] },
+                { key: "10", type: 4, value: 0.05 },
+                { key: "19", type: 4, value: 1920 }, { key: "20", type: 4, value: 1080 },
+                { key: "21", type: 4, value: 720 }
             ] },
             { id: uuid(2), type: edits.types.particle, schemaVersion: 1, parameters: [
                 { key: "1", type: 5, value: [1, 0.5, 0] }, { key: "2", type: 5, value: [0, 0.25, 1] },
@@ -118,6 +121,13 @@ var emitter = projected.nodes.filter(function (node) { return node.kind === "emi
 var type = emitter.params.filter(function (parameter) { return parameter.graphKey === "5"; })[0];
 assert.strictEqual(type.value, 3);
 assert.strictEqual(view.parameterToGraphValue(type, 3), 2, "popup labels map to zero-based graph enums");
+assert.strictEqual(emitter.params.filter(function (parameter) { return parameter.graphKey === "10"; })[0].label,
+                   "Disc Size");
+assert.deepStrictEqual(["19", "20", "21"].map(function (key) {
+    var parameter = emitter.params.filter(function (entry) { return entry.graphKey === key; })[0];
+    return [parameter.value, parameter.max, parameter.unit];
+}), [[1920, 100000, "px"], [1080, 100000, "px"], [720, 100000, "px"]],
+"emitter axis dimensions are direct pixel values in the graph inspector");
 var color = particle.params.filter(function (parameter) { return parameter.graphKey === "1"; })[0];
 assert.deepStrictEqual(view.parameterToGraphValue(color, [255, 127.5, 0]), [1, 0.5, 0]);
 

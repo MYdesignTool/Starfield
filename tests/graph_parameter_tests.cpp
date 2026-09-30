@@ -279,9 +279,9 @@ void test_parameters(PF_InData& host) {
               snapshot->edges[2].destination_node == output_node->id);
     }
     if (emitter_node != snapshot->nodes.end()) {
-        const auto* size_x = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentX);
-        const auto* size_y = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentY);
-        const auto* size_z = find_value(*emitter_node, core::graph_keys::kEmitterSizePercentZ);
+        const auto* size_x = find_value(*emitter_node, core::graph_keys::kEmitterSizeX);
+        const auto* size_y = find_value(*emitter_node, core::graph_keys::kEmitterSizeY);
+        const auto* size_z = find_value(*emitter_node, core::graph_keys::kEmitterSizeZ);
         CHECK(size_x != nullptr && std::get<double>(*size_x) == 250.0);
         CHECK(size_y != nullptr && std::get<double>(*size_y) == 75.0);
         CHECK(size_z != nullptr && std::get<double>(*size_z) == 150.0);

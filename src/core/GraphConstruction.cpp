@@ -23,9 +23,9 @@ GraphNode make_emitter_node(const Settings& settings, NodeId id, bool include_le
         {kEmissionAngleZ, settings.emission_angles_degrees.z},
         {kDirectionMode, static_cast<std::uint32_t>(settings.direction_mode)},
         {kDirectionSpan, settings.direction_span_degrees},
-        {kEmitterSizePercentX, settings.emitter_size_percent.x},
-        {kEmitterSizePercentY, settings.emitter_size_percent.y},
-        {kEmitterSizePercentZ, settings.emitter_size_percent.z}}};
+        {kEmitterSizeX, settings.emitter_size_pixels.x},
+        {kEmitterSizeY, settings.emitter_size_pixels.y},
+        {kEmitterSizeZ, settings.emitter_size_pixels.z}}};
     if (include_legacy_lifetime) {
         node.parameters.insert(node.parameters.begin() + 3,
                                NodeParameter{kLifetimeSeconds, settings.particle_lifetime_seconds});

@@ -219,9 +219,9 @@ inline constexpr ParameterKey kEmissionAngleY{15};
 inline constexpr ParameterKey kEmissionAngleZ{16};
 inline constexpr ParameterKey kDirectionMode{17};
 inline constexpr ParameterKey kDirectionSpan{18};
-inline constexpr ParameterKey kEmitterSizePercentX{19};
-inline constexpr ParameterKey kEmitterSizePercentY{20};
-inline constexpr ParameterKey kEmitterSizePercentZ{21};
+inline constexpr ParameterKey kEmitterSizeX{19};
+inline constexpr ParameterKey kEmitterSizeY{20};
+inline constexpr ParameterKey kEmitterSizeZ{21};
 // Parameter keys are scoped to their node type; force and appearance nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};

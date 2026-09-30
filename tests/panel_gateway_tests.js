@@ -26,7 +26,7 @@ const initialValues = {
     "Size Random": 0,
     "Opacity": 1,
     "Opacity Random": 0,
-    "Emitter Size": 0.05,
+    "Disc Size": 0.05,
     "Size X": 100,
     "Size Y": 100,
     "Size Z": 100,

@@ -542,10 +542,10 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kEmissionAngleZ, ParameterKind::float64, false},
         ParameterDescriptor{kDirectionMode, ParameterKind::uint32, false},
         ParameterDescriptor{kDirectionSpan, ParameterKind::float64, false},
-        // Optional keys default to 100%, preserving legacy schema-1 emitter shapes.
-        ParameterDescriptor{kEmitterSizePercentX, ParameterKind::float64, false},
-        ParameterDescriptor{kEmitterSizePercentY, ParameterKind::float64, false},
-        ParameterDescriptor{kEmitterSizePercentZ, ParameterKind::float64, false},
+        // Direct full-resolution layer-pixel dimensions are optional for early graphs.
+        ParameterDescriptor{kEmitterSizeX, ParameterKind::float64, false},
+        ParameterDescriptor{kEmitterSizeY, ParameterKind::float64, false},
+        ParameterDescriptor{kEmitterSizeZ, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor particle;

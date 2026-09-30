@@ -40,8 +40,9 @@ particle slots assigned to its branch. The Emitter's former lifetime key is read
 only as a fallback for older schema-1 graphs; newly constructed Particle graphs
 store lifetime on Particle. Output still applies one global Max Particles cap and
 keeps stable particle-ID ordering across branches. Particle Size and Size Over
-Life are layer-pixel diameters (currently bounded at 100000 px); emitter axis
-dimensions remain percentages of the shared Emitter Size.
+Life are layer-pixel diameters (currently bounded at 100000 px). Box and Sphere
+emitter dimensions are direct full-resolution layer pixels converted through frame
+height and pixel aspect; the Disc uses its dedicated layer-height diameter control.
 
 ## State and concurrency
 
@@ -99,7 +100,7 @@ The CMake build compiles only the portable core. The AE module is built by the W
 
 1. **Complete in code:** M0/M1 contracts and the AE 2023 Windows x64 shell.
 2. **Complete in code; host gate open:** M2 SmartFX transport, ROI, pixel-format adapters, and deterministic CPU rendering. See M2-06 in `compatibility-matrix.md`.
-3. **Implemented in core and controls:** M3-01 seeded emitters, M3-01B percentage-based per-axis emitter sizes, and M3-02 gravity, drag, and linear legacy age curves. P-02C adds bounded Size/Opacity polyline curves with linear fallback. M3-06 moves explicit graph lifetime ownership to Particle and makes curve interpolation selection non-destructive; the May 2023 SDK candidate builds, while AE curve, lifetime, and translucent-particle compositing checks remain open. G-05 provides Particle branches and parallel force merges; its focused source and host regression gates remain open.
+3. **Implemented in core and controls:** M3-01 seeded emitters, M3-01B direct-pixel Box/Sphere dimensions, and M3-02 gravity, drag, and linear legacy age curves. P-02C adds bounded Size/Opacity polyline curves with linear fallback. M3-06 moves explicit graph lifetime ownership to Particle and makes curve interpolation selection non-destructive; AE curve, lifetime, and translucent-particle compositing checks remain open. G-05 provides Particle branches and parallel force merges; its focused source and host regression gates remain open.
 4. **Graph editing is integrated in source; AE carrier qualification remains open:** G-01–G-05 provide graph model, codec, arbitrary-data persistence, and Particle/branch evaluation. P-02B now loads the revisioned expression snapshot into a UUID-based canvas and routes node add/connect/reconnect/disconnect/splice/delete/duplicate/move and parameter changes through bounded graph transactions. P-02C curve edits use the same transaction and store optional Particle/Appearance curve payloads. The canvas retains a pinned target, top-down layout, viewport-wide marquee/group movement, wheel zoom, middle-button pan, minimap, project-saved node positions, Alt-drag copy, Ctrl+D, and its custom context menu. In AE 23.5x52, direct ExtendScript access to the arbitrary graph property fails because `CUSTOM_VALUE` is not implemented. The expression carrier and supervised commit path are present in source, but callback behavior, one-step undo, save/reopen, stale-write rejection, and rendered parity have not been qualified together in AE 2023. Keep those as release gates.
 5. **Remaining Alpha work:** qualify the current core build and G-05 behavior, exercise P-02B/P-02C carrier persistence and undo in AE 2023, define animation/history, and prioritize depth/projection, source types, and presets from observed behavior.
 6. Keep MFR, Compute Cache, and GPU work behind separate concurrency/performance evidence and host-specific decisions.

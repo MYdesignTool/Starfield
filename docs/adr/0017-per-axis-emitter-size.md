@@ -1,51 +1,51 @@
-# ADR 0017: per-axis emitter size
+# ADR 0017: direct per-axis emitter dimensions
 
-- Status: accepted for the M3-01B implementation; AE 2023 qualification is pending.
+- Status: accepted; supersedes the initial percentage interpretation during pre-release development.
 - Date: 2026-09-30.
 - Depends on: ADRs 0003, 0006, and 0007.
 
 ## Context
 
-The existing emitter has one `Emitter Size` extent. It produces a cube for Box and
-a sphere for Sphere. The reference exposes `Size X/Y/Z` as percentages. Adding
-independent axis controls must preserve renders from existing AE projects and
-schema-1 emitter nodes.
+The first M3-01B implementation multiplied a shared `Emitter Size` by three
+percentage controls. The owner clarified that axis sizes are direct dimensions,
+not percentages, and that a 1000-unit ceiling is too low. The effect is still in
+development, so there is no released project data that requires retaining the old
+meaning.
 
 ## Decision
 
-- Keep the existing `Emitter Size` parameter and graph key as the common extent, in
-  layer heights. Append `Size X`, `Size Y`, and `Size Z` percentages, each with a
-  default of 100 and a supported range of 0–1000. A shape's axis extent is the common
-  extent multiplied by that axis percentage and divided by 100.
-- The three controls are general emitter dimensions. Box uses all three values.
-  Sphere samples its existing uniform-volume sphere, then scales each coordinate to
-  form an ellipsoid with the requested diameters. Disc uses X and Y to form an ellipse
-  in its existing XY plane; Z remains unused until a depth-oriented disc is defined.
-  Point ignores the dimensions. This gives future emitter types the same validated
-  vector without claiming unsupported shape behavior today.
-- Append AE parameter indices 80–84 after the released revision-9 streams: a topic
-  marker at 80, the three visible controls at 81–83, and its topic end at 84. Existing
-  indices and disk identities do not move. The CEP Emitter inspector binds the three
-  visible controls through the existing supervised parameter path.
-- Append emitter graph parameter keys 19–21 as optional `float64` values on the
-  existing schema-1 emitter node. Missing keys mean 100% on each axis, so old graph
-  bytes retain their prior geometry. New graph constructors write all three values.
-- Graph percentages are constant values under the current schema-1 animation
-  contract. In AE Controls mode, ordinary parameter checkout samples each axis at the
-  requested render time.
+- Interpret `Size X`, `Size Y`, and `Size Z` as direct full-resolution layer pixels,
+  with a 0–100000 range and 100 px defaults. Their existing AE parameter IDs 81–83
+  and graph keys 19–21 stay fixed; the manifest revision advances to 12 to record
+  the changed units. No percentage compatibility conversion is performed.
+- Box uses the three values as its full edge lengths. Sphere samples a unit-volume
+  sphere and scales each axis by half of the requested dimension, producing an
+  ellipsoid. Point and the current planar Disc ignore these controls.
+- The prior common `Emitter Size` parameter becomes `Disc Size`, measured in layer
+  heights. It controls the Disc diameter. Box and Sphere do not combine it with
+  Size X/Y/Z.
+- The host-independent core receives an `EmitterDimensionContext` containing full
+  layer height in pixels and pixel aspect ratio. It converts X as
+  `size_x * pixel_aspect / layer_height` and Y/Z as `size / layer_height` into the
+  canonical world coordinate system. Preview downsample is not applied here; the
+  renderer's frame mapping performs that scale once.
+- Graph keys 19–21 remain optional `float64` values on the schema-1 Emitter node.
+  Missing values use the new 100 px default. This is a development default, not a
+  promise to migrate pre-revision-12 graphs that stored percentages.
 
 ## Consequences
 
-The new parameters refine the old shared extent instead of replacing it. Existing
-projects, captured graphs, and presets retain their size. The visible controls match
-the reference's percentage convention while the renderer continues to use the
-project's documented layer-height coordinates. The renderer's shape algorithm is
-changed only at the emitter's deterministic birth-offset boundary.
+The same numeric control value now describes an actual full-resolution pixel
+dimension. Existing pre-release projects can render with a different distribution
+after revision 12, by owner direction. The parameter IDs and effect identity do not
+change. The core remains independent of AE types and gets only the immutable frame
+geometry it needs. Disc continues to use a separate common diameter until its
+per-axis behavior is explicitly designed.
 
 ## Validation
 
-Core validation rejects non-finite input by replacing it with 100%, and clamps finite
-percentages into 0–1000. Focused cases must cover legacy graph defaults, exact 100%
-parity, independent Box bounds, ellipsoid axis scaling, Disc's XY scaling, and
-deterministic repeatability. The May 2023 SDK build alone does not qualify After
-Effects persistence or rendered shape appearance.
+Core checks cover finite-value fallback, the 100000 px clamp, independent Box
+dimensions, ellipsoid scaling, Disc isolation, non-square pixel aspect, layer-height
+conversion, and graph/control projection. The May 2023 SDK build verifies the AE
+parameter declarations and ABI integration. AE 2023 visual and save/reopen
+qualification remains a separate host gate.

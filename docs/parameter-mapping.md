@@ -53,10 +53,10 @@ the per-topic `PF_ParamFlag_START_COLLAPSED`.
 | Emitter | 2 | Type (popup Point/Box/Sphere/Disc) | `emitter_shape` |
 | Emitter | 3 | Particles Per Second (default 100) | `birth_rate` |
 | Emitter | 4 | Origin (3D point, 50/50/50 = layer centre) | `emitter_origin` |
-| Emitter | 5 | Emitter Size | `emitter_size` |
+| Emitter | 5 | Disc Size | `emitter_size` |
 | Emitter | 6/7/8 | Speed X / Speed Y / Speed Z | `velocity.x/y/z` |
 | Emitter | 9 | Speed Random | `velocity_spread` |
-| Emitter Dimensions | 81/82/83 | Size X / Size Y / Size Z (percent) | `emitter_size_percent.x/y/z` |
+| Emitter Dimensions | 81/82/83 | Size X / Size Y / Size Z (full-resolution layer px) | `emitter_size_pixels.x/y/z` |
 | Particle | 12 | Lifetime | `particle_lifetime_seconds` |
 | Particle | 13 | Size | `particle_size` |
 | Particle | 14 | Size Over Life | `particle_size_end` |
@@ -92,14 +92,16 @@ No release has been published, so IDs are still being shaped here; they freeze a
 shared release (ADR 0001). The old 3D-point Velocity stored a different value type, so a
 project saved with revision 1 must be re-authored rather than migrated.
 
-## Manifest revision 10: per-axis emitter dimensions
+## Manifest revisions 10 and 12: emitter dimensions
 
-Revision 10 appends an `Emitter Dimensions` topic at indices 80–84. Visible Size X/Y/Z
-controls occupy indices 81–83 and store percentages of the existing `Emitter Size`
-base extent. Their 100% defaults keep older AE projects visually unchanged. The core
-uses all axes for Box, scales Sphere to an ellipsoid, and uses X/Y for the current
-planar Disc. Point ignores them. Graph keys 19–21 are optional; old schema-1 emitter
-nodes therefore keep 100% on each axis. See ADR 0017.
+Revision 10 appended an `Emitter Dimensions` topic at indices 80–84. Pre-release
+revision 12 changes the existing Size X/Y/Z controls at indices 81–83 to direct
+full-resolution layer-pixel dimensions (0–100000 px, default 100 px). The old
+percentage interpretation is intentionally not migrated during development. The
+core uses all axes for Box and scales Sphere to an ellipsoid; Disc uses its dedicated
+Disc Size in layer heights, and Point ignores the dimensions. Graph keys 19–21 hold
+the same direct-pixel values. The render boundary converts X using pixel aspect and
+all axes using full-resolution layer height. See ADR 0017.
 
 ## Manifest revision 11: Particle variation
 
@@ -224,7 +226,7 @@ pinned to 0 and 1. The selected point also accepts direct numeric value entry. T
 selector describes the segment algorithm: Linear is implemented, and selecting it never changes the
 stored knots. Bezier remains a future option. `Remove Point` deletes the selected interior point. Each
 curve is limited to eight points. Size values are full-resolution layer pixels in 0…100,000 px;
-opacity values are 0…1. CEP Size fields display `px`; Emitter Size X/Y/Z remain percentages.
+opacity values are 0…1. CEP Particle Size and emitter Size X/Y/Z fields display `px`.
 
 The AE parameter streams store a point count plus eight fixed age/value slots per curve. Count zero
 keeps old projects on their existing start/end line. Active curves are copied into optional opaque

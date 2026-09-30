@@ -16,7 +16,8 @@ struct EvaluatedGraph {
 // are constant; appearance endpoints define a linear age curve. Reject invalid
 // topology, ambiguous outputs, and out-of-range values rather than falling back.
 [[nodiscard]] Result<EvaluatedGraph> evaluate_particle_graph(
-    const Graph& graph, RationalTime time, const Cancellation& cancellation);
+    const Graph& graph, RationalTime time, const Cancellation& cancellation,
+    EmitterDimensionContext dimension_context = {});
 
 // Legacy compatibility constructor. Explicit identities allow the host/editor
 // to own UUID creation. Values must satisfy Settings bounds; this helper does

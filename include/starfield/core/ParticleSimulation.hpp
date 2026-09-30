@@ -37,7 +37,9 @@ struct ParticleSlotRange {
 // absolute time from scratch, so frame order, repeats, and negative comp time
 // cannot leak state between renders (ADR 0002).
 //
-// Per-particle birth offsets follow `emitter_shape` within `emitter_size`, and each
+// Per-particle birth offsets follow `emitter_shape`; Box/Sphere dimensions are
+// expressed in full-resolution layer pixels and converted by `dimension_context`.
+// Disc retains its dedicated `emitter_size` diameter. Each
 // particle gets an independent velocity jitter of +/- `velocity_spread` per axis.
 // Gravity and linear drag use closed-form integration, so no frame stepping or
 // render history is required. Size, opacity, and RGB color interpolate linearly
@@ -47,7 +49,8 @@ struct ParticleSlotRange {
 // `time_seconds` is the only lossy conversion allowed across this boundary.
 [[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings,
                                                                      double time_seconds,
-                                                                     const Cancellation& cancellation);
+                                                                     const Cancellation& cancellation,
+                                                                     EmitterDimensionContext dimension_context = {});
 
 // Evaluate only global emission slots assigned to one deterministic branch.
 // Slot identity, birth time, random streams, and the emitter-wide live cap stay
@@ -56,7 +59,8 @@ struct ParticleSlotRange {
 // population once per branch.
 [[nodiscard]] Result<std::vector<ParticleInstance>> simulate_particles_partition(
     const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
-    std::uint32_t partition_index, const Cancellation& cancellation);
+    std::uint32_t partition_index, const Cancellation& cancellation,
+    EmitterDimensionContext dimension_context = {});
 
 // Return the bounded global slot interval used by every branch of an emitter.
 [[nodiscard]] Result<ParticleSlotRange> live_particle_slot_range(
@@ -68,6 +72,6 @@ struct ParticleSlotRange {
 [[nodiscard]] Result<std::size_t> simulate_particles_partition_into(
     const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
     std::uint32_t partition_index, std::span<ParticleInstance> destination,
-    const Cancellation& cancellation);
+    const Cancellation& cancellation, EmitterDimensionContext dimension_context = {});
 
 } // namespace starfield::core
