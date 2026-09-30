@@ -165,6 +165,20 @@ assert.deepEqual(paradeItems.slice(1).map(effect =>
 assert.equal(undo.begins, 1);
 assert.equal(undo.ends, 1);
 
+// AE-level Ctrl+D copies hidden identity streams verbatim. A graph-owned node
+// lookup must reject that ambiguous state rather than silently choosing one.
+const copiedEmitter = parade.addProperty(paradeItems[1].matchName);
+copiedEmitter.name = paradeItems[1].name;
+for (const [name, property] of Object.entries(paradeItems[1].properties)) {
+    copiedEmitter.property(name).setValue(property.value);
+}
+const ambiguous = invoke("ensureNodeEffects", {
+    baseGraphRevision: 4, graphHex, nodeManifest: nodes
+});
+assert.equal(ambiguous.ok, false);
+assert.match(ambiguous.error.message, /share node identity/i,
+    "duplicate native effect identities are reported instead of binding the first match");
+
 const committed = invoke("submitGraph", {
     baseGraphRevision: 4,
     baseNodeManifest: nodes,
@@ -174,9 +188,9 @@ const committed = invoke("submitGraph", {
 assert.equal(committed.ok, true, committed.error && committed.error.message);
 assert.equal(committed.snapshot.revision, 5);
 assert.equal(committed.snapshot.graphHex, changedGraphHex);
-assert.equal(paradeItems.length, 2, "deleting one graph node removes only its matching AE effect instance");
+assert.equal(paradeItems.length, 2, "deleting a graph node removes all AE effects carrying its identity");
 assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
-assert.equal(undo.begins, 2);
-assert.equal(undo.ends, 2);
+assert.equal(undo.begins, 3, "the rejected duplicate reconciliation still closes one undo group");
+assert.equal(undo.ends, 3);
 
-console.log("Native node gateway checks passed (Emitter create, independent values, dimensions, identity, delete, graph commit).");
+console.log("Native node gateway checks passed (Emitter create, independent values, dimensions, duplicate-ID rejection, duplicate cleanup, graph commit).");

@@ -111,8 +111,9 @@ PF_Err add_color(PF_InData* in_data, const char* name, A_long id) noexcept {
 
 PF_Err add_node_identity(PF_InData* in_data) noexcept {
     // Eight exact 16-bit chunks preserve the complete graph UUID. Each chunk is
-    // exactly representable in the slider's 32-bit range fields. The panel detects
-    // copied identities and replaces collisions.
+    // exactly representable in the slider's 32-bit range fields. Graph-canvas
+    // duplication allocates a fresh UUID; the gateway rejects ambiguous AE-level
+    // copies instead of silently binding the first matching effect.
     constexpr PF_FpLong kU16Max = 65535.0;
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         char name[24]{};

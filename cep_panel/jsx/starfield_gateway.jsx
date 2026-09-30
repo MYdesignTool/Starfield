@@ -412,15 +412,25 @@
         }
     }
 
-    function nodeEffectById(layer, id) {
+    function nodeEffectsById(layer, id) {
         var parade = layer.property("ADBE Effect Parade");
-        if (!parade) return null;
+        var matches = [];
+        if (!parade) return matches;
         for (var i = 1; i <= parade.numProperties; i++) {
             var effect = parade.property(i);
             if (!effect || !nativeNodeTypeByMatch(effect.matchName)) continue;
-            if (nodeIdentity(effect) === id) return effect;
+            if (nodeIdentity(effect) === id) matches.push(effect);
         }
-        return null;
+        return matches;
+    }
+
+    function nodeEffectById(layer, id) {
+        var matches = nodeEffectsById(layer, id);
+        if (matches.length > 1) {
+            throw new Error("Multiple AE node effects share node identity " + id +
+                            ". Duplicate the node in the Starfield graph so it receives a new identity.");
+        }
+        return matches.length ? matches[0] : null;
     }
 
     function nativeNodeTypeByMatch(matchName) {
@@ -590,8 +600,23 @@
 
     function removeNativeNodeEffects(layer, ids) {
         for (var i = 0; i < ids.length; i++) {
-            var effect = nodeEffectById(layer, ids[i]);
-            if (effect && typeof effect.remove === "function") effect.remove();
+            // Effect Parade is an indexed group. Removing an instance invalidates
+            // the remaining references, so re-enumerate after each removal. This
+            // also clears accidental AE-level duplicates carrying the same UUID.
+            while (true) {
+                var matches = nodeEffectsById(layer, ids[i]);
+                if (matches.length === 0) break;
+                var parade = layer.property("ADBE Effect Parade");
+                var before = parade ? parade.numProperties : 0;
+                if (typeof matches[matches.length - 1].remove !== "function") {
+                    throw new Error("AE cannot remove the node effect with identity " + ids[i] + ".");
+                }
+                matches[matches.length - 1].remove();
+                parade = layer.property("ADBE Effect Parade");
+                if (!parade || parade.numProperties >= before) {
+                    throw new Error("AE did not remove the node effect with identity " + ids[i] + ".");
+                }
+            }
         }
     }
 

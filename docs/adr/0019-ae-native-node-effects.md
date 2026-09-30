@@ -1,6 +1,6 @@
 # ADR 0019: AE-native effect instances own node records
 
-- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX; AE 2023 synchronization acceptance is pending.
+- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX; AE 2023 synchronization acceptance is pending. The gateway now rejects duplicate native node UUIDs and removes all same-UUID effects when deleting that graph node.
 - Date: 2026-09-30.
 - Depends on ADRs 0006–0013 and 0015.
 
@@ -79,6 +79,12 @@ owned by the corresponding Particle effect. The prototype may start with scalar
 fields, but P-02B must not resume until the curve payload has a bounded,
 project-persisted per-node representation and the renderer snapshot compiles it
 without leaving a second editable source of truth.
+
+The CEP graph's Duplicate command creates new graph UUIDs and materializes new AE
+effects. If an effect is copied directly in Effect Parade, the copied UUID makes
+the graph-to-effect mapping ambiguous. The current gateway detects this and blocks
+edits against that identity; deleting the graph node removes every effect carrying
+that UUID. Automatic import/re-key of raw AE-level duplicates remains open.
 
 Use one thin AEX code fragment per AE effect module. Adobe permits multiple
 PiPLs in a single file for After Effects, but recommends one effect per code
