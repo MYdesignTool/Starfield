@@ -1341,6 +1341,51 @@ void test_renderer_transparent_particle_output() {
     CHECK(background.r == 0 && background.g == 0 && background.b == 0 && background.a == 0);
 }
 
+void test_renderer_requested_alpha_mode() {
+    const CpuParticleRenderer renderer;
+    const CancellingAfterFirstPoll never(false);
+
+    Scene scene;
+    scene.settings.particle_count = 1;
+    scene.settings.birth_rate = 1.0;
+    scene.settings.particle_lifetime_seconds = 4.0;
+    scene.settings.particle_size = 10.0;
+    scene.settings.opacity = 0.5;
+    scene.settings.velocity = Vec3{0.0, 0.0, 0.0};
+    scene.time_seconds = 1.0;
+
+    RenderRequest request = build_request(scene);
+    request.frame.alpha_mode = AlphaMode::straight;
+    const auto output8 = renderer.render(request, never);
+    CHECK(output8.has_value());
+    if (output8.has_value()) {
+        const Rgba8 center = pixel8(output8.value(), 32, 32);
+        CHECK(output8.value().alpha_mode == AlphaMode::straight);
+        CHECK(center.r == 255 && center.g == 255 && center.b == 255);
+        CHECK(center.a >= 126 && center.a <= 129);
+        CHECK(pixel8(output8.value(), 5, 5).r == 0);
+    }
+
+    request.frame.format = PixelFormat::rgba16;
+    const auto output16 = renderer.render(request, never);
+    CHECK(output16.has_value());
+    if (output16.has_value()) {
+        CHECK(output16.value().alpha_mode == AlphaMode::straight);
+        CHECK(channel16(output16.value(), 32, 32, 0) == 32768);
+        CHECK(channel16(output16.value(), 32, 32, 3) >= 16383 &&
+              channel16(output16.value(), 32, 32, 3) <= 16385);
+    }
+
+    request.frame.format = PixelFormat::rgba32f;
+    const auto output32 = renderer.render(request, never);
+    CHECK(output32.has_value());
+    if (output32.has_value()) {
+        CHECK(output32.value().alpha_mode == AlphaMode::straight);
+        CHECK(std::abs(channel32(output32.value(), 32, 32, 0) - 1.0f) < 1e-6f);
+        CHECK(std::abs(channel32(output32.value(), 32, 32, 3) - 0.5f) < 1e-6f);
+    }
+}
+
 void test_renderer_formats_and_limits() {
     const CancellingAfterFirstPoll never(false);
     const CpuParticleRenderer renderer;
@@ -2196,6 +2241,7 @@ int main() {
     test_renderer_region_of_interest();
     test_renderer_downsampled_frame_mapping();
     test_renderer_transparent_particle_output();
+    test_renderer_requested_alpha_mode();
     test_renderer_formats_and_limits();
 
     std::printf("%d checks, %d failures\n", g_checks, g_failures);

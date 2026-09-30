@@ -67,8 +67,8 @@ PixelGrid make_grid(const FrameSpec& frame) noexcept {
 }
 
 bool encode_region(const std::vector<float>& accumulation, std::uint32_t roi_width, std::uint32_t roi_height,
-                   PixelFormat format, std::uint32_t row_bytes, std::vector<std::byte>& destination,
-                   const Cancellation& cancellation) noexcept {
+                   PixelFormat format, AlphaMode alpha_mode, std::uint32_t row_bytes,
+                   std::vector<std::byte>& destination, const Cancellation& cancellation) noexcept {
     const std::uint32_t pixel_bytes = bytes_per_pixel(format);
     for (std::uint32_t y = 0; y < roi_height; ++y) {
         if (cancellation.is_cancelled()) return false;
@@ -77,23 +77,35 @@ bool encode_region(const std::vector<float>& accumulation, std::uint32_t roi_wid
         for (std::uint32_t x = 0; x < roi_width; ++x) {
             const float* pixel = row + static_cast<std::size_t>(x) * 4;
             std::byte* out = out_row + static_cast<std::size_t>(x) * pixel_bytes;
+            float red = pixel[0];
+            float green = pixel[1];
+            float blue = pixel[2];
+            if (alpha_mode == AlphaMode::straight) {
+                if (pixel[3] > 0.0f) {
+                    red /= pixel[3];
+                    green /= pixel[3];
+                    blue /= pixel[3];
+                } else {
+                    red = green = blue = 0.0f;
+                }
+            }
             switch (format) {
                 case PixelFormat::rgba8:
-                    out[0] = static_cast<std::byte>(encode8(pixel[0]));
-                    out[1] = static_cast<std::byte>(encode8(pixel[1]));
-                    out[2] = static_cast<std::byte>(encode8(pixel[2]));
+                    out[0] = static_cast<std::byte>(encode8(red));
+                    out[1] = static_cast<std::byte>(encode8(green));
+                    out[2] = static_cast<std::byte>(encode8(blue));
                     out[3] = static_cast<std::byte>(encode8(pixel[3]));
                     break;
                 case PixelFormat::rgba16:
-                    store_u16(out + 0, encode16(pixel[0]));
-                    store_u16(out + 2, encode16(pixel[1]));
-                    store_u16(out + 4, encode16(pixel[2]));
+                    store_u16(out + 0, encode16(red));
+                    store_u16(out + 2, encode16(green));
+                    store_u16(out + 4, encode16(blue));
                     store_u16(out + 6, encode16(pixel[3]));
                     break;
                 case PixelFormat::rgba32f:
-                    store_f32(out + 0, pixel[0]);
-                    store_f32(out + 4, pixel[1]);
-                    store_f32(out + 8, pixel[2]);
+                    store_f32(out + 0, red);
+                    store_f32(out + 4, green);
+                    store_f32(out + 8, blue);
                     store_f32(out + 12, pixel[3]);
                     break;
             }
@@ -119,7 +131,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     output.region = roi;
     output.format = frame.format;
     output.color_space = frame.color_space;
-    output.alpha_mode = AlphaMode::premultiplied;
+    output.alpha_mode = frame.alpha_mode;
 
     if (roi.empty()) {
         // Nothing to draw: an empty region is a legal request in AE.
@@ -247,7 +259,8 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     } catch (const std::bad_alloc&) {
         return OutputResult::failure(ErrorCode::allocation_failed, "output buffer allocation failed");
     }
-    if (!encode_region(accumulation, roi_width, roi_height, frame.format, *row_bytes, output.pixels, cancellation)) {
+    if (!encode_region(accumulation, roi_width, roi_height, frame.format, frame.alpha_mode, *row_bytes,
+                       output.pixels, cancellation)) {
         return OutputResult::failure(ErrorCode::cancelled, "render cancelled while encoding output pixels");
     }
 

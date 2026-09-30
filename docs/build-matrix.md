@@ -85,15 +85,31 @@ replaced. Core tests pass 11,874 checks, the adapter fake-host suite passes 676 
 and panel graph-view, gateway, and startup checks pass. AE visual/project-lifecycle
 qualification remains open.
 
+## M3-06 requested-alpha output candidate (2026-09-30)
+
+The renderer now encodes its premultiplied internal accumulation in the requested
+`FrameSpec::alpha_mode`. The AE adapter candidate requests straight output after the
+previous paired build rendered white particles darker than an opaque blue lower layer
+(background sample `[0,108,255,255]`; particle sample `[16,98,209,255]`). Core tests
+passed 11,887 checks, including requested straight output at 8/16/32 bpc; the May 2023
+SDK build succeeded. Candidate AEX SHA-256 is
+`AE577C692F4EDA5B1C502CE8536FC7D5A1941B18B5626103698BD36219F5B046`; paired Core
+SHA-256 is `DCC15626AD24667BBB3724892A3EC65BB43E9D6718DD6AD40A1C2FC3F6A2B7E0`, and
+runtime `current.txt` selects `StarfieldCore-DCC15626AD24667B.dll`.
+
+The host still has the earlier AEX SHA-256 `1DBAA183…` at the plug-in root. Its
+`StarfieldRuntime` Junction selects the new Core, but that AEX still requests
+premultiplied output. The new straight-alpha AEX has not yet been installed or rendered
+in AE. The planned `Plug-ins\dist` Junction and sibling `dist\StarfieldRuntime`
+Junction await the exact installation authorization; no plugin-directory change was
+made for this candidate.
+
 Read-only AE 2023 plug-in path audit (2026-09-30): the only discovered
-`StarfieldParticle.aex` is under `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\dist`
-with SHA-256 `8ACF5010…`; its sibling pinned Core is `94A26570…`. The nested
-`dist\StarfieldRuntime` path does not exist. The root `Plug-ins\StarfieldRuntime`
-Junction points to this checkout's `artifacts/runtime` and selects Core generation
-`6E660BB1…`, but `CoreLoader` resolves runtime paths relative to the loaded AEX, so
-the nested copy falls back to its pinned Core. The current `1DBAA183…` AEX / `6E660BB1…`
-Core pair is built but has not been installed at the canonical plug-in root. AE was
-not running during this read-only audit; no host files were changed.
+`StarfieldParticle.aex` is at `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins\StarfieldParticle.aex`
+with SHA-256 `1DBAA183…`. The root `Plug-ins\StarfieldRuntime` Junction points to
+this checkout's `artifacts/runtime`, and `current.txt` selects
+`StarfieldCore-DCC15626AD24667B.dll`. The plugin `dist` child path is absent. AE was
+not running during this audit.
 
 Historical: M0/M1 Windows x64 builds passed against the supplied May 2023 and SDK 26.5 inputs. The user confirmed the corrected M1 shell loads in AE 2023; its exact build is not recorded. The M1-era 8001 version mismatch was corrected. These older artifacts are not the current binary.
 

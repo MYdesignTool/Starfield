@@ -231,7 +231,9 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
                                               static_cast<std::int64_t>(in_data->time_scale)};
     frame.format = pixel_format_for(depth);
     frame.color_space = core::ColorSpace::ae_working_space;
-    frame.alpha_mode = core::AlphaMode::premultiplied;
+    // AE composites the SmartFX output as straight-alpha pixels. The core keeps
+    // its source-over accumulator premultiplied and converts at the output edge.
+    frame.alpha_mode = core::AlphaMode::straight;
     frame.pixel_aspect_ratio = rational_scale_value(state.par, host_pixel_aspect_ratio(*in_data));
     frame.quality = in_data->quality == PF_Quality_HI ? core::Quality::full : core::Quality::draft;
 

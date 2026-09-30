@@ -55,8 +55,10 @@ layer with the effect applied behave as a particle layer: pixels outside the spr
 alpha and underlying composition layers show through. The effect does not change the layer's
 visibility.
 
-The core accumulates particles with premultiplied-alpha "over" and writes premultiplied output in
-the requested format. The AE adapter advertises `PF_OutFlag2_REVEALS_ZERO_ALPHA`, so AE retains the
+The core accumulates particles with premultiplied-alpha "over" and encodes the staging buffer in
+`FrameSpec::alpha_mode`. The AE candidate requests straight output at the host boundary, based on
+the measured dark-particle result from the prior premultiplied candidate (ADR 0003); the revised
+composite remains an AE qualification gate. The AE adapter advertises `PF_OutFlag2_REVEALS_ZERO_ALPHA`, so AE retains the
 requested extent even when the input pixels have zero alpha; PiPL and runtime values are statically
 checked against the May 2023 SDK declaration. The render request intentionally has no source-pixel
 field, preventing accidental reintroduction of source passthrough. Texture/layer sources remain a
@@ -69,11 +71,11 @@ extent to transparent black before copying the core output. This behavior was vi
 AE against the transparency grid on 2026-09-28; testing a lower composition layer behind the
 particle layer remains a separate visual check.
 
-On 2026-09-30 the owner reported that white particles look dark against a blue lower layer during
-translucent portions of their lifetime. That conflicts with the earlier lower-layer visual check,
-so compositing remains open for this opacity case. `CpuRenderer` still computes premultiplied
-source-over once and the AE bridge writes the channels directly. M3-06 leaves the contract unchanged
-until the current paired candidate is compared over the transparency grid and opaque blue layer.
+On 2026-09-30 a render of the paired candidate showed dark white particles over a blue lower layer.
+The revised M3-06 candidate keeps premultiplied source-over accumulation but unpremultiplies when
+encoding `AlphaMode::straight`; `SmartRender` requests that mode and the bridge writes those channel
+values directly. The repaired appearance still requires an AE render comparison over transparency
+and an opaque blue lower layer.
 
 ## Color
 
