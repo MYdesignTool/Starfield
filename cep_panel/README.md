@@ -8,8 +8,8 @@ Refresh. ResizeObserver work is deferred/coalesced so its delivery warning no
 longer covers a native error. Close/reopen CEP to load the source changes.
 
 The owner supplied AE's float/SmartFX contract error. **That fix requires the
-build-6 node AEX candidate**, not just CEP reload. Candidate compiled; deployment
-authorization requested. Emitter duplication works; Particle still awaits
+build-6 node AEX**, not just CEP reload. Build 6 is deployed with hashes verified
+through the existing single plugin junction. Emitter duplication works; Particle still awaits
 actual AE confirmation. [Current checkpoint](../docs/native-node-checkpoint.md).
 
 ## Current CEP 5b update — 2026-10-01
@@ -51,7 +51,7 @@ add it from the node context menu and connect it. Partial first initialization n
 real render response, undo and reopen still require owner confirmation.
 
 
-Current native candidate: revision-18 build 5, deployed 2026-10-01 through the
+Current native build: revision-18 build 6, deployed 2026-10-01 through the
 existing single `Plug-ins/Starfield -> dist` junction. Gateway token:
 `native-node-sync-6`. The owner confirms build 4 fixed the selection crash.
 Build 5 removes all expression access. Node effects own saved values, identity,

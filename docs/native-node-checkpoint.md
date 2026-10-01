@@ -28,8 +28,13 @@ Checks: actual shared node EffectMain compiled separately for all four kinds,
 **276 checks, zero failures**; focused startup/resize/error and native gateway
 fixtures pass; May 2023 SDK candidate build succeeds. Fake copy callbacks verify
 byte transport/error cleanup, not AE's implementation. **No AE acceptance claim.**
-Candidate built with `-NoRuntimePublish -NoDistPublish`; deployment requested
-under ADR 0011. Backup name: `p02d-build6-node-smartfx-20261001`. Next owner gate:
+Candidate built with `-NoRuntimePublish -NoDistPublish`. Owner authorized the
+specific ADR 0011 command; **build 6 is deployed**, all six file hashes verified.
+Existing single `Plug-ins/Starfield -> dist` junction retained. Before: build-5
+AEX set; after: build-6 AEX set, unchanged Core/selected Core generation.
+Backup: `artifacts/disabled/p02d-build6-node-smartfx-20261001/deployment.json`.
+Undo (AE closed): `powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build6-node-smartfx-20261001' -Rollback`.
+The agent did not start/stop AE; the owner chose to test. Next owner gate:
 fresh default Emitter/Particle and one Particle addition in the failing AE
 project, including 32-bpc operation. Earlier rendering checks are not repeated.
 

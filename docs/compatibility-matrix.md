@@ -8,7 +8,8 @@ without implemented SmartFX are a confirmed contract defect. Build 6 adds the
 actual node selectors plus matching flags. CEP resize work is deferred/coalesced
 and resize-delivery warnings no longer replace native transaction errors.
 276 actual-node fake-host checks, focused gateway/startup checks and the SDK
-candidate build pass. Deployment awaits its requested authorization. Emitter
+candidate build pass. Build 6 is deployed after specific owner authorization;
+all six hashes match the candidate. The owner will test AE. Emitter
 duplication is owner-confirmed; Particle default/addition and native 32-bpc
 operation remain open until owner testing. [Checkpoint](native-node-checkpoint.md).
 

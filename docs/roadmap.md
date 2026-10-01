@@ -5,8 +5,9 @@
 Latest: the owner supplied AE's float-aware node / missing SmartFX verification
 error. Build 6 implements node SmartFX passthrough with matching PiPL/runtime
 flags; 276 actual-node checks and the SDK candidate build pass. CEP resize work
-is deferred so it no longer hides operation errors. Deployment authorization is
-pending. Particle/native-node acceptance is still open; Emitter duplication works.
+is deferred so it no longer hides operation errors. Build 6 is deployed after
+explicit authorization, with six hashes verified. Particle/native-node acceptance
+is still open for owner testing; Emitter duplication works.
 
 Current owner evidence after CEP 5a: Emitter duplication works; Particle default
 creation/addition still fails. CEP 5b preserves the failing operation's error and

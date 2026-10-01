@@ -1,16 +1,17 @@
 # Build and host matrix
 
-## Build 6 SmartFX candidate — 2026-10-01
+## Current build 6 SmartFX deployment — 2026-10-01
 
 Owner AE error confirms float-aware internal node effects lacked SmartFX. All
 four node modules now implement smart pre-render/render passthrough and use
 flags2 `0x00001400` in code/PiPL. Packed version: **32774 (`0x8006`)**. No public
 parameter type, match name or project-record change; schema remains revision 18.
 May 2023 SDK build used `-NoRuntimePublish -NoDistPublish`; 276 actual-node
-selector/registration checks and focused CEP checks pass. Deployment is authorized
-under ADR 0011 and follows the source push; AE behavior remains unqualified.
+selector/registration checks and focused CEP checks pass. Source pushed as
+`1277561` before the explicitly authorized ADR 0011 deployment. Installed six
+hashes match the table; AE behavior remains unqualified until owner testing.
 
-| File | Candidate SHA-256 |
+| File | Installed SHA-256 |
 |---|---|
 | `StarfieldParticle.aex` | `DBD984923DED0F79F8CD7F93ADD5197F1C823BF620ECD1A32FD568DD293E7C5A` |
 | `StarfieldEmitter.aex` | `1BC7B0E4ADE174AE715CCB3F44305ABEC1A96F66377610273C5412E012C44532` |
@@ -22,6 +23,8 @@ under ADR 0011 and follows the source push; AE behavior remains unqualified.
 Install/undo uses `tools/Deploy-TestBuild.ps1` with the existing single
 `Plug-ins/Starfield -> dist` junction and backup name
 `p02d-build6-node-smartfx-20261001`. No new plugin folder is required.
+Before: build-5 AEXs. After: build-6 AEXs; Core and selected hot generation are
+unchanged. Backup record: `artifacts/disabled/p02d-build6-node-smartfx-20261001/deployment.json`.
 CEP gateway token: `native-node-sync-6`; details in [the checkpoint](native-node-checkpoint.md).
 
 ## CEP 5a hotfix after owner feedback — 2026-10-01
@@ -563,6 +566,7 @@ command in this file or an externally produced input that must not be edited.
 | Path | Contents | Reproduce with |
 |---|---|---|
 | `plugin/2023/` | Current AE 2023 build: `x64/Release/StarfieldParticle.aex` plus `x64/Release/StarfieldParticle.pdb` and the intermediates under `obj/` | `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1` |
+| `node-effect-tests/<kind>/` | Actual internal node selector/registration fake-host checks, compiler response files and executable | `powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 -NodeEffects -NodeKind Particle` (Emitter/Appearance/Force also supported) |
 | `core-dll/2023/` | Separately built `StarfieldCore.dll` and intermediates | `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -CoreOnly` |
 | `runtime/` | Content-addressed `StarfieldCore-<SHA16>.dll` files and atomic `current.txt` selection for manual hot reload | Either full or `-CoreOnly` build |
 | `loader-tests/` | Loader harness and its workspace-local simulated runtime directory | Build `tests/CoreLoaderTests.vcxproj`, then run it with `dist/StarfieldCore.dll` and `dist/StarfieldParticle.aex` |

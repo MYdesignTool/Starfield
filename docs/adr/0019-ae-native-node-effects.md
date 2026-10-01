@@ -10,7 +10,8 @@ flags2 both become `0x00001400`; packed version is `32774` (`0x8006`). This is a
 implementation-contract fix with no public parameter or node-record migration.
 Nodes remain independent saved effects, hidden from Effects menus. Main remains
 the sole particle renderer and Output owner. MFR/GPU flags stay disabled.
-276 actual-node fake-host checks and SDK compilation pass; Particle creation/
+276 actual-node fake-host checks and SDK compilation pass; build 6 is deployed
+under specific owner authorization and hashes verified. Particle creation/
 32-bpc host acceptance is still pending. CEP token is `native-node-sync-6`.
 
 ## CEP 5b qualification update — 2026-10-01
