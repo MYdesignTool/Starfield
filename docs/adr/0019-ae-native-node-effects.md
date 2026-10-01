@@ -1,16 +1,17 @@
 # ADR 0019: AE-native effect instances own node records
 
-- Status: accepted; source integration keeps Output on the main renderer and omits an Output AEX. AE 2023 synchronization acceptance is pending. The gateway rejects duplicate native node UUIDs, removes all same-UUID effects when deleting a graph node, and can reconcile direct Effect Parade deletion after initial node materialization.
-- Date: 2026-09-30.
+- Status: accepted; Output stays on the main renderer and editable nodes are separate hidden AEX instances. Source integration stores node records on per-node effects and uses a numeric compile trigger. The failed expression mailbox at parameter index 90 has been removed from the active parameter schema. The current candidate builds with the May 2023 SDK but has not yet been qualified in AE 2023.
+- Date: 2026-09-30; implementation correction: 2026-10-01.
 - Depends on ADRs 0006–0013 and 0015.
 
 ## Context
 
 The owner reports that node addition and removal still do not work in the current
-CEP graph editor. The current editor stores the entire topology in one graph
-snapshot on the renderer effect and edits that snapshot through ADR 0013's
-expression carrier. That carrier is only source-integrated; its AE 2023 callback,
-undo, persistence, and topology-edit path have not passed host acceptance.
+CEP graph editor. Thin node AEX modules exist, but the current panel treats them as
+replicas of a graph snapshot owned by the renderer. It checks whether parameter 90
+on the main effect accepts an expression before adding any node; AE 2023 reports
+that it does not. The panel therefore cannot add a node. ADR 0013's expression
+mailbox is rejected for topology authoring.
 
 The project's observed Stardust parameter inventory records one main rendering
 effect and nineteen separate control-effect modules, including Emitter and
@@ -45,11 +46,9 @@ project-persistent node ID.
    duplicated, or removed as an independent AE effect. Global render controls
    such as Max Particles remain owned by the main effect and are exposed from
    the Output inspector; they are not copied into emitter node effects. The
-   fixed terminal stores its cap in the graph snapshot owned by the main effect.
-   The graph compiler combines those global controls with editable node records
-   when it builds the snapshot. The main effect owns the graph topology, edges,
-   layout, and compiled graph snapshot. Editable node
-   modules own their node values and persisted identities. Store the 128-bit
+   fixed terminal's cap stays in the main effect's output-wide controls. Editable
+   node modules own their typed values, UUID, outgoing connections, and canvas
+   position. The main effect stores the compiled render snapshot. Store the 128-bit
    identity as eight exact 16-bit chunks in script-visible scalar streams, not
    four 32-bit values that exceed the exact integer range of a 32-bit float.
    The graph compiler maps node effects to core UUIDs; it must not use display names, effect
@@ -59,13 +58,16 @@ project-persistent node ID.
 3. **Compile before rendering.** A host-side graph synchronizer enumerates node
    effect instances on the UI/edit path, reads their standard parameter streams,
    validates the resulting graph, and writes an immutable compiled snapshot to
-   the renderer's AE-owned graph parameter. The renderer continues to consume
+   the renderer's AE-owned graph parameter. CEP writes ordinary AE node streams,
+   then changes a supervised numeric compile trigger on the renderer. The same
+   trigger handles edits made in Effect Controls. It carries no graph bytes and
+   requires no expression support. The renderer continues to consume
    only its own checked-out snapshot during SmartFX pre-render/render. It never
    queries sibling effects from a render callback.
 4. **Track every edit.** Adding/removing/reordering node effects, editing a node
    parameter in Effect Controls, panel edits, undo/redo, duplication, copy/paste,
    and project reopen must leave the node records and renderer snapshot
-   synchronized. The synchronization write must participate in AE's undo and
+   synchronized. The node edits and compile trigger must participate in AE's undo and
    cache invalidation model. A stale or invalid graph must fail visibly without
    rendering stale particles.
 5. **Keep the runtime hot path.** The main renderer and thin node AEX modules share the
@@ -76,6 +78,33 @@ project-persistent node ID.
    snapshots are not a released project format. This redesign may start with a
    fresh development schema; migration from the current in-development graph
    format is not required.
+
+### Node record streams and synchronization
+
+Each node module stores its UUID in eight exact 16-bit chunks, two hidden
+non-animated layout scalars, an outgoing-connection count, and four fixed outgoing
+connection slots. Each slot stores the destination UUID in eight 16-bit chunks.
+Four outgoing slots per node allow 16,380 edges across 4,095 editable nodes and
+the fixed Output terminal. The source and destination ports are inferred from the v1 node types;
+the graph compiler validates every resulting edge. A future multi-port node schema
+must append explicit port fields and update the node schema version.
+
+On a node parameter edit, the node module asks the renderer to run its supervised
+numeric compile trigger. CEP graph edits write node values, connections, and layout
+in one undo group, reacquire Effect Parade references after structural changes,
+then trigger one compile. The renderer enumerates sibling node effects and reads
+their ordinary streams only in that edit callback. It serializes a new graph into
+its arbitrary-data parameter. Render and pre-render never query sibling effects.
+AE 2023 must still qualify callback delivery, parameter reads, cache invalidation,
+and undo behavior.
+
+The old gateway stopped before modifying the Effect Parade because index 90 was
+non-expressionable. The current source no longer registers that request stream.
+It writes node values, links, and positions
+to the separate node streams, then raises `Commit Graph Edit` as a numeric
+trigger. It checks the renderer's new snapshot against the planned graph. This
+source path builds with the May 2023 SDK, but AE 2023 callback delivery, snapshot
+round-trip, undo, render invalidation, and save/reopen still require host testing.
 
 ### Initial materialization and direct Effect Parade deletion
 
@@ -108,11 +137,10 @@ the graph/effect pair must be coherent before closing or reloading the panel.
 AE 2023 qualification must still check the undo stack, refresh after undo/redo,
 and save/reopen.
 
-P-02C's Size/Opacity curves and other non-scalar node values must also end up
-owned by the corresponding Particle effect. The prototype may start with scalar
-fields, but P-02B must not resume until the curve payload has a bounded,
-project-persisted per-node representation and the renderer snapshot compiles it
-without leaving a second editable source of truth.
+Particle and Appearance modules store bounded Size/Opacity curve banks on their
+own effect instances. The compiler copies those values into the renderer snapshot.
+The main effect's flat legacy controls are hidden while node effects are the
+authoring surface. Curves remain host-unqualified along with the other node data.
 
 ### Node duplication link policy
 
@@ -144,18 +172,33 @@ independent parameter schema.
 
 ## Synchronization spike
 
-Before replacing P-02B's transaction plumbing, prove one Emitter module and one
-Particle module as a narrow AE 2023 prototype alongside the existing Starfield
-Particle renderer. The source candidate routes a node's
-`PF_Cmd_USER_CHANGED_PARAM` through the existing hidden request-expression stream
-and calls the main renderer's `PF_Cmd_USER_CHANGED_PARAM` with
-`AEGP_EffectCallGeneric`. The renderer then updates its own arbitrary graph data
-and snapshot. The panel raises a hidden per-node guard while it writes a batch
-of scripted node controls, so intermediate values do not trigger individual
-commits. The renderer recognizes these zero-nonce node requests before checking
-the graph transaction slider, because that slider retains the last CEP nonce.
-This is only a source-level hypothesis until AE 2023 confirms callback
-delivery, cache refresh, and undo behavior.
+Revision 16 uses main sync guard 42 for Output cap/position batches, numeric commit
+43 and receipt 44, plus ready marker 89. Removing all node effects after bootstrap
+compiles an Output-only transparent graph. CEP rollback restores both authoring
+records and the compiled renderer snapshot. Snapshot acknowledgement compares graph
+semantics with AE float/color quantization tolerance instead of exact byte equality.
+Origin values map between graph world units and full-resolution node point streams.
+Callback timing and actual rendered origin parity remain host gates.
+
+The 2026-10-01 build-2 attempt crashed during fresh apply/viewer opening, before node
+operations. Build 3 is installed with synchronized PiPL/runtime build metadata and
+cleared group-end definitions; it has not been exercised in AE. The crash fix is
+unconfirmed. See `docs/native-node-checkpoint.md` for evidence and remaining work.
+
+The expression-mailbox experiment is rejected: AE 2023.5 Build 52 reports
+parameter index 90 as non-expressionable, and CEP's preflight stopped before
+creating any node effect. The current source removes that parameter entirely. A
+node control edit invokes the main renderer with `AEGP_EffectCallGeneric` and
+the numeric `Commit Graph Edit` trigger at index 43. CEP batches node value and
+metadata writes under a per-node sync guard, then raises one compile trigger.
+The renderer enumerates sibling streams only in that edit callback; rendering
+uses the renderer-owned arbitrary-data snapshot. Callback delivery, cache
+invalidation, undo grouping, and reopen behavior are still AE 2023 gates.
+
+The CEP loader probes the gateway first, then explicitly evaluates the JSX file
+from the active extension folder. A failed load now returns the file-load result
+or error in the panel banner. This is diagnostic behavior only; the updated loader
+and native node flow still need a fresh AE 2023 session to establish host behavior.
 
 Node-effect values currently serialize as constants. Their editable controls
 are marked non-time-varying until graph animation has a dedicated contract;

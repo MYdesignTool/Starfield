@@ -2,13 +2,14 @@
 //
 // Rules this file must keep:
 //   - Only the public AE scripting DOM is used. No sockets, no helper processes,
-//     no direct writes to the effect's arbitrary-data graph parameter. Graph edits
-//     stage a bounded expression mailbox and use the effect's supervised callback.
+//     no direct writes to the effect's arbitrary-data graph parameter. Each editable
+//     node is an independent hidden AE effect with its own values and connections;
+//     a numeric trigger asks the renderer to compile the node effects.
 //   - Every request is parsed, version-checked and fully validated before any
 //     mutation; a failure rejects the whole change set.
 //   - Render values are ordinary supervised parameters. Node positions use separate
-//     hidden, non-animated ordinary streams owned by the effect instance; they never
-//     enter the renderer's graph or rely on CEP-local persistence.
+//     hidden, non-animated ordinary streams owned by the effect instance, compiled
+//     into an optional graph layout record; they do not rely on CEP-local persistence.
 //
 // Host qualification status: see docs/compatibility-matrix.md. The graph carrier
 // entry points are source-level only; expression scripting, callback acknowledgement,
@@ -17,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-2";
+    var GATEWAY_BUILD = "native-node-sync-4";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -27,7 +28,7 @@
     var graphNonceCounter = 0;
     var GRAPH_CARRIERS = {
         snapshot: { index: 41, name: "Graph Snapshot" },
-        request: { index: 90, name: "Graph Edit Request" },
+        guard: { index: 42, name: "Panel Graph Sync Guard" },
         commit: { index: 43, name: "Commit Graph Edit" },
         receipt: { index: 44, name: "Graph Edit Receipt" },
         nodeEffectsReady: { index: 89, name: "Node Effects Ready" }
@@ -442,12 +443,20 @@
         return null;
     }
 
+    function sameValue(left, right) {
+        if (left instanceof Array && right instanceof Array && left.length === right.length) {
+            for (var i = 0; i < left.length; i++) if (!sameValue(left[i], right[i])) return false;
+            return true;
+        }
+        return left === right;
+    }
+
     function setNodeControl(effect, name, value) {
         var property = findEffectProperty(effect, name);
         if (!property || typeof property.setValue !== "function") {
             throw new Error("Node effect parameter is missing: " + name);
         }
-        property.setValue(value);
+        if (!sameValue(property.value, value)) property.setValue(value);
     }
 
     function readGraphFloat64(bytes, offset) {
@@ -494,9 +503,38 @@
         return null;
     }
 
-    function setNodeParameters(effect, node) {
+    function writeNodeRecord(effect, node) {
+        if (!node.position || !isFinite(Number(node.position.x)) || !isFinite(Number(node.position.y)) ||
+            Math.abs(Number(node.position.x)) > 1000000000 || Math.abs(Number(node.position.y)) > 1000000000) {
+            throw new Error("Node layout position is missing or outside the supported range.");
+        }
+        var outgoing = node.outgoing || [];
+        if (!(outgoing instanceof Array) || outgoing.length > 4) {
+            throw new Error("A node can store at most four outgoing connections.");
+        }
+        setNodeControl(effect, "Node Layout X", Number(node.position.x));
+        setNodeControl(effect, "Node Layout Y", Number(node.position.y));
+        setNodeControl(effect, "Outgoing Connection Count", outgoing.length);
+        for (var slot = 0; slot < 4; slot++) {
+            var edge = outgoing[slot] || { id: "00000000000000000000000000000000",
+                                           target: "00000000000000000000000000000000" };
+            if (!/^[0-9a-fA-F]{32}$/.test(String(edge.id)) ||
+                !/^[0-9a-fA-F]{32}$/.test(String(edge.target))) {
+                throw new Error("A node connection has an invalid identity or destination.");
+            }
+            for (var chunk = 0; chunk < 8; chunk++) {
+                setNodeControl(effect, "Connection " + slot + " Target UUID " + chunk,
+                    parseInt(String(edge.target).substr(chunk * 4, 4), 16));
+                setNodeControl(effect, "Connection " + slot + " Edge UUID " + chunk,
+                    parseInt(String(edge.id).substr(chunk * 4, 4), 16));
+            }
+        }
+    }
+
+    function setNodeParameters(effect, node, layer) {
         setNodeControl(effect, "Panel Sync Guard", 1);
         try {
+            writeNodeRecord(effect, node);
             var type = node.type;
             for (var i = 0; i < node.parameters.length; i++) {
                 var parameter = node.parameters[i];
@@ -506,7 +544,14 @@
                     if (key === "2") setNodeControl(effect, "Particles Per Second", value);
                     else if (key === "3") setNodeControl(effect, "Random Seed", value);
                     else if (key === "5") setNodeControl(effect, "Type", Number(value) + 1);
-                    else if (key === "6") setNodeControl(effect, "Origin", value);
+                    else if (key === "6") {
+                        var width = Number(layer.width), height = Number(layer.height);
+                        var aspect = layer.source ? Number(layer.source.pixelAspect) : 1;
+                        if (!isFinite(aspect) || aspect <= 0) aspect = 1;
+                        if (!(width > 0) || !(height > 0)) throw new Error("The emitter layer dimensions are unavailable.");
+                        setNodeControl(effect, "Origin", [width / 2 + value[0] * height / aspect,
+                            height / 2 - value[1] * height, height / 2 + value[2] * height]);
+                    }
                     else if (key === "7") {
                         setNodeControl(effect, "Velocity X", value[0]);
                         setNodeControl(effect, "Velocity Y", value[1]);
@@ -555,16 +600,23 @@
     }
 
     function validateNodeManifest(nodes) {
-        if (!(nodes instanceof Array) || nodes.length > 4096) throw new Error("node manifest is missing or exceeds its limit.");
+        if (!(nodes instanceof Array) || nodes.length > 4095) throw new Error("node manifest is missing or exceeds its limit.");
         var seen = {};
+        var edgeIds = {};
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
             if (!node || typeof node.id !== "string" || !/^[0-9a-fA-F]{32}$/.test(node.id) ||
                 !nativeNodeType(node.type) || !(node.parameters instanceof Array) || node.parameters.length > 64 ||
-                typeof node.schemaVersion !== "number" || node.schemaVersion < 1 || Math.floor(node.schemaVersion) !== node.schemaVersion) {
+                typeof node.schemaVersion !== "number" || node.schemaVersion < 1 || Math.floor(node.schemaVersion) !== node.schemaVersion ||
+                !node.position || !isFinite(Number(node.position.x)) || !isFinite(Number(node.position.y)) ||
+                Math.abs(Number(node.position.x)) > 1000000000 || Math.abs(Number(node.position.y)) > 1000000000 ||
+                !(node.outgoing instanceof Array) || node.outgoing.length > 4) {
                 throw new Error("node manifest contains an invalid node record.");
             }
             node.id = node.id.toLowerCase();
+            if (/^0{32}$/.test(node.id) || node.id === "000000000000000000000000000000ff") {
+                throw new Error("Node identities must be nonzero and cannot use the renderer's Output identity.");
+            }
             if (seen["$" + node.id]) throw new Error("node manifest contains duplicate node identities.");
             seen["$" + node.id] = true;
             var keys = {};
@@ -574,6 +626,26 @@
                     throw new Error("node manifest contains an invalid or duplicate parameter key.");
                 }
                 keys["$" + parameter.key] = true;
+            }
+            for (var e = 0; e < node.outgoing.length; e++) {
+                var connection = node.outgoing[e];
+                if (!connection || typeof connection.id !== "string" || !/^[0-9a-fA-F]{32}$/.test(connection.id) ||
+                    typeof connection.target !== "string" || !/^[0-9a-fA-F]{32}$/.test(connection.target) ||
+                    connection.target.toLowerCase() === node.id || edgeIds["$" + connection.id.toLowerCase()]) {
+                    throw new Error("node manifest contains an invalid or duplicate connection record.");
+                }
+                connection.id = connection.id.toLowerCase();
+                connection.target = connection.target.toLowerCase();
+                edgeIds["$" + connection.id] = true;
+            }
+        }
+        var knownTargets = nodeIds(nodes);
+        knownTargets["$000000000000000000000000000000ff"] = true;
+        for (var sourceIndex = 0; sourceIndex < nodes.length; sourceIndex++) {
+            for (var edgeIndex = 0; edgeIndex < nodes[sourceIndex].outgoing.length; edgeIndex++) {
+                if (!knownTargets["$" + nodes[sourceIndex].outgoing[edgeIndex].target]) {
+                    throw new Error("node manifest connection points to a node that does not exist.");
+                }
             }
         }
         return nodes;
@@ -589,7 +661,7 @@
         try {
             effect.name = spec.label + " " + node.id.substr(0, 6);
             setNodeIdentity(effect, node.id);
-            setNodeParameters(effect, node);
+            setNodeParameters(effect, node, layer);
         } catch (error) {
             if (typeof effect.remove !== "function") {
                 throw new Error(error.toString() + " AE could not remove the partially initialized node effect.");
@@ -617,7 +689,7 @@
             else {
                 var existingType = nativeNodeTypeByMatch(effect.matchName);
                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
-                if (writeExisting) setNodeParameters(effect, node);
+                if (writeExisting) setNodeParameters(effect, node, layer);
             }
         }
     }
@@ -667,10 +739,9 @@
     function resolveCarrier(effect, key) {
         var binding = GRAPH_CARRIERS[key];
         if (!binding) return null;
-        // Resolve the registered slot first. Revision 15 deliberately reuses the
-        // old request property's label at a new index; in projects that retain the
-        // old parameter name, effect.property(name) can otherwise return index 42
-        // and hide the active request at index 90.
+        // Resolve the registered slot first. The old expression request is no
+        // longer part of the active contract; index 42 remains an inert reserved
+        // slot, so a name-first lookup could otherwise bind the wrong stream.
         var property = effect.property(binding.index);
         if (property && property.name === binding.name && property.propertyIndex === binding.index) {
             return property;
@@ -750,47 +821,27 @@
                        target: { token: resolved.token }, snapshot: snapshot });
     }
 
-    function triggerGraphCarrier(resolved, expression, undoLabel, requestId, nonce, manageUndoGroup) {
-        var mailbox = resolved.properties.request;
+    function triggerGraphCarrier(resolved, undoLabel, requestId, nonce, manageUndoGroup) {
         var commit = resolved.properties.commit;
         var receipt = resolved.properties.receipt;
-        if (!mailbox || mailbox.canSetExpression !== true) {
-            return { ok: false, error: { code: "graph_carrier_unsupported",
-                message: "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable." } };
-        }
-        var oldExpression = mailbox.expression;
-        var oldExpressionEnabled = mailbox.expressionEnabled;
         if (typeof nonce !== "number") nonce = nextGraphNonce(commit, receipt);
         var failed = null;
-        var attemptedCommit = false;
         var groupOpen = false;
         try {
             if (manageUndoGroup !== false) {
                 app.beginUndoGroup(undoLabel);
                 groupOpen = true;
             }
-            mailbox.expression = expression;
-            mailbox.expressionEnabled = false;
-            attemptedCommit = true;
             commit.setValue(nonce);
         } catch (error) {
             failed = error.toString();
-            if (!attemptedCommit) {
-                try {
-                    mailbox.expression = oldExpression;
-                    mailbox.expressionEnabled = oldExpressionEnabled;
-                } catch (rollbackError) {
-                    failed += " Mailbox rollback failed: " + rollbackError.toString();
-                }
-            }
         } finally {
             if (groupOpen) {
                 try { app.endUndoGroup(); }
                 catch (endError) { failed = failed || endError.toString(); }
             }
         }
-        if (failed) return { ok: false, error: { code: "graph_commit_failed", message: failed },
-                            context: { commitAttempted: attemptedCommit } };
+        if (failed) return { ok: false, error: { code: "graph_commit_failed", message: failed } };
         var acceptedNonce = Number(receipt.value);
         if (acceptedNonce !== nonce) {
             if (acceptedNonce === -nonce) {
@@ -803,15 +854,37 @@
         return { ok: true, nonce: nonce, requestId: requestId || "" };
     }
 
+    function validateRendererManifest(record) {
+        if (!record || record.id !== "000000000000000000000000000000ff" || !record.position ||
+            !isFinite(record.position.x) || !isFinite(record.position.y) ||
+            Math.abs(record.position.x) > 1000000000 || Math.abs(record.position.y) > 1000000000 ||
+            typeof record.maxParticles !== "number" || !isFinite(record.maxParticles) ||
+            record.maxParticles < 0 || record.maxParticles > 2000000 || Math.floor(record.maxParticles) !== record.maxParticles) {
+            throw new Error("The Output record must have its reserved identity, bounded position and integer particle limit.");
+        }
+        return record;
+    }
+
+    function writeRendererRecord(resolved, record) {
+        var indices = [27, 39, 40], values = [record.maxParticles, record.position.x, record.position.y];
+        for (var i = 0; i < indices.length; i++) {
+            var property = resolved.target.effect.property(indices[i]);
+            if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
+            if (!sameValue(property.value, values[i])) property.setValue(values[i]);
+        }
+    }
+
+    function readRendererRecord(resolved) {
+        return { id: "000000000000000000000000000000ff",
+            maxParticles: Number(resolved.target.effect.property(27).value),
+            position: { x: Number(resolved.target.effect.property(39).value), y: Number(resolved.target.effect.property(40).value) } };
+    }
+
     function syncGraphSnapshot(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
-        if (resolved.properties.request.canSetExpression !== true) {
-            return fail("graph_carrier_unsupported", "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable.");
-        }
         var nonce = nextGraphNonce(resolved.properties.commit, resolved.properties.receipt);
-        var transaction = "/*SFLDSYNC1:" + nonce + "*/0";
-        var receipt = triggerGraphCarrier(resolved, transaction, "Starfield: initialize graph snapshot", request.requestId, nonce);
+        var receipt = triggerGraphCarrier(resolved, "Starfield: compile node graph", request.requestId, nonce);
         if (!receipt.ok) return reply(receipt);
         var snapshot = parseGraphSnapshot(resolved.properties.snapshot.expression);
         if (!snapshot || !snapshot.initialized) return fail("graph_snapshot_unconfirmed", "The effect accepted the request but did not publish a readable graph snapshot.");
@@ -828,7 +901,7 @@
             return fail("stale_graph", "The project graph changed before its AE node effects could be reconciled.");
         }
         var nodes;
-        try { nodes = validateNodeManifest(request.nodeManifest); }
+        try { nodes = validateNodeManifest(request.nodeManifest); validateRendererManifest(request.rendererManifest); }
         catch (manifestError) { return fail("invalid_node_manifest", manifestError.toString()); }
         var missingNodeIds = [];
         try {
@@ -856,33 +929,54 @@
                            target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length });
         }
         var groupOpen = false;
+        var layer = resolved.target.layer;
+        var previousOutput = readRendererRecord(resolved);
         try {
             app.beginUndoGroup("Starfield: create node effects");
             groupOpen = true;
-            ensureNativeNodeEffects(resolved.target.layer, nodes, false);
+            resolved.properties.guard.setValue(1);
+            ensureNativeNodeEffects(layer, nodes, false);
+            var fresh = graphCarrierTarget(request);
+            if (fresh.error) throw new Error(fresh.error.message);
+            writeRendererRecord(fresh, request.rendererManifest);
+            var nonce = nextGraphNonce(fresh.properties.commit, fresh.properties.receipt);
+            var receipt = triggerGraphCarrier(fresh, "Starfield: initialize node graph", request.requestId, nonce, false);
+            if (!receipt.ok) throw new Error(receipt.error && receipt.error.message || "The renderer could not compile the new node effects.");
+            var updated = parseGraphSnapshot(fresh.properties.snapshot.expression);
+            if (!updated || !updated.initialized || updated.revision !== current.revision + 1) {
+                throw new Error("The renderer did not publish the initialized node graph.");
+            }
             // Mark only after every effect was found or created successfully. This
             // value lives in the AE project, so the distinction survives reopen.
-            resolved.properties.nodeEffectsReady.setValue(1);
+            fresh.properties.nodeEffectsReady.setValue(1);
+            resolved = fresh;
+            current = updated;
         } catch (error) {
-            return fail("node_effect_sync_failed", error.toString());
+            var rollbackMessage = "";
+            try {
+                removeNativeNodeEffects(layer, missingNodeIds);
+                var restored = graphCarrierTarget(request);
+                if (restored.error) throw new Error(restored.error.message);
+                writeRendererRecord(restored, previousOutput);
+                var rollback = triggerGraphCarrier(restored, "Starfield: restore initial graph", request.requestId, null, false);
+                if (!rollback.ok) throw new Error(rollback.error.message);
+            } catch (rollbackError) { rollbackMessage = " Bootstrap rollback failed: " + rollbackError.toString(); }
+            return fail("node_effect_sync_failed", error.toString() + rollbackMessage);
         } finally {
+            var clean = graphCarrierTarget(request);
+            if (!clean.error) clean.properties.guard.setValue(0);
             if (groupOpen) {
                 try { app.endUndoGroup(); } catch (ignored) { /* preserve the host error above */ }
             }
         }
         return reply({ ok: true, operation: "ensureNodeEffects", requestId: request.requestId || "",
-                       target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length });
+                       target: { token: resolved.token }, graphRevision: current.revision, count: nodes.length,
+                       snapshot: current });
     }
 
     function submitGraph(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
-        // Check this before adding or removing any node effects. A host that cannot
-        // write the mailbox must leave both the graph snapshot and Effect Parade
-        // untouched, instead of failing after structural edits have begun.
-        if (resolved.properties.request.canSetExpression !== true) {
-            return fail("graph_carrier_unsupported", "After Effects reports the active Graph Edit Request at parameter index 90 as non-expressionable.");
-        }
         if (typeof request.baseGraphRevision !== "number" || !isFinite(request.baseGraphRevision) ||
             Math.floor(request.baseGraphRevision) !== request.baseGraphRevision || request.baseGraphRevision < 1 ||
             request.baseGraphRevision > MAX_GRAPH_REVISION) {
@@ -903,29 +997,31 @@
         try {
             previousNodes = validateNodeManifest(request.baseNodeManifest);
             desiredNodes = validateNodeManifest(request.nodeManifest);
+            validateRendererManifest(request.baseRendererManifest);
+            validateRendererManifest(request.rendererManifest);
         } catch (manifestError) {
             return fail("invalid_node_manifest", manifestError.toString());
         }
         var groupOpen = false;
         var result = null;
+        var layer = resolved.target.layer;
         try {
             app.beginUndoGroup("Starfield: edit graph and nodes");
             groupOpen = true;
-            ensureNativeNodeEffects(resolved.target.layer, desiredNodes, true);
-            removeNativeNodeEffects(resolved.target.layer, removedNodeIds(previousNodes, desiredNodes));
+            resolved.properties.guard.setValue(1);
+            ensureNativeNodeEffects(layer, desiredNodes, true);
+            removeNativeNodeEffects(layer, removedNodeIds(previousNodes, desiredNodes));
 
             // Effect Parade structural edits invalidate indexed-group references. Resolve
             // the pinned renderer and all carrier streams again after changing the parade.
             var fresh = graphCarrierTarget(request);
             if (fresh.error) throw new Error(fresh.error.message);
+            writeRendererRecord(fresh, request.rendererManifest);
             var nonce = nextGraphNonce(fresh.properties.commit, fresh.properties.receipt);
-            var byteCount = graphHex.length / 2;
-            var transaction = "/*SFLDTXN1:" + nonce + ":" + snapshot.revision + ":" + byteCount + ":" +
-                              crc32Hex(graphHex) + ":" + graphHex + "*/0";
-            var receipt = triggerGraphCarrier(fresh, transaction, "Starfield: edit graph", request.requestId, nonce, false);
+            var receipt = triggerGraphCarrier(fresh, "Starfield: edit graph", request.requestId, nonce, false);
             if (!receipt.ok) throw new Error(receipt.error && receipt.error.message || "The graph carrier rejected the edit.");
             var updated = parseGraphSnapshot(fresh.properties.snapshot.expression);
-            if (!updated || !updated.initialized || updated.revision !== snapshot.revision + 1 || updated.graphHex !== graphHex) {
+            if (!updated || !updated.initialized || updated.revision !== snapshot.revision + 1) {
                 throw new Error("The host acknowledgement did not match the saved graph snapshot.");
             }
             result = { ok: true, operation: "submitGraph", requestId: request.requestId || "",
@@ -933,11 +1029,18 @@
         } catch (error) {
             var rollbackMessage = "";
             try {
-                ensureNativeNodeEffects(resolved.target.layer, previousNodes, true);
-                removeNativeNodeEffects(resolved.target.layer, addedNodeIds(previousNodes, desiredNodes));
+                ensureNativeNodeEffects(layer, previousNodes, true);
+                removeNativeNodeEffects(layer, addedNodeIds(previousNodes, desiredNodes));
+                var restored = graphCarrierTarget(request);
+                if (restored.error) throw new Error(restored.error.message);
+                writeRendererRecord(restored, request.baseRendererManifest);
+                var rollback = triggerGraphCarrier(restored, "Starfield: restore node graph", request.requestId, null, false);
+                if (!rollback.ok) throw new Error(rollback.error.message);
             } catch (rollbackError) { rollbackMessage = " Node-effect rollback failed: " + rollbackError.toString(); }
             result = { ok: false, error: { code: "graph_commit_failed", message: error.toString() + rollbackMessage } };
         } finally {
+            var clean = graphCarrierTarget(request);
+            if (!clean.error) clean.properties.guard.setValue(0);
             if (groupOpen) {
                 try { app.endUndoGroup(); }
                 catch (endError) {

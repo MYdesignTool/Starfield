@@ -193,4 +193,21 @@ oversized.client.apply({ type: "addNode", nodeType: "force" }, function (respons
 assert.strictEqual(reply.error.code, "size_limit_exceeded");
 assert.strictEqual(oversized.calls.length, 1, "oversized transaction must never reach the host commit call");
 
+var malformedBootstrapReply;
+var malformedBootstrapClient = transactions.create({
+    codec: codec,
+    edits: edits,
+    call: function (operation, extra, callback) {
+        callback({ ok: true, missingNodeIds: [],
+            snapshot: { initialized: true, revision: 9, graphHex: "00" } });
+    }
+});
+assert.doesNotThrow(function () {
+    malformedBootstrapClient.ensureNativeEffects(
+        { initialized: true, revision: 8, graphHex: codec.toHex(source) },
+        "target-1", function (response) { malformedBootstrapReply = response; });
+}, "a malformed native bootstrap acknowledgement must reach the callback as an error");
+assert.strictEqual(malformedBootstrapReply.ok, false);
+assert.ok(malformedBootstrapReply.error);
+
 console.log("Panel graph transaction checks passed.");

@@ -5,6 +5,7 @@
 #include "AE_Macros.h"
 #include "Param_Utils.h"
 #include "NodeEffectFlags.h"
+#include "NodeRecord.hpp"
 #include "PluginVersion.h"
 
 #include <cstdio>
@@ -133,6 +134,47 @@ PF_Err add_node_identity(PF_InData* in_data) noexcept {
                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
 }
 
+PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kind kind) noexcept {
+    using namespace starfield::adapter::native_nodes;
+    PF_Err error = add_slider(in_data, "Node Layout X", layout_x_id(), -1000000000.0, 1000000000.0, 0.0,
+                              PF_Precision_TENTHS, PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                              PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Node Layout Y", layout_y_id(), -1000000000.0, 1000000000.0, 0.0,
+                       PF_Precision_TENTHS, PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Outgoing Connection Count", connection_count_id(), 0.0,
+                       static_cast<PF_FpLong>(kMaxOutgoingEdges), 0.0, PF_Precision_INTEGER,
+                       PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
+        for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
+            char name[48]{};
+            std::snprintf(name, sizeof(name), "Connection %ld Target UUID %ld",
+                          static_cast<long>(slot), static_cast<long>(chunk));
+            error = add_slider(in_data, name, connection_uuid_id(slot, chunk), 0.0, 65535.0, 0.0,
+                               PF_Precision_INTEGER,
+                               PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                               PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+            if (error != PF_Err_NONE) return error;
+        }
+        for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
+            char name[48]{};
+            std::snprintf(name, sizeof(name), "Connection %ld Edge UUID %ld",
+                          static_cast<long>(slot), static_cast<long>(chunk));
+            error = add_slider(in_data, name, connection_edge_uuid_id(slot, chunk), 0.0, 65535.0, 0.0,
+                               PF_Precision_INTEGER,
+                               PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                               PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+            if (error != PF_Err_NONE) return error;
+        }
+    }
+    (void)kind; // Kind determines the shared stream indices used by the compiler.
+    return PF_Err_NONE;
+}
+
 PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexcept {
     char name[48]{};
     PF_Err error = PF_Err_NONE;
@@ -252,27 +294,36 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     error = add_group(in_data, "Emitter", fourcc('e', 'm', 'i', 't'), true);
     if (error != PF_Err_NONE) return error;
+    error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::emitter);
+    if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
     if (error != PF_Err_NONE) return error;
-    out_data->num_params = 33; // 32 registered parameters (including group markers) plus AE's input layer.
+    out_data->num_params = starfield::adapter::native_nodes::parameter_count(
+        starfield::adapter::native_nodes::Kind::emitter);
     return PF_Err_NONE;
 }
 
 PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_Err error = add_particle_parameters(in_data, true);
     if (error != PF_Err_NONE) return error;
+    error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::particle);
+    if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
     if (error != PF_Err_NONE) return error;
-    out_data->num_params = 55; // 54 registered controls plus AE's input layer.
+    out_data->num_params = starfield::adapter::native_nodes::parameter_count(
+        starfield::adapter::native_nodes::Kind::particle);
     return PF_Err_NONE;
 }
 
 PF_Err setup_appearance(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_Err error = add_particle_parameters(in_data, false);
     if (error != PF_Err_NONE) return error;
+    error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::appearance);
+    if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
     if (error != PF_Err_NONE) return error;
-    out_data->num_params = 54; // 53 registered controls plus AE's input layer.
+    out_data->num_params = starfield::adapter::native_nodes::parameter_count(
+        starfield::adapter::native_nodes::Kind::appearance);
     return PF_Err_NONE;
 }
 
@@ -286,9 +337,12 @@ PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     error = add_group(in_data, "Force", fourcc('f', 'o', 'r', 'c'), true);
     if (error != PF_Err_NONE) return error;
+    error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::force);
+    if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
     if (error != PF_Err_NONE) return error;
-    out_data->num_params = 14; // Thirteen registered controls plus AE's input layer.
+    out_data->num_params = starfield::adapter::native_nodes::parameter_count(
+        starfield::adapter::native_nodes::Kind::force);
     return PF_Err_NONE;
 }
 

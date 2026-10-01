@@ -1,5 +1,20 @@
 # Behavior inventory
 
+## Current host checkpoint — 2026-10-01
+
+Revision-16 build 3 is deployed for **AE 2023.5.0 Build 52**, with the full paired
+five-AEX/Core set. The prior build-2 host check crashed after renderer apply and
+viewer opening; no native-node add/copy/delete test completed. Build 3 has not yet
+been started in AE. Build/cache metadata and group-end initialization were repaired,
+but the crash cause and resolution are **unconfirmed**.
+
+The May 2023 SDK build, eight focused CEP suites and 687 adapter checks pass.
+They do not qualify AE callback delivery, render response, node creation/deletion,
+undo or save/reopen. Exact failure evidence, limitations and the smallest next
+acceptance steps are in [native-node-checkpoint.md](native-node-checkpoint.md).
+Current installed hashes and one-step rollback are in [build-matrix.md](build-matrix.md).
+Earlier installation and expression-mailbox entries below are historical.
+
 Use this file to turn observed behavior into requirements before implementing each feature. Do not infer undocumented internal algorithms from binary details. Static deductions stay hypotheses until a host pass or a reference-effect observation confirms them.
 
 ## Host qualification checkpoint

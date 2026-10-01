@@ -2,11 +2,12 @@
 
 Dockable After Effects 2023 node editor for the top-down `Emitter -> Particle -> Force -> Output`
 graph. The legacy AE Controls view uses protocol v1 of [ADR 0009](../docs/adr/0009-cep-panel-bridge.md).
-Node Graph mode projects the canonical graph through the bounded expression carrier in
-[ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md); the inspector edits the selected node.
+Node Graph mode displays the graph compiled from separate hidden AE node-effect instances,
+as specified by [ADR 0019](../docs/adr/0019-ae-native-node-effects.md); the inspector edits the selected node.
 Cards are 110 × 54 pixels, use color by node type, and connect only from a lower output
-port to an upper input port. Reverse or overlapping connections are rejected, and the
-drag preview is only drawn downward. Particle remains the node label for the particle
+port to an upper input port. Nodes can be placed freely; the
+port direction remains top-in/bottom-out even when a downstream card is placed above
+its source. Particle remains the node label for the particle
 size, opacity, and color controls. Node labels and summaries are centered. Output
 holds the Max Particles control and shows the live particle total for the comp's current
 time; a lightweight read-only poll updates that total every 200 ms while auto-refresh is on.
@@ -25,25 +26,34 @@ revision-checked transaction coordinator. Dynamic card positions are stored in t
 project-owned optional layout record; the older eight layout streams remain only for the
 four-card view.
 The panel reads and writes **supervised render-value parameters** through a namespaced
-ExtendScript gateway. In Node Graph mode, it gets the canonical graph snapshot, plans a
-revision-checked edit, creates/removes the matching Emitter, Particle, Appearance, or Force
-AEX instances, writes their values, and submits the replacement graph through the main
-renderer effect's supervised expression carrier in one AE undo group. The fixed Output
-terminal is backed by the main renderer and is omitted from the node-effect manifest. The
-panel never writes the arbitrary-data `Node Graph Data` property directly or accesses
-host-private state. Editing a node AEX's controls directly in Effect Controls does not yet
-recompile the graph. Fake-host tests cover graph planning, manifests, two independent native
-Emitter instances, dimensions, identity streams, deletion, gateway startup, and projection;
-Effect Parade edits, callback/undo, save/reopen, and render response remain unqualified in
-AE 2023.
+ExtendScript gateway. In Node Graph mode it writes each node's values, links, identity, and
+position into that node's own hidden AE effect instance. A numeric supervised trigger asks
+the main renderer to enumerate those sibling effects on its edit callback, validate the
+assembled graph, and replace its private render snapshot. No graph bytes travel through an
+expression, and rendering never queries sibling effects. The fixed Output terminal is
+backed by the main renderer and omitted from the node-effect manifest. The panel never
+writes the arbitrary-data `Node Graph Data` property directly or accesses host-private
+state. Effect Parade edits, callback/undo, save/reopen, and render response still require
+qualification in AE 2023.
 
 The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, `ensureNodeEffects`, and
-`submitGraph`. Graph reads and commits use ADR 0013's hidden expression carrier;
-`ensureNodeEffects` materializes missing editable node instances from the project graph.
-`submitGraph` accepts bounded schema-1 graph bytes as lowercase hex, reconciles native node
-instances and values, then asks the main effect to validate and persist the graph. This
-integration passes fake-host tests and builds against the May 2023 SDK, but has not yet
-passed its AE 2023 host qualification gates below.
+`submitGraph`. `ensureNodeEffects` materializes node effects from the project's bootstrap
+graph on first use. `submitGraph` reconciles node effects in one undo group, raises the
+numeric compile trigger, and checks the renderer's updated snapshot against the planned
+graph. AE 2023 host qualification remains open.
+
+### Current test candidate (2026-10-01)
+
+Revision 16 uses gateway token `native-node-sync-4`. The expression request at
+index 90 is removed. Output cap and position have a guarded batch update; failed
+transactions restore both node records and the compiled render snapshot. Removing
+all editable nodes leaves a valid transparent Output-only graph. Snapshot checks
+compare identity, topology, layout and values with AE control quantization tolerance.
+Eight focused CEP suites and 687 adapter checks pass; the May 2023 SDK build passes.
+The build-2 host attempt crashed after adding the renderer and opening its viewer,
+before node operations ran. Build 3 bumps PiPL/runtime metadata together and clears
+group-end definitions. These defensive changes do not yet establish a crash fix.
+See `docs/native-node-checkpoint.md` for the deployment and outstanding host gates.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay
@@ -140,7 +150,7 @@ authorization.
 |---|---|---|
 | `bad_response: … unreadable data: EvalScript error.` | The gateway threw before it could answer. The first host run hit this because the entry points were private to the file's IIFE, so `SFLD_getState(...)` was a `ReferenceError`. | Fixed: the gateway publishes `SFLD_getState`/`SFLD_setParameters`/`SFLD_ready` on the ExtendScript global object and the panel loads it by path if the host has not. Update the installed copy (above) and reload the panel. |
 | `bad_response: … unreadable data: undefined` | The gateway is not loaded in this session. | Same as above; the panel's self-loading path covers it. If it persists, confirm `jsx/starfield_gateway.jsx` exists in the installed copy. |
-| `gateway_missing` | Neither the ScriptPath pass nor the self-loading path produced the gateway. | Check the installed copy for `jsx/starfield_gateway.jsx`, then reload the panel. |
+| `gateway_missing` | Neither the ScriptPath pass nor the self-loading path produced the gateway. The panel appends the JSX loader result, such as `missing_file` or `load_error`, when available. | Check that exact file in the active extension folder. The active copy is shown by `getSystemPath("extension")`; reload the panel after updating it. |
 | `no_target` | No selected layer carries the effect. | Select exactly one layer carrying Starfield Particle; the panel retries automatically. **Refresh** is an optional manual re-query. |
 | `missing_parameter` | The installed `.aex` build and the panel's binding table disagree (a parameter was renamed or removed). | Rebuild/install the current `.aex`; the bindings list the names the gateway resolves. |
 
@@ -157,13 +167,11 @@ authorization.
     scroll to zoom at the cursor. Use the bottom-left minimap to inspect the whole graph and click or
     drag it to navigate. Alt-drag previews a duplicate; Ctrl+D and the
     right-click menu expose graph operations. AE 2023 cannot script-read the graph's
-   `CUSTOM_VALUE`, so the panel uses ADR 0013's ordinary expression carrier instead. Source
-   integration is present, but the supervised callback and one-step undo/save-reopen behavior
-   still need qualification with the matching AEX. P-02D's Emitter, Particle, and Force AEX
-   modules currently build as pass-through prototypes; the graph actions are not yet wired to
-   create/remove those AE effects or compile their values into the renderer. Click a node to open its floating
-   properties window. The proposed carrier and its qualification gate are documented in
-   [ADR 0013](../docs/adr/0013-script-visible-graph-snapshot.md). The checked
+   `CUSTOM_VALUE`; node values live on separate hidden Emitter, Particle, Appearance, and
+   Force effect instances, and a numeric callback compiles them into the renderer snapshot.
+   Callback delivery, one-step undo, save/reopen, and render response still need qualification
+   with the matching AEX. Click a node to open its floating properties window. The synchronization
+   contract is documented in [ADR 0019](../docs/adr/0019-ae-native-node-effects.md). The checked
    **Refresh Automatically** option re-reads the selected AE target while the panel is visible;
    **Refresh** remains available for an immediate manual read.
 3. Edit a value in the floating inspector: the panel validates it, writes it through the gateway in one undo

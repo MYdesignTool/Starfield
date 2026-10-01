@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AE_Effect.h"
+#include "AE_GeneralPlug.h"
 #include "starfield/core/Graph.hpp"
 
 namespace starfield::adapter {
@@ -9,6 +10,7 @@ namespace starfield::adapter {
 // ordinary parameter streams. Failure disables the CEP graph carrier only; render
 // and the legacy AE Controls path remain available.
 [[nodiscard]] PF_Err register_graph_carrier(PF_InData* in_data) noexcept;
+[[nodiscard]] AEGP_PluginID graph_carrier_plugin_id() noexcept;
 
 // Called before replacing the canonical arbitrary-data graph in a supervised AE
 // callback. The new expression mirror is prepared first so failure leaves graph bytes

@@ -1,10 +1,51 @@
 # Build and host matrix
 
+## Current revision-16 build 3 — 2026-10-01
+
+The complete May 2023 SDK x64 Release pair is **installed** under
+`D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`.
+Code and PiPL share packed version `32771` (`0x8003`). Installed hashes:
+
+| File | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | `0EC7EE78A9E949FCAE98A3C3416BCC651705C54C3ABB526162CB67C0560C92EE` |
+| StarfieldEmitter.aex | `2041538D2B52E59A5657161BF6E94E252A9674FF9A23131A4AD74EF9B3333C3A` |
+| StarfieldParticleNode.aex | `734C6932077D169EECDA8D779F6C294FF0AD7EAA780EEE0274F71032893DDBB8` |
+| StarfieldAppearance.aex | `DD6A129BDF77E852252F36EC07CEBF64C6D8C9A8C47F01864125CEB9C83D7110` |
+| StarfieldForce.aex | `6A03CBD210B1CC1FB4BD32AA1DA115FDF13E6D1AECA97EE2EC8E7FE9E3310ACF` |
+| StarfieldCore.dll | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+The existing runtime junction selects `StarfieldCore-6D70281C4E756BCA.dll`.
+CEP remains junctioned to this checkout. There is no new junction, registry or
+preference change. The prior build-2 pair and selector are archived under
+`artifacts/disabled/p02d-build3-20261001/`, with `deployment.json`.
+
+Build and checks: 687 adapter checks, zero failures; eight focused CEP suites pass.
+No broader core rerun. Candidate build command (from the repository root):
+
+```powershell
+node tools/Run-WithBuildEnvironment.cjs powershell.exe -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoRuntimePublish -NoDistPublish
+```
+
+The wrapper normalizes duplicate environment-name casing for its build child only.
+The two switches prevent accidental publication into an active development install.
+Installation is an explicit, hash-verified step in `tools/Deploy-TestBuild.ps1`.
+With AE closed, undo this final deployment in one step:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build3-20261001' -Rollback
+```
+
+**Host status:** the prior revision-16 build-2 attempt crashed after renderer apply
+and composition-viewer opening. Build 3 is deployed but has not been started in AE.
+See [the native-node checkpoint](native-node-checkpoint.md) for exact evidence and
+remaining gates. Sections below are historical candidates, not the current install.
+
 ## Current build policy (owner direction, 2026-09-27)
 
 AE 2023 on Windows x64 is the only current target. The default script and direct
 MSBuild project use the May 2023 SDK and write under `artifacts/plugin/2023/`.
-The current candidate passes 11,909 core checks, 678 adapter fake-host checks, and seven
+The earlier revision-15 candidate passed 11,909 core checks, 678 adapter fake-host checks, and seven
 focused CEP graph codec/edit/view/transaction, native-node gateway, gateway, and startup suites.
 The May 2023 SDK build succeeds; candidate hashes and host qualification status are
 recorded below. Earlier counts are historical.

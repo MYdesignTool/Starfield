@@ -1,6 +1,7 @@
 #include "NodeEffects.hpp"
 
 #include "AE_GeneralPlug.h"
+#include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
 #include "SPBasic.h"
 #include "starfield/core/Graph.hpp"
@@ -25,19 +26,23 @@ using starfield::adapter::node_sync::ValueKind;
 
 #if defined(STARFIELD_NODE_KIND_EMITTER)
 constexpr char kRegistrationName[] = "Starfield Emitter Node Sync";
-constexpr A_long kLastParameterIndex = 32;
+constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
+    starfield::adapter::native_nodes::Kind::emitter);
 constexpr A_long kNodeKind = 0;
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
 constexpr char kRegistrationName[] = "Starfield Particle Node Sync";
-constexpr A_long kLastParameterIndex = 54;
+constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
+    starfield::adapter::native_nodes::Kind::particle);
 constexpr A_long kNodeKind = 1;
 #elif defined(STARFIELD_NODE_KIND_APPEARANCE)
 constexpr char kRegistrationName[] = "Starfield Appearance Node Sync";
-constexpr A_long kLastParameterIndex = 53;
+constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
+    starfield::adapter::native_nodes::Kind::appearance);
 constexpr A_long kNodeKind = 2;
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 constexpr char kRegistrationName[] = "Starfield Force Node Sync";
-constexpr A_long kLastParameterIndex = 13;
+constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
+    starfield::adapter::native_nodes::Kind::force);
 constexpr A_long kNodeKind = 3;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
@@ -45,9 +50,7 @@ constexpr A_long kNodeKind = 3;
 
 constexpr A_long kIdentityFirstIndex = kLastParameterIndex - 8;
 constexpr A_long kSyncGuardIndex = kLastParameterIndex;
-constexpr A_long kNodeEditNonce = 0;
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
-constexpr char kHexDigits[] = "0123456789abcdef";
 
 constexpr A_long fourcc(char a, char b, char c, char d) noexcept {
     return (static_cast<A_long>(static_cast<unsigned char>(a)) << 24) |
@@ -263,31 +266,6 @@ bool read_node_id(PF_ParamDef* params[], std::array<std::uint16_t, 8>& chunks) n
     return nonzero;
 }
 
-std::string make_node_edit_expression(const std::array<std::uint16_t, 8>& chunks,
-                                      const EncodedValue& value) {
-    std::string expression(starfield::adapter::node_sync::kRequestPrefix);
-    expression += std::to_string(kNodeEditNonce);
-    expression.push_back(':');
-    for (const std::uint16_t chunk : chunks) {
-        expression.push_back(kHexDigits[(chunk >> 12u) & 0x0fu]);
-        expression.push_back(kHexDigits[(chunk >> 8u) & 0x0fu]);
-        expression.push_back(kHexDigits[(chunk >> 4u) & 0x0fu]);
-        expression.push_back(kHexDigits[chunk & 0x0fu]);
-    }
-    expression.push_back(':');
-    char key_buffer[24]{};
-    const auto key_result = std::to_chars(key_buffer, key_buffer + sizeof(key_buffer), value.key);
-    if (key_result.ec != std::errc{}) return {};
-    expression.append(key_buffer, key_result.ptr);
-    expression.push_back(':');
-    expression.push_back(static_cast<char>(value.kind));
-    expression.push_back(':');
-    expression += value.payload;
-    expression += starfield::adapter::node_sync::kRequestSuffix;
-    if (expression.size() > starfield::adapter::node_sync::kMaxRequestBytes) return {};
-    return expression;
-}
-
 PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH layer,
                        AEGP_EffectRefH& renderer) noexcept {
     renderer = nullptr;
@@ -320,35 +298,33 @@ PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH la
     return PF_Err_NONE;
 }
 
-PF_Err write_request_expression(SuiteSet& suites, AEGP_PluginID plugin_id,
-                                AEGP_EffectRefH renderer, const std::string& expression) {
-    AEGP_StreamRefH request_stream = nullptr;
+PF_Err request_renderer_compile(PF_InData* in_data, SuiteSet& suites, AEGP_PluginID plugin_id,
+                                AEGP_EffectRefH renderer) noexcept {
+    AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(
-        plugin_id, renderer, starfield::adapter::node_sync::kGraphRequestStreamIndex, &request_stream);
-    if (error || !request_stream) return static_cast<PF_Err>(error ? error : PF_Err_BAD_CALLBACK_PARAM);
-
-    std::vector<A_UTF16Char> characters;
-    characters.reserve(expression.size() + 1u);
-    for (const unsigned char character : expression) {
-        if (character > 0x7fu) {
-            suites.stream->AEGP_DisposeStream(request_stream);
-            return PF_Err_BAD_CALLBACK_PARAM;
+        plugin_id, renderer, starfield::adapter::node_sync::kGraphCommitStreamIndex, &raw_stream);
+    if (error || !raw_stream) return static_cast<PF_Err>(error ? error : PF_Err_BAD_CALLBACK_PARAM);
+    AEGP_StreamValue2 value{};
+    const A_Time time{in_data->current_time, in_data->time_scale};
+    error = suites.stream->AEGP_GetNewStreamValue(plugin_id, raw_stream, AEGP_LTimeMode_LayerTime,
+                                                  &time, TRUE, &value);
+    if (!error) {
+        const double current = value.val.one_d;
+        if (!std::isfinite(current) || current < 0.0 || current > 1000000.0 || std::floor(current) != current) {
+            error = PF_Err_BAD_CALLBACK_PARAM;
+        } else {
+            const A_long nonce = current >= 1000000.0 ? 1 : static_cast<A_long>(current) + 1;
+            value.val.one_d = static_cast<A_FpLong>(nonce);
+            error = suites.stream->AEGP_SetStreamValue(plugin_id, raw_stream, &value);
         }
-        characters.push_back(static_cast<A_UTF16Char>(character));
+        suites.stream->AEGP_DisposeStreamValue(&value);
     }
-    characters.push_back(0);
-    error = suites.stream->AEGP_SetExpression(plugin_id, request_stream, characters.data());
-    if (!error) error = suites.stream->AEGP_SetExpressionState(plugin_id, request_stream, FALSE);
-    suites.stream->AEGP_DisposeStream(request_stream);
-    return static_cast<PF_Err>(error);
-}
+    suites.stream->AEGP_DisposeStream(raw_stream);
+    if (error) return static_cast<PF_Err>(error);
 
-PF_Err request_renderer_commit(PF_InData* in_data, SuiteSet& suites, AEGP_PluginID plugin_id,
-                               AEGP_EffectRefH renderer) noexcept {
     PF_UserChangedParamExtra extra{};
     extra.param_index = starfield::adapter::node_sync::kGraphCommitStreamIndex;
-    const A_Time time{in_data->current_time, in_data->time_scale};
-    const A_Err error = suites.effect->AEGP_EffectCallGeneric(
+    error = suites.effect->AEGP_EffectCallGeneric(
         plugin_id, renderer, &time, PF_Cmd_USER_CHANGED_PARAM, &extra);
     return static_cast<PF_Err>(error);
 }
@@ -388,8 +364,8 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         if (!map_parameter_edit(params, changed->uu.id, value)) return PF_Err_NONE;
         std::array<std::uint16_t, 8> node_id{};
         if (!read_node_id(params, node_id)) return PF_Err_BAD_CALLBACK_PARAM;
-        const std::string request = make_node_edit_expression(node_id, value);
-        if (request.empty()) return PF_Err_BAD_CALLBACK_PARAM;
+        (void)node_id;
+        (void)value;
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_NONE;
@@ -405,8 +381,10 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         error = locate_renderer(suites, plugin_id, layer, renderer);
         if (error != PF_Err_NONE) return error;
         if (!renderer) return PF_Err_NONE;
-        error = write_request_expression(suites, plugin_id, renderer, request);
-        if (!error) error = request_renderer_commit(in_data, suites, plugin_id, renderer);
+        // The node effect is the source of truth. Ask the renderer to recompile
+        // from all sibling node streams; never serialize a partial edit through
+        // an expression mailbox on the main effect.
+        error = request_renderer_compile(in_data, suites, plugin_id, renderer);
         suites.effect->AEGP_DisposeEffect(renderer);
         return error;
     } catch (const std::bad_alloc&) {

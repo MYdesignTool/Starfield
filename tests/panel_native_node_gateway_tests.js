@@ -1,366 +1,147 @@
 "use strict";
 
-// Focused fake-host coverage for creating/removing project-owned node AEX instances.
-// This checks the CEP transaction logic; it does not replace AE 2023 qualification.
+// Independent-effect transaction model, including AE indexed-group invalidation.
+// This exercises the gateway/coordinator, not the native compiler or AE host.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
-
-const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "jsx", "starfield_gateway.jsx"), "utf8");
-
-function crc32Hex(hex) {
-    let crc = 0xffffffff;
-    for (let i = 0; i < hex.length; i += 2) {
-        crc ^= parseInt(hex.slice(i, i + 2), 16);
-        for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
-    }
-    return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
-}
-
-function snapshotExpression(revision, graphHex) {
-    return "/*SFLDSNAP1:" + revision + ":" + (graphHex.length / 2) + ":" +
-        crc32Hex(graphHex) + ":" + graphHex + "*/0";
-}
-
-function scalar(name, initial) {
-    return {
-        name,
-        value: Array.isArray(initial) ? initial.slice() : initial,
-        setValue(value) { this.value = Array.isArray(value) ? value.slice() : value; }
-    };
-}
-
+const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
+const codec = require("../cep_panel/js/graph_codec.js"), layout = require("../cep_panel/js/graph_layout.js");
+const edits = require("../cep_panel/js/graph_edits.js"), transactions = require("../cep_panel/js/graph_transactions.js");
+const view = require("../cep_panel/js/graph_view.js");
+const source = fs.readFileSync(path.join(__dirname, "../cep_panel/jsx/starfield_gateway.jsx"), "utf8");
+const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
+let epoch = 0, rejectNext = false, revision = 1, commits = 0;
+const undo = { begins: 0, ends: 0 }, clone = value => Array.isArray(value) ? value.slice() : value;
+const renderer = { matchName: "org.starfieldfx.particle", name: "Starfield Particle", properties: {} };
+const control = (name, value) => ({ name, value: clone(value) });
 function nodeControls() {
-    const values = {
-        "Type": 1, "Particles Per Second": 0, "Random Seed": 0, "Particle Size": 10,
-        "Opacity": 1, "Origin": [0, 0, 0], "Velocity X": 0, "Velocity Y": 0,
-        "Velocity Z": 0, "Disc Size": 0.05, "Speed Random": 0.15,
-        "Size X": 100, "Size Y": 100, "Size Z": 100, "Emission Speed": 0,
-        "Emission Speed Random": 0, "Emission Angle X": 0, "Emission Angle Y": 0,
-        "Emission Angle Z": 0, "Direction": 1, "Direction Span": 60,
-        "Color Start": [255, 255, 255, 1], "Color End": [255, 255, 255, 1],
-        "Size": 10, "Size Over Life": 100, "Opacity Over Life": 100,
-        "Size Random": 0, "Opacity Random": 0, "Lifetime": 2,
-        "Size Curve Count": 0, "Opacity Curve Count": 0,
-        "Gravity": [0, 0, 0], "Linear Drag": 0
-    };
-    for (let i = 0; i < 8; i++) values["Node UUID " + i] = 0;
-    values["Panel Sync Guard"] = 0;
-    return Object.keys(values).reduce((result, name) => {
-        result[name] = scalar(name, values[name]);
-        return result;
-    }, {});
+    const values = { "Type":1, "Particles Per Second":100, "Random Seed":1, "Particle Size":10,
+        "Opacity":1, "Origin":[1920,1080,1080], "Velocity X":0, "Velocity Y":0.3, "Velocity Z":0,
+        "Disc Size":0.05, "Speed Random":0.15, "Size X":100, "Size Y":100, "Size Z":100,
+        "Emission Speed":0, "Emission Speed Random":0, "Emission Angle X":0, "Emission Angle Y":0,
+        "Emission Angle Z":0, "Direction":1, "Direction Span":60, "Color Start":[1,1,1,1],
+        "Color End":[1,1,1,1], "Size":10, "Size Over Life":100, "Opacity Over Life":100,
+        "Size Random":0, "Opacity Random":0, "Lifetime":2, "Size Curve Count":0, "Opacity Curve Count":0,
+        "Gravity":[0,0,0], "Linear Drag":0, "Panel Sync Guard":0,
+        "Node Layout X":0, "Node Layout Y":0, "Outgoing Connection Count":0 };
+    for(let i=0;i<8;i++) values["Node UUID "+i]=0;
+    for(let s=0;s<4;s++) for(let i=0;i<8;i++) {
+        values["Connection "+s+" Target UUID "+i]=0; values["Connection "+s+" Edge UUID "+i]=0;
+    }
+    for(const label of ["Size","Opacity"]) for(let i=0;i<8;i++) {
+        values[label+" Curve "+i+" Age"]=0; values[label+" Curve "+i+" Value"]=100;
+    }
+    return Object.fromEntries(Object.entries(values).map(([name,value])=>[name,control(name,value)]));
 }
-
-const graphHex = "01".repeat(32);
-const changedGraphHex = "02".repeat(32);
-const finalGraphHex = "03".repeat(32);
-const nodeIds = ["11223344556677889900aabbccddeeff", "ffeeddccbbaa00998877665544332211"];
-let activeGraphRevision = 4;
-
-const rendererProperties = {};
-const nodeEffectsReady = scalar("Node Effects Ready", 0);
-nodeEffectsReady.propertyIndex = 89;
-const snapshot = scalar("Graph Snapshot", null);
-snapshot.propertyIndex = 41;
-snapshot.expression = snapshotExpression(4, graphHex);
-const mailbox = scalar("Graph Edit Request", "");
-mailbox.propertyIndex = 90;
-mailbox.expression = "";
-mailbox.expressionEnabled = true;
-mailbox.canSetExpression = true;
-// A revision-14 project can retain a same-name carrier at index 42. The gateway
-// must resolve the revision-15 request by its registered index, not this stale name.
-const staleMailbox = scalar("Graph Edit Request", "stale-expression");
-staleMailbox.propertyIndex = 42;
-staleMailbox.expression = "stale-expression";
-staleMailbox.expressionEnabled = false;
-staleMailbox.canSetExpression = false;
-const legacyMailbox = scalar("Graph Edit Request (Legacy)", "legacy-expression");
-legacyMailbox.propertyIndex = 42;
-legacyMailbox.expression = "legacy-expression";
-legacyMailbox.expressionEnabled = false;
-const receipt = scalar("Graph Edit Receipt", 0);
-receipt.propertyIndex = 44;
-const commit = scalar("Commit Graph Edit", 0);
-commit.propertyIndex = 43;
-commit.setValue = function (nonce) {
-    this.value = nonce;
-    const match = /^\/\*SFLDTXN1:([0-9]+):([0-9]+):([0-9]+):([0-9a-f]{8}):([0-9a-f]+)\*\/0$/.exec(mailbox.expression);
-    if (!match || Number(match[1]) !== nonce || Number(match[2]) !== activeGraphRevision ||
-        Number(match[3]) !== match[5].length / 2 || crc32Hex(match[5]) !== match[4]) {
-        receipt.value = -nonce;
-        return;
-    }
-    activeGraphRevision++;
-    snapshot.expression = snapshotExpression(activeGraphRevision, match[5]);
-    receipt.value = nonce;
-};
-Object.assign(rendererProperties, {
-    "Node Effects Ready": nodeEffectsReady,
-    "Graph Snapshot": snapshot,
-    "Graph Edit Request (Legacy)": legacyMailbox,
-    "Commit Graph Edit": commit,
-    "Graph Edit Receipt": receipt
-});
-const rendererIndexProperties = {
-    41: snapshot,
-    42: legacyMailbox,
-    43: commit,
-    44: receipt,
-    89: nodeEffectsReady,
-    90: mailbox
-};
-let activeRequestPresent = true;
-
-const renderer = {
-    matchName: "org.starfieldfx.particle",
-    property(nameOrIndex) {
-        if (nameOrIndex === "Graph Edit Request") return staleMailbox;
-        if (nameOrIndex === 90) return activeRequestPresent ? mailbox : null;
-        if (typeof nameOrIndex === "number") return rendererIndexProperties[nameOrIndex] || null;
-        return rendererProperties[nameOrIndex] || null;
-    }
-};
-
-const paradeItems = [renderer];
-const parade = {
-    get numProperties() { return paradeItems.length; },
-    property(index) { return paradeItems[index - 1] || null; },
-    addProperty(matchName) {
-        const effect = {
-            matchName,
-            name: "",
-            properties: nodeControls(),
-            property(name) { return this.properties[name] || null; },
-            remove() {
-                const index = paradeItems.indexOf(this);
-                if (index >= 0) paradeItems.splice(index, 1);
-            }
-        };
-        paradeItems.push(effect);
-        return effect;
-    }
-};
-
-const layer = { id: 29, name: "Particle Layer", selected: true,
-    property(name) { return name === "ADBE Effect Parade" ? parade : null; } };
+for(const [index,name,value] of [[27,"Max Particles",1000],[39,"Layout Output X",180],
+    [40,"Layout Output Y",526],[41,"Graph Snapshot",0],[42,"Panel Graph Sync Guard",0],
+    [43,"Commit Graph Edit",0],[44,"Graph Edit Receipt",0],[89,"Node Effects Ready",0]]) {
+    const p=control(name,value); p.propertyIndex=index; renderer.properties[index]=renderer.properties[name]=p;
+}
+const items=[renderer];
+function assertFresh(captured) { if(captured!==epoch) throw new Error("Invalid indexed-group reference"); }
+function wrapProperty(p,captured) {
+    return {name:p.name,propertyIndex:p.propertyIndex,canSetExpression:false,
+        get value(){assertFresh(captured);return clone(p.value);},
+        get expression(){assertFresh(captured);return p.expression||"";},
+        set expression(_){throw new Error("Expression requests are unsupported");},
+        setValue(v){assertFresh(captured);p.value=clone(v);if(p===renderer.properties[43]) compile(v);} };
+}
+function wrapEffect(raw) {
+    const captured=epoch;
+    return {matchName:raw.matchName,get name(){assertFresh(captured);return raw.name;},
+        set name(v){assertFresh(captured);raw.name=v;},
+        property(key){assertFresh(captured);const p=raw.properties[key];return p?wrapProperty(p,captured):null;},
+        remove(){assertFresh(captured);items.splice(items.indexOf(raw),1);epoch++;} };
+}
+function parade() {
+    return {get numProperties(){return items.length;},property(i){return items[i-1]?wrapEffect(items[i-1]):null;},
+        addProperty(matchName){items.push({matchName,name:"",properties:nodeControls()});epoch++;return wrapEffect(items[items.length-1]);} };
+}
+const layer={id:29,name:"Particle Layer",selected:true,width:3840,height:2160,source:{pixelAspect:1},
+    property(name){return name==="ADBE Effect Parade"?parade():null;} };
 function CompItem() {}
-const comp = new CompItem();
-comp.id = 17;
-comp.name = "Test Comp";
-comp.numLayers = 1;
-comp.layer = index => index === 1 ? layer : null;
-const undo = { begins: 0, ends: 0 };
-const exported = {};
-const app = {
-    project: { activeItem: comp, rootFolder: { id: 5 } },
-    beginUndoGroup() { undo.begins++; },
-    endUndoGroup() { undo.ends++; }
-};
-vm.runInNewContext(source, { app, CompItem, $: { global: exported } }, { filename: "starfield_gateway.jsx" });
-
-function emitterNode(id, rate, dimensions) {
-    return { id, type: "org.starfieldfx.nodes.emitter", schemaVersion: 3, parameters: [
-        { key: "2", type: 4, value: rate }, { key: "3", type: 3, value: 5 },
-        { key: "5", type: 3, value: 1 }, { key: "6", type: 5, value: [1920, 1080, 1080] },
-        { key: "7", type: 5, value: [1, 2, 3] }, { key: "8", type: 4, value: 18 },
-        { key: "9", type: 4, value: 0.75 }, { key: "10", type: 4, value: 0.05 },
-        { key: "11", type: 4, value: 0.2 }, { key: "19", type: 4, value: dimensions[0] },
-        { key: "20", type: 4, value: dimensions[1] }, { key: "21", type: 4, value: dimensions[2] }
-    ] };
+const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",numLayers:1,layer:()=>layer});
+const exported={};
+vm.runInNewContext(source,{CompItem,$:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5}},
+    beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;}}});
+const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toString(16).padStart(4,"0")).join("");
+function graphFromEffects() {
+    const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={},p=(key,type,value)=>({key:String(key),type,value});
+    for(const effect of items.slice(1)) {
+        const c=effect.properties,v=name=>clone(c[name].value),id=readUuid(c,"Node UUID ");
+        const type="org.starfieldfx.nodes."+effect.matchName.split(".").pop();
+        let parameters;
+        if(type===edits.types.emitter) {
+            const origin=v("Origin");
+            parameters=[p(2,4,v("Particles Per Second")),p(3,3,v("Random Seed")),p(5,3,v("Type")-1),
+                p(6,5,[(origin[0]-1920)/2160,(1080-origin[1])/2160,(origin[2]-1080)/2160]),
+                p(7,5,[v("Velocity X"),v("Velocity Y"),v("Velocity Z")]),p(8,4,v("Particle Size")),
+                p(9,4,v("Opacity")),p(10,4,v("Disc Size")),p(11,4,v("Speed Random")),
+                p(12,4,v("Emission Speed")),p(13,4,v("Emission Speed Random")),p(14,4,v("Emission Angle X")),
+                p(15,4,v("Emission Angle Y")),p(16,4,v("Emission Angle Z")),p(17,3,v("Direction")-1),
+                p(18,4,v("Direction Span")),p(19,4,v("Size X")),p(20,4,v("Size Y")),p(21,4,v("Size Z"))];
+        } else if(type===edits.types.force) parameters=[p(1,5,v("Gravity")),p(2,4,v("Linear Drag"))];
+        else {
+            parameters=[p(1,5,v("Color Start").slice(0,3)),p(2,5,v("Color End").slice(0,3)),p(3,4,v("Size")),
+                p(4,4,v("Size Over Life")),p(5,4,v("Opacity")),p(6,4,v("Opacity Over Life")),
+                p(9,4,v("Size Random")),p(10,4,v("Opacity Random"))];
+            if(type===edits.types.particle) parameters.push(p(11,4,v("Lifetime")));
+            for(const [key,label] of [[7,"Size"],[8,"Opacity"]]) if(v(label+" Curve Count")) {
+                const points=Array.from({length:v(label+" Curve Count")},(_,i)=>({age:v(label+" Curve "+i+" Age"),value:v(label+" Curve "+i+" Value")}));
+                parameters.push(p(key,7,view.encodeCurve(points)));
+            }
+        }
+        graph.nodes.push({id,type,schemaVersion:type===edits.types.emitter?3:type===edits.types.particle?2:1,parameters});
+        positions[id]={x:v("Node Layout X"),y:v("Node Layout Y")};
+        for(let s=0;s<v("Outgoing Connection Count");s++) graph.edges.push({id:readUuid(c,"Connection "+s+" Edge UUID "),
+            sourceNode:id,sourcePort:type===edits.types.emitter?"1":"2",
+            destinationNode:readUuid(c,"Connection "+s+" Target UUID "),destinationPort:"1"});
+    }
+    graph.nodes.push({id:outputId,type:edits.types.output,schemaVersion:2,parameters:[p(1,3,renderer.properties[27].value)]});
+    positions[outputId]={x:renderer.properties[39].value,y:renderer.properties[40].value};
+    return layout.set(graph,positions);
 }
-
-function invoke(operation, fields) {
-    return JSON.parse(exported["SFLD_" + operation](JSON.stringify(Object.assign({
-        protocol: "org.starfieldfx.panel", version: 1, requestId: operation,
-        operation, target: { token: "p5-c17-l29" }, pinTarget: false
-    }, fields))));
+function publish(graph) {
+    const bytes=codec.serialize(graph),hex=codec.toHex(graph),crc=codec.crc32(bytes).toString(16).padStart(8,"0");
+    renderer.properties[41].expression="/*SFLDSNAP1:"+revision+":"+bytes.length+":"+crc+":"+hex+"*/0";
 }
-
-const nodes = [emitterNode(nodeIds[0], 24, [320, 180, 90]),
-               emitterNode(nodeIds[1], 48, [640, 360, 180])];
-const ensured = invoke("ensureNodeEffects", {
-    baseGraphRevision: 4, graphHex, nodeManifest: nodes
-});
-assert.equal(ensured.ok, true, ensured.error && ensured.error.message);
-assert.equal(ensured.count, 2);
-assert.equal(paradeItems.length, 3, "two Emitter effects are added beside the one main renderer");
-assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
-    "org.starfieldfx.node.emitter", "org.starfieldfx.node.emitter"
-]);
-assert.equal(paradeItems[1].property("Particles Per Second").value, 24);
-assert.equal(paradeItems[2].property("Particles Per Second").value, 48);
-assert.equal(nodeEffectsReady.value, 1, "successful bootstrap is persisted on the main effect");
-assert.deepEqual(["Size X", "Size Y", "Size Z"].map(name => paradeItems[1].property(name).value), [320, 180, 90]);
-assert.deepEqual(["Size X", "Size Y", "Size Z"].map(name => paradeItems[2].property(name).value), [640, 360, 180]);
-assert.deepEqual(paradeItems.slice(1).map(effect => effect.name), [
-    "Emitter " + nodeIds[0].slice(0, 6), "Emitter " + nodeIds[1].slice(0, 6)
-]);
-assert.deepEqual(paradeItems.slice(1).map(effect =>
-    Array.from({ length: 8 }, (_, index) => effect.property("Node UUID " + index).value)
-), [
-    [0x1122, 0x3344, 0x5566, 0x7788, 0x9900, 0xaabb, 0xccdd, 0xeeff],
-    [0xffee, 0xddcc, 0xbbaa, 0x0099, 0x8877, 0x6655, 0x4433, 0x2211]
-]);
-assert.equal(undo.begins, 1);
-assert.equal(undo.ends, 1);
-const unchanged = invoke("ensureNodeEffects", { baseGraphRevision: 4, graphHex, nodeManifest: nodes });
-assert.equal(unchanged.ok, true);
-assert.equal(undo.begins, 1, "automatic refresh does not add empty undo groups once node effects exist");
-
-// AE-level Ctrl+D copies hidden identity streams verbatim. A graph-owned node
-// lookup must reject that ambiguous state rather than silently choosing one.
-const copiedEmitter = parade.addProperty(paradeItems[1].matchName);
-copiedEmitter.name = paradeItems[1].name;
-for (const [name, property] of Object.entries(paradeItems[1].properties)) {
-    copiedEmitter.property(name).setValue(property.value);
+function compile(nonce) {
+    commits++;if(rejectNext){rejectNext=false;renderer.properties[44].value=-nonce;return;}
+    revision++;publish(graphFromEffects());renderer.properties[44].value=nonce;
 }
-const ambiguous = invoke("ensureNodeEffects", {
-    baseGraphRevision: 4, graphHex, nodeManifest: nodes
-});
-assert.equal(ambiguous.ok, false);
-assert.match(ambiguous.error.message, /share node identity/i,
-    "duplicate native effect identities are reported instead of binding the first match");
-
-const paradeCountBeforeUnsupportedCarrier = paradeItems.length;
-mailbox.canSetExpression = false;
-const unsupportedCarrier = invoke("submitGraph", {
-    baseGraphRevision: 4,
-    baseNodeManifest: nodes,
-    nodeManifest: [nodes[1]],
-    graphHex: changedGraphHex
-});
-assert.equal(unsupportedCarrier.ok, false);
-assert.equal(unsupportedCarrier.error.code, "graph_carrier_unsupported");
-assert.equal(paradeItems.length, paradeCountBeforeUnsupportedCarrier,
-    "an unsupported graph mailbox is rejected before adding or removing node effects");
-assert.equal(undo.begins, 1, "mailbox capability rejection does not open an undo group");
-mailbox.canSetExpression = true;
-const paradeCountBeforeMissingCarrier = paradeItems.length;
-activeRequestPresent = false;
-const missingActiveCarrier = invoke("submitGraph", {
-    baseGraphRevision: 4, baseNodeManifest: nodes, nodeManifest: [nodes[1]], graphHex: changedGraphHex
-});
-assert.equal(missingActiveCarrier.ok, false);
-assert.equal(missingActiveCarrier.error.code, "missing_parameter");
-assert.match(missingActiveCarrier.error.message, /Graph Edit Request.*index 90/);
-assert.equal(paradeItems.length, paradeCountBeforeMissingCarrier,
-    "the same-name legacy property cannot substitute when the revision-15 slot is absent");
-activeRequestPresent = true;
-
-const committed = invoke("submitGraph", {
-    baseGraphRevision: 4,
-    baseNodeManifest: nodes,
-    nodeManifest: [nodes[1]],
-    graphHex: changedGraphHex
-});
-assert.equal(committed.ok, true, committed.error && committed.error.message);
-assert.equal(committed.snapshot.revision, 5);
-assert.equal(committed.snapshot.graphHex, changedGraphHex);
-assert.equal(legacyMailbox.expression, "legacy-expression",
-    "graph transactions use the appended request carrier, leaving the old project slot untouched");
-assert.equal(staleMailbox.expression, "stale-expression",
-    "a same-name legacy property at index 42 is not used as the active revision-15 request carrier");
-assert.equal(paradeItems.length, 2, "deleting a graph node removes all AE effects carrying its identity");
-assert.equal(paradeItems[1].property("Particles Per Second").value, 48);
-assert.equal(undo.begins, 2, "only the graph transaction opens an undo group");
-assert.equal(undo.ends, 2);
-
-paradeItems[1].remove();
-const externallyDeleted = invoke("ensureNodeEffects", {
-    baseGraphRevision: 5, graphHex: changedGraphHex, nodeManifest: [nodes[1]]
-});
-assert.equal(externallyDeleted.ok, true);
-assert.deepEqual(externallyDeleted.missingNodeIds, [nodeIds[1]],
-    "after bootstrap, a missing Effect Parade module is reported as a graph deletion");
-assert.equal(paradeItems.length, 1, "refresh does not silently recreate a manually deleted node effect");
-
-// The project-owned node manifest can materialize distinct native module types,
-// preserve their typed values, and remove exactly the node omitted by a later edit.
-const particleId = "00112233445566778899aabbccddeeff";
-const secondParticleId = "102132435465768798a9bacbdcedfe0f";
-const forceId = "ffeeddccbbaa00998877665544330001";
-const secondForceId = "0011ffeeddccbbaa9988776655443322";
-const particle = { id: particleId, type: "org.starfieldfx.nodes.particle", schemaVersion: 2, parameters: [
-    { key: "1", type: 5, value: [0.25, 0.5, 0.75] }, { key: "2", type: 5, value: [1, 1, 1] },
-    { key: "3", type: 4, value: 32 }, { key: "4", type: 4, value: 75 },
-    { key: "5", type: 4, value: 0.8 }, { key: "6", type: 4, value: 60 },
-    { key: "9", type: 4, value: 15 }, { key: "10", type: 4, value: 25 },
-    { key: "11", type: 4, value: 4.5 }
-] };
-const secondParticle = { id: secondParticleId, type: particle.type, schemaVersion: particle.schemaVersion,
-    parameters: particle.parameters.map(parameter => ({ key: parameter.key, type: parameter.type,
-        value: Array.isArray(parameter.value) ? parameter.value.slice() : parameter.value })) };
-secondParticle.parameters.find(parameter => parameter.key === "3").value = 64;
-secondParticle.parameters.find(parameter => parameter.key === "11").value = 2.5;
-const force = { id: forceId, type: "org.starfieldfx.nodes.force", schemaVersion: 1, parameters: [
-    { key: "1", type: 5, value: [0, -2, 0] }, { key: "2", type: 4, value: 0.25 }
-] };
-const secondForce = { id: secondForceId, type: force.type, schemaVersion: force.schemaVersion, parameters: [
-    { key: "1", type: 5, value: [1, 0, 0] }, { key: "2", type: 4, value: 0.5 }
-] };
-const invalidParticle = { id: particleId, type: particle.type, schemaVersion: particle.schemaVersion,
-    parameters: [{ key: "999", type: 4, value: 1 }] };
-const failedParticleAdd = invoke("submitGraph", {
-    baseGraphRevision: 5, baseNodeManifest: [nodes[1]], graphHex: finalGraphHex,
-    nodeManifest: [nodes[1], invalidParticle]
-});
-assert.equal(failedParticleAdd.ok, false, "unsupported node controls reject a partial effect creation");
-assert.equal(paradeItems.length, 2, "a failed node initialization removes its partially created effect");
-
-const mixedNodes = [nodes[1], particle, secondParticle, force, secondForce];
-const mixed = invoke("submitGraph", {
-    baseGraphRevision: 5, baseNodeManifest: [nodes[1]], graphHex: finalGraphHex,
-    nodeManifest: mixedNodes
-});
-assert.equal(mixed.ok, true, mixed.error && mixed.error.message);
-assert.equal(mixed.snapshot.revision, 6);
-assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
-    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle",
-    "org.starfieldfx.node.particle", "org.starfieldfx.node.force", "org.starfieldfx.node.force"
-]);
-assert.deepEqual(Array.from(paradeItems[2].property("Color Start").value), [0.25, 0.5, 0.75, 1]);
-assert.equal(paradeItems[2].property("Size").value, 32);
-assert.equal(paradeItems[2].property("Lifetime").value, 4.5);
-assert.equal(paradeItems[3].property("Size").value, 64);
-assert.equal(paradeItems[3].property("Lifetime").value, 2.5);
-assert.equal(paradeItems[3].property("Node UUID 0").value, 0x1021);
-assert.deepEqual(Array.from(paradeItems[4].property("Gravity").value), [0, -2, 0]);
-assert.equal(paradeItems[4].property("Linear Drag").value, 0.25);
-assert.deepEqual(Array.from(paradeItems[5].property("Gravity").value), [1, 0, 0]);
-assert.equal(paradeItems[5].property("Linear Drag").value, 0.5);
-assert.equal(paradeItems[5].property("Node UUID 0").value, 0x0011);
-assert.equal(paradeItems[2].property("Node UUID 0").value, 0x0011,
-    "the same identity can be retried after a failed partial creation");
-
-const outputRejected = invoke("ensureNodeEffects", {
-    baseGraphRevision: 6, graphHex: finalGraphHex,
-    nodeManifest: mixedNodes.concat([{ id: "00000000000000000000000000000104",
-        type: "org.starfieldfx.nodes.output", schemaVersion: 1, parameters: [] }])
-});
-assert.equal(outputRejected.ok, false, "Output stays virtual and is not materialized as an AEX");
-assert.equal(paradeItems.length, 6);
-
-const removeForce = invoke("submitGraph", {
-    baseGraphRevision: 6, baseNodeManifest: mixedNodes,
-    nodeManifest: [nodes[1], particle, secondParticle, secondForce], graphHex: changedGraphHex
-});
-assert.equal(removeForce.ok, true, removeForce.error && removeForce.error.message);
-assert.equal(removeForce.snapshot.revision, 7);
-assert.equal(removeForce.snapshot.graphHex, changedGraphHex);
-assert.deepEqual(paradeItems.slice(1).map(effect => effect.matchName), [
-    "org.starfieldfx.node.emitter", "org.starfieldfx.node.particle", "org.starfieldfx.node.particle",
-    "org.starfieldfx.node.force"
-]);
-assert.equal(paradeItems[2].property("Size").value, 32, "Particle values survive an unrelated Force deletion");
-assert.equal(paradeItems[3].property("Size").value, 64, "the second Particle retains its independent value");
-assert.deepEqual(Array.from(paradeItems[4].property("Gravity").value), [1, 0, 0],
-    "deleting one Force preserves the other Force's independent vector");
-assert.equal(paradeItems[4].property("Linear Drag").value, 0.5);
-assert.equal(paradeItems[4].property("Node UUID 0").value, 0x0011);
-assert.equal(undo.begins, 5);
-assert.equal(undo.ends, 5);
-
-console.log("Native node gateway checks passed (Emitter, two independent Particle and two Force instances, failed-add cleanup and retry, emitter dimensions, duplicate-ID rejection, Output exclusion, graph commit and selective deletion).");
+function invoke(operation,fields={}) {
+    return JSON.parse(exported["SFLD_"+operation](JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,
+        requestId:operation,operation,target:{token:"p5-c17-l29"},pinTarget:false},fields))));
+}
+let initial=graphFromEffects(),next=10;
+initial=edits.apply(initial,{type:"addNode",nodeType:"emitter",position:{x:-160,y:-80}},()=>uuid(next++));
+initial=edits.apply(initial,{type:"addNode",nodeType:"particle",position:{x:200,y:120}},()=>uuid(next++));
+const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleId=initial.nodes.find(n=>n.type===edits.types.particle).id;
+initial=edits.apply(initial,{type:"connect",from:emitterId,to:particleId},()=>uuid(next++));
+initial=edits.apply(initial,{type:"connect",from:particleId,to:outputId},()=>uuid(next++));publish(initial);
+const client=transactions.create({codec,edits,idFactory:()=>uuid(next++),call:(op,fields,cb)=>cb(invoke(op,fields))});
+const snapshot=()=>invoke("getGraphSnapshot").snapshot;
+function apply(edit){let result;client.apply(edit,r=>result=r,"p5-c17-l29");return result;}
+let ensured;client.ensureNativeEffects(snapshot(),"p5-c17-l29",r=>ensured=r);
+assert.equal(ensured.ok,true,JSON.stringify(ensured));assert.equal(items.length,3);
+assert.equal(renderer.properties[89].value,1);assert.deepEqual(Array.from(items[1].properties.Origin.value),[1920,1080,1080]);
+assert.equal(renderer.properties[42].value,0);
+const duplicate=apply({type:"duplicateNodes",nodeIds:[particleId],offset:{x:160,y:0}});
+assert.equal(duplicate.ok,true,JSON.stringify(duplicate));assert.equal(items.length,4);
+const copiedId=codec.fromHex(snapshot().graphHex).nodes.find(n=>n.type===edits.types.particle&&n.id!==particleId).id;
+assert.equal(apply({type:"setParameters",changes:[{nodeId:copiedId,parameterKey:"3",valueType:4,value:64}]}).ok,true);
+assert.equal(items[2].properties.Size.value,10);assert.equal(items[3].properties.Size.value,64);
+assert.equal(apply({type:"moveNodes",positions:{[outputId]:{x:-300,y:-200}}}).ok,true);
+assert.equal(renderer.properties[39].value,-300);assert.equal(renderer.properties[40].value,-200);
+assert.equal(apply({type:"setParameters",changes:[{nodeId:outputId,parameterKey:"1",valueType:3,value:8000}]}).ok,true);
+assert.equal(renderer.properties[27].value,8000);
+rejectNext=true;assert.equal(apply({type:"deleteNodes",nodeIds:[copiedId]}).ok,false);
+assert.equal(items.length,4,"rejected edit restores the removed effect");
+assert.equal(codec.fromHex(snapshot().graphHex).nodes.length,4,"rollback also recompiles the render snapshot");
+assert.equal(renderer.properties[42].value,0);
+assert.equal(apply({type:"deleteNodes",nodeIds:[copiedId]}).ok,true);assert.equal(items.length,3);
+const all=codec.fromHex(snapshot().graphHex).nodes.filter(n=>n.type!==edits.types.output).map(n=>n.id);
+assert.equal(apply({type:"deleteNodes",nodeIds:all}).ok,true,"all editable nodes can be removed");
+assert.equal(items.length,1);assert.equal(codec.fromHex(snapshot().graphHex).nodes.length,1);
+assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
+console.log("Native node gateway checks passed: bootstrap, copy, independent values, signed layout, Output controls, numeric commit without expressions, stale references, rollback and delete all.");

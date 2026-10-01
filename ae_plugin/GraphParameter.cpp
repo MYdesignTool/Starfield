@@ -194,7 +194,7 @@ core::Result<core::Graph> graph_from_controls(const core::Settings& settings) {
     // Identities are scoped to this graph; the final byte distinguishes each node
     // and edge while keeping the project-visible graph deterministic.
     core::Uuid128 emitter{{0x81,0xcb,0x8b,0xb1,0xf3,0x20,0x41,0x14,0x98,0xf5,0xd2,0x5b,0x54,0x91,0x2c,0x01}};
-    auto output = emitter; output.bytes[15] = 2;
+    core::Uuid128 output{}; output.bytes[15] = 0xff;
     auto particle = emitter; particle.bytes[15] = 3;
     auto force = emitter; force.bytes[15] = 4;
     auto emitter_to_particle = emitter; emitter_to_particle.bytes[15] = 6;

@@ -6,5 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-#define STARFIELD_VERSION_BUILD 2
-#define STARFIELD_VERSION_PACKED 32770 /* 0x8002 */
+// Revision 16 changes the registered parameter surface. Bump the development
+// build together with the PiPL value instead of retaining cached build-2 metadata.
+#define STARFIELD_VERSION_BUILD 3
+#define STARFIELD_VERSION_PACKED 32771 /* 0x8003 */

@@ -1,8 +1,14 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: experimental prototype; AE 2023 host acceptance is open. Revision 15 appends a fresh request stream at index 90 and keeps index 42 as an inert legacy slot. A source audit found that the CEP resolver preferred the old display name before checking the registered index; an existing effect instance could therefore resolve a same-name request from index 42. The resolver now requires the expected index and `propertyIndex`, and a fake-host regression covers that collision. AE must still confirm the real property's index and expression capability. Preferred topology authoring direction is reopened in ADR 0019.
+- Status: rejected for topology editing. AE 2023.5 Build 52 reports the active request stream at index 90 as non-expressionable, so the proposed mailbox cannot be the graph edit path. ADR 0019 supersedes this transport with node-effect-owned records and a numeric compile trigger. The snapshot expression may remain a read-only diagnostic mirror during transition; topology edits must not depend on setting an expression.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
+
+> Historical record only. The proposed request-expression mailbox below was
+> rejected after AE 2023.5 Build 52 returned `canSetExpression=false` for index
+> 90. Do not implement, deploy, or retry that transport. ADR 0019 defines the
+> current source contract: per-node AE effect streams plus a numeric compile
+> trigger; the readable graph expression is only a renderer-written snapshot mirror.
 
 ## Context
 
@@ -18,7 +24,7 @@ CEP still needs a project-saved snapshot and an edit path into the effect's supe
 callback. It must not edit pixels, keep the only copy of a graph in browser storage, or
 make the renderer query host state.
 
-## Proposed carrier
+## Rejected proposal: expression carrier
 
 Manifest revision 8 appends four hidden, ordinary `PF_Param_FLOAT_SLIDER` streams. Revision 15 appends a replacement request stream because the owner still observed the old stream as non-expressionable after the first source fix:
 
@@ -117,10 +123,12 @@ Before accepting this ADR or shipping topology editing:
 5. Verify the render path uses only the arbitrary-data graph parameter and produces
    the same pixels before and after a valid carrier edit.
 
-The spike modifies an AE project and runs AE, so it requires the exact per-action host
-authorization described by ADR 0011. Do not install or restart AE as part of the
-spike. If any gate fails, reject this carrier and compare bounded standard-parameter
-banks or a separately authorized native host bridge before editing the renderer.
+The owner has now exercised the relevant host gate: AE reports parameter index 90
+as non-expressionable. The current `submitGraph` preflight consequently rejects every
+topology edit before it creates a node-effect instance. This confirms that the failure
+is in the selected contract, not in the number or label of the request parameter. Do
+not append another expression mailbox. Use ADR 0019's independent node effects and
+numeric compile trigger; retain this ADR only as the record of the rejected prototype.
 
 ## References
 

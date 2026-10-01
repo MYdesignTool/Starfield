@@ -5,10 +5,12 @@ param(
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '2023',
     [switch]$CoreOnly,
     [switch]$NoRuntimePublish,
+    [switch]$NoDistPublish,
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 
 $ErrorActionPreference = 'Stop'
+Import-Module Microsoft.PowerShell.Utility
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSBuildPath" }
 
@@ -21,6 +23,7 @@ $adapterInputs = @(
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
     'ae_plugin\EffectMain.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\GraphCarrier.hpp',
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
+    'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
     'ae_plugin\WorldBridge.cpp', 'ae_plugin\WorldBridge.hpp',
@@ -30,6 +33,7 @@ $adapterInputs = @(
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeAppearancePiPL.r', 'ae_plugin\NodeForcePiPL.r',
+    'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
@@ -152,7 +156,7 @@ try {
     # Publish a plainly named copy where a person can find it. MSBuild's OutDir is
     # artifacts/plugin/<label>/<platform>/<configuration>/, which is the right place to keep
     # one directory per SDK target but a tedious place to fetch an installable file from.
-    if ($ArtifactLabel -and -not $CoreOnly) {
+    if ($ArtifactLabel -and -not $CoreOnly -and -not $NoDistPublish) {
         $publishedDir = Join-Path $repositoryRoot 'dist'
         $builtAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\StarfieldParticle.aex"
         if (-not (Test-Path -LiteralPath $builtAex)) { throw "Build reported success but $builtAex is missing." }

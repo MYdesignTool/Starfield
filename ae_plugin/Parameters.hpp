@@ -19,17 +19,15 @@ namespace starfield::adapter {
 // reference product's structure; group markers are parameters too, which is why the
 // indices below are not contiguous. AE's implicit input layer occupies parameter index
 // 0, so the effect registers one more parameter than kTotalEffectParameterCount.
-// Manifest revision 6 renumbered everything for the grouping; revisions 7–9 append
-// layout, graph carriers, and over-life curves; revision 10 appends emitter dimensions;
-// revision 11 appends particle-variation controls; revision 14 appends native-node
-// materialization state; revision 15 appends a fresh expression-capable graph request
-// stream because AE still reported the original request stream as non-expressionable.
+// The output effect retains hidden bootstrap controls for a clean first application,
+// but editable graph values live on separate node effects. Index 89 is the last
+// registered parameter; graph topology edits use the numeric commit trigger at 43.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 90; // controls + topics + project metadata
+inline constexpr std::size_t kTotalEffectParameterCount = 89; // controls + topics + project metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -54,7 +52,7 @@ inline constexpr A_long kMaxParticlesId = 27;
 inline constexpr A_long kSeedId = 28;
 // 29/30/31 are the control source, capture action and hidden graph parameter. Index 32
 // closes the Render topic; 33..40 are hidden project-saved layout coordinates and
-// 41..44 are the expression snapshot, edit request, commit trigger and receipt.
+// 41..44 are the read-only snapshot, Output batch guard, numeric commit trigger and receipt.
 inline constexpr A_long kFirstEffectParameterId = 1;
 inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is control source)
 inline constexpr A_long kLayoutEmitterXId = 33;
@@ -66,7 +64,7 @@ inline constexpr A_long kLayoutAppearanceYId = 38;
 inline constexpr A_long kLayoutOutputXId = 39;
 inline constexpr A_long kLayoutOutputYId = 40;
 inline constexpr A_long kGraphSnapshotId = 41;
-inline constexpr A_long kLegacyGraphEditRequestId = 42;
+inline constexpr A_long kGraphSyncGuardId = 42;
 inline constexpr A_long kGraphEditCommitId = 43;
 inline constexpr A_long kGraphEditReceiptId = 44;
 inline constexpr A_long kSizeCurveCountId = 45;
@@ -80,7 +78,6 @@ inline constexpr A_long kEmitterSizeZId = 83;
 inline constexpr A_long kParticleSizeRandomId = 86;
 inline constexpr A_long kOpacityRandomId = 87;
 inline constexpr A_long kNodeEffectsReadyId = 89;
-inline constexpr A_long kGraphEditRequestId = 90;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

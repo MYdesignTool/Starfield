@@ -45,6 +45,7 @@
     <ClCompile Include="CoreLoader.cpp" />
     <ClCompile Include="EffectMain.cpp" />
       <ClCompile Include="GraphCarrier.cpp" />
+    <ClCompile Include="NativeNodeGraph.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />

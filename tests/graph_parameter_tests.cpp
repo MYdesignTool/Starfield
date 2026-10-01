@@ -1,6 +1,7 @@
 // Uses the local Adobe SDK declarations and fake host callbacks, not an AE process.
 #include "GraphParameter.hpp"
 #include "GraphCarrier.hpp"
+#include "NativeNodeGraph.hpp"
 #include "Parameters.hpp"
 #include "WorldBridge.hpp"
 #include "AE_EffectCB.h"
@@ -26,6 +27,12 @@ namespace starfield::adapter {
 PF_Err write_graph_snapshot(PF_InData*, const core::Graph&, A_long* new_revision) noexcept {
     if (new_revision) *new_revision = 1;
     return PF_Err_NONE;
+}
+// Sibling-effect enumeration is qualified in the native host check. This fake
+// host deliberately has no AEGP effect parade; it must not silently compile one.
+PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph&, bool& found) noexcept {
+    found = false;
+    return PF_Err_BAD_CALLBACK_PARAM;
 }
 }
 
@@ -212,16 +219,12 @@ void test_parameters(PF_InData& host) {
     CHECK(node_effects_ready.u.fs_d.dephault == 0.0 &&
           node_effects_ready.u.fs_d.valid_min == 0.0 &&
           node_effects_ready.u.fs_d.valid_max == 1.0);
-    const auto& legacy_graph_request = registered[kLegacyGraphEditRequestId - 1];
-    CHECK(legacy_graph_request.param_type == PF_Param_FLOAT_SLIDER);
-    CHECK((legacy_graph_request.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
-    CHECK((legacy_graph_request.ui_flags & PF_PUI_INVISIBLE) != 0);
-    const auto& graph_request = registered[kGraphEditRequestId - 1];
-    CHECK(graph_request.param_type == PF_Param_FLOAT_SLIDER);
-    CHECK(graph_request.flags == 0);
-    CHECK((graph_request.ui_flags & PF_PUI_INVISIBLE) != 0);
-    CHECK(graph_request.u.fs_d.valid_min == -1000000.0 &&
-          graph_request.u.fs_d.valid_max == 1000000.0);
+    const auto& graph_guard = registered[kGraphSyncGuardId - 1];
+    CHECK(graph_guard.param_type == PF_Param_FLOAT_SLIDER);
+    CHECK((graph_guard.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    CHECK((graph_guard.ui_flags & PF_PUI_INVISIBLE) != 0);
+    CHECK(std::strcmp(graph_guard.name, "Panel Graph Sync Guard") == 0);
+    CHECK(kTotalEffectParameterCount == 89);
     for (std::size_t i = 1; i <= kTotalEffectParameterCount; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;

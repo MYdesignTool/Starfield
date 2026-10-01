@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-2";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-4";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -174,18 +174,39 @@
     // the gateway by path on the first call removes both cases, and it is why a panel
     // edit needs no After Effects restart, only a panel reload.
     var gatewayReady = false;
+    var gatewayLoadDiagnostic = "";
+
+    function isGatewayReady(value) {
+        var result = String(value);
+        // Some CEP/ExtendScript combinations return a quoted string value while
+        // others return its contents. Accept both forms for this fixed token.
+        if (result.length >= 2 && result.charAt(0) === "\"" && result.charAt(result.length - 1) === "\"") {
+            result = result.slice(1, -1);
+        }
+        return result === GATEWAY_READY_TOKEN;
+    }
 
     function ensureGateway(callback) {
         if (gatewayReady) { callback(true); return; }
         evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (probe) {
-            if (String(probe) === GATEWAY_READY_TOKEN) { gatewayReady = true; callback(true); return; }
+            if (isGatewayReady(probe)) { gatewayReady = true; gatewayLoadDiagnostic = ""; callback(true); return; }
             var root = extensionRoot();
-            if (!root) { callback(false); return; }
-            evalScript("$.evalFile(" + quote(root + "/jsx/starfield_gateway.jsx") + ")", function () {
-                evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (second) {
-                    gatewayReady = String(second) === GATEWAY_READY_TOKEN;
-                    callback(gatewayReady);
-                });
+            if (!root) {
+                gatewayLoadDiagnostic = "CEP did not return an extension folder path.";
+                callback(false);
+                return;
+            }
+            var gatewayPath = root + "/jsx/starfield_gateway.jsx";
+            var loader = "(function(){try{" +
+                "var gatewayFile = new File(" + quote(gatewayPath) + ");" +
+                "if (!gatewayFile.exists) return 'missing_file:' + gatewayFile.fsName;" +
+                "$.evalFile(gatewayFile);" +
+                "return (typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing_after_eval';" +
+                "} catch (error) { return 'load_error:' + error.toString(); }}())";
+            evalScript(loader, function (loadResult) {
+                gatewayReady = isGatewayReady(loadResult);
+                gatewayLoadDiagnostic = gatewayReady ? "" : snippet(loadResult || "empty ExtendScript reply");
+                callback(gatewayReady);
             });
         });
     }
@@ -195,7 +216,8 @@
             if (!ready) {
                 callback({ ok: false, error: {
                     code: "gateway_missing",
-                    message: "The ExtendScript gateway is not loaded. Check the install steps in cep_panel/README.md."
+                    message: "The ExtendScript gateway did not load. " +
+                        (gatewayLoadDiagnostic || "Check the CEP extension path and reload the panel.")
                 } });
                 return;
             }

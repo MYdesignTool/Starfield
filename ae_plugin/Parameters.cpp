@@ -3,6 +3,7 @@
 #include "AE_EffectCB.h"
 #include "AE_Macros.h"
 #include "GraphCarrier.hpp"
+#include "NativeNodeGraph.hpp"
 #include "Param_Utils.h"
 #include "WorldBridge.hpp"
 
@@ -13,6 +14,30 @@
 #include <cstdio>
 #include <cstdlib>
 #include <new>
+
+#define STARFIELD_ADD_HIDDEN_TOPIC(NAME, FLAGS, ID) \
+    do { \
+        AEFX_CLR_STRUCT(def); \
+        def.flags = (FLAGS); \
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE; \
+        PF_ADD_TOPIC(NAME, ID); \
+    } while (0)
+
+#define STARFIELD_ADD_HIDDEN_FLOAT(NAME, VALID_MIN, VALID_MAX, SLIDER_MIN, SLIDER_MAX, DFLT, PREC, DISP, FLAGS, ID) \
+    do { \
+        AEFX_CLR_STRUCT(def); \
+        def.flags = (FLAGS); \
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE; \
+        PF_ADD_FLOAT_SLIDER(NAME, VALID_MIN, VALID_MAX, SLIDER_MIN, SLIDER_MAX, 0, DFLT, PREC, DISP, 0, ID); \
+    } while (0)
+
+// PF_END_TOPIC reuses def without clearing it. Group markers must not inherit a
+// preceding slider's union, supervision flags, or the arbitrary-data handle.
+#define STARFIELD_END_TOPIC(ID) \
+    do { \
+        AEFX_CLR_STRUCT(def); \
+        PF_END_TOPIC(ID); \
+    } while (0)
 
 namespace starfield::adapter {
 namespace {
@@ -380,17 +405,17 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     // Labels, ranges, precision, and defaults mirror schema/parameters.json exactly.
     // Float literals match PF_FpShort so no narrowing warning is emitted at /W4.
-    // Every bound control is supervised: an edit in Node Graph mode rewrites the
-    // canonical graph in the same user-change transaction (ADR 0009). Topics reproduce
-    // the reference product's grouping; Physics and Render start folded, which needs
-    // PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG in the global flags.
-    PF_ADD_TOPICX("Emitter", 0, kEmitterTopicDiskId);
+    // These original flat controls remain registered for the host-independent
+    // bootstrap and current development schema, but node values are owned by the
+    // separate hidden node effects. Keep the old controls out of Effect Controls.
+    STARFIELD_ADD_HIDDEN_TOPIC("Emitter", 0, kEmitterTopicDiskId);
     // Type and Origin are registered by hand instead of through PF_ADD_POPUP or
     // PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and never set
     // def.flags, and both controls must be supervised for the panel path.
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = PF_ParamFlag_SUPERVISE;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "Type");
     def.uu.id = kEmitterTypeDiskId;
     def.u.pd.num_choices = 4;
@@ -401,13 +426,14 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (err != PF_Err_NONE) return err;
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Particles Per Second", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 100.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticlesPerSecondDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Particles Per Second", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 100.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticlesPerSecondDiskId);
 
     // Position control: AE owns the on-screen picking behavior for point params.
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POINT_3D;
     def.flags = PF_ParamFlag_SUPERVISE;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "Origin");
     def.uu.id = kOriginDiskId;
     def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = 50.0;
@@ -417,84 +443,86 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (err != PF_Err_NONE) return err;
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Disc Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Disc Size", 0.0f, 10.0f, 0.0f, 1.0f, 0.05f, PF_Precision_THOUSANDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kEmitterSizeDiskId);
 
     // Velocity, not Speed: the reference emitter has a single scalar Speed plus a direction
     // model (Direction/Angle/Direction Span), and its "Speed X/Y/Z" are per-particle rotation
     // speeds in the Particle module. Naming our axes Speed would claim a meaning they do not
     // have. docs/reference-parameter-map.md records the model difference and the planned fix.
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedXDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Velocity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedXDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedYDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Velocity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.3f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedYDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Velocity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedZDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Velocity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedZDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Speed Random", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedRandomDiskId);
-    PF_END_TOPIC(kEmitterTopicDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Speed Random", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedRandomDiskId);
+    STARFIELD_END_TOPIC(kEmitterTopicDiskId);
 
-    PF_ADD_TOPICX("Particle", 0, kParticleTopicDiskId);
+    STARFIELD_ADD_HIDDEN_TOPIC("Particle", 0, kParticleTopicDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
 
     // Default 10 px matches the reference's observed "Size (Pixels): 10".
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 10.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size", 0.0f, 100000.0f, 0.0f, 100000.0f, 10.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSizeDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kParticleSizeEndDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Opacity", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Opacity", 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, PF_Precision_THOUSANDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Opacity Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Opacity Over Life", 0.0f, 100.0f, 0.0f, 100.0f, 100.0f, PF_Precision_TENTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kOpacityEndDiskId);
 
     // PF_ADD_COLOR does not clear the struct or touch flags; set them explicitly.
     AEFX_CLR_STRUCT(def);
     def.flags = PF_ParamFlag_SUPERVISE;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     PF_ADD_COLOR("Color Start", 255, 255, 255, kColorStartDiskId);
     AEFX_CLR_STRUCT(def);
     def.flags = PF_ParamFlag_SUPERVISE;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     PF_ADD_COLOR("Color End", 255, 255, 255, kColorEndDiskId);
-    PF_END_TOPIC(kParticleTopicDiskId);
+    STARFIELD_END_TOPIC(kParticleTopicDiskId);
 
-    PF_ADD_TOPICX("Physics", PF_ParamFlag_START_COLLAPSED, kPhysicsTopicDiskId);
+    STARFIELD_ADD_HIDDEN_TOPIC("Physics", PF_ParamFlag_START_COLLAPSED, kPhysicsTopicDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityYDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Gravity Y", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityYDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Gravity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityZDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Gravity Z", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityZDiskId);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
-    PF_END_TOPIC(kPhysicsTopicDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
+    STARFIELD_END_TOPIC(kPhysicsTopicDiskId);
 
-    PF_ADD_TOPICX("Render", PF_ParamFlag_START_COLLAPSED, kRenderTopicDiskId);
+    PF_ADD_TOPICX("Output", PF_ParamFlag_START_COLLAPSED, kRenderTopicDiskId);
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kMaxParticlesDiskId);
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
-                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
+                              PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
 
     // Control Source defaults to AE Controls (manifest revision 6): a freshly applied
     // effect must drive the visible controls, not sit in Node Graph mode where the
@@ -502,6 +530,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
+    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "Control Source");
     def.uu.id = kControlSourceId;
     def.u.pd.num_choices = 2;
@@ -511,7 +540,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     err = PF_ADD_PARAM(in_data, -1, &def);
     if (err != PF_Err_NONE) return err;
 
-    PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NONE,
+    PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE,
                   PF_ParamFlag_SUPERVISE, kCaptureControlsId);
 
     // The graph's default handle becomes host-owned only after successful ADD_PARAM.
@@ -547,7 +576,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         err = PF_ADD_PARAM(in_data, -1, &def);
         if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
     }
-    PF_END_TOPIC(kRenderTopicDiskId);
+    STARFIELD_END_TOPIC(kRenderTopicDiskId);
 
     // Node positions are non-rendering UI state, but they belong to this effect
     // instance so AE can save, duplicate, and undo the layout with the project.
@@ -573,10 +602,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         if (err != PF_Err_NONE) return err;
     }
 
-    // ADR 0013 carrier. AE 2023 cannot script the arbitrary graph parameter's
-    // CUSTOM_VALUE, so the panel reads a bounded expression mirror and stages a
-    // complete replacement graph in a separate expression mailbox. Only the
-    // supervised commit stream applies the mailbox; the receipt confirms the nonce.
+    // The snapshot is a read-only diagnostic mirror. The panel edits separate node
+    // effects and changes the numeric commit stream to compile those records into
+    // the renderer's arbitrary-data graph. Index 42 guards batched Output writes.
     const struct GraphCarrierParameter {
         const char* name;
         A_long disk_id;
@@ -584,7 +612,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         bool supervised;
     } graph_carrier_parameters[] = {
         {"Graph Snapshot", kGraphSnapshotId, 0.0, false},
-        {"Graph Edit Request (Legacy)", kLegacyGraphEditRequestId, 0.0, false},
+        {"Panel Graph Sync Guard", kGraphSyncGuardId, 0.0, false},
         {"Commit Graph Edit", kGraphEditCommitId, 0.0, true},
         {"Graph Edit Receipt", kGraphEditReceiptId, 0.0, false},
     };
@@ -592,9 +620,6 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     for (const auto& carrier : graph_carrier_parameters) {
         AEFX_CLR_STRUCT(def);
         def.param_type = PF_Param_FLOAT_SLIDER;
-        // The old request stream (index 42) is retained as an inert project slot.
-        // The active request stream is appended at index 90 below, which gives
-        // existing AE projects a newly registered property capability record.
         def.flags = PF_ParamFlag_CANNOT_TIME_VARY |
                     (carrier.supervised ? PF_ParamFlag_SUPERVISE : PF_ParamFlag_NONE);
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
@@ -656,32 +681,27 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     // New direct full-resolution pixel dimensions are appended in their own topic
     // so all earlier AE indices remain stable. Box/Sphere read their X/Y/Z values.
-    PF_ADD_TOPICX("Emitter Dimensions", 0, kEmitterSizeTopicDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size X", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
-                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
-                         PF_ParamFlag_SUPERVISE, kEmitterSizeXDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Y", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
-                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
-                         PF_ParamFlag_SUPERVISE, kEmitterSizeYDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Z", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
-                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
-                         PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
-    PF_END_TOPIC(kEmitterSizeTopicDiskId);
+    STARFIELD_ADD_HIDDEN_TOPIC("Emitter Dimensions", 0, kEmitterSizeTopicDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size X", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
+                              PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                              PF_ParamFlag_SUPERVISE, kEmitterSizeXDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size Y", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
+                              PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                              PF_ParamFlag_SUPERVISE, kEmitterSizeYDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size Z", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
+                              PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                              PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
+    STARFIELD_END_TOPIC(kEmitterSizeTopicDiskId);
 
     // Revision 11 appends variation controls without shifting any released index.
-    PF_ADD_TOPICX("Particle Variation", 0, kParticleVariationTopicDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Size Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
-                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
-                         PF_ParamFlag_SUPERVISE, kParticleSizeRandomDiskId);
-    AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Opacity Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
-                         PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
-                         PF_ParamFlag_SUPERVISE, kOpacityRandomDiskId);
-    PF_END_TOPIC(kParticleVariationTopicDiskId);
+    STARFIELD_ADD_HIDDEN_TOPIC("Particle Variation", 0, kParticleVariationTopicDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Size Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
+                              PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                              PF_ParamFlag_SUPERVISE, kParticleSizeRandomDiskId);
+    STARFIELD_ADD_HIDDEN_FLOAT("Opacity Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
+                              PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
+                              PF_ParamFlag_SUPERVISE, kOpacityRandomDiskId);
+    STARFIELD_END_TOPIC(kParticleVariationTopicDiskId);
 
     // This project-owned marker distinguishes first-time node materialization
     // from a node effect removed later in AE's Effect Parade. It is deliberately
@@ -695,25 +715,6 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
     def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
     def.u.fs_d.valid_max = def.u.fs_d.slider_max = 1.0;
-    def.u.fs_d.precision = PF_Precision_INTEGER;
-    def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
-    err = PF_ADD_PARAM(in_data, -1, &def);
-    if (err != PF_Err_NONE) return err;
-
-    // Revision 15: AE continued reporting canSetExpression=false for the request
-    // stream originally registered at index 42, even after that stream's source
-    // flags became expression-capable. Give transactions a new, appended stream so
-    // old project metadata at index 42 cannot block graph edits. This remains hidden
-    // and unsupervised; only Commit Graph Edit runs the validated graph callback.
-    AEFX_CLR_STRUCT(def);
-    def.param_type = PF_Param_FLOAT_SLIDER;
-    def.flags = PF_ParamFlag_NONE;
-    def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
-    std::snprintf(def.name, sizeof(def.name), "Graph Edit Request");
-    def.uu.id = kGraphEditRequestId;
-    def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
-    def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCarrierControlLimit;
-    def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCarrierControlLimit;
     def.u.fs_d.precision = PF_Precision_INTEGER;
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
     err = PF_ADD_PARAM(in_data, -1, &def);
@@ -939,6 +940,36 @@ PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_Par
     return PF_Err_NONE;
 }
 
+// Output-wide controls remain on the main effect. Once native node records have
+// been materialized, changing Max Particles must recompile those records with the
+// new cap; rebuilding from the now-hidden legacy controls would replace the graph.
+PF_Err sync_native_graph_with_output_controls(PF_InData* in_data, PF_OutData* out_data,
+                                             PF_ParamDef* params[]) noexcept {
+    (void)out_data;
+    if (!in_data || !params || !params[kGraphParameterId] || !params[kNodeEffectsReadyId] ||
+        params[kGraphParameterId]->param_type != PF_Param_ARBITRARY_DATA ||
+        !params[kGraphParameterId]->u.arb_d.value ||
+        params[kNodeEffectsReadyId]->param_type != PF_Param_FLOAT_SLIDER ||
+        params[kNodeEffectsReadyId]->u.fs_d.value < 1.0) return PF_Err_NONE;
+
+    core::Graph graph;
+    bool found_node_effects = false;
+    const PF_Err compiled = compile_native_node_graph(in_data, params, graph, found_node_effects);
+    if (compiled != PF_Err_NONE) return compiled;
+
+    PF_ArbitraryH replacement = nullptr;
+    const PF_Err created = create_graph_parameter(in_data, graph, &replacement);
+    if (created != PF_Err_NONE) return created;
+    const PF_Err mirrored = write_graph_snapshot(in_data, graph);
+    if (mirrored != PF_Err_NONE) {
+        in_data->utils->host_dispose_handle(replacement);
+        return mirrored;
+    }
+    params[kGraphParameterId]->u.arb_d.value = replacement;
+    params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+    return PF_Err_NONE;
+}
+
 void sync_curve_endpoint(PF_ParamDef* params[], A_long count_id, A_long first_point_id,
                          bool end, PF_FpLong value) noexcept {
     if (!params || !params[count_id] || params[count_id]->param_type != PF_Param_FLOAT_SLIDER) return;
@@ -957,6 +988,8 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
                           PF_UserChangedParamExtra* extra) noexcept {
     if (!in_data || !params || !extra) return PF_Err_BAD_CALLBACK_PARAM;
     try {
+        if (params[kGraphSyncGuardId] && params[kGraphSyncGuardId]->param_type == PF_Param_FLOAT_SLIDER &&
+            params[kGraphSyncGuardId]->u.fs_d.value != 0.0) return PF_Err_NONE;
         if (extra->param_index == kCaptureControlsId) return capture_controls(in_data, out_data, params, extra);
         const A_long registered = static_cast<A_long>(kTotalEffectParameterCount) + 1;
         if (in_data->num_params > 0 && in_data->num_params < registered) return PF_Err_NONE;
@@ -964,6 +997,11 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
             return sync_graph_from_controls(in_data, out_data, params);
         }
         if (!is_bound_control(extra->param_index)) return PF_Err_NONE;
+        if (extra->param_index == kMaxParticlesId && params[kNodeEffectsReadyId] &&
+            params[kNodeEffectsReadyId]->param_type == PF_Param_FLOAT_SLIDER &&
+            params[kNodeEffectsReadyId]->u.fs_d.value >= 1.0) {
+            return sync_native_graph_with_output_controls(in_data, out_data, params);
+        }
         if (extra->param_index == kParticleSizeEndId && params[kParticleSizeEndId] &&
                    params[kParticleSizeEndId]->param_type == PF_Param_FLOAT_SLIDER) {
             sync_curve_endpoint(params, kSizeCurveCountId, kSizeCurveFirstPointId, true,

@@ -34,7 +34,7 @@ const window = {
     __adobe_cep__: {
         evalScript(script, callback) {
             if (script.indexOf("SFLD_ready") >= 0) {
-                callback("org.starfieldfx.panel/1/native-node-sync-2");
+                callback("org.starfieldfx.panel/1/native-node-sync-4");
                 return;
             }
             if (script.indexOf("SFLD_getState(") >= 0) {
