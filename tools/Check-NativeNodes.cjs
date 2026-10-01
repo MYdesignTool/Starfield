@@ -4,6 +4,7 @@
 const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
 const codec=require("../cep_panel/js/graph_codec.js"),edits=require("../cep_panel/js/graph_edits.js");
 const transactions=require("../cep_panel/js/graph_transactions.js"),view=require("../cep_panel/js/graph_view.js");
+const snapshots=require("../cep_panel/js/native_graph_snapshot.js");
 const folder=path.join(__dirname,"../artifacts/host-check");
 let serial=0,token;const evidence=[];
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -23,7 +24,7 @@ async function rpc(data) {
 async function call(operation,fields) {
     const body=Object.assign({protocol:"org.starfieldfx.panel",version:1,operation,requestId:"host-"+serial,
         target:token?{token}:undefined,pinTarget:false},fields);
-    return rpc({operation,body:JSON.stringify(body)});
+    return snapshots.normalize(await rpc({operation,body:JSON.stringify(body)}));
 }
 function checked(result,stage) {
     assert.equal(result&&result.ok,true,stage+": "+JSON.stringify(result));evidence.push(stage);return result;
@@ -67,7 +68,7 @@ const ensure=snapshot=>new Promise(resolve=>client.ensureNativeEffects(snapshot,
         assert.equal(direct.nodes.find(n=>n.id===particle.id).parameters.find(p=>p.key==="3").value,23);
         checked(await rpc({action:"deleteNode",nodeId:particle.id}),"delete native effect directly");
         const before=checked(await call("getGraphSnapshot"),"read before native deletion reconciliation").snapshot;
-        const reconciled=checked(await ensure(before),"reconcile native deletion");
+        const reconciled=checked(before.initialized ? await ensure(before) : await call("syncGraphSnapshot"),"reconcile native deletion");
         const after=codec.fromHex((reconciled.snapshot||checked(await call("getGraphSnapshot"),"read reconciled snapshot").snapshot).graphHex);
         assert.ok(!after.nodes.some(n=>n.id===particle.id));
     } catch(error) { failure=error.stack||String(error); }

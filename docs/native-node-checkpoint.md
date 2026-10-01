@@ -1,5 +1,64 @@
 # P-02D native node checkpoint — 2026-10-01
 
+## CEP 5a hotfix after owner feedback — 2026-10-01
+
+The owner reports build 5 creates native Emitter effects but repeatedly shows
+`stale_graph`; copied effects do not appear in the canvas, and reopening CEP
+loses the canvas. **Build 5 did not pass native node acceptance.**
+
+The offending readonly `ensureNodeEffects` path compared a browser reconstruction
+against the actual AE records and rejected reload itself. CEP 5a returns the
+current Effect Parade records directly. Only mutation checks a host-produced
+opaque authoring stamp, so decimal JSON/codec differences do not pretend that
+the owner edited an effect. A targeted fixture reproduces rounded decimal JSON
+and verifies a readonly reload performs no compile, copy/edit still works, and
+a genuine intervening AE value change rejects before adding any effect.
+The exact numerical mismatch in the owner's session was not captured; decimal
+rounding is a reproduced hypothesis, not confirmed host evidence.
+
+Numeric native payload CRCs remain diagnostic. A browser's rounded projection
+cannot prove native byte equality; commit receipt, advancing native revision and
+semantic node-record readback confirm a transaction. Additional supervised
+callbacks may advance revision beyond exactly one. Failed graph reads keep the
+last valid canvas and do not clear/re-show the error banner on every poll.
+
+The gateway/loader token is `native-node-sync-5a`. This changes only workspace
+CEP files through the existing extension junction: **no AEX replacement or AE
+restart is needed**. Close/reopen the CEP panel. The actual effects are the source;
+existing Emitter copies should become visible. If the Particle effect is absent,
+add it from the node context menu and connect it. Partial first initialization now fills missing Emitter/Particle and initial links while ready=0; ready=1 deliberate deletion remains unchanged. Fresh-effect automatic bootstrap,
+real render response, undo and reopen still require owner confirmation.
+
+
+## Current build 5 handoff
+
+- Owner confirmed build 4 fixed layer-selection crashes.
+- Remaining initialization failure was the native expression read on non-time-varying
+  Graph Snapshot (41). Build 5 removes expressions entirely, including diagnostic reads.
+- Nodes are independent hidden AE effects with saved ordinary values, UUID, outgoing
+  connections and layout. Output stays on the main render effect.
+- First panel synchronization creates Emitter → Particle → Output. Later deletion
+  follows the actual Effect Parade; an Output-only graph remains intentionally empty.
+- Ordinary main revision 41 and payload checksum halves 90/91 replace the expression
+  snapshot. A stale manifest/revision rejects an edit before mutation.
+- 756 adapter checks use the actual GraphCarrier. Gateway checks deliberately throw
+  on expression access and cover add, duplicate, independent values/curves, movement,
+  insert/connect/disconnect, AE reorder/direct deletion, raw Ctrl+D re-key, rollback
+  and delete-all. The May 2023 SDK build succeeds.
+- Build 5 is deployed and six hashes verified. Backup:
+  `artifacts/disabled/p02d-build5-native-streams-20261001/`. One existing Starfield
+  junction remains. Core content is unchanged.
+- The owner chose to test; no AE session was started by the agent. Reopen CEP and
+  use a fresh effect/layer. Verify Emitter and Particle appear as separate effects,
+  then add/copy/edit/connect/disconnect/delete and check independent saved values.
+  Undo/redo and save/reopen remain separate host gates.
+- Automatic node creation with CEP closed, multiple active emitters and more than
+  four outgoing connections remain open. Raw AE duplicate re-key now exists in
+  the refresh source path, but its real host behavior is not accepted yet.
+
+The earlier build sections below retain failure history, not current deployment state.
+
+
 ## Build 4 correction and current deployment gate
 
 The owner confirms build 3 can render, but selecting the layer crashes AE.

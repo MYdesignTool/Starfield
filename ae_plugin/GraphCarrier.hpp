@@ -13,9 +13,9 @@ namespace starfield::adapter {
 [[nodiscard]] AEGP_PluginID graph_carrier_plugin_id() noexcept;
 
 // Called before replacing the canonical arbitrary-data graph in a supervised AE
-// callback. The new expression mirror is prepared first so failure leaves graph bytes
-// untouched; it contains only the bounded, project-saved snapshot and revision.
-[[nodiscard]] PF_Err write_graph_snapshot(PF_InData* in_data, const core::Graph& graph,
+// callback. Revision and checksum are ordinary numeric streams; no expression
+// or script-readable copy of the graph is required by node authoring.
+[[nodiscard]] PF_Err write_graph_snapshot(PF_InData* in_data, PF_ParamDef* params[], const core::Graph& graph,
                                           A_long* new_revision = nullptr) noexcept;
 
 // Handles the single commit trigger used by the CEP transaction bridge.

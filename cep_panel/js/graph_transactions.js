@@ -4,10 +4,12 @@
 (function (root, factory) {
     var layout = typeof module === "object" && module.exports
         ? require("./graph_layout.js") : root.StarfieldGraphLayout;
-    var api = factory(layout);
+    var snapshots = typeof module === "object" && module.exports
+        ? require("./native_graph_snapshot.js") : root.StarfieldNativeGraphSnapshot;
+    var api = factory(layout, snapshots);
     if (typeof module === "object" && module.exports) module.exports = api;
     else root.StarfieldGraphTransactions = api;
-}(typeof window !== "undefined" ? window : this, function (layout) {
+}(typeof window !== "undefined" ? window : this, function (layout, snapshots) {
     "use strict";
 
     var DEFAULT_MAX_BYTES = 24 * 1024;
@@ -140,20 +142,15 @@
         if (typeof options.call !== "function" || !options.codec || !options.edits) {
             throw new Error("graph transaction client needs call, codec, and edit planner dependencies");
         }
-        var call = options.call;
+        var call = function (operation, fields, callback) {
+            options.call(operation, fields, function (response) {
+                callback(snapshots.normalize(response));
+            });
+        };
         var codec = options.codec;
         var edits = options.edits;
         var maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
         var idFactory = options.idFactory;
-        // Manual Effect Parade deletion and graph pruning are separate AE undo
-        // records. If the user undoes only the graph prune, keep the restored
-        // graph node visible as a conflict instead of pruning it again forever.
-        var reconciledNativeDeletions = Object.create(null);
-
-        function deletionKey(targetToken, nodeId) {
-            return String(targetToken) + "|" + String(nodeId);
-        }
-
         function apply(edit, callback, targetToken, expectedRevision) {
             if (typeof callback !== "function") throw new Error("graph transaction callback is required");
             var pinnedTarget = targetToken ? { target: { token: targetToken } } : null;
@@ -187,7 +184,7 @@
                                snapshot: base, graphHex: graphHex, noOp: true });
                     return;
                 }
-                var transaction = { baseGraphRevision: base.revision, graphHex: graphHex,
+                var transaction = { baseGraphRevision: base.revision, baseRecordStamp:base.recordStamp, graphHex: graphHex,
                     baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated),
                     baseRendererManifest: rendererManifest(graph), rendererManifest: rendererManifest(updated) };
                 if (targetToken) transaction.target = { token: targetToken };
@@ -195,7 +192,7 @@
                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
                     var saved = committed.snapshot;
                     try {
-                        if (!saved || saved.initialized !== true || saved.revision !== base.revision + 1 ||
+                        if (!saved || saved.initialized !== true || saved.revision <= base.revision ||
                             !sameCompiledGraph(updated, validateSnapshot(saved, codec, maxBytes))) {
                             callback(failure("graph_snapshot_unconfirmed", "The host acknowledgement did not match the submitted graph."));
                             return;
@@ -216,6 +213,8 @@
             if (typeof callback !== "function") throw new Error("node-effect callback is required");
             var graph;
             try {
+                var normalized = snapshots.normalize({ok:true,snapshot:snapshot});
+                if (!normalized.ok) throw normalized.error;
                 graph = validateSnapshot(snapshot, codec, maxBytes);
             } catch (error) {
                 callback(failure(error && error.code ? error.code : "invalid_graph_snapshot",
@@ -226,59 +225,13 @@
                 baseGraphRevision: snapshot.revision, graphHex: snapshot.graphHex,
                 nodeManifest: nativeNodeManifest(graph), rendererManifest: rendererManifest(graph) }, function (ensured) {
                     try {
-                        if (ensured && ensured.ok && ensured.snapshot &&
-                            !sameCompiledGraph(graph, validateSnapshot(ensured.snapshot, codec, maxBytes))) {
-                            callback(failure("graph_snapshot_unconfirmed", "The compiled node effects do not match the initial graph."));
-                            return;
-                        }
+                        if (ensured && ensured.ok && ensured.snapshot) validateSnapshot(ensured.snapshot, codec, maxBytes);
                     } catch (error) {
                         callback(failure(error && error.code ? error.code : "invalid_graph_snapshot",
                             error && error.message ? error.message : String(error)));
                         return;
                     }
-                    if (!ensured || ensured.ok !== true ||
-                        Object.prototype.toString.call(ensured.missingNodeIds) !== "[object Array]") {
-                        callback(ensured);
-                        return;
-                    }
-
-                    var missing = Object.create(null);
-                    for (var missingIndex = 0; missingIndex < ensured.missingNodeIds.length; missingIndex++) {
-                        missing[String(ensured.missingNodeIds[missingIndex])] = true;
-                    }
-                    var manifest = nativeNodeManifest(graph);
-                    for (var nodeIndex = 0; nodeIndex < manifest.length; nodeIndex++) {
-                        var currentId = String(manifest[nodeIndex].id);
-                        if (!missing[currentId]) delete reconciledNativeDeletions[deletionKey(targetToken, currentId)];
-                    }
-
-                    var blocked = [];
-                    for (var checkIndex = 0; checkIndex < ensured.missingNodeIds.length; checkIndex++) {
-                        var missingId = String(ensured.missingNodeIds[checkIndex]);
-                        if (reconciledNativeDeletions[deletionKey(targetToken, missingId)]) blocked.push(missingId);
-                    }
-                    if (blocked.length) {
-                        var undoConflict = failure("native_node_undo_conflict",
-                            "Undo restored graph node(s) " + blocked.join(", ") +
-                            " while their AE effects are still deleted. Restore the missing effect or redo the graph deletion; automatic pruning is paused.");
-                        undoConflict.missingNodeIds = blocked;
-                        callback(undoConflict);
-                        return;
-                    }
-                    if (ensured.missingNodeIds.length === 0) {
-                        callback(ensured);
-                        return;
-                    }
-
-                    apply({ type: "deleteNodes", nodeIds: ensured.missingNodeIds }, function (reconciled) {
-                        if (!reconciled || reconciled.ok !== true) { callback(reconciled); return; }
-                        for (var deletedIndex = 0; deletedIndex < ensured.missingNodeIds.length; deletedIndex++) {
-                            reconciledNativeDeletions[deletionKey(targetToken, ensured.missingNodeIds[deletedIndex])] = true;
-                        }
-                        callback({ ok: true, operation: "reconcileNativeNodeDeletion",
-                            target: reconciled.target, snapshot: reconciled.snapshot,
-                            removedNodeIds: ensured.missingNodeIds.slice() });
-                    }, targetToken, ensured.graphRevision);
+                    callback(ensured);
                 });
         }
 

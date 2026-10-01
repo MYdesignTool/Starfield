@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-4";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-5a";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -278,7 +278,7 @@
                     } });
                     return;
                 }
-                callback(response);
+                callback(window.StarfieldNativeGraphSnapshot ? window.StarfieldNativeGraphSnapshot.normalize(response) : response);
             });
         });
     }
@@ -2434,7 +2434,6 @@
                 return;
             }
             startupRetryAttempt = 0;
-            clearBanner();
             loadGraphSnapshot(response.target.token, function (snapshotResponse) {
                 refreshInFlight = false;
                 if (epoch !== refreshEpoch || canvasInteractionActive() || state.pending) return;
@@ -2443,13 +2442,14 @@
                     var graphError = snapshotResponse && snapshotResponse.error ||
                         { code: "graph_snapshot_unavailable", message: "The canonical graph could not be read from this effect." };
                     showError(graphError.code, graphError.message);
-                    adoptState(response, null);
+                    // Keep the last valid canvas during a host read failure.
+                    if (!state.nodes.length || state.targetToken !== response.target.token) adoptState(response, null);
                     return;
                 }
-                // The first graph sync also materializes the node AEX records.
-                // Keep that lifecycle active in AE Controls mode; only Node Graph
-                // mode projects the canonical topology into the editable canvas.
-                adoptState(response, response.controlSource === "Node Graph" ? snapshotResponse.snapshot : null);
+                // The actual sibling effects own topology and values, including
+                // the first automatic Emitter + Particle initialization.
+                clearBanner();
+                adoptState(response, snapshotResponse.snapshot);
             });
         });
     }

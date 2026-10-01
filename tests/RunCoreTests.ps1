@@ -43,7 +43,7 @@ try {
 
     if ($Adapter) {
         $sources[0] = 'tests\graph_parameter_tests.cpp'
-        $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
+        $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
 
     $responseLines = @(

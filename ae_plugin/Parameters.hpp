@@ -19,14 +19,14 @@ namespace starfield::adapter {
 // editable node groups belong to their separate node effects. AE's implicit input
 // layer occupies index 0, so num_params includes one additional parameter.
 // The output effect retains hidden bootstrap controls for a clean first application,
-// but editable graph values live on separate node effects. Index 89 is the last
+// but editable graph values live on separate node effects. Index 91 is the last
 // registered parameter; graph topology edits use the numeric commit trigger at 43.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 89; // controls + topics + project metadata
+inline constexpr std::size_t kTotalEffectParameterCount = 91; // controls + Output + numeric metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -62,7 +62,7 @@ inline constexpr A_long kLayoutAppearanceXId = 37;
 inline constexpr A_long kLayoutAppearanceYId = 38;
 inline constexpr A_long kLayoutOutputXId = 39;
 inline constexpr A_long kLayoutOutputYId = 40;
-inline constexpr A_long kGraphSnapshotId = 41;
+inline constexpr A_long kGraphRevisionId = 41;
 inline constexpr A_long kGraphSyncGuardId = 42;
 inline constexpr A_long kGraphEditCommitId = 43;
 inline constexpr A_long kGraphEditReceiptId = 44;
@@ -77,6 +77,8 @@ inline constexpr A_long kEmitterSizeZId = 83;
 inline constexpr A_long kParticleSizeRandomId = 86;
 inline constexpr A_long kOpacityRandomId = 87;
 inline constexpr A_long kNodeEffectsReadyId = 89;
+inline constexpr A_long kGraphChecksumHighId = 90;
+inline constexpr A_long kGraphChecksumLowId = 91;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

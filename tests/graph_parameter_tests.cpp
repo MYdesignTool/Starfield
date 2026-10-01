@@ -21,16 +21,16 @@ using namespace starfield;
 using namespace starfield::adapter;
 
 namespace starfield::adapter {
-// The adapter fake-host suite exercises parameter checkout and graph construction;
-// AEGP expression access is covered by the separate host carrier gate, so capture
-// tests provide a successful snapshot sink instead of linking real AEGP suites.
-PF_Err write_graph_snapshot(PF_InData*, const core::Graph&, A_long* new_revision) noexcept {
-    if (new_revision) *new_revision = 1;
-    return PF_Err_NONE;
-}
+bool fake_native_compile = false;
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
-PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph&, bool& found) noexcept {
+PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found) noexcept {
+    if (fake_native_compile) {
+        auto result = graph_from_controls(core::Settings{});
+        if (!result.has_value()) return PF_Err_BAD_CALLBACK_PARAM;
+        graph = result.take_value(); found = true;
+        return PF_Err_NONE;
+    }
     found = false;
     return PF_Err_BAD_CALLBACK_PARAM;
 }
@@ -224,7 +224,17 @@ void test_parameters(PF_InData& host) {
     CHECK((graph_guard.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
     CHECK((graph_guard.ui_flags & PF_PUI_INVISIBLE) != 0);
     CHECK(std::strcmp(graph_guard.name, "Panel Graph Sync Guard") == 0);
-    CHECK(kTotalEffectParameterCount == 89);
+    CHECK(kTotalEffectParameterCount == 91);
+    const auto& revision = registered[kGraphRevisionId - 1];
+    CHECK(std::strcmp(revision.name, "Graph Revision") == 0);
+    CHECK((revision.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    CHECK(revision.u.fs_d.valid_max == 16777215.0f);
+    for (const A_long id : {kGraphChecksumHighId, kGraphChecksumLowId}) {
+        CHECK(registered[id - 1].param_type == PF_Param_FLOAT_SLIDER);
+        CHECK((registered[id - 1].flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+        CHECK((registered[id - 1].ui_flags & PF_PUI_INVISIBLE) != 0);
+        CHECK(registered[id - 1].u.fs_d.valid_max == 65535.0f);
+    }
     int group_depth = 0;
     int group_count = 0;
     for (const auto& definition : registered) {
@@ -651,6 +661,56 @@ void test_world_output_is_transparent_outside_particles() {
     CHECK(destination_pixels[0].red == 40 && destination_pixels[0].alpha == 255);
     CHECK(destination_pixels[3].blue == 120 && destination_pixels[3].alpha == 255);
 }
+
+void test_numeric_graph_receipt(PF_InData& host) {
+    const auto result = graph_from_controls(core::Settings{});
+    CHECK(result.has_value());
+    if (!result.has_value()) return;
+    auto graph = result.value();
+    std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
+    for (std::size_t i = 0; i < parameters.size(); ++i) pointers[i] = &parameters[i];
+    auto& revision = parameters[kGraphRevisionId];
+    revision.u.fs_d.value = 0;
+    // No effect_ref, pica_basicP or expression suite is present. Publication
+    // must depend only on the current callback parameter definitions.
+    A_long published = -1;
+    CHECK(write_graph_snapshot(&host, pointers.data(), graph, &published) == PF_Err_NONE);
+    CHECK(published == 1 && revision.u.fs_d.value == 1);
+    const auto bytes = core::serialize_graph(graph, core::particle_node_registry()).value();
+    std::uint32_t checksum = 0;
+    for (unsigned i = 0; i < 4; ++i) checksum |= std::to_integer<std::uint32_t>(bytes[24 + i]) << (8u * i);
+    CHECK(parameters[kGraphChecksumHighId].u.fs_d.value == (checksum >> 16u));
+    CHECK(parameters[kGraphChecksumLowId].u.fs_d.value == (checksum & 65535u));
+    for (const A_long id : {kGraphRevisionId,kGraphChecksumHighId,kGraphChecksumLowId})
+        CHECK((parameters[id].uu.change_flags & PF_ChangeFlag_CHANGED_VALUE) != 0);
+    revision.u.fs_d.value = 16777215.0;
+    CHECK(write_graph_snapshot(&host, pointers.data(), graph) == PF_Err_BAD_CALLBACK_PARAM);
+    CHECK(revision.u.fs_d.value == 16777215.0);
+    revision.u.fs_d.value = 2.5;
+    CHECK(write_graph_snapshot(&host, pointers.data(), graph) == PF_Err_BAD_CALLBACK_PARAM);
+    CHECK(revision.u.fs_d.value == 2.5);
+    revision.u.fs_d.value = 2;
+    auto& commit = parameters[kGraphEditCommitId];
+    commit.u.fs_d.value = 123;
+    parameters[kNodeEffectsReadyId].u.fs_d.value = 1;
+    parameters[kGraphParameterId].u.arb_d.value = nullptr;
+    PF_UserChangedParamExtra extra{}; extra.param_index = kGraphEditCommitId;
+    PF_OutData output{};
+    host.num_params = static_cast<A_long>(parameters.size());
+    fake_native_compile = true;
+    CHECK(commit_graph_request(&host,&output,pointers.data(),&extra) == PF_Err_NONE);
+    CHECK(parameters[kGraphEditReceiptId].u.fs_d.value == 123);
+    CHECK(revision.u.fs_d.value == 3);
+    CHECK(parameters[kControlSourceId].u.pd.value == kNodeControlSource);
+    CHECK((output.out_flags & PF_OutFlag_FORCE_RERENDER) != 0);
+    const auto saved = parameters[kGraphParameterId].u.arb_d.value;
+    CHECK(saved != nullptr);
+    fake_native_compile = false; commit.u.fs_d.value = 124;
+    CHECK(commit_graph_request(&host,&output,pointers.data(),&extra) == PF_Err_BAD_CALLBACK_PARAM);
+    CHECK(parameters[kGraphEditReceiptId].u.fs_d.value == -124);
+    CHECK(parameters[kGraphParameterId].u.arb_d.value == saved && revision.u.fs_d.value == 3);
+    dispose(saved); parameters[kGraphParameterId].u.arb_d.value = nullptr;
+}
 } // namespace
 
 int main() {
@@ -669,6 +729,7 @@ int main() {
     test_capture_scales_reduced_preview(host);
     test_world_copy_cancellation();
     test_world_output_is_transparent_outside_particles();
+    test_numeric_graph_receipt(host);
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

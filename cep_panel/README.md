@@ -1,11 +1,41 @@
 # Starfield CEP panel
 
-Current native candidate: revision-17 build 4, deployed 2026-10-01 through one
-`Plug-ins/Starfield -> dist` junction. The renderer exposes only the Output
-group; editable values belong to separate node effects. Gateway token remains
-`native-node-sync-4`. Build 3 rendered but crashed on layer selection; build 4
-targets hidden structural groups. Selection safety and native node operations
-are not yet AE-qualified. See `docs/native-node-checkpoint.md`.
+## CEP 5a hotfix after owner feedback — 2026-10-01
+
+The owner reports build 5 creates native Emitter effects but repeatedly shows
+`stale_graph`; copied effects do not appear in the canvas, and reopening CEP
+loses the canvas. **Build 5 did not pass native node acceptance.**
+
+The offending readonly `ensureNodeEffects` path compared a browser reconstruction
+against the actual AE records and rejected reload itself. CEP 5a returns the
+current Effect Parade records directly. Only mutation checks a host-produced
+opaque authoring stamp, so decimal JSON/codec differences do not pretend that
+the owner edited an effect. A targeted fixture reproduces rounded decimal JSON
+and verifies a readonly reload performs no compile, copy/edit still works, and
+a genuine intervening AE value change rejects before adding any effect.
+The exact numerical mismatch in the owner's session was not captured; decimal
+rounding is a reproduced hypothesis, not confirmed host evidence.
+
+Numeric native payload CRCs remain diagnostic. A browser's rounded projection
+cannot prove native byte equality; commit receipt, advancing native revision and
+semantic node-record readback confirm a transaction. Additional supervised
+callbacks may advance revision beyond exactly one. Failed graph reads keep the
+last valid canvas and do not clear/re-show the error banner on every poll.
+
+The gateway/loader token is `native-node-sync-5a`. This changes only workspace
+CEP files through the existing extension junction: **no AEX replacement or AE
+restart is needed**. Close/reopen the CEP panel. The actual effects are the source;
+existing Emitter copies should become visible. If the Particle effect is absent,
+add it from the node context menu and connect it. Partial first initialization now fills missing Emitter/Particle and initial links while ready=0; ready=1 deliberate deletion remains unchanged. Fresh-effect automatic bootstrap,
+real render response, undo and reopen still require owner confirmation.
+
+
+Current native candidate: revision-18 build 5, deployed 2026-10-01 through the
+existing single `Plug-ins/Starfield -> dist` junction. Gateway token:
+`native-node-sync-5a`. The owner confirms build 4 fixed the selection crash.
+Build 5 removes all expression access. Node effects own saved values, identity,
+links and layout; Output and the compiled render graph remain on the main effect.
+Actual add/copy/delete/render/undo acceptance awaits owner testing.
 
 Dockable After Effects 2023 node editor for the top-down `Emitter -> Particle -> Force -> Output`
 graph. The legacy AE Controls view uses protocol v1 of [ADR 0009](../docs/adr/0009-cep-panel-bridge.md).
@@ -43,24 +73,22 @@ writes the arbitrary-data `Node Graph Data` property directly or accesses host-p
 state. Effect Parade edits, callback/undo, save/reopen, and render response still require
 qualification in AE 2023.
 
-The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, `ensureNodeEffects`, and
-`submitGraph`. `ensureNodeEffects` materializes node effects from the project's bootstrap
-graph on first use. `submitGraph` reconciles node effects in one undo group, raises the
-numeric compile trigger, and checks the renderer's updated snapshot against the planned
-graph. AE 2023 host qualification remains open.
+The gateway exposes `getGraphSnapshot`, `syncGraphSnapshot`, `ensureNodeEffects`,
+and `submitGraph`. First synchronization directly creates Emitter → Particle →
+Output using separate effect instances. Snapshot responses contain ordinary
+native-node records. The CEP reconstructs their portable graph; numeric revision
+41 and checksum halves 90/91 confirm the renderer compiled the same payload.
+`submitGraph` compares revision and base records, updates node effects and Output
+in one undo group, then raises numeric commit 43 and reads receipt 44.
+No expression snapshot, expression mailbox or arbitrary-data scripting is used.
 
-### Current test candidate (2026-10-01)
-
-Revision 16 uses gateway token `native-node-sync-4`. The expression request at
-index 90 is removed. Output cap and position have a guarded batch update; failed
-transactions restore both node records and the compiled render snapshot. Removing
-all editable nodes leaves a valid transparent Output-only graph. Snapshot checks
-compare identity, topology, layout and values with AE control quantization tolerance.
-Eight focused CEP suites and 687 adapter checks pass; the May 2023 SDK build passes.
-The build-2 host attempt crashed after adding the renderer and opening its viewer,
-before node operations ran. Build 3 bumps PiPL/runtime metadata together and clears
-group-end definitions. These defensive changes do not yet establish a crash fix.
-See `docs/native-node-checkpoint.md` for the deployment and outstanding host gates.
+Close/reopen the CEP panel after deployment to load gateway `native-node-sync-5a`.
+Use a fresh Starfield effect/layer for this development parameter schema.
+756 adapter checks and the targeted gateway, transaction and startup suites pass.
+The native-node gateway checks include add, duplicate, independent curves/values,
+move, splice, connect/disconnect, native reorder/deletion, raw duplicate re-key,
+rollback and an intentionally empty Output-only graph. These do not establish
+real AE behavior; the owner is running the host test.
 
 At startup, the panel requests the selected effect's state. If AE is still resolving the
 project, selection, or ExtendScript gateway, it retries transient startup errors with a delay

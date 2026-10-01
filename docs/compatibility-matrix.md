@@ -1,12 +1,67 @@
 # Behavior inventory
 
+## CEP 5a hotfix after owner feedback — 2026-10-01
+
+The owner reports build 5 creates native Emitter effects but repeatedly shows
+`stale_graph`; copied effects do not appear in the canvas, and reopening CEP
+loses the canvas. **Build 5 did not pass native node acceptance.**
+
+The offending readonly `ensureNodeEffects` path compared a browser reconstruction
+against the actual AE records and rejected reload itself. CEP 5a returns the
+current Effect Parade records directly. Only mutation checks a host-produced
+opaque authoring stamp, so decimal JSON/codec differences do not pretend that
+the owner edited an effect. A targeted fixture reproduces rounded decimal JSON
+and verifies a readonly reload performs no compile, copy/edit still works, and
+a genuine intervening AE value change rejects before adding any effect.
+The exact numerical mismatch in the owner's session was not captured; decimal
+rounding is a reproduced hypothesis, not confirmed host evidence.
+
+Numeric native payload CRCs remain diagnostic. A browser's rounded projection
+cannot prove native byte equality; commit receipt, advancing native revision and
+semantic node-record readback confirm a transaction. Additional supervised
+callbacks may advance revision beyond exactly one. Failed graph reads keep the
+last valid canvas and do not clear/re-show the error banner on every poll.
+
+The gateway/loader token is `native-node-sync-5a`. This changes only workspace
+CEP files through the existing extension junction: **no AEX replacement or AE
+restart is needed**. Close/reopen the CEP panel. The actual effects are the source;
+existing Emitter copies should become visible. If the Particle effect is absent,
+add it from the node context menu and connect it. Partial first initialization now fills missing Emitter/Particle and initial links while ready=0; ready=1 deliberate deletion remains unchanged. Fresh-effect automatic bootstrap,
+real render response, undo and reopen still require owner confirmation.
+
+
+## Current native authoring gate — build 5, 2026-10-01
+
+Owner evidence on **AE 2023.5.0 Build 52** confirms build 4 stopped the
+layer-selection crash. Node editing remained blocked by
+`AEGP_CanVaryOverTime must be true to get an expression`, before node creation.
+Build 5 removes every expression read/write from synchronization. The saved
+source is each independent node effect's ordinary records; main IDs 41/90/91
+hold numeric revision/checksum receipts. Main 43/44 compile/acknowledge.
+
+The May 2023 SDK x64 build passes. **756 adapter checks, zero failures** include
+the actual numeric GraphCarrier implementation. Targeted gateway/transaction/startup
+checks pass; expression getters/setters deliberately throw in the node fixture.
+The fixture exercises initial Emitter/Particle creation, add/copy, independent
+values and curves, signed movement, splice/connect/disconnect, native effect
+reorder/deletion, raw Ctrl+D re-key, rollback and delete-all. No broad rendering
+regressions or repeated AE attempts were run.
+
+The owner authorized deployment and chose to perform host testing. Build 5 is
+installed with all six file hashes verified through the existing single
+`Plug-ins/Starfield -> dist` junction. No AE session was started by the agent.
+Use fresh effects and reopen CEP to load gateway `native-node-sync-5`.
+Node creation, actual render/cache response, undo/redo and save/reopen remain
+unqualified until the owner's results arrive. Earlier checkpoints below are history.
+
+
 ## Current selection-crash gate — build 4, 2026-10-01
 
 Owner evidence on AE 2023.5.0 Build 52: revision-16 build 3 renders, then crashes
 when its layer is selected. The second dump repeats a null read in
 `AfterFXLib.dll+0x1931d36`, before node modules load. Build 4 replaces hidden
 structural topic markers with invisible scalar slots and leaves one balanced
-Output group; this is a candidate fix, not a confirmed crash resolution.
+Output group; the owner now confirms the selection crash is resolved.
 721 adapter checks, the May 2023 SDK build, and a checkout-contained single-folder
 deployment/rollback check pass. Build 4 is installed through one
 `Plug-ins/Starfield -> dist` junction after authorized shutdown of PID 31772.

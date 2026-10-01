@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Revision 17 removes hidden structural topics from the renderer UI.
-#define STARFIELD_VERSION_BUILD 4
-#define STARFIELD_VERSION_PACKED 32772 /* 0x8004 */
+// Revision 18 replaces expression snapshots with numeric revision/checksum streams.
+#define STARFIELD_VERSION_BUILD 5
+#define STARFIELD_VERSION_PACKED 32773 /* 0x8005 */

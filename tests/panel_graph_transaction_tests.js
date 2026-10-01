@@ -120,60 +120,14 @@ assert.strictEqual(ensureHarness.calls[0].operation, "ensureNodeEffects");
 assert.strictEqual(ensureHarness.calls[0].extra.nodeManifest.length, 2,
                    "startup reconciliation creates editable native nodes only; Output is the main effect");
 
-var deletedNodeId = uuid(2);
-var externalDeleteHarness = createHarness(source, { missingNodeIds: [deletedNodeId] });
-var externalDeleteReply;
-externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
-    externalDeleteReply = response;
-});
-assert.strictEqual(externalDeleteReply.ok, true);
-assert.strictEqual(externalDeleteReply.operation, "reconcileNativeNodeDeletion");
-assert.deepStrictEqual(externalDeleteReply.removedNodeIds, [deletedNodeId]);
-assert.strictEqual(externalDeleteReply.snapshot.revision, 9,
-                   "external Effect Parade deletion commits one new saved graph revision");
-var externallyPrunedGraph = codec.fromHex(externalDeleteReply.snapshot.graphHex);
-assert.deepStrictEqual(externallyPrunedGraph.nodes.map(function (node) { return node.id; }), [uuid(1), uuid(3)]);
-assert.strictEqual(externallyPrunedGraph.edges.length, 0,
-                   "external node deletion also removes its incident graph edges");
-assert.strictEqual(externalDeleteHarness.calls[1].operation, "getGraphSnapshot");
-assert.strictEqual(externalDeleteHarness.calls[2].operation, "submitGraph");
-assert.deepStrictEqual(externalDeleteHarness.calls[2].extra.target, { token: "target-1" },
-                       "the deletion reconciliation stays pinned to the inspected AE effect");
-
-externalDeleteHarness.replaceSnapshot({ initialized: true, revision: 8, graphHex: codec.toHex(source) });
-var undoConflictReply;
-externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
-    undoConflictReply = response;
-});
-assert.strictEqual(undoConflictReply.ok, false,
-                   "undoing only the graph prune must not trigger another automatic prune");
-assert.strictEqual(undoConflictReply.error.code, "native_node_undo_conflict");
-assert.deepStrictEqual(undoConflictReply.missingNodeIds, [deletedNodeId]);
-assert.strictEqual(externalDeleteHarness.calls.length, 4,
-                   "the conflict is surfaced without submitting another graph transaction");
-
-externalDeleteHarness.setMissingNodeIds([]);
-var undoCompleteReply;
-externalDeleteHarness.client.ensureNativeEffects(externalDeleteHarness.snapshot(), "target-1", function (response) {
-    undoCompleteReply = response;
-});
-assert.strictEqual(undoCompleteReply.ok, true,
-                   "restoring the native AE effect clears the temporary undo conflict");
-assert.strictEqual(externalDeleteHarness.calls.length, 5,
-                   "restoration only checks node effects and does not prune graph state");
-
-var staleNativeDeleteHarness = createHarness(source, {
-    missingNodeIds: [deletedNodeId], ensureGraphRevision: 7
-});
-var staleNativeDeleteReply;
-staleNativeDeleteHarness.client.ensureNativeEffects(staleNativeDeleteHarness.snapshot(), "target-1", function (response) {
-    staleNativeDeleteReply = response;
-});
-assert.strictEqual(staleNativeDeleteReply.ok, false,
-                   "a stale node-effect inspection must not delete from a newer graph snapshot");
-assert.strictEqual(staleNativeDeleteReply.error.code, "stale_graph");
-assert.strictEqual(staleNativeDeleteHarness.calls.length, 2,
-                   "stale reconciliation reads the latest snapshot but never submits the stale deletion");
+// Ordinary native-record deletion/re-key tests live in panel_native_node_gateway_tests.
+// A receipt must confirm the renderer compiled the records, not just acknowledge edits.
+var wrongChecksum = createHarness(source, { submit: function (extra, base) {
+    return { ok: true, snapshot: { initialized: true, revision: base.revision + 1,
+        graphHex: extra.graphHex, checksumMatches: false } };
+} });
+wrongChecksum.client.apply({ type: "addNode", nodeType: "force" }, function (response) { reply = response; });
+assert.strictEqual(reply.ok, true, "a decimal projection CRC is diagnostic, not an authoring gate");
 
 var uninitialized = createHarness(source, { getSnapshot: function () {
     return { ok: true, snapshot: { initialized: false }, target: { token: "target-1" } };
@@ -183,7 +137,7 @@ assert.strictEqual(reply.error.code, "graph_snapshot_uninitialized");
 assert.strictEqual(uninitialized.calls.length, 1, "an edit must not silently initialize persisted graph state");
 
 var wrongReceipt = createHarness(source, { submit: function (extra, base) {
-    return { ok: true, snapshot: { initialized: true, revision: base.revision + 2, graphHex: extra.graphHex } };
+    return { ok: true, snapshot: { initialized: true, revision: base.revision, graphHex: extra.graphHex } };
 } });
 wrongReceipt.client.apply({ type: "addNode", nodeType: "force" }, function (response) { reply = response; });
 assert.strictEqual(reply.error.code, "graph_snapshot_unconfirmed");

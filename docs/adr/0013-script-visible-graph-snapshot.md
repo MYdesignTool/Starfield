@@ -1,6 +1,6 @@
 # ADR 0013: Script-visible graph snapshot carrier
 
-- Status: rejected for topology editing. AE 2023.5 Build 52 reports the active request stream at index 90 as non-expressionable, so the proposed mailbox cannot be the graph edit path. ADR 0019 supersedes this transport with node-effect-owned records and a numeric compile trigger. The snapshot expression may remain a read-only diagnostic mirror during transition; topology edits must not depend on setting an expression.
+- Status: rejected completely, including the diagnostic expression snapshot. AE 2023.5 Build 52 rejects expression request writes; build 4 also failed at AEGP_GetExpression on non-time-varying Graph Snapshot (41). Revision 18 / ADR 0019 replace all expression access with node-owned ordinary records, a numeric compile trigger, and numeric revision/checksum receipts.
 - Date: 2026-09-29.
 - Depends on ADRs 0008, 0009, and 0011.
 
@@ -8,7 +8,7 @@
 > rejected after AE 2023.5 Build 52 returned `canSetExpression=false` for index
 > 90. Do not implement, deploy, or retry that transport. ADR 0019 defines the
 > current source contract: per-node AE effect streams plus a numeric compile
-> trigger; the readable graph expression is only a renderer-written snapshot mirror.
+> trigger. No expression snapshot remains in the active implementation.
 
 ## Context
 

@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <new>
+#include <utility>
 
 #define STARFIELD_ADD_BOOTSTRAP_SLOT(NAME, ID) \
     do { \
@@ -604,7 +605,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         if (err != PF_Err_NONE) return err;
     }
 
-    // The snapshot is a read-only diagnostic mirror. The panel edits separate node
+    // Revision and checksum receipts are ordinary numeric streams. The panel edits separate node
     // effects and changes the numeric commit stream to compile those records into
     // the renderer's arbitrary-data graph. Index 42 guards batched Output writes.
     const struct GraphCarrierParameter {
@@ -613,7 +614,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         PF_FpLong default_value;
         bool supervised;
     } graph_carrier_parameters[] = {
-        {"Graph Snapshot", kGraphSnapshotId, 0.0, false},
+        {"Graph Revision", kGraphRevisionId, 0.0, false},
         {"Panel Graph Sync Guard", kGraphSyncGuardId, 0.0, false},
         {"Commit Graph Edit", kGraphEditCommitId, 0.0, true},
         {"Graph Edit Receipt", kGraphEditReceiptId, 0.0, false},
@@ -630,6 +631,10 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         def.u.fs_d.value = def.u.fs_d.dephault = static_cast<PF_FpShort>(carrier.default_value);
         def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCarrierControlLimit;
         def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCarrierControlLimit;
+        if (carrier.disk_id == kGraphRevisionId) {
+            def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
+            def.u.fs_d.valid_max = def.u.fs_d.slider_max = 16777215.0;
+        }
         def.u.fs_d.precision = PF_Precision_INTEGER;
         def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
         err = PF_ADD_PARAM(in_data, -1, &def);
@@ -722,6 +727,19 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     err = PF_ADD_PARAM(in_data, -1, &def);
     if (err != PF_Err_NONE) return err;
 
+    for (const auto& checksum : {std::pair{"Graph Checksum High", kGraphChecksumHighId},
+                                 std::pair{"Graph Checksum Low", kGraphChecksumLowId}}) {
+        AEFX_CLR_STRUCT(def);
+        def.param_type = PF_Param_FLOAT_SLIDER;
+        def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+        std::snprintf(def.name, sizeof(def.name), "%s", checksum.first);
+        def.uu.id = checksum.second;
+        def.u.fs_d.valid_max = def.u.fs_d.slider_max = 65535.0;
+        def.u.fs_d.precision = PF_Precision_INTEGER;
+        err = PF_ADD_PARAM(in_data, -1, &def);
+        if (err != PF_Err_NONE) return err;
+    }
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -872,7 +890,7 @@ PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* p
         PF_ArbitraryH replacement = nullptr;
         const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
         if (created != PF_Err_NONE) return created;
-        const auto mirrored = write_graph_snapshot(in_data, graph.value());
+        const auto mirrored = write_graph_snapshot(in_data, params, graph.value());
         if (mirrored != PF_Err_NONE) {
             in_data->utils->host_dispose_handle(replacement);
             return mirrored;
@@ -931,7 +949,7 @@ PF_Err sync_graph_from_controls(PF_InData* in_data, PF_OutData* out_data, PF_Par
     PF_ArbitraryH replacement = nullptr;
     const auto created = create_graph_parameter(in_data, graph.value(), &replacement);
     if (created != PF_Err_NONE) return created;
-    const auto mirrored = write_graph_snapshot(in_data, graph.value());
+    const auto mirrored = write_graph_snapshot(in_data, params, graph.value());
     if (mirrored != PF_Err_NONE) {
         in_data->utils->host_dispose_handle(replacement);
         return mirrored;
@@ -962,7 +980,7 @@ PF_Err sync_native_graph_with_output_controls(PF_InData* in_data, PF_OutData* ou
     PF_ArbitraryH replacement = nullptr;
     const PF_Err created = create_graph_parameter(in_data, graph, &replacement);
     if (created != PF_Err_NONE) return created;
-    const PF_Err mirrored = write_graph_snapshot(in_data, graph);
+    const PF_Err mirrored = write_graph_snapshot(in_data, params, graph);
     if (mirrored != PF_Err_NONE) {
         in_data->utils->host_dispose_handle(replacement);
         return mirrored;

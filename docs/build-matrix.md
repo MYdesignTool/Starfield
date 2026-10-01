@@ -1,5 +1,69 @@
 # Build and host matrix
 
+## CEP 5a hotfix after owner feedback — 2026-10-01
+
+The owner reports build 5 creates native Emitter effects but repeatedly shows
+`stale_graph`; copied effects do not appear in the canvas, and reopening CEP
+loses the canvas. **Build 5 did not pass native node acceptance.**
+
+The offending readonly `ensureNodeEffects` path compared a browser reconstruction
+against the actual AE records and rejected reload itself. CEP 5a returns the
+current Effect Parade records directly. Only mutation checks a host-produced
+opaque authoring stamp, so decimal JSON/codec differences do not pretend that
+the owner edited an effect. A targeted fixture reproduces rounded decimal JSON
+and verifies a readonly reload performs no compile, copy/edit still works, and
+a genuine intervening AE value change rejects before adding any effect.
+The exact numerical mismatch in the owner's session was not captured; decimal
+rounding is a reproduced hypothesis, not confirmed host evidence.
+
+Numeric native payload CRCs remain diagnostic. A browser's rounded projection
+cannot prove native byte equality; commit receipt, advancing native revision and
+semantic node-record readback confirm a transaction. Additional supervised
+callbacks may advance revision beyond exactly one. Failed graph reads keep the
+last valid canvas and do not clear/re-show the error banner on every poll.
+
+The gateway/loader token is `native-node-sync-5a`. This changes only workspace
+CEP files through the existing extension junction: **no AEX replacement or AE
+restart is needed**. Close/reopen the CEP panel. The actual effects are the source;
+existing Emitter copies should become visible. If the Particle effect is absent,
+add it from the node context menu and connect it. Partial first initialization now fills missing Emitter/Particle and initial links while ready=0; ready=1 deliberate deletion remains unchanged. Fresh-effect automatic bootstrap,
+real render response, undo and reopen still require owner confirmation.
+
+
+## Current revision-18 build 5 deployment — 2026-10-01
+
+Build 4 selection safety is owner-confirmed. Build 5 removes the expression
+snapshot that still blocked initialization. Independent AE node effects own
+authoring records; main numeric revision/checksum and commit/receipt acknowledge
+a compiled graph. Code/PiPL both use **32773 (`0x8005`)**. Fresh effects only.
+
+The May 2023 SDK x64 build and 756 adapter checks pass. Targeted gateway,
+transaction and startup checks pass. The owner chose to test AE; the agent
+did not launch a session. Actual node operations/undo/reopen remain host gates.
+
+Deployment is complete and six hashes match their candidates. Only the existing
+`Plug-ins/Starfield -> newStardust/dist` junction is present. Core content is
+unchanged; its selected generation remains `StarfieldCore-6D70281C4E756BCA.dll`.
+
+| File | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | `0E60C605DBF235EB53A95B3EBDB6E9F37F048CC7B2E9CB6734B0D510FBEC0DD8` |
+| StarfieldEmitter.aex | `8677BFB1E514A6170C68EA5B93F4600A03BF159E232263C082F4D771EFF4A84A` |
+| StarfieldParticleNode.aex | `5725E4CF6FEA9193ABC79B5412C1C8D57280867A75A08A1E760F60A9AB6D6BB5` |
+| StarfieldAppearance.aex | `6FA861895302BC46CB100ED3749B8DA33AEE246714CB4B3A979A7C5D51F17DBA` |
+| StarfieldForce.aex | `68DC61AF360311F2070C8A2E067B2E67884C241EC453725100F479B7BED9709F` |
+| StarfieldCore.dll | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+Backup: `artifacts/disabled/p02d-build5-native-streams-20261001/`.
+One-step undo with AE closed, from this checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build5-native-streams-20261001' -Rollback
+```
+
+Earlier deployed-build sections below are historical.
+
+
 ## Current revision-17 build 4 deployment — 2026-10-01
 
 Owner evidence: build 3 renders particles, but selecting its layer crashes AE.

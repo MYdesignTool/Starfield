@@ -1,8 +1,74 @@
 # ADR 0019: AE-native effect instances own node records
 
-- Status: accepted; Output stays on the main renderer and editable nodes are separate hidden AEX instances. Source integration stores node records on per-node effects and uses a numeric compile trigger. The failed expression mailbox at parameter index 90 has been removed from the active parameter schema. The current candidate builds with the May 2023 SDK but has not yet been qualified in AE 2023.
+## CEP 5a hotfix after owner feedback — 2026-10-01
+
+The owner reports build 5 creates native Emitter effects but repeatedly shows
+`stale_graph`; copied effects do not appear in the canvas, and reopening CEP
+loses the canvas. **Build 5 did not pass native node acceptance.**
+
+The offending readonly `ensureNodeEffects` path compared a browser reconstruction
+against the actual AE records and rejected reload itself. CEP 5a returns the
+current Effect Parade records directly. Only mutation checks a host-produced
+opaque authoring stamp, so decimal JSON/codec differences do not pretend that
+the owner edited an effect. A targeted fixture reproduces rounded decimal JSON
+and verifies a readonly reload performs no compile, copy/edit still works, and
+a genuine intervening AE value change rejects before adding any effect.
+The exact numerical mismatch in the owner's session was not captured; decimal
+rounding is a reproduced hypothesis, not confirmed host evidence.
+
+Numeric native payload CRCs remain diagnostic. A browser's rounded projection
+cannot prove native byte equality; commit receipt, advancing native revision and
+semantic node-record readback confirm a transaction. Additional supervised
+callbacks may advance revision beyond exactly one. Failed graph reads keep the
+last valid canvas and do not clear/re-show the error banner on every poll.
+
+The gateway/loader token is `native-node-sync-5a`. This changes only workspace
+CEP files through the existing extension junction: **no AEX replacement or AE
+restart is needed**. Close/reopen the CEP panel. The actual effects are the source;
+existing Emitter copies should become visible. If the Particle effect is absent,
+add it from the node context menu and connect it. Partial first initialization now fills missing Emitter/Particle and initial links while ready=0; ready=1 deliberate deletion remains unchanged. Fresh-effect automatic bootstrap,
+real render response, undo and reopen still require owner confirmation.
+
+
+- Status: accepted; Output stays on the main renderer and editable nodes are separate hidden AEX instances. Source integration stores node records on per-node effects and uses a numeric compile trigger. All expression transport, including the read-only snapshot, is removed. Numeric revision/checksum streams acknowledge the compiled graph. Revision-18 build 5 is deployed; owner testing is pending. The owner confirmed build 4 fixed the layer-selection crash.
 - Date: 2026-09-30; implementation correction: 2026-10-01.
 - Depends on ADRs 0006–0013 and 0015.
+
+### Expression snapshot removal — revision 18, 2026-10-01
+
+Build 4 stopped the owner's selection crash, but graph initialization still failed:
+AE reported `AEGP_CanVaryOverTime must be true to get an expression`. The native
+snapshot publisher called `AEGP_GetExpression` on ID 41 even though that control
+is non-time-varying. This happened before the gateway could create node effects.
+
+Revision 18 removes every native and script expression read/write from graph
+synchronization. ID 41 becomes Graph Revision (0–16777215); IDs 90/91 hold the
+compiled payload CRC32 as two exact 16-bit numeric halves. IDs 43/44 retain
+numeric commit/receipt. The CEP reads each effect's ordinary values, UUID,
+outgoing edges and signed position, reconstructs the portable graph locally,
+and checks it against the compiled checksum. It never reads CUSTOM_VALUE.
+
+Node effects are the authoring source. The main arbitrary graph is a compiled
+render cache; it is not a source from which missing node effects are recreated.
+The gateway compares the caller's base record manifest as well as numeric
+revision before mutations, so an external effect edit/reorder/deletion cannot
+silently be overwritten. One guarded transaction creates/removes independent
+effects, writes records, reacquires indexed-group references, and compiles once.
+
+The first panel synchronization creates Emitter → Particle → Output directly.
+After marker 89 is set, an empty Effect Parade stays Output-only. The refresh
+path prunes connections to deleted effects. Raw AE duplicates are re-keyed in
+parade order, retaining the original node identity and assigning fresh edge
+identities to copies. These synchronization actions require the CEP panel;
+automatic creation/import with the panel closed remains a separate host gate.
+
+The adapter suite now links the actual GraphCarrier, rather than replacing its
+publisher with a success stub. It checks numeric revision/checksum publication,
+commit/rejection and rerender flags with no expression suite available.
+Gateway checks make all expression access throw and exercise bootstrap,
+add/copy, independent values and curves, signed movement, insert/connect/disconnect,
+Effect Parade reorder/direct deletion, raw Ctrl+D re-key, rollback and delete-all.
+These are source checks; AE acceptance belongs to the owner's fresh-effect test.
 
 ## Context
 
@@ -13,7 +79,7 @@ Dump `cf077068-7651-46c6-a82c-4f8d4e451f8e` repeats the null read at
 `AfterFXLib.dll+0x1931d36`; only the main AEX and Core are loaded, before node
 module materialization. Source registration hid five GROUP_START parameters
 while registering visible GROUP_END markers. This is a suspected ECW hierarchy
-defect, not yet a confirmed cause. Revision 17 replaces these ten unused markers
+defect; the owner later confirmed build 4 no longer crashes on selection. Revision 17 replaces these ten unused markers
 with ordinary hidden scalar slots; Output is the renderer's only structural group.
 The compiled node architecture is unchanged. Code/PiPL both advance to `0x8004`.
 Development effects must be recreated; no type migration is provided. Adapter
@@ -121,34 +187,16 @@ round-trip, undo, render invalidation, and save/reopen still require host testin
 
 ### Initial materialization and direct Effect Parade deletion
 
-The main renderer appends hidden, non-animated parameter ID 89, `Node Effects
-Ready`, to the project. Its default value is 0. During the first successful
-panel synchronization, the gateway creates any native node effects missing from
-the graph manifest and sets the marker to 1 in the same AE undo group. This
-distinguishes a new project that still needs bootstrap from a later deliberate
-deletion in Effect Controls; without project-owned state, every refresh would
-recreate manually deleted nodes.
+The main renderer's project-owned marker 89 distinguishes initial bootstrap from
+an intentionally empty graph. Initial synchronization creates separate Emitter
+and Particle effects and connects them to the existing Output. Later refreshes
+read the actual Effect Parade. A deleted effect disappears from the graph and
+its incoming links are pruned before recompilation; no snapshot recreates it.
 
-After the marker is 1, the gateway reports graph node IDs whose corresponding
-native effect instances are missing. The CEP transaction client then submits a
-revision-checked `deleteNodes` edit against the main effect's saved graph. The
-graph edit also removes incident edges. This reverse reconciliation runs on the
-panel refresh path and does not query sibling effects from rendering callbacks.
-Before pruning, the client rereads the graph and requires the revision to match
-the revision returned by the native-effect inspection; the graph commit then
-performs its own revision check. A stale inspection cannot delete from a newer
-graph state.
-
-Direct Effect Parade deletion and the resulting graph cleanup are separate AE
-operations, so this source design does not yet claim single-step undo for a
-manual deletion. The CEP transaction client now keeps a session-local guard for
-each reconciled deletion. If undo restores the graph node while its AE effect is
-still missing, the panel surfaces `native_node_undo_conflict` and pauses
-automatic pruning for that node; restoring the AE effect clears the guard. This
-prevents refresh from repeatedly consuming an undo. The guard is transient, so
-the graph/effect pair must be coherent before closing or reloading the panel.
-AE 2023 qualification must still check the undo stack, refresh after undo/redo,
-and save/reopen.
+Manual native deletion and the follow-up edge cleanup may occupy separate undo
+steps. An undo restores the actual saved node records, which the panel rereads;
+there is no session-local deletion tombstone or mirror-based pruning loop.
+AE undo/redo, refresh and save/reopen remain host qualification gates.
 
 Particle and Appearance modules store bounded Size/Opacity curve banks on their
 own effect instances. The compiler copies those values into the renderer snapshot.
@@ -172,11 +220,11 @@ authoring surface. Curves remain host-unqualified along with the other node data
 - Alt-drag and Ctrl+D use the same graph edit and link policy. CEP planner
   coverage does not qualify AE effect creation, undo, cache update, or reopen.
 
-The CEP graph's Duplicate command creates new graph UUIDs and materializes new AE
-effects. If an effect is copied directly in Effect Parade, the copied UUID makes
-the graph-to-effect mapping ambiguous. The current gateway detects this and blocks
-edits against that identity; deleting the graph node removes every effect carrying
-that UUID. Automatic import/re-key of raw AE-level duplicates remains open.
+The CEP Duplicate command creates new graph UUIDs and independent AE effects.
+Raw AE-level duplicates are detected on refresh and re-keyed in Effect Parade
+order; the original retains its identity and incoming links. The duplicate gets
+new node/edge IDs and a small position offset. Script checks cover this policy;
+native host undo/cache response still needs qualification.
 
 Use one thin AEX code fragment per AE effect module. Adobe permits multiple
 PiPLs in a single file for After Effects, but recommends one effect per code
@@ -200,7 +248,7 @@ unconfirmed. See `docs/native-node-checkpoint.md` for evidence and remaining wor
 
 The expression-mailbox experiment is rejected: AE 2023.5 Build 52 reports
 parameter index 90 as non-expressionable, and CEP's preflight stopped before
-creating any node effect. The current source removes that parameter entirely. A
+creating any node effect. The expression request is removed; numeric checksum halves now occupy IDs 90/91. A
 node control edit invokes the main renderer with `AEGP_EffectCallGeneric` and
 the numeric `Commit Graph Edit` trigger at index 43. CEP batches node value and
 metadata writes under a per-node sync guard, then raises one compile trigger.
