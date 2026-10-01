@@ -1,13 +1,31 @@
 # ADR 0011: host changes require explicit, per-action authorization
 
-- Status: accepted (owner instruction, 2026-09-27).
+- Status: accepted (owner instruction, 2026-09-27; bounded deployment authorization added 2026-10-02).
 - Applies to every agent working on this repository.
+
+## Standing Starfield deployment authorization — 2026-10-02
+
+The owner explicitly instructed: "部署吧，之后如果你看到ae没有在运行都可以直接部署，不用再问我".
+This authorizes routine Starfield development deployments whenever a read-only check immediately
+before deployment finds neither `AfterFX` nor `AfterFX_64` running. No repeated approval request
+is required for this case. The deployment script also refuses installation while AE is running.
+
+Use `tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName '<unique-backup-name>' -Install`
+through the existing single `Plug-ins\Starfield` Junction to this checkout's `dist/`.
+Keep the replaced files and deployment manifest under `artifacts/disabled/`, verify installed
+hashes, record the before/after state, and provide the same command with `-Rollback` as the
+one-step undo (AE closed). Prefer Core hot updates when an AEX replacement is unnecessary.
+
+This authorization covers the Starfield development bundle. Starting/stopping processes,
+registry or host-wide switches, Adobe caches, per-user folders, CEP installation, other
+extensions, and unrelated host files continue to require their own explicit authorization.
 
 ## Rule
 
 Nothing outside this repository is modified without the owner's **explicit authorization for that
 specific action**. Listing the commands and waiting for approval is the minimum; "it is probably
 safe", "it is reversible" or "the user asked for a working panel" are not authorization.
+The standing Starfield deployment authorization above is the owner's explicit exception.
 
 Host-level changes are exactly the cases that caused harm on 2026-09-27:
 
@@ -21,7 +39,8 @@ Host-level changes are exactly the cases that caused harm on 2026-09-27:
 ## Required procedure for any host change
 
 1. **List it before doing it**: the exact commands, the paths, and what the change depends on.
-2. **Get approval** for that list. A general "go ahead" from an earlier turn does not carry over.
+2. **Get approval** for that list, except deployments covered by the standing authorization above.
+   A general "go ahead" from an earlier turn does not authorize other host changes.
 3. **Prefer reversible**: rename instead of delete, keep a copy in `artifacts/disabled/`, record the
    original path.
 4. **Record the before and after state** in the same message that reports the change.
@@ -66,5 +85,5 @@ Panel and host-integration work stays **frozen** until the owner asks for it. Pl
 repository (core, adapter, schema, docs, tests) continues normally and needs no host authorization,
 because it changes no host state. When host qualification is needed, the agent writes the checklist and
 lets the owner run it. Installing or updating the plug-in and the panel is authorized per action, with
-the exact commands listed first; the install scripts resolve their own paths and print what they
-replaced.
+the exact commands listed first, except Starfield deployments covered by the standing authorization
+above; the install scripts resolve their own paths and print what they replaced.

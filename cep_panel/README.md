@@ -1,6 +1,6 @@
 # Starfield CEP panel
 
-## Current build 6 panel — 2026-10-01
+## Current panel with native build 7 — 2026-10-02
 
 Gateway token: `native-node-sync-6`. Errors from editing stay visible until manual
 Refresh or a successful edit; failed default initialization waits for manual
@@ -8,7 +8,7 @@ Refresh. ResizeObserver work is deferred/coalesced so its delivery warning no
 longer covers a native error. Close/reopen CEP to load the source changes.
 
 The owner supplied AE's float/SmartFX contract error. **That fix requires the
-build-6 node AEX**, not just CEP reload. Build 6 is deployed with hashes verified
+build-6 or later node AEX**, not just CEP reload. Build 7 is deployed with hashes verified
 through the existing single plugin junction. Emitter duplication works; Particle still awaits
 actual AE confirmation. [Current checkpoint](../docs/native-node-checkpoint.md).
 
@@ -51,7 +51,7 @@ add it from the node context menu and connect it. Partial first initialization n
 real render response, undo and reopen still require owner confirmation.
 
 
-Current native build: revision-18 build 6, deployed 2026-10-01 through the
+Current native build: revision-18 build 7, deployed 2026-10-02 through the
 existing single `Plug-ins/Starfield -> dist` junction. Gateway token:
 `native-node-sync-6`. The owner confirms build 4 fixed the selection crash.
 Build 5 removes all expression access. Node effects own saved values, identity,

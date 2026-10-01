@@ -1,6 +1,6 @@
-# P-02D native node checkpoint — 2026-10-01
+# P-02D native node checkpoint — 2026-10-02
 
-## Build 7: constant-control registration candidate — 2026-10-01
+## Build 7: constant-control registration deployment — 2026-10-02
 
 Owner build-6 evidence: Particle addition fails **inside `addProperty`**, before
 gateway identity/parameter writes, with `spatial interpolation method not allowed
@@ -20,8 +20,21 @@ remaining constant, no interpolation restriction and both supervised colors.
 May 2023 SDK candidate build passes with `-NoRuntimePublish -NoDistPublish`.
 These are registration/selector checks, **not reproduction of AE's internal
 interpolation implementation**. Actual Particle creation remains unqualified.
-Deployment authorization requested for backup name
-`p02d-build7-constant-flags-20261001`. Next owner action is one Particle addition;
+Build 7 was built on 2026-10-01 and **deployed on 2026-10-02** after the owner
+authorized installation and future deployments while AE is absent (ADR 0011).
+The pre-deployment process check found no AE process; no process was started or
+stopped. All six installed hashes match the build-matrix table. Existing single
+`Plug-ins/Starfield -> dist` Junction retained. Before: build-6 AEX set; after:
+build-7 AEX set, unchanged Core and selected Core generation.
+Backup: `artifacts/disabled/p02d-build7-constant-flags-20261001/deployment.json`.
+
+Undo (AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build7-constant-flags-20261001' -Rollback
+```
+
+Next owner action is one Particle addition;
 capture any persistent error. Previous rendering/Emitter tests are not repeated.
 
 ## Build 6: node SmartFX contract correction — 2026-10-01

@@ -1,15 +1,18 @@
 # Build and host matrix
 
-## Build 7 constant-control candidate — 2026-10-01
+## Current build 7 constant-control deployment — 2026-10-02
 
 Packed version `32775` (`0x8007`); schema revision 18 unchanged. Build removes
 redundant CANNOT_INTERP from constant node parameters after actual AE reports a
 spatial-interpolation failure during Particle creation. Cause remains a hypothesis
 until owner retest. Particle/Appearance checks pass 146 checks; May 2023 SDK build
-passes. No dist/runtime publication during build. Deployment approval requested.
+passes. Built 2026-10-01 without dist/runtime publication; deployed 2026-10-02
+under owner authorization after confirming AE was absent. All six installed hashes
+match the candidate. Before: build-6 AEXs; after: build-7 AEXs, unchanged Core and
+selected hot generation. Future AE-closed deployments are authorized in ADR 0011.
 CEP is unchanged (`native-node-sync-6`).
 
-| File | Candidate SHA-256 |
+| File | Installed SHA-256 |
 |---|---|
 | `StarfieldParticle.aex` | `0EAC147D841BBF8FA493B04CE3CFBB806BFE90E3FBB6FE207E2EBA839B0A4E3F` |
 | `StarfieldEmitter.aex` | `5429EACC73C391F0D7DE05DCE9311D7ECE24BB05069A8E91711D334B00C26C51` |
@@ -21,7 +24,7 @@ CEP is unchanged (`native-node-sync-6`).
 Deploy/undo uses the existing single Starfield -> dist junction, backup name
 `p02d-build7-constant-flags-20261001`; [checkpoint](native-node-checkpoint.md).
 
-## Current build 6 SmartFX deployment — 2026-10-01
+## Previous build 6 SmartFX deployment — 2026-10-01
 
 Owner AE error confirms float-aware internal node effects lacked SmartFX. All
 four node modules now implement smart pre-render/render passthrough and use

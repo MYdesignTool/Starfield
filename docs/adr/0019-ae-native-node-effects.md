@@ -8,7 +8,9 @@ source-based hypothesis, awaiting real-host confirmation. CANNOT_TIME_VARY
 retains the constant-value contract; supervision stays on editable controls.
 Code/PiPL advance to `32775` (`0x8007`). No public ID, type, match name or schema
 change, so no data migration is required. Native independent effects remain the
-authoring source. Details and evidence: [checkpoint](../native-node-checkpoint.md).
+authoring source. Build 7 deployed 2026-10-02 with all six hashes verified; actual
+Particle addition remains pending owner testing. Details and evidence:
+[checkpoint](../native-node-checkpoint.md).
 
 ## Build 6 flags/selector correction — 2026-10-01
 

@@ -1,12 +1,13 @@
 # Behavior inventory
 
-## Build 7 Particle registration gate — 2026-10-01
+## Build 7 Particle registration gate — 2026-10-02
 
 Build 6 still cannot create Particle: native addProperty throws a spatial-
 interpolation error even though canAddProperty=true. Build 7 removes redundant
 interpolation restrictions from constant node controls. That cause is a
 hypothesis awaiting AE confirmation; 146 Particle/Appearance fake-host checks
-and SDK build pass. Deployment approval requested. [Checkpoint](native-node-checkpoint.md).
+and SDK build pass. Build 7 is deployed; all six hashes match. Actual Particle
+addition is pending owner testing. [Checkpoint](native-node-checkpoint.md).
 
 ## Build 6 correction from actual AE error — 2026-10-01
 

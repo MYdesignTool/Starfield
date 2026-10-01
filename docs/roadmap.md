@@ -1,13 +1,14 @@
 # Development plan: AE 2023 particle Alpha
 
-## Current acceptance checkpoint — 2026-10-01
+## Current acceptance checkpoint — 2026-10-02
 
-Build 7 candidate now targets Particle creation's actual spatial-interpolation
+Build 7 now targets Particle creation's actual spatial-interpolation
 error by removing redundant interpolation flags from constant controls. 146
-Particle/Appearance checks and SDK build pass; deployment approval requested.
+Particle/Appearance checks and SDK build pass; deployed with all six hashes
+verified on 2026-10-02. Owner authorizes future AE-closed deployments (ADR 0011).
 The inferred cause and actual creation still need owner confirmation.
 
-Latest: the owner supplied AE's float-aware node / missing SmartFX verification
+Previous: the owner supplied AE's float-aware node / missing SmartFX verification
 error. Build 6 implements node SmartFX passthrough with matching PiPL/runtime
 flags; 276 actual-node checks and the SDK candidate build pass. CEP resize work
 is deferred so it no longer hides operation errors. Build 6 is deployed after
