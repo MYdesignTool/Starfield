@@ -1,5 +1,31 @@
 # P-02D native node checkpoint — 2026-10-01
 
+## Build 4 correction and current deployment gate
+
+The owner confirms build 3 can render, but selecting the layer crashes AE.
+Dump `cf077068-7651-46c6-a82c-4f8d4e451f8e` has the same null read as the prior
+dump (`AfterFXLib.dll+0x1931d36`, thread 31152). It loads the main AEX/Core,
+not the node AEX modules. Source registers hidden group starts with visible ends;
+that hierarchy is a suspected selection/UI fault. Build 4 removes those unused
+structural markers and leaves one balanced Output group. The development
+parameter schema advances to 17; code and PiPL advance together to `0x8004`.
+Fresh effects are required. This is a candidate fix, not a confirmed resolution.
+
+721 adapter checks and the full May 2023 SDK build passed. A focused deployment
+fixture verified read-only report mode, one bundle junction, hashes, hot runtime
+selection, complete rollback, and preservation of another plug-in. No repeated
+CEP/core suites or AE test operations were run. The owner authorized stopping
+AE PID 31772 and deploying; build 4 is now installed with all six hashes checked.
+AE was not restarted. Layer-selection safety still requires the owner's check.
+
+The installer archived loose Starfield files and the root runtime
+junction, then creates only `Plug-ins/Starfield -> dist`. The nested
+`dist/StarfieldRuntime` is a real folder. Core-only builds publish there without
+touching AEX files. The old single-effect and loose-pair installer scripts were
+removed. Backup: `artifacts/disabled/p02d-build4-single-folder-20261001/`.
+See the build matrix for exact command, hashes and one-step rollback.
+The record below describes build 3 and earlier evidence.
+
 ## Implemented source
 
 - Separate Emitter, Particle, Appearance and Force effect instances own values,

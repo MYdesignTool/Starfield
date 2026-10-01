@@ -31,6 +31,12 @@ standalone effects in AE's Effects menu. The CEP bridge still adds them by stabl
 match name to persist independent node values; AE 2023 must confirm that this
 scripted creation path works while the modules are hidden from the menu.
 
+The main renderer has only one structural parameter group, Output. Hidden
+bootstrap values use ordinary invisible controls; no invisible group boundary
+participates in the ECW hierarchy (development schema 17). Installation exposes
+the complete `dist` bundle through one `Plug-ins/Starfield` junction, with the
+hot Core runtime in a real `dist/StarfieldRuntime` subdirectory.
+
 Keep UI and preset compatibility as separate adapter modules. The AE 2023 dockable CEP panel uses the versioned ExtendScript bridge in ADR 0009. A graph transaction creates/removes the corresponding node AEX instances, writes their values, and commits the canonical graph snapshot to the main effect in one undo group. The Output terminal and its global controls remain on the main effect. Direct node-control edits have a supervised graph-sync source path, but callback delivery, cache/render response, undo and save/reopen remain AE 2023 qualification gates. The panel never shares C++ object layouts with the effect, and render code never queries sibling effects or panel state.
 
 ADR 0012 defines the runtime C ABI and versioned development DLLs. The AE

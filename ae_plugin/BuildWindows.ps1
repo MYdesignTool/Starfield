@@ -12,6 +12,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Import-Module Microsoft.PowerShell.Utility
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if (-not $CoreOnly -and -not $NoDistPublish -and
+    (Get-Process AfterFX, AfterFX_64 -ErrorAction SilentlyContinue)) {
+    throw 'Close AE before publishing AEX files into dist, or build with -NoDistPublish -NoRuntimePublish.'
+}
 if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSBuildPath" }
 
 # A CoreOnly build is safe only while every source that feeds the installed AEX
@@ -110,9 +114,9 @@ try {
 
     # Runtime publication is last: a failed build must leave the currently
     # selected DLL unchanged. Use NoRuntimePublish for an uninstalled candidate
-    # so the AE plug-in's runtime junction keeps selecting its current generation.
+    # so the single linked bundle keeps selecting its current generation.
     if (-not $NoRuntimePublish) {
-    $runtimeDir = Join-Path $repositoryRoot 'artifacts\runtime'
+    $runtimeDir = Join-Path $repositoryRoot 'dist\StarfieldRuntime'
     New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
     $builtCoreHash = (Get-FileHash -LiteralPath $builtCore -Algorithm SHA256).Hash
     $coreHash = $builtCoreHash.Substring(0, 16)

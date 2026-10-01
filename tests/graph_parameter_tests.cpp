@@ -225,6 +225,26 @@ void test_parameters(PF_InData& host) {
     CHECK((graph_guard.ui_flags & PF_PUI_INVISIBLE) != 0);
     CHECK(std::strcmp(graph_guard.name, "Panel Graph Sync Guard") == 0);
     CHECK(kTotalEffectParameterCount == 89);
+    int group_depth = 0;
+    int group_count = 0;
+    for (const auto& definition : registered) {
+        if (definition.param_type == PF_Param_GROUP_START) {
+            CHECK(definition.ui_flags == PF_PUI_NONE);
+            ++group_depth;
+            ++group_count;
+        } else if (definition.param_type == PF_Param_GROUP_END) {
+            CHECK(definition.ui_flags == PF_PUI_NONE);
+            CHECK(group_depth > 0);
+            --group_depth;
+        }
+    }
+    CHECK(group_depth == 0 && group_count == 1);
+    for (const std::size_t index : {1u, 10u, 11u, 19u, 20u, 25u, 80u, 84u, 85u, 88u}) {
+        const auto& slot = registered[index - 1];
+        CHECK(slot.param_type == PF_Param_FLOAT_SLIDER);
+        CHECK((slot.ui_flags & PF_PUI_INVISIBLE) != 0);
+        CHECK((slot.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
+    }
     for (std::size_t i = 1; i <= kTotalEffectParameterCount; ++i) {
         parameters[i] = registered[i - 1];
         parameters[i].uu.change_flags = 0;

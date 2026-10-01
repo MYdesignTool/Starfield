@@ -15,12 +15,12 @@
 #include <cstdlib>
 #include <new>
 
-#define STARFIELD_ADD_HIDDEN_TOPIC(NAME, FLAGS, ID) \
+#define STARFIELD_ADD_BOOTSTRAP_SLOT(NAME, ID) \
     do { \
         AEFX_CLR_STRUCT(def); \
-        def.flags = (FLAGS); \
+        def.flags = PF_ParamFlag_CANNOT_TIME_VARY; \
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE; \
-        PF_ADD_TOPIC(NAME, ID); \
+        PF_ADD_FLOAT_SLIDER(NAME, 0.0f, 1.0f, 0.0f, 1.0f, 0, 0.0f, PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE, 0, ID); \
     } while (0)
 
 #define STARFIELD_ADD_HIDDEN_FLOAT(NAME, VALID_MIN, VALID_MAX, SLIDER_MIN, SLIDER_MAX, DFLT, PREC, DISP, FLAGS, ID) \
@@ -408,7 +408,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // These original flat controls remain registered for the host-independent
     // bootstrap and current development schema, but node values are owned by the
     // separate hidden node effects. Keep the old controls out of Effect Controls.
-    STARFIELD_ADD_HIDDEN_TOPIC("Emitter", 0, kEmitterTopicDiskId);
+    // Hidden group starts with visible group ends leave a malformed ECW tree.
+    // Bootstrap data needs no hierarchy: use ordinary hidden scalar slots here.
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 1", kEmitterTopicDiskId);
     // Type and Origin are registered by hand instead of through PF_ADD_POPUP or
     // PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and never set
     // def.flags, and both controls must be supervised for the panel path.
@@ -465,9 +467,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     AEFX_CLR_STRUCT(def);
     STARFIELD_ADD_HIDDEN_FLOAT("Speed Random", 0.0f, 100.0f, 0.0f, 1.0f, 0.15f, PF_Precision_HUNDREDTHS,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSpeedRandomDiskId);
-    STARFIELD_END_TOPIC(kEmitterTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 10", 'endE');
 
-    STARFIELD_ADD_HIDDEN_TOPIC("Particle", 0, kParticleTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 11", kParticleTopicDiskId);
     AEFX_CLR_STRUCT(def);
     STARFIELD_ADD_HIDDEN_FLOAT("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
@@ -498,9 +500,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.flags = PF_ParamFlag_SUPERVISE;
     def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     PF_ADD_COLOR("Color End", 255, 255, 255, kColorEndDiskId);
-    STARFIELD_END_TOPIC(kParticleTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 19", 'endP');
 
-    STARFIELD_ADD_HIDDEN_TOPIC("Physics", PF_ParamFlag_START_COLLAPSED, kPhysicsTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 20", kPhysicsTopicDiskId);
     AEFX_CLR_STRUCT(def);
     STARFIELD_ADD_HIDDEN_FLOAT("Gravity X", -1000.0f, 1000.0f, -20.0f, 20.0f, 0.0f, PF_Precision_HUNDREDTHS,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kGravityXDiskId);
@@ -513,7 +515,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     AEFX_CLR_STRUCT(def);
     STARFIELD_ADD_HIDDEN_FLOAT("Linear Drag", 0.0f, 100.0f, 0.0f, 10.0f, 0.0f, PF_Precision_THOUSANDTHS,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
-    STARFIELD_END_TOPIC(kPhysicsTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 25", 'endH');
 
     PF_ADD_TOPICX("Output", PF_ParamFlag_START_COLLAPSED, kRenderTopicDiskId);
     AEFX_CLR_STRUCT(def);
@@ -681,7 +683,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     // New direct full-resolution pixel dimensions are appended in their own topic
     // so all earlier AE indices remain stable. Box/Sphere read their X/Y/Z values.
-    STARFIELD_ADD_HIDDEN_TOPIC("Emitter Dimensions", 0, kEmitterSizeTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 80", kEmitterSizeTopicDiskId);
     STARFIELD_ADD_HIDDEN_FLOAT("Size X", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
                               PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                               PF_ParamFlag_SUPERVISE, kEmitterSizeXDiskId);
@@ -691,17 +693,17 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     STARFIELD_ADD_HIDDEN_FLOAT("Size Z", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
                               PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                               PF_ParamFlag_SUPERVISE, kEmitterSizeZDiskId);
-    STARFIELD_END_TOPIC(kEmitterSizeTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 84", 'endX');
 
     // Revision 11 appends variation controls without shifting any released index.
-    STARFIELD_ADD_HIDDEN_TOPIC("Particle Variation", 0, kParticleVariationTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 85", kParticleVariationTopicDiskId);
     STARFIELD_ADD_HIDDEN_FLOAT("Size Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
                               PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                               PF_ParamFlag_SUPERVISE, kParticleSizeRandomDiskId);
     STARFIELD_ADD_HIDDEN_FLOAT("Opacity Random", 0.0f, 100.0f, 0.0f, 100.0f, 0.0f,
                               PF_Precision_INTEGER, PF_ValueDisplayFlag_NONE,
                               PF_ParamFlag_SUPERVISE, kOpacityRandomDiskId);
-    STARFIELD_END_TOPIC(kParticleVariationTopicDiskId);
+    STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 88", 'endV');
 
     // This project-owned marker distinguishes first-time node materialization
     // from a node effect removed later in AE's Effect Parade. It is deliberately

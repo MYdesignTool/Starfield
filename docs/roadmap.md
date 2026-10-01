@@ -2,12 +2,12 @@
 
 ## Current acceptance checkpoint — 2026-10-01
 
-Revision-16 build 3 is deployed with independent node effects. Source/build gates
-pass (eight focused CEP suites and 687 adapter checks). The first build-2 host
-preview crashed before node operations. Build 3 repairs metadata versioning and
-group-end initialization, but it has not been started in AE and its crash fix is
-unconfirmed. The next gate is safe apply/preview, then actual node add/copy/edit/
-connect/delete and rendering. Detailed evidence: [native-node-checkpoint.md](native-node-checkpoint.md).
+Build 3 renders but crashes on layer selection, as confirmed by the owner. Build 4
+removes unused hidden structural groups and passes 721 adapter checks plus the
+May 2023 SDK build. One-folder deployment/rollback checks pass; build 4 is deployed
+after authorized AE closure. No additional AE runs are planned in this turn. The next host
+gate is safe layer selection, then native node operations and render response.
+Detailed evidence: [native-node-checkpoint.md](native-node-checkpoint.md).
 
 Planning baseline: 2026-09-27.
 

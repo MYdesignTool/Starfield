@@ -20,10 +20,14 @@ the opaque C ABI result handle; never transfer a CRT-owned pointer across the
 boundary. Dependency inspection and the AE 2023 host smoke test passed after
 this change; see `docs/compatibility-matrix.md` for the remaining gates.
 
-Development builds publish uniquely named core DLLs and atomically update a
-small `current.txt` manifest under `artifacts/runtime/`. A one-time, explicitly
-authorized host junction may expose that directory as `StarfieldRuntime` next
-to the installed `.aex`. The Options command manually loads the selected core.
+Development builds publish uniquely named core DLLs and atomically update
+`dist/StarfieldRuntime/current.txt`. Owner direction on 2026-10-01 replaces the
+loose-file installation with one junction, `Plug-ins/Starfield -> dist`.
+`StarfieldRuntime` is an ordinary directory inside the bundle, not another link.
+The old root runtime junction and loose binaries are archived during deployment.
+Core-only publication never replaces an AEX; full AEX publication requires AE closed.
+Candidate builds use `-NoRuntimePublish -NoDistPublish` and deployment is explicit.
+The Options command manually loads the selected core.
 The manifest is one ASCII basename no longer than 100 bytes matching
 `StarfieldCore-*.dll`, optionally followed by one line ending; any additional
 line is rejected. Path separators and parent traversal are rejected. If

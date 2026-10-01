@@ -14,11 +14,10 @@
 
 namespace starfield::adapter {
 
-// Settings bindings and their registration-order indices. The ECW is grouped into
-// Emitter / Particle / Physics / Render topics so the control layout follows the
-// reference product's structure; group markers are parameters too, which is why the
-// indices below are not contiguous. AE's implicit input layer occupies parameter index
-// 0, so the effect registers one more parameter than kTotalEffectParameterCount.
+// Settings bindings and their registration-order indices. Output is the only
+// renderer ECW group. Former bootstrap group markers are hidden scalar slots;
+// editable node groups belong to their separate node effects. AE's implicit input
+// layer occupies index 0, so num_params includes one additional parameter.
 // The output effect retains hidden bootstrap controls for a clean first application,
 // but editable graph values live on separate node effects. Index 89 is the last
 // registered parameter; graph topology edits use the numeric commit trigger at 43.

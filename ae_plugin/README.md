@@ -66,13 +66,15 @@ They also write `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`
 and publish the matched pair into `dist/`. For frequent renderer changes use
 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -CoreOnly`.
 That command leaves `StarfieldParticle.aex` untouched and atomically selects a
-content-addressed DLL in `artifacts/runtime/current.txt`. With the explicitly
+content-addressed DLL in `dist/StarfieldRuntime/current.txt`. With the explicitly
 authorized developer junction installed, click the effect's **Options** button
 to load the selected generation and request a refreshed AE frame. The previous
 generation remains usable until its in-flight render leases and owned pixel
-results are released. The source tree does not modify an AE installation during
-builds; `tools/Deploy-HotCore.ps1` is read-only unless `-Install` or
-`-Rollback` is explicitly passed after ADR 0011 authorization.
+results are released. The developer installation is one junction from
+`Plug-ins/Starfield` to `dist`; the runtime is a real subdirectory within it.
+Full builds refuse AEX publication while AE runs. Candidate builds use
+`-NoRuntimePublish -NoDistPublish`; `tools/Deploy-TestBuild.ps1` reports unless
+`-Install` or `-Rollback` is explicitly passed after authorization.
 Current qualification targets AE 2023 only; newer-host adaptation is deferred.
 
 CMake builds the host-independent core, shared core ABI, and self-tests

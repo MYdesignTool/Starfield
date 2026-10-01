@@ -1,5 +1,19 @@
 # Behavior inventory
 
+## Current selection-crash gate — build 4, 2026-10-01
+
+Owner evidence on AE 2023.5.0 Build 52: revision-16 build 3 renders, then crashes
+when its layer is selected. The second dump repeats a null read in
+`AfterFXLib.dll+0x1931d36`, before node modules load. Build 4 replaces hidden
+structural topic markers with invisible scalar slots and leaves one balanced
+Output group; this is a candidate fix, not a confirmed crash resolution.
+721 adapter checks, the May 2023 SDK build, and a checkout-contained single-folder
+deployment/rollback check pass. Build 4 is installed through one
+`Plug-ins/Starfield -> dist` junction after authorized shutdown of PID 31772.
+No new AE session was started. Next acceptance: fresh effect apply/render,
+select/deselect its layer safely, then native node addition/copy/deletion.
+The checkpoint below describes build 3 and earlier evidence.
+
 ## Current host checkpoint — 2026-10-01
 
 Revision-16 build 3 is deployed for **AE 2023.5.0 Build 52**, with the full paired

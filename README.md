@@ -26,7 +26,7 @@
 
 ## 面板与交付示例
 
-- 可停靠 CEP 参数面板：`cep_panel/`（AE 2023）以四个阶段卡片和文字箭头呈现固定链，并提供可编辑参数；尚无节点端口、绘制连线或画布操作。协议与安装步骤见 [面板说明](cep_panel/README.md) 和 [ADR 0009](docs/adr/0009-cep-panel-bridge.md)。当前安装采用指向仓库源码的 Junction，修改前端后重开面板即可加载；修改 manifest 时需要重启 AE。
+- 可停靠 CEP 节点面板：`cep_panel/`（AE 2023）提供节点画布、属性窗口、连线与多选操作。节点增删与独立效果同步仍在宿主验收中；当前阻塞为选中效果图层时崩溃。协议与安装步骤见 [面板说明](cep_panel/README.md)。前端源码通过现有 CEP Junction 加载。
 - 三个交付示例（火花 / 飘雪 / 漂浮光点）：精确参数配方见 [交付示例](docs/examples.md)，面板的 `Example` 下拉可直接套用；不装面板也可以照表手填。
 - 宿主验收清单（含面板与示例）在 [行为清单](docs/compatibility-matrix.md) 的 M2-06 小节。
 
@@ -34,16 +34,17 @@
 
 用 CMake 构建不依赖 AE 的核心库。Windows AE 插件使用锁定的 MSVC v145 和本地 May 2023 SDK；从仓库根目录运行 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`，默认产物写入 `artifacts/plugin/2023/x64/Release/`。显式传入 `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023` 得到同一目标。详细工具链和构建状态见 [构建矩阵](docs/build-matrix.md)。
 
-每次**全量**构建还会在根目录 `dist\` 放一份可安装副本（H-01 起是配对的两个文件）：
+开发安装使用一个文件夹链接，完整构建发布五个 AEX 和配套 Core；热更新只发布版本化 Core：
 
 ```
-dist\StarfieldParticle.aex + dist\StarfieldCore.dll   <- 成对安装，开发期流程：
-powershell -ExecutionPolicy Bypass -File tools\Deploy-HotCore.ps1 -PluginDir <AE Plug-ins>            # 默认只读，只打印路径
-powershell -ExecutionPolicy Bypass -File tools\Deploy-HotCore.ps1 -Install -PluginDir <AE Plug-ins>   # 需要 ADR 0011 逐项授权
-powershell -ExecutionPolicy Bypass -File tools\Deploy-HotCore.ps1 -Rollback -PluginDir <AE Plug-ins>  # 一键撤销
+AE Plug-ins\Starfield -> 项目\dist
+dist\StarfieldRuntime\current.txt -> 同目录版本化 Core DLL
+powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -PluginDir <AE Plug-ins> # 默认只读
+powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -Install -PluginDir <AE Plug-ins> -BackupName <本次备份名>
+powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -Rollback -PluginDir <AE Plug-ins> -BackupName <本次备份名>
 ```
 
-`tools\Install-Plugin.ps1` 只服务于 H-01 之前的单体构建，遇到配对构建会拒绝。`-CoreOnly` 构建只更新 `artifacts\runtime\` 里的版本化 DLL 与 `current.txt`，既不改 `dist\` 也不改 `.aex`。H-01 部署脚本使用显式 `-PluginDir`，将替换的旧文件留在 `artifacts\disabled\`；安装和回滚需先关闭 AE，并按 ADR 0011 对宿主目录操作逐项授权。
+`-CoreOnly` 只更新 `dist\StarfieldRuntime\` 的版本化 DLL 与原子选择文件，不改 AEX。完整构建在 AE 运行时禁止发布 AEX；只构建候选时使用 `-NoRuntimePublish -NoDistPublish`。部署会归档插件根目录中旧的 Starfield 文件和旧运行时链接，保留其他插件。备份位于 `artifacts\disabled\`，替换 AEX 与回滚前必须关闭 AE。旧单体及散文件安装脚本已停用。
 
 ## 许可
 

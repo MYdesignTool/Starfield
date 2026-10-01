@@ -6,6 +6,19 @@
 
 ## Context
 
+### Selection crash correction — revision 17, 2026-10-01
+
+The owner confirmed build 3 renders, but selecting the effect layer crashes AE.
+Dump `cf077068-7651-46c6-a82c-4f8d4e451f8e` repeats the null read at
+`AfterFXLib.dll+0x1931d36`; only the main AEX and Core are loaded, before node
+module materialization. Source registration hid five GROUP_START parameters
+while registering visible GROUP_END markers. This is a suspected ECW hierarchy
+defect, not yet a confirmed cause. Revision 17 replaces these ten unused markers
+with ordinary hidden scalar slots; Output is the renderer's only structural group.
+The compiled node architecture is unchanged. Code/PiPL both advance to `0x8004`.
+Development effects must be recreated; no type migration is provided. Adapter
+checks require one balanced visible group and no hidden structural group markers.
+
 The owner reports that node addition and removal still do not work in the current
 CEP graph editor. Thin node AEX modules exist, but the current panel treats them as
 replicas of a graph snapshot owned by the renderer. It checks whether parameter 90

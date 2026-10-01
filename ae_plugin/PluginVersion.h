@@ -6,7 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Revision 16 changes the registered parameter surface. Bump the development
-// build together with the PiPL value instead of retaining cached build-2 metadata.
-#define STARFIELD_VERSION_BUILD 3
-#define STARFIELD_VERSION_PACKED 32771 /* 0x8003 */
+// Revision 17 removes hidden structural topics from the renderer UI.
+#define STARFIELD_VERSION_BUILD 4
+#define STARFIELD_VERSION_PACKED 32772 /* 0x8004 */

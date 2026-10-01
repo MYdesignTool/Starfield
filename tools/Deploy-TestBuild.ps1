@@ -1,8 +1,7 @@
-# Deploy the paired native-node test build. Default mode reports; no registry,
-# preferences, CEP switches or process operations. Existing runtime junction only.
+# One development bundle junction. Default mode reports; host mutation is explicit.
 param(
     [Parameter(Mandatory=$true)][string]$PluginDir,
-    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName = 'p02d-native-records-20261001',
+    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName = 'p02d-build4-single-folder-20261001',
     [switch]$Install,
     [switch]$Rollback
 )
@@ -10,89 +9,128 @@ $ErrorActionPreference = 'Stop'
 if ($Install -and $Rollback) { throw 'Choose one action.' }
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $destination = (Resolve-Path -LiteralPath $PluginDir).Path
-$backup = Join-Path $repo "artifacts\disabled\$BackupName"
-$runtime = Join-Path $repo 'artifacts\runtime'
+$bundle = Join-Path $repo 'dist'
+$runtime = Join-Path $bundle 'StarfieldRuntime'
 $selector = Join-Path $runtime 'current.txt'
+$link = Join-Path $destination 'Starfield'
+$oldLink = Join-Path $destination 'StarfieldRuntime'
+$oldRuntime = Join-Path $repo 'artifacts\runtime'
+$backup = Join-Path $repo "artifacts\disabled\$BackupName"
+$recordPath = Join-Path $backup 'deployment.json'
 $names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNode.aex',
            'StarfieldAppearance.aex', 'StarfieldForce.aex', 'StarfieldCore.dll')
+$rootNames = @($names) + @($names | ForEach-Object { [IO.Path]::ChangeExtension($_, '.pdb') })
 $sources = @{}
 foreach ($name in $names) {
-    $subdir = if ($name -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
-    $sources[$name] = Join-Path $repo "artifacts\$subdir\2023\x64\Release\$name"
-    Write-Host "$($sources[$name]) -> $(Join-Path $destination $name)"
+    $kind = if ($name -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
+    $sources[$name] = Join-Path $repo "artifacts\$kind\2023\x64\Release\$name"
+    Write-Host "$($sources[$name]) -> $(Join-Path $bundle $name)"
 }
-Write-Host "Backup and undo record: $backup"
-Write-Host "Runtime selector: $selector"
-if (-not $Install -and -not $Rollback) { Write-Host 'Read-only report; pass -Install or -Rollback.'; exit 0 }
-if (Get-Process AfterFX, AfterFX_64 -ErrorAction SilentlyContinue) { throw 'Close AE before deployment or rollback.' }
-$link = Get-Item -LiteralPath (Join-Path $destination 'StarfieldRuntime') -Force
-if ($link.LinkType -ne 'Junction' -or
-    [IO.Path]::GetFullPath([string]$link.Target).TrimEnd('\') -ne [IO.Path]::GetFullPath($runtime).TrimEnd('\')) {
-    throw 'StarfieldRuntime must be the existing junction to this checkout; no junction is changed.'
+Write-Host "Single AE junction: $link -> $bundle"
+Write-Host "Archive loose Starfield binaries and old runtime junction: $backup\host"
+Write-Host "Undo: powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -PluginDir '$destination' -BackupName '$BackupName' -Rollback"
+if (-not $Install -and -not $Rollback) { Write-Host 'Read-only report.'; exit 0 }
+$simulation = $destination.StartsWith((Join-Path $repo 'artifacts\deploy-test\'), [StringComparison]::OrdinalIgnoreCase)
+if (-not $simulation -and (Get-Process AfterFX, AfterFX_64 -ErrorAction SilentlyContinue)) { throw 'Close AE before replacing an AEX or changing its installation.' }
+
+function Assert-Junction([string]$Path, [string]$Target) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.LinkType -ne 'Junction' -or
+        [IO.Path]::GetFullPath([string]$item.Target).TrimEnd('\') -ne [IO.Path]::GetFullPath($Target).TrimEnd('\')) {
+        throw "Unexpected junction: $Path"
+    }
 }
-$recordPath = Join-Path $backup 'deployment.json'
-if ($Rollback) {
-    $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-    if ($record.pluginDir -ne $destination) { throw 'Undo target differs from recorded installation.' }
-    foreach ($entry in $record.files) {
-        $target = Join-Path $destination $entry.name
-        if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $entry.installedHash) {
-            throw "Installed file changed after deployment: $target"
+function Restore-Deployment($record) {
+    if ($record.pluginDir -ne $destination -or $record.bundle -ne $bundle) { throw 'Rollback paths differ from this checkout.' }
+    if ($record.linkCreated -and (Test-Path -LiteralPath $link)) {
+        Assert-Junction $link $bundle
+        # Remove only this validated junction; never recurse into its target.
+        [IO.Directory]::Delete($link, $false)
+    }
+    foreach ($name in $rootNames) {
+        $saved = Join-Path $backup "host\$name"
+        if (Test-Path -LiteralPath $saved) {
+            $target = Join-Path $destination $name
+            if (Test-Path -LiteralPath $target) { throw "Unexpected loose file blocks restoration: $target" }
+            Move-Item -LiteralPath $saved -Destination $target
         }
     }
-    $archive = Join-Path $backup 'candidate'
-    if (Test-Path -LiteralPath $archive) { throw 'This deployment has already been rolled back.' }
-    New-Item -ItemType Directory -Path $archive | Out-Null
-    foreach ($entry in $record.files) {
-        $target = Join-Path $destination $entry.name
-        Move-Item -LiteralPath $target -Destination (Join-Path $archive $entry.name)
-        if ($entry.existed) { Copy-Item -LiteralPath (Join-Path $backup $entry.name) -Destination $target }
+    $savedLink = Join-Path $backup 'host\StarfieldRuntime'
+    if (Test-Path -LiteralPath $savedLink) {
+        Assert-Junction $savedLink $oldRuntime
+        if (Test-Path -LiteralPath $oldLink) { throw 'Old runtime path is occupied.' }
+        Move-Item -LiteralPath $savedLink -Destination $oldLink
     }
-    Copy-Item -LiteralPath (Join-Path $backup 'current.txt') -Destination $selector -Force
-    Write-Host 'Prior files and runtime selector restored; candidate files retained.'
+    $archive = Join-Path $backup 'candidate'
+    New-Item -ItemType Directory -Path $archive -Force | Out-Null
+    foreach ($entry in $record.files) {
+        if ($names -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
+        $target = Join-Path $bundle $entry.name
+        if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination (Join-Path $archive $entry.name) }
+        if ($entry.existed) { Copy-Item -LiteralPath (Join-Path $backup "bundle\$($entry.name)") -Destination $target }
+    }
+    if (Test-Path -LiteralPath $selector) { Move-Item -LiteralPath $selector -Destination (Join-Path $archive 'current.txt') }
+    if ($record.selectorExisted) { Copy-Item -LiteralPath (Join-Path $backup 'bundle\current.txt') -Destination $selector }
+}
+if ($Rollback) {
+    $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+    if (Test-Path -LiteralPath (Join-Path $backup 'rolled-back.txt')) { throw 'Already rolled back.' }
+    foreach ($entry in $record.files) {
+        if ($names -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
+        if ((Get-FileHash -LiteralPath (Join-Path $bundle $entry.name) -Algorithm SHA256).Hash -ne $entry.installedHash) {
+            throw "Bundle changed after this deployment: $($entry.name)"
+        }
+    }
+    Restore-Deployment $record
+    [IO.File]::WriteAllText((Join-Path $backup 'rolled-back.txt'), 'restored')
+    Write-Host 'Previous layout and files restored; candidate retained in backup.'
     exit 0
 }
 foreach ($source in $sources.Values) { if (-not (Test-Path -LiteralPath $source)) { throw "Missing candidate: $source" } }
-if (Test-Path -LiteralPath $backup) { throw "Backup already exists: $backup" }
-New-Item -ItemType Directory -Path $backup -Force | Out-Null
-Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'current.txt')
-$record = [ordered]@{ pluginDir=$destination; files=@(); runtimeName='' }
-foreach ($name in $names) {
-    $target = Join-Path $destination $name
-    $record.files += [ordered]@{ name=$name; existed=(Test-Path -LiteralPath $target);
-        installedHash=(Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash }
+if (Test-Path -LiteralPath $backup) { throw "Backup exists: $backup" }
+if (Test-Path -LiteralPath $link) { Assert-Junction $link $bundle }
+if (Test-Path -LiteralPath $oldLink) { Assert-Junction $oldLink $oldRuntime }
+$unknown = Get-ChildItem -LiteralPath $destination -Force | Where-Object {
+    $_.Name -like 'Starfield*' -and $_.Name -ne 'Starfield' -and $_.Name -ne 'StarfieldRuntime' -and $rootNames -notcontains $_.Name
 }
+if ($unknown) { throw "Unexpected Starfield entries: $($unknown.Name -join ', ')" }
+if (Test-Path -LiteralPath $runtime) {
+    if ((Get-Item -LiteralPath $runtime -Force).LinkType) { throw 'Bundle runtime must be a real subdirectory, not a second junction.' }
+}
+New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
+$record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
+    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName=''}
+if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
+foreach ($name in $names) {
+    $target = Join-Path $bundle $name
+    $exists = Test-Path -LiteralPath $target
+    if ($exists) { Copy-Item -LiteralPath $target -Destination (Join-Path $backup "bundle\$name") }
+    $record.files += [ordered]@{name=$name; existed=$exists; installedHash=(Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash}
+}
+$coreHash = (Get-FileHash -LiteralPath $sources['StarfieldCore.dll'] -Algorithm SHA256).Hash
+$record.runtimeName = "StarfieldCore-$($coreHash.Substring(0,16)).dll"
+$record | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $recordPath -Encoding UTF8
 try {
-    foreach ($entry in $record.files) {
-        $target = Join-Path $destination $entry.name
-        if ($entry.existed) { Move-Item -LiteralPath $target -Destination (Join-Path $backup $entry.name) }
-        Copy-Item -LiteralPath $sources[$entry.name] -Destination $target
-        if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $entry.installedHash) { throw "Copy verification failed: $target" }
+    foreach ($name in $rootNames) {
+        $target = Join-Path $destination $name
+        if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination (Join-Path $backup "host\$name") }
     }
-    $coreHash = (Get-FileHash -LiteralPath $sources['StarfieldCore.dll'] -Algorithm SHA256).Hash
-    $record.runtimeName = "StarfieldCore-$($coreHash.Substring(0,16)).dll"
-    $runtimeCore = Join-Path $runtime $record.runtimeName
-    if (Test-Path -LiteralPath $runtimeCore) {
-        if ((Get-FileHash -LiteralPath $runtimeCore -Algorithm SHA256).Hash -ne $coreHash) { throw 'Runtime hash collision.' }
-    } else { Copy-Item -LiteralPath $sources['StarfieldCore.dll'] -Destination $runtimeCore }
+    if (Test-Path -LiteralPath $oldLink) { Move-Item -LiteralPath $oldLink -Destination (Join-Path $backup 'host\StarfieldRuntime') }
+    foreach ($entry in $record.files) {
+        $target = Join-Path $bundle $entry.name
+        Copy-Item -LiteralPath $sources[$entry.name] -Destination $target -Force
+        if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $entry.installedHash) { throw "Hash mismatch: $target" }
+    }
+    $versioned = Join-Path $runtime $record.runtimeName
+    if (Test-Path -LiteralPath $versioned) {
+        if ((Get-FileHash -LiteralPath $versioned -Algorithm SHA256).Hash -ne $coreHash) { throw 'Runtime hash collision.' }
+    } else { Copy-Item -LiteralPath $sources['StarfieldCore.dll'] -Destination $versioned }
     [IO.File]::WriteAllText($selector, "$($record.runtimeName)`n", [Text.Encoding]::ASCII)
-    $record | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $recordPath -Encoding UTF8
-    $published = Join-Path $repo 'dist'
-    New-Item -ItemType Directory -Path $published -Force | Out-Null
-    foreach ($name in $names) { Copy-Item -LiteralPath $sources[$name] -Destination (Join-Path $published $name) -Force }
+    if ($record.linkCreated) { New-Item -ItemType Junction -Path $link -Target $bundle | Out-Null }
+    Assert-Junction $link $bundle
 } catch {
-    foreach ($entry in $record.files) {
-        $target = Join-Path $destination $entry.name
-        $previous = Join-Path $backup $entry.name
-        if (Test-Path -LiteralPath $previous) {
-            if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination (Join-Path $backup "failed-$($entry.name)") }
-            Copy-Item -LiteralPath $previous -Destination $target
-        } elseif (-not $entry.existed -and (Test-Path -LiteralPath $target)) {
-            Move-Item -LiteralPath $target -Destination (Join-Path $backup "failed-$($entry.name)")
-        }
-    }
-    Copy-Item -LiteralPath (Join-Path $backup 'current.txt') -Destination $selector -Force
+    Restore-Deployment $record
     throw
 }
 foreach ($entry in $record.files) { Write-Host "$($entry.name) SHA256 $($entry.installedHash)" }
-Write-Host "Undo: powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -PluginDir '$destination' -BackupName '$BackupName' -Rollback"
+Write-Host "Installed. AE plug-in root contains one Starfield junction: $link"

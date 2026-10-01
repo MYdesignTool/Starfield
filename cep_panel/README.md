@@ -1,5 +1,12 @@
 # Starfield CEP panel
 
+Current native candidate: revision-17 build 4, deployed 2026-10-01 through one
+`Plug-ins/Starfield -> dist` junction. The renderer exposes only the Output
+group; editable values belong to separate node effects. Gateway token remains
+`native-node-sync-4`. Build 3 rendered but crashed on layer selection; build 4
+targets hidden structural groups. Selection safety and native node operations
+are not yet AE-qualified. See `docs/native-node-checkpoint.md`.
+
 Dockable After Effects 2023 node editor for the top-down `Emitter -> Particle -> Force -> Output`
 graph. The legacy AE Controls view uses protocol v1 of [ADR 0009](../docs/adr/0009-cep-panel-bridge.md).
 Node Graph mode displays the graph compiled from separate hidden AE node-effect instances,

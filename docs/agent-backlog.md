@@ -2,13 +2,13 @@
 
 ## Current P-02D checkpoint — 2026-10-01
 
-Independent node records, guarded Output writes, semantic snapshot confirmation,
-transaction rollback and Output-only deletion are source-integrated. The duplicate
-Path/PATH build blocker is resolved for build children. Eight focused CEP suites,
-687 adapter checks and the May 2023 SDK build pass. Revision-16 build 3 is deployed.
-The preceding build-2 AE attempt crashed after apply/viewer open, before node
-operations. Build 3 has not been started in AE; crash resolution and native-node
-host acceptance remain open. See [native-node-checkpoint.md](native-node-checkpoint.md).
+Independent node records and transactions are source-integrated. Owner evidence:
+build 3 renders but crashes on layer selection. Build 4 removes unused hidden
+structural groups and passes 721 adapter checks and the May 2023 SDK build.
+One-folder deployment/rollback checks pass; build 4 is deployed after authorized AE closure.
+The previous eight CEP suite results remain valid for unchanged panel code.
+Selection safety and native-node host acceptance remain open.
+See [native-node-checkpoint.md](native-node-checkpoint.md).
 
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 

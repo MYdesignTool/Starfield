@@ -1,6 +1,59 @@
 # Build and host matrix
 
-## Current revision-16 build 3 — 2026-10-01
+## Current revision-17 build 4 deployment — 2026-10-01
+
+Owner evidence: build 3 renders particles, but selecting its layer crashes AE.
+The latest dump repeats the prior null read in `AfterFXLib.dll+0x1931d36`.
+Build 4 replaces unused hidden structural groups with scalar slots; Output is
+the renderer's only structural topic. This targets a suspected ECW hierarchy
+defect; it is not yet a confirmed crash resolution. Code/PiPL are `32772` (`0x8004`).
+
+The May 2023 SDK full build passes; **721 adapter checks, zero failures**.
+The focused checkout-contained deployment check passes report/install/hash/
+single-junction/rollback/third-party preservation gates. Core and CEP algorithms
+are unchanged and their broader checks were not repeated.
+
+Build 4 is installed with all six hashes verified, after the owner's explicit
+authorization to stop AE PID 31772 and deploy. The plug-in root now contains
+only one Starfield entry, a junction; loose binaries and the previous runtime
+junction are archived under `artifacts/disabled/p02d-build4-single-folder-20261001/host`.
+AE has not been restarted or tested by the agent. Build 4 was built with
+`-NoRuntimePublish -NoDistPublish`. Installation uses one junction:
+
+```text
+Plug-ins/Starfield -> newStardust/dist
+  StarfieldParticle.aex + four internal node AEX files
+  StarfieldCore.dll
+  StarfieldRuntime/          ordinary directory; no second junction
+    current.txt + versioned Core DLLs
+```
+
+`BuildWindows.ps1 -CoreOnly` now publishes only the nested runtime generation and
+atomic manifest. Full AEX publication refuses to run while AE is running.
+The retired monolithic/loose-file install scripts are removed.
+
+Executed deployment command, from the checkout (requires AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build4-single-folder-20261001' -Install
+```
+
+The same command with `-Rollback` instead of `-Install` restores the recorded
+previous layout/files. Earlier deployment commands below are historical and
+their backup record formats must not be passed to the new single-folder script.
+
+Candidate SHA-256:
+
+| File | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | `A0BA94BA4378C41D7F0947013385D460E8818E69288A7190FCAC1D6946895B3F` |
+| StarfieldEmitter.aex | `C0CA84C91AE7A12D54DF1C2FFF7DF6C6B320C74B2DB8C298B20D339D34BEBA54` |
+| StarfieldParticleNode.aex | `8DD515F30DFC046BC9A4D40DD9B3257BC0464B4683C56CF8955BD3843C2303E3` |
+| StarfieldAppearance.aex | `6E89D7F5E570E17A02D994AD4A45E72E3AF807ADD1EC180B1306E5AF071278BC` |
+| StarfieldForce.aex | `9A451494901F481693C559D3A474B09BE9E99F4B59731A037A09760805893AA4` |
+| StarfieldCore.dll | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+## Prior revision-16 build 3 — 2026-10-01
 
 The complete May 2023 SDK x64 Release pair is **installed** under
 `D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins`.
