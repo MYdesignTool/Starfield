@@ -2,6 +2,11 @@
 
 ## Current acceptance checkpoint — 2026-10-01
 
+Build 7 candidate now targets Particle creation's actual spatial-interpolation
+error by removing redundant interpolation flags from constant controls. 146
+Particle/Appearance checks and SDK build pass; deployment approval requested.
+The inferred cause and actual creation still need owner confirmation.
+
 Latest: the owner supplied AE's float-aware node / missing SmartFX verification
 error. Build 6 implements node SmartFX passthrough with matching PiPL/runtime
 flags; 276 actual-node checks and the SDK candidate build pass. CEP resize work

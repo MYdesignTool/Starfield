@@ -92,6 +92,21 @@ int main() {
           "registered node count matches shared native stream layout");
     check(std::strcmp(registered[uuid_first_index(kind)-1].name, "Node UUID 0") == 0, "UUID stream index matches compiler");
     check(std::strcmp(registered[sync_guard_index(kind)-1].name, "Panel Sync Guard") == 0, "guard stream index matches compiler");
+    int colors = 0;
+    bool controls_constant = true, interpolation_unrestricted = true, colors_supervised = true;
+    for (const auto& control : registered) {
+        if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
+        controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
+        interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;
+        if (control.param_type == PF_Param_COLOR) {
+            ++colors;
+            colors_supervised &= (control.flags & PF_ParamFlag_SUPERVISE) != 0;
+        }
+    }
+    check(controls_constant, "all saved node controls remain non-animatable constants");
+    check(interpolation_unrestricted, "constant streams do not request unnecessary interpolation restrictions");
+    check(colors == ((kind == Kind::particle || kind == Kind::appearance) ? 2 : 0), "only Particle/Appearance register their two colors");
+    check(colors_supervised, "color edits retain the supervised synchronization callback");
 
     host.current_time = 33; host.time_step = 1; host.time_scale = 24;
     PF_PreRenderInput pre_input{}; PF_PreRenderOutput pre_output{};

@@ -1,5 +1,29 @@
 # P-02D native node checkpoint — 2026-10-01
 
+## Build 7: constant-control registration candidate — 2026-10-01
+
+Owner build-6 evidence: Particle addition fails **inside `addProperty`**, before
+gateway identity/parameter writes, with `spatial interpolation method not allowed
+for this stream (1)`; `canAddProperty=true`. The module is recognized, but native
+instance creation is rejected. Emitter duplication remains owner-confirmed.
+
+Particle/Appearance uniquely register color controls. All node controls used
+both CANNOT_TIME_VARY and CANNOT_INTERP. The extra interpolation restriction on
+non-spatial color controls is a **hypothesis** for this host failure. Build 7
+removes CANNOT_INTERP from node registration; CANNOT_TIME_VARY still guarantees
+constant records, and visible controls remain supervised. UUIDs, indices,
+parameter types, schema revision 18, native persistence and rendering are unchanged.
+Code/PiPL version: `32775` (`0x8007`). CEP token stays `native-node-sync-6`.
+
+Particle/Appearance actual-node fixtures pass 146 checks, including all controls
+remaining constant, no interpolation restriction and both supervised colors.
+May 2023 SDK candidate build passes with `-NoRuntimePublish -NoDistPublish`.
+These are registration/selector checks, **not reproduction of AE's internal
+interpolation implementation**. Actual Particle creation remains unqualified.
+Deployment authorization requested for backup name
+`p02d-build7-constant-flags-20261001`. Next owner action is one Particle addition;
+capture any persistent error. Previous rendering/Emitter tests are not repeated.
+
 ## Build 6: node SmartFX contract correction — 2026-10-01
 
 The owner supplied actual AE startup evidence:

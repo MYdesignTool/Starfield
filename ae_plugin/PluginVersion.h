@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 6 implements SmartFX pass-through for the internal 32-bpc node effects.
-#define STARFIELD_VERSION_BUILD 6
-#define STARFIELD_VERSION_PACKED 32774 /* 0x8006 */
+// Build 7 registers constant node controls without interpolation restrictions.
+#define STARFIELD_VERSION_BUILD 7
+#define STARFIELD_VERSION_PACKED 32775 /* 0x8007 */

@@ -1,5 +1,15 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 7 constant-control flags — 2026-10-01
+
+Actual AE rejects Particle native creation with a spatial-interpolation error.
+Removing redundant CANNOT_INTERP on constant node streams is the current
+source-based hypothesis, awaiting real-host confirmation. CANNOT_TIME_VARY
+retains the constant-value contract; supervision stays on editable controls.
+Code/PiPL advance to `32775` (`0x8007`). No public ID, type, match name or schema
+change, so no data migration is required. Native independent effects remain the
+authoring source. Details and evidence: [checkpoint](../native-node-checkpoint.md).
+
 ## Build 6 flags/selector correction — 2026-10-01
 
 Owner AE evidence rejects float-aware internal effects without SmartFX. Build 6

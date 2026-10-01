@@ -1,5 +1,26 @@
 # Build and host matrix
 
+## Build 7 constant-control candidate — 2026-10-01
+
+Packed version `32775` (`0x8007`); schema revision 18 unchanged. Build removes
+redundant CANNOT_INTERP from constant node parameters after actual AE reports a
+spatial-interpolation failure during Particle creation. Cause remains a hypothesis
+until owner retest. Particle/Appearance checks pass 146 checks; May 2023 SDK build
+passes. No dist/runtime publication during build. Deployment approval requested.
+CEP is unchanged (`native-node-sync-6`).
+
+| File | Candidate SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `0EAC147D841BBF8FA493B04CE3CFBB806BFE90E3FBB6FE207E2EBA839B0A4E3F` |
+| `StarfieldEmitter.aex` | `5429EACC73C391F0D7DE05DCE9311D7ECE24BB05069A8E91711D334B00C26C51` |
+| `StarfieldParticleNode.aex` | `571ED1E6A135C058032402D77B1947D41EA7D8837D4E5378AAEF8DDBEEDC81F5` |
+| `StarfieldAppearance.aex` | `4AF94D7549D5F2F7A421C3F3177C03222B9E6151BF0C0BD15F2B07639AB4B639` |
+| `StarfieldForce.aex` | `EB89EF8DDC5F36E4BA0D47830C99E5EA18AC8DA0D1901D464AD926A1FE4D2BB3` |
+| `StarfieldCore.dll` (unchanged) | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+Deploy/undo uses the existing single Starfield -> dist junction, backup name
+`p02d-build7-constant-flags-20261001`; [checkpoint](native-node-checkpoint.md).
+
 ## Current build 6 SmartFX deployment — 2026-10-01
 
 Owner AE error confirms float-aware internal node effects lacked SmartFX. All

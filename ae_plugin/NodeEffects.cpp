@@ -23,6 +23,13 @@ static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
 
 enum class NodeEffectKind { emitter, particle, appearance, force };
 
+// Node records are constants. CANNOT_TIME_VARY is sufficient: CANNOT_INTERP
+// additionally asks AE to configure interpolation when creating the stream,
+// including non-spatial color controls. Do not request interpolation setup for
+// a control that cannot have keyframes in the first place.
+constexpr PF_ParamFlags kNodeConstantFlags = PF_ParamFlag_CANNOT_TIME_VARY;
+constexpr PF_ParamFlags kNodeEditableFlags = PF_ParamFlag_SUPERVISE | kNodeConstantFlags;
+
 #if defined(STARFIELD_NODE_KIND_EMITTER)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::emitter;
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
@@ -54,8 +61,7 @@ PF_Err add_group(PF_InData* in_data, const char* name, A_long id, bool end) noex
 PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
                   PF_FpLong minimum, PF_FpLong maximum, PF_FpLong initial,
                   A_short precision = PF_Precision_HUNDREDTHS,
-                  PF_ParamFlags flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY |
-                                        PF_ParamFlag_CANNOT_INTERP,
+                  PF_ParamFlags flags = kNodeEditableFlags,
                   A_long ui_flags = PF_PUI_NONE) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
@@ -81,7 +87,7 @@ PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
-    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
+    def.flags = kNodeEditableFlags;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.pd.num_choices = choice_count;
@@ -95,7 +101,7 @@ PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POINT_3D;
-    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
+    def.flags = kNodeEditableFlags;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = x;
@@ -108,7 +114,7 @@ PF_Err add_color(PF_InData* in_data, const char* name, A_long id) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_COLOR;
-    def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP;
+    def.flags = kNodeEditableFlags;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.cd.value = PF_Pixel{255, 255, 255, 255};
@@ -127,29 +133,29 @@ PF_Err add_node_identity(PF_InData* in_data) noexcept {
         std::snprintf(name, sizeof(name), "Node UUID %ld", static_cast<long>(chunk));
         const PF_Err error = add_slider(in_data, name, fourcc('u', 'i', 'd', static_cast<char>('0' + chunk)),
                                         0.0, kU16Max, 0.0, PF_Precision_INTEGER,
-                                        PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                                        kNodeConstantFlags,
                                         PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
     }
     return add_slider(in_data, "Panel Sync Guard", fourcc('g', 's', 'y', 'n'),
                       0.0, 2147483647.0, 0.0, PF_Precision_INTEGER,
-                      PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                      kNodeConstantFlags,
                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
 }
 
 PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kind kind) noexcept {
     using namespace starfield::adapter::native_nodes;
     PF_Err error = add_slider(in_data, "Node Layout X", layout_x_id(), -1000000000.0, 1000000000.0, 0.0,
-                              PF_Precision_TENTHS, PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                              PF_Precision_TENTHS, kNodeConstantFlags,
                               PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Node Layout Y", layout_y_id(), -1000000000.0, 1000000000.0, 0.0,
-                       PF_Precision_TENTHS, PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                       PF_Precision_TENTHS, kNodeConstantFlags,
                        PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Outgoing Connection Count", connection_count_id(), 0.0,
                        static_cast<PF_FpLong>(kMaxOutgoingEdges), 0.0, PF_Precision_INTEGER,
-                       PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                       kNodeConstantFlags,
                        PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
     if (error != PF_Err_NONE) return error;
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
@@ -159,7 +165,7 @@ PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kin
                           static_cast<long>(slot), static_cast<long>(chunk));
             error = add_slider(in_data, name, connection_uuid_id(slot, chunk), 0.0, 65535.0, 0.0,
                                PF_Precision_INTEGER,
-                               PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                               kNodeConstantFlags,
                                PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
             if (error != PF_Err_NONE) return error;
         }
@@ -169,7 +175,7 @@ PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kin
                           static_cast<long>(slot), static_cast<long>(chunk));
             error = add_slider(in_data, name, connection_edge_uuid_id(slot, chunk), 0.0, 65535.0, 0.0,
                                PF_Precision_INTEGER,
-                               PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                               kNodeConstantFlags,
                                PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
             if (error != PF_Err_NONE) return error;
         }
@@ -183,20 +189,20 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
     PF_Err error = PF_Err_NONE;
     std::snprintf(name, sizeof(name), "%s Curve Count", label);
     error = add_slider(in_data, name, fourcc(prefix, 'c', 'n', 't'), 0.0, 8.0, 0.0,
-                       PF_Precision_INTEGER, PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                       PF_Precision_INTEGER, kNodeConstantFlags,
                        PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
     if (error != PF_Err_NONE) return error;
     for (A_long point = 0; point < 8; ++point) {
         std::snprintf(name, sizeof(name), "%s Curve %ld Age", label, static_cast<long>(point));
         error = add_slider(in_data, name, fourcc(prefix, 'a', 'g', static_cast<char>('0' + point)),
                            0.0, 1.0, static_cast<PF_FpLong>(point) / 7.0, PF_Precision_THOUSANDTHS,
-                           PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                           kNodeConstantFlags,
                            PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
         std::snprintf(name, sizeof(name), "%s Curve %ld Value", label, static_cast<long>(point));
         error = add_slider(in_data, name, fourcc(prefix, 'v', 'a', static_cast<char>('0' + point)),
                            0.0, 100.0, 100.0, PF_Precision_TENTHS,
-                           PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP,
+                           kNodeConstantFlags,
                            PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
     }
