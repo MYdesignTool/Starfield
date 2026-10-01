@@ -1,5 +1,35 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 9: numeric node disk IDs — 2026-10-02
+
+Owner build-8 evidence: the same duplicate-matchname error persists. Its topic
+repair was insufficient. Every node disk ID was a ten-digit FourCC, outside
+the SDK's 1..9999 range. The name-length model also predicts Particle/Appearance
+collisions in the 40-byte stream-name buffer; host truncation remains inferred.
+
+Build 9 uses shared explicit numeric IDs for controls, curves, layout, connections,
+UUID and guard; registration and supervised lookup use the same table. Compile-time
+guards check all ID ranges/uniqueness and the effect-name budget. Native identity
+revision 2 requires fresh development effects; no FourCC migration. Stream
+indices/counts/types, main schema 18 and CEP token native-node-sync-6 stay unchanged.
+
+SDK build passes; log: artifacts/build9-node-numeric-ids-build.log. No tests
+added/rerun. **Build 9 is deployed**, packed 32777 (0x8009), after confirming
+no AE process, under standing owner authorization. Six hashes match the build
+matrix. Before: build-8 AEXs; after: build-9 AEXs. Core/selected hot generation
+unchanged; single Plug-ins/Starfield -> dist Junction retained. No AE process
+started/stopped. Backup: artifacts/disabled/p02d-build9-numeric-ids-20261002/deployment.json.
+
+Undo (AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build9-numeric-ids-20261002' -Rollback
+```
+
+Next owner gate: create a fresh Starfield effect; confirm default Particle
+creation and one manual Particle addition. Actual AE acceptance remains open.
+
+
 ## Build 8: distinct topic boundary IDs — 2026-10-02
 
 Owner build-7 evidence: Particle creation now fails with

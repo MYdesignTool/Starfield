@@ -1,6 +1,28 @@
 # Build and host matrix
 
-## Current build 8 topic-ID deployment — 2026-10-02
+## Current build 9 numeric-ID deployment — 2026-10-02
+
+Packed 32777 (0x8009); native identity revision 2, main schema 18 and CEP
+native-node-sync-6. All node disk IDs are explicit numbers in 1..9999.
+Compile-time range/uniqueness/name-budget guards and the SDK build pass. No tests
+added/rerun. Deployed with AE absent under standing authorization; six hashes
+verified. Before: build-8 AEXs; after: build-9 AEXs, unchanged Core/hot generation.
+Fresh development effects required. Actual Particle creation awaits owner testing.
+
+| File | Installed SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `9F4D55B100263F73911CAB051EB3B7EE707DB117450231B2EF44C88632891E78` |
+| `StarfieldEmitter.aex` | `A7F271A713829018B110E7EDF6D4A607085D8BD228990A5D4410D0F22DBD57A2` |
+| `StarfieldParticleNode.aex` | `C64652F0F60EEE73C289BA93A24DB11831CD515BCDEA00088923B9EC047F4F51` |
+| `StarfieldAppearance.aex` | `C1B265E7CC53FFCA81EDF04C9D710EC6F5677EF9EDEA037B9AD1643BB7F41FB7` |
+| `StarfieldForce.aex` | `26F9E96DD1AA43006DCC0B9C5A8E32F4A6138989F37B38E1A7E812B03BF5CA4E` |
+| `StarfieldCore.dll (unchanged)` | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+Single Starfield Junction retained; backup p02d-build9-numeric-ids-20261002.
+[Undo and next owner action](native-node-checkpoint.md).
+
+
+## Previous build 8 topic-ID deployment — 2026-10-02
 
 Packed version `32776` (`0x8008`); schema 18 and CEP `native-node-sync-6` unchanged.
 Node GROUP_END IDs are now distinct from GROUP_START, correcting duplicate

@@ -4,6 +4,13 @@ Current target: After Effects 2023 on Windows x64, built with the supplied May 2
 
 ## Goal and boundary
 
+Native node parameter identity revision 2 (build 9) uses explicit disk IDs in
+1..9999, defined in `schema/node-parameters.json` and shared `NodeRecord.hpp`.
+Registration and supervised edit lookup use the same identities; compile-time
+checks cover uniqueness, range and stream match-name length. Stream indices and
+graph schemas are unchanged. Unreleased FourCC IDs are not migrated; create fresh
+effects. The main effect's parameter schema remains revision 18.
+
 This repository is the clean implementation of a node-based particle effect for After Effects. Existing reverse-engineering notes and binaries live in the parent directory and are reference material only. They are not linked into the build and must not be copied into the new implementation. Use observed user-facing behavior to define independent requirements; implement the algorithms and data structures anew.
 
 The native effect is the product boundary. The AE SDK adapter translates selectors, parameters, pixel worlds, and host suites into a small host-independent C++ API. The core does not include AE headers, retain host pointers, access the filesystem implicitly, or call UI APIs.

@@ -13,7 +13,7 @@
 ## Contracts and ownership
 
 - Read `docs/architecture.md`, `docs/roadmap.md`, the relevant ADRs, and the assigned card in `docs/agent-backlog.md` before changing code.
-- `schema/parameters.json` owns public parameter IDs and keys. `Settings.hpp` owns core value types. `Render.hpp` is the current host-independent render boundary; change it only in a task that owns the render contract.
+- `schema/parameters.json` owns main-effect public parameter IDs and keys; `schema/node-parameters.json` owns native node parameter disk IDs. `Settings.hpp` owns core value types. `Render.hpp` is the current host-independent render boundary; change it only in a task that owns the render contract.
 - AE SDK types, suites, handles, and pixel-world pointers stay inside `ae_plugin/`. Core code must not depend on AE headers or host lifetime.
 - Do not change a released AE parameter ID, effect match name, packed plug-in version contract, or sequence schema without an explicit migration plan and an ADR update.
 - PiPL declarations and values returned by `PF_Cmd_GLOBAL_SETUP` must agree. `PluginVersion.h` has a compile-time check for code/PiPL version packing.

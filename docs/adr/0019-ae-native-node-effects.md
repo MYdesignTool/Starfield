@@ -1,5 +1,38 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 9 bounded numeric node disk IDs — 2026-10-02
+
+The owner reports build 8 still fails with the same duplicate-matchname error.
+Distinct topic boundary IDs did not resolve creation. The full layout used
+ten-digit FourCC values for every parameter disk ID. The SDK guide requires
+disk IDs in 1..9999: [parameter identity contract](https://ae-plugins.docsforadobe.dev/effect-details/changing-parameter-orders/).
+The local May 2023 `AE_GeneralPlug.h` declares a 40-byte stream match-name buffer.
+
+Length model: a 29-character Particle effect match name, '-' and a ten-digit
+decimal ID need 41 bytes including NUL. Emitter needs exactly 40 bytes; Appearance
+needs 43. Truncating Particle's modeled `sag0`/`sag1` names at 39 characters gives
+identical strings. This explains the observed module difference, but the host's
+internal formatting/truncation has not been captured and remains an inference.
+The out-of-range disk IDs are a confirmed SDK contract defect.
+
+Build 9 replaces every node disk ID with the explicit numeric allocation in
+`schema/node-parameters.json`, mirrored in the shared `NodeRecord.hpp`. Visible
+controls, both curve banks, layout, all connections, UUID and guard are included.
+Registration and supervised node-edit lookup share this identity table. Whole-
+allocation compile-time checks require uniqueness and 1..9999 bounds; registration
+also rejects an out-of-range ID. Node entry metadata checks the match-name budget.
+
+Migration decision: these modules are unreleased; no migration from FourCC IDs
+is provided, following owner direction. Create fresh development effects. Stream
+order/count, value types, effect match names, graph UUIDs/schemas and the main
+schema 18/CEP indices remain unchanged. Native identity revision becomes 2 and
+packed plug-in version becomes `32777` (`0x8009`). This is an AEX change; the Core
+DLL and CEP sources remain unchanged. Actual Particle creation still needs AE
+confirmation. This iteration adds/runs no tests; SDK compilation is recorded
+in the deployment checkpoint.
+SDK build passes; build 9 is deployed under standing owner authorization with
+all six hashes verified. Actual Particle creation awaits owner testing.
+
 ## Build 8 topic boundary identities — 2026-10-02
 
 After build 7, the owner reports Particle creation now fails inside `addProperty`

@@ -1,11 +1,12 @@
 # Starfield CEP panel
 
-## Current panel with native build 8 — 2026-10-02
+## Current panel with native build 9 — 2026-10-02
 
-Build 8 repairs native node topic start/end IDs after the owner reports a
-duplicate-matchname creation failure. Native value indices and CEP sources are
-unchanged. SDK build passes; installed hashes verified. Particle creation still
-needs the owner's actual AE result.
+Build 8 still failed with the same duplicate-matchname error. Build 9 replaces
+out-of-range FourCC disk IDs with explicit IDs in 1..9999, shared by registration
+and supervised lookup. Native stream indices and CEP sources are unchanged.
+SDK build passes; installed hashes verified. Create a fresh Starfield effect;
+old development IDs are not migrated. Particle creation awaits the owner's AE result.
 
 Gateway token: `native-node-sync-6`. Errors from editing stay visible until manual
 Refresh or a successful edit; failed default initialization waits for manual
@@ -13,7 +14,7 @@ Refresh. ResizeObserver work is deferred/coalesced so its delivery warning no
 longer covers a native error. Close/reopen CEP to load the source changes.
 
 The owner supplied AE's float/SmartFX contract error. **That fix requires the
-build-6 or later node AEX**, not just CEP reload. Build 8 is deployed with hashes verified
+build-6 or later node AEX**, not just CEP reload. Build 9 is deployed with hashes verified
 through the existing single plugin junction. Emitter duplication works; Particle still awaits
 actual AE confirmation. [Current checkpoint](../docs/native-node-checkpoint.md).
 
@@ -56,7 +57,7 @@ add it from the node context menu and connect it. Partial first initialization n
 real render response, undo and reopen still require owner confirmation.
 
 
-Current native build: revision-18 build 8, deployed 2026-10-02 through the
+Current native build: revision-18 build 9, deployed 2026-10-02 through the
 existing single `Plug-ins/Starfield -> dist` junction. Gateway token:
 `native-node-sync-6`. The owner confirms build 4 fixed the selection crash.
 Build 5 removes all expression access. Node effects own saved values, identity,

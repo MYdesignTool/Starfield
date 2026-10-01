@@ -43,6 +43,7 @@ $adapterInputs = @(
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
     'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',
     'include\starfield\core\Time.hpp', 'schema\parameters.json',
+    'schema\node-parameters.json',
     'src\core\Geometry.cpp', 'src\core\Graph.cpp',
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
     'src\core\SequenceCodec.cpp', 'src\core\Settings.cpp', 'src\core\Time.cpp'

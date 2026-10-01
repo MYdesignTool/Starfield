@@ -3,6 +3,9 @@
 #include "AEConfig.h"
 #include "AE_Effect.h"
 
+#include <array>
+#include <iterator>
+
 namespace starfield::adapter::native_nodes {
 
 // Node-module project record v1. Keep this layout shared by the node AEX and
@@ -45,21 +48,96 @@ enum class Kind : A_long { emitter, particle, appearance, force };
     return connection_uuid_index(kind, slot, kConnectionUuidChunks + chunk);
 }
 
-[[nodiscard]] constexpr A_long fourcc(char a, char b, char c, char d) noexcept {
-    return (static_cast<A_long>(static_cast<unsigned char>(a)) << 24) |
-           (static_cast<A_long>(static_cast<unsigned char>(b)) << 16) |
-           (static_cast<A_long>(static_cast<unsigned char>(c)) << 8) |
-           static_cast<A_long>(static_cast<unsigned char>(d));
-}
+// AE parameter disk IDs must be 1..9999, not FourCCs. Long decimal IDs can
+// overflow the generated effect-parameter match name. Keep these explicit
+// identities stable independently of stream indices (schema/node-parameters.json).
+namespace disk_ids {
+enum : A_long {
+    kEmitterGroupStartId = 100, kEmitterTypeId = 101, kBirthRateId = 102,
+    kSeedId = 103, kEmitterParticleSizeId = 104, kOriginId = 106,
+    kVelocityXId = 107, kVelocityYId = 108, kVelocityZId = 109,
+    kDiscSizeId = 110, kSpeedRandomId = 111,
+    kEmitterSizeXId = 112, kEmitterSizeYId = 113, kEmitterSizeZId = 114,
+    kEmissionSpeedId = 115, kEmissionSpeedRandomId = 116,
+    kEmissionAngleXId = 117, kEmissionAngleYId = 118, kEmissionAngleZId = 119,
+    kDirectionId = 120, kDirectionSpanId = 121, kEmitterGroupEndId = 122,
+    kParticleGroupStartId = 200, kLifetimeId = 201, kSizeId = 202,
+    kSizeOverLifeId = 203, kOpacityId = 204, kOpacityOverLifeId = 205,
+    kColorStartId = 206, kColorEndId = 207, kSizeRandomId = 208,
+    kOpacityRandomId = 209, kParticleGroupEndId = 210,
+    kForceGroupStartId = 300, kGravityId = 301, kDragId = 302, kForceGroupEndId = 303,
+    kLayoutXId = 400, kLayoutYId = 401, kConnectionCountId = 402,
+    kConnectionFirstId = 500, kUuidFirstId = 600, kSyncGuardId = 608,
+    kSizeCurveCountId = 700, kSizeCurveAgeFirstId = 710, kSizeCurveValueFirstId = 720,
+    kOpacityCurveCountId = 800, kOpacityCurveAgeFirstId = 810, kOpacityCurveValueFirstId = 820
+};
+} // namespace disk_ids
 
-[[nodiscard]] constexpr A_long connection_count_id() noexcept { return fourcc('n', 'c', 'n', '0'); }
-[[nodiscard]] constexpr A_long layout_x_id() noexcept { return fourcc('n', 'l', 'x', '0'); }
-[[nodiscard]] constexpr A_long layout_y_id() noexcept { return fourcc('n', 'l', 'y', '0'); }
+[[nodiscard]] constexpr bool valid_disk_id(A_long id) noexcept { return id >= 1 && id <= 9999; }
+[[nodiscard]] constexpr A_long connection_count_id() noexcept { return disk_ids::kConnectionCountId; }
+[[nodiscard]] constexpr A_long layout_x_id() noexcept { return disk_ids::kLayoutXId; }
+[[nodiscard]] constexpr A_long layout_y_id() noexcept { return disk_ids::kLayoutYId; }
 [[nodiscard]] constexpr A_long connection_uuid_id(A_long slot, A_long chunk) noexcept {
-    return fourcc('l', static_cast<char>('0' + slot), 'u', static_cast<char>('0' + chunk));
+    return slot >= 0 && slot < kMaxOutgoingEdges && chunk >= 0 && chunk < kConnectionUuidChunks
+        ? disk_ids::kConnectionFirstId + slot * kConnectionRecordChunks + chunk : 0;
 }
 [[nodiscard]] constexpr A_long connection_edge_uuid_id(A_long slot, A_long chunk) noexcept {
-    return fourcc('l', static_cast<char>('0' + slot), 'e', static_cast<char>('0' + chunk));
+    return slot >= 0 && slot < kMaxOutgoingEdges && chunk >= 0 && chunk < kConnectionUuidChunks
+        ? disk_ids::kConnectionFirstId + slot * kConnectionRecordChunks + kConnectionUuidChunks + chunk : 0;
 }
+[[nodiscard]] constexpr A_long uuid_id(A_long chunk) noexcept {
+    return chunk >= 0 && chunk < 8 ? disk_ids::kUuidFirstId + chunk : 0;
+}
+[[nodiscard]] constexpr A_long curve_count_id(char bank) noexcept {
+    return bank == 's' ? disk_ids::kSizeCurveCountId : bank == 'o' ? disk_ids::kOpacityCurveCountId : 0;
+}
+[[nodiscard]] constexpr A_long curve_age_id(char bank, A_long point) noexcept {
+    return point >= 0 && point < 8 && (bank == 's' || bank == 'o')
+        ? (bank == 's' ? disk_ids::kSizeCurveAgeFirstId : disk_ids::kOpacityCurveAgeFirstId) + point : 0;
+}
+[[nodiscard]] constexpr A_long curve_value_id(char bank, A_long point) noexcept {
+    return point >= 0 && point < 8 && (bank == 's' || bank == 'o')
+        ? (bank == 's' ? disk_ids::kSizeCurveValueFirstId : disk_ids::kOpacityCurveValueFirstId) + point : 0;
+}
+
+// Check the whole identity allocation, including every generated connection,
+// UUID and curve ID. A new collision or out-of-range ID must fail compilation.
+[[nodiscard]] constexpr bool disk_ids_are_unique_and_bounded() noexcept {
+    using namespace disk_ids;
+    constexpr A_long fixed[] = {
+        kEmitterGroupStartId, kEmitterTypeId, kBirthRateId, kSeedId, kEmitterParticleSizeId,
+        kOriginId, kVelocityXId, kVelocityYId, kVelocityZId, kDiscSizeId, kSpeedRandomId,
+        kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId, kEmissionSpeedId,
+        kEmissionSpeedRandomId, kEmissionAngleXId, kEmissionAngleYId, kEmissionAngleZId,
+        kDirectionId, kDirectionSpanId, kEmitterGroupEndId, kParticleGroupStartId,
+        kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
+        kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId, kParticleGroupEndId,
+        kForceGroupStartId, kGravityId, kDragId, kForceGroupEndId,
+        kLayoutXId, kLayoutYId, kConnectionCountId, kSyncGuardId,
+        kSizeCurveCountId, kOpacityCurveCountId
+    };
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 32> ids{};
+    std::size_t count = 0;
+    for (auto id : fixed) ids[count++] = id;
+    for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
+        for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
+            ids[count++] = connection_uuid_id(slot, chunk);
+            ids[count++] = connection_edge_uuid_id(slot, chunk);
+        }
+    }
+    for (A_long point = 0; point < 8; ++point) {
+        ids[count++] = uuid_id(point);
+        for (char bank : {'s', 'o'}) {
+            ids[count++] = curve_age_id(bank, point);
+            ids[count++] = curve_value_id(bank, point);
+        }
+    }
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        if (!valid_disk_id(ids[i])) return false;
+        for (std::size_t j = 0; j < i; ++j) if (ids[i] == ids[j]) return false;
+    }
+    return count == ids.size();
+}
+static_assert(disk_ids_are_unique_and_bounded(), "Node parameter disk IDs must be unique and within 1..9999");
 
 } // namespace starfield::adapter::native_nodes

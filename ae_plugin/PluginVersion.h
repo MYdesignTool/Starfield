@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 8 gives node topic boundaries distinct disk IDs.
-#define STARFIELD_VERSION_BUILD 8
-#define STARFIELD_VERSION_PACKED 32776 /* 0x8008 */
+// Build 9 uses bounded numeric disk IDs for every native node parameter.
+#define STARFIELD_VERSION_BUILD 9
+#define STARFIELD_VERSION_PACKED 32777 /* 0x8009 */

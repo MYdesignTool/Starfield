@@ -2,11 +2,13 @@
 
 ## Current acceptance checkpoint — 2026-10-02
 
-Build 8 is deployed after the owner reported Particle creation's duplicate-
-matchname verification error. Node topic starts/ends had the same disk ID;
-ends now have independent IDs. Value IDs and indices are unchanged. SDK build
-passes and six installed hashes match. No tests added/rerun. Actual Particle
-creation remains the next owner gate; [checkpoint](native-node-checkpoint.md).
+Build 9 is deployed: all node disk IDs are explicit numbers in the SDK's
+1..9999 range. Build 8 still failed with the same duplicate-matchname error;
+its topic-ID repair was insufficient. The ten-digit FourCC name-length model
+predicts Particle/Appearance collisions, but host truncation remains inferred.
+Registration/supervised lookup share numeric IDs; compile-time guards and SDK
+build pass. Six hashes verified. No tests added/rerun. Fresh effects required;
+actual Particle creation remains the owner gate. [Checkpoint](native-node-checkpoint.md).
 
 Build 7 targeted Particle creation's actual spatial-interpolation
 error by removing redundant interpolation flags from constant controls. 146

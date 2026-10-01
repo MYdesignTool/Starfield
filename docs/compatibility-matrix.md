@@ -1,5 +1,16 @@
 # Behavior inventory
 
+## Build 9 Particle registration gate — 2026-10-02
+
+Build 8 still fails with the same duplicate-matchname error. Every node FourCC
+disk ID violated the SDK's 1..9999 contract; a match-name length model also fits
+the observed Emitter/Particle difference. Actual host truncation remains inferred.
+Build 9 replaces all node disk IDs and supervised lookup with shared numeric IDs,
+keeps stream layout, and checks allocation range/uniqueness/name budget at compile
+time. SDK build passes; deployed with six hashes verified. No tests added/rerun.
+Fresh effects required; Particle creation awaits owner testing.
+[Checkpoint](native-node-checkpoint.md).
+
 ## Build 8 Particle registration gate — 2026-10-02
 
 Owner build-7 result: Particle still cannot be added, now reporting

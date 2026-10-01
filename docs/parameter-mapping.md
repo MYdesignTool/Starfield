@@ -1,5 +1,15 @@
 # Parameter bridge: schema → AE control → core settings
 
+## Native node disk IDs — build 9
+
+`schema/node-parameters.json` owns native node disk identity revision 2;
+`NodeRecord.hpp` shares those explicit IDs between registration and supervised
+lookup. Every node ID is in the SDK's 1..9999 range. Allocations cover groups,
+visible controls, both curves, layout, every outgoing connection, UUID and guard.
+Compile-time guards reject allocation collisions and overlong stream names;
+registration rejects out-of-range IDs. Host indices and main schema 18 are
+unchanged. No development migration from FourCC IDs; create fresh effects.
+
 Task: M2-02, revised by manifest revision 15. `schema/parameters.json` owns the IDs,
 labels, ranges, and defaults; `ae_plugin/Parameters.cpp` owns the host controls and
 the conversion; the core only ever sees `starfield::core::Settings` after

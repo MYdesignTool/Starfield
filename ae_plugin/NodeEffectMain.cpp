@@ -1,4 +1,5 @@
 #include "AEConfig.h"
+#include "AE_GeneralPlug.h"
 #include "entry.h"
 #include "NodeEffects.hpp"
 #include "PluginVersion.h"
@@ -18,6 +19,11 @@
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
+
+// The effect match name plus '-' and a four-digit parameter ID must fit,
+// including the terminator, in the SDK's stream match-name buffer.
+static_assert(sizeof(STARFIELD_NODE_MATCH) + 1 + 4 <= AEGP_MAX_STREAM_MATCH_NAME_SIZE,
+              "Node effect match name leaves no room for a valid parameter disk ID");
 
 static_assert(STARFIELD_VERSION_STAGE == PF_Stage_DEVELOP);
 static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR, STARFIELD_VERSION_MINOR, STARFIELD_VERSION_BUG,

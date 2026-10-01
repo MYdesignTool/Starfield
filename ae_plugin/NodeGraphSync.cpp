@@ -52,12 +52,8 @@ constexpr A_long kIdentityFirstIndex = kLastParameterIndex - 8;
 constexpr A_long kSyncGuardIndex = kLastParameterIndex;
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
 
-constexpr A_long fourcc(char a, char b, char c, char d) noexcept {
-    return (static_cast<A_long>(static_cast<unsigned char>(a)) << 24) |
-           (static_cast<A_long>(static_cast<unsigned char>(b)) << 16) |
-           (static_cast<A_long>(static_cast<unsigned char>(c)) << 8) |
-           static_cast<A_long>(static_cast<unsigned char>(d));
-}
+using namespace starfield::adapter::native_nodes::disk_ids;
+using starfield::adapter::native_nodes::uuid_id;
 
 std::atomic<AEGP_PluginID> g_plugin_id{0};
 std::mutex g_registration_mutex;
@@ -159,12 +155,12 @@ bool set_vector_parameter(PF_ParamDef* params[], A_long changed_id, A_long param
 }
 
 bool set_velocity(PF_ParamDef* params[], A_long changed_id, EncodedValue& encoded) {
-    if (changed_id != fourcc('v', 'e', 'l', 'x') && changed_id != fourcc('v', 'e', 'l', 'y') &&
-        changed_id != fourcc('v', 'e', 'l', 'z')) return false;
+    if (changed_id != kVelocityXId && changed_id != kVelocityYId &&
+        changed_id != kVelocityZId) return false;
     starfield::core::Vec3 value{};
-    if (!read_slider(params, fourcc('v', 'e', 'l', 'x'), value.x) ||
-        !read_slider(params, fourcc('v', 'e', 'l', 'y'), value.y) ||
-        !read_slider(params, fourcc('v', 'e', 'l', 'z'), value.z) || !encode_vector3(value, encoded.payload)) return false;
+    if (!read_slider(params, kVelocityXId, value.x) ||
+        !read_slider(params, kVelocityYId, value.y) ||
+        !read_slider(params, kVelocityZId, value.z) || !encode_vector3(value, encoded.payload)) return false;
     encoded.key = 7;
     encoded.kind = ValueKind::vector3;
     return true;
@@ -186,7 +182,7 @@ bool set_emitter_popup(PF_ParamDef* params[], A_long changed_id, A_long paramete
 }
 
 bool set_seed(PF_ParamDef* params[], A_long changed_id, EncodedValue& encoded) {
-    constexpr A_long id = fourcc('s', 'e', 'e', 'd');
+    constexpr A_long id = kSeedId;
     if (changed_id != id) return false;
     double value = 0.0;
     if (!read_slider(params, id, value) || value < 0.0 || value > std::numeric_limits<std::uint32_t>::max() ||
@@ -215,38 +211,38 @@ bool set_color(PF_ParamDef* params[], A_long changed_id, A_long parameter_id,
 
 bool map_parameter_edit(PF_ParamDef* params[], A_long changed_id, EncodedValue& encoded) {
     if constexpr (kNodeKind == 0) {
-        return set_scalar(params, changed_id, fourcc('b', 'r', 't', 'h'), 2, encoded) ||
+        return set_scalar(params, changed_id, kBirthRateId, 2, encoded) ||
                set_seed(params, changed_id, encoded) ||
-               set_emitter_popup(params, changed_id, fourcc('e', 's', 'h', 'a'), 5, encoded) ||
-               set_vector_parameter(params, changed_id, fourcc('e', 'p', 'o', 's'), 6, encoded) ||
+               set_emitter_popup(params, changed_id, kEmitterTypeId, 5, encoded) ||
+               set_vector_parameter(params, changed_id, kOriginId, 6, encoded) ||
                set_velocity(params, changed_id, encoded) ||
-               set_scalar(params, changed_id, fourcc('p', 's', 'i', 'z'), 8, encoded) ||
-               set_scalar(params, changed_id, fourcc('o', 'p', 'a', 'c'), 9, encoded) ||
-               set_scalar(params, changed_id, fourcc('d', 's', 'i', 'z'), 10, encoded) ||
-               set_scalar(params, changed_id, fourcc('v', 's', 'p', 'd'), 11, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 'm', 's', 'p'), 12, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 'm', 'r', 'd'), 13, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 'a', 'n', 'x'), 14, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 'a', 'n', 'y'), 15, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 'a', 'n', 'z'), 16, encoded) ||
-               set_emitter_popup(params, changed_id, fourcc('d', 'i', 'r', 'm'), 17, encoded) ||
-               set_scalar(params, changed_id, fourcc('d', 's', 'p', 'n'), 18, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 's', 'z', 'x'), 19, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 's', 'z', 'y'), 20, encoded) ||
-               set_scalar(params, changed_id, fourcc('e', 's', 'z', 'z'), 21, encoded);
+               set_scalar(params, changed_id, kEmitterParticleSizeId, 8, encoded) ||
+               set_scalar(params, changed_id, kOpacityId, 9, encoded) ||
+               set_scalar(params, changed_id, kDiscSizeId, 10, encoded) ||
+               set_scalar(params, changed_id, kSpeedRandomId, 11, encoded) ||
+               set_scalar(params, changed_id, kEmissionSpeedId, 12, encoded) ||
+               set_scalar(params, changed_id, kEmissionSpeedRandomId, 13, encoded) ||
+               set_scalar(params, changed_id, kEmissionAngleXId, 14, encoded) ||
+               set_scalar(params, changed_id, kEmissionAngleYId, 15, encoded) ||
+               set_scalar(params, changed_id, kEmissionAngleZId, 16, encoded) ||
+               set_emitter_popup(params, changed_id, kDirectionId, 17, encoded) ||
+               set_scalar(params, changed_id, kDirectionSpanId, 18, encoded) ||
+               set_scalar(params, changed_id, kEmitterSizeXId, 19, encoded) ||
+               set_scalar(params, changed_id, kEmitterSizeYId, 20, encoded) ||
+               set_scalar(params, changed_id, kEmitterSizeZId, 21, encoded);
     } else if constexpr (kNodeKind == 1 || kNodeKind == 2) {
-        return set_color(params, changed_id, fourcc('c', 'l', 'r', 's'), 1, encoded) ||
-               set_color(params, changed_id, fourcc('c', 'l', 'r', 'e'), 2, encoded) ||
-               set_scalar(params, changed_id, fourcc('s', 'i', 'z', 'e'), 3, encoded) ||
-               set_scalar(params, changed_id, fourcc('s', 'z', 'e', 'n'), 4, encoded) ||
-               set_scalar(params, changed_id, fourcc('o', 'p', 'a', 'c'), 5, encoded) ||
-               set_scalar(params, changed_id, fourcc('o', 'p', 'e', 'n'), 6, encoded) ||
-               (kNodeKind == 1 && set_scalar(params, changed_id, fourcc('l', 'i', 'f', 'e'), 11, encoded)) ||
-               set_scalar(params, changed_id, fourcc('s', 'z', 'r', 'd'), 9, encoded) ||
-               set_scalar(params, changed_id, fourcc('o', 'p', 'r', 'd'), 10, encoded);
+        return set_color(params, changed_id, kColorStartId, 1, encoded) ||
+               set_color(params, changed_id, kColorEndId, 2, encoded) ||
+               set_scalar(params, changed_id, kSizeId, 3, encoded) ||
+               set_scalar(params, changed_id, kSizeOverLifeId, 4, encoded) ||
+               set_scalar(params, changed_id, kOpacityId, 5, encoded) ||
+               set_scalar(params, changed_id, kOpacityOverLifeId, 6, encoded) ||
+               (kNodeKind == 1 && set_scalar(params, changed_id, kLifetimeId, 11, encoded)) ||
+               set_scalar(params, changed_id, kSizeRandomId, 9, encoded) ||
+               set_scalar(params, changed_id, kOpacityRandomId, 10, encoded);
     } else {
-        return set_vector_parameter(params, changed_id, fourcc('g', 'r', 'a', 'v'), 1, encoded) ||
-               set_scalar(params, changed_id, fourcc('d', 'r', 'a', 'g'), 2, encoded);
+        return set_vector_parameter(params, changed_id, kGravityId, 1, encoded) ||
+               set_scalar(params, changed_id, kDragId, 2, encoded);
     }
 }
 
@@ -255,7 +251,7 @@ bool read_node_id(PF_ParamDef* params[], std::array<std::uint16_t, 8>& chunks) n
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         const PF_ParamDef* parameter = params[kIdentityFirstIndex + chunk];
         if (!parameter || parameter->param_type != PF_Param_FLOAT_SLIDER ||
-            parameter->uu.id != fourcc('u', 'i', 'd', static_cast<char>('0' + chunk)) ||
+            parameter->uu.id != uuid_id(chunk) ||
             !std::isfinite(parameter->u.fs_d.value) || parameter->u.fs_d.value < 0.0 ||
             parameter->u.fs_d.value > 65535.0 || std::floor(parameter->u.fs_d.value) != parameter->u.fs_d.value) {
             return false;
