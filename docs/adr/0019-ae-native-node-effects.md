@@ -1,5 +1,28 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 8 topic boundary identities — 2026-10-02
+
+After build 7, the owner reports Particle creation now fails inside `addProperty`
+with `Duplicate matchname found during FillInStreamsFromCanonicalLayout` and
+`canAddProperty=true`. The earlier spatial-interpolation error is no longer the
+reported failure; Particle creation has still not succeeded.
+
+Source inspection finds every internal node topic registered its GROUP_START
+and GROUP_END with the same disk ID. The supplied May 2023 SDK Transformer and
+Convolutrix samples use separate start/end IDs. Build 8 retains start IDs and
+assigns end IDs `endE`, `endP` and `endF` for Emitter, Particle/Appearance and Force.
+Compile-time checks require each pair to differ. A duplicate registration is a
+confirmed source defect; its causal link to this AE error awaits owner testing.
+
+This repairs unreleased structural markers only. Value IDs, stream order/count,
+UUIDs, curves, connections, schema 18 and CEP bindings are unchanged. Development
+schemas are not migrated (owner direction and schema policy); qualify a fresh
+effect. There is no legacy marker conversion. Packed version becomes `32776`
+(`0x8008`). This is an AEX registration change and requires an AE-closed deploy.
+SDK build passes; build 8 is deployed under standing owner authorization with
+all six hashes verified. No tests were added/rerun; actual Particle creation
+awaits the owner's AE result. [Checkpoint](../native-node-checkpoint.md).
+
 ## Build 7 constant-control flags — 2026-10-01
 
 Actual AE rejects Particle native creation with a spatial-interpolation error.

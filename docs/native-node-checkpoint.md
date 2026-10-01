@@ -1,5 +1,38 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 8: distinct topic boundary IDs — 2026-10-02
+
+Owner build-7 evidence: Particle creation now fails with
+`Duplicate matchname found during FillInStreamsFromCanonicalLayout` inside
+`addProperty`, with `canAddProperty=true`. Particle creation remains unqualified.
+
+Source registration reused each node topic's start ID for its end marker.
+Build 8 gives GROUP_END independent IDs: `endE`, `endP`, `endF`; the shared
+Particle/Appearance registration is corrected together. Compile-time assertions
+require distinct start/end IDs. Values, indices, record counts, curves, UUIDs,
+schema 18 and the CEP token `native-node-sync-6` are unchanged. These are
+unreleased structural ID repairs; development schemas are not migrated.
+Use a fresh effect for the creation check. The connection to the reported host
+error is a source-based diagnosis until the owner confirms actual creation.
+
+May 2023 SDK build passes with `-NoRuntimePublish -NoDistPublish`; log:
+`artifacts/build8-node-topic-ids-build.log`. No tests were added or rerun this
+iteration. **Build 8 is deployed**, packed version `32776` (`0x8008`), under
+the owner's standing AE-closed authorization. The process check found no AE;
+no process was started/stopped. Six installed hashes match the build matrix.
+Before: build-7 AEXs; after: build-8 AEXs. Core DLL and selected hot generation
+remain unchanged. Existing single `Plug-ins/Starfield -> dist` Junction retained.
+Backup: `artifacts/disabled/p02d-build8-topic-ids-20261002/deployment.json`.
+
+Undo (AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build8-topic-ids-20261002' -Rollback
+```
+
+Next owner gate: add Particle once in AE 2023.5.0 Build 52; capture any persistent
+creation error. Previous Emitter/render tests are not repeated.
+
 ## Build 7: constant-control registration deployment — 2026-10-02
 
 Owner build-6 evidence: Particle addition fails **inside `addProperty`**, before

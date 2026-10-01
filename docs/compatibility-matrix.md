@@ -1,5 +1,15 @@
 # Behavior inventory
 
+## Build 8 Particle registration gate — 2026-10-02
+
+Owner build-7 result: Particle still cannot be added, now reporting
+`Duplicate matchname found during FillInStreamsFromCanonicalLayout` during
+native creation. Node topics reuse start/end disk IDs in source. Build 8 repairs
+these structural IDs for all four node modules, retaining value IDs and indices.
+SDK compilation passes; six installed hashes verified. No tests added/rerun.
+Actual creation remains pending: the identified source defect does not establish
+an AE acceptance pass. [Checkpoint](native-node-checkpoint.md).
+
 ## Build 7 Particle registration gate — 2026-10-02
 
 Build 6 still cannot create Particle: native addProperty throws a spatial-

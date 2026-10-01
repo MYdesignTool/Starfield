@@ -49,6 +49,18 @@ constexpr A_long fourcc(char a, char b, char c, char d) noexcept {
            static_cast<A_long>(static_cast<unsigned char>(d));
 }
 
+// Both topic boundaries are registered parameters. Each needs a distinct disk
+// ID; reusing the start ID for GROUP_END can create duplicate AE match names.
+constexpr A_long kEmitterGroupStartId = fourcc('e', 'm', 'i', 't');
+constexpr A_long kEmitterGroupEndId = fourcc('e', 'n', 'd', 'E');
+constexpr A_long kParticleGroupStartId = fourcc('p', 'a', 'r', 't');
+constexpr A_long kParticleGroupEndId = fourcc('e', 'n', 'd', 'P');
+constexpr A_long kForceGroupStartId = fourcc('f', 'o', 'r', 'c');
+constexpr A_long kForceGroupEndId = fourcc('e', 'n', 'd', 'F');
+static_assert(kEmitterGroupStartId != kEmitterGroupEndId &&
+              kParticleGroupStartId != kParticleGroupEndId &&
+              kForceGroupStartId != kForceGroupEndId);
+
 PF_Err add_group(PF_InData* in_data, const char* name, A_long id, bool end) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
@@ -210,8 +222,7 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
 }
 
 PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexcept {
-    constexpr A_long group_id = fourcc('p', 'a', 'r', 't');
-    PF_Err error = add_group(in_data, "Particle", group_id, false);
+    PF_Err error = add_group(in_data, "Particle", kParticleGroupStartId, false);
     if (error != PF_Err_NONE) return error;
     if (include_lifetime) {
         error = add_slider(in_data, "Lifetime", fourcc('l', 'i', 'f', 'e'), 0.0, 1000000.0, 2.0,
@@ -243,11 +254,11 @@ PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexce
     if (error != PF_Err_NONE) return error;
     error = add_curve_bank(in_data, "Opacity", 'o');
     if (error != PF_Err_NONE) return error;
-    return add_group(in_data, "Particle", group_id, true);
+    return add_group(in_data, "Particle", kParticleGroupEndId, true);
 }
 
 PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_group(in_data, "Emitter", fourcc('e', 'm', 'i', 't'), false);
+    PF_Err error = add_group(in_data, "Emitter", kEmitterGroupStartId, false);
     if (error != PF_Err_NONE) return error;
     error = add_popup(in_data, "Type", fourcc('e', 's', 'h', 'a'), 4, 1,
                              "Point|Box|Sphere|Disc");
@@ -301,7 +312,7 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     error = add_slider(in_data, "Direction Span", fourcc('d', 's', 'p', 'n'), 0.0, 180.0, 60.0,
                        PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_group(in_data, "Emitter", fourcc('e', 'm', 'i', 't'), true);
+    error = add_group(in_data, "Emitter", kEmitterGroupEndId, true);
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::emitter);
     if (error != PF_Err_NONE) return error;
@@ -337,14 +348,14 @@ PF_Err setup_appearance(PF_InData* in_data, PF_OutData* out_data) noexcept {
 }
 
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_group(in_data, "Force", fourcc('f', 'o', 'r', 'c'), false);
+    PF_Err error = add_group(in_data, "Force", kForceGroupStartId, false);
     if (error != PF_Err_NONE) return error;
     error = add_point3d(in_data, "Gravity", fourcc('g', 'r', 'a', 'v'), 0.0, 0.0, 0.0);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Linear Drag", fourcc('d', 'r', 'a', 'g'), 0.0, 100.0, 0.0,
                        PF_Precision_THOUSANDTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_group(in_data, "Force", fourcc('f', 'o', 'r', 'c'), true);
+    error = add_group(in_data, "Force", kForceGroupEndId, true);
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::force);
     if (error != PF_Err_NONE) return error;

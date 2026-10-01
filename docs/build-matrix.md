@@ -1,6 +1,29 @@
 # Build and host matrix
 
-## Current build 7 constant-control deployment — 2026-10-02
+## Current build 8 topic-ID deployment — 2026-10-02
+
+Packed version `32776` (`0x8008`); schema 18 and CEP `native-node-sync-6` unchanged.
+Node GROUP_END IDs are now distinct from GROUP_START, correcting duplicate
+structural identities found after the owner's actual duplicate-matchname error.
+Value IDs and indices are unchanged. May 2023 SDK build passes without automatic
+dist/runtime publication. No tests added/rerun. Deployed under standing owner
+authorization after an AE-absent process check; all six installed hashes verified.
+Before: build-7 AEXs; after: build-8 AEXs. Core and hot generation are unchanged.
+
+| File | Installed SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `E8336F1705011A618F6FC54F592E22B786436BF6A5DF0486BFFDC39D147931B1` |
+| `StarfieldEmitter.aex` | `FF9C735A28D9575AEC5B654479831A20DDAAA281CDEAF773AE41160A84DA49A3` |
+| `StarfieldParticleNode.aex` | `64AF2079171FD74F50AA3383B562A41C003E63D6A7A9A0D557272BC599FA12B4` |
+| `StarfieldAppearance.aex` | `3A3BD037ABA6CB67D3C3EEAC11C76A5BB96960F29F73685D3F06466E501FE490` |
+| `StarfieldForce.aex` | `34A513B3A78E8DBFCEB4601ADCF2E1B6BC4C5C238BE1D1D0F4E34D14D0E86FD4` |
+| `StarfieldCore.dll` (unchanged) | `6D70281C4E756BCAA65D24E2B4ED0CD06A1C6786BEBEB607983F8DB069B52BA2` |
+
+Existing single `Plug-ins/Starfield -> dist` Junction retained. Backup name:
+`p02d-build8-topic-ids-20261002`; undo and host gate:
+[checkpoint](native-node-checkpoint.md). Actual Particle creation awaits owner testing.
+
+## Previous build 7 constant-control deployment — 2026-10-02
 
 Packed version `32775` (`0x8007`); schema revision 18 unchanged. Build removes
 redundant CANNOT_INTERP from constant node parameters after actual AE reports a

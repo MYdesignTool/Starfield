@@ -2,11 +2,17 @@
 
 ## Current acceptance checkpoint — 2026-10-02
 
-Build 7 now targets Particle creation's actual spatial-interpolation
+Build 8 is deployed after the owner reported Particle creation's duplicate-
+matchname verification error. Node topic starts/ends had the same disk ID;
+ends now have independent IDs. Value IDs and indices are unchanged. SDK build
+passes and six installed hashes match. No tests added/rerun. Actual Particle
+creation remains the next owner gate; [checkpoint](native-node-checkpoint.md).
+
+Build 7 targeted Particle creation's actual spatial-interpolation
 error by removing redundant interpolation flags from constant controls. 146
 Particle/Appearance checks and SDK build pass; deployed with all six hashes
 verified on 2026-10-02. Owner authorizes future AE-closed deployments (ADR 0011).
-The inferred cause and actual creation still need owner confirmation.
+Owner feedback now reports the duplicate-matchname error; creation still fails.
 
 Previous: the owner supplied AE's float-aware node / missing SmartFX verification
 error. Build 6 implements node SmartFX passthrough with matching PiPL/runtime
