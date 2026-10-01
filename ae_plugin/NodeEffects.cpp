@@ -2,11 +2,13 @@
 #include "NodeEffects.hpp"
 
 #include "AE_EffectCB.h"
+#include "AE_EffectCBSuites.h"
 #include "AE_Macros.h"
 #include "Param_Utils.h"
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
 #include "PluginVersion.h"
+#include "SPBasic.h"
 
 #include <cstdio>
 #include <utility>
@@ -16,7 +18,8 @@ namespace {
 static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
                                           PF_OutFlag_DEEP_COLOR_AWARE |
                                           PF_OutFlag_PIX_INDEPENDENT));
-static_assert(STARFIELD_NODE_OUT_FLAGS2 == PF_OutFlag2_FLOAT_COLOR_AWARE);
+static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
+                                           PF_OutFlag2_FLOAT_COLOR_AWARE));
 
 enum class NodeEffectKind { emitter, particle, appearance, force };
 
@@ -353,6 +356,57 @@ PF_Err render_passthrough(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef
     return PF_COPY(&params[0]->u.ld, output, nullptr, nullptr);
 }
 
+// Node effects carry controls only. Forward the exact input request and let the
+// host copy its pixel world; legacy PF_COPY cannot be the 32-bpc render path.
+constexpr A_long kNodeInputCheckout = 0;
+
+PF_Err pre_render_passthrough(PF_InData* in_data, PF_PreRenderExtra* extra) noexcept {
+    if (!in_data || !extra || !extra->input || !extra->output || !extra->cb ||
+        !extra->cb->checkout_layer) return PF_Err_BAD_CALLBACK_PARAM;
+    PF_CheckoutResult result{};
+    const PF_Err error = extra->cb->checkout_layer(in_data->effect_ref, 0, kNodeInputCheckout,
+        &extra->input->output_request, in_data->current_time, in_data->time_step,
+        in_data->time_scale, &result);
+    if (error) return error;
+    extra->output->result_rect = result.result_rect;
+    extra->output->max_result_rect = result.max_result_rect;
+    extra->output->solid = result.solid;
+    extra->output->flags = 0;
+    extra->output->pre_render_data = nullptr;
+    extra->output->delete_pre_render_data_func = nullptr;
+    return PF_Err_NONE;
+}
+
+PF_Err copy_smart_world(PF_InData* in_data, PF_EffectWorld* input, PF_EffectWorld* output) noexcept {
+    if (!input || !output) return PF_Err_BAD_CALLBACK_PARAM;
+    if (output->width == 0 || output->height == 0) return PF_Err_NONE;
+    if (!in_data->pica_basicP || !in_data->pica_basicP->AcquireSuite ||
+        !in_data->pica_basicP->ReleaseSuite) return PF_Err_BAD_CALLBACK_PARAM;
+    const PF_WorldTransformSuite1* suite = nullptr;
+    PF_Err error = static_cast<PF_Err>(in_data->pica_basicP->AcquireSuite(kPFWorldTransformSuite,
+        kPFWorldTransformSuiteVersion1, reinterpret_cast<const void**>(&suite)));
+    if (error) return error;
+    error = suite && suite->copy ? suite->copy(in_data->effect_ref, input, output, nullptr, nullptr) :
+        PF_Err_BAD_CALLBACK_PARAM;
+    const PF_Err release_error = static_cast<PF_Err>(in_data->pica_basicP->ReleaseSuite(
+        kPFWorldTransformSuite, kPFWorldTransformSuiteVersion1));
+    return error ? error : release_error;
+}
+
+PF_Err smart_render_passthrough(PF_InData* in_data, PF_SmartRenderExtra* extra) noexcept {
+    if (!in_data || !extra || !extra->input || !extra->cb || !extra->cb->checkout_layer_pixels ||
+        !extra->cb->checkout_output || !extra->cb->checkin_layer_pixels) return PF_Err_BAD_CALLBACK_PARAM;
+    PF_EffectWorld* input = nullptr;
+    PF_Err error = extra->cb->checkout_layer_pixels(in_data->effect_ref, kNodeInputCheckout, &input);
+    if (error) return error;
+    PF_EffectWorld* output = nullptr;
+    error = extra->cb->checkout_output(in_data->effect_ref, &output);
+    if (!error) error = copy_smart_world(in_data, input, output);
+    // A successful pixel checkout is checked in even if output/suite/copy fails.
+    const PF_Err checkin_error = extra->cb->checkin_layer_pixels(in_data->effect_ref, kNodeInputCheckout);
+    return error ? error : checkin_error;
+}
+
 PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 PF_ParamDef* params[], PF_LayerDef* output, void* extra) noexcept {
     if (!out_data) return PF_Err_BAD_CALLBACK_PARAM;
@@ -389,6 +443,10 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);
+        case PF_Cmd_SMART_PRE_RENDER:
+            return pre_render_passthrough(in_data, static_cast<PF_PreRenderExtra*>(extra));
+        case PF_Cmd_SMART_RENDER:
+            return smart_render_passthrough(in_data, static_cast<PF_SmartRenderExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
             return sync_node_graph_parameter(in_data, out_data, params,

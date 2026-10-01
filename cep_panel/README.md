@@ -1,5 +1,26 @@
 # Starfield CEP panel
 
+## Current build 6 panel — 2026-10-01
+
+Gateway token: `native-node-sync-6`. Errors from editing stay visible until manual
+Refresh or a successful edit; failed default initialization waits for manual
+Refresh. ResizeObserver work is deferred/coalesced so its delivery warning no
+longer covers a native error. Close/reopen CEP to load the source changes.
+
+The owner supplied AE's float/SmartFX contract error. **That fix requires the
+build-6 node AEX candidate**, not just CEP reload. Candidate compiled; deployment
+authorization requested. Emitter duplication works; Particle still awaits
+actual AE confirmation. [Current checkpoint](../docs/native-node-checkpoint.md).
+
+## Current CEP 5b update — 2026-10-01
+
+The owner confirms Emitter duplication, but Particle default/addition still
+fails. Errors now stay visible after background refresh and include creation
+stage/match name/control details. A failed bootstrap waits for manual Refresh
+before another attempt. Close/reopen CEP; no AE restart or AEX replacement is
+needed. Capture one Particle addition failure to continue diagnosis. Current
+gateway token: `native-node-sync-5b`; [checkpoint](../docs/native-node-checkpoint.md).
+
 ## CEP 5a hotfix after owner feedback — 2026-10-01
 
 The owner reports build 5 creates native Emitter effects but repeatedly shows
@@ -32,7 +53,7 @@ real render response, undo and reopen still require owner confirmation.
 
 Current native candidate: revision-18 build 5, deployed 2026-10-01 through the
 existing single `Plug-ins/Starfield -> dist` junction. Gateway token:
-`native-node-sync-5a`. The owner confirms build 4 fixed the selection crash.
+`native-node-sync-6`. The owner confirms build 4 fixed the selection crash.
 Build 5 removes all expression access. Node effects own saved values, identity,
 links and layout; Output and the compiled render graph remain on the main effect.
 Actual add/copy/delete/render/undo acceptance awaits owner testing.

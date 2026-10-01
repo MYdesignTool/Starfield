@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-5a";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-6";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -44,6 +44,10 @@
     var minimapPanState = null;
     var minimapTransform = null;
     var frameStatusInFlight = false;
+    var retainedError = null;
+    var failedGraphInitializations = {};
+    var resizeUpdatePending = false;
+    var observedPanelSize = null;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
     // Adobe's full CSInterface library can replace this shim later without changing
@@ -98,11 +102,13 @@
     // exception during startup is exactly what "the panel is recognised but will not open"
     // looks like from the outside.
     window.onerror = function (message, source, line) {
+        // Chromium reports skipped resize notifications as window errors. They
+        // are not script exceptions and must not cover a native edit failure.
+        if (/^ResizeObserver loop (limit exceeded|completed with undelivered notifications\.?$)/.test(String(message))) return true;
         try {
             var banner = document.getElementById("banner");
             if (banner) {
-                banner.className = "banner error";
-                banner.textContent = "Panel script error: " + message + " (" + source + ":" + line + ")";
+                showError("panel_script_error", message + " (" + source + ":" + line + ")", true);
             }
         } catch (ignored) { /* nothing else we can do */ }
         return false;
@@ -289,12 +295,17 @@
         return "\"" + text.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
     }
 
-    function showError(code, message) {
+    function showError(code, message, retain) {
+        // Background inspection must not erase or replace a failed user edit.
+        if (retainedError && !retain) return;
+        if (retain) retainedError = { code: code, message: message };
         elements.banner.className = "banner error";
         elements.banner.textContent = code + ": " + message;
     }
 
-    function clearBanner() {
+    function clearBanner(acknowledge) {
+        if (retainedError && !acknowledge) return;
+        retainedError = null;
         elements.banner.className = "banner hidden";
         elements.banner.textContent = "";
     }
@@ -862,9 +873,14 @@
                 });
             }
             if (response.snapshot.initialized) { ensureNodeEffects(response); return; }
+            var failed = failedGraphInitializations[targetToken];
+            if (failed) { callback(failed); return; }
             call("syncGraphSnapshot", { target: { token: targetToken } }, function (initialized) {
                 if (!initialized || !initialized.ok || !initialized.snapshot || !initialized.snapshot.initialized) {
-                    callback(initialized || { ok: false, error: { code: "graph_snapshot_unconfirmed", message: "The project graph could not be initialized." } });
+                    failed = initialized && !initialized.ok ? initialized : { ok: false, error: {
+                        code: "graph_snapshot_unconfirmed", message: "The project graph could not be initialized." } };
+                    failedGraphInitializations[targetToken] = failed;
+                    callback(failed);
                     return;
                 }
                 ensureNodeEffects(initialized);
@@ -899,7 +915,7 @@
                 state.pending = false;
                 var loadError = snapshotResponse && snapshotResponse.error ||
                     { code: "graph_snapshot_unavailable", message: "The project graph snapshot could not be read." };
-                showError(loadError.code, loadError.message);
+                showError(loadError.code, loadError.message, true);
                 return;
             }
             var preparedEdit = edit;
@@ -910,18 +926,18 @@
                 }
             } catch (error) {
                 state.pending = false;
-                showError(error && error.code || "invalid_graph", error && error.message || String(error));
+                showError(error && error.code || "invalid_graph", error && error.message || String(error), true);
                 return;
             }
             client.apply(preparedEdit, function (result) {
                 state.pending = false;
                 if (!result || !result.ok) {
                     var error = result && result.error || { code: "graph_edit_failed", message: "The graph transaction failed." };
-                    showError(error.code, error.message);
+                    showError(error.code, error.message, true);
                     refresh(false, false);
                     return;
                 }
-                clearBanner();
+                clearBanner(true);
                 refresh(false, false);
             });
         }
@@ -1653,8 +1669,19 @@
     function clampInspectorToWorkspace() {
         if (!elements.workspace || !elements.inspector || elements.inspector.hidden) return;
         var bounded = clampInspectorPosition(elements.inspector.offsetLeft, elements.inspector.offsetTop);
-        elements.inspector.style.left = bounded.left + "px";
-        elements.inspector.style.top = bounded.top + "px";
+        if (elements.inspector.style.left !== bounded.left + "px") elements.inspector.style.left = bounded.left + "px";
+        if (elements.inspector.style.top !== bounded.top + "px") elements.inspector.style.top = bounded.top + "px";
+    }
+
+    function schedulePanelResize() {
+        if (resizeUpdatePending) return;
+        resizeUpdatePending = true;
+        var defer = window.requestAnimationFrame || function (callback) { window.setTimeout(callback, 16); };
+        defer.call(window, function () {
+            resizeUpdatePending = false;
+            updateCanvasBounds();
+            if (state.inspectorOpen) clampInspectorToWorkspace();
+        });
     }
 
     function render(state) {
@@ -2299,11 +2326,11 @@
             state.pending = false;
             if (!response.ok) {
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
-                showError(error.code, error.message);
+                showError(error.code, error.message, true);
                 refresh();
                 return;
             }
-            clearBanner();
+            clearBanner(true);
             adoptState(response);
         });
     }
@@ -2369,7 +2396,7 @@
             if (!elements.banner.classList.contains("error")) showError("graph_snapshot_unavailable", "The canonical graph could not be read from this effect.");
         } else if (state.graphMode || state.layoutPersistence) {
             clearBanner();
-        } else {
+        } else if (!retainedError) {
             elements.banner.className = "banner";
             elements.banner.textContent = "This plug-in build lacks node-layout streams. The graph uses default positions; update the plug-in to save node moves in the AE project.";
         }
@@ -2402,8 +2429,10 @@
                     var retryIndex = Math.min(startupRetryAttempt, STARTUP_RETRY_DELAYS_MS.length - 1);
                     var delay = STARTUP_RETRY_DELAYS_MS[retryIndex];
                     startupRetryAttempt += 1;
-                    elements.banner.className = "banner";
-                    elements.banner.textContent = "Connecting to After Effects; retrying shortly...";
+                    if (!retainedError) {
+                        elements.banner.className = "banner";
+                        elements.banner.textContent = "Connecting to After Effects; retrying shortly...";
+                    }
                     startupRetryTimer = window.setTimeout(function () {
                         startupRetryTimer = null;
                         if (epoch === refreshEpoch) refresh(true, false);
@@ -2441,7 +2470,8 @@
                     snapshotResponse.snapshot.initialized !== true) {
                     var graphError = snapshotResponse && snapshotResponse.error ||
                         { code: "graph_snapshot_unavailable", message: "The canonical graph could not be read from this effect." };
-                    showError(graphError.code, graphError.message);
+                    showError(graphError.code, graphError.message,
+                        !!failedGraphInitializations[response.target.token]);
                     // Keep the last valid canvas during a host read failure.
                     if (!state.nodes.length || state.targetToken !== response.target.token) adoptState(response, null);
                     return;
@@ -2458,7 +2488,12 @@
     elements.banner.className = "banner";
     elements.banner.textContent = "Panel script loaded; asking the host for the selected effect...";
 
-    elements.refresh.addEventListener("click", function () { refresh(true, true); });
+    elements.refresh.addEventListener("click", function () {
+        if (state.pending || refreshInFlight) return;
+        failedGraphInitializations = {};
+        clearBanner(true);
+        refresh(true, true);
+    });
     if (elements.graphCanvas) elements.graphCanvas.addEventListener("contextmenu", showGraphContextMenu);
     if (elements.contextMenu) elements.contextMenu.addEventListener("click", handleContextMenuAction);
     if (elements.graphScroll) {
@@ -2509,15 +2544,16 @@
         window.addEventListener("pointermove", moveNodeDrag);
         window.addEventListener("pointerup", endNodeDrag);
         window.addEventListener("pointercancel", endNodeDrag);
-        window.addEventListener("resize", function () {
-            updateCanvasBounds();
-            if (state.inspectorOpen) clampInspectorToWorkspace();
-        });
+        window.addEventListener("resize", schedulePanelResize);
     }
     if (window.ResizeObserver && elements.graphScroll) {
         var graphViewportObserver = new window.ResizeObserver(function () {
-            updateCanvasBounds();
-            if (state.inspectorOpen) clampInspectorToWorkspace();
+            var size = elements.graphScroll.clientWidth + ":" + elements.graphScroll.clientHeight + ":" +
+                (elements.workspace ? elements.workspace.clientWidth + ":" + elements.workspace.clientHeight : "");
+            if (size === observedPanelSize) return;
+            observedPanelSize = size;
+            // Write layout in a later frame, outside ResizeObserver delivery.
+            schedulePanelResize();
         });
         graphViewportObserver.observe(elements.graphScroll);
         if (elements.workspace) graphViewportObserver.observe(elements.workspace);

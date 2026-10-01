@@ -10,6 +10,7 @@ const view = require("../cep_panel/js/graph_view.js");
 const source = fs.readFileSync(path.join(__dirname, "../cep_panel/jsx/starfield_gateway.jsx"), "utf8");
 const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
 let epoch = 0, rejectNext = false, revision = 0, commits = 0, roundWireNumbers = false, beforeSubmit = null;
+let rejectNextAdd = null;
 const undo = { begins: 0, ends: 0 }, clone = value => Array.isArray(value) ? value.slice() : value;
 const renderer = { matchName: "org.starfieldfx.particle", name: "Starfield Particle", properties: {} };
 const control = (name, value) => ({ name, value: clone(value) });
@@ -55,7 +56,9 @@ function wrapEffect(raw) {
 }
 function parade() {
     return {get numProperties(){return items.length;},property(i){return items[i-1]?wrapEffect(items[i-1]):null;},
-        addProperty(matchName){items.push({matchName,name:"",properties:nodeControls()});epoch++;return wrapEffect(items[items.length-1]);} };
+        canAddProperty(matchName){return matchName !== "org.starfieldfx.node.particle" || !rejectNextAdd;},
+        addProperty(matchName){if(matchName===rejectNextAdd) throw new Error("Host refused scripted effect creation");
+            items.push({matchName,name:"",properties:nodeControls()});epoch++;return wrapEffect(items[items.length-1]);} };
 }
 const layer={id:29,name:"Particle Layer",selected:true,width:3840,height:2160,source:{pixelAspect:1},
     property(name){return name==="ADBE Effect Parade"?parade():null;} };
@@ -217,5 +220,15 @@ assert.equal(items.length,3);
 assert.equal(recoveredGraph.nodes.filter(n=>n.type===edits.types.emitter).length,1);
 assert.equal(recoveredGraph.nodes.filter(n=>n.type===edits.types.particle).length,1);
 assert.equal(recoveredGraph.edges.length,2);
+const beforeFailedAdd=snapshot().graphHex, beforeFailedAddCount=items.length;
+rejectNextAdd="org.starfieldfx.node.particle";
+const refusedParticle=apply({type:"addNode",nodeType:"particle",position:{x:20,y:20}});
+assert.equal(refusedParticle.ok,false);
+assert.match(refusedParticle.error.message,/Particle \(org\.starfieldfx\.node\.particle\), create effect:.*Host refused/);
+assert.match(refusedParticle.error.message,/canAddProperty=false/);
+assert.equal(items.length,beforeFailedAddCount,"failed Particle creation must not change the Effect Parade");
+assert.equal(snapshot().graphHex,beforeFailedAdd,"failed creation preserves existing nodes and connections");
+assert.equal(renderer.properties[42].value,0);
+rejectNextAdd=null;
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

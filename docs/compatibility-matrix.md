@@ -1,5 +1,26 @@
 # Behavior inventory
 
+## Build 6 correction from actual AE error — 2026-10-01
+
+Owner reports `FLOAT_COLOR_AWARE requires SUPPORTS_SMART_RENDER` in the test
+project and a CEP ResizeObserver delivery warning. Internal node float flags
+without implemented SmartFX are a confirmed contract defect. Build 6 adds the
+actual node selectors plus matching flags. CEP resize work is deferred/coalesced
+and resize-delivery warnings no longer replace native transaction errors.
+276 actual-node fake-host checks, focused gateway/startup checks and the SDK
+candidate build pass. Deployment awaits its requested authorization. Emitter
+duplication is owner-confirmed; Particle default/addition and native 32-bpc
+operation remain open until owner testing. [Checkpoint](native-node-checkpoint.md).
+
+## CEP 5b owner evidence — 2026-10-01
+
+Emitter duplication is owner-confirmed in AE 2023. Particle default creation
+and explicit addition still fail; native node acceptance is incomplete. CEP 5b
+keeps mutation/bootstrap errors visible and adds creation-stage diagnostics.
+Failed bootstrap no longer repeats on background polls. Two focused gateway/
+startup fixtures pass. No AEX was rebuilt/replaced and no AE session was started.
+Actual Particle failure text is required next; see [native-node-checkpoint.md](native-node-checkpoint.md).
+
 ## CEP 5a hotfix after owner feedback — 2026-10-01
 
 The owner reports build 5 creates native Emitter effects but repeatedly shows

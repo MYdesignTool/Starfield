@@ -1,5 +1,61 @@
 # P-02D native node checkpoint — 2026-10-01
 
+## Build 6: node SmartFX contract correction — 2026-10-01
+
+The owner supplied actual AE startup evidence:
+`PF_OutFlag2_FLOAT_COLOR_AWARE requires PF_OutFlag2_SUPPORTS_SMART_RENDER`.
+All four internal node modules advertised float awareness but implemented only
+legacy `PF_Cmd_RENDER`. This is a confirmed invalid flags/selector contract.
+It can block node effects in a 32-bpc project; Particle creation still needs
+real-host confirmation after correction.
+
+Build 6 uses node flags2 `0x00001400` (SmartFX + float) in both PiPL/runtime.
+The shared node implementation forwards input ROI/time/bounds in pre-render,
+copies the input through the host World Transform suite in smart render, and
+pairs successful input checkouts with checkin on output/suite/copy failures.
+Nodes remain controls-only, menu-hidden effects; MFR/GPU remain disabled. Code/
+PiPL version is `32774` (`0x8006`); parameter schema stays revision 18 and the
+Core DLL is unchanged.
+
+The owner's transient banner was actually `ResizeObserver loop limit exceeded`.
+CEP now coalesces resize work into the next animation frame, ignores unchanged
+observed sizes, and avoids redundant inspector-position writes. Only Chromium's
+two known resize-delivery warnings are excluded from the script-error banner;
+other script exceptions and native mutation failures remain visible. Token:
+`native-node-sync-6`.
+
+Checks: actual shared node EffectMain compiled separately for all four kinds,
+**276 checks, zero failures**; focused startup/resize/error and native gateway
+fixtures pass; May 2023 SDK candidate build succeeds. Fake copy callbacks verify
+byte transport/error cleanup, not AE's implementation. **No AE acceptance claim.**
+Candidate built with `-NoRuntimePublish -NoDistPublish`; deployment requested
+under ADR 0011. Backup name: `p02d-build6-node-smartfx-20261001`. Next owner gate:
+fresh default Emitter/Particle and one Particle addition in the failing AE
+project, including 32-bpc operation. Earlier rendering checks are not repeated.
+
+## CEP 5b: preserve Particle failure evidence — 2026-10-01
+
+Owner AE evidence: Emitter duplication now works. Particle is still absent by
+default and cannot be added. The displayed failure disappears before capture.
+**Particle creation and native node acceptance remain open.**
+
+Source inspection found successful background refresh clears the mutation error
+both before and inside `adoptState`. CEP 5b retains mutation/bootstrap failures
+until manual Refresh or a successful user edit. The banner is selectable and
+wraps long errors. A failed default bootstrap is attempted once per target per
+panel session; manual Refresh permits another attempt. Ordinary reads continue.
+Creation errors include the node match name, creation/identity/parameter stage,
+and a diagnostic `canAddProperty` result when creation itself fails. Parameter
+write failures include the exact control name. No successful Particle creation
+is inferred from static registration, parameter indices, or fake-host checks.
+
+Gateway/loader token: `native-node-sync-5b`. Only CEP sources changed via the
+existing junction; build-5 AEX/Core files are unchanged. Close/reopen CEP and
+attempt Particle once to capture the persistent actual AE error. Focused startup
+checks cover retention and bootstrap retry suppression; the native gateway
+fixture covers refusal to create Particle and verifies existing effects/links
+survive rollback. These checks passed; the real AE failure detail is pending.
+
 ## CEP 5a hotfix after owner feedback — 2026-10-01
 
 The owner reports build 5 creates native Emitter effects but repeatedly shows

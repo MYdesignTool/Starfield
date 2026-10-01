@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-5a";
+    var GATEWAY_BUILD = "native-node-sync-6";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -458,7 +458,11 @@
         if (!property || typeof property.setValue !== "function") {
             throw new Error("Node effect parameter is missing: " + name);
         }
-        if (!sameValue(property.value, value)) property.setValue(value);
+        try {
+            if (!sameValue(property.value, value)) property.setValue(value);
+        } catch (error) {
+            throw new Error("Node parameter '" + name + "' (" + effect.matchName + "): " + error.toString());
+        }
     }
 
     function readGraphFloat64(bytes, offset) {
@@ -820,15 +824,26 @@
         var parade = layer.property("ADBE Effect Parade");
         if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
         var previousCount = parade.numProperties;
-        var effect = parade.addProperty(spec.matchName);
-        if (!effect) throw new Error("AE did not create the " + spec.label + " effect instance.");
+        var effect = null, stage = "create effect";
         try {
+            effect = parade.addProperty(spec.matchName);
+            if (!effect) throw new Error("AE did not return the effect instance.");
+            stage = "name effect";
             effect.name = spec.label + " " + node.id.substr(0, 6);
+            stage = "write node identity";
             setNodeIdentity(effect, node.id);
+            stage = "write node record and parameters";
             setNodeParameters(effect, node, layer);
         } catch (error) {
+            var detail = spec.label + " (" + spec.matchName + "), " + stage + ": " + error.toString();
+            if (!effect) {
+                var available = "unknown";
+                try { available = String(layer.property("ADBE Effect Parade").canAddProperty(spec.matchName)); }
+                catch (ignoredAvailability) { /* diagnostic only; never gates creation */ }
+                throw new Error(detail + " [canAddProperty=" + available + "]");
+            }
             if (typeof effect.remove !== "function") {
-                throw new Error(error.toString() + " AE could not remove the partially initialized node effect.");
+                throw new Error(detail + " AE could not remove the partially initialized node effect.");
             }
             try {
                 effect.remove();
@@ -837,10 +852,10 @@
                     throw new Error("AE did not remove the partially initialized node effect.");
                 }
             } catch (rollbackError) {
-                throw new Error(error.toString() + " Removing the partially initialized node effect failed: " +
+                throw new Error(detail + " Removing the partially initialized node effect failed: " +
                                 rollbackError.toString());
             }
-            throw error;
+            throw new Error(detail);
         }
     }
 

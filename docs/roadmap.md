@@ -2,6 +2,18 @@
 
 ## Current acceptance checkpoint — 2026-10-01
 
+Latest: the owner supplied AE's float-aware node / missing SmartFX verification
+error. Build 6 implements node SmartFX passthrough with matching PiPL/runtime
+flags; 276 actual-node checks and the SDK candidate build pass. CEP resize work
+is deferred so it no longer hides operation errors. Deployment authorization is
+pending. Particle/native-node acceptance is still open; Emitter duplication works.
+
+Current owner evidence after CEP 5a: Emitter duplication works; Particle default
+creation/addition still fails. CEP 5b preserves the failing operation's error and
+captures the creation stage without an AEX replacement. Particle/native-node
+acceptance is still open. The remaining failure detail must come from one owner
+operation in AE; [checkpoint](native-node-checkpoint.md).
+
 Build 3 renders but crashes on layer selection, as confirmed by the owner. Build 4
 removes unused hidden structural groups and passes 721 adapter checks plus the
 May 2023 SDK build. One-folder deployment/rollback checks pass; build 4 is deployed

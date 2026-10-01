@@ -23,18 +23,25 @@ class FakeElement {
 }
 
 const elements = {};
-for (const id of ["banner", "chain", "targetLine", "modeLine", "revisionLine", "resolutionLine", "preset", "refresh"]) {
+for (const id of ["banner", "chain", "targetLine", "modeLine", "revisionLine", "resolutionLine", "preset", "refresh", "graphScroll"]) {
     elements[id] = new FakeElement(id);
 }
 
 const timers = new Map();
 let nextTimerId = 1;
 let stateCalls = 0;
+let failParameterWrite = true;
+let simulateBootstrapFailure = false, bootstrapCalls = 0;
+const windowListeners = {};
+const resizeObservers = [], animationFrames = [];
 const window = {
+    addEventListener(type, callback) { windowListeners[type] = callback; },
+    ResizeObserver: class { constructor(callback) { resizeObservers.push(callback); } observe() {} },
+    requestAnimationFrame(callback) { animationFrames.push(callback); },
     __adobe_cep__: {
         evalScript(script, callback) {
             if (script.indexOf("SFLD_ready") >= 0) {
-                callback("org.starfieldfx.panel/1/native-node-sync-5a");
+                callback("org.starfieldfx.panel/1/native-node-sync-6");
                 return;
             }
             if (script.indexOf("SFLD_getState(") >= 0) {
@@ -50,6 +57,24 @@ const window = {
                         resolution: "name", layoutPersistence: true, layout: {},
                         target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [] };
                 callback(JSON.stringify(response));
+                return;
+            }
+            if (script.indexOf("SFLD_setParameters(") >= 0) {
+                callback(JSON.stringify(failParameterWrite ? { protocol:"org.starfieldfx.panel", ok:false,
+                    error:{code:"graph_commit_failed",message:"Particle: creation failed; exact host detail"} } :
+                    {protocol:"org.starfieldfx.panel",ok:true,revision:"r3",controlSource:"AE Controls",
+                        resolution:"name",layoutPersistence:true,layout:{},
+                        target:{token:"target-1",comp:"Comp 1",layer:"Particles"},nodes:[]}));
+                return;
+            }
+            if (simulateBootstrapFailure && script.indexOf("SFLD_getGraphSnapshot(") >= 0) {
+                callback(JSON.stringify({protocol:"org.starfieldfx.panel",ok:true,snapshot:{initialized:false}}));
+                return;
+            }
+            if (simulateBootstrapFailure && script.indexOf("SFLD_syncGraphSnapshot(") >= 0) {
+                bootstrapCalls++;
+                callback(JSON.stringify({protocol:"org.starfieldfx.panel",ok:false,
+                    error:{code:"node_effect_sync_failed",message:"Particle: bootstrap failed"}}));
                 return;
             }
             callback("undefined");
@@ -96,4 +121,45 @@ assert.strictEqual(elements.banner.className, "banner hidden",
     "successful discovery should clear the banner: " + elements.banner.textContent);
 assert.strictEqual(timers.size, 0, "successful discovery should stop the retry loop");
 
-console.log("panel startup discovery passed (empty reply and delayed target recovered without manual Refresh)");
+elements.preset.value = "defaults";
+elements.preset.listeners.change();
+const retainedMessage = elements.banner.textContent;
+assert.match(retainedMessage, /graph_commit_failed.*exact host detail/,
+    "a failed edit must leave the complete diagnostic visible after its immediate refresh");
+windowListeners.focus();
+assert.equal(elements.banner.textContent, retainedMessage,
+    "a successful background read must not erase the edit error");
+assert.equal(elements.banner.className, "banner error");
+assert.equal(window.onerror("ResizeObserver loop limit exceeded", "index.html", 0), true);
+assert.equal(elements.banner.textContent, retainedMessage, "resize warnings must not mask the native edit failure");
+resizeObservers[0]();
+resizeObservers[0]();
+windowListeners.resize();
+assert.equal(animationFrames.length, 1, "observer and resize events defer/coalesce layout writes");
+animationFrames.shift()();
+resizeObservers[0]();
+assert.equal(animationFrames.length, 0, "unchanged observed dimensions must not start a resize feedback loop");
+elements.refresh.listeners.click();
+assert.equal(elements.banner.className, "banner hidden", "manual Refresh acknowledges the retained error");
+elements.preset.value = "defaults";
+elements.preset.listeners.change();
+failParameterWrite = false;
+elements.preset.value = "defaults";
+elements.preset.listeners.change();
+assert.equal(elements.banner.className, "banner hidden", "a successful user edit clears the previous edit error");
+
+window.StarfieldGraphCodec = {};
+window.StarfieldGraphTransactions = {};
+window.StarfieldGraphEdits = {};
+simulateBootstrapFailure = true;
+elements.refresh.listeners.click();
+assert.equal(bootstrapCalls, 1);
+assert.match(elements.banner.textContent, /node_effect_sync_failed.*Particle: bootstrap failed/);
+windowListeners.focus();
+windowListeners.focus();
+assert.equal(bootstrapCalls, 1, "background reads must not repeatedly mutate a failing bootstrap");
+assert.match(elements.banner.textContent, /Particle: bootstrap failed/);
+elements.refresh.listeners.click();
+assert.equal(bootstrapCalls, 2, "manual Refresh explicitly retries bootstrap once");
+
+console.log("Panel startup and retained error checks passed (discovery, failed edit survives background refresh, manual/successful edit acknowledgement, bootstrap retry suppression).");

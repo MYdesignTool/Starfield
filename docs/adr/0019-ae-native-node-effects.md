@@ -1,5 +1,28 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 6 flags/selector correction — 2026-10-01
+
+Owner AE evidence rejects float-aware internal effects without SmartFX. Build 6
+implements `PF_Cmd_SMART_PRE_RENDER` and `PF_Cmd_SMART_RENDER` in the shared node
+module, forwarding metadata/requested pixels and pairing pixel checkout/checkin.
+World Transform suite copy provides host-depth passthrough. Node PiPL/runtime
+flags2 both become `0x00001400`; packed version is `32774` (`0x8006`). This is an
+implementation-contract fix with no public parameter or node-record migration.
+Nodes remain independent saved effects, hidden from Effects menus. Main remains
+the sole particle renderer and Output owner. MFR/GPU flags stay disabled.
+276 actual-node fake-host checks and SDK compilation pass; Particle creation/
+32-bpc host acceptance is still pending. CEP token is `native-node-sync-6`.
+
+## CEP 5b qualification update — 2026-10-01
+
+The owner confirms Emitter duplication; Particle is still absent by default and
+cannot be added. Independent node effects remain the architecture. CEP 5b adds
+persistent mutation/bootstrap diagnostics and stops repeated failing bootstrap
+mutations on background reads. Actual Particle creation failure is not yet
+known; no AEX workaround or schema change is justified by static inspection.
+See [the checkpoint](../native-node-checkpoint.md) for the focused checks and the
+single next host action. Gateway token is `native-node-sync-5b`.
+
 ## CEP 5a hotfix after owner feedback — 2026-10-01
 
 The owner reports build 5 creates native Emitter effects but repeatedly shows

@@ -24,12 +24,20 @@ After Effects
 
 The node AEX modules hold independent AE parameter streams; they do not render
 particles. The existing `StarfieldParticle.aex` remains the only renderer and owns
-the canonical graph snapshot. The graph's fixed visible Output terminal is the
+the compiled graph snapshot. The independent node effects own saved authoring
+records. The graph's fixed visible Output terminal is the
 panel representation of that main effect; no separate Output AEX is built.
 Node AEX modules set `PF_OutFlag_I_AM_OBSOLETE` so they are not offered as
 standalone effects in AE's Effects menu. The CEP bridge still adds them by stable
 match name to persist independent node values; AE 2023 must confirm that this
 scripted creation path works while the modules are hidden from the menu.
+
+Build 6 corrects the internal node 32-bpc contract reported by the owner: node
+modules implement SmartFX pre-render/render pass-through and advertise SmartFX
+together with float awareness (`flags2=0x00001400`). They forward the input ROI,
+copy through the host world suite, and check in successful input checkouts on
+every failure path. Parameter schema remains revision 18. Four actual-node
+fake-host runs pass 276 checks; AE Particle creation/32-bpc qualification is open.
 
 The main renderer has only one structural parameter group, Output. Hidden
 bootstrap values use ordinary invisible controls; no invisible group boundary

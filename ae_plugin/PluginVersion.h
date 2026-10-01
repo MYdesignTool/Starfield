@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Revision 18 replaces expression snapshots with numeric revision/checksum streams.
-#define STARFIELD_VERSION_BUILD 5
-#define STARFIELD_VERSION_PACKED 32773 /* 0x8005 */
+// Build 6 implements SmartFX pass-through for the internal 32-bpc node effects.
+#define STARFIELD_VERSION_BUILD 6
+#define STARFIELD_VERSION_PACKED 32774 /* 0x8006 */

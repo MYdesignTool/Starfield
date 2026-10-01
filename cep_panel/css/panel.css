@@ -54,6 +54,9 @@ body {
   background: var(--panel);
   padding: 5px 7px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
 }
 .banner.error { border-left-color: var(--error); }
 .banner.hidden { display: none; }
