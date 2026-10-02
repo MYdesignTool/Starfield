@@ -51,10 +51,15 @@
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />
+    <ClCompile Include="EmitterHistoryCapture.cpp" />
     <ClCompile Include="WorldBridge.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
+    <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
+    <ClCompile Include="..\src\core\EmitterHistory.cpp" />
+    <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
+    <ClCompile Include="..\src\core\Random.cpp" />
     <ClCompile Include="..\src\core\Render.cpp" />
     <ClCompile Include="..\src\core\SequenceCodec.cpp" />
     <ClCompile Include="..\src\core\Settings.cpp" />

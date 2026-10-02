@@ -249,7 +249,7 @@ struct EvaluationBudget { std::uint64_t work{0}; };
 static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
                                                EmitterDimensionContext dimension_context,
-                                               EvaluationBudget& budget, unsigned depth) {
+                                               EvaluationBudget& budget, unsigned depth, EmitterOriginSampler* origins) {
     using R = Result<EvaluatedGraph>;
     if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph evaluation cancelled");
     budget.work += graph.nodes.size() + graph.edges.size();
@@ -436,7 +436,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 const auto source = index_of(edge.source_node);
                 return emitters[source] && auxiliary(source);
             }), roots.edges.end());
-            auto primary = evaluate_graph_impl(roots, time, cancellation, dimension_context, budget, depth + 1);
+            auto primary = evaluate_graph_impl(roots, time, cancellation, dimension_context, budget, depth + 1, origins);
             // Parked Auxiliary nodes remain ancestors through incoming edges in
             // a root-only graph only if their outputs are present (removed above).
             if (!primary.has_value()) return R::failure(primary.error());
@@ -521,7 +521,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                         if (kept.size() == output_particle_count && birth < kept.top().birth) break;
                         if (birth > 9e9) return R::failure(ErrorCode::invalid_time, "auxiliary birth exceeds time range");
                         const RationalTime birth_time{static_cast<std::int64_t>(std::llround(birth * 1e9)), 1'000'000'000};
-                        auto parents = evaluate_graph_impl(parent_graph, birth_time, cancellation, dimension_context, budget, depth + 1);
+                        auto parents = evaluate_graph_impl(parent_graph, birth_time, cancellation, dimension_context, budget, depth + 1, origins);
                         if (!parents.has_value()) return R::failure(parents.error());
                         for (const auto& parent : parents.value().particles) {
                             if (++budget.work > 20'000'000) return R::failure(ErrorCode::work_limit_exceeded, "auxiliary population evaluation limit exceeded");
@@ -552,9 +552,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             const double inherited_velocity = percent(kInheritVelocity, 0);
                             const double integral = settings.linear_drag > 0 ? -std::expm1(-settings.linear_drag * instance.age_seconds) / settings.linear_drag : instance.age_seconds;
                             const double decay = std::exp(-settings.linear_drag * instance.age_seconds);
-                            instance.position.x += parent.position.x + settings.emitter_origin.x + parent.velocity.x * inherited_velocity * integral;
-                            instance.position.y += parent.position.y + settings.emitter_origin.y + parent.velocity.y * inherited_velocity * integral;
-                            instance.position.z += parent.position.z + settings.emitter_origin.z + parent.velocity.z * inherited_velocity * integral;
+                            Vec3 birth_origin=settings.emitter_origin;
+                            if(origins) {
+                                const auto sampled=origins->sample(nodes[emitter]->id,birth);
+                                if(!sampled.has_value()) return R::failure(sampled.error());
+                                birth_origin=sampled.value();
+                            }
+                            instance.position.x += parent.position.x + birth_origin.x + parent.velocity.x * inherited_velocity * integral;
+                            instance.position.y += parent.position.y + birth_origin.y + parent.velocity.y * inherited_velocity * integral;
+                            instance.position.z += parent.position.z + birth_origin.z + parent.velocity.z * inherited_velocity * integral;
                             instance.velocity.x += parent.velocity.x * inherited_velocity * decay;
                             instance.velocity.y += parent.velocity.y * inherited_velocity * decay;
                             instance.velocity.z += parent.velocity.z * inherited_velocity * decay;
@@ -790,6 +796,14 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 }
                 auto& instance = result.particles[branch_targets[i].destination];
                 instance.emitter_id = nodes[plan.emitter]->id;
+                if(origins) {
+                    const double birth=double(branch_targets[i].slot)/plan.settings.value.birth_rate;
+                    const auto sampled=origins->sample(instance.emitter_id,birth);
+                    if(!sampled.has_value()) return R::failure(sampled.error());
+                    instance.position.x += sampled.value().x-plan.settings.value.emitter_origin.x;
+                    instance.position.y += sampled.value().y-plan.settings.value.emitter_origin.y;
+                    instance.position.z += sampled.value().z-plan.settings.value.emitter_origin.z;
+                }
                 // One downstream Appearance replaces the Particle curves.
                 apply_appearance(instance, appearance, plan.settings.value.seed);
             }
@@ -806,7 +820,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
 
 Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
-                                               EmitterDimensionContext dimension_context) {
+                                               EmitterDimensionContext dimension_context, EmitterOriginSampler* origin_sampler) {
     for (const auto& node : graph.nodes) if (node.type_key == graph_keys::kOutputNode) {
         const auto* enabled = find_value(node, graph_keys::kTimeRemapEnabled);
         const auto* clock = find_value(node, graph_keys::kTimeRemapSeconds);
@@ -820,7 +834,11 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         }
     }
     EvaluationBudget budget;
-    return evaluate_graph_impl(graph, time, cancellation, dimension_context, budget, 0);
+    auto decoded=decode_emitter_origin_history(graph);
+    if(!decoded.has_value()) return Result<EvaluatedGraph>::failure(decoded.error());
+    auto history=decoded.take_value();
+    if(!origin_sampler && history.present) origin_sampler=&history;
+    return evaluate_graph_impl(graph, time, cancellation, dimension_context, budget, 0, origin_sampler);
 }
 
 } // namespace starfield::core

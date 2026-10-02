@@ -42,6 +42,7 @@ try {
         'src\core\Graph.cpp',
         'src\core\GraphConstruction.cpp',
         'src\core\GraphEvaluation.cpp',
+        'src\core\EmitterHistory.cpp',
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',
         'src\core\PluginApi.cpp',
@@ -57,7 +58,7 @@ try {
         $sources[0] = 'tests\native_sync_tests.cpp'
         $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
-            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
+            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp')
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp') }
 

@@ -41,6 +41,7 @@
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
+    <ClCompile Include="..\src\core\EmitterHistory.cpp" />
     <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
     <ClCompile Include="..\src\core\PluginApi.cpp" />
     <ClCompile Include="..\src\core\Random.cpp" />

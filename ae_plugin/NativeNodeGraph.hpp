@@ -9,6 +9,9 @@ namespace starfield::adapter {
 
 namespace node_sync { struct NativeEdit; }
 
+struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}; };
+[[nodiscard]] PF_Err read_native_origin_bindings(const core::Graph&, std::vector<NativeOriginBinding>&) noexcept;
+
 // UI-only transaction. Restores changed dependency expressions unless accepted.
 class NativeBindingTransaction {
 public:

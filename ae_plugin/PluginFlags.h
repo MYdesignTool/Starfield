@@ -24,7 +24,9 @@
  * MFR (PF_OutFlag2_SUPPORTS_THREADED_RENDERING), GPU, and Compute Cache flags stay
  * unset until their milestones are implemented and qualified.
  */
-#define STARFIELD_OUT_FLAGS 0x02000464L  /* DEEP_COLOR_AWARE | PIX_INDEPENDENT | USE_OUTPUT_EXTENT | I_DO_DIALOG | NON_PARAM_VARY */
-#define STARFIELD_OUT_FLAGS2 0x0020148AL /* camera dependency plus SmartFX/float/alpha/GUID */
+/* Birth-position sampling checks out historical parameters. SmartFX tracks
+ * those dependencies automatically; no history cache survives a frame. */
+#define STARFIELD_OUT_FLAGS 0x02000466L  /* prior flags plus WIDE_TIME_INPUT */
+#define STARFIELD_OUT_FLAGS2 0x0022148AL /* prior flags plus AUTOMATIC_WIDE_TIME_INPUT */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

@@ -7,6 +7,8 @@
 #include "GraphCarrier.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
+#include "EmitterHistory.hpp"
+#include "starfield/core/GraphEvaluation.hpp"
 #include "AE_GeneralPlug.h"
 #include "SPBasic.h"
 #include "starfield/core/AgeCurve.hpp"
@@ -123,7 +125,8 @@ double evaluated_binding(A_long index, A_long time) {
     const std::u16string needle=u"result = fx.param(";
     auto from=expr.find(needle)+needle.size(); auto to=expr.find(u")",from);
     const auto digits=expr.substr(from,to-from);
-    int source=std::stoi(std::string(digits.begin(),digits.end())); auto& value=fixtures[id].values[source];
+    std::string source_digits;for(auto digit:digits) source_digits.push_back(static_cast<char>(digit));
+    int source=std::stoi(source_digits); auto& value=fixtures[id].values[source];
     auto component_marker=expr.find(u").value[",to);
     if(component_marker!=std::u16string::npos) {
         int component=expr[component_marker+8]-u'0';
@@ -486,10 +489,69 @@ int main() {
     renderer_data.inter.checkout_param=successful_checkout;
     for(auto count:{1,static_cast<int>(kTotalEffectParameterCount+1)}) {
         renderer_data.num_params=count;
-        auto graph=animated_graph;
-        check(sample_native_node_animation(&renderer_data,graph,1920,1080)==0,"stream sampling also works with nonzero delivered counts");
+        auto count_graph=animated_graph;
+        check(sample_native_node_animation(&renderer_data,count_graph,1920,1080)==0,"stream sampling also works with nonzero delivered counts");
     }
     renderer_data.num_params=0;
+    std::vector<NativeOriginBinding> birth_bindings;
+    check(read_native_origin_bindings(animated_graph,birth_bindings)==0 && birth_bindings.size()==1,
+          "native emitter identity maps to its three owned Origin dependency streams");
+    const auto birth_binding=birth_bindings.front();
+    static NativeOriginBinding fixture_birth_binding;
+    fixture_birth_binding=birth_binding;
+    renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long time,A_long,A_u_long scale,PF_ParamDef* output)->PF_Err {
+        const double seconds=double(time)/scale;
+        *output={};output->param_type=PF_Param_FLOAT_SLIDER;
+        if(index==fixture_birth_binding.x) output->u.fs_d.value=960+240*seconds*seconds;
+        else if(index==fixture_birth_binding.y) output->u.fs_d.value=540;
+        else if(index==fixture_birth_binding.z) output->u.fs_d.value=0;
+        else return PF_Err_INVALID_INDEX;
+        return 0;
+    };
+    auto birth_graph=animated_graph;
+    for(auto& node:birth_graph.nodes) for(auto& p:node.parameters) {
+        if(node.type_key==core::graph_keys::kEmitterNode && p.key==core::graph_keys::kBirthRate) p.value=4.0;
+        if(node.type_key==core::graph_keys::kEmitterNode && p.key==core::graph_keys::kEmitterShape) p.value=std::uint32_t{0};
+        if(node.type_key==core::graph_keys::kEmitterNode && p.key==core::graph_keys::kVelocity) p.value=core::Vec3{};
+        if(node.type_key==core::graph_keys::kEmitterNode &&
+           (p.key==core::graph_keys::kEmissionSpeed || p.key==core::graph_keys::kEmissionSpeedRandom || p.key==core::graph_keys::kVelocitySpread)) p.value=0.0;
+        if(node.type_key==core::graph_keys::kParticleNode && p.key==core::graph_keys::kParticleLifetimeSeconds) p.value=5.0;
+        if(node.type_key==core::graph_keys::kForceNode && p.key==core::graph_keys::kGravity) p.value=core::Vec3{};
+    }
+    const auto saved_before_history=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
+    std::vector<std::byte> history_pixels;
+    for(auto time:{24,36,24}) {
+        auto snapshot=birth_graph;renderer_data.current_time=time;PF_OutData birth_output{};
+        check(capture_emitter_origin_history(&renderer_data,&birth_output,snapshot,1920,1080,core::NeverCancelled{})==0,
+              "pre-render samples nonlinear native Origin XY at historical birth times");
+        const auto population=core::evaluate_particle_graph(snapshot,{time,24},core::NeverCancelled{});
+        check(population.has_value() && !population.value().particles.empty(),"frozen birth graph evaluates without AE callbacks");
+        if(population.has_value()) for(const auto& p:population.value().particles)
+            check(std::abs(p.position.x-(240*std::pow(double(p.id)/4,2))/1080)<1e-10,
+                  "already emitted particles retain birth positions as the emitter moves");
+        core::RenderRequest request{};request.settings=core::validate_settings(core::Settings{});
+        request.graph=std::make_shared<const core::Graph>(snapshot);
+        request.frame={1920,1080,512,288,{0,0,512,288},{time,24},{1,24},core::PixelFormat::rgba8,
+            core::ColorSpace::ae_working_space,core::AlphaMode::premultiplied,1,core::Quality::full};
+        const auto pixels=core::CpuParticleRenderer{}.render(request,core::NeverCancelled{});
+        check(pixels.has_value(),"CPU backend renders native historical Origin graph");
+        if(pixels.has_value()) {
+            if(history_pixels.empty()) history_pixels=pixels.value().pixels;
+            else if(time==24) check(history_pixels==pixels.value().pixels,"history pixels repeat exactly in reverse frame order");
+        }
+    }
+    check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==saved_before_history && suite_requests==suites_before,
+          "birth history neither mutates saved project graph nor acquires AEGP suites");
+    renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex,A_long,A_long,A_u_long,PF_ParamDef*)->PF_Err {return PF_Err_INVALID_INDEX;};
+    auto failed_history=birth_graph;PF_OutData history_error{};
+    check(capture_emitter_origin_history(&renderer_data,&history_error,failed_history,1920,1080,core::NeverCancelled{})==PF_Err_INVALID_INDEX &&
+          std::strstr(history_error.return_msg,"parameter checkout failed") && failed_history.optional_records.size()==birth_graph.optional_records.size(),
+          "historical checkout rejection reports its cause and cannot publish partial history");
+    struct CancelHistory final:core::Cancellation {bool is_cancelled() const noexcept override {return true;}} cancel_history;
+    auto cancelled_history=birth_graph;PF_OutData cancel_output{};
+    check(capture_emitter_origin_history(&renderer_data,&cancel_output,cancelled_history,1920,1080,cancel_history)==PF_Interrupt_CANCEL && cancel_output.return_msg[0]=='\0',
+          "cancelled birth sampling returns the normal interrupt without an error dialog");
+    renderer_data.inter.checkout_param=successful_checkout;
     renderer_data.inter.checkout_param=[](PF_ProgPtr, PF_ParamIndex, A_long, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
         *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=kNativeBindingUnavailable;return 0;
     };

@@ -2,6 +2,7 @@
 
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
+#include "starfield/core/EmitterHistory.hpp"
 
 namespace starfield::core {
 
@@ -13,11 +14,12 @@ struct EvaluatedGraph {
 };
 
 // Evaluate an immutable schema-1 snapshot at absolute rational time. Node values
-// are constant; appearance endpoints define a linear age curve. Reject invalid
+// are sampled frame values; an optional origin sampler/history supplies emitter
+// positions at each birth. Appearance endpoints define an age curve. Reject invalid
 // topology, ambiguous outputs, and out-of-range values rather than falling back.
 [[nodiscard]] Result<EvaluatedGraph> evaluate_particle_graph(
     const Graph& graph, RationalTime time, const Cancellation& cancellation,
-    EmitterDimensionContext dimension_context = {});
+    EmitterDimensionContext dimension_context = {}, EmitterOriginSampler* origin_sampler = nullptr);
 
 // Construct a schema-1 graph with an explicit Particle node. The Particle node
 // receives the settings' age-curve values; when appearance is disabled, constant

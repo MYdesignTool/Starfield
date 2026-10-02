@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 20: SmartFX stream sampling without a delivered parameter array.
-#define STARFIELD_VERSION_BUILD 20
-#define STARFIELD_VERSION_PACKED 32788 /* 0x8014 */
+// Build 21: immutable emitter Origin history sampled at particle birth.
+#define STARFIELD_VERSION_BUILD 21
+#define STARFIELD_VERSION_PACKED 32789 /* 0x8015 */

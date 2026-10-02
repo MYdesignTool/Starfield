@@ -5,6 +5,7 @@
 #include "Camera.hpp"
 #include "Diagnostics.hpp"
 #include "Parameters.hpp"
+#include "EmitterHistory.hpp"
 #include "WorldBridge.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
@@ -345,6 +346,12 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         // pre-render reports an error. (PF_PreRenderCallbacks has no checkin callback.)
         return graph_err;
     }
+    core::Graph frame_graph=*graph;
+    HostCancellation history_cancel(in_data);
+    const auto history_error=capture_emitter_origin_history(in_data,out_data,frame_graph,
+        input_result.ref_width,input_result.ref_height,history_cancel);
+    if(history_error) return history_error;
+    graph=std::make_shared<const core::Graph>(std::move(frame_graph));
     auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
     if (!encoded.has_value()) {
         report_core_failure(out_data, encoded.error().detail);

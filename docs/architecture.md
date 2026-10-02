@@ -1,6 +1,18 @@
 # Starfield plug-in architecture
 
 
+## M3-03 / build 21 — emitter Origin birth history
+
+Build 20 owner playback renders but reveals current Origin moving all survivors.
+Pre-render now samples owned Origin XY/Z at birth times and carries a transient
+immutable history record to Core, shared across Auxiliary parent evaluations.
+Ordinary velocity/force displacement stays relative to each birth position.
+Wide-time dependency declarations match PiPL/runtime; history never persists in
+project data or a process-global cache. IDs, Render.hpp and C ABI 2 stay stable.
+921 scoped checks and the paired SDK build pass. Owner trajectory/interpolation,
+cache invalidation after past-key edits and reopen need AE qualification.
+Other animated clocks/birth controls and Force integration are separate work.
+
 ## P-02J / build 20 — SmartFX delivered parameter count
 
 Owner build-19 opening error reports binding stream -1. Sampling no longer treats

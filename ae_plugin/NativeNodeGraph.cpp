@@ -895,6 +895,21 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
+PF_Err read_native_origin_bindings(const core::Graph& graph, std::vector<NativeOriginBinding>& bindings) noexcept {
+    try {
+        std::vector<RawNode> nodes;
+        if(!read_binding_record(graph,nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        for(const auto& node:nodes) if(node.kind==Kind::emitter) {
+            const auto& xy=node.fields[4];const auto& z=node.fields[5];
+            if(!xy.present || xy.type!=node_sync::ValueKind::point2 || xy.slot<0 ||
+               !z.present || z.type!=node_sync::ValueKind::scalar || z.slot<0) return PF_Err_BAD_CALLBACK_PARAM;
+            bindings.push_back({node.id,kNativeBindingFirstIndex+xy.slot,kNativeBindingFirstIndex+xy.slot+1,kNativeBindingFirstIndex+z.slot});
+        }
+        return PF_Err_NONE;
+    } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+    catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+
 PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height,
                                     A_long* failed_stream, const char** failed_stage) noexcept {
     if (failed_stream) *failed_stream = -1;

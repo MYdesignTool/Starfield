@@ -32,6 +32,7 @@ $adapterInputs = @(
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
+    'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\EmitterHistory.hpp',
     'ae_plugin\WorldBridge.cpp', 'ae_plugin\WorldBridge.hpp',
     'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h', 'ae_plugin\BuildPiPL.ps1',
     'ae_plugin\StarfieldPiPL.r', 'ae_plugin\Starfield.vcxproj',
@@ -42,13 +43,17 @@ $adapterInputs = @(
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
+    'include\starfield\core\EmitterHistory.hpp',
     'include\starfield\core\ParticleSimulation.hpp',
+    'include\starfield\core\Random.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
     'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',
     'include\starfield\core\Time.hpp', 'schema\parameters.json',
     'schema\node-parameters.json',
     'src\core\Geometry.cpp', 'src\core\Graph.cpp',
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
+    'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
+    'src\core\ParticleSimulation.cpp', 'src\core\Random.cpp',
     'src\core\SequenceCodec.cpp', 'src\core\Settings.cpp', 'src\core\Time.cpp'
 )
 $adapterFingerprint = ($adapterInputs | ForEach-Object {

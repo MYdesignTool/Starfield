@@ -1,5 +1,25 @@
 # Agent-ready implementation backlog
 
+## M3-03 — emitter Origin birth history / build 21
+
+Owner confirms build 20 renders but Origin keys translate every live particle.
+Owns GraphEvaluation.hpp/.cpp, new core EmitterHistory.hpp/.cpp, native origin
+binding accessors and new adapter EmitterHistory capture, SmartRender.cpp,
+Starfield/Core MSBuild and CMake source lists, build fingerprint/targeted runner,
+current/native scoped checks, PluginVersion, PluginFlags/EffectMain for paired
+historical dependency declarations, and ADR 0024/architecture/roadmap/build/
+compatibility/checkpoint records. Render.hpp and C ABI 2 remain unchanged.
+Sample native Origin XY/Z at particle birth times through owned PF checkouts in
+pre-render; encode a transient immutable history record for the DLL. Preserve
+determinism, Auxiliary parent birth positions, force-relative motion, cancellation
+and bounded memory. No project migration or process-global simulation state.
+Animated rates/lifetime/forces and other birth controls require separate semantics.
+AE visual interpolation/reopen remain owner qualification.
+
+Build 21 source/SDK candidate complete: 921 focused checks pass, covering actual
+historical PF checkouts, frozen graph/CPU pixels, Auxiliary birth origins and
+failure/cancellation behavior. All five AEXs plus Core build; owner AE gate open.
+
 ## P-02I — native Effect Controls commit / build 17
 
 Build 17 owner evidence: build 16 still fails at delivery/parameter 4/stream -1/516.

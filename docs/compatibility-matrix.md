@@ -1,5 +1,33 @@
 # Behavior inventory
 
+## Build 21 M3-03 — emitter Origin at birth
+
+Owner confirms build 20 renders and Origin keys animate, but survivors follow the
+current emitter position. Birth-position semantics are implemented separately from
+current-frame parameter sampling (ADR 0024). Pre-render queries owned Origin XY/Z
+dependencies at selected particles' birth times, memoized by emitter UUID/time.
+Its transient optional record 0x8003/version 1 passes immutable positions to the
+DLL. Primary particles retain their birth origin plus normal velocity/force motion;
+Auxiliary children use historical parent positions and their own birth offsets.
+No project graph writes, process-global state, AE handles in Core, public ID,
+Render.hpp or C ABI 2 changes. Paired PiPL/runtime wide-time flags let AE track
+historical dependencies; no cross-frame history cache is kept.
+
+Native sync 792, camera 12, portable current-node 78 and renderer controls 39
+checks pass (921 total). Nonlinear/subframe origins, frozen codec transport, old
+particles staying at birth positions, Auxiliary parents, forward/reverse pixels,
+unchanged project graph, failed checkout and quiet cancellation are covered.
+All five May 2023 SDK Release /MT AEXs and the paired Core DLL build without
+compiler warnings/errors. Logs: artifacts/build21-*. No AE session operated.
+Owner AE interpolation, prior-key cache invalidation and reopen remain open gates.
+
+History is bounded to 1,000,000 unique origins (48 bytes each); host sampling uses
+up to one-million ticks/s, reduced to fit its 32-bit numerator. Other animated
+birth controls/emission clocks and integrated Force history remain separate work.
+The main AEX's birth planner shares GraphEvaluation/ParticleSimulation/Random
+source with Core; these inputs are now part of the adapter fingerprint, requiring
+paired builds when planning changes. CEP keeps its unchanged animation-19 token.
+
 ## Build 20 P-02J follow-up — 2026-10-02
 
 Owner rejects build 19 on opening: animation binding stream -1 unavailable (516).

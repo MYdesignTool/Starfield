@@ -8,6 +8,7 @@ add_library(starfield_core STATIC
     src/core/Graph.cpp
     src/core/GraphConstruction.cpp
     src/core/GraphEvaluation.cpp
+    src/core/EmitterHistory.cpp
     src/core/ParticleSimulation.cpp
     src/core/Random.cpp
     src/core/Render.cpp

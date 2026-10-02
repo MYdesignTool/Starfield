@@ -2,6 +2,7 @@
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/PluginApi.h"
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/SequenceCodec.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -173,4 +174,51 @@ void test_reference_force_and_globals() {
     check(all.has_value() && normal.has_value() && all.value().pixels==normal.value().pixels,"Preview 100 matches normal pixels exactly");
     set(preview.nodes[2],kPreviewChance,101.0);check(!render().has_value(),"invalid global percentages rejected");
 }
-int main() {test_auxiliary();test_camera();test_reference_force_and_globals();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_birth_origins() {
+    struct Path final:EmitterOriginSampler {
+        std::vector<EmitterOriginSample> captured;
+        Result<Vec3> sample(NodeId node,double time) override {
+            const Vec3 value{(node.value.bytes[15]==4 ? 20.0 : 10.0)*time*time,0,0};
+            if(std::none_of(captured.begin(),captured.end(),[&](const auto& s){return s.emitter==node && s.birth_seconds==time;})) captured.push_back({node,time,value});
+            return Result<Vec3>::success(value);
+        }
+    } path;
+    Settings settings;settings.birth_rate=2;settings.particle_lifetime_seconds=5;settings.velocity={};settings.velocity_spread=0;settings.emitter_origin={99,0,0};
+    auto made=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)});
+    auto graph=made.take_value();
+    const auto first=evaluate_particle_graph(graph,{1,1},never,{},&path);
+    check(first.has_value() && first.value().particles.size()==3,"birth path emits at distinct historical origins");
+    if(!first.has_value()) return;
+    for(const auto& p:first.value().particles) check(std::abs(p.position.x-10*std::pow(double(p.id)/2,2))<1e-12,"nonlinear origin sampled at subframe birth");
+    const auto encoded=encode_emitter_origin_history(path.captured);
+    check(encoded.has_value(),"encode immutable birth history");
+    if(!encoded.has_value()) return;
+    graph.optional_records.push_back(encoded.value());
+    const auto bytes=serialize_graph(graph,particle_node_registry());
+    check(bytes.has_value(),"birth history survives Core graph transport");
+    auto decoded=deserialize_graph(bytes.value(),particle_node_registry());
+    check(decoded.has_value(),"decode transported birth history");
+    const auto replay=evaluate_particle_graph(decoded.value(),{1,1},never);
+    check(replay.has_value() && replay.value().particles.size()==first.value().particles.size(),"DLL evaluation uses frozen birth positions without host callbacks");
+    if(replay.has_value()) for(std::size_t i=0;i<replay.value().particles.size();++i)
+        check(replay.value().particles[i].position.x==first.value().particles[i].position.x,"frozen history repeats exact positions");
+    graph.optional_records.clear();
+    const auto later=evaluate_particle_graph(graph,{2,1},never,{},&path);
+    check(later.has_value() && later.value().particles.size()==5,"later frame includes new births");
+    if(later.has_value()) for(const auto& old:first.value().particles) {
+        const auto found=std::find_if(later.value().particles.begin(),later.value().particles.end(),[&](const auto& p){return p.id==old.id;});
+        check(found!=later.value().particles.end() && found->position.x==old.position.x,"emitter movement leaves older stationary particles in place");
+    }
+    const auto reverse=evaluate_particle_graph(graph,{1,1},never,{},&path);
+    check(reverse.has_value() && reverse.value().particles[1].position.x==first.value().particles[1].position.x,"reverse-frame evaluation is independent of later history");
+    auto missing=encoded.value();missing.resize(12);missing[4]=std::byte{12};missing[5]=std::byte{0};missing[6]=std::byte{0};missing[7]=std::byte{0};
+    for(std::size_t i=8;i<12;++i) missing[i]=std::byte{0};
+    graph.optional_records={missing};check(!evaluate_particle_graph(graph,{1,1},never).has_value(),"missing birth positions do not fall back to current origin");
+    graph.optional_records={encoded.value()};graph.optional_records[0][4]=std::byte{0};
+    check(!evaluate_particle_graph(graph,{1,1},never).has_value(),"malformed history rejected before simulation");
+    auto auxiliary=auxiliary_graph();Path aux_path;
+    const auto children=evaluate_particle_graph(auxiliary,{5,4},never,{},&aux_path);
+    check(children.has_value() && std::any_of(children.value().particles.begin(),children.value().particles.end(),[](const auto& p){return std::abs(p.position.x-5.5)<1e-9;}),
+          "Auxiliary children keep parent's historical origin and their own birth offset");
+}
+int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
