@@ -1,5 +1,15 @@
 # Build and host matrix
 
+## Build 15 P-02I candidate — 2026-10-02
+
+Packed 32783 / 0x800F; main 21/native identity 3/layout 6; node schemas and Core
+ABI 2 unchanged. Native edits use acknowledged generic requests and explicit
+renderer stream publication. Scoped native 252/camera 12 and renderer controls
+38 checks pass; this is fake-host evidence, not AE acceptance. One paired AEX
+update is required because both node transport and renderer entrypoint change.
+Candidate build and deployment records stay under artifacts/build15-*; see
+native-node-checkpoint.md and ADR 0022 for remaining AE qualification.
+
 ## Build 14 P-02H candidate — 2026-10-02
 
 Packed 32782 / 0x800E; main 21/native identity 3/layout 6; Emitter 5, Particle 2,

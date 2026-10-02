@@ -53,7 +53,12 @@ try {
         $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
     if ($CurrentNodes) { $sources[0] = 'tests\current_node_core_tests.cpp' }
-    if ($NativeSync) { $sources = @('tests\native_sync_tests.cpp', 'tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp') }
+    if ($NativeSync) {
+        $sources[0] = 'tests\native_sync_tests.cpp'
+        $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',
+            'ae_plugin\GraphCarrier.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
+            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
+    }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp') }
 
     $responseLines = @(

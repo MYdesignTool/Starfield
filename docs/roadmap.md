@@ -1,5 +1,17 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-02I / build 15 — native control synchronization
+
+Owner reports native controls only affect rendering after a CEP edit. Build 15
+uses an acknowledged generic request with the callback's new value and explicit
+renderer stream publication/readback/rollback. Targeted fake-host timing checks
+exercise new values before their source streams commit. Native dragging with CEP
+closed, undo/redo and save/reopen remain owner AE 2023 qualification gates.
+
+The owner's Appearance review is partially confirmed: it is an active optional
+override, with duplicated Particle controls except Life. Its removal is a separate
+cleanup scope; default topology omission alone does not prove unreachable code.
+
 ## P-02H / build 14 — 2026-10-02
 
 Owner requests Force/main reference alignment, million-particle fresh cap and

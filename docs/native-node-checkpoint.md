@@ -1,5 +1,36 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 15 candidate: native Effect Controls commits
+
+P-02I replaces synthetic supervised inter-effect calls with COMPLETELY_GENERAL,
+carrying the edited value by UUID. Main graph/revision/checksum/source are saved
+with AEGP streams, read back byte-for-byte and restored on failure. Ignored calls
+cannot report a successful edit. No layout, schema, public ID or Core ABI changes.
+
+Minimum checks: native sync 252 and camera capture 12, all passing; renderer
+registration/pre-render 38 passing. The sync fixture retains old source values
+until callback return and discards callback-array edits, then verifies the actual
+saved graph. It covers Origin at Quarter, scalar values, angles/popups, Life,
+opacity/color, Force, independent curves, missing UUIDs and failed/ignored writes.
+Scratch logs: artifacts/build15-native-sync.log and build15-renderer-controls.log.
+May 2023 SDK x64 Release /MT candidate build passes at packed 32783 (0x800F),
+with -NoRuntimePublish -NoDistPublish; source push precedes deployment.
+No AE session operated; native edits with CEP closed, undo and reopen remain open.
+
+### Appearance review
+
+Confirmed: gateway registers Appearance, native base counts are Particle 43 and
+Appearance 42, both use add_particle_parameters (the boolean adds Life), and CEP
+still permits creating Appearance. The default chain omits it. Native compiler
+conditional offsets correspond to those layouts and do not alone imply wrong
+reads. Core treats Appearance as an active optional downstream override, rejects
+multiple active overrides per Particle stream, and replaces appearance values
+before one apply_appearance call. It is overlapping design, not unreachable code.
+No causal link to delayed native edits is established. Removal would touch Core
+schemas, node modules/build/deploy manifests and CEP; it is not silently folded
+into this synchronization patch. Owner's requested Particle naming remains the
+default topology.
+
 ## Build 14: ordinary Force, renderer globals and population default
 
 P-02H implements scalar Gravity/random, separate Wind XYZ, Spin/frequency/resist/

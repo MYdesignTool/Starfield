@@ -1,5 +1,15 @@
 # Starfield plug-in architecture
 
+## P-02I / build 15
+
+Native node USER_CHANGED_PARAM sends an acknowledged COMPLETELY_GENERAL request
+to the renderer, carrying its accepted value and UUID. The native compiler applies
+that value only to the matching node/index; other controls remain AE-owned streams.
+The renderer publishes graph/revision/checksum/source with AEGP_SetStreamValue,
+checks exact saved bytes and restores old values on failure. No synthetic callback
+array is treated as persistence. Rendering still consumes immutable saved graphs;
+main 21/native layout 6/Core ABI 2 and node schemas are unchanged. See ADR 0022.
+
 ## P-02H / build 14
 
 Fresh Output cap is 1000000 (maximum 2000000); low-population evaluation reserves

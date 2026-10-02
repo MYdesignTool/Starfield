@@ -11,6 +11,7 @@
 #include "GraphCarrier.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
+#include "NodeGraphSync.hpp"
 #include "PluginFlags.h"
 #include "PluginVersion.h"
 #include "SmartRender.hpp"
@@ -105,6 +106,9 @@ PF_Err dispatch(PF_Cmd cmd,
                 carrier_error != PF_Err_NONE) return carrier_error;
             return starfield::adapter::user_changed_param(in_data, out_data, params,
                                                           static_cast<PF_UserChangedParamExtra*>(extra));
+        case PF_Cmd_COMPLETELY_GENERAL:
+            return starfield::adapter::commit_native_graph_edit(in_data, out_data, params,
+                static_cast<starfield::adapter::node_sync::NativeEdit*>(extra));
         case PF_Cmd_DO_DIALOG:
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);

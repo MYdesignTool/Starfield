@@ -1,6 +1,7 @@
 #include "GraphCarrier.hpp"
 #include "NativeNodeGraph.hpp"
 #include "Parameters.hpp"
+#include "NodeGraphSync.hpp"
 #include "SPBasic.h"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -9,8 +10,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <new>
+#include <array>
 
 namespace starfield::adapter {
 namespace {
@@ -119,5 +122,131 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return reject(output, params, nonce, "allocation failed", PF_Err_OUT_OF_MEMORY); }
     catch (...) { return reject(output, params, nonce, "unexpected failure", PF_Err_INTERNAL_STRUCT_DAMAGED); }
+}
+
+PF_Err commit_native_graph_edit(PF_InData* data, PF_OutData* output, PF_ParamDef* params[],
+                               node_sync::NativeEdit* edit) noexcept {
+    // Unknown generic calls do not belong to our private transport.
+    if (!edit || edit->magic != 0x53464E45u) return PF_Err_NONE;
+    edit->accepted = false; edit->revision = 0; edit->status = PF_Err_BAD_CALLBACK_PARAM;
+    if (!data || !params || !data->utils || !data->pica_basicP || !data->effect_ref ||
+        !node_sync::valid_edit(*edit) || data->num_params <= kGraphChecksumLowId)
+        return edit->status;
+    try {
+        // Never ask AE to honor modifications to a synthetic callback array.
+        std::array<PF_ParamDef, kTotalEffectParameterCount + 1> scratch{};
+        std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
+        if (data->num_params < static_cast<A_long>(scratch.size())) return edit->status;
+        for (std::size_t i = 0; i < scratch.size(); ++i) {
+            if (!params[i]) return edit->status;
+            scratch[i] = *params[i]; pointers[i] = &scratch[i];
+        }
+        core::Graph graph;
+        bool found = false;
+        PF_Err error = compile_native_node_graph(data, pointers.data(), graph, found, edit);
+        if (error || !found) return edit->status = error ? error : PF_Err_BAD_CALLBACK_PARAM;
+        A_long revision = 0;
+        error = write_graph_snapshot(data, pointers.data(), graph, &revision);
+        if (error) return edit->status = error;
+        scratch[kControlSourceId].u.pd.value = kNodeControlSource;
+
+        struct Publish {
+            PF_InData* data{};
+            const AEGP_PFInterfaceSuite1* pf{};
+            const AEGP_EffectSuite4* effects{};
+            const AEGP_StreamSuite6* streams{};
+            AEGP_EffectRefH renderer{};
+            PF_ArbitraryH graph{};
+            std::array<AEGP_StreamRefH, 5> refs{};
+            std::array<AEGP_StreamValue2, 5> old{};
+            std::array<bool, 5> read{};
+            ~Publish() {
+                for (std::size_t i = 0; i < refs.size(); ++i) {
+                    if (read[i]) streams->AEGP_DisposeStreamValue(&old[i]);
+                    if (refs[i]) streams->AEGP_DisposeStream(refs[i]);
+                }
+                if (renderer) effects->AEGP_DisposeEffect(renderer);
+                if (graph) data->utils->host_dispose_handle(graph);
+                if (streams) data->pica_basicP->ReleaseSuite(kAEGPStreamSuite, kAEGPStreamSuiteVersion6);
+                if (effects) data->pica_basicP->ReleaseSuite(kAEGPEffectSuite, kAEGPEffectSuiteVersion4);
+                if (pf) data->pica_basicP->ReleaseSuite(kAEGPPFInterfaceSuite, kAEGPPFInterfaceSuiteVersion1);
+            }
+        } publish;
+        publish.data = data;
+        error = create_graph_parameter(data, graph, &publish.graph);
+        if (error) return edit->status = error;
+        const AEGP_PluginID plugin_id = graph_carrier_plugin_id();
+        if (!plugin_id) return edit->status;
+        auto* basic = data->pica_basicP;
+        A_Err ae_error = basic->AcquireSuite(kAEGPPFInterfaceSuite, kAEGPPFInterfaceSuiteVersion1,
+                                             reinterpret_cast<const void**>(&publish.pf));
+        if (!ae_error) ae_error = basic->AcquireSuite(kAEGPEffectSuite, kAEGPEffectSuiteVersion4,
+                                                     reinterpret_cast<const void**>(&publish.effects));
+        if (!ae_error) ae_error = basic->AcquireSuite(kAEGPStreamSuite, kAEGPStreamSuiteVersion6,
+                                                     reinterpret_cast<const void**>(&publish.streams));
+        if (!ae_error) ae_error = publish.pf->AEGP_GetNewEffectForEffect(plugin_id, data->effect_ref, &publish.renderer);
+        if (ae_error || !publish.renderer) return edit->status = static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);
+        // Publish graph last: its changed stream invalidates the main renderer.
+        constexpr std::array<A_long, 5> indices{kControlSourceId, kGraphRevisionId,
+            kGraphChecksumHighId, kGraphChecksumLowId, kGraphParameterId};
+        const A_Time time{data->current_time, data->time_scale};
+        for (std::size_t i = 0; i < indices.size(); ++i) {
+            ae_error = publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id, publish.renderer,
+                indices[i], &publish.refs[i]);
+            if (ae_error || !publish.refs[i]) return edit->status = static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);
+            ae_error = publish.streams->AEGP_GetNewStreamValue(plugin_id, publish.refs[i], AEGP_LTimeMode_LayerTime,
+                &time, TRUE, &publish.old[i]);
+            if (ae_error) return edit->status = static_cast<PF_Err>(ae_error);
+            publish.read[i] = true;
+        }
+        std::size_t written = 0;
+        for (; written < indices.size(); ++written) {
+            AEGP_StreamValue2 value{}; value.streamH = publish.refs[written];
+            if (written == indices.size() - 1) value.val.arbH = reinterpret_cast<AEGP_ArbBlockVal>(publish.graph);
+            else value.val.one_d = written == 0 ? kNodeControlSource : scratch[indices[written]].u.fs_d.value;
+            ae_error = publish.streams->AEGP_SetStreamValue(plugin_id, publish.refs[written], &value);
+            if (ae_error) { ++written; break; } // Restore even a partially applied failed write.
+        }
+        // A successful suite call still needs an actual saved graph and receipt.
+        if (!ae_error) {
+            for (std::size_t i = 0; i < indices.size(); ++i) {
+                AEGP_StreamValue2 saved{};
+                ae_error = publish.streams->AEGP_GetNewStreamValue(plugin_id, publish.refs[i], AEGP_LTimeMode_LayerTime,
+                    &time, TRUE, &saved);
+                if (ae_error) break;
+                if (i == indices.size() - 1) {
+                    const auto handle = reinterpret_cast<PF_ArbitraryH>(saved.val.arbH);
+                    const auto size = data->utils->host_get_handle_size(publish.graph);
+                    if (!handle || data->utils->host_get_handle_size(handle) != size) ae_error = PF_Err_BAD_CALLBACK_PARAM;
+                    else {
+                        const void* expected = data->utils->host_lock_handle(publish.graph);
+                        const void* actual = data->utils->host_lock_handle(handle);
+                        if (!expected || !actual || std::memcmp(expected, actual, static_cast<std::size_t>(size)) != 0)
+                            ae_error = PF_Err_BAD_CALLBACK_PARAM;
+                        if (actual) data->utils->host_unlock_handle(handle);
+                        if (expected) data->utils->host_unlock_handle(publish.graph);
+                    }
+                } else if (saved.val.one_d != (i == 0 ? kNodeControlSource : scratch[indices[i]].u.fs_d.value)) {
+                    ae_error = PF_Err_BAD_CALLBACK_PARAM;
+                }
+                publish.streams->AEGP_DisposeStreamValue(&saved);
+                if (ae_error) break;
+            }
+        }
+        if (ae_error) {
+            bool rollback_failed = false;
+            while (written > 0) {
+                --written;
+                rollback_failed = publish.streams->AEGP_SetStreamValue(plugin_id, publish.refs[written],
+                    &publish.old[written]) != 0 || rollback_failed;
+            }
+            if (output) std::snprintf(output->return_msg, sizeof(output->return_msg),
+                "Starfield native graph publication failed%s.", rollback_failed ? "; rollback failed" : " (restored)");
+            return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
+        }
+        edit->revision = revision; edit->status = PF_Err_NONE; edit->accepted = true;
+        return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return edit->status = PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return edit->status = PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 }

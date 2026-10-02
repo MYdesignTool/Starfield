@@ -1,5 +1,24 @@
 # Agent-ready implementation backlog
 
+## P-02I — native Effect Controls commit / build 15
+
+Owner reports native controls only reach rendering after a subsequent CEP edit.
+Owned files: NodeGraphSync.*, NativeNodeGraph.*, GraphCarrier.*, EffectMain.cpp,
+PluginVersion.h, targeted native sync fixtures/runner and checkpoint/ADR docs.
+Dependencies: P-02G native records and P-02H layout 6. Keep schemas, parameter
+IDs, Core ABI and separate node effects unchanged.
+
+Replace the synthetic USER_CHANGED_PARAM cross-effect call with an acknowledged
+COMPLETELY_GENERAL request. Carry the callback's edited value by UUID so saved
+sibling streams cannot substitute an old value. Explicitly persist the renderer
+graph/revision/checksum through AEGP streams, verify readback and rollback failed
+publishes. Test a host that discards generic params-array writes and retains old
+node stream values until the native callback returns. AE acceptance remains open.
+
+Native sync 252/camera 12 and renderer controls 38 scoped checks pass. May 2023
+SDK x64 Release /MT candidate build passes at packed 32783; schemas/IDs/Core ABI
+unchanged. Source publication and AE-absent installation follow the checks.
+
 ## Current P-02H candidate — 2026-10-02
 
 Build 14 adds ordinary Force controls/curve, renderer Time Remapping/Preview and

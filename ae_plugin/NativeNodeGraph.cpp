@@ -5,6 +5,7 @@
 #include "AE_GeneralPlug.h"
 #include "GraphCarrier.hpp"
 #include "NodeRecord.hpp"
+#include "NodeGraphSync.hpp"
 #include "Parameters.hpp"
 #include "SPBasic.h"
 
@@ -57,6 +58,10 @@ struct SuiteSet {
     const AEGP_PFInterfaceSuite1* pf_interface{};
     const AEGP_EffectSuite4* effect{};
     const AEGP_StreamSuite6* stream{};
+    const node_sync::NativeEdit* edit{};
+    AEGP_EffectRefH edited_effect{};
+    bool edit_applied{};
+    bool edit_matched{};
 };
 
 struct EffectRef {
@@ -79,6 +84,10 @@ struct StreamRef {
 
 bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, double& output) noexcept {
+    if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
+        if (suites.edit->value_kind != node_sync::ValueKind::scalar) return false;
+        suites.edit_applied = true; output = suites.edit->value[0]; return true;
+    }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
     if (error || !raw_stream) return false;
@@ -96,6 +105,10 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
 
 bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
+        if (suites.edit->value_kind != node_sync::ValueKind::point2) return false;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], 0.0}; return true;
+    }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
     if (error || !raw_stream) return false;
@@ -113,6 +126,10 @@ bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
 
 bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                   A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
+        if (suites.edit->value_kind != node_sync::ValueKind::point3) return false;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
+    }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
     if (error || !raw_stream) return false;
@@ -130,6 +147,10 @@ bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH eff
 
 bool read_color(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
+        if (suites.edit->value_kind != node_sync::ValueKind::color) return false;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
+    }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
     if (error || !raw_stream) return false;
@@ -431,15 +452,19 @@ core::PortKey destination_port(Kind kind) noexcept {
 } // namespace
 
 PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
-                                 core::Graph& graph, bool& found_node_effects) noexcept {
+                                 core::Graph& graph, bool& found_node_effects,
+                                 const node_sync::NativeEdit* edit) noexcept {
     graph = {};
     found_node_effects = false;
     if (!in_data || !params || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
+    if (edit && (!node_sync::valid_edit(*edit) || edit->parameter_index >
+        native_nodes::base_parameter_count(static_cast<Kind>(edit->node_kind)))) return PF_Err_BAD_CALLBACK_PARAM;
     const AEGP_PluginID plugin_id = graph_carrier_plugin_id();
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
 
     try {
         SuiteSet suites(in_data);
+        suites.edit = edit;
         PF_Err error = suites.acquire();
         if (error != PF_Err_NONE) return error;
         AEGP_LayerH layer = nullptr;
@@ -463,6 +488,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         layout_entries.reserve(static_cast<std::size_t>(effect_count) + 1u);
 
         for (A_long effect_index = 0; effect_index < effect_count; ++effect_index) {
+            suites.edited_effect = nullptr; // EffectRef handles may be reused after disposal.
             AEGP_EffectRefH raw_effect = nullptr;
             ae_error = suites.effect->AEGP_GetLayerEffectByIndex(plugin_id, layer, effect_index, &raw_effect);
             if (ae_error) return static_cast<PF_Err>(ae_error);
@@ -485,6 +511,18 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             core::Uuid128 uuid{};
             if (!read_uuid(suites, plugin_id, effect.value, native_nodes::uuid_first_index(kind), time, uuid))
                 return PF_Err_BAD_CALLBACK_PARAM;
+            if (edit && static_cast<std::uint32_t>(kind) == edit->node_kind) {
+                bool matches = true;
+                for (std::size_t chunk = 0; chunk < edit->uuid.size(); ++chunk) {
+                    const auto word = static_cast<std::uint16_t>((uuid.bytes[chunk * 2] << 8u) | uuid.bytes[chunk * 2 + 1]);
+                    matches = matches && word == edit->uuid[chunk];
+                }
+                if (matches) {
+                    if (suites.edit_matched) return PF_Err_BAD_CALLBACK_PARAM;
+                    suites.edit_matched = true;
+                    suites.edited_effect = effect.value;
+                }
+            }
             core::GraphNode node{core::NodeId{uuid}, type_key, schema_version, {}};
             if (!read_node_parameters(suites, plugin_id, effect.value, kind, time, units, node))
                 return PF_Err_BAD_CALLBACK_PARAM;
@@ -500,6 +538,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             graph.nodes.push_back(std::move(node));
         }
 
+        if (edit && !suites.edit_applied) return PF_Err_BAD_CALLBACK_PARAM;
         if (!params[kMaxParticlesId] || params[kMaxParticlesId]->param_type != PF_Param_FLOAT_SLIDER ||
             !std::isfinite(params[kMaxParticlesId]->u.fs_d.value) || params[kMaxParticlesId]->u.fs_d.value < 0.0 ||
             params[kMaxParticlesId]->u.fs_d.value > static_cast<PF_FpLong>(std::numeric_limits<std::uint32_t>::max()) ||

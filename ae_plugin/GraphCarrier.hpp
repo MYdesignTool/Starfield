@@ -6,6 +6,8 @@
 
 namespace starfield::adapter {
 
+namespace node_sync { struct NativeEdit; }
+
 // Registers the effect with AEGP so supervised callbacks can address their own
 // ordinary parameter streams. Failure disables the CEP graph carrier only; render
 // and the legacy AE Controls path remain available.
@@ -22,5 +24,9 @@ namespace starfield::adapter {
 [[nodiscard]] PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data,
                                           PF_ParamDef* params[],
                                           PF_UserChangedParamExtra* extra) noexcept;
+
+// Generic inter-effect calls must persist with AEGP streams, not params[] flags.
+[[nodiscard]] PF_Err commit_native_graph_edit(PF_InData* in_data, PF_OutData* out_data,
+                                              PF_ParamDef* params[], node_sync::NativeEdit* edit) noexcept;
 
 } // namespace starfield::adapter
