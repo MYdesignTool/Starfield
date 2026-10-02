@@ -431,6 +431,9 @@ bindings, evaluated-value/state validation, sentinel rejection and rollback adde
 798 scoped checks plus actual CPU pixels, generated-expression and JSX startup
 regressions pass. Owner Origin XY black output is recorded; its binding-object
 cause is a hypothesis pending AE 2023 qualification. SDK Release candidate builds.
+Build 19 deployed with AE absent; all six installed hashes, prior bundle backup
+hashes and selected/pinned Core parity verified. Owner fresh-layer animation gate
+remains open; deployment and one-step rollback recorded in build-matrix.md.
 
 
 P-02J source/build/deployment complete: 761 scoped checks plus generated expression/

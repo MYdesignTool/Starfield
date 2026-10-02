@@ -29,6 +29,33 @@ An initial mistyped runner switch selected the old broad Core suite (269 failure
 including outdated graph/codec expectations); this is not counted as passing
 evidence. No broad-suite qualification is claimed by this scoped follow-up.
 
+### Build 19 deployment completed
+
+Source dd8daa0cff4659a5a1a2232ede5dc4e22efe8eae pushed before deployment.
+Immediate read-only process check confirmed no AfterFX/AfterFX_64. Installed using
+standing permission through the existing single Plug-ins/Starfield -> dist Junction.
+No AE process started/stopped. All six installed/candidate hashes and prior bundle
+backup hashes/selector verified; pinned/selected Core unchanged and equal.
+Records: artifacts/build19-deploy-before.json / build19-deploy-after.json.
+Backup: artifacts/disabled/p02j-build19-animation-binding-fix-20261002.
+Recreate effects on a fresh test layer for owner qualification: saved development
+projects can retain build-18 generated expressions until a new UI graph commit.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | E4AAD9EB1DC510C933A7828A47B74A23C113B0D79054DB6292C631C0E119D973 |
+| StarfieldEmitter.aex | A4F82D131731EB8EFCCE7F297F2695C48A37EB764BC90011722265DAEEC02A4A |
+| StarfieldParticleNode.aex | 36AB1F8500213C629850197948E2BE2A211C02AEE73032E38756B5F610F67404 |
+| StarfieldAppearance.aex | 146BB219DE5CB4E5719615AD26E8414A27674F88129C8539A6D9F916C575C241 |
+| StarfieldForce.aex | 662AB626F4D54DECAAA7A54442A58BDF509A6F1D33E7456ED7BEDCBD5894B9D2 |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+One-step rollback (close AE first):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02j-build19-animation-binding-fix-20261002' -Rollback
+```
+
 ## Build 18 P-02J candidate — 2026-10-02
 
 Owner confirms build 17 native edits work, then reports almost all stopwatches are
