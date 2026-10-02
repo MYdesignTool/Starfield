@@ -10,6 +10,11 @@ suite and six-source parsing pass. May 2023 SDK candidate builds at packed 32782
 main 21/native layout 6/Force 2/Output 3/Core ABI 2. No AE session operated.
 Source push precedes installation; deployment evidence goes in the checkpoint.
 
+Source 6a32f94 was pushed before deployment. Build 14 is now installed under the
+standing AE-absent permission; six installed/selected Core hashes and build-13
+backups match. One existing Junction retained; no AE session operated. Host
+acceptance and the reference main-effect capability matrix remain open.
+
 ## Current P-02G checkpoint — 2026-10-02
 
 Build 13 candidate fixes native runtime edit dispatch, adds UUID effect selection,

@@ -11,6 +11,10 @@ Time Remapping animation, Preview stability, undo/reopen and non-square PAR rema
 owner host gates. Main feature differences are explicitly listed in
 reference-main-force-comparison.md; this is not full Stardust parity.
 
+Build 14 installed after source 6a32f94 push and a zero-process read-only check.
+Six hashes, selected Core and prior build backups verified; single Junction
+retained. No AE operation performed. These are installation checks only.
+
 ## Build 13 P-02G candidate evidence — 2026-10-02
 
 Source 2751a56 pushed before paired deployment. Build 13 is installed with all

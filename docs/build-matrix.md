@@ -11,6 +11,12 @@ SDK and is removed from every build/editor input. Fresh effects required.
 Deployment/hash/rollback evidence is recorded in native-node-checkpoint.md;
 compiler/scoped evidence is distinct from AE host qualification.
 
+Build 14 source 6a32f94 pushed before AE-absent installation. Existing single
+Junction retained; six installed hashes, selected Core and build-13 backups
+verified. Runtime selects StarfieldCore-0D3C8D672DE171D7.dll. Deployment log and
+before/after records stay under artifacts/build14-*. One-step rollback is in
+native-node-checkpoint.md; host behavior still needs owner verification.
+
 ## Current build 13 P-02G deployment — 2026-10-02
 
 Packed 32781 (0x800D), main manifest 20, native identity 3/layout 5, Emitter

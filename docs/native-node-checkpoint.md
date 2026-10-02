@@ -18,6 +18,37 @@ Real AE behavior, exact reference motion and remaining main capabilities remain
 open. See ADR 0021 and reference-main-force-comparison.md. Source is pushed before
 the one paired AEX deployment; no AE process started/stopped or GUI operated.
 
+### Build 14 deployment completed
+
+Source `6a32f94822d517fefd40e8e718497ae9ecff3a0e` was pushed to
+`origin/codex/m3-01b-emitter-dimensions` before installation. Read-only checks
+confirmed neither AfterFX nor AfterFX_64 was running. Standing owner permission
+covered this deployment; no process or host-wide setting changed.
+
+Retained the existing `Plug-ins/Starfield -> newStardust/dist` Junction. All six
+installed hashes equal the final candidates; selected Core and build-13 backup
+hashes/selector also verified. Before/after records are
+`artifacts/build14-deploy-before.json` / `artifacts/build14-deploy-after.json`.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 9C24EED3596756920BEF02E72C9F1BCFFCB4A63DA0D8B917E456091D43A8C58E |
+| StarfieldEmitter.aex | 833D16809723722E1272A644068F8FE074DFEDBEB69393B2606842796FDDB370 |
+| StarfieldParticleNode.aex | B8CEA3F99D03132ABE2884E2B2B3AE7CB56DB3E4451B4C2689F3A86E54329FD1 |
+| StarfieldAppearance.aex | 8CABACD37761C255023458181C75723766CA19C1160FDC70DEE9132E088FFD16 |
+| StarfieldForce.aex | CD2C35088409E25FCF90FC70D86A86884E4388BB5A66ADF24F565E6D9E096B6A |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+Runtime selector: `StarfieldCore-0D3C8D672DE171D7.dll`.
+Backup: `artifacts/disabled/p02h-build14-reference-force-globals-20261002`.
+With AE closed, one-step rollback from the checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02h-build14-reference-force-globals-20261002' -Rollback
+```
+
+Owner AE tests remain pending; deployment verification does not establish them.
+
 ## Build 13: current-node interaction, camera and Auxiliary — 2026-10-02
 
 P-02G fixes setup-only uu.id/change_flags aliasing in native edit dispatch,
