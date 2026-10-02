@@ -32,6 +32,32 @@ warnings/errors found in its log. Logs: artifacts/build16-renderer-controls.log
 and build16-sdk.log. Candidate source is pushed before the paired deployment.
 No AE session operated; native editing, undo/redo and reopen need owner qualification.
 
+### Build 16 deployment completed
+
+Source `76801bb237fe7ae974823cb4a453c222972457d5` was pushed to
+origin/codex/m3-01b-emitter-dimensions before deployment. Immediate read-only checks
+found neither AfterFX nor AfterFX_64. Standing authorization covered the install
+through the existing single Plug-ins/Starfield -> newStardust/dist Junction.
+No process or other host setting changed. Installed candidate hashes, selected
+unchanged Core, all six prior build-15 bundle hashes and runtime selector backups
+were verified. Records: artifacts/build16-deploy-before.json, build16-deploy-after.json
+and build16-deploy.log. Real AE native editing acceptance remains open.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 1E1BF19D0750089127D787610521BBFBAB00EED6A7A417FEDAB3CC2C24B4A43E |
+| StarfieldEmitter.aex | 8A3F7C631036EB34644DCF1B6E930143B239C6BA5C6978B5366F419BF8440C52 |
+| StarfieldParticleNode.aex | 25E7E3AD43636D7A9FC0D11C1BE6B0E2D10B3A6980913C34D5D914F89942359F |
+| StarfieldAppearance.aex | B58885BBB083D8D5762C79190A44EF8EFE7C3610FE4254A215781D56BFEBAB54 |
+| StarfieldForce.aex | 1FA7458C52F02A1D3228F9D5638A9CB78A55309428DC5B3532FA903211941433 |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+One-step rollback to build 15, with AE closed (from repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02i-build16-generic-context-20261002' -Rollback
+```
+
 ## Build 15 candidate: native Effect Controls commits
 
 P-02I replaces synthetic supervised inter-effect calls with COMPLETELY_GENERAL,

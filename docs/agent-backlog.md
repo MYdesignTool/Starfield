@@ -14,6 +14,11 @@ float storage and maximum revision are covered. Renderer controls 38 scoped chec
 and final May 2023 SDK x64 Release /MT build pass, packed 32784 / 0x8010, no compiler
 warnings/errors found. Owner AE qualification remains open.
 
+Source 76801bb pushed before build-16 AE-absent installation through the existing
+single Junction. Installed candidate hashes, unchanged Core and build-15 backup
+bundle/selector verified. Before/after records and one-step rollback recorded in
+native-node-checkpoint.md. No AE process or other host setting changed.
+
 Owner reports native controls only reach rendering after a subsequent CEP edit.
 Owned files: NodeGraphSync.*, NativeNodeGraph.*, GraphCarrier.*, EffectMain.cpp,
 PluginVersion.h, targeted native sync fixtures/runner and checkpoint/ADR docs.

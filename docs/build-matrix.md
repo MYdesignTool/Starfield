@@ -13,6 +13,11 @@ build passes with -NoRuntimePublish -NoDistPublish; no compiler warnings/errors
 were found in its log. Deployment evidence follows in the native checkpoint;
 real AE acceptance remains open. Scratch output stays under artifacts/build16-*.
 
+Source 76801bb pushed before AE-absent deployment. Existing single Junction and
+unchanged selected Core retained; six installed candidate hashes and build-15
+backup hashes/selector verified. Before/after records and one-step rollback are
+in native-node-checkpoint.md. No AE process operated.
+
 ## Build 15 P-02I candidate — 2026-10-02
 
 Packed 32783 / 0x800F; main 21/native identity 3/layout 6; node schemas and Core
