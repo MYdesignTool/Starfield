@@ -45,7 +45,7 @@ No AE playback qualification claimed; test on a fresh layer with recreated effec
 | StarfieldAppearance.aex | 29F2B8B5358F421CCEE957880FE3CCA2B3BA8B5DDFE38737A6BA9A711DE890BE |
 | StarfieldForce.aex | 7C549D970996D39D568F274919E154F75F8067B41665BD8BC59B2F6325D0BCAA |
 | StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
- 
+
 One-step rollback (close AE first):
 
 ```powershell
