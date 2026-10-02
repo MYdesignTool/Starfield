@@ -17,6 +17,31 @@ May 2023 SDK x64 Release /MT candidate build passes at packed 32783 (0x800F),
 with -NoRuntimePublish -NoDistPublish; source push precedes deployment.
 No AE session operated; native edits with CEP closed, undo and reopen remain open.
 
+### Build 15 deployment completed
+
+Source `96ecf6d` was pushed to origin/codex/m3-01b-emitter-dimensions before
+installation. Immediate read-only checks found neither AfterFX nor AfterFX_64.
+Standing authorization covered one Deploy-TestBuild install through the existing
+Plug-ins/Starfield -> newStardust/dist Junction. No process started/stopped.
+All six installed candidate hashes, selected Core and build-14 backup hashes /
+selector verified. Core is unchanged. Records: artifacts/build15-deploy-before.json,
+build15-deploy-after.json and build15-deploy.log. Real AE acceptance remains open.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | C17A593165C31289903554D31E91E603B82B62DD2808C5A607D5F61CA481983D |
+| StarfieldEmitter.aex | 6146192F9BFEF116844FB03EAFA09FDE4D08B1907F8566012C239DA6FA64B356 |
+| StarfieldParticleNode.aex | 8FD45094CCAC4ACBFE474446FFC4ABF5EEA864F28B8E7E4375280DFAA336CBF7 |
+| StarfieldAppearance.aex | F5FD6510B78CB812B5CD118CFCAFBB982B01094F846DE1AEFA53272FA83308A7 |
+| StarfieldForce.aex | 46F49B38926973562E2713411560AD515D4344F3978B811CB5FB371C78025157 |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+One-step rollback, with AE closed (from repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02i-build15-native-control-commit-20261002' -Rollback
+```
+
 ### Appearance review
 
 Confirmed: gateway registers Appearance, native base counts are Particle 43 and

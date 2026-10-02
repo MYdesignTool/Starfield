@@ -10,6 +10,10 @@ update is required because both node transport and renderer entrypoint change.
 Candidate build and deployment records stay under artifacts/build15-*; see
 native-node-checkpoint.md and ADR 0022 for remaining AE qualification.
 
+Source 96ecf6d pushed before AE-absent deployment. Existing single Junction and
+Core generation retained; six installed/selected Core hashes and build-14 backups
+verified. Before/after state and one-step rollback are in the native checkpoint.
+
 ## Build 14 P-02H candidate — 2026-10-02
 
 Packed 32782 / 0x800E; main 21/native identity 3/layout 6; Emitter 5, Particle 2,

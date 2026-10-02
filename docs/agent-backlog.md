@@ -19,6 +19,11 @@ Native sync 252/camera 12 and renderer controls 38 scoped checks pass. May 2023
 SDK x64 Release /MT candidate build passes at packed 32783; schemas/IDs/Core ABI
 unchanged. Source publication and AE-absent installation follow the checks.
 
+Source 96ecf6d pushed before build-15 installation. Existing single Junction
+retained; six installed hashes, selected unchanged Core and build-14 backups
+verified. Standing AE-absent authorization used; no AE session operated. Native
+Effect Controls behavior, undo/redo and reopen await owner qualification.
+
 ## Current P-02H candidate — 2026-10-02
 
 Build 14 adds ordinary Force controls/curve, renderer Time Remapping/Preview and
