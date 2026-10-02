@@ -22,7 +22,9 @@ development effects; gateway native-node-sync-12. Close/reopen CEP with the
 new build. Default sprite coverage cutoff is removed and scan rows check
 cancellation; large visible sprites can still render slowly. Explicit finite
 RenderLimits fail without truncating output. SDK compilation and JavaScript
-parsing do not establish actual AE acceptance.
+parsing do not establish actual AE acceptance. Build 12 is deployed after source
+push cadab2a and AE-absent checks, with installed hashes/selected Core verified
+and build 11 backed up. Owner acceptance remains pending.
 [Deployment status and rollback](../docs/native-node-checkpoint.md).
 
 ## Build 11 canvas deletion and flat controls — 2026-10-02

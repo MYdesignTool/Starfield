@@ -1,6 +1,6 @@
 # Development plan: AE 2023 particle Alpha
 
-## Current P-02F candidate — 2026-10-02
+## Current P-02F deployment — 2026-10-02
 
 Build 12 addresses shared Particle inputs, excessive numeric drag steps and
 the sprite-coverage budget dialog during Over Life edits. It also separates
@@ -9,7 +9,9 @@ multi-emitter counts and retains outgoing wires on Emitter copies. Implemented
 control labels/splits/defaults use the local reference table. Life caps at
 10000, defaults to 2, CEP step 0.1. Layout 4/main 20/Emitter schema 4 have no
 development migration. Candidate uses May 2023 SDK, with no test suites run.
-Owner gates: fresh initialization, shared inputs, direct native and CEP edits,
+Source pushed as cadab2a, then build 12 installed with AE absent under standing
+authorization. Six installed hashes/selected Core verified, build 11 backed up
+and one Junction retained. Owner gates: fresh initialization, shared inputs, direct native and CEP edits,
 undo/save/reopen, curve independence and large-sprite cancellation/rendering.
 [Deployment status](native-node-checkpoint.md).
 

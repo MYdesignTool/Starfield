@@ -1,6 +1,6 @@
 # Build and host matrix
 
-## Current build 12 P-02F candidate — 2026-10-02
+## Current build 12 P-02F deployment — 2026-10-02
 
 Packed 32780 (0x800C); main manifest 20, native identity 3/layout 4,
 Emitter graph schema 4, gateway native-node-sync-12. Build 12 adds shared
@@ -10,12 +10,16 @@ migration; graph envelope and C ABI unchanged.
 
 May 2023 SDK x64 Release /MT build passes using -NoRuntimePublish -NoDistPublish.
 Four changed JavaScript sources parse. No tests added/run; no AE session operated.
-Source is being pushed before deployment; installed build 11 remains unchanged
-at candidate capture. Build log: artifacts/build12-shared-particle-controls-build.log.
+Source pushed as cadab2a before deployment. Installed with AE absent under
+standing authorization through the existing single Starfield Junction. All six
+installed hashes and selected Core verified. Build 11 is backed up under
+p02f-build12-shared-particle-controls-20261002. Runtime now selects
+StarfieldCore-3FC7633A1CFC8165.dll. Owner host acceptance remains pending.
+Build log: artifacts/build12-shared-particle-controls-build.log.
 Before/candidate state: artifacts/build12-deploy-before.json.
 [Checkpoint and rollback](native-node-checkpoint.md).
 
-| Candidate file | SHA-256 |
+| Installed file | SHA-256 |
 |---|---|
 | `StarfieldParticle.aex` | `7F0D1BDEB47C8F505889F85C839BC390C4382BB46F603718FAFD205C8255D2A8` |
 | `StarfieldEmitter.aex` | `8ECCF65D05E2B9C7A8A97C690F3FD98103CBEB6F71228FB89E809D7DFE86F1AE` |
@@ -24,7 +28,7 @@ Before/candidate state: artifacts/build12-deploy-before.json.
 | `StarfieldForce.aex` | `9E9C7163538A80919FE850A48ACECF0028F9A18909AD546902298F9EAA7A484E` |
 | `StarfieldCore.dll` | `3FC7633A1CFC81654DE1B5F4ADB85CA898FB987417248B21EF177597C038AAD7` |
 
-## Current build 11 P-02E deployment — 2026-10-02
+## Previous build 11 P-02E deployment — 2026-10-02
 
 Packed 32779 (0x800B); main schema 19, native identity revision 2/layout 3,
 gateway native-node-sync-11. All outer parameter topic markers are removed;
@@ -48,7 +52,7 @@ unchanged; one existing Starfield Junction retained.
 | `StarfieldForce.aex` | `4F3B9353644950DEBEA8857EE169C2DC1A9DE5009F5079C5493CDDE9CF951F9B` |
 | `StarfieldCore.dll` (unchanged) | `AE18EFC2E9856178B858444BA0E0F7FEC5A4BB7763D53334C873C635A52B280D` |
 
-## Current build 10 G-06 deployment — 2026-10-02
+## Previous build 10 G-06 deployment — 2026-10-02
 
 Packed 32778 (0x800A); main schema 18, native identity revision 2, graph schemas
 and CEP native-node-sync-6 unchanged. Multi-emitter evaluation shares one Output

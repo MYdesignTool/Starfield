@@ -1,6 +1,6 @@
 # Agent-ready implementation backlog
 
-## Current P-02F candidate — 2026-10-02
+## Current P-02F checkpoint — 2026-10-02
 
 Build 12 source implements shared Particle inputs, stable independent emitter
 births, corrected Life range/steps, reference control naming/splits/units,
@@ -8,11 +8,13 @@ independent base and percentage curves, multi-emitter counts and preserved
 copy connections. Sprite rasterization skips zero alpha and uses cancellable
 exact rendering without a default coverage budget. May 2023 SDK and four
 JavaScript parse gates pass. No test suites added/run or AE session operated.
-Main 20/native layout 4/Emitter schema 4; no development migration. Candidate
-deployment follows source push and the standing AE-closed authorization.
+Main 20/native layout 4/Emitter schema 4; no development migration. Source
+pushed as cadab2a, then build 12 deployed with AE absent under standing permission.
+Six installed/selected Core hashes verified; build 11 backed up; one Junction
+retained. Owner acceptance remains open.
 [Checkpoint](native-node-checkpoint.md).
 
-## Current P-02E checkpoint — 2026-10-02
+## Previous P-02E checkpoint — 2026-10-02
 
 Owner reports canvas deletion unavailable and redundant collapsed outer topics.
 Build 11 adds Delete/Backspace, filters fixed Output out of delete/duplicate

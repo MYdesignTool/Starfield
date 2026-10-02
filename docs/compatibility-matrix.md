@@ -23,6 +23,9 @@ Owner AE 2023.5 Build 52 checks remain open: fresh main creates Emitter+Particle
 multiple Emitters into one Particle, shared downstream Force/Output, copies,
 Life/default/steps, XY/Z preservation, Speed=0 random retention, both curves,
 native edits/undo/reopen and the original error case. No AE session operated.
+Source pushed as cadab2a, then build 12 deployed after immediate AE-absent checks.
+Six installed hashes and selected Core match; build 11 retained for rollback;
+existing single Junction unchanged.
 [Deployment record](native-node-checkpoint.md).
 
 ## Build 11 P-02E owner feedback — 2026-10-02

@@ -33,8 +33,15 @@ artifacts/build12-shared-particle-controls-build.log and build12-deploy-before.j
 The existing CEP Junction points to source; reopen the panel with build 12.
 Use a fresh development layer/main effect to exercise the new layout/defaults.
 
-Deployment pending the source push and immediate AE-absent check. Planned
-backup: artifacts/disabled/p02f-build12-shared-particle-controls-20261002/deployment.json.
+Source pushed as cadab2a before deployment. **Build 12 is installed** under
+standing authorization after immediate read-only checks found neither AfterFX
+nor AfterFX_64. All six installed hashes match the candidate; the selected
+runtime Core also matches StarfieldCore.dll. Core selection changed from
+StarfieldCore-AE18EFC2E9856178.dll to StarfieldCore-3FC7633A1CFC8165.dll.
+Before/after state: artifacts/build12-deploy-before.json and build12-deploy-after.json;
+deployment log: artifacts/build12-deploy.log. Build-11 AEX/Core and selector
+backups are retained and their six hashes match the before-state record.
+Backup: artifacts/disabled/p02f-build12-shared-particle-controls-20261002/deployment.json.
 The existing single Starfield -> dist Junction is retained. No process starts,
 stops, registry changes or other host changes are part of this deployment.
 
