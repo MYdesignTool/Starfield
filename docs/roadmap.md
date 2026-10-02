@@ -1,5 +1,15 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-02I / build 17 — direct native publication
+
+Owner build-16 error remains at delivery, before the commit handler acknowledges
+the request. Remove the unreliable inter-effect generic call. Native node AEXs now
+compile/publish the renderer snapshot directly on the UI edit path using their own
+AEGP registration ID. Per-node authored values remain independent, and render still
+consumes the saved arbitrary graph. Shared source/build inputs and scoped checks
+must qualify the independent node links. Real AE dragging with CEP closed, undo/redo
+and save/reopen remain the owner gate; compiler/fake-host success is not acceptance.
+
 ## P-02I / build 16 — native control synchronization
 
 Build 15 owner acceptance failed: all tried native edits report error 516. Build 16

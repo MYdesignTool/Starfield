@@ -2,6 +2,38 @@
 
 Status: development implementation, owner AE 2023 qualification pending.
 
+## Build 17 decision: direct native publication
+
+Owner build-16 evidence: `delivery (parameter 4, stream -1, error 516)`.
+The request never advanced to the receiver's context phase. This does not distinguish
+an API rejection from an ignored selector, but confirms that the acknowledged
+inter-effect path did not work in the owner's AE session. Build-16 host acceptance
+failed; improving downstream generic context was not sufficient.
+
+Remove EffectCallGeneric and the main COMPLETELY_GENERAL edit handler. Each native
+node AEX compiles NativeGraphCommit.cpp / NativeNodeGraph.cpp / GraphParameter.cpp
+and the minimal host-independent graph codec sources. Its USER_CHANGED_PARAM
+callback directly compiles sibling node records with its own registered AEGP ID,
+substituting the accepted callback value by UUID/index, then writes/verifies/restores
+the main renderer streams. The main callback is not invoked to accept this edit.
+AE may still call its arbitrary-data handlers as part of normal stream ownership.
+
+NativeEdit is now a local UI context with no transport magic/version. Borrowed refs
+and callbacks live only until the direct function returns. Main CEP transactions
+share the compiler and snapshot helper, using their own registered AEGP ID. Saved
+parameters, identities, node schemas, main 21/layout 6 and Core ABI 2 are unchanged.
+The build inputs include the added adapter units so CoreOnly cannot skip their
+deployment. Node effects retain independent authored parameters.
+
+Scoped fixture: no main AEGP registration; the generic API always rejects with 516
+and is never called. Actual node edit callbacks persist new Origin/scalars/types,
+and direct compiler checks cover Particle/Force/color/curves and all existing
+rollback/type/float tests. Native sync 348/camera 12 and renderer controls 38 scoped
+checks pass. May 2023 SDK x64 Release /MT build and all four independent node AEX
+links pass at build 17; real AE Effect Controls edits remain a qualification gate.
+
+The following build-16 notes describe the superseded transport and its diagnosis.
+
 ## Build 16 correction
 
 The owner reports every tried native control edit rejected with error 516 in build 15. That

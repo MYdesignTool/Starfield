@@ -1,5 +1,34 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 17 candidate: delivery failure in build 16
+
+Owner screenshot reports `delivery (parameter 4, stream -1, error 516)`. The
+receiver did not advance the edit to its context phase; the screenshot does not
+distinguish an ignored selector from an AEGP API rejection. Build-16 host acceptance
+failed, so the generic context patch did not resolve the observed problem.
+
+Build 17 removes the inter-effect generic edit call and main edit selector. Every
+native node AEX includes a shared graph compiler/publisher and codec. Native UI
+callbacks directly compile sibling node records with the node's own AEGP ID,
+substitute the callback's new value by UUID/index, then save/readback/rollback the
+main renderer streams. No main registration or renderer callback context is needed.
+Normal AE arbitrary-data ownership callbacks remain. NativeEdit is only a local
+borrowed UI context; main/node schemas, public IDs, graph persistence and Core ABI
+stay unchanged. CEP continues using its existing supervised commit path.
+
+Native sync 348/camera capture 12 scoped checks pass. The generic API deliberately
+returns 516 if invoked, and the fixture leaves the main AEGP registration absent.
+Actual native callback edits still save new values and the generic call count is
+zero. Existing receipt typing, exact integer checks, graph/scalar failure phases,
+rollback and balanced-resource checks remain. Logs: artifacts/build17-native-sync.log.
+Renderer controls 38 scoped checks and final May 2023 SDK x64 Release /MT build
+pass at packed 32785 / 0x8011, including all four independent node links, with
+-NoRuntimePublish -NoDistPublish. No compiler warnings/errors found in the build
+log. Logs: artifacts/build17-renderer-controls.log and build17-sdk.log. Candidate
+source is pushed before the paired deployment. No AE session
+operated; Effect Controls behavior with CEP closed, undo/redo and reopen need owner
+qualification.
+
 ## Build 16 candidate: shared native edit error 516
 
 Owner reports every tried Effect Controls edit fails, including Origin parameter 4.

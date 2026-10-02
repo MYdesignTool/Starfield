@@ -3,7 +3,6 @@
 
 #include "AE_EffectCB.h"
 #include "AE_GeneralPlug.h"
-#include "GraphCarrier.hpp"
 #include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
 #include "Parameters.hpp"
@@ -456,14 +455,13 @@ core::PortKey destination_port(Kind kind) noexcept {
 } // namespace
 
 PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
-                                 core::Graph& graph, bool& found_node_effects,
+                                 core::Graph& graph, bool& found_node_effects, AEGP_PluginID plugin_id,
                                  const node_sync::NativeEdit* edit) noexcept {
     graph = {};
     found_node_effects = false;
     if (!in_data || !params || !in_data->pica_basicP || (!in_data->effect_ref && !(edit && edit->layer))) return PF_Err_BAD_CALLBACK_PARAM;
     if (edit && (!node_sync::valid_edit(*edit) || edit->parameter_index >
         native_nodes::base_parameter_count(static_cast<Kind>(edit->node_kind)))) return PF_Err_BAD_CALLBACK_PARAM;
-    const AEGP_PluginID plugin_id = graph_carrier_plugin_id();
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
 
     try {

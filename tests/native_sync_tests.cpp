@@ -25,7 +25,7 @@ int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{};
 void check(bool condition, const char* message) {
     ++checks; if (!condition) { ++failures; std::printf("FAILED: %s\n", message); }
 }
-bool ignore_call{}, ignore_graph{};
+bool ignore_graph{};
 A_long fail_set = -1;
 A_long fail_read = -1;
 A_long wrong_type = -1;
@@ -101,13 +101,7 @@ node_sync::NativeEdit edit(std::uint32_t kind, A_long index, double value) {
     return request;
 }
 PF_Err direct_edit(node_sync::NativeEdit& request) {
-    // Model the generic selector, not a fully populated native UI callback.
-    PF_InData generic = renderer_data;
-    generic.num_params = 0; generic.effect_ref = nullptr;
-    generic.width = generic.height = generic.current_time = 0;
-    generic.time_scale = 0; generic.pixel_aspect_ratio = {0, 0};
-    generic.utils = nullptr; generic.pica_basicP = nullptr;
-    PF_OutData output{}; return commit_native_graph_edit(&generic, &output, nullptr, &request);
+    PF_OutData output{}; return commit_native_graph_edit(&request, 701, &output);
 }
 }
 int main() {
@@ -151,7 +145,7 @@ int main() {
     connection(2, records::Kind::particle, 4, 12);
     connection(3, records::Kind::force, 255, 13);
 
-    utility.AEGP_RegisterWithAEGP = [](AEGP_GlobalRefcon, const A_char*, AEGP_PluginID* id)->A_Err { *id = 1; return 0; };
+    utility.AEGP_RegisterWithAEGP = [](AEGP_GlobalRefcon, const A_char*, AEGP_PluginID* id)->A_Err { *id = 701; return 0; };
     layers.AEGP_GetLayerSourceItem = [](AEGP_LayerH, AEGP_ItemH* item)->A_Err { *item = reinterpret_cast<AEGP_ItemH>(1); return 0; };
     layers.AEGP_GetLayerCurrentTime = [](AEGP_LayerH, AEGP_LTimeMode, A_Time* time)->A_Err { *time = {0, 24}; return 0; };
     items.AEGP_GetItemDimensions = [](AEGP_ItemH, A_long* width, A_long* height)->A_Err { *width = 1920; *height = 1080; return 0; };
@@ -163,10 +157,9 @@ int main() {
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
     effect.AEGP_DisposeEffect = [](AEGP_EffectRefH)->A_Err { return 0; };
-    effect.AEGP_EffectCallGeneric = [](AEGP_PluginID, AEGP_EffectRefH, const A_Time*, PF_Cmd cmd, void* extra)->A_Err {
-        ++calls; check(cmd == PF_Cmd_COMPLETELY_GENERAL, "SDK generic command transports native edit");
-        if (ignore_call) return 0;
-        return direct_edit(*static_cast<node_sync::NativeEdit*>(extra));
+    effect.AEGP_EffectCallGeneric = [](AEGP_PluginID, AEGP_EffectRefH, const A_Time*, PF_Cmd, void*)->A_Err {
+        ++calls; check(false, "cross-effect generic calls are forbidden in native edits");
+        return PF_Err_BAD_CALLBACK_PARAM;
     };
     stream.AEGP_GetNewEffectStreamByIndex = [](AEGP_PluginID, AEGP_EffectRefH ref, A_long index, AEGP_StreamRefH* out)->A_Err {
         ++live_refs; *out = reinterpret_cast<AEGP_StreamRefH>(new Ref{effect_index(ref), index}); return 0;
@@ -208,7 +201,8 @@ int main() {
         if (!key.effect && key.index == kGraphParameterId) dispose(reinterpret_cast<PF_Handle>(value->val.arbH)); return 0;
     };
     stream.AEGP_DisposeStream = [](AEGP_StreamRefH ref)->A_Err { --live_refs; delete reinterpret_cast<Ref*>(ref); return 0; };
-    check(register_graph_carrier(&renderer_data) == 0 && register_node_graph_sync(&renderer_data) == 0, "both adapters register");
+    check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
+    check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
     PF_InData node_data = renderer_data; node_data.effect_ref = reinterpret_cast<PF_ProgPtr>(2);
     node_data.num_params = static_cast<A_long>(emitter.params.size()); node_data.downsample_x = {1, 4}; node_data.downsample_y = {1, 4};
     std::vector<PF_ParamDef*> pointers; for (auto& param : emitter.params) pointers.push_back(&param);
@@ -220,8 +214,8 @@ int main() {
     check(std::abs(origin.x - 640.0 / 1080) < 1e-9 && std::abs(origin.y + 1860.0 / 1080) < 1e-9, "callback Origin beats delayed old stream with quarter normalization");
     check(emitter.values[4].two_d.x == 960 && emitter.values[4].two_d.y == 540, "source remains owned by host edit");
     check((output.out_flags & PF_OutFlag_FORCE_RERENDER) != 0, "native callback requests rerender");
-    check(std::get<std::uint32_t>(parameter(graph, core::graph_keys::kOutputNode, core::graph_keys::kParticleCount)) == 1000000, "main cap comes from AEGP despite null generic params");
-    check(std::get<double>(parameter(graph, core::graph_keys::kOutputNode, core::graph_keys::kPreviewChance)) == 100, "main preview comes from AEGP despite generic zero geometry/count");
+    check(std::get<std::uint32_t>(parameter(graph, core::graph_keys::kOutputNode, core::graph_keys::kParticleCount)) == 1000000, "main cap comes from AEGP on node-owned publication path");
+    check(std::get<double>(parameter(graph, core::graph_keys::kOutputNode, core::graph_keys::kPreviewChance)) == 100, "main preview comes from AEGP on node-owned publication path");
     node_data.width = node_data.height = 0; node_data.time_scale = 0; node_data.pixel_aspect_ratio = {0, 0};
     check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0,
           "native UI without dimensions/time uses source item and layer time");
@@ -242,17 +236,17 @@ int main() {
     changed.param_index = 5; emitter.params[5].u.fs_d.value = -200;
     check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0, "native Origin Z commits");
     emitter.values[5].one_d = -200;
-    const int before_calls = calls;
+    const int before_sets = sets;
     emitter.params[records::sync_guard_index(records::Kind::emitter)].u.fs_d.value = 1;
-    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && calls == before_calls, "CEP guard skips native publication");
+    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && sets == before_sets, "CEP guard skips native publication");
     emitter.params[records::sync_guard_index(records::Kind::emitter)].u.fs_d.value = 0;
     changed.param_index = records::layout_x_index(records::Kind::emitter);
-    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && calls == before_calls, "metadata awaits CEP transaction");
+    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && sets == before_sets, "metadata awaits CEP transaction");
     auto life = edit(1, 1, 9); check(direct_edit(life) == 0 && life.accepted, "Particle Life publishes independently");
     particle.values[1].one_d = 9; // Host saves Life after its native callback returns.
-    auto null_generic = edit(1, 2, 15); PF_OutData null_output{};
-    check(commit_native_graph_edit(nullptr, &null_output, nullptr, &null_generic) == 0 && null_generic.accepted,
-          "generic in_data may be absent when request context is complete");
+    auto local_edit = edit(1, 2, 15); PF_OutData local_output{};
+    check(commit_native_graph_edit(&local_edit, 701, &local_output) == 0 && local_edit.accepted,
+          "publication needs no renderer callback or registered main AEGP ID");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kParticleLifetimeSeconds)) == 9, "Particle lifetime saved");
     auto opacity = edit(1, 4, 25); check(direct_edit(opacity) == 0, "Particle opacity publishes");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kOpacityStart)) == .25, "percent opacity normalized");
@@ -308,9 +302,11 @@ int main() {
           failed.stage == node_sync::Stage::verify_graph && failed.stream_index == kGraphParameterId,
           "silent ignored graph write reports graph readback and rolls back");
     check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes == old_bytes, "readback rejection restores graph");
-    changed.param_index = 3; ignore_call = true; output = {};
-    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) != 0 && !(output.out_flags & PF_OutFlag_FORCE_RERENDER), "ignored generic call cannot acknowledge native edit");
-    ignore_call = false;
+    changed.param_index = 3; fail_set = kGraphParameterId; output = {};
+    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) != 0 &&
+          !(output.out_flags & PF_OutFlag_FORCE_RERENDER) && std::strstr(output.return_msg, "publish graph"),
+          "failed native publication reports actual write stage and cannot acknowledge edit");
+    check(calls == 0, "all native edits work without entering the renderer effect selector");
     check(handles.size() == old_handle_count && live_refs == 0 && acquisitions == 0, "all publication handles/suites balanced");
     main.values[kGraphRevisionId].one_d = 16777214;
     auto max_receipt = edit(1, 2, 20);

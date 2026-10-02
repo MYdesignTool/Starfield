@@ -1008,7 +1008,7 @@ PF_Err sync_native_graph_with_output_controls(PF_InData* in_data, PF_OutData* ou
 
     core::Graph graph;
     bool found_node_effects = false;
-    const PF_Err compiled = compile_native_node_graph(in_data, params, graph, found_node_effects);
+    const PF_Err compiled = compile_native_node_graph(in_data, params, graph, found_node_effects, graph_carrier_plugin_id());
     if (compiled != PF_Err_NONE) return compiled;
 
     PF_ArbitraryH replacement = nullptr;

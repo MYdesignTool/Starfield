@@ -1,5 +1,18 @@
 # Starfield plug-in architecture
 
+## P-02I / build 17
+
+Build 16 owner acceptance failed at delivery: its generic request was not acknowledged.
+Native node USER_CHANGED_PARAM now directly calls a shared compiler/publisher compiled
+inside every node AEX. It reads sibling node records with the node module's AEGP ID,
+substitutes its accepted callback value by UUID/index, and saves/verifies/restores
+the main renderer graph and integer receipts through AEGP streams. No cross-effect
+generic call, transport payload or main edit selector remains. NativeGraphCommit.*
+owns shared publication/snapshot helpers; NativeNodeGraph accepts an explicit caller
+ID. Main CEP commits retain the same helpers, and render uses immutable saved graphs.
+Independent node controls, main 21/layout 6/node schemas/Core ABI 2 remain unchanged.
+Actual AE native edits, undo/redo and reopen still require owner qualification.
+
 ## P-02I / build 16
 
 Native node USER_CHANGED_PARAM sends an acknowledged COMPLETELY_GENERAL request

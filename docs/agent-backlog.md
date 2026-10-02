@@ -1,6 +1,18 @@
 # Agent-ready implementation backlog
 
-## P-02I — native Effect Controls commit / build 16
+## P-02I — native Effect Controls commit / build 17
+
+Build 17 owner evidence: build 16 still fails at delivery/parameter 4/stream -1/516.
+Replace the cross-effect generic transport with direct node-owned graph compilation
+and AEGP publication, with explicit caller registration ID. Preserve independent
+node records, immutable saved render graph and existing schema/ID/ABI contracts.
+Extend this card's owned files to NativeGraphCommit.*, NodeEffect.vcxproj,
+Starfield.vcxproj, BuildWindows.ps1, Parameters.cpp and the targeted fixture runner /
+compiler stub, as required to compile the shared publisher inside each node AEX.
+Native sync 348/camera 12 checks pass with a generic API that rejects every call
+and absent main registration. Renderer controls 38 scoped checks and final May 2023
+SDK x64 Release /MT build pass at packed 32785 / 0x8011, no compiler warnings/errors
+found. All four independent node AEX links pass. Owner AE acceptance remains open.
 
 Build 16 follow-up: owner reports all tried native edits fail with error 516. Build 15 host
 acceptance failed. Remove assumptions that a generic callback supplies a complete

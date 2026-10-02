@@ -1,5 +1,18 @@
 # Build and host matrix
 
+## Build 17 P-02I follow-up — 2026-10-02
+
+Packed 32785 / 0x8011. Build 16 failed owner qualification at delivery / 516.
+Native nodes now directly compile/publish the renderer snapshot with their own
+registered AEGP ID; the generic transport and main edit handler are removed.
+All node AEXs link the shared publisher/compiler/graph codec. Main 21/native identity
+3/layout 6, node schemas and Core ABI 2 unchanged. Native sync 348/camera 12 checks
+and renderer controls 38 scoped checks pass without main registration or a working
+generic API. Final May 2023 SDK x64 Release /MT build passes with -NoRuntimePublish
+-NoDistPublish, including all four independent node AEX links. No compiler warnings /
+errors found in the build log. Deployment evidence follows in the native checkpoint;
+real AE acceptance remains open. Scratch outputs stay under artifacts/build17-*.
+
 ## Build 16 P-02I follow-up — 2026-10-02
 
 Packed 32784 / 0x8010; private synchronous native request v2. Main 21/native identity

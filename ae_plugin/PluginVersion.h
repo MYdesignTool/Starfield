@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 16: AEGP main controls; generic context has no params/image requirement.
-#define STARFIELD_VERSION_BUILD 16
-#define STARFIELD_VERSION_PACKED 32784 /* 0x8010 */
+// Build 17: native UI edits publish directly, without cross-effect generic calls.
+#define STARFIELD_VERSION_BUILD 17
+#define STARFIELD_VERSION_PACKED 32785 /* 0x8011 */

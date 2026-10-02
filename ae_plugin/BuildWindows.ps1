@@ -27,6 +27,7 @@ $adapterInputs = @(
     'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
     'ae_plugin\EffectMain.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\GraphCarrier.hpp',
+    'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\NativeGraphCommit.hpp',
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',

@@ -25,7 +25,7 @@ bool fake_native_compile = false;
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
 PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found,
-                                const node_sync::NativeEdit*) noexcept {
+                                AEGP_PluginID, const node_sync::NativeEdit*) noexcept {
     if (fake_native_compile) {
         auto result = graph_from_controls(core::Settings{});
         if (!result.has_value()) return PF_Err_BAD_CALLBACK_PARAM;

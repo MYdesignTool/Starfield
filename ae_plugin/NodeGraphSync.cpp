@@ -3,6 +3,7 @@
 #include "AE_GeneralPlug.h"
 #include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
+#include "NativeGraphCommit.hpp"
 #include "SPBasic.h"
 #include "starfield/core/Graph.hpp"
 
@@ -242,13 +243,11 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         edit.time = in_data->current_time; edit.time_scale = static_cast<A_long>(in_data->time_scale);
         edit.pixel_aspect = in_data->pixel_aspect_ratio;
         // The host may not have saved this callback's value into its stream yet.
-        // Carry it with the request and require explicit renderer publication.
+        // Apply it locally by UUID and explicitly publish the renderer snapshot.
         error = complete_context(edit);
         if (error) edit.stage = starfield::adapter::node_sync::Stage::context;
         else {
-            const A_Time edit_time{edit.time, static_cast<A_u_long>(edit.time_scale)};
-            error = static_cast<PF_Err>(suites.effect->AEGP_EffectCallGeneric(
-                plugin_id, renderer, &edit_time, PF_Cmd_COMPLETELY_GENERAL, &edit));
+            error = starfield::adapter::commit_native_graph_edit(&edit, plugin_id, out_data);
         }
         suites.effect->AEGP_DisposeEffect(renderer);
         if (!error) error = edit.accepted && edit.revision > 0 ? edit.status :

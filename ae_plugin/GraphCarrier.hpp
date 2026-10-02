@@ -3,10 +3,9 @@
 #include "AE_Effect.h"
 #include "AE_GeneralPlug.h"
 #include "starfield/core/Graph.hpp"
+#include "NativeGraphCommit.hpp"
 
 namespace starfield::adapter {
-
-namespace node_sync { struct NativeEdit; }
 
 // Registers the effect with AEGP so supervised callbacks can address their own
 // ordinary parameter streams. Failure disables the CEP graph carrier only; render
@@ -14,19 +13,9 @@ namespace node_sync { struct NativeEdit; }
 [[nodiscard]] PF_Err register_graph_carrier(PF_InData* in_data) noexcept;
 [[nodiscard]] AEGP_PluginID graph_carrier_plugin_id() noexcept;
 
-// Called before replacing the canonical arbitrary-data graph in a supervised AE
-// callback. Revision and checksum are ordinary numeric streams; no expression
-// or script-readable copy of the graph is required by node authoring.
-[[nodiscard]] PF_Err write_graph_snapshot(PF_InData* in_data, PF_ParamDef* params[], const core::Graph& graph,
-                                          A_long* new_revision = nullptr) noexcept;
-
 // Handles the single commit trigger used by the CEP transaction bridge.
 [[nodiscard]] PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data,
                                           PF_ParamDef* params[],
                                           PF_UserChangedParamExtra* extra) noexcept;
-
-// Generic inter-effect calls must persist with AEGP streams, not params[] flags.
-[[nodiscard]] PF_Err commit_native_graph_edit(PF_InData* in_data, PF_OutData* out_data,
-                                              PF_ParamDef* params[], node_sync::NativeEdit* edit) noexcept;
 
 } // namespace starfield::adapter
