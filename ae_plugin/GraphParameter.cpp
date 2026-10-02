@@ -26,7 +26,7 @@ public:
     LockedBytes(PF_InData* data, PF_ArbitraryH handle) : data_(data), handle_(handle) {
         if (!handles_available(data) || !handle) return;
         const auto size = data->utils->host_get_handle_size(handle);
-        if (size < core::kSequenceHeaderSize || size > core::kMaxGraphPayloadBytes) return;
+        if (size < core::kSequenceHeaderSize || size > core::kMaxSavedGraphPayloadBytes) return;
         pointer_ = data->utils->host_lock_handle(handle);
         if (pointer_) bytes_ = {static_cast<const std::byte*>(pointer_), static_cast<std::size_t>(size)};
     }
@@ -45,7 +45,7 @@ private:
 PF_Err copy_bytes(PF_InData* data, std::span<const std::byte> bytes, PF_ArbitraryH* output) {
     if (!output) return PF_Err_BAD_CALLBACK_PARAM;
     *output = nullptr;
-    if (!handles_available(data) || bytes.size() < core::kSequenceHeaderSize || bytes.size() > core::kMaxGraphPayloadBytes)
+    if (!handles_available(data) || bytes.size() < core::kSequenceHeaderSize || bytes.size() > core::kMaxSavedGraphPayloadBytes)
         return PF_Err_BAD_CALLBACK_PARAM;
     const auto handle = data->utils->host_new_handle(bytes.size());
     if (!handle) return PF_Err_OUT_OF_MEMORY;
@@ -119,7 +119,7 @@ PF_Err dispatch_arbitrary(PF_InData* data, PF_ArbParamsExtra& extra) {
             auto& p = extra.u.unflatten_func_params;
             if (!p.arbPH) return PF_Err_BAD_CALLBACK_PARAM;
             *p.arbPH = nullptr;
-            if (!p.flat_dataPV || p.buf_sizeLu > core::kMaxGraphPayloadBytes) return PF_Err_BAD_CALLBACK_PARAM;
+            if (!p.flat_dataPV || p.buf_sizeLu > core::kMaxSavedGraphPayloadBytes) return PF_Err_BAD_CALLBACK_PARAM;
             return accept_bytes(data, {static_cast<const std::byte*>(p.flat_dataPV), p.buf_sizeLu}, p.arbPH);
         }
         case PF_Arbitrary_INTERP_FUNC: {
@@ -167,7 +167,7 @@ PF_Err dispatch_arbitrary(PF_InData* data, PF_ArbParamsExtra& extra) {
             auto& p = extra.u.scan_func_params;
             if (!p.arbPH) return PF_Err_BAD_CALLBACK_PARAM;
             *p.arbPH = nullptr;
-            if (!p.bufPC || p.bytes_to_scanLu > kTextPrefix.size() + 2 * core::kMaxGraphPayloadBytes + 1)
+            if (!p.bufPC || p.bytes_to_scanLu > kTextPrefix.size() + 2 * core::kMaxSavedGraphPayloadBytes + 1)
                 return PF_Err_CANNOT_PARSE_KEYFRAME_TEXT;
             std::string_view text(p.bufPC, p.bytes_to_scanLu);
             if (!text.empty() && text.back() == '\0') text.remove_suffix(1);
@@ -219,6 +219,9 @@ PF_Err create_graph_parameter(PF_InData* data, const core::Graph& graph, PF_Arbi
     if (!output) return PF_Err_BAD_CALLBACK_PARAM;
     *output = nullptr;
     try {
+        for(const auto& record:graph.optional_records) if(record.size()>=2 &&
+            record[1]==std::byte{0x80} && (record[0]==std::byte{3} || record[0]==std::byte{4}))
+            return PF_Err_BAD_CALLBACK_PARAM; // Frame history must never become project data.
         const auto encoded = core::serialize_graph(graph, core::particle_node_registry());
         if (!encoded.has_value()) return codec_error(encoded.error());
         return copy_bytes(data, encoded.value(), output);

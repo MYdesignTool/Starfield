@@ -1,5 +1,22 @@
 # Behavior inventory
 
+## M3-05 / build 22 — temporal controls, Particle color and native Angle
+
+Owner confirms build 21 Origin birth behavior. Build 22 integrates historical
+PPS, samples all existing birth controls at actual birth times, and integrates
+Force over lived time for ordinary/Auxiliary systems. Particle Color uses four
+modes and a saved 2–8-stop gradient. Emitter rotations use native AE Angle controls
+with turns/degrees, a dial and keyframes. Fresh Emitter/Particle effects required.
+See [parameter time audit](temporal-parameter-audit.md) and ADR 0025 for the full
+control matrix, precision, bounds and remaining reference/AE gates.
+
+1,420 scoped C++ checks and focused generated-expression/startup/gradient JS
+checks pass; all five May 2023 SDK Release /MT AEXs and paired Core DLL build.
+No AE session operated. Owner AE 2023.5.0 Build 52 qualification remains open.
+Build 22 is 32790/0x8016; native identity 3/layout metadata 7; main IDs/manifest,
+Render.hpp and C ABI 2 unchanged. The CEP ready marker remains animation-19.
+
+
 ## Build 21 M3-03 — emitter Origin at birth
 
 Owner confirms build 20 renders and Origin keys animate, but survivors follow the

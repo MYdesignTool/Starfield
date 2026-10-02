@@ -16,7 +16,7 @@
         appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 5, particle: 2, force: 2, appearance: 1, output: 3 };
+    var SCHEMA_VERSIONS = { emitter: 5, particle: 3, force: 2, appearance: 1, output: 3 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
@@ -43,7 +43,9 @@
             {key:"29",type:4,value:0}, {key:"30",type:4,value:0}
         ],
         particle: [
-            { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
+            { key: "12", type: 3, value: 0 },
+            { key: "13", type: 7, value: defaultGradient() },
+            { key: "1", type: 5, value: [1, 1, 1] },
             { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 100 },
             { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 100 },
             { key: "11", type: 4, value: 2 },
@@ -64,6 +66,16 @@
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
             {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100}]
     };
+
+    function defaultGradient() {
+        var bytes=new Uint8Array(68),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;
+        for(var i=0;i<2;i++) {
+            view.setFloat64(4+32*i,i,true);
+            for(var channel=0;channel<3;channel++) view.setFloat64(12+32*i+8*channel,1,true);
+        }
+        return bytes;
+    }
 
     function fail(code, message) {
         var result = new Error(message);
@@ -403,7 +415,7 @@
             var value = copyValue(change.value);
             if (found < 0) {
                 if ((node.type !== TYPES.particle && node.type !== TYPES.appearance) ||
-                    (change.parameterKey !== "7" && change.parameterKey !== "8") ||
+                    (change.parameterKey !== "7" && change.parameterKey !== "8" && !(node.type===TYPES.particle && change.parameterKey==="13")) ||
                     change.valueType !== 7 || !(value instanceof Uint8Array)) {
                     fail("missing_parameter", "the requested graph parameter is not present");
                 }

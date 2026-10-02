@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 21: immutable emitter Origin history sampled at particle birth.
-#define STARFIELD_VERSION_BUILD 21
-#define STARFIELD_VERSION_PACKED 32789 /* 0x8015 */
+// Build 22: temporal controls and Particle color gradient.
+#define STARFIELD_VERSION_BUILD 22
+#define STARFIELD_VERSION_PACKED 32790 /* 0x8016 */

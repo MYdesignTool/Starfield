@@ -9,8 +9,10 @@ namespace starfield::adapter {
 
 namespace node_sync { struct NativeEdit; }
 
-struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}; };
+struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}, rate{}; };
 [[nodiscard]] PF_Err read_native_origin_bindings(const core::Graph&, std::vector<NativeOriginBinding>&) noexcept;
+struct NativeLifetimeBinding { core::NodeId particle; A_long stream{}; };
+[[nodiscard]] PF_Err read_native_lifetime_bindings(const core::Graph&,std::vector<NativeLifetimeBinding>&) noexcept;
 
 // UI-only transaction. Restores changed dependency expressions unless accepted.
 class NativeBindingTransaction {
@@ -30,7 +32,8 @@ private:
 [[nodiscard]] PF_Err sample_native_node_animation(PF_InData*, core::Graph&,
                                                   A_long width, A_long height,
                                                   A_long* failed_stream = nullptr,
-                                                  const char** failed_stage = nullptr) noexcept;
+                                                  const char** failed_stage = nullptr,
+                                                  const core::NodeId* node_filter = nullptr) noexcept;
 
 // Reads per-node records from sibling hidden node effects on the supervised
 // edit path. It must never be called from SmartFX pre-render or render.

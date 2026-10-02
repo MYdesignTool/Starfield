@@ -1,11 +1,13 @@
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/ColorGradient.hpp"
 #include "starfield/core/Random.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <new>
 #include <optional>
 #include <queue>
@@ -42,6 +44,8 @@ struct AppearanceValues {
     double opacity_random_percent{0.0};
     AgeCurve size_curve{};
     AgeCurve opacity_curve{};
+    std::uint32_t color_mode{1};
+    ColorGradient gradient{white_gradient()};
 };
 
 constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
@@ -164,12 +168,12 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     const auto* size_end = find_value(node, kSizeEnd);
     const auto* opacity_start = find_value(node, kOpacityStart);
     const auto* opacity_end = find_value(node, kOpacityEnd);
-    if (!color_start || !color_end || !size_start || !size_end || !opacity_start || !opacity_end) {
+    if (!color_start || (!color_end && node.type_key!=kParticleNode) || !size_start || !size_end || !opacity_start || !opacity_end) {
         return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance node is missing values");
     }
     Settings settings;
     settings.color_start = std::get<Vec3>(*color_start);
-    settings.color_end = std::get<Vec3>(*color_end);
+    settings.color_end = color_end?std::get<Vec3>(*color_end):settings.color_start;
     settings.particle_size = std::get<double>(*size_start);
     settings.particle_size_end = std::get<double>(*size_end);
     settings.opacity = std::get<double>(*opacity_start);
@@ -202,13 +206,22 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     if (!validated.notices.empty()) {
         return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance node value is outside supported bounds");
     }
-    return Result<AppearanceValues>::success(AppearanceValues{
+    AppearanceValues result{
         validated.value.color_start, validated.value.color_end,
         validated.value.particle_size, validated.value.particle_size_end,
         validated.value.opacity, validated.value.opacity_end,
         validated.value.particle_lifetime_seconds,
         validated.value.particle_size_random_percent, validated.value.opacity_random_percent,
-        validated.value.size_over_life, validated.value.opacity_over_life});
+        validated.value.size_over_life, validated.value.opacity_over_life};
+    result.gradient.stops[0]={0,result.color_start};result.gradient.stops[1]={1,result.color_end};
+    if(const auto* mode=find_value(node,kParticleColorMode)) {
+        result.color_mode=std::get<std::uint32_t>(*mode);
+        if(result.color_mode>3) return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"invalid Particle Color mode");
+    }
+    if(const auto* gradient=find_value(node,kColorGradient))
+        if(!decode_color_gradient(std::get<OpaqueBytes>(*gradient),result.gradient))
+            return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"invalid Color Gradient");
+    return Result<AppearanceValues>::success(std::move(result));
 }
 
 void apply_appearance(ParticleInstance& particle, const AppearanceValues& appearance,
@@ -225,10 +238,12 @@ void apply_appearance(ParticleInstance& particle, const AppearanceValues& appear
         unit_value(seed, particle.id, RandomPurpose::size);
     particle.opacity *= 1.0 - (appearance.opacity_random_percent / 100.0) *
         unit_value(seed, particle.id, RandomPurpose::opacity);
-    particle.color = Vec3{
-        appearance.color_start.x + (appearance.color_end.x - appearance.color_start.x) * age_fraction,
-        appearance.color_start.y + (appearance.color_end.y - appearance.color_start.y) * age_fraction,
-        appearance.color_start.z + (appearance.color_end.z - appearance.color_start.z) * age_fraction};
+    // An independent random stream keeps gradient sampling stable across frames.
+    const double random=unit_value(seed,particle.id,RandomPurpose::particle_color);
+    double location=age_fraction;
+    if(appearance.color_mode==2) location=random;
+    if(appearance.color_mode==3) location=std::fmod(random+age_fraction,1.0);
+    particle.color=appearance.color_mode==0?appearance.color_start:evaluate_color_gradient(appearance.gradient,location);
 }
 
 bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
@@ -818,9 +833,21 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
     }
 }
 
+#include "TemporalEvaluation.hpp"
+
 Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
                                                EmitterDimensionContext dimension_context, EmitterOriginSampler* origin_sampler) {
+    const OpaqueBytes* frozen=nullptr;
+    for(const auto& record:graph.optional_records) if(record.size()>=2 &&
+        record[0]==std::byte{4} && record[1]==std::byte{0x80}) {
+        if(frozen) return Result<EvaluatedGraph>::failure(ErrorCode::invalid_request,"duplicate temporal particle record");
+        frozen=&record;
+    }
+    if(frozen) {
+        if(cancellation.is_cancelled()) return Result<EvaluatedGraph>::failure(ErrorCode::cancelled,"temporal render cancelled");
+        return decode_evaluated_particles(*frozen,time);
+    }
     for (const auto& node : graph.nodes) if (node.type_key == graph_keys::kOutputNode) {
         const auto* enabled = find_value(node, graph_keys::kTimeRemapEnabled);
         const auto* clock = find_value(node, graph_keys::kTimeRemapSeconds);

@@ -21,7 +21,7 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return 30;
-        case Kind::particle: return 43;
+        case Kind::particle: return 60;
         case Kind::appearance: return 42;
         case Kind::force: return 27;
     }
@@ -53,13 +53,15 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 // identities stable independently of stream indices (schema/node-parameters.json).
 namespace disk_ids {
 enum : A_long {
+    kParticleColorModeId = 211, kColorGradientCountId = 930,
+    kColorGradientPositionFirstId = 940, kColorGradientColorFirstId = 950,
     kEmitterTypeId = 101, kBirthRateId = 102,
     kSeedId = 103, kEmitterParticleSizeId = 104,
     kVelocityXId = 107, kVelocityYId = 108, kVelocityZId = 109,
     kDiscSizeId = 110, kSpeedRandomId = 111,
     kEmitterSizeXId = 112, kEmitterSizeYId = 113, kEmitterSizeZId = 114,
     kEmissionSpeedId = 115, kEmissionSpeedRandomId = 116,
-    kEmissionAngleXId = 117, kEmissionAngleYId = 118, kEmissionAngleZId = 119,
+    kEmissionAngleXId = 133, kEmissionAngleYId = 134, kEmissionAngleZId = 135,
     kDirectionId = 120, kDirectionSpanId = 121,
     kOriginXYId = 123, kOriginZId = 124,
     kEmittingModeId = 125, kEmitChanceId = 126, kEmitLifeStartId = 127, kEmitLifeEndId = 128,
@@ -119,13 +121,14 @@ enum : A_long {
         kDirectionId, kDirectionSpanId,
         kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
         kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId,
+        kParticleColorModeId, kColorGradientCountId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,
         kWindXId, kWindYId, kWindZId, kSpinId, kSpinFrequencyId, kSpinResistId, kSpinDelayId,
         kWindSpinCurveCountId,
         kLayoutXId, kLayoutYId, kConnectionCountId, kSyncGuardId,
         kSizeCurveCountId, kOpacityCurveCountId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 48> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 64> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
@@ -135,6 +138,8 @@ enum : A_long {
         }
     }
     for (A_long point = 0; point < 8; ++point) {
+        ids[count++]=kColorGradientPositionFirstId+point;
+        ids[count++]=kColorGradientColorFirstId+point;
         ids[count++] = uuid_id(point);
         for (char bank : {'s', 'o', 'w'}) {
             ids[count++] = curve_age_id(bank, point);

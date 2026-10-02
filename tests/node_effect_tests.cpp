@@ -91,6 +91,10 @@ int main() {
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
+    if(kind==Kind::emitter) for(A_long index:{12,13,14})
+        check(registered[index-1].param_type==PF_Param_ANGLE &&
+            (registered[index-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0 &&
+            registered[index-1].u.ad.value==0,"rotation registers native AE Angle with zero turns and keyframes");
     check(std::strcmp(registered[uuid_first_index(kind)-1].name, "Node UUID 0") == 0, "UUID stream index matches compiler");
     check(std::strcmp(registered[sync_guard_index(kind)-1].name, "Panel Sync Guard") == 0, "guard stream index matches compiler");
     if constexpr (kind == Kind::emitter) {
@@ -118,18 +122,19 @@ int main() {
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
-        if (control_index <= last_animated) controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
+        if (control_index <= last_animated && !(kind==Kind::emitter && control_index==2))
+            controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
         else controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
         interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;
         if (control.param_type == PF_Param_COLOR) {
             ++colors;
-            colors_supervised &= (control.flags & PF_ParamFlag_SUPERVISE) != 0;
+            if(!(control.ui_flags & PF_PUI_INVISIBLE)) colors_supervised &= (control.flags & PF_ParamFlag_SUPERVISE) != 0;
         }
     }
     check(controls_animated, "all public node controls permit keyframes");
     check(controls_constant, "topology identity and curve banks stay constant");
     check(interpolation_unrestricted, "constant streams do not request unnecessary interpolation restrictions");
-    check(colors == ((kind == Kind::particle || kind == Kind::appearance) ? 2 : 0), "only Particle/Appearance register their two colors");
+    check(colors == (kind == Kind::particle ? 9 : kind == Kind::appearance ? 2 : 0), "Particle registers Color plus eight saved gradient stops");
     check(colors_supervised, "color edits retain the supervised synchronization callback");
 
     host.current_time = 33; host.time_step = 1; host.time_scale = 24;

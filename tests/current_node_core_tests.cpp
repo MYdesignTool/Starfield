@@ -3,11 +3,14 @@
 #include "starfield/core/PluginApi.h"
 #include "starfield/core/AgeCurve.hpp"
 #include "starfield/core/SequenceCodec.hpp"
+#include "starfield/core/ColorGradient.hpp"
+#include "starfield/core/Random.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <functional>
 
 using namespace starfield::core;
 using namespace starfield::core::graph_keys;
@@ -221,4 +224,204 @@ void test_birth_origins() {
     check(children.has_value() && std::any_of(children.value().particles.begin(),children.value().particles.end(),[](const auto& p){return std::abs(p.position.x-5.5)<1e-9;}),
           "Auxiliary children keep parent's historical origin and their own birth offset");
 }
-int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+struct TemporalFixture final:TemporalGraphSampler {
+    Graph graph;
+    std::function<double(NodeId,double)> emission;
+    std::function<void(GraphNode&,double)> animate;
+    Result<GraphNode> node(NodeId id,double seconds) override {
+        auto found=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==id;});
+        if(found==graph.nodes.end()) return Result<GraphNode>::failure(ErrorCode::invalid_request,"fixture node missing");
+        auto sampled=*found;if(animate) animate(sampled,seconds);return Result<GraphNode>::success(std::move(sampled));
+    }
+    Result<double> rate(NodeId id,double seconds) override {
+        if(emission) return Result<double>::success(emission(id,seconds));
+        auto sampled=node(id,seconds);if(!sampled.has_value()) return Result<double>::failure(sampled.error());
+        for(const auto& p:sampled.value().parameters) if(p.key==kBirthRate) return Result<double>::success(std::get<double>(p.value));
+        return Result<double>::failure(ErrorCode::invalid_request,"fixture rate missing");
+    }
+};
+void test_temporal_controls() {
+    Settings settings;settings.birth_rate=4;settings.particle_lifetime_seconds=5;settings.velocity={};settings.velocity_spread=0;
+    settings.particle_count=100;settings.particle_size=10;settings.opacity=1;
+    auto made=make_emitter_particle_force_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(3)},NodeId{uuid(255)},
+        EdgeId{uuid(11)},EdgeId{uuid(12)},EdgeId{uuid(13)});
+    check(made.has_value(),"construct temporal reference graph");
+    TemporalFixture fixture;fixture.graph=made.take_value();
+    fixture.emission=[](NodeId,double t){return t<1?4.0:0.0;};
+    fixture.animate=[](GraphNode& n,double t) {
+        if(n.type_key==kEmitterNode) {
+            set(n,kEmitterOrigin,Vec3{t*t,0,0});set(n,kVelocity,Vec3{1+t,0,0});
+            set(n,kEmitterShape,std::uint32_t{0});set(n,kSeed,std::uint32_t(100+t*100));
+            set(n,kEmissionSpeed,0.0);
+        }
+        if(n.type_key==kParticleNode) {
+            set(n,kParticleLifetimeSeconds,5+t);set(n,kSizeStart,10+t);set(n,kOpacityStart,1-t/10);
+            set(n,kParticleColorMode,std::uint32_t{0});set(n,kColorStart,Vec3{t/2,0.25,0.5});
+        }
+    };
+    auto evaluate=[&](double t) {return evaluate_temporal_particle_graph(fixture.graph,{std::int64_t(std::llround(t*1000000)),1000000},never,{1080,1},fixture);};
+    const auto first=evaluate(0.75), later=evaluate(2), reverse=evaluate(0.75);
+    check(first.has_value() && first.value().particles.size()==4,"historical rate produces stable first four births");
+    check(later.has_value() && later.value().particles.size()==5,"rate zero keeps historical births alive including boundary threshold");
+    check(reverse.has_value() && first.has_value() && reverse.value().particles.size()==first.value().particles.size(),"reverse timeline count identical");
+    if(first.has_value() && later.has_value()) for(const auto& old:first.value().particles) {
+        const double birth=double(old.id)/4;
+        const auto found=std::find_if(later.value().particles.begin(),later.value().particles.end(),[&](const auto& p){return p.id==old.id;});
+        check(found!=later.value().particles.end(),"later rate never removes a live older birth");
+        if(found==later.value().particles.end()) continue;
+        check(std::abs(found->position.x-(birth*birth+(1+birth)*(2-birth)))<1e-8,"speed/direction and Origin are birth values");
+        check(found->size_pixels==old.size_pixels && found->size_pixels==10+birth,"base Size is sampled at birth");
+        check(found->opacity==old.opacity && std::abs(found->opacity-(1-birth/10))<1e-10,"base Opacity is sampled at birth");
+        check(found->color.x==old.color.x && std::abs(found->color.x-birth/2)<1e-10,"animated solid Color is sampled at birth");
+        check(std::abs(found->lifetime_seconds-(5+birth))<1e-10,"Life is sampled at birth");
+    }
+    if(later.has_value()) {
+        auto frozen=encode_evaluated_particles(later.value(),{2,1});check(frozen.has_value(),"encode whole immutable temporal result");
+        auto graph=fixture.graph;graph.optional_records.push_back(frozen.value());
+        auto serialized=serialize_graph(graph,particle_node_registry());check(serialized.has_value(),"temporal snapshot crosses Core codec");
+        auto decoded=deserialize_graph(serialized.value(),particle_node_registry());check(decoded.has_value(),"decode temporal snapshot graph");
+        auto replay=evaluate_particle_graph(decoded.value(),{48,24},never,{1080,1});
+        check(replay.has_value() && replay.value().particles.size()==later.value().particles.size(),"frozen render accepts equivalent rational time");
+        if(replay.has_value()) for(std::size_t i=0;i<replay.value().particles.size();++i)
+            check(replay.value().particles[i].position.x==later.value().particles[i].position.x &&
+                  replay.value().particles[i].color.x==later.value().particles[i].color.x,"frozen pixels preserve double-valued trajectory and colors");
+        check(!evaluate_particle_graph(decoded.value(),{3,1},never).has_value(),"stale frozen frame is rejected");
+        auto invalid=frozen.value();invalid.pop_back();check(!decode_evaluated_particles(invalid,{2,1}).has_value(),"truncated temporal record rejected");
+    }
+    // Linear rate 2+2t has integral 2t+t*t, independent of current rate 6.
+    fixture.emission=[](NodeId,double t){return 2+2*t;};
+    fixture.animate=[](GraphNode& n,double t) {
+        if(n.type_key==kEmitterNode) {set(n,kVelocity,Vec3{});set(n,kEmitterOrigin,Vec3{t,0,0});}
+        if(n.type_key==kParticleNode) set(n,kParticleLifetimeSeconds,5.0);
+    };
+    auto ramp=evaluate(2);
+    check(ramp.has_value() && ramp.value().particles.size()==9,"linear rate uses integrated emission rather than current PPS");
+    if(ramp.has_value()) for(const auto& p:ramp.value().particles)
+        check(std::abs(p.position.x-(-1+std::sqrt(1+double(p.id))))<1e-8,"integrated rate inversion gives each actual birth time");
+    // A positive-to-zero hold and a delayed start must not divide by zero.
+    fixture.emission=[](NodeId,double t){return t<1?0.0:4.0;};
+    auto delayed=evaluate(1.5);
+    check(delayed.has_value() && delayed.value().particles.size()==3,"zero interval creates no phantom births");
+    if(delayed.has_value()) for(const auto& p:delayed.value().particles)
+        check(std::abs(p.position.x-(1+double(p.id)/4))<1e-8,"delayed emission preserves absolute birth times");
+    fixture.emission=[](NodeId,double){return 4.0;};
+    fixture.animate=[](GraphNode& n,double t) {
+        if(n.type_key==kEmitterNode) {set(n,kVelocity,Vec3{});set(n,kEmitterOrigin,Vec3{});}
+        if(n.type_key==kParticleNode) set(n,kParticleLifetimeSeconds,t<1?3.0:0.2);
+        if(n.type_key==kForceNode) set(n,kGravity,Vec3{t<1?0.0:2.0,0,0});
+    };
+    auto force=evaluate(2);
+    check(force.has_value() && force.value().particles.size()==5,"later Life keys do not kill earlier births");
+    if(force.has_value()) {
+        auto oldest=std::find_if(force.value().particles.begin(),force.value().particles.end(),[](const auto& p){return p.id==0;});
+        check(oldest!=force.value().particles.end() && std::abs(oldest->position.x-1)<1e-8 &&
+            std::abs(oldest->velocity.x-2)<1e-8,"Force acts only during the time after its key");
+    }
+    fixture.animate=[](GraphNode& n,double t) {
+        if(n.type_key==kEmitterNode) {set(n,kVelocity,Vec3{1,0,0});set(n,kEmitterOrigin,Vec3{});}
+        if(n.type_key==kParticleNode) set(n,kParticleLifetimeSeconds,5.0);
+        if(n.type_key==kForceNode) set(n,kLinearDrag,t<1?0.0:1.0);
+    };
+    auto drag=evaluate(2);
+    if(drag.has_value()) {
+        const auto& p=drag.value().particles.front();
+        check(std::abs(p.position.x-(2-std::exp(-1)))<1e-8 && std::abs(p.velocity.x-std::exp(-1))<1e-8,
+            "Air Density integrates its lived interval without retroactive drag");
+    } else check(false,"animated drag evaluates");
+    fixture.animate=[](GraphNode& n,double) {
+        if(n.type_key==kEmitterNode) {set(n,kVelocity,Vec3{});set(n,kEmitterOrigin,Vec3{});}
+        if(n.type_key==kParticleNode) set(n,kParticleLifetimeSeconds,5.0);
+        if(n.type_key==kForceNode) {set(n,kGravity,Vec3{});set(n,kLinearDrag,0.0);set(n,kSpin,1.0);set(n,kSpinFrequency,0.5);}
+    };
+    auto spin=evaluate(0.5);
+    check(spin.has_value(),"temporal Spin evaluates");
+    if(spin.has_value()) {
+        const auto& p=spin.value().particles.front();
+        check(std::abs(p.velocity.x+3.14159265358979323846)<1e-8 && std::abs(p.velocity.y)<1e-8,
+              "Auxiliary inheritance receives instantaneous Spin field velocity");
+    }
+    // Auxiliary traversal must not leak parent particles to the final Output.
+    fixture.graph=auxiliary_graph();fixture.emission={};fixture.animate={};
+    auto aux=evaluate(1.25);
+    check(aux.has_value() && !aux.value().particles.empty(),"temporal Auxiliary graph evaluates parent birth history");
+    if(aux.has_value()) for(const auto& p:aux.value().particles)
+        check(p.emitter_id==NodeId{uuid(4)},"Auxiliary-only Output does not draw its disconnected parents");
+    struct Cancel final:Cancellation {bool is_cancelled() const noexcept override{return true;}} cancel;
+    auto cancelled=evaluate_temporal_particle_graph(fixture.graph,{2,1},cancel,{1080,1},fixture);
+    check(!cancelled.has_value() && cancelled.error().code==ErrorCode::cancelled,"temporal cancellation is a normal cancelled result");
+    fixture.emission=[](NodeId,double){return std::numeric_limits<double>::quiet_NaN();};
+    check(!evaluate(2).has_value(),"nonfinite historical rates are rejected");
+}
+void test_particle_gradient() {
+    auto gradient=white_gradient();gradient.count=3;
+    gradient.stops[0]={0,{1,0,0}};gradient.stops[1]={0.3,{0,1,0}};gradient.stops[2]={1,{0,0,1}};
+    auto bytes=encode_color_gradient(gradient);ColorGradient decoded;
+    check(decode_color_gradient(bytes,decoded) && decoded.count==3,"multi-stop Color Gradient round trips");
+    auto sampled=evaluate_color_gradient(decoded,.15);
+    check(sampled.x==.5 && sampled.y==.5 && sampled.z==0,"gradient honors nonuniform stop positions");
+    auto invalid=bytes;invalid[2]=std::byte{1};check(!decode_color_gradient(invalid,decoded),"gradient reserved bytes checked");
+    gradient.stops[1].position=0;check(encode_color_gradient(gradient).empty(),"duplicate color stops rejected");
+    TemporalFixture fixture;Settings settings;settings.birth_rate=2;settings.particle_lifetime_seconds=4;
+    settings.velocity={};settings.velocity_spread=0;
+    fixture.graph=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    set(fixture.graph.nodes[1],kColorGradient,bytes);
+    for(std::uint32_t mode=0;mode<4;++mode) {
+        set(fixture.graph.nodes[1],kParticleColorMode,mode);
+        auto a=evaluate_temporal_particle_graph(fixture.graph,{1,1},never,{1080,1},fixture);
+        auto b=evaluate_temporal_particle_graph(fixture.graph,{2,1},never,{1080,1},fixture);
+        check(a.has_value() && b.has_value(),"all four Particle Color modes render");
+        if(!a.has_value() || !b.has_value()) continue;
+        const auto& p=a.value().particles[0];const auto& later=b.value().particles[0];
+        if(mode==0) check(p.color.x==1 && p.color.y==1 && later.color.x==1,"Solid color ignores gradient");
+        if(mode==1) check(p.color.x>0 && p.color.y>0 && later.color.z>0,"Color over life walks through multi-stop gradient");
+        if(mode==2) check(p.color.x==later.color.x && p.color.y==later.color.y && p.color.z==later.color.z,"random gradient color stays attached to particle identity");
+        if(mode==3) check(p.color.x!=later.color.x || p.color.y!=later.color.y || p.color.z!=later.color.z,"loop gradient ages from stable random offset");
+    }
+}
+void test_birth_parameter_matrix() {
+    Settings settings;settings.birth_rate=4;settings.particle_lifetime_seconds=5;settings.velocity_spread=.2;
+    settings.emission_speed=3;settings.emission_speed_random=.3;settings.particle_size=10;settings.opacity=.8;
+    settings.emitter_size_pixels={100,200,300};
+    auto graph=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    struct Change {const char* name;std::string type;ParameterKey key;ParameterValue value;};
+    const Change cases[]={
+        {"Shape",kEmitterNode,kEmitterShape,std::uint32_t{1}},
+        {"Seed",kEmitterNode,kSeed,std::uint32_t{913}},
+        {"Speed",kEmitterNode,kEmissionSpeed,11.0},
+        {"Speed amplitude",kEmitterNode,kEmissionSpeedRandom,1.5},
+        {"Speed Random",kEmitterNode,kEmissionSpeedRandomPercent,80.0},
+        {"Angle X",kEmitterNode,kEmissionAngleX,45.0},{"Angle Y",kEmitterNode,kEmissionAngleY,90.0},
+        {"Angle Z",kEmitterNode,kEmissionAngleZ,135.0},{"Direction",kEmitterNode,kDirectionMode,std::uint32_t{1}},
+        {"Direction Span",kEmitterNode,kDirectionSpan,12.0},
+        {"Velocity",kEmitterNode,kVelocity,Vec3{2,3,4}},{"Velocity spread",kEmitterNode,kVelocitySpread,2.0},
+        {"Size X",kEmitterNode,kEmitterSizeX,400.0},{"Size Y",kEmitterNode,kEmitterSizeY,500.0},
+        {"Size Z",kEmitterNode,kEmitterSizeZ,600.0},{"Disc extent",kEmitterNode,kEmitterSize,.8},
+        {"Life",kParticleNode,kParticleLifetimeSeconds,1.5},
+        {"Size",kParticleNode,kSizeStart,40.0},{"Opacity",kParticleNode,kOpacityStart,.25},
+        {"Size Random",kParticleNode,kSizeRandom,75.0},{"Opacity Random",kParticleNode,kOpacityRandom,75.0},
+        {"Color",kParticleNode,kColorStart,Vec3{.2,.4,.6}},
+        {"Size over life multiplier",kParticleNode,kSizeEnd,20.0},
+        {"Opacity over life multiplier",kParticleNode,kOpacityEnd,30.0},
+    };
+    for(const auto& change:cases) {
+        TemporalFixture fixture;fixture.graph=graph;
+        fixture.animate=[&](GraphNode& node,double time){if(node.type_key==change.type && time>=.5) set(node,change.key,change.value);};
+        auto temporal=evaluate_temporal_particle_graph(fixture.graph,{1,1},never,{1080,1},fixture);
+        auto old=evaluate_particle_graph(graph,{1,1},never,{1080,1});
+        auto changed=graph;for(auto& node:changed.nodes) if(node.type_key==change.type) set(node,change.key,change.value);
+        auto newborns=evaluate_particle_graph(changed,{1,1},never,{1080,1});
+        check(temporal.has_value() && old.has_value() && newborns.has_value(),change.name);
+        if(!temporal.has_value() || !old.has_value() || !newborns.has_value()) continue;
+        for(std::uint64_t id:{0ULL,3ULL}) {
+            const auto& expected=id==0?old.value().particles[id]:newborns.value().particles[id];
+            const auto found=std::find_if(temporal.value().particles.begin(),temporal.value().particles.end(),[&](const auto& p){return p.id==id;});
+            check(found!=temporal.value().particles.end(),change.name);
+            if(found==temporal.value().particles.end()) continue;
+            check(std::abs(found->position.x-expected.position.x)<1e-9 && std::abs(found->position.y-expected.position.y)<1e-9 &&
+                std::abs(found->position.z-expected.position.z)<1e-9 && std::abs(found->size_pixels-expected.size_pixels)<1e-9 &&
+                std::abs(found->opacity-expected.opacity)<1e-9 && std::abs(found->color.x-expected.color.x)<1e-9 &&
+                std::abs(found->lifetime_seconds-expected.lifetime_seconds)<1e-9,change.name);
+        }
+    }
+}
+int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

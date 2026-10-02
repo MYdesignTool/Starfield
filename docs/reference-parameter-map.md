@@ -1,5 +1,16 @@
 # Reference parameter map (observed behavior)
 
+## Build 22 Particle Color / native rotation slice — 2026-10-03
+
+The observed inventory defines Particle Color, Color and Color Gradient, rather
+than two visible endpoints. The official guide documents Solid color, Color over
+life, Random from gradient and Loop from grad; these are now implemented with
+2–8 independently saved stops. Source/path color modes await source contracts.
+Emitter Angle X/Y/Z use PF_Param_ANGLE controls at the owner's request. Emission,
+birth appearance and lived Force timing are documented in temporal-parameter-audit.md.
+This does not claim full Stardust feature or numerical kernel parity.
+
+
 ## Build 14 ordinary Force/main slice — 2026-10-02
 
 Scalar Gravity/random, separate Wind X/Y/Z, Spin/frequency/resist/delay and Air

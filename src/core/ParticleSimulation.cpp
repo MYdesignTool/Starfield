@@ -271,13 +271,11 @@ PartitionRange partition_range(ParticleSlotRange range, std::uint32_t partition_
     return PartitionRange{first_slot, (last_slot - first_slot) / partition_count + 1};
 }
 
-ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed, std::uint64_t slot,
+ParticleInstance evaluate_particle(const Settings& values, double age, std::uint64_t slot,
                                    const EmitterDimensionContext& dimension_context) noexcept {
     ParticleInstance particle;
-    const double birth_rate = values.birth_rate;
     // Age is derived from the slot distance instead of `t - k / rate`, which
     // keeps full relative precision for long comps and high birth rates.
-    double age = (slots_elapsed - static_cast<double>(slot)) / birth_rate;
     if (age < 0.0) {
         age = 0.0; // knife-edge rounding at the newest slot
     }
@@ -382,12 +380,17 @@ Result<std::size_t> simulate_partition(const ValidatedSettings& settings, double
         const std::uint64_t slot = assigned_range.first_slot +
             static_cast<std::uint64_t>(i) * partition_count;
         store_particle(i, slot, live_range.first_slot,
-                       evaluate_particle(settings.value, slots_elapsed, slot, dimension_context));
+                       evaluate_particle(settings.value, (slots_elapsed-double(slot))/settings.value.birth_rate, slot, dimension_context));
     }
     return Result<std::size_t>::success(slot_count);
 }
 
 } // namespace
+
+ParticleInstance simulate_particle_at_age(const Settings& settings, double age,
+    std::uint64_t identity, EmitterDimensionContext dimensions) noexcept {
+    return evaluate_particle(settings, age, identity, dimensions);
+}
 
 Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings, double time_seconds,
                                                         const Cancellation& cancellation,
@@ -497,7 +500,7 @@ Result<std::size_t> simulate_selected_particles_into(const ValidatedSettings& se
             target.slot - range.first_slot >= range.count) {
             return R::failure(ErrorCode::invalid_request, "selected particle slot is outside the live range");
         }
-        destination[target.destination] = evaluate_particle(settings.value, slots_elapsed,
+        destination[target.destination] = evaluate_particle(settings.value, (slots_elapsed-double(target.slot))/settings.value.birth_rate,
                                                             target.slot, dimension_context);
     }
     return R::success(targets.size());

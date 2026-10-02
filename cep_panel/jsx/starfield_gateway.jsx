@@ -489,6 +489,30 @@
         return value;
     }
 
+    function writeNodeColorGradient(effect, bytes) {
+        if(!bytes || bytes[0]!==1 || bytes[2]!==0 || bytes[3]!==0 ||
+            bytes[1]<2 || bytes[1]>8 || bytes.length!==4+32*bytes[1]) throw new Error("Invalid Color Gradient payload.");
+        var count=bytes[1],previous=-1,stops=[];
+        for(var i=0;i<count;i++) {
+            var position=readGraphFloat64(bytes,4+32*i),color=[];
+            if(!isFinite(position) || position<=previous || position<0 || position>1) throw new Error("Unordered Color Gradient.");
+            previous=position;
+            for(var c=0;c<3;c++) {
+                var value=readGraphFloat64(bytes,12+32*i+8*c);
+                if(!isFinite(value) || value<0 || value>64) throw new Error("Invalid Color Gradient channel.");
+                color.push(value);
+            }
+            stops.push({position:position,color:color});
+        }
+        if(stops[0].position!==0 || stops[count-1].position!==1) throw new Error("Color Gradient endpoints must be 0 and 100%.");
+        // Validate the whole payload before mutating any native property.
+        setNodeControl(effect,"Color Gradient Count",count);
+        for(var point=0;point<count;point++) {
+            setNodeControl(effect,"Color Gradient "+point+" Position",stops[point].position);
+            setNodeControl(effect,"Color Gradient "+point+" Color",stops[point].color.concat([1]));
+        }
+    }
+
     function writeNodeCurve(effect, label, bytes) {
         var points = [];
         if (bytes !== null && bytes !== undefined) {
@@ -568,7 +592,7 @@
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
             schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 5 :
-                type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.force" ? 2 : 1,
+                type === "org.starfieldfx.nodes.particle" ? 3 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -628,7 +652,19 @@
                 node.parameters.push({key:"9",type:7,value:forceBytes});
             }
         } else {
-            vector(1, "Color Start"); vector(2, "Color End");
+            if(type==="org.starfieldfx.nodes.particle") {
+                vector(1,"Color");
+                scalar(12,"Particle Color",3);node.parameters[node.parameters.length-1].value-=1;
+                var colorCount=Number(nodeControlValue(effect,"Color Gradient Count"));
+                if(Math.floor(colorCount)!==colorCount || colorCount<2 || colorCount>8) throw new Error("Invalid Color Gradient count.");
+                var colorBytes=[1,colorCount,0,0];
+                for(var stop=0;stop<colorCount;stop++) {
+                    appendFloat64(colorBytes,Number(nodeControlValue(effect,"Color Gradient "+stop+" Position")));
+                    var stopColor=nodeControlValue(effect,"Color Gradient "+stop+" Color");
+                    for(var channel=0;channel<3;channel++) appendFloat64(colorBytes,Number(stopColor[channel]));
+                }
+                node.parameters.push({key:"13",type:7,value:colorBytes});
+            } else {vector(1, "Color Start"); vector(2, "Color End");}
             scalar(3, "Size (Pixels)"); scalar(4, "Size Over Life"); scalar(5, "Opacity");
             node.parameters[node.parameters.length - 1].value /= 100;
             scalar(6, "Opacity Over Life");
@@ -783,8 +819,13 @@
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
-                    if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
-                        [value[0], value[1], value[2], 1]);
+                    if (key === "1" || key === "2") {
+                        if(type!=="org.starfieldfx.nodes.particle" || key==="1")
+                            setNodeControl(effect,type==="org.starfieldfx.nodes.particle"?"Color":key === "1" ? "Color Start" : "Color End",
+                                [value[0], value[1], value[2], 1]);
+                    }
+                    else if(key==="12" && type==="org.starfieldfx.nodes.particle") setNodeControl(effect,"Particle Color",Number(value)+1);
+                    else if(key==="13" && type==="org.starfieldfx.nodes.particle") writeNodeColorGradient(effect,value);
                     else if (key === "3") setNodeControl(effect, "Size (Pixels)", value);
                     else if (key === "4") setNodeControl(effect, "Size Over Life", value);
                     else if (key === "5") setNodeControl(effect, "Opacity", Number(value) * 100);
@@ -1222,7 +1263,7 @@
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:2,
+                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:3,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }

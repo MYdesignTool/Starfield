@@ -44,6 +44,7 @@ $adapterInputs = @(
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\EmitterHistory.hpp',
+    'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp',
     'include\starfield\core\ParticleSimulation.hpp',
     'include\starfield\core\Random.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',

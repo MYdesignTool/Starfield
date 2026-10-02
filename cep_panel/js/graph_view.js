@@ -31,9 +31,9 @@
             "12": { label: "Speed", kind: "slider", decimals: 1, step: 1, min: 0, max: 10000, unit: "px/s" },
             "13": { label: "Speed Amplitude", hidden: true, kind: "slider", decimals: 3, min: 0, max: 100000 },
             "22": { label: "Speed Random", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
-            "14": { label: "Angle X", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
-            "15": { label: "Angle Y", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
-            "16": { label: "Angle Z", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "14": { label: "Angle X", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
+            "15": { label: "Angle Y", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
+            "16": { label: "Angle Z", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
             "17": { label: "Direction", kind: "popup", decimals: 0, step: 1, min: 1, max: 2, displayOffset: 1,
                    choices: ["Directional", "Uniform"] },
             "18": { label: "Direction Span", kind: "slider", decimals: 1, step: 1, min: 0, max: 180 },
@@ -50,8 +50,11 @@
             "30": {label:"Inherit Color",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
         },
         particle: {
-            "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
-            "2": { label: "Color End", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_end" },
+            "1": { label: "Color", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
+            "2": { hidden: true },
+            "12": {label:"Particle Color",kind:"popup",decimals:0,step:1,min:1,max:4,displayOffset:1,
+                choices:["Solid color","Color over life","Random from gradient","Loop from grad"]},
+            "13": {hidden:true},
             "3": { label: "Size (Pixels)", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
             "4": { label: "Size Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "particle_size_end" },
             "5": { label: "Opacity", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%", legacyKey: "opacity" },
@@ -288,6 +291,35 @@
         return bytes;
     }
 
+    function decodeGradient(value) {
+        if(value===undefined || value===null) return [{position:0,color:[1,1,1]},{position:1,color:[1,1,1]}];
+        if(!(value instanceof Uint8Array) || value.length<68 || value[0]!==1 || value[2]!==0 || value[3]!==0 ||
+            value[1]<2 || value[1]>8 || value.length!==4+32*value[1]) fail("invalid_gradient","Malformed Color Gradient.");
+        var view=new DataView(value.buffer,value.byteOffset,value.byteLength),stops=[];
+        for(var i=0;i<value[1];i++) {
+            var position=view.getFloat64(4+32*i,true),color=[];
+            if(!isFinite(position) || position<0 || position>1 || (i && position<=stops[i-1].position)) fail("invalid_gradient","Unordered Color Gradient.");
+            for(var c=0;c<3;c++) {
+                var channel=view.getFloat64(12+32*i+8*c,true);
+                if(!isFinite(channel)||channel<0||channel>64) fail("invalid_gradient","Invalid Color Gradient channel.");
+                color.push(channel);
+            }
+            stops.push({position:position,color:color});
+        }
+        if(stops[0].position!==0 || stops[stops.length-1].position!==1) fail("invalid_gradient","Color Gradient endpoints must be 0 and 100%.");
+        return stops;
+    }
+    function encodeGradient(stops) {
+        if(!stops || stops.length<2 || stops.length>8) fail("invalid_gradient","A gradient requires 2–8 stops.");
+        var bytes=new Uint8Array(4+32*stops.length),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=stops.length;
+        for(var i=0;i<stops.length;i++) {
+            view.setFloat64(4+32*i,stops[i].position,true);
+            for(var c=0;c<3;c++) view.setFloat64(12+32*i+8*c,stops[i].color[c],true);
+        }
+        decodeGradient(bytes);return bytes;
+    }
+
     function project(graph, layoutOverride, geometry) {
         if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
             Object.prototype.toString.call(graph.edges) !== "[object Array]") {
@@ -311,6 +343,11 @@
                             ? { size: "7", opacity: "8", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
                             : null };
             byId[node.id] = node;
+            if(kind==="particle") {
+                var colorMode=findParameter(source,"12"),gradient=findParameter(source,"13");
+                node.colorMode=colorMode?Number(colorMode.value):0;
+                node.gradient=decodeGradient(gradient?gradient.value:null);
+            }
             var specs = SPECS[kind];
             for (var p = 0; p < source.parameters.length; p++) {
                 var graphParameter = source.parameters[p];
@@ -320,6 +357,7 @@
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 if (spec && spec.hidden) continue;
+                if(kind==="particle" && graphParameter.key==="1" && node.colorMode!==0) continue;
                 if (kind === "emitter") {
                     if (Number(graphParameter.key) >= 24 && Number(graphParameter.key) <= 30 && !isAuxiliary) continue;
                     if (["19","20","21"].indexOf(graphParameter.key) >= 0 && (!shape || [1,2].indexOf(Number(shape.value)) < 0)) continue;
@@ -391,7 +429,7 @@
             }
             if (kind === "particle" || kind === "appearance") {
                 var particleOrder = { "11": 0, "3": 1, "9": 2, "5": 3, "10": 4,
-                                      "1": 5, "2": 6, "4": 7, "6": 8 };
+                                      "12": 5, "1": 6, "2": 7, "4": 8, "6": 9 };
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });
@@ -483,6 +521,7 @@
              activeEmitterParameters: activeEmitterParameters,
              countLiveParticles: countLiveParticles, countGraphLiveParticles: countGraphLiveParticles,
              encodeCurve: encodeCurve, decodeCurve: decodeCurve,
+             encodeGradient:encodeGradient,decodeGradient:decodeGradient,
              mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {
                  if (typeof parameter.forceComponent === "number") {
                      var force=parameter.canonicalForce.slice();

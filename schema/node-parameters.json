@@ -1,8 +1,8 @@
 {
   "identityRevision": 3,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Development layout 6 replaces Force vector Gravity/Linear Drag with scalar Gravity/random, Wind XYZ, Spin/frequency/resist/delay, Air Density and hidden percentage curve. Force schema 2/base 27; fresh effects, no migration; Core ABI 2 unchanged.",
-  "animation": "Public controls animate; UUID/layout/connection/guards/curve-knot banks stay constant. ADR 0023; parameter IDs and layout 6 unchanged.",
+  "migrationPolicy": "Development Particle schema 3/base 60 adds Color mode/gradient; Emitter Angle X/Y/Z change from sliders to native Angle controls with disk IDs 133–135. Fresh Emitter/Particle effects required; no legacy migration. Other stream indices and layouts remain unchanged. ADR 0025; Core ABI 2 unchanged.",
+  "animation": "Birth controls sample at birth; PPS and Force integrate over time. Emitting is structural and constant. Identity/layout/topology and curve/gradient knot banks remain constant. ADR 0025.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,
@@ -18,9 +18,9 @@
     "emitter_size_z": 114,
     "emission_speed": 115,
     "emission_speed_random": 116,
-    "emission_angle_x": 117,
-    "emission_angle_y": 118,
-    "emission_angle_z": 119,
+    "emission_angle_x": 133,
+    "emission_angle_y": 134,
+    "emission_angle_z": 135,
     "direction": 120,
     "direction_span": 121,
     "lifetime": 201,
@@ -60,7 +60,9 @@
     "spin_frequency": 311,
     "spin_resist": 312,
     "spin_delay": 313,
-    "wind_spin_curve_count": 900
+    "wind_spin_curve_count": 900,
+    "particle_color_mode": 211,
+    "color_gradient_count": 930
   },
   "outgoingConnections": {
     "first": 500,
@@ -84,7 +86,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter, Particle and Appearance reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 6,
+  "layoutRevision": 7,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -96,7 +98,10 @@
   "reservedRemovedControlIds": [
     106,
     301,
-    302
+    302,
+    117,
+    118,
+    119
   ],
   "visibleControlPolicy": "Typed limits and normal AE slider ranges are independent. CEP uses explicit scrub steps, never the full typed range. AE slider sensitivity also depends on the host's native interaction.",
   "controls": {
@@ -195,9 +200,13 @@
         "Angle Y",
         "Angle Z"
       ],
-      "sliderMin": -180,
-      "sliderMax": 180,
-      "scrubStep": 1
+      "nativeType": "PF_Param_ANGLE",
+      "min": -32768,
+      "max": 32767.99998,
+      "default": 0,
+      "scrubStep": 0.1,
+      "unit": "degrees",
+      "display": "turns plus degrees and native AE dial"
     },
     "direction_span": {
       "label": "Direction Span",
@@ -251,11 +260,12 @@
     }
   },
   "graphAuthoring": {
-    "emitterSchemaVersion": 4,
+    "emitterSchemaVersion": 5,
     "speedRandomPercentKey": 22,
     "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
     "forceSchemaVersion": 2,
-    "outputSchemaVersion": 3
+    "outputSchemaVersion": 3,
+    "particleSchemaVersion": 3
   },
   "nativeControlOrder": {
     "emitter": [
@@ -282,8 +292,8 @@
       "Size Random",
       "Opacity",
       "Opacity Random",
-      "Color Start",
-      "Color End",
+      "Particle Color",
+      "Color",
       "Size Over Life",
       "Opacity Over Life"
     ],
@@ -304,5 +314,16 @@
     "ageFirst": 910,
     "valueFirst": 920,
     "points": 8
+  },
+  "colorGradient": {
+    "positionFirst": 940,
+    "colorFirst": 950,
+    "points": 8,
+    "graphKey": 13,
+    "modeGraphKey": 12,
+    "nativeCountIndex": 44,
+    "nativePositionFirstIndex": 45,
+    "nativeColorFirstIndex": 46,
+    "nativeStride": 2
   }
 }

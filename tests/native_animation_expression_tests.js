@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const expressions = JSON.parse(fs.readFileSync(path.join(root, "artifacts/native-animation-expressions.json"), "utf8"));
-assert.equal(expressions.length, 54);
+assert.equal(expressions.length, 52);
 function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {value:n === 7 ? uuid : 0};
@@ -11,7 +11,7 @@ function node(firstUuid, uuid, values) {
     Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
 }
 let frameTime=0;
-const emitter = node(98, 1, {4:()=>[250+frameTime*100,500]}), particle = node(111,2,{6:[0.2,0.4,0.6,1],7:[0.3,0.5,0.7,1]});
+const emitter = node(98, 1, {4:()=>[250+frameTime*100,500]}), particle = node(128,2,{6:1,7:[0.3,0.5,0.7,1]});
 const force = node(95,4,{}), duplicate = node(98,777,{4:[999,999]});
 for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
     const parade = {numProperties:effects.length};
@@ -22,7 +22,7 @@ for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[fo
         /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
         const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx.param(105).value === 1") ? emitter : expression.includes("fx.param(118).value === 2") ? particle : force;
+        const source = expression.includes("fx.param(105).value === 1") ? emitter : expression.includes("fx.param(135).value === 2") ? particle : force;
         let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");

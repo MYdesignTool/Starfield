@@ -9,6 +9,7 @@
 #include "SPBasic.h"
 
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/ColorGradient.hpp"
 #include "starfield/core/Geometry.hpp"
 
 #include <array>
@@ -44,7 +45,7 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, 44> fields{};
+    std::array<RawField, 61> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -381,7 +382,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 43) return false;
+            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 60) return false;
             node.kind = static_cast<Kind>(kind);
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -433,7 +434,7 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
         kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 5; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
-        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 2; return true;
+        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 3; return true;
     }
     if (std::strcmp(match_name, kAppearanceMatchName) == 0) {
         kind = Kind::appearance; type_key = core::graph_keys::kAppearanceNode; schema = 1; return true;
@@ -524,7 +525,7 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     }
 
     const bool particle = kind == Kind::particle;
-    const A_long color_start_index = particle ? 6 : 5;
+    const A_long color_start_index = particle ? 7 : 5;
     const A_long color_end_index = particle ? 7 : 6;
     const A_long size_index = particle ? 2 : 1;
     const A_long size_end_index = particle ? 8 : 7;
@@ -534,8 +535,22 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     const A_long opacity_random_index = particle ? 5 : 4;
     if (!read_color(suites, plugin_id, effect, color_start_index, time, vector)) return false;
     add_value(node, kColorStart, vector);
-    if (!read_color(suites, plugin_id, effect, color_end_index, time, vector)) return false;
-    add_value(node, kColorEnd, vector);
+    if(!particle) {
+        if(!read_color(suites,plugin_id,effect,color_end_index,time,vector)) return false;
+        add_value(node,kColorEnd,vector);
+    }
+    if(particle) {
+        std::uint32_t mode{},count{};
+        if(!read_uint(suites,plugin_id,effect,6,time,mode) || mode<1 || mode>4 ||
+            !read_uint(suites,plugin_id,effect,44,time,count) || count<2 || count>8) return false;
+        add_value(node,kParticleColorMode,mode-1);
+        core::ColorGradient gradient;gradient.count=static_cast<std::uint8_t>(count);
+        for(std::uint32_t i=0;i<count;++i)
+            if(!read_one_d(suites,plugin_id,effect,45+2*i,time,gradient.stops[i].position) ||
+                !read_color(suites,plugin_id,effect,46+2*i,time,gradient.stops[i].color)) return false;
+        auto bytes=core::encode_color_gradient(gradient);if(bytes.empty()) return false;
+        add_value(node,kColorGradient,std::move(bytes));
+    }
     if (!read_one_d(suites, plugin_id, effect, size_index, time, scalar)) return false;
     add_value(node, kSizeStart, scalar);
     if (!read_one_d(suites, plugin_id, effect, size_end_index, time, scalar)) return false;
@@ -903,15 +918,31 @@ PF_Err read_native_origin_bindings(const core::Graph& graph, std::vector<NativeO
             const auto& xy=node.fields[4];const auto& z=node.fields[5];
             if(!xy.present || xy.type!=node_sync::ValueKind::point2 || xy.slot<0 ||
                !z.present || z.type!=node_sync::ValueKind::scalar || z.slot<0) return PF_Err_BAD_CALLBACK_PARAM;
-            bindings.push_back({node.id,kNativeBindingFirstIndex+xy.slot,kNativeBindingFirstIndex+xy.slot+1,kNativeBindingFirstIndex+z.slot});
+            const auto& rate=node.fields[3];
+            if(!rate.present || rate.slot<0 || rate.type!=node_sync::ValueKind::scalar) return PF_Err_BAD_CALLBACK_PARAM;
+            bindings.push_back({node.id,kNativeBindingFirstIndex+xy.slot,kNativeBindingFirstIndex+xy.slot+1,kNativeBindingFirstIndex+z.slot,
+                kNativeBindingFirstIndex+rate.slot});
         }
         return PF_Err_NONE;
     } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
     catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
 
+PF_Err read_native_lifetime_bindings(const core::Graph& graph,std::vector<NativeLifetimeBinding>& bindings) noexcept {
+    try {
+        std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        for(const auto& node:nodes) if(node.kind==Kind::particle) {
+            const auto& life=node.fields[1];
+            if(!life.present || life.slot<0 || life.type!=node_sync::ValueKind::scalar) return PF_Err_BAD_CALLBACK_PARAM;
+            bindings.push_back({node.id,kNativeBindingFirstIndex+life.slot});
+        }
+        return PF_Err_NONE;
+    } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+      catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+
 PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height,
-                                    A_long* failed_stream, const char** failed_stage) noexcept {
+                                    A_long* failed_stream, const char** failed_stage, const core::NodeId* node_filter) noexcept {
     if (failed_stream) *failed_stream = -1;
     const auto stage = [failed_stage](const char* value) { if (failed_stage) *failed_stage = value; };
     try {
@@ -928,6 +959,7 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             data->pixel_aspect_ratio.den ? double(data->pixel_aspect_ratio.num) / data->pixel_aspect_ratio.den : 1.0};
         SuiteSet reader(nullptr); // No AEGP acquisition, even during destruction.
         for (auto& raw : nodes) {
+            if(node_filter && raw.id!=*node_filter) continue;
             for (auto& field : raw.fields) if (field.present && field.slot >= 0) {
                 for (A_long component = 0; component < component_count(field.type); ++component) {
                     PF_ParamDef sampled{};

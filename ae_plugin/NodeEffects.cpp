@@ -97,17 +97,26 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
 }
 
 PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
-                 A_short choice_count, A_short initial, const char* choices) noexcept {
+                 A_short choice_count, A_short initial, const char* choices,
+                 PF_ParamFlags flags=kNodeEditableFlags) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
-    def.flags = kNodeEditableFlags;
+    def.flags = flags;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.pd.num_choices = choice_count;
     def.u.pd.value = def.u.pd.dephault = initial;
     def.u.pd.u.namesptr = choices;
     return add_checked_parameter(in_data, def);
+}
+
+PF_Err add_angle(PF_InData* in_data,const char* name,A_long id) noexcept {
+    PF_ParamDef def{};
+    def.param_type=PF_Param_ANGLE;def.flags=kNodeEditableFlags;def.uu.id=id;
+    std::snprintf(def.name,sizeof(def.name),"%s",name);
+    def.u.ad.value=def.u.ad.dephault=0; // Native AE turns + degrees and dial.
+    return add_checked_parameter(in_data,def);
 }
 
 PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
@@ -137,11 +146,12 @@ PF_Err add_point2d(PF_InData* in_data, const char* name, A_long id) noexcept {
     return add_checked_parameter(in_data, def);
 }
 
-PF_Err add_color(PF_InData* in_data, const char* name, A_long id) noexcept {
+PF_Err add_color(PF_InData* in_data, const char* name, A_long id,
+    PF_ParamFlags flags=kNodeEditableFlags,PF_ParamUIFlags ui=PF_PUI_NONE) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_COLOR;
-    def.flags = kNodeEditableFlags;
+    def.flags = flags;def.ui_flags=ui;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.cd.value = PF_Pixel{255, 255, 255, 255};
@@ -254,9 +264,12 @@ PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexce
     error = add_slider(in_data, "Opacity Random", kOpacityRandomId, 0.0, 100.0, 0.0,
                        PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;
-    error = add_color(in_data, "Color Start", kColorStartId);
+    error = include_lifetime
+        ? add_popup(in_data,"Particle Color",kParticleColorModeId,4,1,
+            "Solid color|Color over life|Random from gradient|Loop from grad")
+        : add_color(in_data, "Color Start", kColorStartId);
     if (error != PF_Err_NONE) return error;
-    error = add_color(in_data, "Color End", kColorEndId);
+    error = include_lifetime?add_color(in_data,"Color",kColorStartId):add_color(in_data, "Color End", kColorEndId);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Size Over Life", kSizeOverLifeId, 0.0, 100.0, 100.0,
                        PF_Precision_TENTHS);
@@ -268,6 +281,21 @@ PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexce
     if (error != PF_Err_NONE) return error;
     error = add_curve_bank(in_data, "Opacity", 'o');
     if (error != PF_Err_NONE) return error;
+    if(include_lifetime) {
+        error=add_slider(in_data,"Color Gradient Count",kColorGradientCountId,2,8,2,PF_Precision_INTEGER,
+            kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);
+        if(error) return error;
+        for(A_long i=0;i<8;++i) {
+            char name[48]{};
+            std::snprintf(name,sizeof(name),"Color Gradient %ld Position",static_cast<long>(i));
+            error=add_slider(in_data,name,kColorGradientPositionFirstId+i,0,1,i==1?1:double(i)/7,
+                PF_Precision_THOUSANDTHS,kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);
+            if(error) return error;
+            std::snprintf(name,sizeof(name),"Color Gradient %ld Color",static_cast<long>(i));
+            error=add_color(in_data,name,kColorGradientColorFirstId+i,kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);
+            if(error) return error;
+        }
+    }
     return PF_Err_NONE;
 }
 
@@ -275,7 +303,7 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_Err error = add_popup(in_data, "Type", kEmitterTypeId, 4, 1,
                              "Point|Box|Sphere|Disc");
     if (error != PF_Err_NONE) return error;
-    error = add_popup(in_data, "Emitting", kEmittingModeId, 2, 1, "Default|Auxiliary");
+    error = add_popup(in_data, "Emitting", kEmittingModeId, 2, 1, "Default|Auxiliary",kNodeConstantFlags);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Particles Per Second", kBirthRateId,
                        0.0, 1000000.0, 100.0, PF_Precision_INTEGER);
@@ -305,8 +333,7 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     for (const auto& axis : {std::pair{"X", kEmissionAngleXId}, std::pair{"Y", kEmissionAngleYId}, std::pair{"Z", kEmissionAngleZId}}) {
         char name[32]{};
         std::snprintf(name, sizeof(name), "Angle %s", axis.first);
-        error = add_slider(in_data, name, axis.second, -100000.0, 100000.0, 0.0,
-                           PF_Precision_TENTHS);
+        error = add_angle(in_data, name, axis.second);
         if (error != PF_Err_NONE) return error;
     }
     error = add_popup(in_data, "Direction", kDirectionId, 2, 1,

@@ -363,3 +363,11 @@ body.dragging-node { user-select: none; }
 body.scrubbing-number, body.scrubbing-number * { user-select: none; cursor: ew-resize !important; }
 body.marquee-selecting { user-select: none; cursor: crosshair; }
 body.panning-canvas { user-select: none; cursor: grabbing; }
+.gradient-editor { margin-top: 12px; padding: 10px; border: 1px solid #49505a; border-radius: 4px; }
+.gradient-bar { position: relative; height: 25px; margin: 14px 8px 18px; border: 1px solid #8993a2; cursor: crosshair; }
+.gradient-stop { position: absolute; top: 20px; width: 13px; height: 17px; padding: 0; transform: translateX(-50%); border: 1px solid #aaa; cursor: ew-resize; }
+.gradient-stop.selected { outline: 2px solid #8ab8ff; }
+.gradient-controls { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+.gradient-controls input[type=color] { width: 38px; height: 26px; padding: 0; }
+.gradient-controls input[type=number] { width: 65px; }
+.gradient-editor small { color: #b6bdc9; display: block; }

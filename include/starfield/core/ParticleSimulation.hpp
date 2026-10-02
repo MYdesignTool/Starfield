@@ -46,6 +46,11 @@ struct ParticleSlotTarget {
     std::size_t destination{0};
 };
 
+// Stable random identity and age are independent of the emission clock.
+[[nodiscard]] ParticleInstance simulate_particle_at_age(
+    const Settings&, double age_seconds, std::uint64_t identity,
+    EmitterDimensionContext = {}) noexcept;
+
 // Use the branch's own half-open lifetime before applying its candidate cap.
 // The graph merges these sequences and applies Output's single population cap.
 [[nodiscard]] Result<ParticleSlotSequence> live_particle_branch_slots(

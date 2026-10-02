@@ -544,14 +544,14 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor particle;
     particle.type_key = kParticleNode;
-    particle.schema_version = 2;
+    particle.schema_version = 3;
     particle.ports = {
         PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
     };
     particle.parameters = {
         ParameterDescriptor{kColorStart, ParameterKind::vector3_float64, true},
-        ParameterDescriptor{kColorEnd, ParameterKind::vector3_float64, true},
+        ParameterDescriptor{kColorEnd, ParameterKind::vector3_float64, false},
         ParameterDescriptor{kSizeStart, ParameterKind::float64, true},
         ParameterDescriptor{kSizeEnd, ParameterKind::float64, true},
         ParameterDescriptor{kOpacityStart, ParameterKind::float64, true},
@@ -561,6 +561,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
         ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
         ParameterDescriptor{kParticleLifetimeSeconds, ParameterKind::float64, true},
+        ParameterDescriptor{kParticleColorMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kColorGradient, ParameterKind::opaque_bytes, false},
     };
 
     NodeTypeDescriptor output;

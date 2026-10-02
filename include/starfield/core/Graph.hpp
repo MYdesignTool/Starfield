@@ -128,7 +128,9 @@ inline constexpr std::size_t kMaxNodeParameters = 512;
 inline constexpr std::size_t kMaxNodeTypes = 256;
 inline constexpr std::size_t kMaxNodePorts = 128;
 inline constexpr std::size_t kMaxGraphTypeKeyBytes = 128;
-inline constexpr std::uint64_t kMaxGraphPayloadBytes = 64ull * 1024ull * 1024ull;
+inline constexpr std::uint64_t kMaxSavedGraphPayloadBytes = 64ull * 1024ull * 1024ull;
+// A pre-render-only evaluated particle snapshot may carry the full 2M cap.
+inline constexpr std::uint64_t kMaxGraphPayloadBytes = 512ull * 1024ull * 1024ull;
 
 enum class GraphErrorCode : std::uint8_t {
     none,
@@ -262,6 +264,8 @@ inline constexpr ParameterKey kSizeRandom{9};
 inline constexpr ParameterKey kOpacityRandom{10};
 // Particle branch lifetime is distinct from the retained legacy emitter key.
 inline constexpr ParameterKey kParticleLifetimeSeconds{11};
+inline constexpr ParameterKey kParticleColorMode{12};
+inline constexpr ParameterKey kColorGradient{13};
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

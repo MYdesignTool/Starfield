@@ -1182,6 +1182,7 @@
             grid.appendChild(renderParameter(node.params[p]));
         }
         elements.inspectorBody.appendChild(grid);
+        if(kind==="particle" && node.gradient && node.colorMode!==0) elements.inspectorBody.appendChild(renderGradientEditor(node));
         var curves = currentCurveState("size", node.id);
         if (kind === "force" && curves) {
             elements.inspectorBody.appendChild(renderCurveEditor("size", "Wind and Spin Over Life (%)", curves.size, 100));
@@ -1195,6 +1196,80 @@
         }
         if (shownInspectorNodeId !== node.id) positionInspector(node.id);
         shownInspectorNodeId = node.id;
+    }
+
+    function renderGradientEditor(node) {
+        var section=document.createElement("section");section.className="gradient-editor";
+        var title=document.createElement("strong");title.textContent="Color Gradient";section.appendChild(title);
+        var stops=node.gradient.map(function(stop){return {position:stop.position,color:stop.color.slice()};}),selected=0;
+        var bar=document.createElement("div");bar.className="gradient-bar";section.appendChild(bar);
+        var controls=document.createElement("div");controls.className="gradient-controls";section.appendChild(controls);
+        var color=document.createElement("input");color.type="color";color.setAttribute("aria-label","Selected gradient color");controls.appendChild(color);
+        var position=document.createElement("input");position.type="number";position.min=0;position.max=100;position.step=0.1;
+        position.setAttribute("aria-label","Gradient stop position (%)");controls.appendChild(position);
+        var remove=document.createElement("button");remove.textContent="Remove";controls.appendChild(remove);
+        var add=document.createElement("button");add.textContent="Add";controls.appendChild(add);
+        var instruction=document.createElement("small");instruction.textContent="Click the bar to add a stop; drag a marker to move it.";section.appendChild(instruction);
+        function hex(rgb) {return "#"+rgb.map(function(c){return ("0"+Math.round(Math.max(0,Math.min(1,c))*255).toString(16)).slice(-2);}).join("");}
+        function commit() {
+            if(state.pending) return;
+            applyTopologyEdit({type:"setParameters",changes:[{nodeId:node.id,parameterKey:"13",valueType:7,value:window.StarfieldGraphView.encodeGradient(stops)}]});
+        }
+        function draw() {
+            bar.innerHTML="";
+            bar.style.background="linear-gradient(to right,"+stops.map(function(s){return hex(s.color)+" "+s.position*100+"%";}).join(",")+")";
+            stops.forEach(function(stop,index){
+                var marker=document.createElement("button");marker.className="gradient-stop"+(selected===index?" selected":"");
+                marker.style.left=stop.position*100+"%";marker.style.backgroundColor=hex(stop.color);
+                marker.setAttribute("aria-label","Gradient stop "+(index+1));bar.appendChild(marker);
+                marker.addEventListener("click",function(event){event.stopPropagation();selected=index;draw();});
+                marker.addEventListener("pointerdown",function(event){
+                    if(event.button!==0 || state.pending) return;
+                    event.preventDefault();event.stopPropagation();selected=index;
+                    if(index===0 || index===stops.length-1) {draw();return;}
+                    var moved=false,original=stop.position;
+                    function move(e) {
+                        var rect=bar.getBoundingClientRect(),value=(e.clientX-rect.left)/rect.width;
+                        stop.position=Math.max(stops[index-1].position+0.001,Math.min(stops[index+1].position-0.001,value));
+                        moved=true;marker.style.left=stop.position*100+"%";position.value=(stop.position*100).toFixed(1);
+                        bar.style.background="linear-gradient(to right,"+stops.map(function(s){return hex(s.color)+" "+s.position*100+"%";}).join(",")+")";
+                    }
+                    function up(e){
+                        window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
+                        if(e.type==="pointercancel"){stop.position=original;draw();}
+                        else if(moved) commit();else draw();
+                    }
+                    window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up);
+                });
+            });
+            color.value=hex(stops[selected].color);position.value=(stops[selected].position*100).toFixed(1);
+            position.disabled=selected===0 || selected===stops.length-1;
+            remove.disabled=position.disabled || stops.length<=2;add.disabled=stops.length>=8;
+        }
+        function insert(value) {
+            if(stops.length>=8) return;
+            value=Math.max(0.001,Math.min(0.999,value));
+            for(var i=1;i<stops.length;i++) if(value<stops[i].position) {
+                if(value-stops[i-1].position<0.001 || stops[i].position-value<0.001) return;
+                var left=stops[i-1],right=stops[i],fraction=(value-left.position)/(right.position-left.position);
+                stops.splice(i,0,{position:value,color:left.color.map(function(c,ch){return c+(right.color[ch]-c)*fraction;})});
+                selected=i;commit();return;
+            }
+        }
+        bar.addEventListener("click",function(event){if(event.target!==bar)return;var rect=bar.getBoundingClientRect();insert((event.clientX-rect.left)/rect.width);});
+        color.addEventListener("change",function(){var value=color.value;stops[selected].color=[1,3,5].map(function(start){return parseInt(value.substr(start,2),16)/255;});commit();});
+        position.addEventListener("change",function(){
+            var value=Number(position.value)/100;
+            if(isFinite(value) && selected>0 && selected<stops.length-1) {
+                stops[selected].position=Math.max(stops[selected-1].position+0.001,Math.min(stops[selected+1].position-0.001,value));commit();
+            }
+        });
+        remove.addEventListener("click",function(){if(selected>0 && selected<stops.length-1 && stops.length>2){stops.splice(selected,1);selected=0;commit();}});
+        add.addEventListener("click",function(){
+            var widest=1;for(var i=2;i<stops.length;i++) if(stops[i].position-stops[i-1].position>stops[widest].position-stops[widest-1].position)widest=i;
+            insert((stops[widest].position+stops[widest-1].position)/2);
+        });
+        draw();return section;
     }
 
     function renderCurveEditor(kind, label, curve, maximum) {

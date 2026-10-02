@@ -121,7 +121,7 @@ double evaluated_binding(A_long index, A_long time) {
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
     std::size_t id = expr.find(u"fx.param(105).value === 1") != std::u16string::npos ? 1 :
-        expr.find(u"fx.param(118).value === 2") != std::u16string::npos ? 2 : 3;
+        expr.find(u"fx.param(135).value === 2") != std::u16string::npos ? 2 : 3;
     const std::u16string needle=u"result = fx.param(";
     auto from=expr.find(needle)+needle.size(); auto to=expr.find(u")",from);
     const auto digits=expr.substr(from,to-from);
@@ -171,7 +171,9 @@ int main() {
     for (int i : {8, 9, 10, 17, 19, 25, 26}) emitter.values[i].one_d = 100;
     emitter.values[15].one_d = 1; emitter.values[16].one_d = 60;
     particle.values[1].one_d = 2; particle.values[2].one_d = 10; particle.values[4].one_d = 100;
-    particle.values[6].color = {1, 1, 1, 1}; particle.values[7].color = {1, 1, 1, 1};
+    particle.values[6].one_d = 1; particle.values[7].color = {1, 1, 1, 1};
+    particle.values[44].one_d=2;particle.values[45].one_d=0;particle.values[47].one_d=1;
+    particle.values[46].color={1,1,1,1};particle.values[48].color={1,1,1,1};
     particle.values[8].one_d = 100; particle.values[9].one_d = 100;
     connection(1, records::Kind::emitter, 2, 11);
     connection(2, records::Kind::particle, 4, 12);
@@ -304,7 +306,7 @@ int main() {
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kParticleLifetimeSeconds)) == 9, "Particle lifetime saved");
     auto opacity = edit(1, 4, 25); check(direct_edit(opacity) == 0, "Particle opacity publishes");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kOpacityStart)) == .25, "percent opacity normalized");
-    auto color = edit(1, 6, 0); color.value_kind = node_sync::ValueKind::color; color.value = {.2, .3, .4, 1};
+    auto color = edit(1, 7, 0); color.value_kind = node_sync::ValueKind::color; color.value = {.2, .3, .4, 1};
     check(direct_edit(color) == 0, "color publishes with delayed stream");
     check(std::get<core::Vec3>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kColorStart)).x == .2, "color value replaces only selected color");
     auto gravity = edit(3, 1, 1080); check(direct_edit(gravity) == 0, "Force Gravity publishes");
@@ -368,7 +370,7 @@ int main() {
           main.values[kGraphRevisionId].one_d == 16777215,
           "largest integer revision survives host float storage and exact verification");
     auto animated_graph = saved_graph();
-    check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 54,
+    check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 52,
           "all emitter particle force scalar and vector/color components have bindings");
     const auto expression_baseline = expressions;
     {
@@ -387,7 +389,7 @@ int main() {
         generated << "]";
         check(bool(generated),"actual generated expressions recorded under artifacts for syntax/identity checks");
     }
-    for (A_long i=0; i<54; ++i) expressions[i] = u"0"; // Force a binding rewrite, then fail graph publication.
+    for (A_long i=0; i<52; ++i) expressions[i] = u"0"; // Force a binding rewrite, then fail graph publication.
     const auto before_failed_binding = expressions;
     fail_set = kGraphParameterId;
     auto binding_failure = edit(1, 2, 22);
@@ -441,7 +443,7 @@ int main() {
         check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kParticleLifetimeSeconds))==2.0+time/24.0,
               "animated lifetime samples seconds");
         const auto animated_color=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kColorStart));
-        check(animated_color.x==particle.values[6].color.redF*(1.0-time/48.0),"animated color samples RGB components");
+        check(animated_color.x==particle.values[7].color.redF*(1.0-time/48.0),"animated color samples RGB components");
         const auto animated_gravity=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kForceNode,core::graph_keys::kGravity));
         check(std::abs(animated_gravity.y+(fixtures[3].values[1].one_d+time)/1080.0)<1e-12,"animated Force converts pixels to world units");
         std::shared_ptr<const core::Graph> owned_graph;
@@ -498,14 +500,25 @@ int main() {
           "native emitter identity maps to its three owned Origin dependency streams");
     const auto birth_binding=birth_bindings.front();
     static NativeOriginBinding fixture_birth_binding;
+    static A_long fixture_life_stream;
+    static bool fixture_animated_rate=false;
     fixture_birth_binding=birth_binding;
+    std::vector<NativeLifetimeBinding> life_bindings;
+    check(read_native_lifetime_bindings(animated_graph,life_bindings)==0 && life_bindings.size()==1,
+          "native Particle maps to its owned Life dependency stream");
+    fixture_life_stream=life_bindings.front().stream;
+    emitter.values[3].one_d=4;emitter.values[1].one_d=1;emitter.values[6].one_d=0;emitter.values[7].one_d=0;
+    for(int index:{12,13,14,18,19,20,21}) emitter.values[index].one_d=0;
+    particle.values[1].one_d=5;fixtures[3].values[1].one_d=0;
     renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long time,A_long,A_u_long scale,PF_ParamDef* output)->PF_Err {
         const double seconds=double(time)/scale;
         *output={};output->param_type=PF_Param_FLOAT_SLIDER;
         if(index==fixture_birth_binding.x) output->u.fs_d.value=960+240*seconds*seconds;
         else if(index==fixture_birth_binding.y) output->u.fs_d.value=540;
         else if(index==fixture_birth_binding.z) output->u.fs_d.value=0;
-        else return PF_Err_INVALID_INDEX;
+        else if(index==fixture_birth_binding.rate && fixture_animated_rate) output->u.fs_d.value=seconds<1?4:0;
+        else if(index==fixture_life_stream) output->u.fs_d.value=5;
+        else output->u.fs_d.value=evaluated_binding(index,0);
         return 0;
     };
     auto birth_graph=animated_graph;
@@ -542,10 +555,21 @@ int main() {
     }
     check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==saved_before_history && suite_requests==suites_before,
           "birth history neither mutates saved project graph nor acquires AEGP suites");
+    fixture_animated_rate=true;
+    auto rate_history=birth_graph;renderer_data.current_time=48;PF_OutData rate_output{};
+    check(capture_emitter_origin_history(&renderer_data,&rate_output,rate_history,1920,1080,core::NeverCancelled{})==0,
+          "real owned PF checkout captures a rate that stops emitting");
+    auto historical_rate=core::evaluate_particle_graph(rate_history,{2,1},core::NeverCancelled{},{1080,1});
+    check(historical_rate.has_value() && historical_rate.value().particles.size()==5,
+          "DLL renders historical survivors when current PPS is zero");
+    PF_ArbitraryH forbidden_project_history=nullptr;
+    check(create_graph_parameter(&renderer_data,rate_history,&forbidden_project_history)==PF_Err_BAD_CALLBACK_PARAM &&
+          forbidden_project_history==nullptr,"transient temporal record cannot be persisted into AE project data");
+    fixture_animated_rate=false;
     renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex,A_long,A_long,A_u_long,PF_ParamDef*)->PF_Err {return PF_Err_INVALID_INDEX;};
     auto failed_history=birth_graph;PF_OutData history_error{};
     check(capture_emitter_origin_history(&renderer_data,&history_error,failed_history,1920,1080,core::NeverCancelled{})==PF_Err_INVALID_INDEX &&
-          std::strstr(history_error.return_msg,"parameter checkout failed") && failed_history.optional_records.size()==birth_graph.optional_records.size(),
+          std::strstr(history_error.return_msg,"checkout failed") && failed_history.optional_records.size()==birth_graph.optional_records.size(),
           "historical checkout rejection reports its cause and cannot publish partial history");
     struct CancelHistory final:core::Cancellation {bool is_cancelled() const noexcept override {return true;}} cancel_history;
     auto cancelled_history=birth_graph;PF_OutData cancel_output{};

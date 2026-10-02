@@ -1,5 +1,17 @@
 # Agent-ready implementation backlog
 
+## M3-05 — temporal controls and Particle color / build 22
+
+Owner confirms Origin birth behavior in build 21. Audit and implement the entire
+existing public parameter temporal contract, emission integration and reference
+Particle color controls; see ADR 0025. Owns shared Graph/SequenceCodec/simulation/
+history/evaluation/types, adapter sampling/parameters/records/SmartRender/compiler,
+CEP inspector/gateway/editor, parameter schema, build fingerprint/version, scoped
+regressions and documentation. Render.hpp / C ABI 2 remain unchanged. Native
+Emitter/Particle control/layout changes require fresh effects; no compatibility migration.
+Process start/stop and host settings remain separately authorized.
+
+
 ## M3-03 — emitter Origin birth history / build 21
 
 Owner confirms build 20 renders but Origin keys translate every live particle.
