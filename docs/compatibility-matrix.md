@@ -26,6 +26,10 @@ Animation uses current-frame settings; birth/history integration is separate.
 See ADR 0023.
 
 
+Build 18 installed after source push and AE-absent check. All candidate/backup
+hashes and selected Core verified; existing single Junction retained. Installation
+is verified, AE animation acceptance remains open.
+
 ## Build 14 P-02H candidate evidence — 2026-10-02
 
 Ordinary Force/reference control names and fresh zero defaults, the million-particle

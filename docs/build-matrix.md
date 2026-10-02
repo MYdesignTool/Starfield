@@ -26,6 +26,32 @@ Animation uses current-frame settings; birth/history integration is separate.
 See ADR 0023.
 
 
+### Build 18 deployment completed
+
+Source 176e05260dccafc4d51117f265bf0433d6816dcf pushed before deployment.
+Immediate read-only process check found no AfterFX/AfterFX_64. Installed through
+the existing single Plug-ins/Starfield -> dist Junction under standing permission.
+No AE process started/stopped. Six installed candidate hashes, selected/pinned
+Core parity, prior build-17 bundle hashes and selector backups verified.
+Before/after records: artifacts/build18-deploy-before.json / build18-deploy-after.json.
+Backup: artifacts/disabled/p02j-build18-native-animation-20261002.
+No AE playback qualification claimed; test on a fresh layer with recreated effects.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 1497C4CA80550C2FF07766F311D49496E278B5458368CE6BD61E2A7FE672168F |
+| StarfieldEmitter.aex | 60F84E262B7CF011A305851F4B0A1A7877F2865D3ED29AF45EC04A6E69D031A7 |
+| StarfieldParticleNode.aex | B482E90CBE96190F401C18CD23448A62D5E7F9C693AE15C6F6091D7BD8B1777B |
+| StarfieldAppearance.aex | 29F2B8B5358F421CCEE957880FE3CCA2B3BA8B5DDFE38737A6BA9A711DE890BE |
+| StarfieldForce.aex | 7C549D970996D39D568F274919E154F75F8067B41665BD8BC59B2F6325D0BCAA |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+ 
+One-step rollback (close AE first):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02j-build18-native-animation-20261002' -Rollback
+```
+
 ## Build 17 P-02I follow-up — 2026-10-02
 
 Packed 32785 / 0x8011. Build 16 failed owner qualification at delivery / 516.
