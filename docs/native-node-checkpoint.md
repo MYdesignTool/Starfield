@@ -1,5 +1,37 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 16 candidate: shared native edit error 516
+
+Owner reports every tried Effect Controls edit fails, including Origin parameter 4.
+Build 15 host acceptance therefore failed. Its generic callback required a complete
+98-entry params array/input image and PF context that the inter-effect contract does
+not promise. The old message did not identify the actual failing phase; this is the
+identified incorrect assumption, not proof of the precise AE rejection site.
+
+Build 16 request v2 borrows the native UI caller's renderer/layer refs and suite /
+handle callbacks for the synchronous call; dimensions/PAR/time are numeric only.
+Missing geometry/time is read from source item/layer. The main generic handler can
+receive null in_data/params and reads only eight needed main controls via AEGP.
+Node values remain separate AE effects; a single callback value is substituted by
+UUID/index while compiling the saved graph. No schema, parameter ID or Core ABI change.
+
+Review follow-up: scratch params are not persistence. Publish scalars / publish
+graph and verify scalars / verify graph are distinct diagnostic stages with stream
+indices. The four scalars are source 2, integer revision <= 16777215 and two 16-bit
+CRC halves, so exact equality survives float storage. Continuous node controls are
+not compared by that receipt code. OneD/ARB types are checked before union reads.
+Graph remains last; failure restores every attempted stream write.
+
+Scoped evidence: native sync 330 and camera capture 12 checks pass. This exercises
+null generic callback context, missing UI geometry/time, delayed native values,
+wrong receipt types, float quantization at maximum revision, scalar/graph failures,
+readback rejection, rollback and balanced handles. Logs: artifacts/build16-native-sync.log.
+Renderer controls 38 scoped checks pass. Final May 2023 SDK x64 Release /MT build
+passes at packed 32784 / 0x8010 with -NoRuntimePublish -NoDistPublish, with no compiler
+warnings/errors found in its log. Logs: artifacts/build16-renderer-controls.log
+and build16-sdk.log. Candidate source is pushed before the paired deployment.
+No AE session operated; native editing, undo/redo and reopen need owner qualification.
+
 ## Build 15 candidate: native Effect Controls commits
 
 P-02I replaces synthetic supervised inter-effect calls with COMPLETELY_GENERAL,

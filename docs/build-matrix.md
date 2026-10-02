@@ -1,5 +1,18 @@
 # Build and host matrix
 
+## Build 16 P-02I follow-up — 2026-10-02
+
+Packed 32784 / 0x8010; private synchronous native request v2. Main 21/native identity
+3/layout 6, node schemas and Core ABI 2 unchanged. Build 15 owner acceptance failed:
+all tried native edits reported error 516. Build 16 no longer trusts generic PF
+callback params/context; it uses borrowed node context and eight main AEGP streams.
+Scalar and graph publication/readback phases are distinct; typed integer receipts
+use exact checks, with host float storage exercised. Native sync 330/camera 12
+and renderer controls 38 scoped checks pass. Final May 2023 SDK x64 Release /MT
+build passes with -NoRuntimePublish -NoDistPublish; no compiler warnings/errors
+were found in its log. Deployment evidence follows in the native checkpoint;
+real AE acceptance remains open. Scratch output stays under artifacts/build16-*.
+
 ## Build 15 P-02I candidate — 2026-10-02
 
 Packed 32783 / 0x800F; main 21/native identity 3/layout 6; node schemas and Core

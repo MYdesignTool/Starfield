@@ -150,6 +150,35 @@ bool capture_edit(PF_InData& data, const PF_ParamDef& param,
     return starfield::adapter::node_sync::valid_edit(edit);
 }
 
+PF_Err complete_context(starfield::adapter::node_sync::NativeEdit& edit) noexcept {
+    if (edit.width > 0 && edit.height > 0 && edit.pixel_aspect.num > 0 &&
+        edit.pixel_aspect.den > 0 && edit.time_scale > 0) return PF_Err_NONE;
+    const AEGP_LayerSuite9* layers = nullptr;
+    const AEGP_ItemSuite9* items = nullptr;
+    A_Err error = edit.basic->AcquireSuite(kAEGPLayerSuite, kAEGPLayerSuiteVersion9,
+        reinterpret_cast<const void**>(&layers));
+    const bool geometry_missing = edit.width <= 0 || edit.height <= 0 ||
+        edit.pixel_aspect.num <= 0 || edit.pixel_aspect.den <= 0;
+    if (!error && geometry_missing) error = edit.basic->AcquireSuite(kAEGPItemSuite, kAEGPItemSuiteVersion9,
+        reinterpret_cast<const void**>(&items));
+    if (!error && geometry_missing) {
+        AEGP_ItemH item = nullptr; A_Ratio aspect{};
+        error = layers->AEGP_GetLayerSourceItem(edit.layer, &item);
+        if (!error && !item) error = PF_Err_BAD_CALLBACK_PARAM;
+        if (!error) error = items->AEGP_GetItemDimensions(item, &edit.width, &edit.height);
+        if (!error) error = items->AEGP_GetItemPixelAspectRatio(item, &aspect);
+        if (!error) edit.pixel_aspect = {aspect.num, aspect.den};
+    }
+    if (!error && edit.time_scale <= 0) {
+        A_Time time{};
+        error = layers->AEGP_GetLayerCurrentTime(edit.layer, AEGP_LTimeMode_LayerTime, &time);
+        if (!error) { edit.time = time.value; edit.time_scale = static_cast<A_long>(time.scale); }
+    }
+    if (items) edit.basic->ReleaseSuite(kAEGPItemSuite, kAEGPItemSuiteVersion9);
+    if (layers) edit.basic->ReleaseSuite(kAEGPLayerSuite, kAEGPLayerSuiteVersion9);
+    return static_cast<PF_Err>(error);
+}
+
 } // namespace
 
 PF_Err register_node_graph_sync(PF_InData* in_data) noexcept {
@@ -207,19 +236,29 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         error = locate_renderer(suites, plugin_id, layer, renderer);
         if (error != PF_Err_NONE) return error;
         if (!renderer) return PF_Err_NONE;
+        edit.renderer = renderer; edit.layer = layer;
+        edit.handles = in_data->utils; edit.basic = in_data->pica_basicP;
+        edit.width = in_data->width; edit.height = in_data->height;
+        edit.time = in_data->current_time; edit.time_scale = static_cast<A_long>(in_data->time_scale);
+        edit.pixel_aspect = in_data->pixel_aspect_ratio;
         // The host may not have saved this callback's value into its stream yet.
         // Carry it with the request and require explicit renderer publication.
-        const A_Time time{in_data->current_time, in_data->time_scale};
-        error = static_cast<PF_Err>(suites.effect->AEGP_EffectCallGeneric(
-            plugin_id, renderer, &time, PF_Cmd_COMPLETELY_GENERAL, &edit));
+        error = complete_context(edit);
+        if (error) edit.stage = starfield::adapter::node_sync::Stage::context;
+        else {
+            const A_Time edit_time{edit.time, static_cast<A_u_long>(edit.time_scale)};
+            error = static_cast<PF_Err>(suites.effect->AEGP_EffectCallGeneric(
+                plugin_id, renderer, &edit_time, PF_Cmd_COMPLETELY_GENERAL, &edit));
+        }
         suites.effect->AEGP_DisposeEffect(renderer);
         if (!error) error = edit.accepted && edit.revision > 0 ? edit.status :
             (edit.status ? edit.status : PF_Err_BAD_CALLBACK_PARAM);
         if (out_data) {
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
             else std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                "Starfield native edit was not committed (parameter %ld, error %d).",
-                static_cast<long>(extra->param_index), static_cast<int>(error));
+                "Starfield native edit failed: %s (parameter %ld, stream %ld, error %d).",
+                starfield::adapter::node_sync::stage_name(edit.stage), static_cast<long>(extra->param_index),
+                static_cast<long>(edit.stream_index), static_cast<int>(error));
         }
         return error;
     } catch (const std::bad_alloc&) {

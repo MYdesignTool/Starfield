@@ -1,13 +1,20 @@
 # Starfield plug-in architecture
 
-## P-02I / build 15
+## P-02I / build 16
 
 Native node USER_CHANGED_PARAM sends an acknowledged COMPLETELY_GENERAL request
 to the renderer, carrying its accepted value and UUID. The native compiler applies
 that value only to the matching node/index; other controls remain AE-owned streams.
 The renderer publishes graph/revision/checksum/source with AEGP_SetStreamValue,
 checks exact saved bytes and restores old values on failure. No synthetic callback
-array is treated as persistence. Rendering still consumes immutable saved graphs;
+array is treated as persistence. Generic callback context is not assumed populated:
+private request v2 borrows the node's suite/handle callbacks and layer/renderer refs,
+with numeric source geometry/time. Only eight main control streams are read for
+compilation. Publication/readback distinguishes scalar receipts from the arbitrary
+graph. Receipt integers are float-exact and union reads require matching stream
+types. Borrowed host objects never enter Core or persistent state. Build 15 owner
+qualification failed with error 516 across controls; build 16 AE acceptance is open.
+Rendering still consumes immutable saved graphs;
 main 21/native layout 6/Core ABI 2 and node schemas are unchanged. See ADR 0022.
 
 ## P-02H / build 14

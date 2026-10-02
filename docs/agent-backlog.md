@@ -1,6 +1,18 @@
 # Agent-ready implementation backlog
 
-## P-02I — native Effect Controls commit / build 15
+## P-02I — native Effect Controls commit / build 16
+
+Build 16 follow-up: owner reports all tried native edits fail with error 516. Build 15 host
+acceptance failed. Remove assumptions that a generic callback supplies a complete
+params array/input image/count and renderer geometry. Read only required main
+streams via AEGP; use synchronous borrowed renderer/layer refs and numeric geometry
+from the node callback. Add phase/index diagnostics and fixtures with null generic
+params/effect_ref/utils/pica and num_params=0. Split scalar/graph publish and verify
+phases, validate stream types and keep exact checks only for integer receipts.
+Keep the same owned files and schemas. Native sync 330/camera 12 scoped checks pass;
+float storage and maximum revision are covered. Renderer controls 38 scoped checks
+and final May 2023 SDK x64 Release /MT build pass, packed 32784 / 0x8010, no compiler
+warnings/errors found. Owner AE qualification remains open.
 
 Owner reports native controls only reach rendering after a subsequent CEP edit.
 Owned files: NodeGraphSync.*, NativeNodeGraph.*, GraphCarrier.*, EffectMain.cpp,

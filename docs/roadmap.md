@@ -1,11 +1,14 @@
 # Development plan: AE 2023 particle Alpha
 
-## P-02I / build 15 — native control synchronization
+## P-02I / build 16 — native control synchronization
 
-Owner reports native controls only affect rendering after a CEP edit. Build 15
-uses an acknowledged generic request with the callback's new value and explicit
-renderer stream publication/readback/rollback. Targeted fake-host timing checks
-exercise new values before their source streams commit. Native dragging with CEP
+Build 15 owner acceptance failed: all tried native edits report error 516. Build 16
+removes its assumptions about generic callback params and context, carrying bounded
+borrowed caller context and reading main controls through AEGP. Separate scalar/graph
+publication and verification phases identify failures, and integer receipt/type
+contracts prevent inappropriate floating comparisons or union reads. Targeted fake
+host checks exercise absent generic context, delayed node values and rollback.
+Native dragging with CEP
 closed, undo/redo and save/reopen remain owner AE 2023 qualification gates.
 
 The owner's Appearance review is partially confirmed: it is an active optional

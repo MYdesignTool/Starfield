@@ -62,6 +62,10 @@ struct SuiteSet {
     AEGP_EffectRefH edited_effect{};
     bool edit_applied{};
     bool edit_matched{};
+    bool fail(A_long index) const noexcept {
+        if (edit) edit->stream_index = index;
+        return false;
+    }
 };
 
 struct EffectRef {
@@ -85,20 +89,20 @@ struct StreamRef {
 bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, double& output) noexcept {
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
-        if (suites.edit->value_kind != node_sync::ValueKind::scalar) return false;
+        if (suites.edit->value_kind != node_sync::ValueKind::scalar) return suites.fail(index);
         suites.edit_applied = true; output = suites.edit->value[0]; return true;
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
-    if (error || !raw_stream) return false;
+    if (error || !raw_stream) return suites.fail(index);
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
                                                   &time, TRUE, &value);
-    if (error) return false;
+    if (error) return suites.fail(index);
     const double result = value.val.one_d;
     suites.stream->AEGP_DisposeStreamValue(&value);
-    if (!std::isfinite(result)) return false;
+    if (!std::isfinite(result)) return suites.fail(index);
     output = result;
     return true;
 }
@@ -106,20 +110,20 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
 bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
-        if (suites.edit->value_kind != node_sync::ValueKind::point2) return false;
+        if (suites.edit->value_kind != node_sync::ValueKind::point2) return suites.fail(index);
         suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], 0.0}; return true;
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
-    if (error || !raw_stream) return false;
+    if (error || !raw_stream) return suites.fail(index);
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
                                                 &time, TRUE, &value);
-    if (error) return false;
+    if (error) return suites.fail(index);
     const core::Vec3 result{value.val.two_d.x, value.val.two_d.y, 0.0};
     suites.stream->AEGP_DisposeStreamValue(&value);
-    if (!std::isfinite(result.x) || !std::isfinite(result.y)) return false;
+    if (!std::isfinite(result.x) || !std::isfinite(result.y)) return suites.fail(index);
     output = result;
     return true;
 }
@@ -127,20 +131,20 @@ bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
 bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                   A_long index, const A_Time& time, core::Vec3& output) noexcept {
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
-        if (suites.edit->value_kind != node_sync::ValueKind::point3) return false;
+        if (suites.edit->value_kind != node_sync::ValueKind::point3) return suites.fail(index);
         suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
-    if (error || !raw_stream) return false;
+    if (error || !raw_stream) return suites.fail(index);
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
                                                   &time, TRUE, &value);
-    if (error) return false;
+    if (error) return suites.fail(index);
     const core::Vec3 result{value.val.three_d.x, value.val.three_d.y, value.val.three_d.z};
     suites.stream->AEGP_DisposeStreamValue(&value);
-    if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return false;
+    if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return suites.fail(index);
     output = result;
     return true;
 }
@@ -148,20 +152,20 @@ bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH eff
 bool read_color(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
-        if (suites.edit->value_kind != node_sync::ValueKind::color) return false;
+        if (suites.edit->value_kind != node_sync::ValueKind::color) return suites.fail(index);
         suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
-    if (error || !raw_stream) return false;
+    if (error || !raw_stream) return suites.fail(index);
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
                                                   &time, TRUE, &value);
-    if (error) return false;
+    if (error) return suites.fail(index);
     const core::Vec3 result{value.val.color.redF, value.val.color.greenF, value.val.color.blueF};
     suites.stream->AEGP_DisposeStreamValue(&value);
-    if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return false;
+    if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return suites.fail(index);
     output = result;
     return true;
 }
@@ -170,7 +174,7 @@ bool read_uint(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect
                A_long index, const A_Time& time, std::uint32_t& output) noexcept {
     double value = 0.0;
     if (!read_one_d(suites, plugin_id, effect, index, time, value) || value < 0.0 ||
-        value > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) || std::floor(value) != value) return false;
+        value > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) || std::floor(value) != value) return suites.fail(index);
     output = static_cast<std::uint32_t>(value);
     return true;
 }
@@ -456,7 +460,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                  const node_sync::NativeEdit* edit) noexcept {
     graph = {};
     found_node_effects = false;
-    if (!in_data || !params || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
+    if (!in_data || !params || !in_data->pica_basicP || (!in_data->effect_ref && !(edit && edit->layer))) return PF_Err_BAD_CALLBACK_PARAM;
     if (edit && (!node_sync::valid_edit(*edit) || edit->parameter_index >
         native_nodes::base_parameter_count(static_cast<Kind>(edit->node_kind)))) return PF_Err_BAD_CALLBACK_PARAM;
     const AEGP_PluginID plugin_id = graph_carrier_plugin_id();
@@ -467,8 +471,8 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         suites.edit = edit;
         PF_Err error = suites.acquire();
         if (error != PF_Err_NONE) return error;
-        AEGP_LayerH layer = nullptr;
-        A_Err ae_error = suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref, &layer);
+        AEGP_LayerH layer = edit ? edit->layer : nullptr;
+        A_Err ae_error = layer ? 0 : suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref, &layer);
         if (ae_error || !layer) return static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);
 
         A_long effect_count = 0;
