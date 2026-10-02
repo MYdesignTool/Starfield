@@ -1,6 +1,16 @@
 # Starfield plug-in architecture
 
 
+## P-02J / build 20 — SmartFX delivered parameter count
+
+Owner build-19 opening error reports binding stream -1. Sampling no longer treats
+PF_InData.num_params as the registered stream count; SmartFX passes no params[].
+Actual checkout/checkin callbacks validate bindings and main render globals.
+Count-zero full graph/CPU frame checks reproduce rejection before the fix and pass
+afterward; 812 scoped checks pass. Diagnostics distinguish record/context/stream
+failures and include delivered count. Host attribution remains an inference until
+owner playback qualification. CEP animation-19 token and IDs/ABI stay unchanged.
+
 ## P-02J / build 19 — animation binding follow-up
 
 Owner reports Origin XY keys produce black output and the panel rejects its

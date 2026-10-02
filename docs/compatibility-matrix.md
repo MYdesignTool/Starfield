@@ -1,5 +1,34 @@
 # Behavior inventory
 
+## Build 20 P-02J follow-up — 2026-10-02
+
+Owner rejects build 19 on opening: animation binding stream -1 unavailable (516).
+The sampler rejected num_params below 610 before checking out any binding. That
+field counts delivered parameters, not registered streams; SmartFX delivers no
+params[] array. The previous fixtures always supplied the registered count, hiding
+this path. Reproduction with num_params=0 failed the build-19 native suite (30
+failures); removing that gate restores the same samples and visible frame pixels.
+The owner screenshot does not expose the actual count; attribution of that host
+error to this gate remains an inference until owner AE playback qualification.
+
+Sampling now relies on registered stream IDs and checkout/checkin callback errors.
+The main render checkout also reads Time Remapping/Preview controls without a
+delivered-array count gate. Failures identify record/callback/checkout/value/
+checkin/conversion phase, stream index and delivered count. Invalid records,
+missing callbacks and invalid expression values still reject; no zero fallback.
+No parameter ID/layout/Core ABI, expression format or CEP changes. The paired
+animation-19 gateway token intentionally stays unchanged.
+
+Native sync 761, camera 12 and renderer controls 39 checks pass (812 total).
+The full main graph checkout and CPU pixel test use num_params=0 at forward,
+intermediate and reverse times. Counts 1 and 610 also succeed; actual checkout
+errors, missing callbacks and malformed records retain precise rejection phases.
+Time Remapping/Preview values and failure propagation are exercised with count 0.
+May 2023 SDK x64 Release /MT builds all five AEXs with no compiler warnings/errors.
+Generated-expression and actual JSX startup suites pass; CEP sources are unchanged.
+Logs: artifacts/build20-*. AE interpolation, CEP-closed playback and reopen remain
+owner qualification gates. No AE session operated by the agent.
+
 ## Build 19 P-02J follow-up — 2026-10-02
 
 Owner rejected build 18: gateway_missing despite the JSX animation-18 token;

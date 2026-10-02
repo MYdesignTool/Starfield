@@ -895,14 +895,19 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
-PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height, A_long* failed_stream) noexcept {
+PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height,
+                                    A_long* failed_stream, const char** failed_stage) noexcept {
     if (failed_stream) *failed_stream = -1;
+    const auto stage = [failed_stage](const char* value) { if (failed_stage) *failed_stage = value; };
     try {
         std::vector<RawNode> nodes;
+        stage("binding record");
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
         if (nodes.empty()) return PF_Err_NONE;
-        if (!data || !data->inter.checkout_param || !data->inter.checkin_param ||
-            data->num_params < kNativeBindingFirstIndex + kNativeBindingCapacity) return PF_Err_BAD_CALLBACK_PARAM;
+        stage("host callbacks");
+        // num_params describes the delivered params[] array. SmartFX has no such
+        // array; registered streams are available through checkout regardless.
+        if (!data || !data->inter.checkout_param || !data->inter.checkin_param) return PF_Err_BAD_CALLBACK_PARAM;
         const core::LayerUnits units{double(std::max<A_long>(width > 0 ? width : data->width, 1)),
             double(std::max<A_long>(height > 0 ? height : data->height, 1)),
             data->pixel_aspect_ratio.den ? double(data->pixel_aspect_ratio.num) / data->pixel_aspect_ratio.den : 1.0};
@@ -912,6 +917,7 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
                 for (A_long component = 0; component < component_count(field.type); ++component) {
                     PF_ParamDef sampled{};
                     if (failed_stream) *failed_stream = kNativeBindingFirstIndex + field.slot + component;
+                    stage("parameter checkout");
                     const auto error = PF_CHECKOUT_PARAM(data, kNativeBindingFirstIndex + field.slot + component,
                         data->current_time, data->time_step, data->time_scale, &sampled);
                     if (error) return error;
@@ -919,23 +925,28 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
                         std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value != kNativeBindingUnavailable;
                     const double value = valid ? sampled.u.fs_d.value : 0;
                     const auto checked_in = PF_CHECKIN_PARAM(data, &sampled);
+                    stage("parameter value");
                     if (!valid) return PF_Err_BAD_CALLBACK_PARAM;
+                    stage("parameter checkin");
                     if (checked_in) return checked_in;
                     field.value[component] = value;
                 }
             }
             auto node = std::find_if(graph.nodes.begin(), graph.nodes.end(), [&](const auto& n) {return n.id == raw.id;});
+            stage("node lookup");
             if (node == graph.nodes.end()) return PF_Err_BAD_CALLBACK_PARAM;
             const auto expected = raw.kind == Kind::emitter ? core::graph_keys::kEmitterNode :
                 raw.kind == Kind::particle ? core::graph_keys::kParticleNode :
                 raw.kind == Kind::appearance ? core::graph_keys::kAppearanceNode : core::graph_keys::kForceNode;
+            stage("node type");
             if (node->type_key != expected) return PF_Err_BAD_CALLBACK_PARAM;
             node->parameters.clear(); reader.playback = &raw;
+            stage("node conversion");
             if (!read_node_parameters(reader, 0, nullptr, raw.kind, {}, units, *node)) return PF_Err_BAD_CALLBACK_PARAM;
         }
         return PF_Err_NONE;
-    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
-    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
+    } catch (const std::bad_alloc&) { stage("allocation"); return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { stage("exception"); return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
 } // namespace starfield::adapter

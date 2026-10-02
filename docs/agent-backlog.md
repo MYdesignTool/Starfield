@@ -435,6 +435,13 @@ Build 19 deployed with AE absent; all six installed hashes, prior bundle backup
 hashes and selected/pinned Core parity verified. Owner fresh-layer animation gate
 remains open; deployment and one-step rollback recorded in build-matrix.md.
 
+Build 20 follow-up owns the same adapter/tests/docs files: owner opening error
+stream -1; remove SmartFX's incorrect delivered-parameter-count guards from
+animation sampling and render globals. Count-zero rejection reproduced before
+repair, full graph/CPU pixel checks pass after. 812 scoped checks pass; new phase/
+stream/count diagnostics preserve real checkout failures. Owner host acceptance
+remains open; CEP and render contracts unchanged.
+
 
 P-02J source/build/deployment complete: 761 scoped checks plus generated expression/
 CEP keyed-write checks pass; build 18 installed through the existing Junction,

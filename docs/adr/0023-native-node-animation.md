@@ -2,6 +2,19 @@
 
 Status: development implementation; AE 2023 owner qualification required.
 
+Build 20 follow-up: owner build-19 opening error identifies stream -1. Remove the
+sampler's delivered num_params >= 610 requirement and the same gate around render
+globals. SmartFX supplies no params[] array; registered IDs and PF_CHECKOUT_PARAM /
+PF_CHECKIN_PARAM validate stream access. Local May 2023 AE_Effect.h documents
+num_params as the input parameters received, and the SDK SmartFX contract requires
+non-layer parameter checkout because it does not deliver a parameter array.
+Count-zero fixtures reproduce the premature failure, then full graph sampling and
+actual CPU pixel regressions pass after repair. Build 19 did not report the count,
+so the exact owner-host cause remains inferred. Keep malformed/absent binding and
+callback errors strict; diagnostics now include failure phase and delivered count.
+812 scoped checks pass. AE host animation acceptance remains open. No ID/layout,
+Core ABI, expression or CEP handshake change is required by this correction.
+
 Build 19 follow-up: owner Origin XY keys yield black output; the panel also
 rejects its loaded JSX. The startup token mismatch is confirmed and corrected
 with paired animation-19 tokens and actual JSX readiness regression coverage.

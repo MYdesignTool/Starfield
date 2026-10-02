@@ -408,11 +408,22 @@ int main() {
     emitter.values[1].one_d = 1;
     emitter.values[6].one_d = 0;
     renderer_data.inter.checkout_param = [](PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
+        if(index<kNativeBindingFirstIndex) {
+            *output=fixtures[0].params.at(index);
+            if(index==kGraphParameterId) output->u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(fixtures[0].values[index].arbH);
+            if(index==kControlSourceId) output->u.pd.value=static_cast<A_long>(fixtures[0].values[index].one_d);
+            return 0;
+        }
         *output = {}; output->param_type=PF_Param_FLOAT_SLIDER;
         output->u.fs_d.value=evaluated_binding(index,time);
         return 0;
     };
     renderer_data.inter.checkin_param = [](PF_ProgPtr, PF_ParamDef*)->PF_Err {return 0;};
+    // SmartFX has no delivered params[]; callbacks still expose registered streams.
+    renderer_data.num_params = 0;
+    auto smartfx_graph = animated_graph;
+    check(sample_native_node_animation(&renderer_data,smartfx_graph,1920,1080)==0,
+          "SmartFX samples registered animation streams without a delivered parameter array");
     const auto suites_before=suite_requests;
     std::vector<std::byte> first_animated_pixels;
     for (auto time : {0,24,12,0}) {
@@ -430,9 +441,17 @@ int main() {
         check(animated_color.x==particle.values[6].color.redF*(1.0-time/48.0),"animated color samples RGB components");
         const auto animated_gravity=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kForceNode,core::graph_keys::kGravity));
         check(std::abs(animated_gravity.y+(fixtures[3].values[1].one_d+time)/1080.0)<1e-12,"animated Force converts pixels to world units");
+        std::shared_ptr<const core::Graph> owned_graph;
+        PF_OutData render_output{};
+        check(checkout_render_graph(&renderer_data,&render_output,owned_graph,nullptr,1920,1080)==0 && owned_graph,
+              "SmartFX full graph checkout succeeds with zero delivered parameters");
+        if(!owned_graph) continue;
+        const auto checked_origin=std::get<core::Vec3>(parameter(*owned_graph,core::graph_keys::kEmitterNode,core::graph_keys::kEmitterOrigin));
+        check(checked_origin.x==sampled_origin.x && checked_origin.y==sampled_origin.y && checked_origin.z==sampled_origin.z,
+              "full SmartFX checkout retains the requested-time Origin XY value");
         core::RenderRequest request{};
         request.settings=core::validate_settings(core::Settings{});
-        request.graph=std::make_shared<const core::Graph>(sampled);
+        request.graph=owned_graph;
         request.frame={1920,1080,512,288,{0,0,512,288},{1,1},{1,24},core::PixelFormat::rgba8,
             core::ColorSpace::ae_working_space,core::AlphaMode::premultiplied,1,core::Quality::full};
         auto rendered=core::CpuParticleRenderer{}.render(request,core::NeverCancelled{});
@@ -447,13 +466,38 @@ int main() {
         } else std::printf("Animated render detail: %s\n",rendered.error().detail);
     }
     check(suite_requests==suites_before && live_refs==0,"render sampling acquires no AEGP suites or references");
+    auto invalid_record=animated_graph;
+    for(auto& record:invalid_record.optional_records)
+        if(record.size()>=12 && record[0]==std::byte{2} && record[1]==std::byte{0x80}) record[4]=std::byte{0};
+    A_long failed_stream=-1;
+    const char* failed_stage="";
+    check(sample_native_node_animation(&renderer_data,invalid_record,1920,1080,&failed_stream,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+          failed_stream==-1 && std::strcmp(failed_stage,"binding record")==0,"malformed record is distinguished from a stream failure");
+    auto absent_callbacks=renderer_data; absent_callbacks.inter.checkout_param=nullptr;
+    auto callback_graph=animated_graph;
+    check(sample_native_node_animation(&absent_callbacks,callback_graph,1920,1080,&failed_stream,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+          failed_stream==-1 && std::strcmp(failed_stage,"host callbacks")==0,"missing SmartFX callbacks report their actual phase");
+    const auto successful_checkout=renderer_data.inter.checkout_param;
+    renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex,A_long,A_long,A_u_long,PF_ParamDef*)->PF_Err {return PF_Err_INVALID_INDEX;};
+    auto checkout_failure=animated_graph;
+    check(sample_native_node_animation(&renderer_data,checkout_failure,1920,1080,&failed_stream,&failed_stage)==PF_Err_INVALID_INDEX &&
+          failed_stream==kNativeBindingFirstIndex && std::strcmp(failed_stage,"parameter checkout")==0,
+          "actual checkout errors survive independently of delivered parameter count");
+    renderer_data.inter.checkout_param=successful_checkout;
+    for(auto count:{1,static_cast<int>(kTotalEffectParameterCount+1)}) {
+        renderer_data.num_params=count;
+        auto graph=animated_graph;
+        check(sample_native_node_animation(&renderer_data,graph,1920,1080)==0,"stream sampling also works with nonzero delivered counts");
+    }
+    renderer_data.num_params=0;
     renderer_data.inter.checkout_param=[](PF_ProgPtr, PF_ParamIndex, A_long, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
         *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=kNativeBindingUnavailable;return 0;
     };
     A_long missing_stream=-1;
     auto unresolved_graph=animated_graph;
-    check(sample_native_node_animation(&renderer_data,unresolved_graph,1920,1080,&missing_stream)==PF_Err_BAD_CALLBACK_PARAM &&
-          missing_stream==kNativeBindingFirstIndex,"unresolved expression output cannot silently zero particle settings");
+    check(sample_native_node_animation(&renderer_data,unresolved_graph,1920,1080,&missing_stream,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+          missing_stream==kNativeBindingFirstIndex && std::strcmp(failed_stage,"parameter value")==0,
+          "unresolved expression output cannot silently zero particle settings");
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {

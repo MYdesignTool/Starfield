@@ -28,7 +28,7 @@ NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AE
 NativeBindingTransaction::~NativeBindingTransaction() = default;
 PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*) noexcept { return PF_Err_NONE; }
 void NativeBindingTransaction::accept() noexcept {}
-PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long, A_long*) noexcept { return PF_Err_NONE; }
+PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long, A_long*, const char**) noexcept { return PF_Err_NONE; }
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
 PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found,
@@ -756,7 +756,7 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(create_graph_parameter(&host,graph_from_controls(core::Settings{}).value(),&parameters[kGraphParameterId].u.arb_d.value)==0);
     parameters[kTimeRemapEnabledId].u.bd.value=TRUE;parameters[kTimeRemapSecondsId].u.fs_d.value=1.25;
     parameters[kPreviewEnabledId].u.bd.value=TRUE;parameters[kPreviewChanceId].u.fs_d.value=25;
-    host.num_params=static_cast<A_long>(kTotalEffectParameterCount)+1;
+    host.num_params=0; // SmartFX delivers no params[]; global streams still exist.
     std::shared_ptr<const core::Graph> graph;
     CHECK(checkout_render_graph(&host,&output,graph)==0 && graph && checked_out.empty());
     for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode) {

@@ -26,7 +26,8 @@ private:
 // Render-safe: checks out owned numeric inputs; never calls an AEGP suite.
 [[nodiscard]] PF_Err sample_native_node_animation(PF_InData*, core::Graph&,
                                                   A_long width, A_long height,
-                                                  A_long* failed_stream = nullptr) noexcept;
+                                                  A_long* failed_stream = nullptr,
+                                                  const char** failed_stage = nullptr) noexcept;
 
 // Reads per-node records from sibling hidden node effects on the supervised
 // edit path. It must never be called from SmartFX pre-render or render.
