@@ -441,6 +441,8 @@ animation sampling and render globals. Count-zero rejection reproduced before
 repair, full graph/CPU pixel checks pass after. 812 scoped checks pass; new phase/
 stream/count diagnostics preserve real checkout failures. Owner host acceptance
 remains open; CEP and render contracts unchanged.
+Build 20 installed with AE absent. Six candidate/installed and prior-backup hashes
+plus pinned/selected Core verified; deployment and rollback recorded in build-matrix.
 
 
 P-02J source/build/deployment complete: 761 scoped checks plus generated expression/

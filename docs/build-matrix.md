@@ -29,6 +29,32 @@ Generated-expression and actual JSX startup suites pass; CEP sources are unchang
 Logs: artifacts/build20-*. AE interpolation, CEP-closed playback and reopen remain
 owner qualification gates. No AE session operated by the agent.
 
+### Build 20 deployment completed
+
+Source eeb3e66f4798966e8a5b2195edb2917cb48ef857 pushed before deployment.
+Immediate read-only process check confirmed no AfterFX/AfterFX_64. Standing
+permission used the existing single Plug-ins/Starfield -> dist Junction. All six
+installed/candidate hashes, prior build-19 backup hashes and selector verified.
+Core pinned/selected parity is unchanged. No AE process started/stopped.
+Records: artifacts/build20-deploy-before.json / build20-deploy-after.json.
+Backup: artifacts/disabled/p02j-build20-smartfx-count-fix-20261002.
+Packed version 32788 / 0x8014; owner AE opening/playback gate remains open.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | C75170A9B674AFAD53E2661678CED110BD8087BD9A6A65640F056DA5B430E352 |
+| StarfieldEmitter.aex | 75981C8755C8B055980F0937D69400C3AD8B0E66850C3665685223D328B0AAA9 |
+| StarfieldParticleNode.aex | 93CB305299757F78FBB3312EE8D6560241586504738B381D249DEF45EB0B8EC8 |
+| StarfieldAppearance.aex | D5F53D818D10369A4F56CD4ED1C71C9BB1BC21F862E737D2E541BE3CAF912598 |
+| StarfieldForce.aex | 8DCAA69EE4B7975B3AE3146AB1034F1DA7810C4C4F2DBD48C675DB9FEF7E34B4 |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+One-step rollback (close AE first):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02j-build20-smartfx-count-fix-20261002' -Rollback
+```
+
 ## Build 19 P-02J follow-up — 2026-10-02
 
 Owner rejected build 18: gateway_missing despite the JSX animation-18 token;

@@ -29,6 +29,12 @@ Generated-expression and actual JSX startup suites pass; CEP sources are unchang
 Logs: artifacts/build20-*. AE interpolation, CEP-closed playback and reopen remain
 owner qualification gates. No AE session operated by the agent.
 
+Build 20 deployed with no AfterFX/AfterFX_64 running; six installed/candidate and
+prior backup hashes plus Core selector verified. Single Junction preserved.
+Source eeb3e66f4798966e8a5b2195edb2917cb48ef857; before/after capture files under
+artifacts/build20-deploy-*.json. Backup p02j-build20-smartfx-count-fix-20261002;
+the exact one-step rollback is in build-matrix.md. Owner host gate remains open.
+
 ## Build 19 P-02J follow-up — 2026-10-02
 
 Owner rejected build 18: gateway_missing despite the JSX animation-18 token;
