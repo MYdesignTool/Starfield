@@ -3,6 +3,7 @@ param(
     [switch]$NodeEffects,
     [switch]$CurrentNodes,
     [switch]$NativeSync,
+    [switch]$TraceIncludes,
     [ValidateSet('Emitter', 'Particle', 'Appearance', 'Force')][string]$NodeKind = 'Particle',
     [string]$MSVCVarsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 )
@@ -66,6 +67,7 @@ try {
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
     )
+    if ($TraceIncludes) { $responseLines += '/showIncludes' }
     if ($Adapter -or $NodeEffects -or $NativeSync) {
         $sdkHeaders = "$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Headers"
         $responseLines += @('/DMSWindows', '/DWIN32', '/D_WINDOWS', '/D_CRT_SECURE_NO_WARNINGS',

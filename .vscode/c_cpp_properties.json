@@ -1,0 +1,54 @@
+{
+  "env": {
+    "starfieldIncludes": [
+      "${workspaceFolder}/include",
+      "${workspaceFolder}/ae_plugin",
+      "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers",
+      "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers/SP",
+      "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers/Win",
+      "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Util"
+    ],
+    "starfieldDefines": ["MSWindows", "WIN32", "_WINDOWS", "_CRT_SECURE_NO_WARNINGS"]
+  },
+  "configurations": [
+    {
+      "name": "Win32",
+      "intelliSenseMode": "windows-msvc-x64",
+      "includePath": ["${starfieldIncludes}"],
+      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_EMITTER"],
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "browse": {
+        "path": ["${workspaceFolder}/include", "${workspaceFolder}/ae_plugin", "${workspaceFolder}/src", "${workspaceFolder}/tests"],
+        "limitSymbolsToIncludedHeaders": true,
+        "databaseFilename": "${workspaceFolder}/artifacts/editor/browse.vc.db"
+      }
+    },
+    {
+      "name": "Particle",
+      "intelliSenseMode": "windows-msvc-x64",
+      "includePath": ["${starfieldIncludes}"],
+      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_PARTICLE"],
+      "cStandard": "c17",
+      "cppStandard": "c++20"
+    },
+    {
+      "name": "Appearance",
+      "intelliSenseMode": "windows-msvc-x64",
+      "includePath": ["${starfieldIncludes}"],
+      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_APPEARANCE"],
+      "cStandard": "c17",
+      "cppStandard": "c++20"
+    },
+    {
+      "name": "Force",
+      "intelliSenseMode": "windows-msvc-x64",
+      "includePath": ["${starfieldIncludes}"],
+      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_FORCE"],
+      "cStandard": "c17",
+      "cppStandard": "c++20"
+    }
+  ],
+  "version": 4,
+  "enableConfigurationSquiggles": true
+}

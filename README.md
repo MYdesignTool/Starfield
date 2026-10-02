@@ -32,6 +32,11 @@
 
 ## 构建
 
+VS Code 请打开 [Starfield.code-workspace](tools/Starfield.code-workspace) 或直接打开
+`newStardust` 文件夹，使项目级 C++20、Core/May 2023 SDK 包含路径生效。
+编辑器诊断与实际 MSVC 编译日志分别核对；配置和最小编译检查见
+[编辑器说明](docs/editor-setup.md)。
+
 用 CMake 构建不依赖 AE 的核心库。Windows AE 插件使用锁定的 MSVC v145 和本地 May 2023 SDK；从仓库根目录运行 `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`，默认产物写入 `artifacts/plugin/2023/x64/Release/`。显式传入 `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023` 得到同一目标。详细工具链和构建状态见 [构建矩阵](docs/build-matrix.md)。
 
 开发安装使用一个文件夹链接，完整构建发布五个 AEX 和配套 Core；热更新只发布版本化 Core：
