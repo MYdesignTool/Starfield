@@ -13,6 +13,11 @@ generic API. Final May 2023 SDK x64 Release /MT build passes with -NoRuntimePubl
 errors found in the build log. Deployment evidence follows in the native checkpoint;
 real AE acceptance remains open. Scratch outputs stay under artifacts/build17-*.
 
+Source b0e9e6b pushed before AE-absent build-17 installation through the existing
+single Junction. All six installed hashes, unchanged selected Core and build-16
+bundle/selector backups verified. Before/after state and one-step rollback are in
+native-node-checkpoint.md. No AE session operated.
+
 ## Build 16 P-02I follow-up — 2026-10-02
 
 Packed 32784 / 0x8010; private synchronous native request v2. Main 21/native identity

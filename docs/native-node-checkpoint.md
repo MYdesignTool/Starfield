@@ -29,6 +29,31 @@ source is pushed before the paired deployment. No AE session
 operated; Effect Controls behavior with CEP closed, undo/redo and reopen need owner
 qualification.
 
+### Build 17 deployment completed
+
+Source `b0e9e6b45342e9df1b6c182b9bfc834fa12182a5` was pushed before installation.
+Immediate read-only checks found neither AfterFX nor AfterFX_64. Standing permission
+covered the existing single Plug-ins/Starfield -> newStardust/dist Junction install.
+No process started/stopped and no other host setting changed. All six installed
+candidate hashes, unchanged selected Core, prior build-16 bundle hashes and selector
+backup verified. Records: artifacts/build17-deploy-before.json, build17-deploy-after.json
+and build17-deploy.log. Owner AE native editing qualification remains open.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | C909F341C018A7D6C6445AAD842848269D47A51AC0562763FFED021034B0CC49 |
+| StarfieldEmitter.aex | CB05F0E5192F64025E19442873A73D8A7CD832656A4DDEC99B4B16AC01FB9EF8 |
+| StarfieldParticleNode.aex | 446EE0548FC5BC844A37159FF8FC600C8D6D88287ADF5EAE72E3BFFE5621A2CF |
+| StarfieldAppearance.aex | F2BF85BB5850AB39A8F848232ABD0F93039FAF3313DB5EB730F5DCFF4F0EC9BA |
+| StarfieldForce.aex | C5C51B13A688F87586FB002D712CE31C44F1FA8CA67B3E4EFA8963CBE468CB36 |
+| StarfieldCore.dll | 0D3C8D672DE171D70DF699C3B8E14A9133E91AB43F74F14B8617F7517E3DA5E7 |
+
+One-step rollback to build 16, with AE closed (from repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Deploy-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02i-build17-direct-native-commit-20261002' -Rollback
+```
+
 ## Build 16 candidate: shared native edit error 516
 
 Owner reports every tried Effect Controls edit fails, including Origin parameter 4.

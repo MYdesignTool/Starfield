@@ -14,6 +14,11 @@ and absent main registration. Renderer controls 38 scoped checks and final May 2
 SDK x64 Release /MT build pass at packed 32785 / 0x8011, no compiler warnings/errors
 found. All four independent node AEX links pass. Owner AE acceptance remains open.
 
+Source b0e9e6b pushed before build-17 AE-absent installation. Existing single
+Junction, unchanged Core, all six installed hashes and build-16 backup hashes /
+selector verified. Before/after records and rollback are in native-node-checkpoint.md.
+No AE session or other host setting changed; real native editing gate remains open.
+
 Build 16 follow-up: owner reports all tried native edits fail with error 516. Build 15 host
 acceptance failed. Remove assumptions that a generic callback supplies a complete
 params array/input image/count and renderer geometry. Read only required main
