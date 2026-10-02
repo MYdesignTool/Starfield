@@ -14,7 +14,7 @@ namespace starfield::adapter::node_sync {
 enum class ValueKind : std::uint32_t { scalar, point2, point3, color };
 
 enum class Stage : std::uint32_t { context, controls, compile, snapshot,
-    allocation, suites, capture, publish_scalars, publish_graph,
+    allocation, animation_bindings, suites, capture, publish_scalars, publish_graph,
     verify_scalars, verify_graph, rollback, complete };
 
 inline const char* stage_name(Stage stage) noexcept {
@@ -24,6 +24,7 @@ inline const char* stage_name(Stage stage) noexcept {
         case Stage::compile: return "node compile";
         case Stage::snapshot: return "snapshot";
         case Stage::allocation: return "graph allocation";
+        case Stage::animation_bindings: return "animation binding";
         case Stage::suites: return "AEGP suites";
         case Stage::capture: return "stream capture";
         case Stage::publish_scalars: return "publish scalars";

@@ -2,7 +2,9 @@
 
 ## Build 14 current controls
 
-Reopen CEP for gateway native-node-sync-14 after installing the paired build.
+Reopen CEP for gateway native-node-animation-19 after installing the paired build.
+The panel and JSX readiness tokens must match. The startup fixture now executes
+the real gateway and checks stale-script reload with its actual readiness response.
 Use fresh development effects (main manifest 21, native layout 6, Force schema 2,
 Output schema 3). Force has scalar Gravity/random, separate Wind controls, Spin
 and Air Density, plus an independent 0..100% Wind/Spin Over Life editor. Output

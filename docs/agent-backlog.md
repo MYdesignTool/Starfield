@@ -420,6 +420,18 @@ Implement public stopwatches plus per-frame owned PF dependency inputs; constant
 remain only for topology/identity/curve banks. Source/build checks precede deployment.
 AE interpolation, undo/reopen and CEP-closed animation remain owner qualification.
 
+Build 18 follow-up: owner reports loader token mismatch and incorrect animation.
+Extend this card to own panel.js startup handshake and its scoped startup tests/
+README. Correct paired-version validation using the actual JSX readiness response,
+then investigate render-time sampling and owner-described animation behavior.
+Also own NodeGraphSync.hpp's local failure-stage diagnostics for animation bindings.
+
+Build 19 source candidate: confirmed panel/JSX mismatch fixed; typed effect/param
+bindings, evaluated-value/state validation, sentinel rejection and rollback added.
+798 scoped checks plus actual CPU pixels, generated-expression and JSX startup
+regressions pass. Owner Origin XY black output is recorded; its binding-object
+cause is a hypothesis pending AE 2023 qualification. SDK Release candidate builds.
+
 
 P-02J source/build/deployment complete: 761 scoped checks plus generated expression/
 CEP keyed-write checks pass; build 18 installed through the existing Junction,

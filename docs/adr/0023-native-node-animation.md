@@ -2,6 +2,23 @@
 
 Status: development implementation; AE 2023 owner qualification required.
 
+Build 19 follow-up: owner Origin XY keys yield black output; the panel also
+rejects its loaded JSX. The startup token mismatch is confirmed and corrected
+with paired animation-19 tokens and actual JSX readiness regression coverage.
+The old callable PropertyGroup/Effect assumption and catch-all zero fallback
+are a hypothesis for black output. Bindings now use documented Layer.effect /
+Effect.param methods, isolate unrelated identity probes, and use a finite
+unavailable sentinel (-2^40). UI transactions evaluate every bound stream and
+check expression enabled state before graph publication; failure restores base
+values, expression text and enabled state. Missing/nonfinite render bindings
+reject with the exact stream index rather than silently zeroing settings.
+Reference: https://helpx.adobe.com/after-effects/desktop/work-with-expressions/expression-language-reference/expression-language-reference.html
+
+Scoped build-19 evidence: 798 adapter/camera/registration checks, actual CPU
+alpha/frame-change/reverse-time checks, generated expressions with non-callable
+host-object fixtures, and actual JSX startup tests. May 2023 SDK build passes.
+No AE session operated; owner Origin XY playback/CEP-closed/reopen gate remains.
+
 Build 17 native edits now take effect according to the owner, but public node
 controls were registered CANNOT_TIME_VARY. Removing that flag alone would leave
 rendering on a constant graph. P-02J completes both paths.

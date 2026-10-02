@@ -1,6 +1,18 @@
 # Development plan: AE 2023 particle Alpha
 
 
+## P-02J / build 19 — animation binding follow-up
+
+Owner reports Origin XY keys produce black output and the panel rejects its
+gateway. Paired animation-19 readiness fixes the confirmed token mismatch.
+Bindings use documented effect/param methods, reject missing UUIDs instead of
+zeroing values, and validate evaluated values/enabled state before publication.
+Rollback restores underlying values as well as expressions. UI/render failures
+identify the binding stream. The old callable-host-object assumption is a
+hypothesis for the owner black output; AE playback acceptance remains open.
+798 scoped adapter/camera/registration checks plus actual CPU frame regressions,
+generated-expression tests and real JSX handshake tests pass. See ADR 0023.
+
 ## P-02J / build 18 — native keyframes
 
 Owner confirms build 17 Effect Controls edits take effect. Public node controls

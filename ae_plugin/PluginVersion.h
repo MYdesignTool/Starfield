@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 18: native keyframes and owned render dependencies (ADR 0023).
-#define STARFIELD_VERSION_BUILD 18
-#define STARFIELD_VERSION_PACKED 32786 /* 0x8012 */
+// Build 19: paired gateway and checked, typed native animation bindings.
+#define STARFIELD_VERSION_BUILD 19
+#define STARFIELD_VERSION_PACKED 32787 /* 0x8013 */

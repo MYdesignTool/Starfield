@@ -141,7 +141,8 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         error = create_graph_parameter(data, graph, &publish.graph);
         if (error) return edit->status = error;
         NativeBindingTransaction bindings(data, plugin_id, edit->renderer);
-        error = bindings.install(graph);
+        edit->stage = node_sync::Stage::animation_bindings;
+        error = bindings.install(graph, &edit->stream_index);
         if (error) return edit->status = error;
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.

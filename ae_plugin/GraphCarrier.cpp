@@ -79,8 +79,15 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         error = create_graph_parameter(data, graph, &replacement);
         if (error) return reject(output, params, nonce, "graph allocation failed", error);
         NativeBindingTransaction bindings(data, graph_carrier_plugin_id());
-        error = bindings.install(graph);
-        if (error) { data->utils->host_dispose_handle(replacement); return reject(output, params, nonce, "native animation bindings failed", error); }
+        A_long failed_binding = -1;
+        error = bindings.install(graph, &failed_binding);
+        if (error) {
+            data->utils->host_dispose_handle(replacement);
+            char reason[100]{};
+            std::snprintf(reason, sizeof(reason), "animation binding stream %ld failed (error %ld)",
+                static_cast<long>(failed_binding), static_cast<long>(error));
+            return reject(output, params, nonce, reason, error);
+        }
         error = write_graph_snapshot(data, params, graph);
         if (error) { data->utils->host_dispose_handle(replacement); return reject(output, params, nonce, "numeric graph receipt failed", error); }
         params[kGraphParameterId]->u.arb_d.value = replacement;

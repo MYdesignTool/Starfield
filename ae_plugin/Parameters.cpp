@@ -887,8 +887,14 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value);
             if (!decoded.has_value()) return graph_error(out_data, decoded.error());
             core::Graph sampled = decoded.take_value();
-            err = sample_native_node_animation(in_data, sampled, reference_width, reference_height);
-            if (err) return err;
+            A_long failed_binding = -1;
+            err = sample_native_node_animation(in_data, sampled, reference_width, reference_height, &failed_binding);
+            if (err) {
+                if (out_data) std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
+                    "Starfield animation: binding stream %ld unavailable (error %ld).",
+                    static_cast<long>(failed_binding), static_cast<long>(err));
+                return err;
+            }
             graph = std::make_shared<const core::Graph>(std::move(sampled));
         } else return PF_Err_BAD_CALLBACK_PARAM;
         if (in_data->num_params >= static_cast<A_long>(kTotalEffectParameterCount) + 1) {

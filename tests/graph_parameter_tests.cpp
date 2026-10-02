@@ -26,9 +26,9 @@ struct NativeBindingTransaction::Impl {};
 NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH)
     : impl_(std::make_unique<Impl>()) {}
 NativeBindingTransaction::~NativeBindingTransaction() = default;
-PF_Err NativeBindingTransaction::install(const core::Graph&) noexcept { return PF_Err_NONE; }
+PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*) noexcept { return PF_Err_NONE; }
 void NativeBindingTransaction::accept() noexcept {}
-PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long) noexcept { return PF_Err_NONE; }
+PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long, A_long*) noexcept { return PF_Err_NONE; }
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
 PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found,

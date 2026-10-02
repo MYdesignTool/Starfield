@@ -413,17 +413,18 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
 }
 
 std::u16string binding_expression(const RawNode& node, A_long index, A_long component) {
-    std::string text = "var sf = thisLayer(\"ADBE Effect Parade\"); var result = 0;\n";
-    text += "for (var n = 1; n <= sf.numProperties; n++) { try { var fx = sf(n); if (";
+    // PropertyGroup and Effect are host objects; use documented methods.
+    std::string text = "var count = thisLayer(\"ADBE Effect Parade\").numProperties; var result = -1099511627776;\n";
+    text += "for (var n = 1; n <= count; n++) { var fx = thisLayer.effect(n); var match = false; try { match = ";
     const auto first = native_nodes::uuid_first_index(node.kind);
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         if (chunk) text += " && ";
         const unsigned word = (node.id.value.bytes[chunk * 2] << 8u) | node.id.value.bytes[chunk * 2 + 1];
-        text += "fx(" + std::to_string(first + chunk) + ").value === " + std::to_string(word);
+        text += "fx.param(" + std::to_string(first + chunk) + ").value === " + std::to_string(word);
     }
-    text += ") { result = fx(" + std::to_string(index) + ").value";
+    text += "; } catch (unrelatedEffect) {} if (match) { result = fx.param(" + std::to_string(index) + ").value";
     if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
-    text += "; break; } } catch (ignored) {} }\nresult;";
+    text += "; break; } }\nresult;";
     return std::u16string(text.begin(), text.end());
 }
 
@@ -777,6 +778,8 @@ struct NativeBindingTransaction::Impl {
         AEGP_StreamRefH ref{};
         std::u16string previous;
         A_Boolean enabled{};
+        double previous_value{};
+        A_long index{-1};
         bool changed{};
     };
     PF_InData* data{};
@@ -791,6 +794,8 @@ struct NativeBindingTransaction::Impl {
     ~Impl() {
         for (auto& change : changes) {
             if (!accepted && change.changed) {
+                AEGP_StreamValue2 value{}; value.streamH = change.ref; value.val.one_d = change.previous_value;
+                suites.stream->AEGP_SetStreamValue(id, change.ref, &value);
                 suites.stream->AEGP_SetExpression(id, change.ref, reinterpret_cast<const A_UTF16Char*>(change.previous.c_str()));
                 suites.stream->AEGP_SetExpressionState(id, change.ref, change.enabled);
             }
@@ -806,7 +811,8 @@ NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginI
 NativeBindingTransaction::~NativeBindingTransaction() = default;
 void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; }
 
-PF_Err NativeBindingTransaction::install(const core::Graph& graph) noexcept {
+PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream) noexcept {
+    if (failed_stream) *failed_stream = -1;
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
@@ -826,12 +832,20 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph) noexcept {
             const auto& field = node.fields[index]; if (!field.present || field.slot < 0) continue;
             for (A_long component = 0; component < component_count(field.type); ++component) {
                 tx.changes.emplace_back(); auto& change = tx.changes.back();
+                change.index = kNativeBindingFirstIndex + field.slot + component;
+                if (failed_stream) *failed_stream = change.index;
                 ae = tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id, tx.renderer,
                     kNativeBindingFirstIndex + field.slot + component, &change.ref);
                 if (ae || !change.ref) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
                 AEGP_StreamType type = AEGP_StreamType_NO_DATA;
                 ae = tx.suites.stream->AEGP_GetStreamType(change.ref, &type);
                 if (ae || type != AEGP_StreamType_OneD) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+                const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
+                AEGP_StreamValue2 previous{};
+                ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, TRUE, &previous);
+                if (ae) return static_cast<PF_Err>(ae);
+                change.previous_value = previous.val.one_d;
+                tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &change.enabled);
                 if (ae) return static_cast<PF_Err>(ae);
                 AEGP_MemHandle handle{};
@@ -854,17 +868,35 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph) noexcept {
                 const auto desired = binding_expression(node, index, component);
                 if (change.previous == desired && change.enabled) continue;
                 change.changed = true;
+                AEGP_StreamValue2 sentinel{}; sentinel.streamH = change.ref; sentinel.val.one_d = kNativeBindingUnavailable;
+                ae = tx.suites.stream->AEGP_SetStreamValue(tx.id, change.ref, &sentinel);
+                if (ae) return static_cast<PF_Err>(ae);
                 ae = tx.suites.stream->AEGP_SetExpression(tx.id, change.ref, reinterpret_cast<const A_UTF16Char*>(desired.c_str()));
                 if (!ae) ae = tx.suites.stream->AEGP_SetExpressionState(tx.id, change.ref, TRUE);
                 if (ae) return static_cast<PF_Err>(ae);
             }
+        }
+        // Suite success alone does not prove an expression evaluated in AE.
+        const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
+        for (const auto& change : tx.changes) {
+            if (failed_stream) *failed_stream = change.index;
+            AEGP_StreamValue2 evaluated{};
+            ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, FALSE, &evaluated);
+            if (ae) return static_cast<PF_Err>(ae);
+            const double value = evaluated.val.one_d;
+            tx.suites.stream->AEGP_DisposeStreamValue(&evaluated);
+            A_Boolean enabled = FALSE;
+            ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &enabled);
+            if (ae || !enabled) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+            if (!std::isfinite(value) || value == kNativeBindingUnavailable) return PF_Err_BAD_CALLBACK_PARAM;
         }
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
-PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height) noexcept {
+PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height, A_long* failed_stream) noexcept {
+    if (failed_stream) *failed_stream = -1;
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
@@ -879,10 +911,12 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             for (auto& field : raw.fields) if (field.present && field.slot >= 0) {
                 for (A_long component = 0; component < component_count(field.type); ++component) {
                     PF_ParamDef sampled{};
+                    if (failed_stream) *failed_stream = kNativeBindingFirstIndex + field.slot + component;
                     const auto error = PF_CHECKOUT_PARAM(data, kNativeBindingFirstIndex + field.slot + component,
                         data->current_time, data->time_step, data->time_scale, &sampled);
                     if (error) return error;
-                    const bool valid = sampled.param_type == PF_Param_FLOAT_SLIDER && std::isfinite(sampled.u.fs_d.value);
+                    const bool valid = sampled.param_type == PF_Param_FLOAT_SLIDER &&
+                        std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value != kNativeBindingUnavailable;
                     const double value = valid ? sampled.u.fs_d.value : 0;
                     const auto checked_in = PF_CHECKIN_PARAM(data, &sampled);
                     if (!valid) return PF_Err_BAD_CALLBACK_PARAM;

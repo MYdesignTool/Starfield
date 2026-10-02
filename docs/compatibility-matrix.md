@@ -1,5 +1,34 @@
 # Behavior inventory
 
+## Build 19 P-02J follow-up — 2026-10-02
+
+Owner rejected build 18: gateway_missing despite the JSX animation-18 token;
+Origin XY keys did not animate and produced black output. Panel expected sync-14,
+so the gateway/panel mismatch is confirmed. Both now use animation-19, and the
+startup regression executes the actual JSX readiness function.
+
+The old binding expression called intermediate host objects and swallowed all
+errors into zero. This is a hypothesis for the AE black output, not a confirmed
+host diagnosis. Generated bindings now use Layer.effect(index)/Effect.param(index),
+catch only unrelated-effect identity probes, and return an unavailable sentinel
+when no UUID matches. UI installation evaluates every installed binding and checks
+its enabled state before publication. Failure restores previous values/expressions;
+UI and render diagnostics include the failed binding stream. Render still samples
+only its own PF inputs; no Core ABI, parameter ID or node layout changes.
+
+Packed version 32787 / 0x8013. Native sync 747, camera 12 and renderer controls 39
+checks pass (798 total). Pixel regression renders the sampled graphs with the
+actual CPU backend, checking visible alpha, changed frames and reverse-time
+repeatability. Generated-expression tests use non-callable host-object fixtures,
+missing identities and source failures; actual JSX/panel handshake tests pass.
+All five May 2023 SDK Release /MT AEXs build with no warnings/errors in the log.
+Logs: artifacts/build19-*. No AE session operated. AE Origin XY interpolation,
+CEP-closed playback and reopen remain owner qualification gates.
+
+An initial mistyped runner switch selected the old broad Core suite (269 failures,
+including outdated graph/codec expectations); this is not counted as passing
+evidence. No broad-suite qualification is claimed by this scoped follow-up.
+
 ## Build 18 P-02J candidate — 2026-10-02
 
 Owner confirms build 17 native edits work, then reports almost all stopwatches are

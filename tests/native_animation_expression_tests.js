@@ -6,23 +6,35 @@ assert.equal(expressions.length, 54);
 function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {value:n === 7 ? uuid : 0};
-    Object.keys(values).forEach(key => properties[key] = {value:values[key]});
-    const effect = index => {if(!properties[index]) return {value:Number(index)};return properties[index];};
+    Object.keys(values).forEach(key => properties[key] = {get value(){return typeof values[key]==="function" ? values[key]() : values[key];}});
+    const effect = {param(index){if(!properties[index]) return {value:Number(index)};return properties[index];}};
     Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
 }
-const emitter = node(98, 1, {4:[250,500]}), particle = node(111,2,{6:[0.2,0.4,0.6,1],7:[0.3,0.5,0.7,1]});
+let frameTime=0;
+const emitter = node(98, 1, {4:()=>[250+frameTime*100,500]}), particle = node(111,2,{6:[0.2,0.4,0.6,1],7:[0.3,0.5,0.7,1]});
 const force = node(95,4,{}), duplicate = node(98,777,{4:[999,999]});
-for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
-    const parade = index => effects[index-1]; parade.numProperties = effects.length;
-    const context = {thisLayer:name => {assert.equal(name,"ADBE Effect Parade");return parade;}};
+for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
+    const parade = {numProperties:effects.length};
+    const layer = name => {assert.equal(name,"ADBE Effect Parade");return parade;};
+    layer.effect = index => effects[index-1];
+    const context = {thisLayer:layer};
+    assert.throws(()=>vm.runInNewContext('var group=thisLayer("ADBE Effect Parade"); group(1);',context),
+        /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
-        const match = /result = fx\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx(105).value === 1") ? emitter : expression.includes("fx(118).value === 2") ? particle : force;
-        let expected = source(Number(match[1])).value;
+        const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
+        const source = expression.includes("fx.param(105).value === 1") ? emitter : expression.includes("fx.param(118).value === 2") ? particle : force;
+        let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
     }
 }
+const originExpression=expressions.find(expr=>expr.includes("fx.param(105).value === 1") && expr.includes("result = fx.param(4).value[0]"));
+const missingLayer=()=>({numProperties:0});missingLayer.effect=()=>{throw new Error("missing effect");};
+assert.equal(vm.runInNewContext(originExpression,{thisLayer:missingLayer}),-1099511627776,"missing UUID cannot turn particle settings into zero");
+const failingEmitter=node(98,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
+const failingLayer=()=>({numProperties:1});failingLayer.effect=()=>failingEmitter;
+assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer}),/Origin XY evaluation failed/,
+    "source-property failures are not caught as unrelated effects");
 // Exercise the actual gateway setter without exposing test entry points in production.
 const gateway = fs.readFileSync(path.join(root,"cep_panel/jsx/starfield_gateway.jsx"),"utf8")
     .replace("    function setNodeControl(effect, name, value) {","    $.global.testSetNodeControl = setNodeControl;\n    function setNodeControl(effect, name, value) {");

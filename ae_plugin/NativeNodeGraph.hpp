@@ -16,7 +16,7 @@ public:
     ~NativeBindingTransaction();
     NativeBindingTransaction(const NativeBindingTransaction&) = delete;
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;
-    PF_Err install(const core::Graph&) noexcept;
+    PF_Err install(const core::Graph&, A_long* failed_stream = nullptr) noexcept;
     void accept() noexcept;
 private:
     struct Impl;
@@ -25,7 +25,8 @@ private:
 
 // Render-safe: checks out owned numeric inputs; never calls an AEGP suite.
 [[nodiscard]] PF_Err sample_native_node_animation(PF_InData*, core::Graph&,
-                                                  A_long width, A_long height) noexcept;
+                                                  A_long width, A_long height,
+                                                  A_long* failed_stream = nullptr) noexcept;
 
 // Reads per-node records from sibling hidden node effects on the supervised
 // edit path. It must never be called from SmartFX pre-render or render.

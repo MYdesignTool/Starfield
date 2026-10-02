@@ -10,6 +10,7 @@
 #include "AE_GeneralPlug.h"
 #include "SPBasic.h"
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/CpuRenderer.hpp"
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -64,6 +65,7 @@ AEGP_MemorySuite1 memory{};
 std::array<std::u16string, kNativeBindingCapacity> expressions;
 std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 A_long fail_expression = -1;
+bool disable_next_expression{};
 AEGP_LayerSuite9 layers{};
 AEGP_ItemSuite9 items{};
 PF_InData renderer_data{};
@@ -112,6 +114,24 @@ node_sync::NativeEdit edit(std::uint32_t kind, A_long index, double value) {
 PF_Err direct_edit(node_sync::NativeEdit& request) {
     PF_OutData output{}; return commit_native_graph_edit(&request, 701, &output);
 }
+}
+double evaluated_binding(A_long index, A_long time) {
+    const auto& expr = expressions[index-kNativeBindingFirstIndex];
+    if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
+    std::size_t id = expr.find(u"fx.param(105).value === 1") != std::u16string::npos ? 1 :
+        expr.find(u"fx.param(118).value === 2") != std::u16string::npos ? 2 : 3;
+    const std::u16string needle=u"result = fx.param(";
+    auto from=expr.find(needle)+needle.size(); auto to=expr.find(u")",from);
+    const auto digits=expr.substr(from,to-from);
+    int source=std::stoi(std::string(digits.begin(),digits.end())); auto& value=fixtures[id].values[source];
+    auto component_marker=expr.find(u").value[",to);
+    if(component_marker!=std::u16string::npos) {
+        int component=expr[component_marker+8]-u'0';
+        if(id==1 && source==4) return component ? value.two_d.y : value.two_d.x + time;
+        return component==0 ? value.color.redF*(1.0-time/48.0) : component==1 ? value.color.greenF : value.color.blueF;
+    }
+    return (id==2 && source==2) || (id==3 && source==1) ? value.one_d+time :
+        (id==2 && source==4) ? 100.0-time : (id==2 && source==1) ? 2.0+time/24.0 : value.one_d;
 }
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -179,10 +199,12 @@ int main() {
         else *type = key.index == kGraphParameterId ? AEGP_StreamType_ARB : AEGP_StreamType_OneD;
         return 0;
     };
-    stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time*, A_Boolean, AEGP_StreamValue2* out)->A_Err {
+    stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time* time, A_Boolean pre_expression, AEGP_StreamValue2* out)->A_Err {
         auto& key = *reinterpret_cast<Ref*>(ref);
         if (!key.effect && key.index == fail_read) { fail_read = -1; return PF_Err_BAD_CALLBACK_PARAM; }
         out->streamH = ref; out->val = fixtures[key.effect].values[key.index];
+        if (!key.effect && key.index>=kNativeBindingFirstIndex && !pre_expression)
+            out->val.one_d=evaluated_binding(key.index,time->value);
         if (!key.effect && key.index == kGraphParameterId) out->val.arbH = reinterpret_cast<AEGP_ArbBlockVal>(clone(reinterpret_cast<PF_Handle>(out->val.arbH)));
         return 0;
     };
@@ -227,6 +249,7 @@ int main() {
         expressions[index] = reinterpret_cast<const char16_t*>(text); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
+        if(enabled && disable_next_expression) { enabled=FALSE;disable_next_expression=false; }
         expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;return 0;
     };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
@@ -369,27 +392,29 @@ int main() {
     check(direct_edit(binding_failure) != 0 && expressions == before_failed_binding,
           "graph publication failure restores all changed binding expressions");
     expressions = expression_baseline;
+    expressions[0]=u"0";
+    const auto disabled_expression_baseline=expressions;
+    disable_next_expression=true;
+    auto rejected_binding=edit(1,2,23);
+    check(direct_edit(rejected_binding)==PF_Err_BAD_CALLBACK_PARAM &&
+          rejected_binding.stage==node_sync::Stage::animation_bindings && rejected_binding.stream_index==kNativeBindingFirstIndex,
+          "AE parser disabling a binding is rejected at the exact stream before graph publication");
+    check(expressions==disabled_expression_baseline && expression_enabled[0],
+          "disabled-binding rejection restores old expressions and enabled states");
+    expressions=expression_baseline;
+    // Earlier publication checks intentionally place the emitter outside the frame.
+    // Keep the pixel regression visible while sampling the same native bindings.
+    emitter.values[4].two_d = {960, 540};
+    emitter.values[1].one_d = 1;
+    emitter.values[6].one_d = 0;
     renderer_data.inter.checkout_param = [](PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
         *output = {}; output->param_type=PF_Param_FLOAT_SLIDER;
-        // Evaluate the generated dependency against typed fixture streams.
-        const auto& expr = expressions[index-kNativeBindingFirstIndex];
-        std::size_t id = expr.find(u"fx(105).value === 1") != std::u16string::npos ? 1 :
-            expr.find(u"fx(118).value === 2") != std::u16string::npos ? 2 : 3;
-        auto from=expr.find(u"result = fx(")+12; auto to=expr.find(u")",from);
-        const auto digits=expr.substr(from,to-from);
-        int source=std::stoi(std::string(digits.begin(),digits.end())); auto& value=fixtures[id].values[source];
-        auto component_marker=expr.find(u").value[",to);
-        if (component_marker != std::u16string::npos) {
-            int component=expr[component_marker+8]-u'0';
-            if(id==1 && source==4) output->u.fs_d.value=component ? value.two_d.y : value.two_d.x + time;
-            else output->u.fs_d.value=component==0 ? value.color.redF * (1.0 - time/48.0) :
-                component==1 ? value.color.greenF : value.color.blueF;
-        } else output->u.fs_d.value=(id==2 && source==2) || (id==3 && source==1) ? value.one_d + time :
-            (id==2 && source==4) ? 100.0-time : (id==2 && source==1) ? 2.0+time/24.0 : value.one_d;
+        output->u.fs_d.value=evaluated_binding(index,time);
         return 0;
     };
     renderer_data.inter.checkin_param = [](PF_ProgPtr, PF_ParamDef*)->PF_Err {return 0;};
     const auto suites_before=suite_requests;
+    std::vector<std::byte> first_animated_pixels;
     for (auto time : {0,24,12,0}) {
         auto sampled=animated_graph; renderer_data.current_time=time;
         check(sample_native_node_animation(&renderer_data,sampled,1920,1080)==0,"owned inputs sample requested animation time");
@@ -405,8 +430,30 @@ int main() {
         check(animated_color.x==particle.values[6].color.redF*(1.0-time/48.0),"animated color samples RGB components");
         const auto animated_gravity=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kForceNode,core::graph_keys::kGravity));
         check(std::abs(animated_gravity.y+(fixtures[3].values[1].one_d+time)/1080.0)<1e-12,"animated Force converts pixels to world units");
+        core::RenderRequest request{};
+        request.settings=core::validate_settings(core::Settings{});
+        request.graph=std::make_shared<const core::Graph>(sampled);
+        request.frame={1920,1080,512,288,{0,0,512,288},{1,1},{1,24},core::PixelFormat::rgba8,
+            core::ColorSpace::ae_working_space,core::AlphaMode::premultiplied,1,core::Quality::full};
+        auto rendered=core::CpuParticleRenderer{}.render(request,core::NeverCancelled{});
+        check(rendered.has_value(),"sampled native animation graph renders through the actual CPU backend");
+        if(rendered.has_value()) {
+            const auto& pixels=rendered.value().pixels;
+            bool visible=false; for(std::size_t i=3;i<pixels.size();i+=4) visible |= pixels[i]!=std::byte{0};
+            check(visible,"Origin XY animation does not zero output alpha");
+            if(first_animated_pixels.empty()) first_animated_pixels=pixels;
+            else check(time==0 ? pixels==first_animated_pixels : pixels!=first_animated_pixels,
+                "animation changes actual pixels and reverse-order sampling repeats exactly");
+        } else std::printf("Animated render detail: %s\n",rendered.error().detail);
     }
     check(suite_requests==suites_before && live_refs==0,"render sampling acquires no AEGP suites or references");
+    renderer_data.inter.checkout_param=[](PF_ProgPtr, PF_ParamIndex, A_long, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
+        *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=kNativeBindingUnavailable;return 0;
+    };
+    A_long missing_stream=-1;
+    auto unresolved_graph=animated_graph;
+    check(sample_native_node_animation(&renderer_data,unresolved_graph,1920,1080,&missing_stream)==PF_Err_BAD_CALLBACK_PARAM &&
+          missing_stream==kNativeBindingFirstIndex,"unresolved expression output cannot silently zero particle settings");
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {

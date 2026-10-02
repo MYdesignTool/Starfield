@@ -29,7 +29,10 @@ for (const id of ["banner", "chain", "targetLine", "modeLine", "revisionLine", "
 
 const timers = new Map();
 let nextTimerId = 1;
-let stateCalls = 0;
+const gatewayHost = {};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,"..","cep_panel","jsx","starfield_gateway.jsx"),"utf8"), {$:{global:gatewayHost}});
+const actualReadyToken = gatewayHost.SFLD_ready();
+let stateCalls = 0, gatewayLoads = 0, gatewayProbes = 0;
 let failParameterWrite = true;
 let simulateBootstrapFailure = false, bootstrapCalls = 0;
 const windowListeners = {};
@@ -39,9 +42,11 @@ const window = {
     ResizeObserver: class { constructor(callback) { resizeObservers.push(callback); } observe() {} },
     requestAnimationFrame(callback) { animationFrames.push(callback); },
     __adobe_cep__: {
+        getSystemPath() { return "C:/Starfield/cep_panel"; },
         evalScript(script, callback) {
             if (script.indexOf("SFLD_ready") >= 0) {
-                callback("org.starfieldfx.panel/1/native-node-sync-6");
+                if(script.indexOf("$.evalFile") >= 0) {gatewayLoads++;callback(actualReadyToken);}
+                else {gatewayProbes++;callback(gatewayProbes===1 ? "org.starfieldfx.panel/1/stale-gateway" : actualReadyToken);}
                 return;
             }
             if (script.indexOf("SFLD_getState(") >= 0) {
@@ -100,6 +105,7 @@ const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "pa
 vm.runInNewContext(source, { window, document, Date, Math, JSON, String, Number, isFinite });
 
 assert.strictEqual(stateCalls, 1, "panel should request the current target immediately on startup");
+assert.strictEqual(gatewayLoads, 1, "panel reloads a stale gateway and accepts the actual paired JSX readiness token");
 assert.match(elements.banner.textContent, /retrying shortly/i, "empty startup reply should show a retry state");
 
 const expectedRetryDelays = [250, 750, 1500, 3000, 5000, 5000];

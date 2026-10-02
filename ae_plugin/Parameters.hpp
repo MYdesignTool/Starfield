@@ -29,6 +29,8 @@ inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
 inline constexpr A_long kNativeBindingFirstIndex = 98;
 inline constexpr A_long kNativeBindingCapacity = 512;
 inline constexpr A_long kNativeBindingFirstDiskId = 1000;
+// Exact power of two, outside every authored range, survives host float storage.
+inline constexpr double kNativeBindingUnavailable = -1099511627776.0;
 inline constexpr std::size_t kTotalEffectParameterCount = 97 + kNativeBindingCapacity;
 
 inline constexpr A_long kTypeId = 2;
