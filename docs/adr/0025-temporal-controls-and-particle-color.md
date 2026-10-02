@@ -1,6 +1,6 @@
 # ADR 0025: temporal controls and Particle color (development build 22)
 
-Status: implemented in build 22 candidate; AE 2023 owner qualification required.
+Status: implemented and deployed in development build 22; AE 2023 owner qualification required.
 
 Owner confirms build 21 Origin birth sampling, and reports current-rate
 repopulation. M3-05 owns the shared graph evaluator/simulation/history codec,

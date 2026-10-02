@@ -2,6 +2,9 @@
 
 ## M3-05 — temporal controls and Particle color / build 22
 
+Status: source implemented, 1,420 scoped checks pass, SDK build and deployment
+verified; owner AE 2023 qualification remains open (ADR 0025).
+
 Owner confirms Origin birth behavior in build 21. Audit and implement the entire
 existing public parameter temporal contract, emission integration and reference
 Particle color controls; see ADR 0025. Owns shared Graph/SequenceCodec/simulation/

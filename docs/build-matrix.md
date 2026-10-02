@@ -17,6 +17,35 @@ Build 22 is 32790/0x8016; native identity 3/layout metadata 7; main IDs/manifest
 Render.hpp and C ABI 2 unchanged. The CEP ready marker remains animation-19.
 
 
+### Build 22 deployment — 2026-10-03
+
+Source commit `5d4acdb7bc68643927fd8519203c79796b0e5241` is pushed to the current branch. A read-only check found
+neither AfterFX nor AfterFX_64 running. The standing owner authorization was used
+through Deploy-TestBuild.ps1; no process was started/stopped and no registry/cache
+preferences were changed. The sole Starfield Junction still targets newStardust/dist.
+Six installed/candidate hashes, selected/pinned Core and all six prior bundle
+backup hashes plus the old selector were verified. Before/after records:
+artifacts/build22-deploy-before.json and artifacts/build22-deploy-after.json.
+Selected Core: `StarfieldCore-A99ACA9486FDFA56.dll`.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `FA9116D4C41F41C5E4C963D9B71C0DC8CD0BB23A9CC684C243E27B1C8F4CA96A` |
+| StarfieldEmitter.aex | `F89D9F6610976835DC14D9804A38F94D0BC3FAC85396A7B98A8E541E6C1C816D` |
+| StarfieldParticleNode.aex | `54B021B771C435B5848E44EC86A15D705B0435E125D23485A5047BB93ACA9853` |
+| StarfieldAppearance.aex | `4B99E6C4215F92AB8FBEBA8E857755F9DC581E3129DE874CAE51C64A7CF8D8D5` |
+| StarfieldForce.aex | `A924F1D8E235017B1B589E1FC581C32BCB93141EE76D9454AB5CDDF732C112EF` |
+| StarfieldCore.dll | `A99ACA9486FDFA566D286B22A1831FF234C7FBCA4FE2E33CFDFD252515DDCDA9` |
+
+One-step rollback to build 21 (with AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm305-build22-temporal-controls-color-20261003' -Rollback
+```
+
+AE has not loaded this build under agent operation. Owner host qualification,
+cache invalidation, gradient undo/reopen and performance remain open.
+
 ## Build 21 M3-03 — emitter Origin at birth
 
 Owner confirms build 20 renders and Origin keys animate, but survivors follow the

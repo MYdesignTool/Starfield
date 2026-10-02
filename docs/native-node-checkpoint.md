@@ -17,6 +17,12 @@ Build 22 is 32790/0x8016; native identity 3/layout metadata 7; main IDs/manifest
 Render.hpp and C ABI 2 unchanged. The CEP ready marker remains animation-19.
 
 
+Build 22 is deployed with AE absent. The single Junction and six installed,
+selected/pinned Core and old backup hashes were verified. Source 5d4acdb is pushed;
+before/after states and one-step rollback are recorded in build-matrix.md.
+Fresh Emitter/Particle effects and a reopened CEP panel are required; owner AE
+qualification remains open.
+
 ## Build 21 M3-03 — emitter Origin at birth
 
 Owner confirms build 20 renders and Origin keys animate, but survivors follow the
