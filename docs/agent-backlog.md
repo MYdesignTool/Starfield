@@ -19,6 +19,8 @@ AE visual interpolation/reopen remain owner qualification.
 Build 21 source/SDK candidate complete: 921 focused checks pass, covering actual
 historical PF checkouts, frozen graph/CPU pixels, Auxiliary birth origins and
 failure/cancellation behavior. All five AEXs plus Core build; owner AE gate open.
+Paired build 21 deployed through the existing single Junction with AE absent;
+six hashes, prior backups and selected/pinned Core verified. Rollback recorded.
 
 ## P-02I — native Effect Controls commit / build 17
 

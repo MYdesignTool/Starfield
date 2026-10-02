@@ -28,6 +28,13 @@ The main AEX's birth planner shares GraphEvaluation/ParticleSimulation/Random
 source with Core; these inputs are now part of the adapter fingerprint, requiring
 paired builds when planning changes. CEP keeps its unchanged animation-19 token.
 
+Build 21 deployed with AE absent; six installed/candidate and build-20 backup
+hashes verified. New pinned/selected Core generation matches. Single Junction
+preserved; no AE process operation. Source 369f0ddca599441fd49bca9f193089f28e518cb4.
+Before/after records are artifacts/build21-deploy-*.json; backup is
+m303-build21-origin-birth-history-20261002. Exact rollback is in build-matrix.md.
+Owner AE trajectory/interpolation/cache/reopen gate remains open.
+
 ## Build 20 P-02J follow-up — 2026-10-02
 
 Owner rejects build 19 on opening: animation binding stream -1 unavailable (516).

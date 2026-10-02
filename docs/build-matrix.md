@@ -28,6 +28,33 @@ The main AEX's birth planner shares GraphEvaluation/ParticleSimulation/Random
 source with Core; these inputs are now part of the adapter fingerprint, requiring
 paired builds when planning changes. CEP keeps its unchanged animation-19 token.
 
+### Build 21 deployment completed
+
+Source 369f0ddca599441fd49bca9f193089f28e518cb4 pushed before deployment.
+Immediate read-only process check confirmed no AfterFX/AfterFX_64. Installed
+through the existing single Plug-ins/Starfield -> dist Junction under standing
+permission. All six candidate/installed and prior build-20 backup hashes verified.
+Selected/pinned Core both match the new generation; no AE process started/stopped.
+Packed version 32789 / 0x8015; Core ABI 2 and CEP animation-19 token unchanged.
+Records: artifacts/build21-deploy-before.json / build21-deploy-after.json.
+Backup: artifacts/disabled/m303-build21-origin-birth-history-20261002.
+Owner AE birth-position/key interpolation/cache invalidation/reopen gates remain open.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | F18E70874E72E2BF7C7E8E75AF673F51CE371D74CAC715010AFE8022D04915FE |
+| StarfieldEmitter.aex | 6FEBA4002EA1665461289F1CB4E3E216098E01A48D985AE838DDEB6724221C91 |
+| StarfieldParticleNode.aex | DBB68AA4E586B8D06DD80CDADCA4780B4546E3E258AD336E517C0CAFCBCE7DA2 |
+| StarfieldAppearance.aex | DDB0C0B4E492A527943F452B141A2A1AE23C0F4C817AA7BA6B34054C777538B3 |
+| StarfieldForce.aex | 329B263357AD7043616700371294FA8A25876A9D04BFAEB2B83D4EDB95BA998C |
+| StarfieldCore.dll | 5D4ECE4496D9D1F0C14938B8902A71FDC368429DB1A07D93429D58D4EC094566 |
+
+One-step rollback (close AE first):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm303-build21-origin-birth-history-20261002' -Rollback
+```
+
 ## Build 20 P-02J follow-up — 2026-10-02
 
 Owner rejects build 19 on opening: animation binding stream -1 unavailable (516).
