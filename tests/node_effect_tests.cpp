@@ -112,17 +112,22 @@ int main() {
         check(registered[8].u.fs_d.slider_max==10 && registered[8].u.fs_d.precision==PF_Precision_TENTHS,"Spin delay uses seconds and a useful native range");
     }
     int colors = 0;
-    bool controls_constant = true, interpolation_unrestricted = true, colors_supervised = true;
+    bool controls_constant = true, controls_animated = true, interpolation_unrestricted = true, colors_supervised = true;
+    A_long control_index = 0;
+    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 9 : kind == Kind::appearance ? 8 : 10;
     for (const auto& control : registered) {
+        ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
-        controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
+        if (control_index <= last_animated) controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
+        else controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
         interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;
         if (control.param_type == PF_Param_COLOR) {
             ++colors;
             colors_supervised &= (control.flags & PF_ParamFlag_SUPERVISE) != 0;
         }
     }
-    check(controls_constant, "all saved node controls remain non-animatable constants");
+    check(controls_animated, "all public node controls permit keyframes");
+    check(controls_constant, "topology identity and curve banks stay constant");
     check(interpolation_unrestricted, "constant streams do not request unnecessary interpolation restrictions");
     check(colors == ((kind == Kind::particle || kind == Kind::appearance) ? 2 : 0), "only Particle/Appearance register their two colors");
     check(colors_supervised, "color edits retain the supervised synchronization callback");

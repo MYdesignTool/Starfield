@@ -35,6 +35,25 @@ constexpr char kParticleMatchName[] = "org.starfieldfx.node.particle";
 constexpr char kAppearanceMatchName[] = "org.starfieldfx.node.appearance";
 constexpr char kForceMatchName[] = "org.starfieldfx.node.force";
 
+struct RawField {
+    bool present{};
+    node_sync::ValueKind type{};
+    A_long slot{-1};
+    std::array<double, 3> value{};
+};
+struct RawNode {
+    core::NodeId id{};
+    Kind kind{};
+    std::array<RawField, 44> fields{};
+};
+constexpr std::uint16_t kBindingRecordTag = 0x8002;
+constexpr A_long component_count(node_sync::ValueKind type) noexcept {
+    return type == node_sync::ValueKind::scalar ? 1 : type == node_sync::ValueKind::point2 ? 2 : 3;
+}
+constexpr A_long animated_last_index(Kind kind) noexcept {
+    return kind == Kind::emitter ? 30 : kind == Kind::particle ? 9 : kind == Kind::appearance ? 8 : 10;
+}
+
 struct SuiteSet {
     explicit SuiteSet(PF_InData* data) : basic(data ? data->pica_basicP : nullptr) {}
     ~SuiteSet() {
@@ -53,6 +72,8 @@ struct SuiteSet {
                                                  reinterpret_cast<const void**>(&stream));
         return static_cast<PF_Err>(error);
     }
+    RawNode* recording{};
+    const RawNode* playback{};
     SPBasicSuite* basic{};
     const AEGP_PFInterfaceSuite1* pf_interface{};
     const AEGP_EffectSuite4* effect{};
@@ -85,11 +106,34 @@ struct StreamRef {
     StreamRef& operator=(const StreamRef&) = delete;
 };
 
+bool record_value(SuiteSet& suites, A_long index, node_sync::ValueKind type,
+                  const std::array<double, 3>& value) noexcept {
+    if (suites.recording) {
+        if (index < 1 || index >= static_cast<A_long>(suites.recording->fields.size())) return false;
+        auto& field = suites.recording->fields[index];
+        field.present = true; field.type = type; field.value = value;
+    }
+    return true;
+}
+bool playback_value(SuiteSet& suites, A_long index, node_sync::ValueKind type,
+                    std::array<double, 3>& value) noexcept {
+    if (index < 1 || index >= static_cast<A_long>(suites.playback->fields.size())) return false;
+    const auto& field = suites.playback->fields[index];
+    if (!field.present || field.type != type) return false;
+    value = field.value; return true;
+}
+
 bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, double& output) noexcept {
+    if (suites.playback) {
+        std::array<double, 3> sampled{};
+        if (!playback_value(suites, index, node_sync::ValueKind::scalar, sampled)) return false;
+        output = sampled[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+    }
+
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::scalar) return suites.fail(index);
-        suites.edit_applied = true; output = suites.edit->value[0]; return true;
+        suites.edit_applied = true; output = suites.edit->value[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
@@ -97,20 +141,26 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
-                                                  &time, TRUE, &value);
+                                                  &time, suites.recording ? FALSE : TRUE, &value);
     if (error) return suites.fail(index);
     const double result = value.val.one_d;
     suites.stream->AEGP_DisposeStreamValue(&value);
     if (!std::isfinite(result)) return suites.fail(index);
     output = result;
-    return true;
+    return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
 }
 
 bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.playback) {
+        std::array<double, 3> sampled{};
+        if (!playback_value(suites, index, node_sync::ValueKind::point2, sampled)) return false;
+        output = {sampled[0], sampled[1], sampled[2]}; return record_value(suites, index, node_sync::ValueKind::point2, {output.x, output.y, output.z});
+    }
+
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::point2) return suites.fail(index);
-        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], 0.0}; return true;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], 0.0}; return record_value(suites, index, node_sync::ValueKind::point2, {output.x, output.y, output.z});
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
@@ -118,20 +168,26 @@ bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
-                                                &time, TRUE, &value);
+                                                &time, suites.recording ? FALSE : TRUE, &value);
     if (error) return suites.fail(index);
     const core::Vec3 result{value.val.two_d.x, value.val.two_d.y, 0.0};
     suites.stream->AEGP_DisposeStreamValue(&value);
     if (!std::isfinite(result.x) || !std::isfinite(result.y)) return suites.fail(index);
     output = result;
-    return true;
+    return record_value(suites, index, node_sync::ValueKind::point2, {output.x, output.y, output.z});
 }
 
 bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                   A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.playback) {
+        std::array<double, 3> sampled{};
+        if (!playback_value(suites, index, node_sync::ValueKind::point3, sampled)) return false;
+        output = {sampled[0], sampled[1], sampled[2]}; return record_value(suites, index, node_sync::ValueKind::point3, {output.x, output.y, output.z});
+    }
+
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::point3) return suites.fail(index);
-        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return record_value(suites, index, node_sync::ValueKind::point3, {output.x, output.y, output.z});
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
@@ -139,20 +195,26 @@ bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH eff
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
-                                                  &time, TRUE, &value);
+                                                  &time, suites.recording ? FALSE : TRUE, &value);
     if (error) return suites.fail(index);
     const core::Vec3 result{value.val.three_d.x, value.val.three_d.y, value.val.three_d.z};
     suites.stream->AEGP_DisposeStreamValue(&value);
     if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return suites.fail(index);
     output = result;
-    return true;
+    return record_value(suites, index, node_sync::ValueKind::point3, {output.x, output.y, output.z});
 }
 
 bool read_color(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    if (suites.playback) {
+        std::array<double, 3> sampled{};
+        if (!playback_value(suites, index, node_sync::ValueKind::color, sampled)) return false;
+        output = {sampled[0], sampled[1], sampled[2]}; return record_value(suites, index, node_sync::ValueKind::color, {output.x, output.y, output.z});
+    }
+
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::color) return suites.fail(index);
-        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return true;
+        suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return record_value(suites, index, node_sync::ValueKind::color, {output.x, output.y, output.z});
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
@@ -160,20 +222,23 @@ bool read_color(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     StreamRef stream(suites.stream, raw_stream);
     AEGP_StreamValue2 value{};
     error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
-                                                  &time, TRUE, &value);
+                                                  &time, suites.recording ? FALSE : TRUE, &value);
     if (error) return suites.fail(index);
     const core::Vec3 result{value.val.color.redF, value.val.color.greenF, value.val.color.blueF};
     suites.stream->AEGP_DisposeStreamValue(&value);
     if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return suites.fail(index);
     output = result;
-    return true;
+    return record_value(suites, index, node_sync::ValueKind::color, {output.x, output.y, output.z});
 }
 
 bool read_uint(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                A_long index, const A_Time& time, std::uint32_t& output) noexcept {
     double value = 0.0;
     if (!read_one_d(suites, plugin_id, effect, index, time, value) || value < 0.0 ||
-        value > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) || std::floor(value) != value) return suites.fail(index);
+        value > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) return suites.fail(index);
+    if ((suites.playback && index <= animated_last_index(suites.playback->kind)) ||
+        (suites.recording && index <= animated_last_index(suites.recording->kind))) value = std::round(value);
+    if (std::floor(value) != value) return suites.fail(index);
     output = static_cast<std::uint32_t>(value);
     return true;
 }
@@ -264,6 +329,102 @@ core::OpaqueBytes make_layout_record(std::vector<LayoutEntry>& entries) {
         append_u64(bytes, std::bit_cast<std::uint64_t>(entry.y));
     }
     return bytes;
+}
+
+core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
+    std::sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    core::OpaqueBytes bytes;
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, 1); append_u32(bytes, 0);
+    append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
+    A_long slot = 0;
+    for (auto& node : nodes) {
+        for (auto b : node.id.value.bytes) bytes.push_back(static_cast<std::byte>(b));
+        append_u16(bytes, static_cast<std::uint16_t>(node.kind));
+        std::uint16_t count = 0;
+        for (const auto& field : node.fields) if (field.present) ++count;
+        append_u16(bytes, count);
+        for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
+            auto& field = node.fields[index]; if (!field.present) continue;
+            if (index <= animated_last_index(node.kind)) {
+                field.slot = slot; slot += component_count(field.type);
+                if (slot > kNativeBindingCapacity) return {};
+            }
+            append_u16(bytes, static_cast<std::uint16_t>(index));
+            append_u16(bytes, static_cast<std::uint16_t>(field.type));
+            append_u16(bytes, field.slot < 0 ? 0xffffu : static_cast<std::uint16_t>(field.slot));
+            append_u16(bytes, 0);
+            for (auto value : field.value) append_u64(bytes, std::bit_cast<std::uint64_t>(value));
+        }
+    }
+    for (unsigned i = 0; i < 4; ++i) bytes[4 + i] = static_cast<std::byte>((bytes.size() >> (i * 8)) & 0xffu);
+    return bytes;
+}
+
+bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) {
+    bool found = false;
+    std::array<bool, kNativeBindingCapacity> used{};
+    for (const auto& bytes : graph.optional_records) {
+        if (bytes.size() < 2 || bytes[0] != std::byte{2} || bytes[1] != std::byte{0x80}) continue;
+        if (found || bytes.size() < 12) return false;
+        found = true; std::size_t at = 0;
+        auto read = [&](unsigned count, std::uint64_t& out) {
+            if (count > bytes.size() - at) return false;
+            out = 0;
+            for (unsigned i = 0; i < count; ++i) out |= std::uint64_t(std::to_integer<unsigned char>(bytes[at++])) << (8 * i);
+            return true;
+        };
+        std::uint64_t tag{}, version{}, length{}, count{};
+        if (!read(2, tag) || !read(2, version) || version != 1 || !read(4, length) ||
+            length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
+        for (std::uint64_t n = 0; n < count; ++n) {
+            RawNode node;
+            std::uint64_t value{};
+            for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
+            std::uint64_t kind{}, fields{};
+            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 43) return false;
+            node.kind = static_cast<Kind>(kind);
+            if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
+            for (std::uint64_t f = 0; f < fields; ++f) {
+                std::uint64_t index{}, type{}, slot{}, reserved{};
+                if (!read(2, index) || index < 1 || index >= node.fields.size() || node.fields[index].present ||
+                    !read(2, type) || type > 3 || !read(2, slot) || !read(2, reserved) || reserved != 0) return false;
+                auto& field = node.fields[index]; field.present = true;
+                field.type = static_cast<node_sync::ValueKind>(type);
+                field.slot = slot == 0xffffu ? -1 : static_cast<A_long>(slot);
+                if (field.slot >= 0) {
+                    if (index > static_cast<std::uint64_t>(animated_last_index(node.kind)) ||
+                        field.slot + component_count(field.type) > kNativeBindingCapacity) return false;
+                    for (A_long c = 0; c < component_count(field.type); ++c) {
+                        if (used[field.slot + c]) return false;
+                        used[field.slot + c] = true;
+                    }
+                } else if (index <= static_cast<std::uint64_t>(animated_last_index(node.kind))) return false;
+                for (auto& scalar : field.value) {
+                    if (!read(8, value)) return false;
+                    scalar = std::bit_cast<double>(value);
+                    if (!std::isfinite(scalar)) return false;
+                }
+            }
+            nodes.push_back(std::move(node));
+        }
+        if (at != bytes.size()) return false;
+    }
+    return true; // No binding record on bootstrap graphs.
+}
+
+std::u16string binding_expression(const RawNode& node, A_long index, A_long component) {
+    std::string text = "var sf = thisLayer(\"ADBE Effect Parade\"); var result = 0;\n";
+    text += "for (var n = 1; n <= sf.numProperties; n++) { try { var fx = sf(n); if (";
+    const auto first = native_nodes::uuid_first_index(node.kind);
+    for (A_long chunk = 0; chunk < 8; ++chunk) {
+        if (chunk) text += " && ";
+        const unsigned word = (node.id.value.bytes[chunk * 2] << 8u) | node.id.value.bytes[chunk * 2 + 1];
+        text += "fx(" + std::to_string(first + chunk) + ").value === " + std::to_string(word);
+    }
+    text += ") { result = fx(" + std::to_string(index) + ").value";
+    if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
+    text += "; break; } } catch (ignored) {} }\nresult;";
+    return std::u16string(text.begin(), text.end());
 }
 
 bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key, std::uint16_t& schema) noexcept {
@@ -483,6 +644,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                     static_cast<double>(std::max<A_long>(in_data->height, 1)),
                                     in_data->pixel_aspect_ratio.den ?
                                         static_cast<double>(in_data->pixel_aspect_ratio.num) / in_data->pixel_aspect_ratio.den : 1.0};
+        std::vector<RawNode> raw_nodes;
         std::vector<Connection> connections;
         std::vector<LayoutEntry> layout_entries;
         graph.nodes.reserve(static_cast<std::size_t>(effect_count) + 1u);
@@ -525,9 +687,12 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     suites.edited_effect = effect.value;
                 }
             }
+            RawNode raw; raw.id = core::NodeId{uuid}; raw.kind = kind;
+            suites.recording = &raw;
             core::GraphNode node{core::NodeId{uuid}, type_key, schema_version, {}};
             if (!read_node_parameters(suites, plugin_id, effect.value, kind, time, units, node))
                 return PF_Err_BAD_CALLBACK_PARAM;
+            suites.recording = nullptr; raw_nodes.push_back(std::move(raw));
             double layout_x = 0.0;
             double layout_y = 0.0;
             if (!read_one_d(suites, plugin_id, effect.value, native_nodes::layout_x_index(kind), time, layout_x) ||
@@ -593,13 +758,150 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         }
 
         const auto validation = core::validate_graph(graph, core::particle_node_registry());
-        if (validation.ok()) graph.optional_records.push_back(make_layout_record(layout_entries));
+        if (validation.ok()) {
+            graph.optional_records.push_back(make_layout_record(layout_entries));
+            auto bindings = make_binding_record(raw_nodes);
+            if (bindings.empty() && !raw_nodes.empty()) return PF_Err_BAD_CALLBACK_PARAM;
+            if (!bindings.empty()) graph.optional_records.push_back(std::move(bindings));
+        }
         return validation.ok() ? PF_Err_NONE : PF_Err_BAD_CALLBACK_PARAM;
     } catch (const std::bad_alloc&) {
         return PF_Err_OUT_OF_MEMORY;
     } catch (...) {
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
     }
+}
+
+struct NativeBindingTransaction::Impl {
+    struct Change {
+        AEGP_StreamRefH ref{};
+        std::u16string previous;
+        A_Boolean enabled{};
+        bool changed{};
+    };
+    PF_InData* data{};
+    AEGP_PluginID id{};
+    AEGP_EffectRefH renderer{};
+    bool owned_renderer{};
+    SuiteSet suites;
+    const AEGP_MemorySuite1* memory{};
+    std::vector<Change> changes;
+    bool accepted{};
+    Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r) : data(d), id(i), renderer(r), suites(d) {}
+    ~Impl() {
+        for (auto& change : changes) {
+            if (!accepted && change.changed) {
+                suites.stream->AEGP_SetExpression(id, change.ref, reinterpret_cast<const A_UTF16Char*>(change.previous.c_str()));
+                suites.stream->AEGP_SetExpressionState(id, change.ref, change.enabled);
+            }
+            if (change.ref) suites.stream->AEGP_DisposeStream(change.ref);
+        }
+        if (owned_renderer && renderer) suites.effect->AEGP_DisposeEffect(renderer);
+        if (memory) suites.basic->ReleaseSuite(kAEGPMemorySuite, kAEGPMemorySuiteVersion1);
+    }
+};
+
+NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginID id, AEGP_EffectRefH renderer)
+    : impl_(std::make_unique<Impl>(data, id, renderer)) {}
+NativeBindingTransaction::~NativeBindingTransaction() = default;
+void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; }
+
+PF_Err NativeBindingTransaction::install(const core::Graph& graph) noexcept {
+    try {
+        std::vector<RawNode> nodes;
+        if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        if (nodes.empty()) return PF_Err_NONE;
+        auto& tx = *impl_;
+        auto error = tx.suites.acquire(); if (error) return error;
+        A_Err ae = tx.suites.basic->AcquireSuite(kAEGPMemorySuite, kAEGPMemorySuiteVersion1,
+            reinterpret_cast<const void**>(&tx.memory));
+        if (ae) return static_cast<PF_Err>(ae);
+        if (!tx.renderer) {
+            ae = tx.suites.pf_interface->AEGP_GetNewEffectForEffect(tx.id, tx.data->effect_ref, &tx.renderer);
+            tx.owned_renderer = true;
+            if (ae || !tx.renderer) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+        }
+        tx.changes.reserve(kNativeBindingCapacity);
+        for (const auto& node : nodes) for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
+            const auto& field = node.fields[index]; if (!field.present || field.slot < 0) continue;
+            for (A_long component = 0; component < component_count(field.type); ++component) {
+                tx.changes.emplace_back(); auto& change = tx.changes.back();
+                ae = tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id, tx.renderer,
+                    kNativeBindingFirstIndex + field.slot + component, &change.ref);
+                if (ae || !change.ref) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+                AEGP_StreamType type = AEGP_StreamType_NO_DATA;
+                ae = tx.suites.stream->AEGP_GetStreamType(change.ref, &type);
+                if (ae || type != AEGP_StreamType_OneD) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+                ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &change.enabled);
+                if (ae) return static_cast<PF_Err>(ae);
+                AEGP_MemHandle handle{};
+                ae = tx.suites.stream->AEGP_GetExpression(tx.id, change.ref, &handle);
+                if (ae) return static_cast<PF_Err>(ae);
+                if (handle) {
+                    void* text = nullptr; ae = tx.memory->AEGP_LockMemHandle(handle, &text);
+                    struct LockedExpression {
+                        const AEGP_MemorySuite1* suite;
+                        AEGP_MemHandle handle;
+                        bool locked;
+                        ~LockedExpression() {
+                            if (locked) suite->AEGP_UnlockMemHandle(handle);
+                            suite->AEGP_FreeMemHandle(handle);
+                        }
+                    } owned{tx.memory, handle, ae == 0};
+                    if (!ae && text) change.previous = reinterpret_cast<const char16_t*>(text);
+                    if (ae) return static_cast<PF_Err>(ae);
+                }
+                const auto desired = binding_expression(node, index, component);
+                if (change.previous == desired && change.enabled) continue;
+                change.changed = true;
+                ae = tx.suites.stream->AEGP_SetExpression(tx.id, change.ref, reinterpret_cast<const A_UTF16Char*>(desired.c_str()));
+                if (!ae) ae = tx.suites.stream->AEGP_SetExpressionState(tx.id, change.ref, TRUE);
+                if (ae) return static_cast<PF_Err>(ae);
+            }
+        }
+        return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
+}
+
+PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height) noexcept {
+    try {
+        std::vector<RawNode> nodes;
+        if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        if (nodes.empty()) return PF_Err_NONE;
+        if (!data || !data->inter.checkout_param || !data->inter.checkin_param ||
+            data->num_params < kNativeBindingFirstIndex + kNativeBindingCapacity) return PF_Err_BAD_CALLBACK_PARAM;
+        const core::LayerUnits units{double(std::max<A_long>(width > 0 ? width : data->width, 1)),
+            double(std::max<A_long>(height > 0 ? height : data->height, 1)),
+            data->pixel_aspect_ratio.den ? double(data->pixel_aspect_ratio.num) / data->pixel_aspect_ratio.den : 1.0};
+        SuiteSet reader(nullptr); // No AEGP acquisition, even during destruction.
+        for (auto& raw : nodes) {
+            for (auto& field : raw.fields) if (field.present && field.slot >= 0) {
+                for (A_long component = 0; component < component_count(field.type); ++component) {
+                    PF_ParamDef sampled{};
+                    const auto error = PF_CHECKOUT_PARAM(data, kNativeBindingFirstIndex + field.slot + component,
+                        data->current_time, data->time_step, data->time_scale, &sampled);
+                    if (error) return error;
+                    const bool valid = sampled.param_type == PF_Param_FLOAT_SLIDER && std::isfinite(sampled.u.fs_d.value);
+                    const double value = valid ? sampled.u.fs_d.value : 0;
+                    const auto checked_in = PF_CHECKIN_PARAM(data, &sampled);
+                    if (!valid) return PF_Err_BAD_CALLBACK_PARAM;
+                    if (checked_in) return checked_in;
+                    field.value[component] = value;
+                }
+            }
+            auto node = std::find_if(graph.nodes.begin(), graph.nodes.end(), [&](const auto& n) {return n.id == raw.id;});
+            if (node == graph.nodes.end()) return PF_Err_BAD_CALLBACK_PARAM;
+            const auto expected = raw.kind == Kind::emitter ? core::graph_keys::kEmitterNode :
+                raw.kind == Kind::particle ? core::graph_keys::kParticleNode :
+                raw.kind == Kind::appearance ? core::graph_keys::kAppearanceNode : core::graph_keys::kForceNode;
+            if (node->type_key != expected) return PF_Err_BAD_CALLBACK_PARAM;
+            node->parameters.clear(); reader.playback = &raw;
+            if (!read_node_parameters(reader, 0, nullptr, raw.kind, {}, units, *node)) return PF_Err_BAD_CALLBACK_PARAM;
+        }
+        return PF_Err_NONE;
+    } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
+    catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
 } // namespace starfield::adapter

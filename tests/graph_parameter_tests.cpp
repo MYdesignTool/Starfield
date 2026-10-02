@@ -22,6 +22,13 @@ using namespace starfield::adapter;
 
 namespace starfield::adapter {
 bool fake_native_compile = false;
+struct NativeBindingTransaction::Impl {};
+NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH)
+    : impl_(std::make_unique<Impl>()) {}
+NativeBindingTransaction::~NativeBindingTransaction() = default;
+PF_Err NativeBindingTransaction::install(const core::Graph&) noexcept { return PF_Err_NONE; }
+void NativeBindingTransaction::accept() noexcept {}
+PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long) noexcept { return PF_Err_NONE; }
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
 PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found,
@@ -717,7 +724,15 @@ void test_numeric_graph_receipt(PF_InData& host) {
 void test_renderer_controls(PF_InData& host) {
     PF_OutData output{};
     CHECK(setup_parameters(&host,&output)==PF_Err_NONE);
-    CHECK(output.num_params==98 && registered.size()==97);
+    CHECK(output.num_params==kTotalEffectParameterCount+1 && registered.size()==kTotalEffectParameterCount);
+    bool bindings_animated=true, bindings_hidden=true, binding_ids=true;
+    for(A_long slot=0;slot<kNativeBindingCapacity;++slot) {
+        const auto& p=registered[kNativeBindingFirstIndex+slot-1];
+        bindings_animated &= p.param_type==PF_Param_FLOAT_SLIDER && !(p.flags & PF_ParamFlag_CANNOT_TIME_VARY);
+        bindings_hidden &= (p.ui_flags & PF_PUI_NO_ECW_UI) && (p.ui_flags & PF_PUI_INVISIBLE);
+        binding_ids &= p.uu.id==kNativeBindingFirstDiskId+slot && p.uu.id<=9999;
+    }
+    CHECK(bindings_animated && bindings_hidden && binding_ids);
     CHECK(registered[kMaxParticlesId-1].u.fs_d.value==1000000 && registered[kMaxParticlesId-1].u.fs_d.dephault==1000000);
     CHECK(registered[89].param_type==PF_Param_GROUP_START && registered[89].ui_flags==PF_PUI_NONE);
     CHECK(registered[93].param_type==PF_Param_GROUP_START && registered[93].ui_flags==PF_PUI_NONE);
@@ -741,7 +756,7 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(create_graph_parameter(&host,graph_from_controls(core::Settings{}).value(),&parameters[kGraphParameterId].u.arb_d.value)==0);
     parameters[kTimeRemapEnabledId].u.bd.value=TRUE;parameters[kTimeRemapSecondsId].u.fs_d.value=1.25;
     parameters[kPreviewEnabledId].u.bd.value=TRUE;parameters[kPreviewChanceId].u.fs_d.value=25;
-    host.num_params=98;
+    host.num_params=static_cast<A_long>(kTotalEffectParameterCount)+1;
     std::shared_ptr<const core::Graph> graph;
     CHECK(checkout_render_graph(&host,&output,graph)==0 && graph && checked_out.empty());
     for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode) {

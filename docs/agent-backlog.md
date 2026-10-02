@@ -407,3 +407,15 @@ Use `docs/reference-inventory.md` to choose one independently reviewable family 
 ## Agent task handoff template
 
 > Implement **[task ID]** only. Read `AGENTS.md`, the listed ADRs, and this task card. Keep edits within the owned files unless integration is explicitly assigned. Preserve parameter/match/version/schema contracts. Return a short summary, changed files, actual build/host evidence, and any unresolved decision. Do not claim an untested AE host is supported.
+
+
+## P-02J — native node keyframes (2026-10-02)
+
+Owner: primary adapter agent. Dependency: P-02I build 17, owner confirms edits work.
+Owns NodeEffects, NativeNodeGraph, NativeGraphCommit, GraphCarrier, Parameters,
+PluginVersion, schemas/parameters + node-parameters, gateway animated value writes,
+scoped native/registration tests and runner, and matching architecture/roadmap/
+ADR 0023/build/compatibility records. Core render API and simulation are unchanged.
+Implement public stopwatches plus per-frame owned PF dependency inputs; constants
+remain only for topology/identity/curve banks. Source/build checks precede deployment.
+AE interpolation, undo/reopen and CEP-closed animation remain owner qualification.

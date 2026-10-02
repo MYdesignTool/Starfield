@@ -18,14 +18,18 @@ namespace starfield::adapter {
 // controls belong to their separate node effects. AE's implicit input
 // layer occupies index 0, so num_params includes one additional parameter.
 // The output effect retains hidden bootstrap controls for a clean first application,
-// but editable graph values live on separate node effects. Index 97 is the last
-// registered parameter; indices 90..97 are renderer globals. Graph topology edits use the numeric commit trigger at 41.
+// but editable graph values live on separate node effects. Indices 90..97 are
+// renderer globals; 98..609 are derived animation inputs (ADR 0023).
+// Graph topology edits use the numeric commit trigger at 41.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 97; // controls + numeric metadata
+inline constexpr A_long kNativeBindingFirstIndex = 98;
+inline constexpr A_long kNativeBindingCapacity = 512;
+inline constexpr A_long kNativeBindingFirstDiskId = 1000;
+inline constexpr std::size_t kTotalEffectParameterCount = 97 + kNativeBindingCapacity;
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;

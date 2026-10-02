@@ -23,12 +23,10 @@ static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
 
 enum class NodeEffectKind { emitter, particle, appearance, force };
 
-// Node records are constants. CANNOT_TIME_VARY is sufficient: CANNOT_INTERP
-// additionally asks AE to configure interpolation when creating the stream,
-// including non-spatial color controls. Do not request interpolation setup for
-// a control that cannot have keyframes in the first place.
+// Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
+// Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
 constexpr PF_ParamFlags kNodeConstantFlags = PF_ParamFlag_CANNOT_TIME_VARY;
-constexpr PF_ParamFlags kNodeEditableFlags = PF_ParamFlag_SUPERVISE | kNodeConstantFlags;
+constexpr PF_ParamFlags kNodeEditableFlags = PF_ParamFlag_SUPERVISE;
 
 #if defined(STARFIELD_NODE_KIND_EMITTER)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::emitter;

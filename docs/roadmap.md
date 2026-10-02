@@ -1,5 +1,16 @@
 # Development plan: AE 2023 particle Alpha
 
+
+## P-02J / build 18 — native keyframes
+
+Owner confirms build 17 Effect Controls edits take effect. Public node controls
+now permit keyframes/user expressions. Main manifest 22 appends 512 derived numeric
+dependencies; UI commits bind native UUID/property/components, render samples its
+own PF inputs at each requested time. Optional record 0x8002 holds typed mappings.
+No render-thread AEGP reads, Core ABI or node layout change. ADR 0023 documents
+capacity, fresh-development-effect qualification and current-frame kernel semantics.
+AE stopwatches/interpolation, CEP-closed rendering and undo/reopen need owner tests.
+
 ## P-02I / build 17 — direct native publication
 
 Owner build-16 error remains at delivery, before the commit handler acknowledges

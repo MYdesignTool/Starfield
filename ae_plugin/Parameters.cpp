@@ -748,6 +748,18 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                         PF_ValueDisplayFlag_PERCENT, PF_ParamFlag_SUPERVISE, 926);
     AEFX_CLR_STRUCT(def);
     PF_END_TOPIC(927);
+    for (A_long slot = 0; slot < kNativeBindingCapacity; ++slot) {
+        AEFX_CLR_STRUCT(def);
+        def.param_type = PF_Param_FLOAT_SLIDER;
+        def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
+        def.uu.id = kNativeBindingFirstDiskId + slot;
+        std::snprintf(def.name, sizeof(def.name), "Native Render Input %ld", static_cast<long>(slot + 1));
+        def.u.fs_d.valid_min = def.u.fs_d.slider_min = -1.0e15f;
+        def.u.fs_d.valid_max = def.u.fs_d.slider_max = 1.0e15f;
+        def.u.fs_d.precision = PF_Precision_THOUSANDTHS;
+        const auto binding_error = PF_ADD_PARAM(in_data, -1, &def);
+        if (binding_error) return binding_error;
+    }
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -874,7 +886,10 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             if (stored.value.param_type != PF_Param_ARBITRARY_DATA) return PF_Err_BAD_CALLBACK_PARAM;
             auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value);
             if (!decoded.has_value()) return graph_error(out_data, decoded.error());
-            graph = std::make_shared<const core::Graph>(decoded.take_value());
+            core::Graph sampled = decoded.take_value();
+            err = sample_native_node_animation(in_data, sampled, reference_width, reference_height);
+            if (err) return err;
+            graph = std::make_shared<const core::Graph>(std::move(sampled));
         } else return PF_Err_BAD_CALLBACK_PARAM;
         if (in_data->num_params >= static_cast<A_long>(kTotalEffectParameterCount) + 1) {
             core::Graph snapshot = *graph;

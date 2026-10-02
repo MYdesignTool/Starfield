@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-14";
+    var GATEWAY_BUILD = "native-node-animation-18";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -450,6 +450,9 @@
             for (var i = 0; i < left.length; i++) if (!sameValue(left[i], right[i])) return false;
             return true;
         }
+        if (typeof left === "number" && typeof right === "number") {
+            return Math.abs(left-right) <= 1e-9 + Math.max(Math.abs(left),Math.abs(right))*1e-12;
+        }
         return left === right;
     }
 
@@ -459,7 +462,15 @@
             throw new Error("Node effect parameter is missing: " + name);
         }
         try {
-            if (!sameValue(property.value, value)) property.setValue(value);
+            if (!sameValue(property.value, value)) {
+                if (property.canSetExpression === true && property.expressionEnabled) {
+                    throw new Error("This parameter is driven by an expression; edit its expression in AE.");
+                }
+                if (property.numKeys > 0 && typeof property.setValueAtTime === "function") {
+                    var ownerLayer = effect.propertyGroup(2);
+                    property.setValueAtTime(ownerLayer.containingComp.time, value);
+                } else property.setValue(value);
+            }
         } catch (error) {
             throw new Error("Node parameter '" + name + "' (" + effect.matchName + "): " + error.toString());
         }

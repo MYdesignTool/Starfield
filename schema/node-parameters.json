@@ -2,6 +2,7 @@
   "identityRevision": 3,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "migrationPolicy": "Development layout 6 replaces Force vector Gravity/Linear Drag with scalar Gravity/random, Wind XYZ, Spin/frequency/resist/delay, Air Density and hidden percentage curve. Force schema 2/base 27; fresh effects, no migration; Core ABI 2 unchanged.",
+  "animation": "Public controls animate; UUID/layout/connection/guards/curve-knot banks stay constant. ADR 0023; parameter IDs and layout 6 unchanged.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,

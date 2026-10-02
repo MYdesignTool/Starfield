@@ -78,12 +78,16 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         PF_ArbitraryH replacement = nullptr;
         error = create_graph_parameter(data, graph, &replacement);
         if (error) return reject(output, params, nonce, "graph allocation failed", error);
+        NativeBindingTransaction bindings(data, graph_carrier_plugin_id());
+        error = bindings.install(graph);
+        if (error) { data->utils->host_dispose_handle(replacement); return reject(output, params, nonce, "native animation bindings failed", error); }
         error = write_graph_snapshot(data, params, graph);
         if (error) { data->utils->host_dispose_handle(replacement); return reject(output, params, nonce, "numeric graph receipt failed", error); }
         params[kGraphParameterId]->u.arb_d.value = replacement;
         params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
         params[kControlSourceId]->u.pd.value = kNodeControlSource;
         params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+        bindings.accept();
         set_numeric(params, kGraphEditReceiptId, nonce);
         if (output) output->out_flags |= PF_OutFlag_FORCE_RERENDER;
         return PF_Err_NONE;

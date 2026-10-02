@@ -1,5 +1,31 @@
 # Build and host matrix
 
+## Build 18 P-02J candidate — 2026-10-02
+
+Owner confirms build 17 native edits work, then reports almost all stopwatches are
+unavailable. Public native controls no longer carry CANNOT_TIME_VARY. Main manifest
+22 appends 512 hidden expression-capable numeric dependencies at indices 98..609,
+disk IDs 1000..1511. UUID/property/component bindings are installed transactionally
+on the UI path. Optional record 0x8002 saves typed raw fields and slots; own PF
+checkouts sample each requested frame, including points, RGB, opacity, Life and
+Force. The native conversion code is shared. No render-time AEGP acquisition.
+Failed graph publication restores changed expressions. CEP edits keyed values at
+current comp time, protects user expressions, and never asks constant metadata
+for expression state. No authored keyframes are stored on the main effect.
+
+Packed version 32786 / 0x8012; node IDs/schemas/layout 6 and Core ABI 2 unchanged.
+Native sync 404/camera 12, four node registration suites 306, renderer registration
+39 checks pass (761 total). Actual generated expressions pass JavaScript execution
+with reordered/same-name/duplicated peers; focused CEP keyframe preservation checks
+pass. May 2023 SDK x64 Release /MT final candidate builds all five AEXs with
+-NoRuntimePublish -NoDistPublish; no compiler warnings/errors found in its log.
+Logs: artifacts/build18-*. No AE session operated. These checks do not qualify
+AE expressions or keyframe playback. Recreate effects on a fresh test layer;
+owner tests stopwatches, interpolation, CEP-closed rendering, undo and reopen.
+Animation uses current-frame settings; birth/history integration is separate.
+See ADR 0023.
+
+
 ## Build 17 P-02I follow-up — 2026-10-02
 
 Packed 32785 / 0x8011. Build 16 failed owner qualification at delivery / 516.

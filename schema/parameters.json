@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "schemaVersion": 21,
+  "schemaVersion": 22,
   "revisionNote": "Development build 14: fresh Max Particles default 1000000, existing streams 1..89 fixed, appended renderer Time Remapping and Preview controls 90..97. Native layout 6/Force schema 2, Output schema 3, no old-project migration; Core ABI 2 unchanged.",
   "effect": {
     "displayName": "Starfield Particle",
@@ -118,11 +118,17 @@
     {"id": 95,"diskId": 925,"key": "preview_enabled","label": "Preview","type": "checkbox","default": 0,"min": 0,"max": 1,"decimals": 0,"scrubStep": 1},
     {"id": 96,"diskId": 926,"key": "preview_chance","label": "Particle chance","type": "float_slider","default": 100,"min": 0,"max": 100,"decimals": 1,"scrubStep": 1}
   ],
+  "nativeRenderBindings": {
+    "firstIndex": 98, "count": 512, "firstDiskId": 1000,
+    "type": "float_slider", "hidden": true, "animated": true,
+    "min": -1000000000000000, "max": 1000000000000000,
+    "note": "Derived expressions refer to native UUID/property/component. ADR 0023."
+  },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Unreleased development manifest 21 keeps indices 1..89 and appends renderer controls 90..97. Force schema 2/Output schema 3/native layout 6 require fresh effects, no old-project migration; Core ABI 2 unchanged.",
+    "migrationPolicy": "Unreleased manifest 22 keeps indices 1..97 and appends derived render inputs 98..609; recreate development effects. Force schema 2/Output schema 3/native layout 6 require fresh effects, no old-project migration; Core ABI 2 unchanged.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
-    "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. No expression is read or written by graph synchronization. Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
+    "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
   }
 }

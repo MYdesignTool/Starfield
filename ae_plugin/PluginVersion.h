@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 17: native UI edits publish directly, without cross-effect generic calls.
-#define STARFIELD_VERSION_BUILD 17
-#define STARFIELD_VERSION_PACKED 32785 /* 0x8011 */
+// Build 18: native keyframes and owned render dependencies (ADR 0023).
+#define STARFIELD_VERSION_BUILD 18
+#define STARFIELD_VERSION_PACKED 32786 /* 0x8012 */

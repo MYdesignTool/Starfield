@@ -1,4 +1,7 @@
 #include "NodeEffects.hpp"
+#include "NativeNodeGraph.hpp"
+#include <string>
+#include <fstream>
 #include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
 #include "GraphCarrier.hpp"
@@ -21,7 +24,7 @@ namespace {
 using namespace starfield::adapter;
 namespace core = starfield::core;
 namespace records = starfield::adapter::native_nodes;
-int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{};
+int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{};
 void check(bool condition, const char* message) {
     ++checks; if (!condition) { ++failures; std::printf("FAILED: %s\n", message); }
 }
@@ -57,16 +60,22 @@ AEGP_PFInterfaceSuite1 pf{};
 AEGP_EffectSuite4 effect{};
 AEGP_StreamSuite6 stream{};
 AEGP_UtilitySuite6 utility{};
+AEGP_MemorySuite1 memory{};
+std::array<std::u16string, kNativeBindingCapacity> expressions;
+std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
+A_long fail_expression = -1;
 AEGP_LayerSuite9 layers{};
 AEGP_ItemSuite9 items{};
 PF_InData renderer_data{};
 A_Err acquire(const char* name, int32, const void** out) {
+    ++suite_requests;
     if (!std::strcmp(name, kAEGPPFInterfaceSuite)) *out = &pf;
     else if (!std::strcmp(name, kAEGPEffectSuite)) *out = &effect;
     else if (!std::strcmp(name, kAEGPStreamSuite)) *out = &stream;
     else if (!std::strcmp(name, kAEGPUtilitySuite)) *out = &utility;
     else if (!std::strcmp(name, kAEGPLayerSuite)) *out = &layers;
     else if (!std::strcmp(name, kAEGPItemSuite)) *out = &items;
+    else if (!std::strcmp(name, kAEGPMemorySuite)) *out = &memory;
     else return 1;
     ++acquisitions; return 0;
 }
@@ -201,6 +210,25 @@ int main() {
         if (!key.effect && key.index == kGraphParameterId) dispose(reinterpret_cast<PF_Handle>(value->val.arbH)); return 0;
     };
     stream.AEGP_DisposeStream = [](AEGP_StreamRefH ref)->A_Err { --live_refs; delete reinterpret_cast<Ref*>(ref); return 0; };
+    stream.AEGP_GetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean* enabled)->A_Err {
+        *enabled = expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex]; return 0;
+    };
+    stream.AEGP_GetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_MemHandle* result)->A_Err {
+        *result = reinterpret_cast<AEGP_MemHandle>(new std::u16string(expressions[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex])); return 0;
+    };
+    memory.AEGP_LockMemHandle = [](AEGP_MemHandle ref, void** result)->A_Err {
+        *result = const_cast<char16_t*>(reinterpret_cast<std::u16string*>(ref)->c_str()); return 0;
+    };
+    memory.AEGP_UnlockMemHandle = [](AEGP_MemHandle)->A_Err {return 0;};
+    memory.AEGP_FreeMemHandle = [](AEGP_MemHandle ref)->A_Err {delete reinterpret_cast<std::u16string*>(ref);return 0;};
+    stream.AEGP_SetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, const A_UTF16Char* text)->A_Err {
+        auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
+        if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
+        expressions[index] = reinterpret_cast<const char16_t*>(text); return 0;
+    };
+    stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
+        expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;return 0;
+    };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
     check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
     PF_InData node_data = renderer_data; node_data.effect_ref = reinterpret_cast<PF_ProgPtr>(2);
@@ -313,6 +341,72 @@ int main() {
     check(direct_edit(max_receipt) == 0 && max_receipt.accepted && max_receipt.revision == 16777215 &&
           main.values[kGraphRevisionId].one_d == 16777215,
           "largest integer revision survives host float storage and exact verification");
+    auto animated_graph = saved_graph();
+    check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 54,
+          "all emitter particle force scalar and vector/color components have bindings");
+    const auto expression_baseline = expressions;
+    {
+        std::ofstream generated("artifacts/native-animation-expressions.json");
+        generated << "[";
+        bool first=true;
+        for(const auto& expression:expressions) if(!expression.empty()) {
+            if(!first) generated << ","; first=false;
+            generated << "\"";
+            for(auto c:expression) {
+                if(c==u'\n') generated << "\\n";
+                else {if(c==u'\\' || c==u'\"') generated << "\\"; generated << static_cast<char>(c);}
+            }
+            generated << "\"";
+        }
+        generated << "]";
+        check(bool(generated),"actual generated expressions recorded under artifacts for syntax/identity checks");
+    }
+    for (A_long i=0; i<54; ++i) expressions[i] = u"0"; // Force a binding rewrite, then fail graph publication.
+    const auto before_failed_binding = expressions;
+    fail_set = kGraphParameterId;
+    auto binding_failure = edit(1, 2, 22);
+    main.values[kGraphRevisionId].one_d = 100; // Avoid revision exhaustion for this transaction.
+    check(direct_edit(binding_failure) != 0 && expressions == before_failed_binding,
+          "graph publication failure restores all changed binding expressions");
+    expressions = expression_baseline;
+    renderer_data.inter.checkout_param = [](PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
+        *output = {}; output->param_type=PF_Param_FLOAT_SLIDER;
+        // Evaluate the generated dependency against typed fixture streams.
+        const auto& expr = expressions[index-kNativeBindingFirstIndex];
+        std::size_t id = expr.find(u"fx(105).value === 1") != std::u16string::npos ? 1 :
+            expr.find(u"fx(118).value === 2") != std::u16string::npos ? 2 : 3;
+        auto from=expr.find(u"result = fx(")+12; auto to=expr.find(u")",from);
+        const auto digits=expr.substr(from,to-from);
+        int source=std::stoi(std::string(digits.begin(),digits.end())); auto& value=fixtures[id].values[source];
+        auto component_marker=expr.find(u").value[",to);
+        if (component_marker != std::u16string::npos) {
+            int component=expr[component_marker+8]-u'0';
+            if(id==1 && source==4) output->u.fs_d.value=component ? value.two_d.y : value.two_d.x + time;
+            else output->u.fs_d.value=component==0 ? value.color.redF * (1.0 - time/48.0) :
+                component==1 ? value.color.greenF : value.color.blueF;
+        } else output->u.fs_d.value=(id==2 && source==2) || (id==3 && source==1) ? value.one_d + time :
+            (id==2 && source==4) ? 100.0-time : (id==2 && source==1) ? 2.0+time/24.0 : value.one_d;
+        return 0;
+    };
+    renderer_data.inter.checkin_param = [](PF_ProgPtr, PF_ParamDef*)->PF_Err {return 0;};
+    const auto suites_before=suite_requests;
+    for (auto time : {0,24,12,0}) {
+        auto sampled=animated_graph; renderer_data.current_time=time;
+        check(sample_native_node_animation(&renderer_data,sampled,1920,1080)==0,"owned inputs sample requested animation time");
+        check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kSizeStart))==particle.values[2].one_d+time,
+              "size samples forward intermediate and reverse times");
+        const auto sampled_origin=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kEmitterNode,core::graph_keys::kEmitterOrigin));
+        check(std::abs(sampled_origin.x-(emitter.values[4].two_d.x+time-960)/1080)<1e-12,"animated point converts full-resolution pixels");
+        check(std::abs(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kOpacityStart))-(100.0-time)/100.0)<1e-12,
+              "animated opacity converts percentage to multiplier");
+        check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kParticleLifetimeSeconds))==2.0+time/24.0,
+              "animated lifetime samples seconds");
+        const auto animated_color=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kColorStart));
+        check(animated_color.x==particle.values[6].color.redF*(1.0-time/48.0),"animated color samples RGB components");
+        const auto animated_gravity=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kForceNode,core::graph_keys::kGravity));
+        check(std::abs(animated_gravity.y+(fixtures[3].values[1].one_d+time)/1080.0)<1e-12,"animated Force converts pixels to world units");
+    }
+    check(suite_requests==suites_before && live_refs==0,"render sampling acquires no AEGP suites or references");
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {
