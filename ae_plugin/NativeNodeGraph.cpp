@@ -94,6 +94,23 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     return true;
 }
 
+bool read_two_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
+                A_long index, const A_Time& time, core::Vec3& output) noexcept {
+    AEGP_StreamRefH raw_stream = nullptr;
+    A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
+    if (error || !raw_stream) return false;
+    StreamRef stream(suites.stream, raw_stream);
+    AEGP_StreamValue2 value{};
+    error = suites.stream->AEGP_GetNewStreamValue(plugin_id, stream.value, AEGP_LTimeMode_LayerTime,
+                                                &time, TRUE, &value);
+    if (error) return false;
+    const core::Vec3 result{value.val.two_d.x, value.val.two_d.y, 0.0};
+    suites.stream->AEGP_DisposeStreamValue(&value);
+    if (!std::isfinite(result.x) || !std::isfinite(result.y)) return false;
+    output = result;
+    return true;
+}
+
 bool read_three_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                   A_long index, const A_Time& time, core::Vec3& output) noexcept {
     AEGP_StreamRefH raw_stream = nullptr;
@@ -227,7 +244,7 @@ core::OpaqueBytes make_layout_record(std::vector<LayoutEntry>& entries) {
 
 bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key, std::uint16_t& schema) noexcept {
     if (std::strcmp(match_name, kEmitterMatchName) == 0) {
-        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 3; return true;
+        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 4; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
         kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 2; return true;
@@ -250,40 +267,42 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     if (kind == Kind::emitter) {
         if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
         add_value(node, kBirthRate, scalar);
-        if (!read_uint(suites, plugin_id, effect, 3, time, integer)) return false;
+        if (!read_uint(suites, plugin_id, effect, 16, time, integer)) return false;
         add_value(node, kSeed, integer);
         if (!read_uint(suites, plugin_id, effect, 1, time, integer) || integer < 1 || integer > 4) return false;
         add_value(node, kEmitterShape, integer - 1u);
-        if (!read_three_d(suites, plugin_id, effect, 6, time, vector)) return false;
-        add_value(node, kEmitterOrigin, core::layer_point_to_world(vector.x, vector.y, vector.z, units));
-        if (!read_one_d(suites, plugin_id, effect, 7, time, vector.x) ||
-            !read_one_d(suites, plugin_id, effect, 8, time, vector.y) ||
-            !read_one_d(suites, plugin_id, effect, 9, time, vector.z)) return false;
+        if (!read_two_d(suites, plugin_id, effect, 3, time, vector) ||
+            !read_one_d(suites, plugin_id, effect, 4, time, vector.z)) return false;
+        add_value(node, kEmitterOrigin, core::layer_point_to_world(vector.x, vector.y, vector.z + units.layer_height / 2.0, units));
+        if (!read_one_d(suites, plugin_id, effect, 19, time, vector.x) ||
+            !read_one_d(suites, plugin_id, effect, 20, time, vector.y) ||
+            !read_one_d(suites, plugin_id, effect, 21, time, vector.z)) return false;
         add_value(node, kVelocity, vector);
-        if (!read_one_d(suites, plugin_id, effect, 4, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 17, time, scalar)) return false;
         add_value(node, kParticleSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 5, time, scalar)) return false;
-        add_value(node, kOpacity, scalar);
+        if (!read_one_d(suites, plugin_id, effect, 18, time, scalar)) return false;
+        add_value(node, kOpacity, scalar / 100.0);
         if (!read_one_d(suites, plugin_id, effect, 10, time, scalar)) return false;
         add_value(node, kEmitterSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 11, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 22, time, scalar)) return false;
         add_value(node, kVelocitySpread, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 15, time, scalar)) return false;
-        add_value(node, kEmissionSpeed, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 16, time, scalar)) return false;
-        add_value(node, kEmissionSpeedRandom, scalar);
+        if (!read_one_d(suites, plugin_id, effect, 5, time, scalar)) return false;
+        const double emission_speed = scalar / units.layer_height;
+        add_value(node, kEmissionSpeed, emission_speed);
+        if (!read_one_d(suites, plugin_id, effect, 6, time, scalar)) return false;
+        add_value(node, kEmissionSpeedRandomPercent, scalar);
         constexpr std::array<core::ParameterKey, 3> angle_keys{kEmissionAngleX, kEmissionAngleY, kEmissionAngleZ};
         for (A_long axis = 0; axis < 3; ++axis) {
-            if (!read_one_d(suites, plugin_id, effect, 17 + axis, time, scalar)) return false;
+            if (!read_one_d(suites, plugin_id, effect, 11 + axis, time, scalar)) return false;
             add_value(node, angle_keys[static_cast<std::size_t>(axis)], scalar);
         }
-        if (!read_uint(suites, plugin_id, effect, 20, time, integer) || integer < 1 || integer > 2) return false;
+        if (!read_uint(suites, plugin_id, effect, 14, time, integer) || integer < 1 || integer > 2) return false;
         add_value(node, kDirectionMode, integer - 1u);
-        if (!read_one_d(suites, plugin_id, effect, 21, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 15, time, scalar)) return false;
         add_value(node, kDirectionSpan, scalar);
         constexpr std::array<core::ParameterKey, 3> size_keys{kEmitterSizeX, kEmitterSizeY, kEmitterSizeZ};
         for (A_long axis = 0; axis < 3; ++axis) {
-            if (!read_one_d(suites, plugin_id, effect, 12 + axis, time, scalar)) return false;
+            if (!read_one_d(suites, plugin_id, effect, 7 + axis, time, scalar)) return false;
             add_value(node, size_keys[static_cast<std::size_t>(axis)], scalar);
         }
         return true;
@@ -300,11 +319,11 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     const A_long color_start_index = particle ? 6 : 5;
     const A_long color_end_index = particle ? 7 : 6;
     const A_long size_index = particle ? 2 : 1;
-    const A_long size_end_index = particle ? 3 : 2;
+    const A_long size_end_index = particle ? 8 : 7;
     const A_long opacity_index = particle ? 4 : 3;
-    const A_long opacity_end_index = particle ? 5 : 4;
-    const A_long size_random_index = particle ? 8 : 7;
-    const A_long opacity_random_index = particle ? 9 : 8;
+    const A_long opacity_end_index = particle ? 9 : 8;
+    const A_long size_random_index = particle ? 3 : 2;
+    const A_long opacity_random_index = particle ? 5 : 4;
     if (!read_color(suites, plugin_id, effect, color_start_index, time, vector)) return false;
     add_value(node, kColorStart, vector);
     if (!read_color(suites, plugin_id, effect, color_end_index, time, vector)) return false;
@@ -314,7 +333,7 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     if (!read_one_d(suites, plugin_id, effect, size_end_index, time, scalar)) return false;
     add_value(node, kSizeEnd, scalar);
     if (!read_one_d(suites, plugin_id, effect, opacity_index, time, scalar)) return false;
-    add_value(node, kOpacityStart, scalar);
+    add_value(node, kOpacityStart, scalar / 100.0);
     if (!read_one_d(suites, plugin_id, effect, opacity_end_index, time, scalar)) return false;
     add_value(node, kOpacityEnd, scalar);
     if (!read_one_d(suites, plugin_id, effect, size_random_index, time, scalar)) return false;

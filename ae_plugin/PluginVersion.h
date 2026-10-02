@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 11 removes redundant outer parameter topics; main layout revision 19.
-#define STARFIELD_VERSION_BUILD 11
-#define STARFIELD_VERSION_PACKED 32779 /* 0x800B */
+// Build 12: shared Particle inputs, reference controls and cancellable rasterization.
+#define STARFIELD_VERSION_BUILD 12
+#define STARFIELD_VERSION_PACKED 32780 /* 0x800C */

@@ -1,5 +1,35 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 12 reference controls and shared Particle inputs — 2026-10-02
+
+P-02F uses the locally observed reference parameter table to name Life (Seconds),
+Size (Pixels), Speed, Speed Random and Angle X/Y/Z, and splits Origin into an AE
+2D point Origin XY plus scalar Origin Z. New Origin disk IDs 123/124 replace 106;
+106 is reserved. Native identity revision 3/layout 4; Emitter base count 22.
+Other node stream counts remain unchanged. Native Opacity is 0..100 percent;
+Speed is pixels/second and Speed Random is percentage amplitude. The compiler
+and gateway convert these values to canonical graph units. Hidden vector-velocity
+and emitter appearance bootstrap fields are retained as internal value inputs.
+CEP snapshot geometry supplies independent Origin/Speeds conversions for each
+node, rather than borrowing a main-effect parameter. Shared Particle fan-in is
+defined in ADR 0015. Main manifest 20 retains the 89-stream layout. Packed build
+12 is 32780 (0x800C); gateway native-node-sync-12. Emitter schema 4 adds
+authored percentage key 22; key 13 remains the independent world-amplitude
+input for Settings graph construction. If present, key 22 takes precedence and
+is converted after reading base Speed. Native graphs emit key 22, preserving
+it at zero Speed. Graph envelopes/C ABI unchanged.
+
+Visible Emitter order is Type, Particles Per Second, Origin XY/Z, Speed/Random,
+Size X/Y/Z, Disc Size, Angle X/Y/Z, Direction/Span and Random Seed. Hidden
+bootstrap size/opacity/vector velocity follows these. Visible Particle order
+is Life, Size/Random, Opacity/Random, Color Start/End, then Over Life endpoints
+and the hidden curve banks. Main Max Particles uses slider range 0..100 with
+valid typed range 0..2000000. Node compiler indices change with registration.
+Emitter duplication retains mapped outgoing edges now that shared Particle
+fan-in is valid; mixed Emitter/Particle copies use the copied Emitter.
+These are unreleased development identities/units; no migration or placeholder
+Origin stream is provided. Fresh development effects are required.
+
 ## Build 11 flat parameter layout and canvas deletion — 2026-10-02
 
 Owner reports unavailable canvas deletion and redundant collapsed top-level topics.

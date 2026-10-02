@@ -17,57 +17,58 @@
     };
     var SPECS = {
         emitter: {
-            "2": { label: "Particles Per Second", kind: "slider", decimals: 0, min: 0, max: 1000000, legacyKey: "birth_rate" },
-            "3": { label: "Random Seed", kind: "slider", decimals: 0, min: 0, max: 2147483647, legacyKey: "seed" },
-            "5": { label: "Type", kind: "popup", decimals: 0, min: 1, max: 4, displayOffset: 1,
+            "2": { label: "Particles Per Second", kind: "slider", decimals: 0, step: 1, min: 0, max: 1000000, legacyKey: "birth_rate" },
+            "3": { label: "Random Seed", kind: "slider", decimals: 0, step: 1, min: 0, max: 2147483647, legacyKey: "seed" },
+            "5": { label: "Type", kind: "popup", decimals: 0, step: 1, min: 1, max: 4, displayOffset: 1,
                   choices: ["Point", "Box", "Sphere", "Disc"], legacyKey: "emitter_shape" },
             "6": { label: "Origin", kind: "point3d", decimals: 3, min: -100, max: 100, legacyKey: "emitter_origin" },
-            "7": { label: "Velocity", kind: "point3d", decimals: 2, min: -1000, max: 1000,
+            "7": { label: "Velocity", hidden: true, kind: "point3d", decimals: 2, min: -1000, max: 1000,
                   legacyKeys: ["velocity_x", "velocity_y", "velocity_z"] },
-            "8": { label: "Particle Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
-            "9": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
-            "10": { label: "Disc Size", kind: "slider", decimals: 3, min: 0, max: 10, legacyKey: "emitter_size" },
-            "11": { label: "Speed Random", kind: "slider", decimals: 2, min: 0, max: 100, legacyKey: "velocity_spread" },
-            "12": { label: "Emission Speed", kind: "slider", decimals: 2, min: 0, max: 1000 },
-            "13": { label: "Emission Speed Random", kind: "slider", decimals: 2, min: 0, max: 1000 },
-            "14": { label: "Emission Angle X", kind: "slider", decimals: 1, min: -100000, max: 100000 },
-            "15": { label: "Emission Angle Y", kind: "slider", decimals: 1, min: -100000, max: 100000 },
-            "16": { label: "Emission Angle Z", kind: "slider", decimals: 1, min: -100000, max: 100000 },
-            "17": { label: "Direction Mode", kind: "popup", decimals: 0, min: 1, max: 2, displayOffset: 1,
+            "8": { label: "Particle Size", hidden: true, kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
+            "9": { label: "Opacity", hidden: true, kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%", legacyKey: "opacity" },
+            "10": { label: "Disc Size", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 10, legacyKey: "emitter_size" },
+            "11": { label: "Velocity Random", hidden: true, kind: "slider", decimals: 2, min: 0, max: 100, legacyKey: "velocity_spread" },
+            "12": { label: "Speed", kind: "slider", decimals: 1, step: 1, min: 0, max: 10000, unit: "px/s" },
+            "13": { label: "Speed Amplitude", hidden: true, kind: "slider", decimals: 3, min: 0, max: 100000 },
+            "22": { label: "Speed Random", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
+            "14": { label: "Angle X", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "15": { label: "Angle Y", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "16": { label: "Angle Z", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "17": { label: "Direction", kind: "popup", decimals: 0, step: 1, min: 1, max: 2, displayOffset: 1,
                    choices: ["Directional", "Uniform"] },
-            "18": { label: "Direction Span", kind: "slider", decimals: 1, min: 0, max: 180 },
-            "19": { label: "Size X", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
-            "20": { label: "Size Y", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
-            "21": { label: "Size Z", kind: "slider", decimals: 0, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" }
+            "18": { label: "Direction Span", kind: "slider", decimals: 1, step: 1, min: 0, max: 180 },
+            "19": { label: "Size X", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
+            "20": { label: "Size Y", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
+            "21": { label: "Size Z", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" }
         },
         particle: {
-            "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
-            "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255, legacyKey: "color_end" },
-            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%", legacyKey: "particle_size_end" },
-            "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1, legacyKey: "opacity" },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%", legacyKey: "opacity_end" },
-            "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "particle_size_random" },
-            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100, legacyKey: "opacity_random" },
-            "11": { label: "Lifetime", kind: "slider", decimals: 3, min: 0, max: 1000000, legacyKey: "particle_lifetime" }
+            "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
+            "2": { label: "Color End", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_end" },
+            "3": { label: "Size (Pixels)", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "particle_size_end" },
+            "5": { label: "Opacity", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%", legacyKey: "opacity" },
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "opacity_end" },
+            "9": { label: "Size Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "particle_size_random" },
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
+            "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" }
         },
         appearance: {
-            "1": { label: "Color Start", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
-            "2": { label: "Color End", kind: "color", decimals: 0, min: 0, max: 255, scale: 255 },
-            "3": { label: "Size", kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%" },
-            "5": { label: "Opacity", kind: "slider", decimals: 3, min: 0, max: 1 },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, min: 0, max: 100, unit: "%" },
-            "9": { label: "Size Random", kind: "slider", decimals: 0, min: 0, max: 100 },
-            "10": { label: "Opacity Random", kind: "slider", decimals: 0, min: 0, max: 100 }
+            "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255 },
+            "2": { label: "Color End", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255 },
+            "3": { label: "Size (Pixels)", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit: "px" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
+            "5": { label: "Opacity", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%" },
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
+            "9": { label: "Size Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100 },
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100 }
         },
         force: {
-            "1": { label: "Gravity", kind: "point3d", decimals: 2, min: -1000, max: 1000,
+            "1": { label: "Gravity", kind: "point3d", decimals: 2, step: 0.1, min: -1000, max: 1000,
                   legacyKeys: ["gravity_x", "gravity_y", "gravity_z"] },
-            "2": { label: "Linear Drag", kind: "slider", decimals: 3, min: 0, max: 100, legacyKey: "linear_drag" }
+            "2": { label: "Linear Drag", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 100, legacyKey: "linear_drag" }
         },
         output: {
-            "1": { label: "Max Particles", kind: "slider", decimals: 0, min: 0, max: 2000000, legacyKey: "particle_count" }
+            "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" }
         }
     };
     var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
@@ -131,62 +132,64 @@
                 particles.push(graph.nodes[n]);
             }
         }
-        if (emitters.length !== 1) return null;
-        var emitter = emitters[0];
         var output = byId["$" + outputIds[0]];
-        var cap = findParameter(output, "1");
-        var rate = findParameter(emitter, "2");
-        if (!cap || !rate) return null;
-        cap = Number(cap.value);
-        rate = Number(rate.value);
-        if (!isFinite(cap) || Math.floor(cap) !== cap || cap < 0 || cap > 2000000 ||
-            !isFinite(rate) || rate < 0 || rate > 1000000) return null;
+        var capParameter = findParameter(output, "1");
+        if (!capParameter) return null;
+        var cap = Number(capParameter.value);
+        if (!isFinite(cap) || Math.floor(cap) !== cap || cap < 0 || cap > 2000000) return null;
         particles.sort(function (left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; });
-        var branchLifetimes = [];
-        for (var p = 0; p < particles.length; p++) {
-            var branchLifetime = findParameter(particles[p], "11");
-            if (!branchLifetime) return null;
-            branchLifetime = Number(branchLifetime.value);
-            if (!isFinite(branchLifetime) || branchLifetime < 0 || branchLifetime > 1000000) return null;
-            branchLifetimes.push(branchLifetime);
+        var streams = [];
+        for (var emitterIndex = 0; emitterIndex < emitters.length; emitterIndex++) {
+            var emitter = emitters[emitterIndex], rateParameter = findParameter(emitter, "2");
+            if (!rateParameter) return null;
+            var rate = Number(rateParameter.value);
+            if (!isFinite(rate) || rate < 0 || rate > 1000000) return null;
+            var branchLifetimes = [], lifetime = 0;
+            for (var particleIndex = 0; particleIndex < particles.length; particleIndex++) {
+                var particle = particles[particleIndex];
+                if ((incoming["$" + particle.id] || []).indexOf(emitter.id) < 0) continue;
+                var lifeParameter = findParameter(particle, "11");
+                if (!lifeParameter) return null;
+                var life = Number(lifeParameter.value);
+                if (!isFinite(life) || life < 0 || life > 10000) return null;
+                branchLifetimes.push(life);
+                lifetime = Math.max(lifetime, life);
+            }
+            if (branchLifetimes.length) streams.push({ emitterId: emitter.id, birthRate: rate,
+                lifetimeSeconds: lifetime, branchLifetimes: branchLifetimes });
         }
-        var lifetime = 0;
-        for (var life = 0; life < branchLifetimes.length; life++) {
-            lifetime = Math.max(lifetime, branchLifetimes[life]);
-        }
-        return { emitterId: emitter.id, maxParticles: cap, birthRate: rate,
-                 lifetimeSeconds: lifetime, branchLifetimes: branchLifetimes };
+        return { maxParticles: cap, emitters: streams };
     }
 
     function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap, branchLifetimes) {
-        var time = Number(timeSeconds);
-        var rate = Number(birthRate);
-        var lifetime = Number(lifetimeSeconds);
+        var time = Number(timeSeconds), rate = Number(birthRate), lifetime = Number(lifetimeSeconds);
         var cap = Math.floor(Number(populationCap));
         if (!isFinite(time) || !isFinite(rate) || !isFinite(lifetime) || !isFinite(cap) ||
             time < 0 || rate <= 0 || lifetime <= 0 || cap <= 0) return 0;
         var lastSlot = Math.floor(time * rate);
-        var firstSlot = Math.floor((time - lifetime) * rate) + 1;
-        if (!isFinite(lastSlot) || !isFinite(firstSlot) || lastSlot > 9007199254740992 ||
-            firstSlot > 9007199254740992) return 0;
-        if (lastSlot < firstSlot) return 0;
-        firstSlot = Math.max(0, firstSlot);
-        var alive = lastSlot - firstSlot + 1;
-        if (alive > cap) {
-            firstSlot = lastSlot - cap + 1;
-            alive = cap;
-        }
-        if (!branchLifetimes || !branchLifetimes.length) return alive;
+        if (!isFinite(lastSlot) || lastSlot > 9007199254740992) return 0;
+        if (!branchLifetimes || !branchLifetimes.length) branchLifetimes = [lifetime];
         var count = 0;
         for (var branch = 0; branch < branchLifetimes.length; branch++) {
             var branchLife = Number(branchLifetimes[branch]);
             if (!isFinite(branchLife) || branchLife <= 0) continue;
-            var branchFirst = Math.max(firstSlot, Math.floor((time - branchLife) * rate) + 1);
-            var offset = (branch - (branchFirst % branchLifetimes.length) + branchLifetimes.length) % branchLifetimes.length;
-            var firstAssigned = branchFirst + offset;
-            if (firstAssigned <= lastSlot) {
-                count += Math.floor((lastSlot - firstAssigned) / branchLifetimes.length) + 1;
-            }
+            var firstSlot = Math.max(0, Math.floor((time - branchLife) * rate) + 1);
+            var offset = (branch - (firstSlot % branchLifetimes.length) + branchLifetimes.length) % branchLifetimes.length;
+            var firstAssigned = firstSlot + offset;
+            if (firstAssigned <= lastSlot) count += Math.floor((lastSlot - firstAssigned) / branchLifetimes.length) + 1;
+            if (count >= cap) return cap;
+        }
+        return count;
+    }
+
+    function countGraphLiveParticles(timeSeconds, emission) {
+        if (!emission) return 0;
+        var count = 0;
+        for (var i = 0; i < emission.emitters.length; i++) {
+            var stream = emission.emitters[i];
+            count += countLiveParticles(timeSeconds, stream.birthRate, stream.lifetimeSeconds,
+                                        emission.maxParticles, stream.branchLifetimes);
+            if (count >= emission.maxParticles) return emission.maxParticles;
         }
         return count;
     }
@@ -194,7 +197,7 @@
     function graphValueToDisplay(value, spec) {
         if (spec.kind === "popup") return Number(value) + (spec.displayOffset || 0);
         if (spec.kind === "color") return value.map(function (channel) { return channel * spec.scale; });
-        return Object.prototype.toString.call(value) === "[object Array]" ? value.slice() : value;
+        return Object.prototype.toString.call(value) === "[object Array]" ? value.slice() : Number(value) * (spec.scale || 1);
     }
 
     function viewParameter(node, kind, graphParameter, spec) {
@@ -207,6 +210,7 @@
             kind: spec ? spec.kind : (graphParameter.type === 5 ? "point3d" : "slider"),
             value: spec ? graphValueToDisplay(graphParameter.value, spec) : graphParameter.value,
             displayDecimals: spec ? spec.decimals : 3,
+            scrubStep: spec && spec.step ? spec.step : undefined,
             min: spec && typeof spec.min === "number" ? spec.min : undefined,
             max: spec && typeof spec.max === "number" ? spec.max : undefined,
             choices: spec && spec.choices ? spec.choices.slice() : undefined,
@@ -264,7 +268,7 @@
         return bytes;
     }
 
-    function project(graph, layoutOverride) {
+    function project(graph, layoutOverride, geometry) {
         if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
             Object.prototype.toString.call(graph.edges) !== "[object Array]") {
             fail("invalid_graph", "the decoded graph has no node and edge arrays");
@@ -292,7 +296,40 @@
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
-                node.params.push(viewParameter(node, kind, graphParameter, spec));
+                if (spec && spec.hidden) continue;
+                var parameter = viewParameter(node, kind, graphParameter, spec);
+                if (kind === "emitter" && geometry && Number(geometry.height) > 0 && Number(geometry.width) > 0) {
+                    var height = Number(geometry.height), width = Number(geometry.width);
+                    var aspect = Number(geometry.pixelAspect);
+                    if (!isFinite(aspect) || aspect <= 0) aspect = 1;
+                    if (graphParameter.key === "6") {
+                        var origin = graphParameter.value;
+                        parameter.kind = "point2d"; parameter.label = "Origin XY";
+                        parameter.key += ":xy"; parameter.originComponent = "xy";
+                        parameter.canonicalOrigin = origin.slice(); parameter.geometry = geometry;
+                        parameter.displayDecimals = 0; parameter.scrubStep = 1;
+                        parameter.channelMin = [width / 2 - 100 * height / aspect, height / 2 - 100 * height];
+                        parameter.channelMax = [width / 2 + 100 * height / aspect, height / 2 + 100 * height];
+                        parameter.min = Math.min(parameter.channelMin[0], parameter.channelMin[1]);
+                        parameter.max = Math.max(parameter.channelMax[0], parameter.channelMax[1]);
+                        parameter.value = [width / 2 + origin[0] * height / aspect, height / 2 - origin[1] * height];
+                        node.params.push(parameter);
+                        var zParameter = viewParameter(node, kind, graphParameter, spec);
+                        zParameter.kind = "slider"; zParameter.label = "Origin Z";
+                        zParameter.key += ":z"; zParameter.originComponent = "z";
+                        zParameter.canonicalOrigin = origin.slice(); zParameter.geometry = geometry;
+                        zParameter.displayDecimals = 0; zParameter.scrubStep = 1;
+                        zParameter.min = -100 * height; zParameter.max = 100 * height;
+                        zParameter.value = origin[2] * height; zParameter.unit = "px";
+                        node.params.push(zParameter);
+                        continue;
+                    }
+                    if (graphParameter.key === "12") {
+                        parameter.value = Number(graphParameter.value) * height;
+                        parameter.displayScale = height;
+                    }
+                }
+                node.params.push(parameter);
             }
             if (kind === "particle" || kind === "appearance") {
                 ["9", "10"].forEach(function (key) {
@@ -302,9 +339,14 @@
                     }
                 });
             }
-            if (kind === "particle") {
-                var particleOrder = { "11": 0, "3": 1, "4": 2, "5": 3, "6": 4,
-                                      "1": 5, "2": 6, "9": 7, "10": 8 };
+            if (kind === "emitter") {
+                var emitterOrder = { "5":0, "2":1, "6":2, "12":3, "22":4, "19":5, "20":6, "21":7,
+                                     "10":8, "14":9, "15":10, "16":11, "17":12, "18":13, "3":14 };
+                node.params.sort(function (left, right) { return emitterOrder[left.graphKey] - emitterOrder[right.graphKey]; });
+            }
+            if (kind === "particle" || kind === "appearance") {
+                var particleOrder = { "11": 0, "3": 1, "9": 2, "5": 3, "10": 4,
+                                      "1": 5, "2": 6, "4": 7, "6": 8 };
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });
@@ -327,7 +369,6 @@
             node.position = positions[node.id] || { x: 235, y: 22 + i * 100 };
             nodes.push(node);
         }
-        var emitters = nodes.filter(function (node) { return node.kind === "emitter"; });
         var outputs = nodes.filter(function (node) { return node.kind === "output"; });
         if (outputs.length) {
             var maxParticles = findParameter(graph.nodes.filter(function (node) {
@@ -387,11 +428,21 @@
     return { types: TYPE, project: project, samePositions: samePositions,
              graphSnapshotChanged: graphSnapshotChanged,
              activeEmitterParameters: activeEmitterParameters,
-             countLiveParticles: countLiveParticles,
+             countLiveParticles: countLiveParticles, countGraphLiveParticles: countGraphLiveParticles,
              encodeCurve: encodeCurve, decodeCurve: decodeCurve,
              mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {
+                 if (parameter.originComponent) {
+                     var origin = parameter.canonicalOrigin.slice(), geometry = parameter.geometry;
+                     var height = Number(geometry.height), aspect = Number(geometry.pixelAspect);
+                     if (!isFinite(aspect) || aspect <= 0) aspect = 1;
+                     if (parameter.originComponent === "xy") {
+                         origin[0] = (Number(displayValue[0]) - Number(geometry.width) / 2) * aspect / height;
+                         origin[1] = 0.5 - Number(displayValue[1]) / height;
+                     } else origin[2] = Number(displayValue) / height;
+                     return origin;
+                 }
                  if (parameter.kind === "popup") return Number(displayValue) - parameter.displayOffset;
                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
-                 return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : displayValue;
+                 return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
              } };
 }));

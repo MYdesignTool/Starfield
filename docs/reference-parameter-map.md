@@ -1,5 +1,24 @@
 # Reference parameter map (observed behavior)
 
+## Build 12 implemented control alignment — 2026-10-02
+
+The local observed dump confirms Life (Seconds)=2, Size (Pixels)=10,
+Opacity=100, Particles Per Second=100, Origin XY at layer center, Origin Z=0,
+Speed=100, Speed Random=0, Size X/Y/Z=100, Angle X/Y/Z=0, Direction Span=60
+and emitter Random Seed=1000. Build 12 adopts these implemented control names,
+splits and defaults. Life max 10000/CEP step 0.1 comes from owner direction,
+not an inferred reference limit. Native/CEP speed is pixels/second, randomness
+and opacity display percent. Scalar speed's random percentage persists even
+at zero speed. Reference distribution/interpolation kernels are not copied
+or claimed equivalent. Per-axis velocity and birth appearance bootstrap are
+hidden internal controls; Particle exposes size/opacity/life.
+
+Shape-specific Disc controls, the current vector gravity/linear-drag kernel,
+Life Random, non-square Size Y, richer gradients and additional reference
+modules still have distinct incomplete contracts. The current Gravity and
+Linear Drag labels are not replaced with reference names for different models.
+This slice does not claim full reference parameter or behavior coverage.
+
 Source: `tools/dump_effect_parameters.jsx` run in AE 23.5 on one solid layer carrying every
 module of the reference product. Parameter names, match names, nesting and the values of a
 freshly applied instance are **observed behavior**, which ADR 0010 allows as a spec input.

@@ -1,5 +1,29 @@
 # Build and host matrix
 
+## Current build 12 P-02F candidate — 2026-10-02
+
+Packed 32780 (0x800C); main manifest 20, native identity 3/layout 4,
+Emitter graph schema 4, gateway native-node-sync-12. Build 12 adds shared
+Particle inputs, reference control units/splits, explicit CEP steps and exact
+cancellable rasterization with no default coverage cutoff. No development
+migration; graph envelope and C ABI unchanged.
+
+May 2023 SDK x64 Release /MT build passes using -NoRuntimePublish -NoDistPublish.
+Four changed JavaScript sources parse. No tests added/run; no AE session operated.
+Source is being pushed before deployment; installed build 11 remains unchanged
+at candidate capture. Build log: artifacts/build12-shared-particle-controls-build.log.
+Before/candidate state: artifacts/build12-deploy-before.json.
+[Checkpoint and rollback](native-node-checkpoint.md).
+
+| Candidate file | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `7F0D1BDEB47C8F505889F85C839BC390C4382BB46F603718FAFD205C8255D2A8` |
+| `StarfieldEmitter.aex` | `8ECCF65D05E2B9C7A8A97C690F3FD98103CBEB6F71228FB89E809D7DFE86F1AE` |
+| `StarfieldParticleNode.aex` | `A58A228761E28C5BA9B3EBE56857993E963CB890BD0D74F94628452B6EE5DC9F` |
+| `StarfieldAppearance.aex` | `EB5C46F24C777201E453BBA9D50DC3825AEAB575CE60C350742BAB55B6649744` |
+| `StarfieldForce.aex` | `9E9C7163538A80919FE850A48ACECF0028F9A18909AD546902298F9EAA7A484E` |
+| `StarfieldCore.dll` | `3FC7633A1CFC81654DE1B5F4ADB85CA898FB987417248B21EF177597C038AAD7` |
+
 ## Current build 11 P-02E deployment — 2026-10-02
 
 Packed 32779 (0x800B); main schema 19, native identity revision 2/layout 3,

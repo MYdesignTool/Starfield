@@ -50,9 +50,14 @@ being displayed as errors. Genuine failures retain their diagnostics; result
 release and pixel checkout cleanup still execute on cancellation. Actual AE
 editing/preview acceptance of the build-10 fix remains open.
 
-Work is bounded on purpose: the CPU renderer accumulates a sprite-coverage budget and returns
-`work_limit_exceeded` instead of blocking the host for an unbounded time. The budget is a
-documented constant, not a hidden truncation.
+Build 12 makes the sprite-pixel cutoff an opt-in RenderLimits setting. Zero means
+no artificial coverage cutoff: legitimate large Size/Over Life combinations
+render exactly instead of failing at the old fixed 268M bounding-box estimate.
+Explicit nonzero limits still return work_limit_exceeded before overspending.
+Graph/population/ROI/storage bounds remain. Fully transparent sprites are skipped;
+every scan row checks host cancellation, in addition to graph/particle/encoding
+checks, so large sprites can be interrupted promptly. Output is never silently
+truncated or downsampled to fit a hidden work budget. Render.hpp and C ABI unchanged.
 
 ## Output semantics (owner direction, 2026-09-28)
 

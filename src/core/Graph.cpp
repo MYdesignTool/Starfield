@@ -135,7 +135,6 @@ struct ConnectionRef {
     NodeId node{};
     PortKey port{};
     std::uint32_t maximum{};
-    bool source_is_emitter{false};
 };
 
 const NodeTypeDescriptor* find_type(const std::vector<const NodeTypeDescriptor*>& sorted_types,
@@ -439,8 +438,7 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
             }
 
             connections.push_back(ConnectionRef{edge.destination_node, edge.destination_port,
-                                                destination_port->max_connections,
-                                                source_node.descriptor->type_key == graph_keys::kEmitterNode});
+                                                destination_port->max_connections});
             if (!is_cycle_breaking_input(*destination_node.descriptor, edge.destination_port)) {
                 adjacency[*source_index].push_back(*destination_index);
             }
@@ -458,15 +456,6 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
                 ++last;
             }
             const std::uint32_t maximum = connections[first].maximum;
-            const auto emitter_source_count = std::count_if(
-                connections.begin() + static_cast<std::ptrdiff_t>(first),
-                connections.begin() + static_cast<std::ptrdiff_t>(last),
-                [](const ConnectionRef& connection) { return connection.source_is_emitter; });
-            if (emitter_source_count > 1) {
-                return failure(GraphErrorCode::duplicate_input_connection,
-                               "an input cannot merge multiple emitter streams", connections[first].node, {},
-                               connections[first].port);
-            }
             if (maximum != 0 && last - first > maximum) {
                 const auto code = maximum == 1 ? GraphErrorCode::duplicate_input_connection
                                                : GraphErrorCode::too_many_connections;
@@ -517,7 +506,7 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor emitter;
     emitter.type_key = kEmitterNode;
-    emitter.schema_version = 3;
+    emitter.schema_version = 4;
     emitter.ports.push_back(PortDescriptor{kEmitterParticles, PortDirection::output, kParticleStream, false, 0});
     emitter.parameters = {
         ParameterDescriptor{kBirthRate, ParameterKind::float64, true},
@@ -529,9 +518,7 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kOpacity, ParameterKind::float64, true},
         ParameterDescriptor{kEmitterSize, ParameterKind::float64, true},
         ParameterDescriptor{kVelocitySpread, ParameterKind::float64, true},
-        // The direction model is optional so that graphs written before it existed stay
-        // valid: a missing key keeps the Settings default in read_emitter, which is the
-        // old straight-line behaviour.
+        // Settings-based construction may omit authoring-only direction values.
         ParameterDescriptor{kEmissionSpeed, ParameterKind::float64, false},
         ParameterDescriptor{kEmissionSpeedRandom, ParameterKind::float64, false},
         ParameterDescriptor{kEmissionAngleX, ParameterKind::float64, false},
@@ -539,17 +526,18 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kEmissionAngleZ, ParameterKind::float64, false},
         ParameterDescriptor{kDirectionMode, ParameterKind::uint32, false},
         ParameterDescriptor{kDirectionSpan, ParameterKind::float64, false},
-        // Direct full-resolution layer-pixel dimensions are optional for early graphs.
+        // Dimensions may use Settings defaults in direct graph construction.
         ParameterDescriptor{kEmitterSizeX, ParameterKind::float64, false},
         ParameterDescriptor{kEmitterSizeY, ParameterKind::float64, false},
         ParameterDescriptor{kEmitterSizeZ, ParameterKind::float64, false},
+        ParameterDescriptor{kEmissionSpeedRandomPercent, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor particle;
     particle.type_key = kParticleNode;
     particle.schema_version = 2;
     particle.ports = {
-        PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 1},
+        PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
     };
     particle.parameters = {

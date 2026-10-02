@@ -1,13 +1,12 @@
 {
-  "identityRevision": 2,
+  "identityRevision": 3,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Pre-release layout 3 removes outer topic markers without migration. Control indices shift by one; record-bank indices shift by two. Surviving numeric disk IDs, value types, UUIDs and graph schemas stay unchanged. Main-effect layout is schema 19. Create fresh development effects.",
+  "migrationPolicy": "Unreleased layout 4 splits Origin into 2D XY (disk 123) and scalar Z (124), reserving removed disk 106. Emitter base count is 22; other node counts stay unchanged. Native Opacity is 0..100 percent; Speed is pixels/second, Speed Random percentage amplitude. Compiler/gateway convert to canonical Speed/Opacity units; Emitter schema 4 adds independent random-percent graph key 22. Main manifest 20. No development migration; create fresh effects.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,
     "seed": 103,
     "emitter_particle_size": 104,
-    "origin": 106,
     "velocity_x": 107,
     "velocity_y": 108,
     "velocity_z": 109,
@@ -39,7 +38,9 @@
     "connection_count": 402,
     "sync_guard": 608,
     "size_curve_count": 700,
-    "opacity_curve_count": 800
+    "opacity_curve_count": 800,
+    "origin_xy": 123,
+    "origin_z": 124
   },
   "outgoingConnections": {
     "first": 500,
@@ -63,7 +64,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter, Particle and Appearance reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 3,
+  "layoutRevision": 4,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -71,5 +72,181 @@
     210,
     300,
     303
-  ]
+  ],
+  "reservedRemovedControlIds": [
+    106
+  ],
+  "visibleControlPolicy": "Typed limits and normal AE slider ranges are independent. CEP uses explicit scrub steps, never the full typed range. AE slider sensitivity also depends on the host's native interaction.",
+  "controls": {
+    "life": {
+      "label": "Life (Seconds)",
+      "min": 0,
+      "max": 10000,
+      "default": 2,
+      "sliderMin": 0,
+      "sliderMax": 10,
+      "scrubStep": 0.1
+    },
+    "size": {
+      "label": "Size (Pixels)",
+      "min": 0,
+      "max": 100000,
+      "default": 10,
+      "sliderMin": 0,
+      "sliderMax": 100,
+      "scrubStep": 1
+    },
+    "opacity": {
+      "label": "Opacity",
+      "min": 0,
+      "max": 100,
+      "default": 100,
+      "scrubStep": 1,
+      "unit": "percent"
+    },
+    "birth_rate": {
+      "label": "Particles Per Second",
+      "min": 0,
+      "max": 1000000,
+      "default": 100,
+      "sliderMin": 0,
+      "sliderMax": 100,
+      "scrubStep": 1
+    },
+    "seed": {
+      "label": "Random Seed",
+      "min": 0,
+      "max": 2147483647,
+      "default": 1000,
+      "sliderMin": 0,
+      "sliderMax": 100,
+      "scrubStep": 1
+    },
+    "speed": {
+      "label": "Speed",
+      "min": 0,
+      "max": 10000,
+      "default": 100,
+      "sliderMin": 0,
+      "sliderMax": 100,
+      "scrubStep": 1,
+      "unit": "pixels_per_second"
+    },
+    "speed_random": {
+      "label": "Speed Random",
+      "min": 0,
+      "max": 100,
+      "default": 0,
+      "scrubStep": 1,
+      "unit": "percent"
+    },
+    "origin_xy": {
+      "label": "Origin XY",
+      "default": "layer_center",
+      "scrubStep": 1,
+      "unit": "layer_pixels"
+    },
+    "origin_z": {
+      "label": "Origin Z",
+      "default": 0,
+      "sliderMin": -50,
+      "sliderMax": 50,
+      "scrubStep": 1,
+      "unit": "layer_pixels"
+    },
+    "emitter_dimensions": {
+      "labels": [
+        "Size X",
+        "Size Y",
+        "Size Z"
+      ],
+      "min": 0,
+      "max": 100000,
+      "default": 100,
+      "sliderMin": 0,
+      "sliderMax": 100,
+      "scrubStep": 1
+    },
+    "angles": {
+      "labels": [
+        "Angle X",
+        "Angle Y",
+        "Angle Z"
+      ],
+      "sliderMin": -180,
+      "sliderMax": 180,
+      "scrubStep": 1
+    },
+    "direction_span": {
+      "label": "Direction Span",
+      "min": 0,
+      "max": 180,
+      "default": 60,
+      "scrubStep": 1
+    },
+    "disc_size": {
+      "label": "Disc Size",
+      "min": 0,
+      "max": 10,
+      "default": 0.05,
+      "sliderMin": 0,
+      "sliderMax": 1,
+      "scrubStep": 0.01
+    },
+    "drag": {
+      "label": "Linear Drag",
+      "min": 0,
+      "max": 100,
+      "default": 0,
+      "sliderMin": 0,
+      "sliderMax": 1,
+      "scrubStep": 0.01
+    },
+    "gravity": {
+      "label": "Gravity",
+      "scrubStep": 0.1
+    },
+    "over_life": {
+      "min": 0,
+      "max": 100,
+      "scrubStep": 1,
+      "unit": "percent"
+    }
+  },
+  "graphAuthoring": {
+    "emitterSchemaVersion": 4,
+    "speedRandomPercentKey": 22,
+    "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed."
+  },
+  "nativeControlOrder": {
+    "emitter": [
+      "Type",
+      "Particles Per Second",
+      "Origin XY",
+      "Origin Z",
+      "Speed",
+      "Speed Random",
+      "Size X",
+      "Size Y",
+      "Size Z",
+      "Disc Size",
+      "Angle X",
+      "Angle Y",
+      "Angle Z",
+      "Direction",
+      "Direction Span",
+      "Random Seed"
+    ],
+    "particle": [
+      "Life (Seconds)",
+      "Size (Pixels)",
+      "Size Random",
+      "Opacity",
+      "Opacity Random",
+      "Color Start",
+      "Color End",
+      "Size Over Life",
+      "Opacity Over Life"
+    ]
+  }
 }

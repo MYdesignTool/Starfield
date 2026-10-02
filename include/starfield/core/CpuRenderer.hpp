@@ -7,10 +7,11 @@
 namespace starfield::core {
 
 struct RenderLimits {
-    // Upper bound on sprite pixels a single render may touch, summed over particles
-    // and counted after clipping to the region of interest. Exceeding the budget
-    // fails with work_limit_exceeded instead of blocking the host indefinitely.
-    std::uint64_t max_sprite_pixel_ops{1ull << 28}; // 268M sprite pixels
+    // Optional upper bound on clipped sprite pixels, summed over particles.
+    // Zero disables the artificial cutoff; graph, population and buffer bounds
+    // still apply and every scan row checks cancellation. Explicit finite limits
+    // fail with work_limit_exceeded instead of truncating the output.
+    std::uint64_t max_sprite_pixel_ops{0};
 };
 
 // Deterministic CPU reference backend for the current particle slice: particles

@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-11";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-12";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -672,7 +672,7 @@
         }
         if (kind === "particle" || kind === "appearance") {
             return "Size " + shortNumber(parameterValue(node, "particle_size") || graphParameterValue(node, 3)) +
-                   " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5));
+                   " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
         }
         var status = state.frameStatus;
         if (status && status.available === false) return "Live count unavailable";
@@ -697,13 +697,13 @@
                                timeSeconds: response.timeSeconds };
                 } else {
                     status = { available: true, targetToken: response.targetToken,
-                               timeSeconds: response.timeSeconds, birthRate: emission.birthRate,
-                               lifetimeSeconds: emission.lifetimeSeconds, branchLifetimes: emission.branchLifetimes,
+                               timeSeconds: response.timeSeconds, emission: emission,
                                maxParticles: emission.maxParticles };
                 }
             }
             state.frameStatus = status;
             state.liveParticleCount = status.available === false ? null :
+                state.graphMode ? window.StarfieldGraphView.countGraphLiveParticles(status.timeSeconds, status.emission) :
                 window.StarfieldGraphView.countLiveParticles(status.timeSeconds, status.birthRate,
                                                             status.lifetimeSeconds, status.maxParticles,
                                                             status.branchLifetimes);
@@ -1117,7 +1117,7 @@
         return null;
     }
 
-    function graphParameterValue(node, key) {
+    function graphParameterRecord(node, key) {
         if (!node || !node.graphParameters) return null;
         for (var i = 0; i < node.graphParameters.length; i++) {
             if (node.graphParameters[i].key === String(key)) return node.graphParameters[i];
@@ -1357,7 +1357,7 @@
         if (state.graphMode) {
             var graphNode = selectedGraphNode(nodeId);
             var graphKey = kind === "size" ? "4" : "6";
-            var graphParameter = graphParameterValue(graphNode, graphKey);
+            var graphParameter = graphParameterRecord(graphNode, graphKey);
             return !!(graphParameter && graphParameter.animated === true);
         }
         for (var i = 0; i < state.nodes.length; i++) {
@@ -1621,7 +1621,7 @@
                 Math.abs(curveState.points[curveState.points.length - 1].value - points[points.length - 1].value) < 1e-9) return;
             var graphChanges = [];
             var endKey = kind === "size" ? keys.sizeEnd : keys.opacityEnd;
-            var endParameter = graphParameterValue(node, endKey);
+            var endParameter = graphParameterRecord(node, endKey);
             if (endParameter && Math.abs(Number(endParameter.value) - points[points.length - 1].value) > 1e-9) {
                 graphChanges.push({ nodeId: node.id, parameterKey: endKey,
                                     valueType: endParameter.type, value: points[points.length - 1].value });
@@ -2170,7 +2170,7 @@
         label.title = parameter.key;
         var holder = document.createElement("div");
         holder.className = "param-value" +
-                           (parameter.kind === "color" || parameter.kind === "point3d" ? " multi" : "");
+                           (parameter.kind === "color" || parameter.kind === "point3d" || parameter.kind === "point2d" ? " multi" : "");
 
         if (parameter.kind === "color") {
             var swatch = document.createElement("span");
@@ -2181,8 +2181,8 @@
             for (var c = 0; c < 3; c++) {
                 holder.appendChild(numberInput(parameter, c));
             }
-        } else if (parameter.kind === "point3d") {
-            for (var a = 0; a < 3; a++) {
+        } else if (parameter.kind === "point3d" || parameter.kind === "point2d") {
+            for (var a = 0; a < parameter.value.length; a++) {
                 holder.appendChild(numberInput(parameter, a));
             }
         } else if (parameter.kind === "popup") {
@@ -2233,7 +2233,7 @@
         var input = document.createElement("input");
         input.type = "number";
         var decimals = parameterDecimals(parameter);
-        input.step = String(Math.pow(10, -decimals));
+        input.step = String(numericScrubStep(parameter, decimals));
         var value = channel === null ? parameter.value : parameter.value[channel];
         input.value = formatParameterNumber(value, decimals);
         input.dataset.key = parameter.key;
@@ -2249,6 +2249,8 @@
         input.dataset.scrubStep = String(numericScrubStep(parameter, decimals));
         var min = parameter.kind === "color" ? 0 : parameter.min;
         var max = parameter.kind === "color" ? 255 : parameter.max;
+        if (channel !== null && parameter.channelMin) min = parameter.channelMin[channel];
+        if (channel !== null && parameter.channelMax) max = parameter.channelMax[channel];
         if (typeof min === "number") {
             input.min = String(min);
             input.dataset.min = String(min);
@@ -2279,8 +2281,9 @@
     }
 
     function numericScrubStep(parameter, decimals) {
-        if (parameter.kind !== "slider" || decimals <= 1) return 1;
-        return Math.pow(10, 1 - decimals);
+        var explicit = Number(parameter.scrubStep);
+        if (isFinite(explicit) && explicit > 0) return explicit;
+        return decimals === 0 ? 1 : Math.pow(10, -decimals);
     }
 
     function beginNumericScrub(event) {
@@ -2356,6 +2359,8 @@
             }
             var minimum = parameter.kind === "color" ? 0 : parameter.min;
             var maximum = parameter.kind === "color" ? 255 : parameter.max;
+            if (channel !== null && parameter.channelMin) minimum = parameter.channelMin[channel];
+            if (channel !== null && parameter.channelMax) maximum = parameter.channelMax[channel];
             if (typeof minimum === "number") raw = Math.max(minimum, raw);
             if (typeof maximum === "number") raw = Math.min(maximum, raw);
             input.value = formatParameterNumber(raw, isFinite(decimals) ? decimals : 2);
@@ -2367,19 +2372,6 @@
             var graphChanges = [{ nodeId: input.dataset.graphNodeId,
                                   parameterKey: input.dataset.graphKey,
                                   valueType: Number(input.dataset.graphType), value: graphValue }];
-            if (channel === null && (input.dataset.graphKey === "3" || input.dataset.graphKey === "5")) {
-                var graphNode = selectedGraphNode(input.dataset.graphNodeId);
-                var curveKind = input.dataset.graphKey === "3" ? "size" : "opacity";
-                var curve = graphNode && graphNode.curves && graphNode.curves[curveKind];
-                var curveKeys = graphNode && graphNode.curveParameterKeys;
-                if (curve && curve.custom && curveKeys) {
-                    var updatedPoints = copyCurvePoints(curve.points);
-                    updatedPoints[0].value = Number(graphValue);
-                    graphChanges.push({ nodeId: graphNode.id,
-                        parameterKey: curveKind === "size" ? curveKeys.size : curveKeys.opacity,
-                        valueType: 7, value: window.StarfieldGraphView.encodeCurve(updatedPoints) });
-                }
-            }
             applyChanges(graphChanges);
             return;
         }
@@ -2433,7 +2425,7 @@
         if (state.graphMode && state.topologyReady) {
             try {
                 var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
-                var view = window.StarfieldGraphView.project(graph);
+                var view = window.StarfieldGraphView.project(graph, null, graphSnapshot.geometry);
                 graphLayoutChanged = !window.StarfieldGraphView.samePositions(nodePositions, view.positions);
                 state.graph = graph;
                 state.nodes = view.nodes;

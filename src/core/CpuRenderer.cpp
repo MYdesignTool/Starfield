@@ -187,6 +187,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         }
 
         const ParticleInstance& particle = particles.value()[index];
+        if (!(particle.opacity > 0.0)) continue;
         const double radius = 0.5 * particle.size_pixels;
         if (!(radius > 0.0)) {
             continue; // a zero-size particle is invisible by contract
@@ -216,7 +217,8 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         }
 
         const auto box_pixels = static_cast<std::uint64_t>(right - left) * static_cast<std::uint64_t>(bottom - top);
-        if (sprite_pixels + box_pixels > limits_.max_sprite_pixel_ops) {
+        if (limits_.max_sprite_pixel_ops != 0 &&
+            box_pixels > limits_.max_sprite_pixel_ops - sprite_pixels) {
             return OutputResult::failure(ErrorCode::work_limit_exceeded,
                                          "sprite coverage exceeds the bounded work budget");
         }
@@ -229,6 +231,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         const double edge_scale = std::min(radius_x, radius_y);
 
         for (std::int64_t y = top; y < bottom; ++y) {
+            if (cancellation.is_cancelled()) {
+                return OutputResult::failure(ErrorCode::cancelled, "cancelled during sprite scan");
+            }
             const double delta_y = (static_cast<double>(y) + 0.5 - pixel_y) * inverse_radius_y;
             float* row = accumulation.data() + static_cast<std::size_t>(y) * roi_width * 4;
             for (std::int64_t x = left; x < right; ++x) {

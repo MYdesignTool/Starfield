@@ -221,6 +221,10 @@ inline constexpr ParameterKey kDirectionSpan{18};
 inline constexpr ParameterKey kEmitterSizeX{19};
 inline constexpr ParameterKey kEmitterSizeY{20};
 inline constexpr ParameterKey kEmitterSizeZ{21};
+// Native authoring preserves this percentage even at zero base Speed. When
+// present it defines the amplitude; Settings/direct graph construction retain
+// their independent world-unit jitter input (key 13).
+inline constexpr ParameterKey kEmissionSpeedRandomPercent{22};
 // Parameter keys are scoped to their node type; force and appearance nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};

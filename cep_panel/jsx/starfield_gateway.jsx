@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-11";
+    var GATEWAY_BUILD = "native-node-sync-12";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -50,7 +50,7 @@
         { key: "particle_count", index: 26, name: "Max Particles", kind: "slider", min: 0, max: 2000000, displayDecimals: 0 },
         { key: "birth_rate", index: 3, name: "Particles Per Second", kind: "slider", min: 0, max: 1000000, displayDecimals: 0 },
         { key: "seed", index: 27, name: "Random Seed", kind: "slider", min: 0, max: 2147483647, displayDecimals: 0 },
-        { key: "particle_lifetime", index: 12, name: "Lifetime", kind: "slider", min: 0, max: 1000000, displayDecimals: 3 },
+        { key: "particle_lifetime", index: 12, name: "Life (Seconds)", kind: "slider", min: 0, max: 10000, displayDecimals: 1, scrubStep: 0.1 },
         { key: "emitter_shape", index: 2, name: "Type", kind: "popup", min: 1, max: 4, displayDecimals: 0,
           choices: ["Point", "Box", "Sphere", "Disc"] },
         { key: "emitter_origin", index: 4, name: "Origin", kind: "point3d", displayDecimals: 0 },
@@ -556,7 +556,7 @@
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
-            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 3 :
+            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 4 :
                 type === "org.starfieldfx.nodes.particle" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
@@ -571,29 +571,35 @@
         if (type === "org.starfieldfx.nodes.emitter") {
             scalar(2, "Particles Per Second"); scalar(3, "Random Seed", 3);
             scalar(5, "Type", 3); node.parameters[node.parameters.length - 1].value--;
-            var origin = nodeControlValue(effect, "Origin");
+            var xy = nodeControlValue(effect, "Origin XY"), z = Number(nodeControlValue(effect, "Origin Z"));
+            var origin = [Number(xy[0]), Number(xy[1]), z];
             var height = Number(layer.height), aspect = layer.source ? Number(layer.source.pixelAspect) : 1;
             if (!isFinite(aspect) || aspect <= 0) aspect = 1;
             if (!(height > 0) || !(Number(layer.width) > 0)) throw new Error("The emitter layer dimensions are unavailable.");
             node.parameters.push({ key: "6", type: 5, value: [
                 (origin[0] / Number(layer.width) - 0.5) * (Number(layer.width) * aspect / height),
-                0.5 - origin[1] / height, origin[2] / height - 0.5] });
+                0.5 - origin[1] / height, origin[2] / height] });
             node.parameters.push({ key: "7", type: 5, value: [
                 Number(nodeControlValue(effect, "Velocity X")), Number(nodeControlValue(effect, "Velocity Y")),
                 Number(nodeControlValue(effect, "Velocity Z"))] });
-            var emitterControls = [[8,"Particle Size"],[9,"Opacity"],[10,"Disc Size"],[11,"Speed Random"],
-                [12,"Emission Speed"],[13,"Emission Speed Random"],[14,"Emission Angle X"],
-                [15,"Emission Angle Y"],[16,"Emission Angle Z"],[18,"Direction Span"],
+            var emitterControls = [[8,"Particle Size"],[10,"Disc Size"],[11,"Velocity Random"],
+                [14,"Angle X"],[15,"Angle Y"],[16,"Angle Z"],[18,"Direction Span"],
                 [19,"Size X"],[20,"Size Y"],[21,"Size Z"]];
             for (var e = 0; e < emitterControls.length; e++) scalar(emitterControls[e][0], emitterControls[e][1]);
+            scalar(9, "Opacity"); node.parameters[node.parameters.length - 1].value /= 100;
+            var speed = Number(nodeControlValue(effect, "Speed")) / height;
+            node.parameters.push({ key:"12", type:4, value:speed });
+            scalar(22, "Speed Random");
             scalar(17, "Direction", 3); node.parameters[node.parameters.length - 1].value--;
         } else if (type === "org.starfieldfx.nodes.force") {
             vector(1, "Gravity"); scalar(2, "Linear Drag");
         } else {
             vector(1, "Color Start"); vector(2, "Color End");
-            scalar(3, "Size"); scalar(4, "Size Over Life"); scalar(5, "Opacity"); scalar(6, "Opacity Over Life");
+            scalar(3, "Size (Pixels)"); scalar(4, "Size Over Life"); scalar(5, "Opacity");
+            node.parameters[node.parameters.length - 1].value /= 100;
+            scalar(6, "Opacity Over Life");
             scalar(9, "Size Random"); scalar(10, "Opacity Random");
-            if (type === "org.starfieldfx.nodes.particle") scalar(11, "Lifetime");
+            if (type === "org.starfieldfx.nodes.particle") scalar(11, "Life (Seconds)");
             var curves = [[7,"Size"],[8,"Opacity"]];
             for (var c = 0; c < curves.length; c++) {
                 var label = curves[c][1], count = Number(nodeControlValue(effect, label + " Curve Count"));
@@ -717,40 +723,40 @@
                         var aspect = layer.source ? Number(layer.source.pixelAspect) : 1;
                         if (!isFinite(aspect) || aspect <= 0) aspect = 1;
                         if (!(width > 0) || !(height > 0)) throw new Error("The emitter layer dimensions are unavailable.");
-                        setNodeControl(effect, "Origin", [width / 2 + value[0] * height / aspect,
-                            height / 2 - value[1] * height, height / 2 + value[2] * height]);
+                        setNodeControl(effect, "Origin XY", [width / 2 + value[0] * height / aspect, height / 2 - value[1] * height]);
+                        setNodeControl(effect, "Origin Z", value[2] * height);
                     }
                     else if (key === "7") {
                         setNodeControl(effect, "Velocity X", value[0]);
                         setNodeControl(effect, "Velocity Y", value[1]);
                         setNodeControl(effect, "Velocity Z", value[2]);
                     } else if (key === "8") setNodeControl(effect, "Particle Size", value);
-                    else if (key === "9") setNodeControl(effect, "Opacity", value);
+                    else if (key === "9") setNodeControl(effect, "Opacity", Number(value) * 100);
                     else if (key === "10") setNodeControl(effect, "Disc Size", value);
-                    else if (key === "11") setNodeControl(effect, "Speed Random", value);
-                    else if (key === "12") setNodeControl(effect, "Emission Speed", value);
-                    else if (key === "13") setNodeControl(effect, "Emission Speed Random", value);
-                    else if (key === "14") setNodeControl(effect, "Emission Angle X", value);
-                    else if (key === "15") setNodeControl(effect, "Emission Angle Y", value);
-                    else if (key === "16") setNodeControl(effect, "Emission Angle Z", value);
+                    else if (key === "11") setNodeControl(effect, "Velocity Random", value);
+                    else if (key === "12") setNodeControl(effect, "Speed", Number(value) * Number(layer.height));
+                    else if (key === "14") setNodeControl(effect, "Angle X", value);
+                    else if (key === "15") setNodeControl(effect, "Angle Y", value);
+                    else if (key === "16") setNodeControl(effect, "Angle Z", value);
                     else if (key === "17") setNodeControl(effect, "Direction", Number(value) + 1);
                     else if (key === "18") setNodeControl(effect, "Direction Span", value);
                     else if (key === "19") setNodeControl(effect, "Size X", value);
                     else if (key === "20") setNodeControl(effect, "Size Y", value);
                     else if (key === "21") setNodeControl(effect, "Size Z", value);
+                    else if (key === "22") setNodeControl(effect, "Speed Random", value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
                     if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
                         [value[0], value[1], value[2], 1]);
-                    else if (key === "3") setNodeControl(effect, "Size", value);
+                    else if (key === "3") setNodeControl(effect, "Size (Pixels)", value);
                     else if (key === "4") setNodeControl(effect, "Size Over Life", value);
-                    else if (key === "5") setNodeControl(effect, "Opacity", value);
+                    else if (key === "5") setNodeControl(effect, "Opacity", Number(value) * 100);
                     else if (key === "6") setNodeControl(effect, "Opacity Over Life", value);
                     else if (key === "7") writeNodeCurve(effect, "Size", value);
                     else if (key === "8") writeNodeCurve(effect, "Opacity", value);
                     else if (key === "9") setNodeControl(effect, "Size Random", value);
                     else if (key === "10") setNodeControl(effect, "Opacity Random", value);
-                    else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Lifetime", value);
+                    else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Life (Seconds)", value);
                     else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.force") {
                     if (key === "1") setNodeControl(effect, "Gravity", value);
@@ -976,7 +982,9 @@
         var renderer = readRendererRecord(resolved);
         return { initialized: Number(resolved.properties.nodeEffectsReady.value) === 1 && revision > 0 && !repairNeeded,
             repairNeeded: repairNeeded, revision: revision, checksum: checksum, nativeNodes: nodes,
-            renderer: renderer, recordStamp:authoringStamp(nodes,renderer) };
+            renderer: renderer, geometry: { width:Number(resolved.target.layer.width), height:Number(resolved.target.layer.height),
+                pixelAspect:resolved.target.layer.source ? Number(resolved.target.layer.source.pixelAspect) : 1 },
+            recordStamp:authoringStamp(nodes,renderer) };
     }
 
     function readGraphSnapshot(request) {
@@ -1119,7 +1127,7 @@
                 }
                 var initial = [];
                 if (!emitter) {
-                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:3,
+                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:4,
                         parameters:[{key:"6",type:5,value:[0,0,0]}],position:{x:180,y:22},outgoing:[]};
                     initial.push(emitter);
                 }

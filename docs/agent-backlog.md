@@ -1,5 +1,17 @@
 # Agent-ready implementation backlog
 
+## Current P-02F candidate — 2026-10-02
+
+Build 12 source implements shared Particle inputs, stable independent emitter
+births, corrected Life range/steps, reference control naming/splits/units,
+independent base and percentage curves, multi-emitter counts and preserved
+copy connections. Sprite rasterization skips zero alpha and uses cancellable
+exact rendering without a default coverage budget. May 2023 SDK and four
+JavaScript parse gates pass. No test suites added/run or AE session operated.
+Main 20/native layout 4/Emitter schema 4; no development migration. Candidate
+deployment follows source push and the standing AE-closed authorization.
+[Checkpoint](native-node-checkpoint.md).
+
 ## Current P-02E checkpoint — 2026-10-02
 
 Owner reports canvas deletion unavailable and redundant collapsed outer topics.
@@ -37,6 +49,14 @@ See [native-node-checkpoint.md](native-node-checkpoint.md).
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 
 ## Current checkpoint
+
+### P-02F — Shared Particle inputs, parameter controls and curve rendering (2026-10-02)
+
+- **Owner:** integration lead; current task after P-02E.
+- **Dependencies:** G-06, P-02E, ADRs 0005, 0009, 0015, 0016, 0019.
+- **Owned files:** core `Graph.hpp`, `Graph.cpp`, `GraphConstruction.cpp`, `GraphEvaluation.cpp`, `Settings.hpp`, `CpuRenderer.hpp/.cpp`; adapter `NodeEffects.cpp`, `NodeRecord.hpp`, `NodeGraphSync.cpp`, `NativeNodeGraph.cpp`, `Parameters.cpp`, `PluginVersion.h`; CEP `graph_edits.js`, `graph_view.js`, `panel.js`, `starfield_gateway.jsx`, README; main/native parameter manifests and corresponding ADR, architecture, roadmap, mapping, build, compatibility and deployment docs. `Render.hpp` and the C ABI remain unchanged.
+- **Scope:** Particle accepts multiple direct Emitters; each emitter keeps its own UUID/birth allocation while sharing Particle lifetime/appearance. Audit visible scalar ranges and explicit CEP scrub steps; Life defaults to 2, caps at 10000 seconds and scrubs by 0.1. Align supported labels/units with the observed reference table and split native Origin XY/Z. Remove accidental base-value writes to percentage curve knots. Skip transparent sprites and use cancellable exact rasterization without the default arbitrary per-frame coverage cutoff; retain opt-in finite work limits.
+- **Acceptance:** May 2023 SDK candidate builds; changed JavaScript parses. Owner tests shared Particle inputs, controls/curve independence, direct native edits, rendering, undo and reopen. No tests added/run without request. Native layout 4/main manifest 20 and packed build 12 have no development migration. AE-closed deployment follows standing authorization; no process start/stop.
 
 ### P-02E — Canvas deletion and flat Effect Controls (2026-10-02)
 

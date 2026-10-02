@@ -66,10 +66,28 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
     def.u.fs_d.valid_max = static_cast<PF_FpShort>(maximum);
     def.u.fs_d.slider_min = static_cast<PF_FpShort>(minimum);
     def.u.fs_d.slider_max = static_cast<PF_FpShort>(maximum);
+    // Valid typed ranges and normal drag ranges serve different purposes.
+    // Large supported values must not make a one-pixel drag jump thousands.
+    if (ui_flags == PF_PUI_NONE) {
+        switch (id) {
+            case kLifetimeId: def.u.fs_d.slider_max = 10.0f; break;
+            case kSizeId: case kEmitterParticleSizeId: case kBirthRateId:
+            case kSeedId: case kEmitterSizeXId: case kEmitterSizeYId: case kEmitterSizeZId:
+            case kEmissionSpeedId: def.u.fs_d.slider_max = 100.0f; break;
+            case kOriginZId: def.u.fs_d.slider_min = -50.0f; def.u.fs_d.slider_max = 50.0f; break;
+            case kDiscSizeId: case kDragId: def.u.fs_d.slider_max = 1.0f; break;
+            case kEmissionAngleXId: case kEmissionAngleYId: case kEmissionAngleZId:
+                def.u.fs_d.slider_min = -180.0f; def.u.fs_d.slider_max = 180.0f; break;
+        }
+    }
     def.u.fs_d.value = initial;
     def.u.fs_d.dephault = static_cast<PF_FpShort>(initial);
     def.u.fs_d.precision = precision;
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
+    if (id == kOpacityId || id == kSizeRandomId || id == kOpacityRandomId ||
+        id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId) {
+        def.u.fs_d.display_flags = PF_ValueDisplayFlag_PERCENT;
+    }
     def.u.fs_d.curve_tolerance = AEFX_AUDIO_DEFAULT_CURVE_TOLERANCE;
     return add_checked_parameter(in_data, def);
 }
@@ -99,6 +117,19 @@ PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
     def.u.point3d_d.x_value = def.u.point3d_d.x_dephault = x;
     def.u.point3d_d.y_value = def.u.point3d_d.y_dephault = y;
     def.u.point3d_d.z_value = def.u.point3d_d.z_dephault = z;
+    return add_checked_parameter(in_data, def);
+}
+
+PF_Err add_point2d(PF_InData* in_data, const char* name, A_long id) noexcept {
+    PF_ParamDef def{};
+    AEFX_CLR_STRUCT(def);
+    def.param_type = PF_Param_POINT;
+    def.flags = kNodeEditableFlags;
+    std::snprintf(def.name, sizeof(def.name), "%s", name);
+    def.uu.id = id;
+    def.u.td.x_value = def.u.td.x_dephault = 50 << 16;
+    def.u.td.y_value = def.u.td.y_dephault = 50 << 16;
+    def.u.td.restrict_bounds = FALSE;
     return add_checked_parameter(in_data, def);
 }
 
@@ -204,30 +235,30 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
 PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexcept {
     PF_Err error = PF_Err_NONE;
     if (include_lifetime) {
-        error = add_slider(in_data, "Lifetime", kLifetimeId, 0.0, 1000000.0, 2.0,
-                           PF_Precision_THOUSANDTHS);
+        error = add_slider(in_data, "Life (Seconds)", kLifetimeId, 0.0, 10000.0, 2.0,
+                           PF_Precision_TENTHS);
         if (error != PF_Err_NONE) return error;
     }
-    error = add_slider(in_data, "Size", kSizeId, 0.0, 100000.0, 10.0);
+    error = add_slider(in_data, "Size (Pixels)", kSizeId, 0.0, 100000.0, 10.0, PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Size Over Life", kSizeOverLifeId, 0.0, 100.0, 100.0,
+    error = add_slider(in_data, "Size Random", kSizeRandomId, 0.0, 100.0, 0.0,
+                       PF_Precision_INTEGER);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Opacity", kOpacityId, 0.0, 100.0, 100.0,
                        PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Opacity", kOpacityId, 0.0, 1.0, 1.0,
-                       PF_Precision_THOUSANDTHS);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Opacity Over Life", kOpacityOverLifeId, 0.0, 100.0, 100.0,
-                       PF_Precision_TENTHS);
+    error = add_slider(in_data, "Opacity Random", kOpacityRandomId, 0.0, 100.0, 0.0,
+                       PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;
     error = add_color(in_data, "Color Start", kColorStartId);
     if (error != PF_Err_NONE) return error;
     error = add_color(in_data, "Color End", kColorEndId);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Size Random", kSizeRandomId, 0.0, 100.0, 0.0,
-                       PF_Precision_INTEGER);
+    error = add_slider(in_data, "Size Over Life", kSizeOverLifeId, 0.0, 100.0, 100.0,
+                       PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Opacity Random", kOpacityRandomId, 0.0, 100.0, 0.0,
-                       PF_Precision_INTEGER);
+    error = add_slider(in_data, "Opacity Over Life", kOpacityOverLifeId, 0.0, 100.0, 100.0,
+                       PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
     error = add_curve_bank(in_data, "Size", 's');
     if (error != PF_Err_NONE) return error;
@@ -241,29 +272,19 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
                              "Point|Box|Sphere|Disc");
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Particles Per Second", kBirthRateId,
-                       0.0, 1000000.0, 30.0, PF_Precision_INTEGER);
+                       0.0, 1000000.0, 100.0, PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Random Seed", kSeedId,
-                       0.0, 2147483647.0, 1.0, PF_Precision_INTEGER);
+    error = add_point2d(in_data, "Origin XY", kOriginXYId);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Particle Size", kEmitterParticleSizeId, 0.0, 100000.0, 10.0);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Opacity", kOpacityId, 0.0, 1.0, 1.0,
-                       PF_Precision_THOUSANDTHS);
-    if (error != PF_Err_NONE) return error;
-    error = add_point3d(in_data, "Origin", kOriginId, 50.0, 50.0, 50.0);
+    error = add_slider(in_data, "Origin Z", kOriginZId, -10000000.0, 10000000.0, 0.0,
+                       PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;
 
-    error = add_slider(in_data, "Velocity X", kVelocityXId, -1000.0, 1000.0, 0.0);
+    error = add_slider(in_data, "Speed", kEmissionSpeedId, 0.0, 10000.0, 100.0,
+                       PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Velocity Y", kVelocityYId, -1000.0, 1000.0, 0.3);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Velocity Z", kVelocityZId, -1000.0, 1000.0, 0.0);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Disc Size", kDiscSizeId, 0.0, 10.0, 0.05,
-                       PF_Precision_THOUSANDTHS);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Speed Random", kSpeedRandomId, 0.0, 100.0, 0.15);
+    error = add_slider(in_data, "Speed Random", kEmissionSpeedRandomId, 0.0, 100.0, 0.0,
+                       PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
     for (const auto& axis : {std::pair{"X", kEmitterSizeXId}, std::pair{"Y", kEmitterSizeYId}, std::pair{"Z", kEmitterSizeZId}}) {
         char name[24]{};
@@ -272,13 +293,12 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
                            PF_Precision_INTEGER);
         if (error != PF_Err_NONE) return error;
     }
-    error = add_slider(in_data, "Emission Speed", kEmissionSpeedId, 0.0, 1000.0, 0.0);
-    if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Emission Speed Random", kEmissionSpeedRandomId, 0.0, 1000.0, 0.0);
+    error = add_slider(in_data, "Disc Size", kDiscSizeId, 0.0, 10.0, 0.05,
+                       PF_Precision_THOUSANDTHS);
     if (error != PF_Err_NONE) return error;
     for (const auto& axis : {std::pair{"X", kEmissionAngleXId}, std::pair{"Y", kEmissionAngleYId}, std::pair{"Z", kEmissionAngleZId}}) {
         char name[32]{};
-        std::snprintf(name, sizeof(name), "Emission Angle %s", axis.first);
+        std::snprintf(name, sizeof(name), "Angle %s", axis.first);
         error = add_slider(in_data, name, axis.second, -100000.0, 100000.0, 0.0,
                            PF_Precision_TENTHS);
         if (error != PF_Err_NONE) return error;
@@ -288,6 +308,27 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Direction Span", kDirectionSpanId, 0.0, 180.0, 60.0,
                        PF_Precision_TENTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Random Seed", kSeedId,
+                       0.0, 2147483647.0, 1000.0, PF_Precision_INTEGER);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Particle Size", kEmitterParticleSizeId, 0.0, 100000.0, 10.0,
+                       PF_Precision_TENTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Opacity", kOpacityId, 0.0, 100.0, 100.0,
+                       PF_Precision_TENTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Velocity X", kVelocityXId, -1000.0, 1000.0, 0.0,
+                       PF_Precision_HUNDREDTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Velocity Y", kVelocityYId, -1000.0, 1000.0, 0.0,
+                       PF_Precision_HUNDREDTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Velocity Z", kVelocityZId, -1000.0, 1000.0, 0.0,
+                       PF_Precision_HUNDREDTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Velocity Random", kSpeedRandomId, 0.0, 100.0, 0.0,
+                       PF_Precision_HUNDREDTHS, kNodeEditableFlags, PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::emitter);
     if (error != PF_Err_NONE) return error;

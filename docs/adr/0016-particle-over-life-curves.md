@@ -15,6 +15,15 @@ the native effect rebuild its graph during a supervised parameter change.
 
 ## Decision
 
+### Build 12 percentage independence — 2026-10-02
+
+Editing base Size/Opacity never writes any curve knot. Remove the remaining CEP
+path that copied a pixel or normalized-alpha base value into the first percentage
+ordinate. Curves remain fixed 0..100 percent multipliers. Life (Seconds) has a
+10000-second typed bound, default 2 and 0.1-second CEP scrub step; AE's normal
+slider range is independently 0..10 seconds. Large typed bounds must not set
+drag sensitivity for the remaining scalar controls either.
+
 Each curve uses normalized age `x ∈ [0,1]` and an ordinate in percent, bounded by
 0…100. Both plots always use that fixed vertical range. The Size curve percentage
 multiplies the Particle node's base Size in full-resolution layer pixels; the

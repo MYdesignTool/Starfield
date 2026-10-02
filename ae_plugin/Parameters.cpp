@@ -463,7 +463,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 11", kParticleTopicDiskId);
     AEFX_CLR_STRUCT(def);
-    STARFIELD_ADD_HIDDEN_FLOAT("Lifetime", 0.0f, 1000000.0f, 0.0f, 1000000.0f, 2.0f, PF_Precision_THOUSANDTHS,
+    STARFIELD_ADD_HIDDEN_FLOAT("Life (Seconds)", 0.0f, 10000.0f, 0.0f, 10.0f, 2.0f, PF_Precision_TENTHS,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLifetimeDiskId);
 
     // Default 10 px matches the reference's observed "Size (Pixels): 10".
@@ -510,7 +510,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 25", 'endH');
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
+    PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 100.0f, 1000.0f, PF_Precision_INTEGER,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kMaxParticlesDiskId);
 
     AEFX_CLR_STRUCT(def);

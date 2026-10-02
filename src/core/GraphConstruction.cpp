@@ -9,7 +9,7 @@ namespace {
 using namespace graph_keys;
 
 GraphNode make_emitter_node(const Settings& settings, NodeId id) {
-    GraphNode node{id, kEmitterNode, 3, {
+    GraphNode node{id, kEmitterNode, 4, {
         {kBirthRate, settings.birth_rate},
         {kSeed, settings.seed},
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},

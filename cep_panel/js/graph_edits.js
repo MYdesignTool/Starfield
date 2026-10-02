@@ -16,27 +16,26 @@
         appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 3, particle: 2, force: 1, appearance: 1, output: 2 };
+    var SCHEMA_VERSIONS = { emitter: 4, particle: 2, force: 1, appearance: 1, output: 2 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { output: "1" },
-        "org.starfieldfx.nodes.particle": { input: "1", output: "2", inputLimit: 1 },
+        "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.appearance": { input: "1", output: "2" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
         emitter: [
-            { key: "2", type: 4, value: 30 },
-            { key: "3", type: 3, value: 1 },
+            { key: "2", type: 4, value: 100 },
+            { key: "3", type: 3, value: 1000 },
             { key: "5", type: 3, value: 0 }, { key: "6", type: 5, value: [0, 0, 0] },
-            { key: "7", type: 5, value: [0, 0.3, 0] }, { key: "8", type: 4, value: 10 },
+            { key: "7", type: 5, value: [0, 0, 0] }, { key: "8", type: 4, value: 10 },
             { key: "9", type: 4, value: 1 }, { key: "10", type: 4, value: 0.05 },
-            { key: "11", type: 4, value: 0.15 }, { key: "12", type: 4, value: 0 },
-            { key: "13", type: 4, value: 0 }, { key: "14", type: 4, value: 0 },
+            { key: "11", type: 4, value: 0 }, { key: "14", type: 4, value: 0 },
             { key: "15", type: 4, value: 0 }, { key: "16", type: 4, value: 0 },
             { key: "17", type: 3, value: 0 }, { key: "18", type: 4, value: 60 },
             { key: "19", type: 4, value: 100 }, { key: "20", type: 4, value: 100 },
-            { key: "21", type: 4, value: 100 }
+            { key: "21", type: 4, value: 100 }, { key: "22", type: 4, value: 0 }
         ],
         particle: [
             { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
@@ -203,14 +202,6 @@
                 return true;
             }
         }
-        if (destinationSchema.inputLimit === 1) {
-            for (var c = graph.edges.length - 1; c >= 0; c--) {
-                var connected = graph.edges[c];
-                if (connected.destinationNode === edit.to && connected.destinationPort === destinationPort) {
-                    graph.edges.splice(c, 1);
-                }
-            }
-        }
         graph.edges.push(makeEdge(graph, idFactory, edit.from, edit.to, sourcePort, destinationPort));
         return false;
     }
@@ -341,12 +332,6 @@
 
             var copiedSource = sourceSelected ? ids["$" + edge.sourceNode] : edge.sourceNode;
             var copiedDestination = destinationSelected ? ids["$" + edge.destinationNode] : edge.destinationNode;
-            if (source.type === TYPES.emitter) {
-                // Emitter copies stay disconnected. When a Particle is also copied,
-                // keep its duplicated branch fed by the original single active Emitter.
-                if (!destinationSelected) continue;
-                copiedSource = edge.sourceNode;
-            }
             graph.edges.push(makeEdge(graph, idFactory, copiedSource, copiedDestination,
                                       edge.sourcePort, edge.destinationPort));
         }

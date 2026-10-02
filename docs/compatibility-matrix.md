@@ -1,5 +1,30 @@
 # Behavior inventory
 
+## Build 12 P-02F owner feedback — 2026-10-02
+
+Owner reports only one Emitter can feed a Particle, Life drags by huge values,
+and Over Life edits show sprite coverage exceeds bounded work budget (512).
+Source review finds four merge blockers (port count, editor replacement,
+generic emitter-merge rejection and evaluator one-parent assumption); all are
+removed. Input fan-in retains distinct emitter identity and global Output cap.
+Normal native slider ranges are separate from typed bounds; CEP uses explicit
+steps. Life is 2 by default, max 10000, CEP step 0.1. Supported names/splits
+follow the observed table, with independent percent opacity/randomness.
+
+Base Size/Opacity no longer overwrite custom curve point zero. Summary getter
+shadowing is repaired. Live counts use every emitter's direct Particle children;
+expired branch slots cannot consume the counter cap. Rendering skips opacity=0,
+disables the default coverage limit and polls cancellation each scan row;
+explicit finite budgets retain their error result. Rendering work is still
+proportional to clipped visible coverage. No pixel/host acceptance claimed.
+
+Build 12 SDK and four modified JavaScript syntax gates pass; no tests added/run.
+Owner AE 2023.5 Build 52 checks remain open: fresh main creates Emitter+Particle,
+multiple Emitters into one Particle, shared downstream Force/Output, copies,
+Life/default/steps, XY/Z preservation, Speed=0 random retention, both curves,
+native edits/undo/reopen and the original error case. No AE session operated.
+[Deployment record](native-node-checkpoint.md).
+
 ## Build 11 P-02E owner feedback — 2026-10-02
 
 Owner reports canvas deletion unavailable; Effect Controls show redundant

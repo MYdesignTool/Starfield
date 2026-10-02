@@ -1,5 +1,30 @@
 # Starfield CEP panel
 
+## Build 12 shared Particle and numeric controls — 2026-10-02
+
+Connect several Emitters to the same Particle top port. Connecting a new
+Emitter preserves existing connections; force/output inputs also support fan-in.
+Each node's native record holds up to four outgoing links. Emitter duplication
+preserves mapped outgoing links; group copies use the copied Emitter.
+The Output counter handles multiple emitter streams under its one global cap.
+
+Life (Seconds) defaults to 2, caps at 10000 and drags in 0.1-second CEP steps.
+Counts, seed, positions and dimensions use integer display/step 1. Size (Pixels)
+uses 1-pixel steps, Speed 1 pixel/second, percentages/angles 1, Disc/Drag 0.01,
+and Gravity 0.1. Shift is faster, Ctrl finer within displayed precision.
+Type/Direction stay dropdowns. Origin XY and Origin Z are separate pixel edits
+that preserve the other component. Opacity and Speed Random display 0..100%.
+Changing base Size/Opacity leaves both Over Life percent curves untouched;
+Speed Random retains its value at zero Speed. Both plot axes remain 0..100%.
+
+Native layout 4/identity 3, main manifest 20 and Emitter schema 4 require fresh
+development effects; gateway native-node-sync-12. Close/reopen CEP with the
+new build. Default sprite coverage cutoff is removed and scan rows check
+cancellation; large visible sprites can still render slowly. Explicit finite
+RenderLimits fail without truncating output. SDK compilation and JavaScript
+parsing do not establish actual AE acceptance.
+[Deployment status and rollback](../docs/native-node-checkpoint.md).
+
 ## Build 11 canvas deletion and flat controls — 2026-10-02
 
 Select editable nodes and press Delete/Backspace, or use Delete Selected in the

@@ -44,7 +44,7 @@ enum class EmitterShape : std::uint8_t {
 // Later stages (simulation, rasterizer) may rely on them without re-checking.
 inline constexpr std::uint32_t kMaxParticleCount = 2'000'000;
 inline constexpr double kMaxBirthRate = 1'000'000.0;
-inline constexpr double kMaxLifetimeSeconds = 1'000'000.0;
+inline constexpr double kMaxLifetimeSeconds = 10'000.0;
 inline constexpr double kMaxParticleSize = 100'000.0;
 inline constexpr double kMaxParticleRandomPercent = 100.0;
 inline constexpr std::uint32_t kMaxSeed = 2'147'483'647;
@@ -58,7 +58,7 @@ inline constexpr double kMaxVelocitySpread = 100.0;
 inline constexpr double kMaxGravityMagnitude = 1'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
 inline constexpr double kMaxParticleColor = 64.0;
-inline constexpr double kMaxEmissionSpeed = 1'000.0;
+inline constexpr double kMaxEmissionSpeed = 100'000.0;
 inline constexpr double kMaxEmissionAngleDegrees = 100'000.0;
 inline constexpr double kMaxDirectionSpanDegrees = 180.0;
 

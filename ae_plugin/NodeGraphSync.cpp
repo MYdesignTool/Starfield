@@ -166,6 +166,20 @@ bool set_velocity(PF_ParamDef* params[], A_long changed_id, EncodedValue& encode
     return true;
 }
 
+bool set_origin_parameter(PF_ParamDef* params[], A_long changed_id, EncodedValue& encoded) {
+    if (changed_id != kOriginXYId && changed_id != kOriginZId) return false;
+    const auto* xy = parameter_by_id(params, kOriginXYId);
+    double z = 0.0;
+    if (!xy || xy->param_type != PF_Param_POINT || !read_slider(params, kOriginZId, z)) return false;
+    // This value only gates a valid native edit; the renderer compiler reads the
+    // complete node streams in full-resolution units after the host change.
+    const starfield::core::Vec3 value{xy->u.td.x_value / 65536.0, xy->u.td.y_value / 65536.0, z};
+    if (!encode_vector3(value, encoded.payload)) return false;
+    encoded.key = 6;
+    encoded.kind = ValueKind::vector3;
+    return true;
+}
+
 bool set_emitter_popup(PF_ParamDef* params[], A_long changed_id, A_long parameter_id,
                        std::uint64_t key, EncodedValue& encoded) {
     if (changed_id != parameter_id) return false;
@@ -214,14 +228,14 @@ bool map_parameter_edit(PF_ParamDef* params[], A_long changed_id, EncodedValue& 
         return set_scalar(params, changed_id, kBirthRateId, 2, encoded) ||
                set_seed(params, changed_id, encoded) ||
                set_emitter_popup(params, changed_id, kEmitterTypeId, 5, encoded) ||
-               set_vector_parameter(params, changed_id, kOriginId, 6, encoded) ||
+               set_origin_parameter(params, changed_id, encoded) ||
                set_velocity(params, changed_id, encoded) ||
                set_scalar(params, changed_id, kEmitterParticleSizeId, 8, encoded) ||
                set_scalar(params, changed_id, kOpacityId, 9, encoded) ||
                set_scalar(params, changed_id, kDiscSizeId, 10, encoded) ||
                set_scalar(params, changed_id, kSpeedRandomId, 11, encoded) ||
                set_scalar(params, changed_id, kEmissionSpeedId, 12, encoded) ||
-               set_scalar(params, changed_id, kEmissionSpeedRandomId, 13, encoded) ||
+               set_scalar(params, changed_id, kEmissionSpeedRandomId, 22, encoded) ||
                set_scalar(params, changed_id, kEmissionAngleXId, 14, encoded) ||
                set_scalar(params, changed_id, kEmissionAngleYId, 15, encoded) ||
                set_scalar(params, changed_id, kEmissionAngleZId, 16, encoded) ||

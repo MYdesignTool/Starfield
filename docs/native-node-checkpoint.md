@@ -1,5 +1,53 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 12: shared Particle, reference controls and curve rendering — 2026-10-02
+
+P-02F removes all four single-source blockers: Particle's port limit, editor
+edge replacement, generic emitter-merge rejection and evaluator one-parent
+assumption. Each (Emitter, Particle) pair gets a branch; properties/forces are
+planned once per Particle. Own emitter births/UUIDs and global Output cap remain.
+Outgoing native storage remains four links per node. Emitter copies retain
+mapped outgoing connections; mixed copies use the copied Emitter.
+
+Life (Seconds) defaults to 2, caps at 10000 and uses CEP step 0.1. Normal AE
+slider bounds are separated from typed bounds for Life, size, counts/seed,
+dimensions, speed, Origin Z, angles, Disc and Drag. CEP steps are explicit.
+Implemented names/units/order/defaults follow the observed reference table.
+Origin XY is a true 2D point and Origin Z a centered scalar; opacity and
+Speed Random display percent. Emitter schema 4 stores random percent in key 22,
+independently of base Speed including zero. Native layout 4/identity 3 reserves
+removed Origin ID 106 and uses 123/124; main manifest 20 keeps 89 streams.
+Packed 32780; gateway native-node-sync-12. Envelope/C ABI unchanged; no migration.
+
+Base Size/Opacity never rewrite curve points. Separate projected-value and
+canonical-record getters fix summary shadowing. Output counts actual surviving
+branches across all emitters. Renderer skips zero-alpha sprites and disables
+the default arbitrary coverage cutoff; row-wise cancellation, storage/ROI,
+particle/graph limits and opt-in finite work budgets remain. Visible large
+sprites still incur full render work; output is neither dropped nor approximated.
+
+May 2023 SDK /MT candidate and four JavaScript parse checks pass. No test suite
+added/run; owner AE host checks remain pending. Candidate build leaves dist and
+runtime selection unchanged. Build log and before/candidate capture are under
+artifacts/build12-shared-particle-controls-build.log and build12-deploy-before.json.
+The existing CEP Junction points to source; reopen the panel with build 12.
+Use a fresh development layer/main effect to exercise the new layout/defaults.
+
+Deployment pending the source push and immediate AE-absent check. Planned
+backup: artifacts/disabled/p02f-build12-shared-particle-controls-20261002/deployment.json.
+The existing single Starfield -> dist Junction is retained. No process starts,
+stops, registry changes or other host changes are part of this deployment.
+
+One-step plugin rollback after closing AE (CEP is tracked separately by Git):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02f-build12-shared-particle-controls-20261002' -Rollback
+```
+
+Owner gates: shared inputs and downstream fields, copies, Life/default/steps,
+XY/Z preservation, Speed=0 random percent retention, both Over Life curves,
+direct AE edits, cancellation, native sync, undo and save/reopen.
+
 ## Build 11: canvas deletion and flat Effect Controls — 2026-10-02
 
 Owner reports unavailable canvas deletion and unnecessary collapsed outer

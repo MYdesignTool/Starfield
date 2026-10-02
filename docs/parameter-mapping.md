@@ -1,5 +1,39 @@
 # Parameter bridge: schema → AE control → core settings
 
+## Reference controls — build 12
+
+Main schema 20 keeps indices 1..89. Life (hidden bootstrap) caps at 10000,
+defaults to 2 and has slider range 0..10. Native identity 3/layout 4 removes
+Origin disk 106, reserves it and registers 2D Origin XY 123 plus Origin Z 124.
+Emitter base count becomes 22; Particle/Appearance/Force remain 43/42/2.
+All UUID/layout/connection indices derive from the base count.
+
+| Emitter stream | Value | Canonical graph key/conversion |
+|---|---|---|
+| 1 / 2 | Type / Particles Per Second | 5 (minus one) / 2 |
+| 3 / 4 | Origin XY / Z | 6; layer-pixel XY about layer center, +Y up; Z/height |
+| 5 / 6 | Speed / Speed Random | 12 = pixels/height; 22 = independent percent |
+| 7..9 / 10 | Size X/Y/Z / Disc Size | 19..21 pixel dimensions / 10 layer-heights |
+| 11..13 / 14 / 15 | Angle X/Y/Z / Direction / Span | 14..16 / 17 (minus one) / 18 |
+| 16 | Random Seed | 3 |
+| 17 / 18 / 19..21 / 22 | Hidden birth size / opacity / velocity / vector jitter | 8 / 9 (divide 100) / 7 / 11 |
+
+Particle streams 1..9: Life, Size, Size Random, Opacity, Opacity Random,
+Color Start/End, Size Over Life, Opacity Over Life. Appearance omits Life,
+so the corresponding streams are one lower. Opacity displays 0..100% and
+converts to canonical 0..1. Curve-bank stream indices remain unchanged.
+Emitter schema 4 stores authored Speed Random in key 22 even at zero Speed;
+the evaluator computes world jitter amplitude from Speed times percentage.
+Standalone Settings graphs retain their world-unit key 13 input. No migration
+from earlier development layouts/schemas. Native/CEP conversion agrees on
+layer dimensions and pixel aspect; no main-effect Origin drives node values.
+
+CEP steps are explicit per control: Life 0.1 s; counts/seed/positions/dimensions
+1; Size 1 px; Speed 1 px/s; percentages/angles 1; Disc Size and Drag 0.01;
+Gravity 0.1. Shift multiplies by 10 and Ctrl by 0.1, subject to display precision.
+Native slider bounds serve normal AE dragging independently of typed bounds;
+AE's exact drag feel remains an owner host check.
+
 ## Flat stream layout — build 11
 
 Main schema 19 removes Output topic indices 26 and 32. Former indices 27..31

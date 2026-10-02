@@ -1,5 +1,30 @@
 # Starfield plug-in architecture
 
+## P-02F / build 12
+
+Particle input accepts distinct direct Emitters. The registry has no
+emitter-specific merge prohibition; the edit planner preserves existing wires.
+Each (Emitter, Particle) pair has one birth sequence, with shared Particle
+properties and forces planned once. Emitter UUID/birth identity, deterministic
+modulo child assignment and Output's global cap remain intact. Native records
+still store up to four outgoing edges per node; all current inputs accept fan-in.
+The CEP population counter sums actual per-emitter branch survivors before
+applying the global cap. Emitter copies preserve mapped outgoing connections.
+
+Native layout 4/identity 3 and main manifest 20 align implemented controls with
+observed names: Life (Seconds), Size (Pixels), Origin XY/Z, Speed, Speed Random,
+Angle X/Y/Z and percentage Opacity. Emitter schema 4 adds key 22 for independent
+random percent; C ABI and graph envelope stay fixed. Life caps at 10000,
+defaults to 2 and uses explicit 0.1 CEP steps. Base size/opacity never rewrite
+percentage curve knots. Duplicate summary/record lookup functions are separated.
+
+The renderer skips fully transparent sprites and has no default coverage-count
+cutoff; explicit RenderLimits remain supported. Scan-row cancellation, graph,
+population, ROI and storage bounds remain. Large visible sprites still cost
+their full rasterization work; output is neither truncated nor approximated.
+No development migration; use fresh effects. Source/SDK gates are distinct
+from owner AE acceptance. See ADRs 0005, 0015, 0016 and 0019.
+
 Current target: After Effects 2023 on Windows x64, built with the supplied May 2023 SDK. Owner direction on 2026-09-27 defers newer-host adaptation and qualification. See [the detailed roadmap](roadmap.md) for the support matrix and milestone gates.
 
 ## Goal and boundary
