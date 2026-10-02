@@ -12,8 +12,10 @@ removal still uses the established transaction path.
 Actual outer group markers are removed from all five effects. Main indices
 compact to 1..89 (schema 19); native layout 3 compacts value/record indices.
 Surviving disk IDs and Core stay unchanged. Gateway token native-node-sync-11.
-SDK build and JavaScript parsing establish source readiness only; no tests
-added/rerun or AE session operated. Owner checks: single/multiple node deletion,
+SDK build and JavaScript parsing pass; no tests added/rerun or AE session operated.
+Source pushed as cb53d50, then installed with AE absent under standing
+authorization. Six installed hashes verified; Core/generation unchanged,
+single Junction retained, build 10 backed up. Owner checks: single/multiple node deletion,
 native effect disappearance, fixed Output mixed selection, direct parameter
 visibility, native edits, undo and save/reopen.
 [Deployment status and rollback](native-node-checkpoint.md).

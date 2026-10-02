@@ -7,7 +7,9 @@ outer categories. Delete/Backspace and context-menu actions share editable
 selection, preserving fixed Output. Outer topics are removed with compacted
 main schema 19/native layout 3 indices; surviving disk IDs and Core unchanged.
 Gateway native-node-sync-11 reads the new layout. No development migration.
-SDK build and JS parsing are source gates; owner verifies actual deletion,
+SDK build and JS parsing pass; build 11 deployed with AE absent after source
+push cb53d50. Six hashes verified; one Junction retained and build 10 backed up.
+Owner verifies actual deletion,
 native effect removal, flat controls, undo and reopening in AE 2023.
 [Deployment status](native-node-checkpoint.md).
 

@@ -1,6 +1,6 @@
 # Build and host matrix
 
-## Build 11 P-02E candidate — 2026-10-02
+## Current build 11 P-02E deployment — 2026-10-02
 
 Packed 32779 (0x800B); main schema 19, native identity revision 2/layout 3,
 gateway native-node-sync-11. All outer parameter topic markers are removed;
@@ -9,9 +9,13 @@ Backspace/context-menu actions preserve fixed Output and remove editable nodes.
 Build uses -NoRuntimePublish -NoDistPublish; SDK compilation and both CEP syntax
 checks pass. No tests added/rerun and no AE session operated.
 Actual host deletion and flat control display remain owner acceptance gates.
+Source pushed as cb53d50 before deployment. Installed with AE absent under
+standing authorization; all six hashes verified. Build-10 AEXs backed up under
+p02e-build11-flat-controls-20261002. Core and selected runtime generation remain
+unchanged; one existing Starfield Junction retained.
 [Deployment status, hashes and rollback](native-node-checkpoint.md).
 
-| Candidate file | SHA-256 |
+| Installed file | SHA-256 |
 |---|---|
 | `StarfieldParticle.aex` | `A6A5DB560F49AC418CF0DC378119BA0BBDD9687BA07D79A78743D4230C9FF442` |
 | `StarfieldEmitter.aex` | `290329A2827CF7784F188605284478F0D61030693AF68124FA3CF109DF5483F4` |

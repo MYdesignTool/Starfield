@@ -13,7 +13,8 @@ Force categories. Parameters appear directly under each effect header. Main
 schema 19 and native layout 3 compact stream indices without development
 migration; surviving disk IDs and Core remain unchanged. Gateway token is
 `native-node-sync-11`; close/reopen CEP after loading the new AEXs. SDK build and
-JS syntax checks are source gates; owner AE acceptance remains pending.
+JS syntax checks pass. Build 11 is deployed with installed hashes verified;
+owner AE acceptance remains pending.
 [Deployment status and one-step rollback](../docs/native-node-checkpoint.md).
 
 ## Build 10 wire interaction update — 2026-10-02

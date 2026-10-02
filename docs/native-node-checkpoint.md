@@ -25,8 +25,16 @@ The installed CEP Junction already points to this checkout, so no separate
 CEP installation or host-wide settings change is required. Close/reopen CEP
 after loading build 11.
 
-Deployment is pending final source review/push and an immediate read-only
-AE-absent check. Proposed backup name: p02e-build11-flat-controls-20261002.
+Source was pushed as cb53d50 before deployment. **Build 11 is deployed** under
+standing authorization after an immediate read-only check found neither AfterFX
+nor AfterFX_64. All six installed hashes match the build matrix. Before: build-10
+AEXs; after: build-11 AEXs. Pinned Core and selected generation
+StarfieldCore-AE18EFC2E9856178.dll remain unchanged; the generation hash was
+verified separately. The existing single Plug-ins/Starfield -> dist Junction
+is retained. No AE session was started/stopped and no host-wide setting changed.
+Backup: artifacts/disabled/p02e-build11-flat-controls-20261002/deployment.json.
+Before/after state: artifacts/build11-deploy-before.json and
+artifacts/build11-deploy-after.json. Deployment log: artifacts/build11-deployment.log.
 
 One-step undo after deployment (AE closed):
 

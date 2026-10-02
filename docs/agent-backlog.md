@@ -8,8 +8,11 @@ selection, and pauses polling while the context menu is open. Actual outer
 topic markers are removed from all native effects; main/native indices and
 gateway bindings are compacted together. Main schema 19, native layout 3,
 gateway native-node-sync-11; surviving disk IDs unchanged, no development
-migration. SDK build and CEP syntax checks are the source gates; owner AE
-acceptance remains open. [Checkpoint](native-node-checkpoint.md).
+migration. SDK build and CEP syntax checks pass; no tests added/rerun. Source
+pushed as cb53d50, then deployed with AE absent under standing authorization.
+Six installed hashes verified; Core/generation unchanged, one Junction retained,
+build 10 backed up. Owner AE acceptance remains open.
+[Checkpoint](native-node-checkpoint.md).
 
 ## Previous G-06 checkpoint — 2026-10-02
 
