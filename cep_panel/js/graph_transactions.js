@@ -114,8 +114,8 @@
                     var value = a || b;
                     var fallback = (node.type === "org.starfieldfx.nodes.particle" || node.type === "org.starfieldfx.nodes.appearance") ?
                         defaults[key] : node.type === "org.starfieldfx.nodes.emitter" ?
-                        ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60})[key] : undefined;
-                    if (fallback === undefined || value.type !== (key === "17" ? 3 : 4) || value.value !== fallback) return false;
+                        ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60,"22":0,"23":0,"24":100,"25":0,"26":100,"27":0,"28":0,"29":0,"30":0})[key] : undefined;
+                    if (fallback === undefined || value.type !== (key === "17" || key === "23" ? 3 : 4) || value.value !== fallback) return false;
                 } else if (a.type === 7 && (key === "7" || key === "8")) {
                     var av = a.value, bv = b.value;
                     if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1]) return false;
@@ -165,7 +165,10 @@
                 var graphHex;
                 try {
                     graph = validateSnapshot(base, codec, maxBytes);
-                    var updated = edits.apply(graph, edit, idFactory);
+                    var authoredEdit = {};
+                    Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
+                    authoredEdit.layerHeightPixels = base.geometry ? Number(base.geometry.height) : 1;
+                    var updated = edits.apply(graph, authoredEdit, idFactory);
                     graphHex = codec.toHex(updated);
                     if (graphHex.length / 2 > maxBytes) {
                         callback(failure("size_limit_exceeded", "The edited graph exceeds the AE project limit of " + maxBytes + " bytes."));

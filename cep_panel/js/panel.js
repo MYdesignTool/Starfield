@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-12";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-13";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -715,6 +715,28 @@
         });
     }
 
+    var effectSelectionInFlight = false;
+    var queuedEffectSelection = null;
+    function selectNativeEffect(nodeId) {
+        queuedEffectSelection = {id:nodeId, target:state.targetToken};
+        flushEffectSelection();
+    }
+    function flushEffectSelection() {
+        if (effectSelectionInFlight || !queuedEffectSelection) return;
+        if (state.pending) { window.setTimeout(flushEffectSelection, 100); return; }
+        var selection = queuedEffectSelection;
+        queuedEffectSelection = null;
+        if (!selection.target || selection.target !== state.targetToken) return;
+        effectSelectionInFlight = true;
+        call("selectNodeEffect", {nodeId:selection.id}, function (response) {
+            effectSelectionInFlight = false;
+            if (!response.ok && !queuedEffectSelection && selection.target === state.targetToken) {
+                showError(response.error.code, response.error.message);
+            }
+            flushEffectSelection();
+        });
+    }
+
     function addGraphNode(node) {
         var card = document.createElement("section");
         var position = positionFor(node, state.nodes.indexOf(node));
@@ -750,6 +772,7 @@
             }
             state.selectedNodeId = node.id;
             state.inspectorOpen = true;
+            selectNativeEffect(node.id);
             syncNodeSelectionStyles();
             renderInspector();
         });

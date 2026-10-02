@@ -1,5 +1,35 @@
 # Starfield CEP panel
 
+## Build 13 current-node interaction and Auxiliary — 2026-10-02
+
+Clicking a node selects its matching native effect by saved UUID; Output selects
+the renderer. Selection requests coalesce and do not add undo entries. Native
+parameter sync now uses runtime indices instead of the setup-only disk-ID union.
+Existing supported control names/steps remain; Random Seed ends the source list.
+CEP hides unused shape and inheritance controls. New Speed defaults to 100 pixels/s.
+
+Add Auxiliary from the canvas menu, then connect:
+`Emitter -> Particle -> Auxiliary -> Particle -> Output`.
+For both parent and child particles to remain visible, also connect the first
+Particle to Output. Auxiliary uses the same native Emitter effect, with Emitting
+set to Auxiliary, and accepts several parent streams on its upper input. Set Emit
+Chance and Emit Life Start/End to choose participating parents and their life
+interval; Inherit Velocity/Size/Opacity/Color controls use percentages. Children
+retain their birth state after the parent dies. Feedback cycles remain invalid.
+
+Switching Emitting to Default in CEP removes parent wires in the same transaction.
+Disconnect parents before changing that mode in native Effect Controls. Auxiliary
+live count currently reports unavailable; a simple constant-rate estimate would
+be incorrect. Speed Over Life/Inertia/Orient/time-sampling controls remain future
+contracts. Active AE camera projection is implemented; actual AE camera/native
+sync/selection/auxiliary behavior awaits owner testing. Non-square comp/source PAR
+and extreme 3D layer transforms remain qualification gates.
+
+Use fresh development effects for native layout 5/Emitter schema 5/Core ABI 2.
+Close/reopen CEP for gateway native-node-sync-13. The paired bundle requires one
+AEX deployment; subsequent compatible Core changes can use hot updates.
+[Deployment status and rollback](../docs/native-node-checkpoint.md).
+
 ## Build 12 shared Particle and numeric controls — 2026-10-02
 
 Connect several Emitters to the same Particle top port. Connecting a new

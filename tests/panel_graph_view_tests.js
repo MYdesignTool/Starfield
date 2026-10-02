@@ -77,8 +77,8 @@ assert.strictEqual(output.maxParticles, 6400);
 assert.strictEqual(output.params[0].graphNodeId, source.nodes[2].id,
                    "Output Max Particles control belongs to the logical Output node");
 assert.deepStrictEqual(view.activeEmitterParameters(source), {
-    emitterId: source.nodes[0].id, maxParticles: 6400, birthRate: 60, lifetimeSeconds: 2,
-    branchLifetimes: [2]
+    maxParticles: 6400, emitters: [{emitterId: source.nodes[0].id, birthRate: 60, lifetimeSeconds: 2,
+    branchLifetimes: [2]}]
 });
 assert.strictEqual(view.countLiveParticles(2.5, 60, 2, 6400), 120,
                    "graph frame status counts the emitter’s live slots at AE comp time");
@@ -104,17 +104,17 @@ independentLifetimes.edges.push(
 );
 independentLifetimes = codec.fromHex(codec.toHex(independentLifetimes));
 var lifetimeSummary = view.activeEmitterParameters(independentLifetimes);
-assert.deepStrictEqual(lifetimeSummary.branchLifetimes, [1, 3],
+assert.deepStrictEqual(lifetimeSummary.emitters[0].branchLifetimes, [1, 3],
                        "active Particle nodes report their own lifetimes in stable ID order");
-assert.strictEqual(lifetimeSummary.lifetimeSeconds, 3,
+assert.strictEqual(lifetimeSummary.emitters[0].lifetimeSeconds, 3,
                    "the frame-count window uses the longest active branch lifetime");
-assert.strictEqual(view.countLiveParticles(2.5, 2, 3, 100, lifetimeSummary.branchLifetimes), 4,
+assert.strictEqual(view.countLiveParticles(2.5, 2, 3, 100, lifetimeSummary.emitters[0].branchLifetimes), 4,
                    "live count expires each modulo-assigned Particle branch independently");
 
 var withParkedEmitter = codec.fromHex(codec.toHex(source));
 withParkedEmitter.nodes.push({ id: uuid(10), type: edits.types.emitter, schemaVersion: 3,
     parameters: [{ key: "2", type: 4, value: 1 }] });
-assert.strictEqual(view.activeEmitterParameters(withParkedEmitter).emitterId, source.nodes[0].id,
+assert.strictEqual(view.activeEmitterParameters(withParkedEmitter).emitters[0].emitterId, source.nodes[0].id,
                    "a disconnected emitter does not replace the emitter feeding Output");
 var parkedEmitterOutput = view.project(withParkedEmitter).nodes.filter(function (node) {
     return node.kind === "output";
@@ -134,15 +134,15 @@ withSecondActiveEmitter.nodes.push({ id: uuid(11), type: edits.types.particle, s
 withSecondActiveEmitter.edges.push(
     { id: uuid(20), sourceNode: uuid(10), sourcePort: "1", destinationNode: uuid(11), destinationPort: "1" },
     { id: uuid(21), sourceNode: uuid(11), sourcePort: "2", destinationNode: uuid(3), destinationPort: "1" });
-assert.strictEqual(view.activeEmitterParameters(withSecondActiveEmitter), null,
-                   "frame count fails closed when multiple active emitters are unsupported");
+assert.strictEqual(view.activeEmitterParameters(withSecondActiveEmitter).emitters.length, 2,
+                   "each active emitter contributes its own live-slot window");
 
 var emitter = projected.nodes.filter(function (node) { return node.kind === "emitter"; })[0];
 var type = emitter.params.filter(function (parameter) { return parameter.graphKey === "5"; })[0];
 assert.strictEqual(type.value, 3);
 assert.strictEqual(view.parameterToGraphValue(type, 3), 2, "popup labels map to zero-based graph enums");
-assert.strictEqual(emitter.params.filter(function (parameter) { return parameter.graphKey === "10"; })[0].label,
-                   "Disc Size");
+assert.strictEqual(emitter.params.some(function (parameter) { return parameter.graphKey === "10"; }), false,
+                   "Sphere hides the Disc-only size control");
 assert.deepStrictEqual(["19", "20", "21"].map(function (key) {
     var parameter = emitter.params.filter(function (entry) { return entry.graphKey === key; })[0];
     return [parameter.value, parameter.max, parameter.unit];

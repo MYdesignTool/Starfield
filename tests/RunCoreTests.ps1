@@ -1,12 +1,14 @@
 param(
     [switch]$Adapter,
     [switch]$NodeEffects,
+    [switch]$CurrentNodes,
+    [switch]$NativeSync,
     [ValidateSet('Emitter', 'Particle', 'Appearance', 'Force')][string]$NodeKind = 'Particle',
     [string]$MSVCVarsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Adapter -and $NodeEffects) { throw 'Select either Adapter or NodeEffects.' }
+if (([int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -24,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -48,6 +50,8 @@ try {
         $sources[0] = 'tests\graph_parameter_tests.cpp'
         $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
+    if ($CurrentNodes) { $sources[0] = 'tests\current_node_core_tests.cpp' }
+    if ($NativeSync) { $sources = @('tests\native_sync_tests.cpp', 'tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp') }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp') }
 
     $responseLines = @(
@@ -62,13 +66,14 @@ try {
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
     )
-    if ($Adapter -or $NodeEffects) {
+    if ($Adapter -or $NodeEffects -or $NativeSync) {
         $sdkHeaders = "$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Headers"
         $responseLines += @('/DMSWindows', '/DWIN32', '/D_WINDOWS', '/D_CRT_SECURE_NO_WARNINGS',
             "/I `"$aliasRoot\ae_plugin`"", "/I `"$sdkHeaders`"", "/I `"$sdkHeaders\SP`"",
             "/I `"$sdkHeaders\Win`"", "/I `"$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Util`"")
     }
     if ($NodeEffects) { $responseLines += "/DSTARFIELD_NODE_KIND_$($NodeKind.ToUpperInvariant())" }
+    if ($NativeSync) { $responseLines += '/DSTARFIELD_NODE_KIND_EMITTER' }
     $responseLines += $sources | ForEach-Object { "`"$aliasRoot\$_`"" }
 
     $responsePath = Join-Path $buildDirectory 'core-tests.rsp'

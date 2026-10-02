@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 12: shared Particle inputs, reference controls and cancellable rasterization.
-#define STARFIELD_VERSION_BUILD 12
-#define STARFIELD_VERSION_PACKED 32780 /* 0x800C */
+// Build 13: native edit dispatch, camera projection and auxiliary emission.
+#define STARFIELD_VERSION_BUILD 13
+#define STARFIELD_VERSION_PACKED 32781 /* 0x800D */

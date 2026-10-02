@@ -3,7 +3,12 @@
 - Status: accepted for M0/M1.
 - Date: 2026-09-27
 
-The renderer's canonical composition space is centered on the comp center, has +X right, +Y up, and +Z toward the viewer. One world unit is one comp-height; pixel aspect and downsample are applied only at the AE boundary. Time and geometry calculations use double precision; color accumulation uses float or wider.
+The renderer's canonical composition space is centered on the comp center, has +X right, +Y up, and +Z away from the viewer in the default camera view (matching AE's Z direction). One world unit is one comp-height; pixel aspect and downsample are applied only at the AE boundary. Time and geometry calculations use double precision; color accumulation uses float or wider.
+
+P-02G corrects the former +Z-toward-viewer prose before production release. The
+existing AE point conversion already used positive AE Z; the former flat renderer
+did not project depth. No stored value conversion is introduced. ADR 0020 owns the
+new camera boundary and its pending AE qualification.
 
 Host input and output buffers state width, height, rowbytes, pixel format, color space, alpha mode, and ROI explicitly. Never assume tightly packed rows or equal input/output rowbytes. The AE adapter converts to/from the host's 8/16/32-bpc representation and respects AE's channel accessors. The particle output is accumulated internally with premultiplied alpha over transparent black and encoded in the requested output alpha mode; the current effect does not consume input pixel values (ADR 0005).
 

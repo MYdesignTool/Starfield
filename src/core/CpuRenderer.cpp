@@ -66,6 +66,57 @@ PixelGrid make_grid(const FrameSpec& frame) noexcept {
     return grid;
 }
 
+struct Sprite {
+    const ParticleInstance* particle{};
+    double x{}, y{}, depth{}, ax{}, ay{}, bx{}, by{};
+};
+bool valid_camera(const RenderRequest::Camera& camera) noexcept {
+    if (!camera.enabled) return true;
+    return std::all_of(camera.layer_to_view.begin(), camera.layer_to_view.end(), [](double v) { return std::isfinite(v); }) &&
+        std::all_of(camera.image_to_layer.begin(), camera.image_to_layer.end(), [](double v) { return std::isfinite(v); }) &&
+        std::isfinite(camera.focal_x) && camera.focal_x > 0 && std::isfinite(camera.focal_y) && camera.focal_y > 0 &&
+        std::isfinite(camera.center_x) && std::isfinite(camera.center_y) && std::isfinite(camera.near_clip) && camera.near_clip > 0;
+}
+bool project_sprite(const ParticleInstance& particle, const RenderRequest& request, const PixelGrid& grid, Sprite& sprite) noexcept {
+    sprite.particle = &particle;
+    const double radius = particle.size_pixels * 0.5;
+    if (!(radius > 0) || !(particle.opacity > 0)) return false;
+    if (!request.camera.enabled) {
+        sprite.x = (0.5 + particle.position.x / grid.aspect) * grid.frame_width;
+        sprite.y = (0.5 - particle.position.y) * grid.frame_height;
+        sprite.ax = radius * grid.scale_x; sprite.by = radius * grid.scale_y;
+        return std::isfinite(sprite.x) && std::isfinite(sprite.y);
+    }
+    const auto& camera = request.camera;
+    const auto& frame = request.frame;
+    const double local[4]{frame.layer_width * 0.5 + particle.position.x * frame.layer_height / frame.pixel_aspect_ratio,
+                          (0.5 - particle.position.y) * frame.layer_height,
+                          particle.position.z * frame.layer_height, 1.0};
+    double view[3]{};
+    for (int col = 0; col < 3; ++col) for (int row = 0; row < 4; ++row)
+        view[col] += local[row] * camera.layer_to_view[row * 4 + col];
+    sprite.depth = view[2];
+    if (!(view[2] >= camera.near_clip)) return false;
+    const double u = camera.center_x + camera.focal_x * view[0] / view[2];
+    const double v = camera.center_y + camera.focal_y * view[1] / view[2];
+    const auto& m = camera.image_to_layer;
+    const double w = m[6] * u + m[7] * v + m[8];
+    if (!std::isfinite(w) || std::abs(w) < 1e-12) return false;
+    const double x = (m[0] * u + m[1] * v + m[2]) / w;
+    const double y = (m[3] * u + m[4] * v + m[5]) / w;
+    sprite.x = x * grid.scale_x; sprite.y = y * grid.scale_y;
+    // Local derivative of the homogeneous inverse mapping gives camera-facing
+    // circle axes, including rotated/scaled effect layers and non-square grids.
+    const double rx = radius * camera.focal_x / view[2];
+    const double ry = radius * camera.focal_y / view[2];
+    sprite.ax = (m[0] - x * m[6]) / w * rx * grid.scale_x;
+    sprite.ay = (m[3] - y * m[6]) / w * rx * grid.scale_y;
+    sprite.bx = (m[1] - x * m[7]) / w * ry * grid.scale_x;
+    sprite.by = (m[4] - y * m[7]) / w * ry * grid.scale_y;
+    return std::isfinite(sprite.x) && std::isfinite(sprite.y) && std::isfinite(sprite.ax) &&
+        std::isfinite(sprite.ay) && std::isfinite(sprite.bx) && std::isfinite(sprite.by);
+}
+
 bool encode_region(const std::vector<float>& accumulation, std::uint32_t roi_width, std::uint32_t roi_height,
                    PixelFormat format, AlphaMode alpha_mode, std::uint32_t row_bytes,
                    std::vector<std::byte>& destination, const Cancellation& cancellation) noexcept {
@@ -125,6 +176,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         return OutputResult::failure(validated.error());
     }
     const FrameSpec& frame = validated.value();
+    if (!valid_camera(request.camera)) return OutputResult::failure(ErrorCode::invalid_request, "invalid camera projection");
     const RectI roi = frame.region_of_interest;
 
     RenderOutput output;
@@ -181,37 +233,44 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     const PixelGrid grid = make_grid(frame);
     std::uint64_t sprite_pixels = 0;
 
-    for (std::size_t index = 0; index < particles.value().size(); ++index) {
+    std::vector<Sprite> sprites;
+    try {
+        sprites.reserve(particles.value().size());
+        for (std::size_t i = 0; i < particles.value().size(); ++i) {
+            if (i % kCancellationParticleInterval == 0 && cancellation.is_cancelled())
+                return OutputResult::failure(ErrorCode::cancelled, "cancelled during camera projection");
+            Sprite sprite{};
+            if (project_sprite(particles.value()[i], request, grid, sprite)) sprites.push_back(sprite);
+        }
+        if (request.camera.enabled) std::stable_sort(sprites.begin(), sprites.end(), [](const Sprite& a, const Sprite& b) {
+            return a.depth > b.depth;
+        });
+    } catch (const std::bad_alloc&) { return OutputResult::failure(ErrorCode::allocation_failed, "camera sprite allocation failed"); }
+
+    for (std::size_t index = 0; index < sprites.size(); ++index) {
         if ((index % kCancellationParticleInterval) == 0 && cancellation.is_cancelled()) {
             return OutputResult::failure(ErrorCode::cancelled, "cancelled during sprite rasterization");
         }
 
-        const ParticleInstance& particle = particles.value()[index];
+        const auto& sprite = sprites[index];
+        const ParticleInstance& particle = *sprite.particle;
         if (!(particle.opacity > 0.0)) continue;
         const double radius = 0.5 * particle.size_pixels;
         if (!(radius > 0.0)) {
             continue; // a zero-size particle is invisible by contract
         }
 
-        const double world_x = particle.position.x;
-        const double world_y = particle.position.y;
-        if (!std::isfinite(world_x) || !std::isfinite(world_y)) {
-            continue; // defensive: a non-finite position must never reach the scan loop
-        }
-        const double pixel_x = (0.5 + world_x / grid.aspect) * grid.frame_width - static_cast<double>(roi.left);
-        const double pixel_y = (0.5 - world_y) * grid.frame_height - static_cast<double>(roi.top);
-        const double radius_x = radius * grid.scale_x;
-        const double radius_y = radius * grid.scale_y;
+        const double pixel_x = sprite.x - roi.left, pixel_y = sprite.y - roi.top;
+        const double radius_x = std::hypot(sprite.ax, sprite.bx);
+        const double radius_y = std::hypot(sprite.ay, sprite.by);
         if (!(radius_x > 0.0) || !(radius_y > 0.0)) {
             continue;
         }
 
-        const auto left = std::max<std::int64_t>(0, static_cast<std::int64_t>(std::floor(pixel_x - radius_x - 1.0)));
-        const auto top = std::max<std::int64_t>(0, static_cast<std::int64_t>(std::floor(pixel_y - radius_y - 1.0)));
-        const auto right = std::min<std::int64_t>(roi_width,
-                                                 static_cast<std::int64_t>(std::ceil(pixel_x + radius_x + 1.0)));
-        const auto bottom = std::min<std::int64_t>(roi_height,
-                                                  static_cast<std::int64_t>(std::ceil(pixel_y + radius_y + 1.0)));
+        const auto left = static_cast<std::int64_t>(std::clamp(std::floor(pixel_x - radius_x - 1.0), 0.0, double(roi_width)));
+        const auto top = static_cast<std::int64_t>(std::clamp(std::floor(pixel_y - radius_y - 1.0), 0.0, double(roi_height)));
+        const auto right = static_cast<std::int64_t>(std::clamp(std::ceil(pixel_x + radius_x + 1.0), 0.0, double(roi_width)));
+        const auto bottom = static_cast<std::int64_t>(std::clamp(std::ceil(pixel_y + radius_y + 1.0), 0.0, double(roi_height)));
         if (right <= left || bottom <= top) {
             continue; // fully outside the region of interest
         }
@@ -226,18 +285,20 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
 
         // A one-pixel-wide analytic coverage ramp on the rim keeps edges stable
         // without any neighborhood or random sampling.
-        const double inverse_radius_x = 1.0 / radius_x;
-        const double inverse_radius_y = 1.0 / radius_y;
+        const double determinant = sprite.ax * sprite.by - sprite.ay * sprite.bx;
+        if (!std::isfinite(determinant) || std::abs(determinant) < 1e-18) continue;
         const double edge_scale = std::min(radius_x, radius_y);
 
         for (std::int64_t y = top; y < bottom; ++y) {
             if (cancellation.is_cancelled()) {
                 return OutputResult::failure(ErrorCode::cancelled, "cancelled during sprite scan");
             }
-            const double delta_y = (static_cast<double>(y) + 0.5 - pixel_y) * inverse_radius_y;
+            const double dy = static_cast<double>(y) + 0.5 - pixel_y;
             float* row = accumulation.data() + static_cast<std::size_t>(y) * roi_width * 4;
             for (std::int64_t x = left; x < right; ++x) {
-                const double delta_x = (static_cast<double>(x) + 0.5 - pixel_x) * inverse_radius_x;
+                const double dx = static_cast<double>(x) + 0.5 - pixel_x;
+                const double delta_x = (dx * sprite.by - dy * sprite.bx) / determinant;
+                const double delta_y = (dy * sprite.ax - dx * sprite.ay) / determinant;
                 const double distance = std::sqrt(delta_x * delta_x + delta_y * delta_y);
                 const double coverage = std::clamp(0.5 + (1.0 - distance) * edge_scale, 0.0, 1.0);
                 if (coverage <= 0.0) {

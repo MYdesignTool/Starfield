@@ -92,6 +92,16 @@ int main() {
           "registered node count matches shared native stream layout");
     check(std::strcmp(registered[uuid_first_index(kind)-1].name, "Node UUID 0") == 0, "UUID stream index matches compiler");
     check(std::strcmp(registered[sync_guard_index(kind)-1].name, "Panel Sync Guard") == 0, "guard stream index matches compiler");
+    if constexpr (kind == Kind::emitter) {
+        check(std::strcmp(registered[1].name, "Emitting") == 0 && registered[1].param_type == PF_Param_POPUP,
+              "source mode is runtime stream 2");
+        check(std::strcmp(registered[3].name, "Origin XY") == 0 && registered[3].param_type == PF_Param_POINT,
+              "native XY is runtime point stream 4");
+        check(std::strcmp(registered[16].name, "Emit Chance") == 0 &&
+              registered[16].u.fs_d.display_flags == PF_ValueDisplayFlag_PERCENT,
+              "auxiliary bank starts at runtime stream 17 in percent");
+        check(std::strcmp(registered[23].name, "Random Seed") == 0, "seed ends source controls at runtime stream 24");
+    }
     int colors = 0;
     bool controls_constant = true, interpolation_unrestricted = true, colors_supervised = true;
     for (const auto& control : registered) {

@@ -1,5 +1,38 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 13: current-node interaction, camera and Auxiliary — 2026-10-02
+
+P-02G fixes setup-only uu.id/change_flags aliasing in native edit dispatch,
+selects the UUID-owned native effect on CEP node click and skips unchanged node
+manifest writes. The source/Particle/Force/Output architecture remains independent
+native effects with immutable compiled render graphs.
+
+Unified Emitter schema 5/native layout 5 exposes Default/Auxiliary mode, parent
+particle input, chance, life-window and inheritance percentages. Child positions
+are sampled at birth and survive parent death. The deterministic comp-zero clock
+and percentage inheritance kernel are independent implementations, not a claim
+of reference timing equivalence. Auxiliary live count and advanced reference
+source controls remain follow-ups. CEP mode changes disconnect parent wires;
+native mode changes require those wires disconnected first.
+
+Core ABI 2 carries numeric camera matrices. Main PiPL/runtime add I_USE_3D_CAMERA;
+SmartRender captures SDK geometry and the Core projects and sorts visible sprites,
+with inverse layer mappings before AE's later transform. Default view geometry is
+used when available; missing default geometry retains flat output. Non-square PAR,
+extreme 3D layer angles and all actual camera behavior remain owner host gates.
+
+Packed 32781 (0x800D), main manifest 20, identity 3/layout 5, gateway
+native-node-sync-13. Require fresh development effects; no old-layout migration.
+May 2023 SDK /MT candidate builds. Owner-authorized minimal scopes pass:
+Core 28, native sync 14, camera capture 12, Emitter 77, Particle 73 checks;
+three focused CEP suites pass. No AE GUI session operated or broad tests run.
+Candidate build uses -NoRuntimePublish -NoDistPublish. Build and scoped logs stay
+under artifacts/build13-*. Original build 12 remains installed until deployment.
+
+Owner acceptance: native XY/Z and other edits, correct effect selection after
+duplicate/reorder, camera movement/zoom, parent/child stream wiring, multiple
+parents, inheritance/chance/life windows, copies, undo and save/reopen.
+
 ## Build 12: shared Particle, reference controls and curve rendering — 2026-10-02
 
 P-02F removes all four single-source blockers: Particle's port limit, editor

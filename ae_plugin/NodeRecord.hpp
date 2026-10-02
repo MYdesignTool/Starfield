@@ -20,7 +20,7 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
-        case Kind::emitter: return 22;
+        case Kind::emitter: return 30;
         case Kind::particle: return 43;
         case Kind::appearance: return 42;
         case Kind::force: return 2;
@@ -62,6 +62,8 @@ enum : A_long {
     kEmissionAngleXId = 117, kEmissionAngleYId = 118, kEmissionAngleZId = 119,
     kDirectionId = 120, kDirectionSpanId = 121,
     kOriginXYId = 123, kOriginZId = 124,
+    kEmittingModeId = 125, kEmitChanceId = 126, kEmitLifeStartId = 127, kEmitLifeEndId = 128,
+    kInheritVelocityId = 129, kInheritSizeId = 130, kInheritOpacityId = 131, kInheritColorId = 132,
     kLifetimeId = 201, kSizeId = 202,
     kSizeOverLifeId = 203, kOpacityId = 204, kOpacityOverLifeId = 205,
     kColorStartId = 206, kColorEndId = 207, kSizeRandomId = 208,

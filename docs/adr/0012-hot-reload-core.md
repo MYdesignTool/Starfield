@@ -5,6 +5,12 @@
 
 ## Decision
 
+P-02G/build 13 upgrades the pre-release Core ABI from 1 to 2 to carry numeric
+camera geometry (ADR 0020). Old and new modules reject mismatched ABI versions.
+Deploy the adapter, internal node modules and Core together once with AE closed;
+subsequent ABI-2 Core-only iterations retain the hot generation mechanism.
+No released project data migration or cross-ABI shim is introduced.
+
 `StarfieldParticle.aex` remains the stable AE SDK adapter: PiPL, selectors, parameter
 registration, arbitrary-data persistence, host checkouts and pixel-world copying
 stay there. Particle evaluation, simulation and CPU rasterization move to a

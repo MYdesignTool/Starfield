@@ -85,7 +85,9 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
     def.u.fs_d.precision = precision;
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
     if (id == kOpacityId || id == kSizeRandomId || id == kOpacityRandomId ||
-        id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId) {
+        id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId ||
+        id == kEmitChanceId || id == kEmitLifeStartId || id == kEmitLifeEndId ||
+        id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId) {
         def.u.fs_d.display_flags = PF_ValueDisplayFlag_PERCENT;
     }
     def.u.fs_d.curve_tolerance = AEFX_AUDIO_DEFAULT_CURVE_TOLERANCE;
@@ -271,6 +273,8 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_Err error = add_popup(in_data, "Type", kEmitterTypeId, 4, 1,
                              "Point|Box|Sphere|Disc");
     if (error != PF_Err_NONE) return error;
+    error = add_popup(in_data, "Emitting", kEmittingModeId, 2, 1, "Default|Auxiliary");
+    if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Particles Per Second", kBirthRateId,
                        0.0, 1000000.0, 100.0, PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;
@@ -309,6 +313,15 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     error = add_slider(in_data, "Direction Span", kDirectionSpanId, 0.0, 180.0, 60.0,
                        PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
+    for (const auto& control : {
+            std::pair{"Emit Chance", kEmitChanceId}, std::pair{"Emit Life Start", kEmitLifeStartId},
+            std::pair{"Emit Life End", kEmitLifeEndId}, std::pair{"Inherit Velocity", kInheritVelocityId},
+            std::pair{"Inherit Size", kInheritSizeId}, std::pair{"Inherit Opacity", kInheritOpacityId},
+            std::pair{"Inherit Color", kInheritColorId}}) {
+        const double initial = control.second == kEmitChanceId || control.second == kEmitLifeEndId ? 100.0 : 0.0;
+        error = add_slider(in_data, control.first, control.second, 0.0, 100.0, initial, PF_Precision_TENTHS);
+        if (error != PF_Err_NONE) return error;
+    }
     error = add_slider(in_data, "Random Seed", kSeedId,
                        0.0, 2147483647.0, 1000.0, PF_Precision_INTEGER);
     if (error != PF_Err_NONE) return error;

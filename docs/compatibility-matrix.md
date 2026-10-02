@@ -1,5 +1,36 @@
 # Behavior inventory
 
+## Build 13 P-02G candidate evidence — 2026-10-02
+
+Owner correction: CEP Origin moves particles; only native Effect Controls Origin
+does not. Source diagnosis finds callback UUID/disk-ID comparisons against uu.id,
+which aliases change_flags during USER_CHANGED_PARAM. Dispatch now uses runtime
+indices and saved numeric UUID values. A fake-host callback test with overwritten
+change flags confirms native XY/Z invoke the renderer commit path; actual AE
+delivery/render cache/undo/reopen remains unqualified.
+
+CEP effect selection resolves UUID rather than effect names/order and performs no
+parameter writes or undo-group changes. Fake-host selection/reorder/stale-target
+checks pass. New Emitter speed uses real geometry; Auxiliary records use schema 5,
+optional parent input 2, percentages and the common source kernel. Child birth
+position and velocity inheritance, survival after parent death, stable identity,
+cap/zero chance/invalid intervals/cycles pass in the scoped Core tests.
+
+Camera capture uses SDK row matrices and inverse 2D/3D layer mappings. Core tests
+cover Z perspective, translation, behind-camera clipping, 8/16/32-bpc plane parity,
+exact ROI crop and downsample. Fake suites cover transformed layers, default-view
+fallback, singular explicit cameras and balanced releases. Main camera flags match
+PiPL/runtime. Minimum scopes: Core 28, native sync 14, camera 12, actual Emitter 77,
+Particle 73 checks; three focused CEP suites pass. No broad suite or AE session run.
+
+Open owner gates: fresh default graph, native Origin XY/Z, selected effect highlight,
+multiple parent Auxiliary links, inheritance, camera animation/zoom/perspective,
+native/CEP edits undo/save/reopen and UI feel. Non-square comp/source PAR and extreme
+3D plane transforms remain open. Advanced source controls and evaluated Auxiliary
+live count are incomplete. Build 13 compilation/scoped checks do not imply AE 2023
+host support beyond the owner's previously recorded observations.
+[Deployment record](native-node-checkpoint.md).
+
 ## Build 12 P-02F owner feedback — 2026-10-02
 
 Owner reports only one Emitter can feed a Particle, Life drags by huge values,

@@ -95,6 +95,19 @@ SfCoreStatus SF_CORE_CALL render(const SfCoreRenderRequest* input, SfCoreRenderR
         frame.pixel_aspect_ratio = source.pixel_aspect_ratio;
         request.graph = std::make_shared<const core::Graph>(graph.take_value());
         request.graph_revision = input->graph_revision;
+        if (input->camera_enabled > 1) {
+            output->status = SF_CORE_INVALID_REQUEST;
+            detail(output->detail, "invalid camera flag");
+            return output->status;
+        }
+        request.camera.enabled = input->camera_enabled != 0;
+        std::copy_n(input->layer_to_view, 16, request.camera.layer_to_view.begin());
+        std::copy_n(input->image_to_layer, 9, request.camera.image_to_layer.begin());
+        request.camera.focal_x = input->focal_x;
+        request.camera.focal_y = input->focal_y;
+        request.camera.center_x = input->center_x;
+        request.camera.center_y = input->center_y;
+        request.camera.near_clip = input->near_clip;
         const CallbackCancellation cancellation(*input);
         const core::CpuParticleRenderer renderer;
         auto rendered = renderer.render(request, cancellation);

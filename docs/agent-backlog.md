@@ -1,6 +1,15 @@
 # Agent-ready implementation backlog
 
-## Current P-02F checkpoint — 2026-10-02
+## Current P-02G checkpoint — 2026-10-02
+
+Build 13 candidate fixes native runtime edit dispatch, adds UUID effect selection,
+camera projection and unified Auxiliary sources. Minimum owner-authorized tests
+and the May 2023 SDK build pass; six modified JavaScript sources parse. Core ABI 2,
+Emitter schema 5/native layout 5 require one paired deployment and fresh effects.
+Source/publish/deployment evidence is tracked in native-node-checkpoint.md;
+all new host behavior remains owner qualification work. No AE session operated.
+
+## Previous P-02F checkpoint — 2026-10-02
 
 Build 12 source implements shared Particle inputs, stable independent emitter
 births, corrected Life range/steps, reference control naming/splits/units,
@@ -51,6 +60,15 @@ See [native-node-checkpoint.md](native-node-checkpoint.md).
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 
 ## Current checkpoint
+
+### P-02G — Native edits, effect selection, camera and auxiliary emission (2026-10-02)
+
+- **Owner:** integration lead; current task after P-02F.
+- **Dependencies:** P-02F; ADRs 0003, 0005, 0009, 0012, 0015, 0019, 0020.
+- **Owned files:** core graph, simulation, renderer and render contract (`Render.hpp`), C ABI `PluginApi.h/.cpp`; adapter native synchronization, camera capture, SmartRender, flags/version/build metadata; CEP gateway, graph model/edits/view, panel/styles; native manifests, scoped current-node/native-camera/Emitter/Particle/panel checks and corresponding architecture, ADR, mapping, build, checkpoint and compatibility documentation.
+- **Scope:** fix native Effect Controls edits using runtime indices instead of the setup-only `uu.id` union; select the UUID-owned AE effect on node click; improve current controls and avoid redundant stream writes. Add immutable camera projection across the render boundary. Emitter supports an Auxiliary mode with incoming particle sources, probability, normalized parent-life interval and inheritance. Preserve independent node effects and project storage. Development schema/ABI changes require the explicit ADR 0020 plan, without old-project migration.
+- **Acceptance:** May 2023 SDK candidate builds and modified JavaScript parses; owner verifies native Origin XY/Z changes, effect selection, camera movement/zoom and auxiliary births, undo/reopen and current-node interaction. No tests or AE sessions run without request. Prefer one paired deployment after AE closes, retaining the single Junction and verified rollback.
+- **Evidence:** owner goal explicitly permits necessary minimal tests. Core current-node scope passes 28 checks; native edit callback 14, camera capture 12, actual Emitter/Particle selector scopes 77/73; three focused CEP suites pass. Build 13 candidate uses packed 32781, native layout 5/Emitter schema 5/Core ABI 2 and main manifest 20. No AE session operated. Native Origin/highlight/camera/Auxiliary host acceptance, non-square PAR, advanced reference source controls and Auxiliary live counter remain open. See ADR 0020 and native-node-checkpoint.
 
 ### P-02F — Shared Particle inputs, parameter controls and curve rendering (2026-10-02)
 

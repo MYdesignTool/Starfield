@@ -1,6 +1,23 @@
 # Build and host matrix
 
-## Current build 12 P-02F deployment — 2026-10-02
+## Build 13 P-02G candidate — 2026-10-02
+
+Packed 32781 (0x800D), main manifest 20, native identity 3/layout 5, Emitter
+graph schema 5, gateway native-node-sync-13, Core ABI 2. Adds native edit dispatch,
+transient UUID effect selection, camera projection and unified Auxiliary emission.
+Paired candidate builds with the May 2023 SDK x64 Release /MT using
+-NoRuntimePublish -NoDistPublish. Main camera flag is implemented and statically
+matched with PiPL. No old-development-layout migration; fresh effects required.
+
+Minimum requested checks pass: 28 Core, 14 native sync, 12 camera capture,
+77 Emitter and 73 Particle checks; three focused CEP suites. JavaScript syntax
+checks are recorded separately. No AE process started/stopped or GUI session run.
+Host qualification and remaining reference controls stay open (ADR 0020).
+Logs: artifacts/build13-current-node-build.log, build13-current-node-tests.log,
+build13-native-sync-tests.log, build13-emitter-tests.log and build13-particle-tests.log.
+[Deployment status and rollback](native-node-checkpoint.md).
+
+## Previous build 12 P-02F deployment — 2026-10-02
 
 Packed 32780 (0x800C); main manifest 20, native identity 3/layout 4,
 Emitter graph schema 4, gateway native-node-sync-12. Build 12 adds shared

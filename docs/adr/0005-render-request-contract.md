@@ -10,7 +10,7 @@
 
 1. `layer_width` / `layer_height`: the full-resolution layer size. This is the world-space
    reference: one world unit is one layer height, the origin is the layer center, +X is right,
-   +Y is up, +Z is toward the viewer (ADR 0003).
+   +Y is up, +Z is away from the viewer in the default view (ADR 0003 / 0020).
 2. `frame_width` / `frame_height`: the full render-resolution pixel grid, i.e. the layer grid
    already scaled by the host downsample factor.
 3. `region_of_interest`: the half-open sub-rect of the frame grid that this render must fill.
@@ -28,6 +28,25 @@ pixel_scale = frame_width / layer_width               (sprite scale, ~ 1 / downs
 
 `pixel_aspect_ratio` is the host's pixel width/height ratio. It widens the world mapping; it does
 not turn sprites into ellipses, because `particle_size` is a pixel diameter, not a world length.
+
+## Camera extension — P-02G / build 13
+
+ADR 0020 appends a value-only Camera to RenderRequest and Core ABI 2. The adapter
+captures row-based SDK layer/camera geometry during Smart Render. The Core first
+maps canonical points into full-resolution layer pixels, then into camera space,
+projects visible depths, maps the image back into the effect layer and applies
+downsample/ROI once. A 3D layer uses an inverse plane homography to avoid AE's
+later double projection; a 2D layer uses the inverse affine transform. Sprites
+face the camera and are stably sorted back to front. Alpha ownership is unchanged.
+The adapter advertises I_USE_3D_CAMERA in both PiPL and GLOBAL_SETUP.
+
+Host-provided default view geometry is used when available. If no active camera
+and no default geometry exist, the ordinary flat layer mapping remains available.
+An invalid explicit camera is an error. Non-square composition/source PAR and
+extreme 3D layer angles remain explicit AE qualification gates; pure projection
+tests are not host evidence. Lighting, motion blur and GPU rendering remain future
+contracts. This pre-release boundary requires a paired AEX/Core build, with no
+ABI-1 hot deployment into the new adapter (ADR 0012).
 
 ## Output ownership and errors
 

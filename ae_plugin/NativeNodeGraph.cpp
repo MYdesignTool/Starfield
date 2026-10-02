@@ -244,7 +244,7 @@ core::OpaqueBytes make_layout_record(std::vector<LayoutEntry>& entries) {
 
 bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key, std::uint16_t& schema) noexcept {
     if (std::strcmp(match_name, kEmitterMatchName) == 0) {
-        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 4; return true;
+        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 5; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
         kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 2; return true;
@@ -265,45 +265,53 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     std::uint32_t integer = 0;
     core::Vec3 vector{};
     if (kind == Kind::emitter) {
-        if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 3, time, scalar)) return false;
         add_value(node, kBirthRate, scalar);
-        if (!read_uint(suites, plugin_id, effect, 16, time, integer)) return false;
+        if (!read_uint(suites, plugin_id, effect, 24, time, integer)) return false;
         add_value(node, kSeed, integer);
         if (!read_uint(suites, plugin_id, effect, 1, time, integer) || integer < 1 || integer > 4) return false;
         add_value(node, kEmitterShape, integer - 1u);
-        if (!read_two_d(suites, plugin_id, effect, 3, time, vector) ||
-            !read_one_d(suites, plugin_id, effect, 4, time, vector.z)) return false;
+        if (!read_two_d(suites, plugin_id, effect, 4, time, vector) ||
+            !read_one_d(suites, plugin_id, effect, 5, time, vector.z)) return false;
         add_value(node, kEmitterOrigin, core::layer_point_to_world(vector.x, vector.y, vector.z + units.layer_height / 2.0, units));
-        if (!read_one_d(suites, plugin_id, effect, 19, time, vector.x) ||
-            !read_one_d(suites, plugin_id, effect, 20, time, vector.y) ||
-            !read_one_d(suites, plugin_id, effect, 21, time, vector.z)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 27, time, vector.x) ||
+            !read_one_d(suites, plugin_id, effect, 28, time, vector.y) ||
+            !read_one_d(suites, plugin_id, effect, 29, time, vector.z)) return false;
         add_value(node, kVelocity, vector);
-        if (!read_one_d(suites, plugin_id, effect, 17, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 25, time, scalar)) return false;
         add_value(node, kParticleSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 18, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 26, time, scalar)) return false;
         add_value(node, kOpacity, scalar / 100.0);
-        if (!read_one_d(suites, plugin_id, effect, 10, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 11, time, scalar)) return false;
         add_value(node, kEmitterSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 22, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 30, time, scalar)) return false;
         add_value(node, kVelocitySpread, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 5, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 6, time, scalar)) return false;
         const double emission_speed = scalar / units.layer_height;
         add_value(node, kEmissionSpeed, emission_speed);
-        if (!read_one_d(suites, plugin_id, effect, 6, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 7, time, scalar)) return false;
         add_value(node, kEmissionSpeedRandomPercent, scalar);
         constexpr std::array<core::ParameterKey, 3> angle_keys{kEmissionAngleX, kEmissionAngleY, kEmissionAngleZ};
         for (A_long axis = 0; axis < 3; ++axis) {
-            if (!read_one_d(suites, plugin_id, effect, 11 + axis, time, scalar)) return false;
+            if (!read_one_d(suites, plugin_id, effect, 12 + axis, time, scalar)) return false;
             add_value(node, angle_keys[static_cast<std::size_t>(axis)], scalar);
         }
-        if (!read_uint(suites, plugin_id, effect, 14, time, integer) || integer < 1 || integer > 2) return false;
+        if (!read_uint(suites, plugin_id, effect, 15, time, integer) || integer < 1 || integer > 2) return false;
         add_value(node, kDirectionMode, integer - 1u);
-        if (!read_one_d(suites, plugin_id, effect, 15, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 16, time, scalar)) return false;
         add_value(node, kDirectionSpan, scalar);
         constexpr std::array<core::ParameterKey, 3> size_keys{kEmitterSizeX, kEmitterSizeY, kEmitterSizeZ};
         for (A_long axis = 0; axis < 3; ++axis) {
-            if (!read_one_d(suites, plugin_id, effect, 7 + axis, time, scalar)) return false;
+            if (!read_one_d(suites, plugin_id, effect, 8 + axis, time, scalar)) return false;
             add_value(node, size_keys[static_cast<std::size_t>(axis)], scalar);
+        }
+        if (!read_uint(suites, plugin_id, effect, 2, time, integer) || integer < 1 || integer > 2) return false;
+        add_value(node, kEmittingMode, integer - 1u);
+        constexpr std::array<core::ParameterKey, 7> auxiliary_keys{kEmitChance, kEmitLifeStart, kEmitLifeEnd,
+            kInheritVelocity, kInheritSize, kInheritOpacity, kInheritColor};
+        for (A_long field = 0; field < 7; ++field) {
+            if (!read_one_d(suites, plugin_id, effect, 17 + field, time, scalar)) return false;
+            add_value(node, auxiliary_keys[field], scalar);
         }
         return true;
     }
@@ -398,7 +406,7 @@ core::PortKey source_port(Kind kind) noexcept {
 core::PortKey destination_port(Kind kind) noexcept {
     using namespace core::graph_keys;
     switch (kind) {
-        case Kind::emitter: return {};
+        case Kind::emitter: return kEmitterParents;
         case Kind::particle: return kParticleParticlesIn;
         case Kind::appearance: return kAppearanceParticlesIn;
         case Kind::force: return kForceParticlesIn;

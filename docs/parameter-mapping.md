@@ -1,5 +1,31 @@
 # Parameter bridge: schema → AE control → core settings
 
+## Current controls — build 13
+
+Main manifest 20 is unchanged (streams 1..89). Native identity 3/layout 5 has
+Emitter base count 30; other native base counts and curve banks remain unchanged.
+Emitter graph schema is 5; envelope is 1; Core ABI is 2. Fresh effects are required.
+The saved node UUID/layout/connection indices derive from each base count.
+
+| Emitter stream | Control | Graph key / conversion |
+|---|---|---|
+| 1 / 2 / 3 | Type / Emitting / Particles Per Second | 5 minus one / 23 minus one / 2 |
+| 4 / 5 | Origin XY / Origin Z | 6; XY layer-centered, +Y up, AE Z divided by height |
+| 6 / 7 | Speed / Speed Random | 12 pixels/height / 22 percent |
+| 8..10 / 11 | Size X/Y/Z / Disc Size | 19..21 pixels / 10 layer-heights |
+| 12..14 / 15 / 16 | Angle X/Y/Z / Direction / Span | 14..16 / 17 minus one / 18 |
+| 17..19 | Emit Chance / Emit Life Start / Emit Life End | 24..26 percent |
+| 20..23 | Inherit Velocity / Size / Opacity / Color | 27..30 percent |
+| 24 | Random Seed | 3 |
+| 25 / 26 / 27..29 / 30 | Hidden birth size / opacity / velocity / vector jitter | 8 / 9 divide 100 / 7 / 11 |
+
+Emitting Default=0, Auxiliary=1. Auxiliary upper parent port is 2; Emitter lower
+particle output remains 1. Chance/life/inheritance default to 100/0/100/0/0/0/0.
+CEP uses 1-percent steps, and displays shape/Auxiliary controls only when relevant.
+The native effect currently exposes all authored source controls in its flat list.
+New graph Emitters initialize Speed to 100 pixels/s using actual layer geometry.
+Native edits use runtime indices, never setup-only uu.id. Selection has no value key.
+
 ## Reference controls — build 12
 
 Main schema 20 keeps indices 1..89. Life (hidden bootstrap) caps at 10000,

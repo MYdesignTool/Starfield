@@ -100,9 +100,9 @@ var alternateEmitterId = alternateEmitter.nodes[4].id;
 alternateEmitter = edits.apply(alternateEmitter, {
     type: "connect", from: alternateEmitterId, to: particleId
 }, idFactory);
-assert.strictEqual(edgeTo(alternateEmitter, particleId).length, 1,
-                   "reconnecting a single-input Particle still removes its prior source");
-assert.strictEqual(edgeTo(alternateEmitter, particleId)[0].sourceNode, alternateEmitterId);
+assert.strictEqual(edgeTo(alternateEmitter, particleId).length, 2,
+                   "Particle keeps multiple direct Emitter inputs");
+assert.ok(edgeTo(alternateEmitter, particleId).some(function (edge) { return edge.sourceNode === alternateEmitterId; }));
 
 var inserted = edits.apply(original, { type: "insertNode", from: particleId, to: forceId, nodeType: "force" }, idFactory);
 var insertedId = inserted.nodes[4].id;
@@ -191,10 +191,10 @@ assert.ok(duplicatedParticle.edges.some(function (edge) {
 
 var duplicatedEmitter = edits.apply(original, { type: "duplicateNodes", nodeIds: [original.nodes[0].id] }, idFactory);
 var copiedEmitterId = duplicatedEmitter.nodes[4].id;
-assert.strictEqual(duplicatedEmitter.edges.length, original.edges.length, "an Emitter copy stays disconnected");
+assert.strictEqual(duplicatedEmitter.edges.length, original.edges.length + 1, "an Emitter copy retains its outgoing Particle link");
 assert.strictEqual(duplicatedEmitter.edges.some(function (edge) {
     return edge.sourceNode === copiedEmitterId || edge.destinationNode === copiedEmitterId;
-}), false, "an Emitter copy does not create a second active source");
+}), true, "an Emitter copy contributes an independent active source");
 
 var appearanceGraph = edits.apply(original, { type: "addNode", nodeType: "appearance" }, idFactory);
 var appearanceId = appearanceGraph.nodes[4].id;

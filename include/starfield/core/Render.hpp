@@ -5,6 +5,7 @@
 #include "starfield/core/Time.hpp"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -161,6 +162,17 @@ struct RenderRequest {
     std::shared_ptr<const Graph> graph;
     // Stable caller-owned revision key reserved for derived render caches.
     std::uint64_t graph_revision{0};
+    struct Camera {
+        bool enabled{false};
+        // Row-vector layer-pixel -> view transform; +Z is in front of camera.
+        std::array<double, 16> layer_to_view{};
+        // Column-vector homogeneous image-pixel -> output-layer-pixel mapping.
+        // Removes AE's subsequent layer transform, including 3D perspective.
+        std::array<double, 9> image_to_layer{};
+        double focal_x{1.0}, focal_y{1.0};
+        double center_x{0.0}, center_y{0.0};
+        double near_clip{0.01};
+    } camera;
 };
 
 struct RenderOutput {

@@ -1,5 +1,30 @@
 # Starfield plug-in architecture
 
+## P-02G / build 13
+
+Native node edit callbacks dispatch by runtime parameter index. PF_ParamDef's
+setup-only uu.id union cannot identify edits: during USER_CHANGED_PARAM it holds
+change flags. UUID values and the batch guard still validate the owning node.
+The renderer continues to consume immutable graph snapshots; no render-time
+sibling reads are introduced. CEP node clicks select the UUID-owned AE effect
+(Output selects the renderer), with coalesced transient requests and no undo group.
+Unchanged node manifests skip redundant stream writes.
+
+Core ABI 2 carries a numeric camera snapshot. The adapter captures SDK matrices
+and the Core projects camera-facing sprites, clips behind-camera particles and
+sorts visible sprites by depth. Main PiPL/runtime flags include camera dependency.
+Layer inverse mapping avoids applying AE's later transform twice. See ADRs 0003,
+0005, 0012 and 0020 for coordinates, absent-camera behavior and open host gates.
+
+Emitter schema 5/native layout 5 adds Auxiliary mode and optional parent input 2.
+Auxiliary reuses StarfieldEmitter.aex and the common motion kernel. Each child
+samples parent position/velocity/appearance at birth and survives independently
+after parent death. Chance, parent-life window and inheritance are percentages.
+Output retains one cap; recursion/work are bounded and cancellable. CEP offers
+Auxiliary creation, preserves stable native records, and omits an inaccurate
+simple live-count estimate for Auxiliary. No old-project migration is provided.
+Fresh development effects are required. SDK/scoped tests do not qualify AE behavior.
+
 ## P-02F / build 12
 
 Particle input accepts distinct direct Emitters. The registry has no

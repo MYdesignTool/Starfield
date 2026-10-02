@@ -203,6 +203,7 @@ bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destinatio
     const auto& from = source.type_key;
     const auto& to = destination.type_key;
     if (from == kEmitterNode) return to == kParticleNode;
+    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kAppearanceNode;
     if (from == kParticleNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
     if (from == kForceNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
     if (from == kAppearanceNode) return to == kOutputNode;
@@ -212,11 +213,15 @@ bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destinatio
 } // namespace
 
 
-Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
+struct EvaluationBudget { std::uint64_t work{0}; };
+static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
-                                               EmitterDimensionContext dimension_context) {
+                                               EmitterDimensionContext dimension_context,
+                                               EvaluationBudget& budget, unsigned depth) {
     using R = Result<EvaluatedGraph>;
     if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph evaluation cancelled");
+    budget.work += graph.nodes.size() + graph.edges.size();
+    if (depth > 16 || budget.work > 20'000'000) return R::failure(ErrorCode::work_limit_exceeded, "auxiliary graph evaluation limit exceeded");
     if (!std::isfinite(dimension_context.layer_height_pixels) ||
         !(dimension_context.layer_height_pixels > 0.0) ||
         !std::isfinite(dimension_context.pixel_aspect_ratio) ||
@@ -270,6 +275,12 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 }
                 output_particle_count = validated_output.value.particle_count;
             } else if (node.type_key == kEmitterNode) {
+                if (const auto* mode = find_value(node, kEmittingMode); mode && std::get<std::uint32_t>(*mode) > 1)
+                    return R::failure(ErrorCode::invalid_request, "invalid Emitting mode");
+                for (const auto key : {kEmitChance, kEmitLifeStart, kEmitLifeEnd, kInheritVelocity, kInheritSize, kInheritOpacity, kInheritColor}) {
+                    if (const auto* value = find_value(node, key); value && (std::get<double>(*value) < 0 || std::get<double>(*value) > 100))
+                        return R::failure(ErrorCode::invalid_request, "auxiliary percentage outside 0..100");
+                }
                 auto value = read_emitter(node);
                 if (!value.has_value()) return R::failure(value.error());
                 emitters[i] = value.take_value();
@@ -356,9 +367,169 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         // validate_graph above.
         if (active_emitter_count == 0) return R::success(std::move(result));
 
+        // Apply stage rules before either primary or Auxiliary evaluation. An
+        // auxiliary prefix must not make an invalid active bypass disappear.
+        for (const auto& edge : graph.edges) {
+            const std::size_t source = index_of(edge.source_node);
+            const std::size_t destination = index_of(edge.destination_node);
+            if (active[source] && active[destination] &&
+                !is_particle_graph_edge(*nodes[source], *nodes[destination])) {
+                return R::failure(ErrorCode::invalid_request, "invalid active Particle graph connection");
+            }
+        }
+
+        const auto auxiliary = [&](std::size_t index) {
+            const auto* mode = find_value(*nodes[index], kEmittingMode);
+            return mode && std::get<std::uint32_t>(*mode) == 1;
+        };
+        bool has_auxiliary = false;
+        for (const auto index : topological_order) if (emitters[index]) {
+            if (!auxiliary(index) && !incoming[index].empty()) return R::failure(ErrorCode::invalid_request, "a parent input requires Auxiliary Emitting mode");
+            has_auxiliary = has_auxiliary || auxiliary(index);
+        }
+        if (has_auxiliary) {
+            // Parent graphs are restricted to each source's ancestors. Sampling
+            // at child birth time preserves children after their parent dies.
+            Graph roots = graph;
+            roots.edges.erase(std::remove_if(roots.edges.begin(), roots.edges.end(), [&](const GraphEdge& edge) {
+                const auto source = index_of(edge.source_node);
+                return emitters[source] && auxiliary(source);
+            }), roots.edges.end());
+            auto primary = evaluate_graph_impl(roots, time, cancellation, dimension_context, budget, depth + 1);
+            // Parked Auxiliary nodes remain ancestors through incoming edges in
+            // a root-only graph only if their outputs are present (removed above).
+            if (!primary.has_value()) return R::failure(primary.error());
+            struct Candidate { double birth; ParticleInstance particle; };
+            const auto before = [](const Candidate& a, const Candidate& b) {
+                if (a.birth != b.birth) return a.birth > b.birth; // oldest at heap top
+                if (a.particle.emitter_id != b.particle.emitter_id) return a.particle.emitter_id > b.particle.emitter_id;
+                return a.particle.id > b.particle.id;
+            };
+            std::vector<Candidate> storage; storage.reserve(output_particle_count);
+            std::priority_queue<Candidate, std::vector<Candidate>, decltype(before)> kept(before, std::move(storage));
+            const double now = to_seconds(*normalized);
+            auto retain = [&](ParticleInstance instance, double birth) {
+                if (output_particle_count == 0) return;
+                Candidate candidate{birth, std::move(instance)};
+                if (kept.size() < output_particle_count) kept.push(std::move(candidate));
+                else if (before(candidate, kept.top())) { kept.pop(); kept.push(std::move(candidate)); }
+            };
+            for (auto& instance : primary.value().particles) retain(std::move(instance), now - instance.age_seconds);
+            for (const auto emitter : topological_order) {
+                if (!emitters[emitter] || !auxiliary(emitter) || incoming[emitter].empty() || output_particle_count == 0) continue;
+                const auto percent = [&](ParameterKey key, double initial) {
+                    const auto* value = find_value(*nodes[emitter], key); return value ? std::get<double>(*value) / 100.0 : initial;
+                };
+                const double chance = percent(kEmitChance, 1), start = percent(kEmitLifeStart, 0), end = percent(kEmitLifeEnd, 1);
+                if (start > end) return R::failure(ErrorCode::invalid_request, "Emit Life Start exceeds Emit Life End");
+                if (chance == 0 || start == end || emitters[emitter]->value.birth_rate == 0) continue;
+                std::vector<std::size_t> children;
+                for (const auto child : outgoing[emitter]) if (active[child] && particles[child]) children.push_back(child);
+                std::sort(children.begin(), children.end());
+                if (children.empty()) continue;
+                // Reuse edge identities for terminal links, after pruning the
+                // original parent->Auxiliary edges out of this prefix graph.
+                std::vector<bool> ancestors(count, false);
+                std::vector<std::size_t> stack = incoming[emitter];
+                while (!stack.empty()) {
+                    const auto current = stack.back(); stack.pop_back();
+                    if (ancestors[current]) continue;
+                    ancestors[current] = true;
+                    for (const auto source : incoming[current]) stack.push_back(source);
+                }
+                Graph parent_graph;
+                for (std::size_t n = 0; n < count; ++n) if (ancestors[n] || n == output) parent_graph.nodes.push_back(*nodes[n]);
+                for (const auto& edge : graph.edges) {
+                    const auto source = index_of(edge.source_node), destination = index_of(edge.destination_node);
+                    if (ancestors[source] && ancestors[destination]) parent_graph.edges.push_back(edge);
+                    else if (destination == emitter) parent_graph.edges.push_back({edge.id, edge.source_node, edge.source_port, nodes[output]->id, kOutputParticles});
+                }
+                for (std::size_t branch = 0; branch < children.size(); ++branch) {
+                    const auto child = children[branch];
+                    Settings settings = emitters[emitter]->value;
+                    settings.particle_count = output_particle_count;
+                    settings.particle_lifetime_seconds = particles[child]->lifetime_seconds;
+                    AppearanceValues appearance = *particles[child];
+                    std::vector<bool> visited(count, false); stack = {child};
+                    unsigned overrides = 0;
+                    while (!stack.empty()) {
+                        const auto current = stack.back(); stack.pop_back();
+                        if (visited[current]) continue; visited[current] = true;
+                        if (forces[current]) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; }
+                        if (appearances[current]) { appearance = *appearances[current]; ++overrides; }
+                        for (const auto destination : outgoing[current]) if (active[destination] && !emitters[destination]) stack.push_back(destination);
+                    }
+                    if (overrides > 1) return R::failure(ErrorCode::invalid_request, "multiple Appearance overrides on Auxiliary stream");
+                    auto validated_settings = validate_settings(settings);
+                    if (!validated_settings.notices.empty()) return R::failure(ErrorCode::invalid_request, "auxiliary force values outside bounds");
+                    if (now < 0 || settings.particle_lifetime_seconds <= 0) continue;
+                    // Count clocks, not children: low chance or an empty parent
+                    // interval must not prematurely truncate the candidate window.
+                    const double last_tick = std::floor(now * settings.birth_rate);
+                    const double first_tick = std::max(0.0, std::floor((now-settings.particle_lifetime_seconds)*settings.birth_rate)+1.0);
+                    if (!std::isfinite(last_tick) || last_tick > 9e15) return R::failure(ErrorCode::invalid_time,"auxiliary clock exceeds exact slot range");
+                    const auto stride = static_cast<std::uint64_t>(children.size());
+                    const auto first = static_cast<std::uint64_t>(first_tick);
+                    const auto last = static_cast<std::uint64_t>(last_tick);
+                    const auto aligned_first = first + (branch + stride - first % stride) % stride;
+                    const auto clock_count = aligned_first <= last ? (last-aligned_first)/stride+1 : 0;
+                    for (std::uint64_t remaining = clock_count; remaining > 0; --remaining) {
+                        if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "auxiliary emission cancelled");
+                        const auto slot = aligned_first + (remaining - 1) * stride;
+                        const double birth = double(slot) / settings.birth_rate;
+                        if (kept.size() == output_particle_count && birth < kept.top().birth) break;
+                        if (birth > 9e9) return R::failure(ErrorCode::invalid_time, "auxiliary birth exceeds time range");
+                        const RationalTime birth_time{static_cast<std::int64_t>(std::llround(birth * 1e9)), 1'000'000'000};
+                        auto parents = evaluate_graph_impl(parent_graph, birth_time, cancellation, dimension_context, budget, depth + 1);
+                        if (!parents.has_value()) return R::failure(parents.error());
+                        for (const auto& parent : parents.value().particles) {
+                            if (++budget.work > 20'000'000) return R::failure(ErrorCode::work_limit_exceeded, "auxiliary population evaluation limit exceeded");
+                            const double age_fraction = parent.lifetime_seconds > 0 ? parent.age_seconds / parent.lifetime_seconds : 1;
+                            if (age_fraction < start || age_fraction >= end) continue;
+                            std::uint64_t parent_key = mix64(parent.id);
+                            for (const auto byte : parent.emitter_id.value.bytes) parent_key = mix64(parent_key ^ byte);
+                            if (unit_value(settings.seed, parent_key, RandomPurpose::auxiliary_chance) >= chance) continue;
+                            const auto child_id = mix64(parent_key ^ mix64(slot));
+                            auto child_settings = validated_settings;
+                            child_settings.value.seed = static_cast<std::uint32_t>(mix64(child_id ^ settings.seed));
+                            // Translate after the kernel; world positions are not
+                            // clamped to the authored Origin slider's UI bounds.
+                            child_settings.value.emitter_origin = {};
+                            ParticleInstance instance;
+                            const ParticleSlotTarget target{0, 0};
+                            const auto simulated = simulate_selected_particles_into(child_settings, now - birth, {&target, 1}, {&instance, 1}, cancellation, dimension_context);
+                            if (!simulated.has_value()) return R::failure(simulated.error());
+                            instance.id = child_id; instance.emitter_id = nodes[emitter]->id;
+                            auto inherited = appearance;
+                            const auto blend = [](double own, double source, double amount) { return own + (source - own) * amount; };
+                            inherited.size_start = blend(inherited.size_start, parent.size_pixels, percent(kInheritSize, 0));
+                            inherited.opacity_start = blend(inherited.opacity_start, parent.opacity, percent(kInheritOpacity, 0));
+                            const double color = percent(kInheritColor, 0);
+                            inherited.color_start = {blend(inherited.color_start.x, parent.color.x, color), blend(inherited.color_start.y, parent.color.y, color), blend(inherited.color_start.z, parent.color.z, color)};
+                            inherited.color_end = {blend(inherited.color_end.x, parent.color.x, color), blend(inherited.color_end.y, parent.color.y, color), blend(inherited.color_end.z, parent.color.z, color)};
+                            apply_appearance(instance, inherited, child_settings.value.seed);
+                            const double inherited_velocity = percent(kInheritVelocity, 0);
+                            const double integral = settings.linear_drag > 0 ? -std::expm1(-settings.linear_drag * instance.age_seconds) / settings.linear_drag : instance.age_seconds;
+                            const double decay = std::exp(-settings.linear_drag * instance.age_seconds);
+                            instance.position.x += parent.position.x + settings.emitter_origin.x + parent.velocity.x * inherited_velocity * integral;
+                            instance.position.y += parent.position.y + settings.emitter_origin.y + parent.velocity.y * inherited_velocity * integral;
+                            instance.position.z += parent.position.z + settings.emitter_origin.z + parent.velocity.z * inherited_velocity * integral;
+                            instance.velocity.x += parent.velocity.x * inherited_velocity * decay;
+                            instance.velocity.y += parent.velocity.y * inherited_velocity * decay;
+                            instance.velocity.z += parent.velocity.z * inherited_velocity * decay;
+                            retain(std::move(instance), birth);
+                        }
+                    }
+                }
+            }
+            result.particles.resize(kept.size());
+            for (std::size_t i = 0; !kept.empty(); ++i) { result.particles[i] = kept.top().particle; kept.pop(); }
+            return R::success(std::move(result));
+        }
+
         // An emitter without an active Particle branch is an incomplete graph,
-        // not an implicit single-stream renderer. Keep direct Emitter -> Output
-        // rewires transparent and reject active force/appearance bypasses.
+        // not an implicit single-stream renderer. Disconnected Output ancestry
+        // stays transparent; active force/appearance bypasses are rejected.
         if (active_particles.empty()) {
             for (const std::size_t index : topological_order) {
                 const auto type = nodes[index]->type_key;
@@ -379,14 +550,6 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             topological_rank[topological_order[rank]] = rank;
         }
 
-        for (const auto& edge : graph.edges) {
-            const std::size_t source = index_of(edge.source_node);
-            const std::size_t destination = index_of(edge.destination_node);
-            if (!active[source] || !active[destination]) continue;
-            if (!is_particle_graph_edge(*nodes[source], *nodes[destination])) {
-                return R::failure(ErrorCode::invalid_request, "invalid active Particle graph connection");
-            }
-        }
         std::vector<std::uint32_t> emitter_branch_counts(count, 0);
         for (const std::size_t particle_index : active_particles) {
             for (const std::size_t emitter_index : incoming[particle_index]) {
@@ -461,7 +624,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                                           "graph exceeds the particle-branch evaluation budget");
                     }
                     ++traversal_work;
-                    if (active[destination] && visited[destination] != visit_id) {
+                    if (active[destination] && !emitters[destination] && visited[destination] != visit_id) {
                         visited[destination] = visit_id;
                         stack.push_back(destination);
                     }
@@ -589,12 +752,21 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 apply_appearance(instance, appearance, plan.settings.value.seed);
             }
         }
+        budget.work += result.particles.size();
+        if (budget.work > 20'000'000) return R::failure(ErrorCode::work_limit_exceeded, "auxiliary evaluation limit exceeded");
         return R::success(std::move(result));
     } catch (const std::bad_alloc&) {
         return R::failure(ErrorCode::allocation_failed, "graph evaluation allocation failed");
     } catch (...) {
         return R::failure(ErrorCode::internal_failure, "graph evaluation failed");
     }
+}
+
+Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
+                                               const Cancellation& cancellation,
+                                               EmitterDimensionContext dimension_context) {
+    EvaluationBudget budget;
+    return evaluate_graph_impl(graph, time, cancellation, dimension_context, budget, 0);
 }
 
 } // namespace starfield::core

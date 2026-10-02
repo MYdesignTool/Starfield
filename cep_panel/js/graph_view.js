@@ -39,7 +39,15 @@
             "18": { label: "Direction Span", kind: "slider", decimals: 1, step: 1, min: 0, max: 180 },
             "19": { label: "Size X", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
             "20": { label: "Size Y", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
-            "21": { label: "Size Z", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" }
+            "21": { label: "Size Z", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" },
+            "23": { label:"Emitting",kind:"popup",decimals:0,step:1,min:1,max:2,displayOffset:1,choices:["Default","Auxiliary"] },
+            "24": {label:"Emit Chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "25": {label:"Emit Life Start",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "26": {label:"Emit Life End",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "27": {label:"Inherit Velocity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "28": {label:"Inherit Size",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "29": {label:"Inherit Opacity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "30": {label:"Inherit Color",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
         },
         particle: {
             "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
@@ -127,6 +135,8 @@
         var particles = [];
         for (var n = 0; n < graph.nodes.length; n++) {
             if (kindFor(graph.nodes[n].type) === "emitter" && active["$" + graph.nodes[n].id]) {
+                var emitting = findParameter(graph.nodes[n], "23");
+                if (emitting && Number(emitting.value) === 1) return null; // sampled parent populations require native evaluation
                 emitters.push(graph.nodes[n]);
             } else if (kindFor(graph.nodes[n].type) === "particle" && active["$" + graph.nodes[n].id]) {
                 particles.push(graph.nodes[n]);
@@ -280,8 +290,11 @@
             var source = graph.nodes[i];
             var kind = kindFor(source.type);
             if (!kind) fail("unknown_node_type", "the panel cannot display node type " + source.type);
-            var node = { id: source.id, kind: kind, type: source.type, label: LABELS[kind],
-                         inputPort: kind === "emitter" ? null : "1",
+            var emitting = findParameter(source,"23");
+            var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
+            var shape = findParameter(source,"5");
+            var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
+                         inputPort: kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
                          outputPort: kind === "output" ? null : (kind === "emitter" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,
                          curveParameterKeys: kind === "particle" || kind === "appearance"
@@ -297,6 +310,11 @@
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 if (spec && spec.hidden) continue;
+                if (kind === "emitter") {
+                    if (Number(graphParameter.key) >= 24 && Number(graphParameter.key) <= 30 && !isAuxiliary) continue;
+                    if (["19","20","21"].indexOf(graphParameter.key) >= 0 && (!shape || [1,2].indexOf(Number(shape.value)) < 0)) continue;
+                    if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
+                }
                 var parameter = viewParameter(node, kind, graphParameter, spec);
                 if (kind === "emitter" && geometry && Number(geometry.height) > 0 && Number(geometry.width) > 0) {
                     var height = Number(geometry.height), width = Number(geometry.width);
@@ -338,6 +356,10 @@
                             { key: key, type: 4, value: 0 }, specs[key]));
                     }
                 });
+            }
+            if (kind === "emitter") {
+                var emitterOrder = ["5","23","2","6","12","22","14","15","16","17","18","19","20","21","10","24","25","26","27","28","29","30","3"];
+                node.params.sort(function (a,b) { return emitterOrder.indexOf(a.graphKey)-emitterOrder.indexOf(b.graphKey); });
             }
             if (kind === "emitter") {
                 var emitterOrder = { "5":0, "2":1, "6":2, "12":3, "22":4, "19":5, "20":6, "21":7,

@@ -1,5 +1,22 @@
 # Reference parameter map (observed behavior)
 
+## Build 13 Emitter/Auxiliary slice — 2026-10-02
+
+The local observed parameter inventory and owner's screenshot confirm Emitter and
+Auxiliary share the reference Emitter module. Implement independent shared source
+infrastructure in StarfieldEmitter.aex, with a separate Auxiliary creation action
+and a Default/Auxiliary source-mode popup. This popup is our development mode
+selector; the reference's Emitting options have not been characterized. Do not
+claim their semantics match merely because the label is the same.
+
+Implemented: Emit Chance (100%), Emit Life Start/End (0/100%), inheritance of
+instantaneous velocity, size, opacity and color, native project storage, parent
+particle input and independent child lifetime. The core uses deterministic chance
+per parent identity and comp-zero emission ticks. Exact reference distributions,
+Origin Time Sample, Speed Over Life, Inertia, Orient and Time Offset remain open.
+Names/ordering alone do not establish behavior parity. Random Seed stays last.
+No decompiled kernels or private identities are reused.
+
 ## Build 12 implemented control alignment — 2026-10-02
 
 The local observed dump confirms Life (Seconds)=2, Size (Pixels)=10,

@@ -192,6 +192,7 @@ inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
 inline constexpr const char* kAppearanceNode = "org.starfieldfx.nodes.appearance";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
 inline constexpr PortKey kEmitterParticles{1};
+inline constexpr PortKey kEmitterParents{2};
 inline constexpr PortKey kParticleParticlesIn{1};
 inline constexpr PortKey kParticleParticlesOut{2};
 inline constexpr PortKey kForceParticlesIn{1};
@@ -225,6 +226,14 @@ inline constexpr ParameterKey kEmitterSizeZ{21};
 // present it defines the amplitude; Settings/direct graph construction retain
 // their independent world-unit jitter input (key 13).
 inline constexpr ParameterKey kEmissionSpeedRandomPercent{22};
+inline constexpr ParameterKey kEmittingMode{23};
+inline constexpr ParameterKey kEmitChance{24};
+inline constexpr ParameterKey kEmitLifeStart{25};
+inline constexpr ParameterKey kEmitLifeEnd{26};
+inline constexpr ParameterKey kInheritVelocity{27};
+inline constexpr ParameterKey kInheritSize{28};
+inline constexpr ParameterKey kInheritOpacity{29};
+inline constexpr ParameterKey kInheritColor{30};
 // Parameter keys are scoped to their node type; force and appearance nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};

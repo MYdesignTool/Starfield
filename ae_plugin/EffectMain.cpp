@@ -30,7 +30,7 @@ static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_P
               "PiPL AE_Effect_Global_OutFlags must match the runtime declaration");
 static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_REVEALS_ZERO_ALPHA | PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                        PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG |
-                                       PF_OutFlag2_I_MIX_GUID_DEPENDENCIES),
+                                       PF_OutFlag2_I_MIX_GUID_DEPENDENCIES | PF_OutFlag2_I_USE_3D_CAMERA),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
 
 namespace {

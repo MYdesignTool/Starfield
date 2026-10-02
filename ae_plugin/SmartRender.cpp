@@ -2,6 +2,7 @@
 
 #include "AE_Macros.h"
 #include "CoreLoader.hpp"
+#include "Camera.hpp"
 #include "Diagnostics.hpp"
 #include "Parameters.hpp"
 #include "WorldBridge.hpp"
@@ -256,6 +257,11 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
             frame.pixel_aspect_ratio};
         request.graph_bytes = state.graph_bytes.data();
         request.graph_byte_count = state.graph_bytes.size();
+        const PF_Err camera_error = capture_camera(in_data, request);
+        if (camera_error) {
+            std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
+            return camera_error;
+        }
         request.is_cancelled = [](void* context) -> std::int32_t {
             return static_cast<HostCancellation*>(context)->is_cancelled() ? 1 : 0;
         };

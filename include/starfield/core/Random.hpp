@@ -26,6 +26,7 @@ enum class RandomPurpose : std::uint64_t {
     direction_u1 = 9,
     direction_u2 = 10,
     emission_speed = 11,
+    auxiliary_chance = 12,
 };
 
 // splitmix64 finalizer: cheap, well distributed, and identical on every platform.

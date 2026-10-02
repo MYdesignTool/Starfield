@@ -1,5 +1,22 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 13 native edits, selection and Auxiliary — 2026-10-02
+
+P-02G retains independently saved native effects and immutable graph commits.
+Native edit callbacks use registered runtime indices: PF_ParamDef::uu.id is a
+setup-only union member and contains change flags during supervised edits.
+Saved UUID values and the batch guard validate node identity. CEP node clicks
+select the corresponding UUID-owned effect without graph writes/undo entries.
+
+Emitter and Auxiliary share StarfieldEmitter.aex. Native layout 5 registers
+source mode at index 2, auxiliary percent controls at 17..23 and seed at 24;
+disk IDs 125..132 are new. Base count is 30; record indices derive from it.
+Emitter graph schema 5 adds optional parent input 2. Main manifest 20 and
+Particle/Appearance/Force layouts remain unchanged. Core ABI 2 is paired with
+the camera-aware main adapter. Fresh development effects are required; no
+old-layout migration is added. Exact render/auxiliary contracts and host gates
+are in ADR 0020. Source/fake-host evidence is separate from AE acceptance.
+
 ## Build 12 reference controls and shared Particle inputs — 2026-10-02
 
 P-02F uses the locally observed reference parameter table to name Life (Seconds),

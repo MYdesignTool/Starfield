@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-12";
+    var GATEWAY_BUILD = "native-node-sync-13";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -556,7 +556,7 @@
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
-            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 4 :
+            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 5 :
                 type === "org.starfieldfx.nodes.particle" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
@@ -591,6 +591,10 @@
             node.parameters.push({ key:"12", type:4, value:speed });
             scalar(22, "Speed Random");
             scalar(17, "Direction", 3); node.parameters[node.parameters.length - 1].value--;
+            scalar(23, "Emitting", 3); node.parameters[node.parameters.length - 1].value--;
+            var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
+                [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
+            for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
         } else if (type === "org.starfieldfx.nodes.force") {
             vector(1, "Gravity"); scalar(2, "Linear Drag");
         } else {
@@ -744,6 +748,9 @@
                     else if (key === "20") setNodeControl(effect, "Size Y", value);
                     else if (key === "21") setNodeControl(effect, "Size Z", value);
                     else if (key === "22") setNodeControl(effect, "Speed Random", value);
+                    else if (key === "23") setNodeControl(effect, "Emitting", Number(value) + 1);
+                    else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
+                        ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
                     if (key === "1" || key === "2") setNodeControl(effect, key === "1" ? "Color Start" : "Color End",
@@ -865,8 +872,31 @@
         }
     }
 
-    function ensureNativeNodeEffects(layer, nodes, writeExisting) {
+    function sameAuthoredNode(left, right) {
+        if (!left || !right || left.type !== right.type || left.schemaVersion !== right.schemaVersion) return false;
+        function close(a,b) {
+            if (a instanceof Array && b instanceof Array) {
+                if (a.length !== b.length) return false;
+                for (var i=0;i<a.length;i++) if (!close(a[i],b[i])) return false;
+                return true;
+            }
+            if (typeof a === "number" && typeof b === "number") return Math.abs(a-b) <= 1e-9 + Math.max(Math.abs(a),Math.abs(b))*1e-12;
+            return a === b;
+        }
+        if (!close(left.position.x,right.position.x) || !close(left.position.y,right.position.y) ||
+            JSON.stringify(left.outgoing) !== JSON.stringify(right.outgoing) || left.parameters.length !== right.parameters.length) return false;
+        var byKey={};
+        for(var p=0;p<left.parameters.length;p++) byKey["$"+left.parameters[p].key]=left.parameters[p];
+        for(var q=0;q<right.parameters.length;q++) {
+            var target=right.parameters[q], source=byKey["$"+target.key];
+            if (!source || source.type !== target.type || !close(source.value,target.value)) return false;
+        }
+        return true;
+    }
+    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes) {
         validateNodeManifest(nodes);
+        var previous={};
+        if (previousNodes) for(var p=0;p<previousNodes.length;p++) previous["$"+previousNodes[p].id]=previousNodes[p];
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
             var effect = nodeEffectById(layer, node.id);
@@ -874,7 +904,7 @@
             else {
                 var existingType = nativeNodeTypeByMatch(effect.matchName);
                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
-                if (writeExisting) setNodeParameters(effect, node, layer);
+                if (writeExisting && !sameAuthoredNode(previous["$"+node.id],node)) setNodeParameters(effect, node, layer);
             }
         }
     }
@@ -1127,7 +1157,7 @@
                 }
                 var initial = [];
                 if (!emitter) {
-                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:4,
+                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:5,
                         parameters:[{key:"6",type:5,value:[0,0,0]}],position:{x:180,y:22},outgoing:[]};
                     initial.push(emitter);
                 }
@@ -1231,7 +1261,7 @@
             app.beginUndoGroup("Starfield: edit graph and nodes");
             groupOpen = true;
             resolved.properties.guard.setValue(1);
-            ensureNativeNodeEffects(layer, desiredNodes, true);
+            ensureNativeNodeEffects(layer, desiredNodes, true, previousNodes);
             removeNativeNodeEffects(layer, removedNodeIds(previousNodes, desiredNodes));
 
             // Effect Parade structural edits invalidate indexed-group references. Resolve
@@ -1712,6 +1742,25 @@
         }
     }
 
+    function SFLD_selectNodeEffect(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request || request.operation !== "selectNodeEffect") return fail("invalid_request", "Invalid selection request.");
+        try {
+            var resolved = graphCarrierTarget(request);
+            if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+            var layer = resolved.target.layer;
+            var effect = request.nodeId === "000000000000000000000000000000ff" ? resolved.target.effect : nodeEffectById(layer, request.nodeId);
+            if (!effect) return fail("missing_node", "The selected node effect was removed; refresh the graph.");
+            // Selection is transient host UI state. UUID lookup survives reorder,
+            // duplicate names and native effect deletion; it writes no controls.
+            var selected = layer.selectedProperties;
+            for (var i = selected.length - 1; i >= 0; i--) selected[i].selected = false;
+            layer.selected = true;
+            effect.selected = true;
+            return reply({ok:true, operation:"selectNodeEffect", nodeId:request.nodeId, requestId:request.requestId || ""});
+        } catch (error) { return fail("selection_failed", error.toString()); }
+    }
+
     function SFLD_getFrameStatus(requestJson) {
         var request = parseRequest(requestJson);
         if (!request) return fail("invalid_request", "Unsupported or malformed request envelope.");
@@ -1793,6 +1842,7 @@
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
     host.SFLD_getState = SFLD_getState;
+    host.SFLD_selectNodeEffect = SFLD_selectNodeEffect;
     host.SFLD_getFrameStatus = SFLD_getFrameStatus;
     host.SFLD_setParameters = SFLD_setParameters;
     host.SFLD_setNodeLayout = SFLD_setNodeLayout;

@@ -43,6 +43,7 @@
   <ItemGroup>
     <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="CoreLoader.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="EffectMain.cpp" />
       <ClCompile Include="GraphCarrier.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />

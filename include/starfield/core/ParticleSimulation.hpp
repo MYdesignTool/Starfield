@@ -23,6 +23,7 @@ struct ParticleInstance {
     double opacity{0.0};
     Vec3 color{1.0, 1.0, 1.0};
     Vec3 position{};
+    Vec3 velocity{}; // instantaneous world units/s, used by auxiliary inheritance
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

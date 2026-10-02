@@ -301,6 +301,10 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
                           values.gravity.y * factors.acceleration_displacement;
     particle.position.z = values.emitter_origin.z + birth.z + particle_velocity.z * factors.velocity_displacement +
                           values.gravity.z * factors.acceleration_displacement;
+    const double decay = std::exp(-values.linear_drag * age);
+    particle.velocity = {particle_velocity.x * decay + values.gravity.x * factors.velocity_displacement,
+                         particle_velocity.y * decay + values.gravity.y * factors.velocity_displacement,
+                         particle_velocity.z * decay + values.gravity.z * factors.velocity_displacement};
     return particle;
 }
 

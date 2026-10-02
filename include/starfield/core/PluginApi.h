@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 1u
+#define SF_CORE_ABI_VERSION 2u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -58,6 +58,10 @@ typedef struct SfCoreRenderRequest {
     uint64_t graph_revision;
     int32_t (SF_CORE_CALL *is_cancelled)(void* context);
     void* cancel_context;
+    uint32_t camera_enabled;
+    double layer_to_view[16];
+    double image_to_layer[9];
+    double focal_x, focal_y, center_x, center_y, near_clip;
 } SfCoreRenderRequest;
 
 /* pixels and opaque_handle are owned by this DLL generation. The adapter copies

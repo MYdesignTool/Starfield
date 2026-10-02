@@ -24,6 +24,7 @@ if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSB
 # are intentionally absent here.
 $adapterInputs = @(
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
+    'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
     'ae_plugin\EffectMain.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\GraphCarrier.hpp',
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',

@@ -506,7 +506,8 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor emitter;
     emitter.type_key = kEmitterNode;
-    emitter.schema_version = 4;
+    emitter.schema_version = 5;
+    emitter.ports.push_back(PortDescriptor{kEmitterParents, PortDirection::input, kParticleStream, false, 0});
     emitter.ports.push_back(PortDescriptor{kEmitterParticles, PortDirection::output, kParticleStream, false, 0});
     emitter.parameters = {
         ParameterDescriptor{kBirthRate, ParameterKind::float64, true},
@@ -531,6 +532,14 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kEmitterSizeY, ParameterKind::float64, false},
         ParameterDescriptor{kEmitterSizeZ, ParameterKind::float64, false},
         ParameterDescriptor{kEmissionSpeedRandomPercent, ParameterKind::float64, false},
+        ParameterDescriptor{kEmittingMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kEmitChance, ParameterKind::float64, false},
+        ParameterDescriptor{kEmitLifeStart, ParameterKind::float64, false},
+        ParameterDescriptor{kEmitLifeEnd, ParameterKind::float64, false},
+        ParameterDescriptor{kInheritVelocity, ParameterKind::float64, false},
+        ParameterDescriptor{kInheritSize, ParameterKind::float64, false},
+        ParameterDescriptor{kInheritOpacity, ParameterKind::float64, false},
+        ParameterDescriptor{kInheritColor, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor particle;

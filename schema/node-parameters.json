@@ -1,7 +1,7 @@
 {
   "identityRevision": 3,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Unreleased layout 4 splits Origin into 2D XY (disk 123) and scalar Z (124), reserving removed disk 106. Emitter base count is 22; other node counts stay unchanged. Native Opacity is 0..100 percent; Speed is pixels/second, Speed Random percentage amplitude. Compiler/gateway convert to canonical Speed/Opacity units; Emitter schema 4 adds independent random-percent graph key 22. Main manifest 20. No development migration; create fresh effects.",
+  "migrationPolicy": "Development layout 5 appends Auxiliary controls and registers Emitting after Type; Emitter base count 30, graph schema 5, paired Core ABI 2. No old-project migration; create fresh development effects.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,
@@ -40,7 +40,15 @@
     "size_curve_count": 700,
     "opacity_curve_count": 800,
     "origin_xy": 123,
-    "origin_z": 124
+    "origin_z": 124,
+    "emitting_mode": 125,
+    "emit_chance": 126,
+    "emit_life_start": 127,
+    "emit_life_end": 128,
+    "inherit_velocity": 129,
+    "inherit_size": 130,
+    "inherit_opacity": 131,
+    "inherit_color": 132
   },
   "outgoingConnections": {
     "first": 500,
@@ -64,7 +72,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter, Particle and Appearance reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 4,
+  "layoutRevision": 5,
   "reservedRemovedGroupIds": [
     100,
     122,
