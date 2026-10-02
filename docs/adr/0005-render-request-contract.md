@@ -41,6 +41,15 @@ Failures use the `ErrorCode` taxonomy, never host error codes. Structural proble
 (`work_limit_exceeded`), and host cancellation (`cancelled`) are distinguishable so the adapter
 can map them onto a stable AE error.
 
+Build 10 (G-06, 2026-10-02) treats `cancelled` as normal host interruption:
+return the captured `PF_ABORT` error, or `PF_Interrupt_CANCEL` if unavailable,
+and leave `PF_OutData::return_msg` empty. The May 2023 SDK `AE_Effect.h` documents
+that any nonempty return_msg opens a dialog even without DISPLAY_ERROR_MESSAGE.
+Owner build-9 screenshots show graph evaluation and pixel encoding cancellations
+being displayed as errors. Genuine failures retain their diagnostics; result
+release and pixel checkout cleanup still execute on cancellation. Actual AE
+editing/preview acceptance of the build-10 fix remains open.
+
 Work is bounded on purpose: the CPU renderer accumulates a sprite-coverage budget and returns
 `work_limit_exceeded` instead of blocking the host for an unbounded time. The budget is a
 documented constant, not a hidden truncation.

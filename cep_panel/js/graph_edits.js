@@ -156,6 +156,9 @@
         if (destination.type === TYPES.particle && source.type !== TYPES.emitter) {
             fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
         }
+        if (source.type === TYPES.appearance && destination.type !== TYPES.output) {
+            fail("invalid_stage", "an Appearance override connects to Output");
+        }
         // Reject a cycle before producing a request. The native validator still checks
         // the complete graph, including node-specific stage rules and resource limits.
         var adjacency = {};
@@ -424,5 +427,14 @@
         return layout.set(graph, positions);
     }
 
-    return { types: TYPES, ports: PORTS, apply: apply, createInsertEdit: createInsertEdit, randomId: randomId };
+    function canConnect(graph, sourceId, destinationId, sourcePort, destinationPort) {
+        if (!graph) return false;
+        try {
+            validateConnection(graph, sourceId, destinationId, sourcePort, destinationPort);
+            return true;
+        } catch (invalidConnection) { return false; }
+    }
+
+    return { types: TYPES, ports: PORTS, apply: apply, createInsertEdit: createInsertEdit,
+             randomId: randomId, canConnect: canConnect };
 }));

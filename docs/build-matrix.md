@@ -1,5 +1,28 @@
 # Build and host matrix
 
+## Build 10 G-06 candidate — 2026-10-02
+
+Packed 32778 (0x800A); main schema 18, native identity revision 2, graph schemas
+and CEP native-node-sync-6 unchanged. Multi-emitter evaluation shares one Output
+cap; normal cancellation has no dialog message. CEP wire disconnect/port snapping
+uses the existing native transactions and installed source Junction.
+SDK build and both CEP syntax checks pass; no test suites added/rerun.
+Build used -NoRuntimePublish -NoDistPublish. Deployment/owner acceptance pending.
+Selected installed Core is still StarfieldCore-6D70281C4E756BCA.dll (build 9);
+the candidate will select StarfieldCore-AE18EFC2E9856178.dll.
+
+| Candidate file | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `13D03304FCA41528BD1DE10FAF04B05A1C3D436C2A62ADB0D6AD6D8B059741F3` |
+| `StarfieldEmitter.aex` | `A41FB2A3155DEDC16371565D4ABB54BB2BA1898058AAD09A2CB87EE5F253BE2D` |
+| `StarfieldParticleNode.aex` | `BDA6885E48EA6B854C5106F74809B73E5A201A70E2B0B8BD51017DC06535E88C` |
+| `StarfieldAppearance.aex` | `AE8CEE33812F38DF7CD2DE778B7A36999C84435C494F4F17FA16DEF82CAE3288` |
+| `StarfieldForce.aex` | `322529E0D6EF6F77AC6B6686941CB0CDCC7A3F0B113022F4976832526AB5B8DE` |
+| `StarfieldCore.dll` | `AE18EFC2E9856178B858444BA0E0F7FEC5A4BB7763D53334C873C635A52B280D` |
+
+Backup name: p02d-build10-multi-emitter-20261002.
+[Before/after state, owner gates and one-step rollback](native-node-checkpoint.md).
+
 ## Current build 9 numeric-ID deployment — 2026-10-02
 
 Packed 32777 (0x8009); native identity revision 2, main schema 18 and CEP

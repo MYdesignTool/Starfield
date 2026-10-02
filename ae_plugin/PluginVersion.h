@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 9 uses bounded numeric disk IDs for every native node parameter.
-#define STARFIELD_VERSION_BUILD 9
-#define STARFIELD_VERSION_PACKED 32777 /* 0x8009 */
+// Build 10 supports multiple emitter streams and quiet host cancellation.
+#define STARFIELD_VERSION_BUILD 10
+#define STARFIELD_VERSION_PACKED 32778 /* 0x800A */

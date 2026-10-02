@@ -146,6 +146,7 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   touch-action: none;
 }
 .graph-edges, .graph-nodes { position: absolute; inset: 0; width: 100%; height: 100%; }
+.graph-nodes { pointer-events: none; }
 .graph-edges { overflow: visible; pointer-events: auto; }
 .graph-edges .edge {
   fill: none;
@@ -211,6 +212,7 @@ button:hover, button:focus-visible { border-color: var(--accent); }
 .hint { color: var(--muted); margin: 9px; }
 
 .graph-node {
+  pointer-events: auto;
   position: absolute;
   width: 110px;
   height: 54px;
@@ -256,6 +258,10 @@ button:hover, button:focus-visible { border-color: var(--accent); }
   background: var(--node-color);
   pointer-events: auto;
   cursor: crosshair;
+}
+.port.connection-snap {
+  border-color: #fff;
+  box-shadow: 0 0 0 5px #89a9d255, 0 0 12px var(--node-color);
 }
 .floating-inspector {
   position: absolute;

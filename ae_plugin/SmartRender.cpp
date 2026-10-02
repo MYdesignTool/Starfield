@@ -82,12 +82,16 @@ void report_failure(PF_OutData* out_data, const core::CoreError& error) noexcept
     if (out_data == nullptr) {
         return;
     }
+    if (error.code == core::ErrorCode::cancelled) {
+        out_data->return_msg[0] = '\0';
+        return;
+    }
     // std::snprintf instead of the host formatter: this path must not depend on a
     // callback that may be unavailable when a render fails.
     std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield Particle: %s (%s)",
                   core::describe(error.code), error.detail);
-    // Deliberately not PF_OutFlag_DISPLAY_ERROR_MESSAGE: a failing preview frame
-    // should land in AE's error list instead of interrupting every render.
+    // A nonempty return_msg opens a dialog even without DISPLAY_ERROR_MESSAGE
+    // (AE_Effect.h). Keep diagnostics for real failures, never normal interrupts.
 }
 
 PF_Err host_error_for_status(SfCoreStatus status, PF_Err abort_error) noexcept {
@@ -266,9 +270,12 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
             ~ResultRelease() { api.release_render_result(&result); }
         } release{api, rendered};
         if (status != SF_CORE_OK || rendered.status != SF_CORE_OK) {
-            report_core_failure(out_data, rendered.detail);
-            return host_error_for_status(status != SF_CORE_OK ? status : rendered.status,
-                                         cancellation.abort_error());
+            const auto failure = status != SF_CORE_OK ? status : rendered.status;
+            // AE aborts superseded preview frames during ordinary editing. A
+            // return_msg converts that normal interrupt into an error dialog.
+            if (failure != SF_CORE_CANCELLED) report_core_failure(out_data, rendered.detail);
+            else if (out_data != nullptr) out_data->return_msg[0] = '\0';
+            return host_error_for_status(failure, cancellation.abort_error());
         }
         if (rendered.pixel_byte_count > std::numeric_limits<std::size_t>::max() ||
             (rendered.pixel_byte_count > 0 && rendered.pixels == nullptr) ||

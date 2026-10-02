@@ -4,6 +4,16 @@ Current target: After Effects 2023 on Windows x64, built with the supplied May 2
 
 ## Goal and boundary
 
+G-06/build 10 evaluates multiple Emitters through their own UUID-ordered Particle
+children and merges actual live births under Output's single cap. Internal
+particle identity pairs Emitter UUID with local birth slot. Selected particles
+write directly into a bounded final buffer; no per-emitter population allocation
+or final sort. Host cancellation returns an interrupt without a dialog message.
+CEP wire hits pass through the empty node container and connection previews snap
+to compatible ports within 22 screen pixels. Independent saved AE node effects,
+render snapshots, graph schemas and C ABI remain unchanged. SDK compilation
+passes; owner qualification of these fixes is pending.
+
 Native node parameter identity revision 2 (build 9) uses explicit disk IDs in
 1..9999, defined in `schema/node-parameters.json` and shared `NodeRecord.hpp`.
 Registration and supervised edit lookup use the same identities; compile-time
@@ -154,4 +164,4 @@ prior monolith is backed up for rollback. Half/Third point mapping, split-build
 copy/undo, shapes and basic gravity/size changes also have AE observations. See
 `compatibility-matrix.md`.
 
-M0/M1, M2 rendering, M3 core behavior, G-01–G-05 and CEP graph authoring source are present. Revision-18 build 5 is deployed through one Starfield → dist junction. Independent node effects own authoring data; the main effect owns Output and a compiled render graph. The gateway reads ordinary records without expressions or CUSTOM_VALUE scripting. Ready marker 89 prevents deleted nodes from being recreated; refresh prunes dangling links and re-keys raw duplicates. The owner reported stale_graph during refresh; CEP 5a removes projection-based inspection rejection. Retest native add/copy/edit/connect/disconnect/delete, render response, undo and save/reopen. Automatic bootstrap with CEP closed, multiple active emitters, animation/history, MFR and GPU remain open.
+M0/M1, M2 rendering, M3 core behavior, G-01–G-06 and CEP graph authoring source are present. Independent node effects own authoring data; the main effect owns Output and a compiled render graph. The gateway reads ordinary records without expressions or CUSTOM_VALUE scripting. Ready marker 89 prevents deleted nodes from being recreated; refresh prunes dangling links and re-keys raw duplicates. The owner describes build 9 as basically working but reports render cancellation dialogs and multiple-emitter rejection. Build 10 implements those fixes plus wire disconnect/snapping. Exact node-operation acceptance, render response, multi-emitter behavior, undo and save/reopen remain owner gates. Automatic bootstrap with CEP closed, animation/history, MFR and GPU remain open.

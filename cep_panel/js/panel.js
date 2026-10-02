@@ -31,6 +31,7 @@
     var marqueeState = null;
     var panState = null;
     var connectionState = null;
+    var edgePressState = null;
     var contextEdge = null;
     var contextGraphPoint = null;
     var nodePositions = {};
@@ -397,7 +398,7 @@
     }
 
     function canvasInteractionActive() {
-        return !!(dragState || panState || marqueeState || connectionState || minimapPanState || inspectorDragState || curveDragState ||
+        return !!(dragState || panState || marqueeState || connectionState || edgePressState || minimapPanState || inspectorDragState || curveDragState ||
                   numericScrubState);
     }
 
@@ -806,15 +807,24 @@
             path.setAttribute("tabindex", "0");
             path.setAttribute("role", "button");
             path.setAttribute("aria-label", "Disconnect " + edge[0] + " from " + edge[1]);
-            path.addEventListener("click", function () {
-                requestTopologyEdit({ type: "disconnect", from: this.getAttribute("data-from"),
-                                      to: this.getAttribute("data-to"),
-                                      edgeId: this.getAttribute("data-edge-id") || undefined });
+            path.addEventListener("pointerdown", function (event) {
+                if (event.button !== 0 || event.isPrimary === false || state.pending) return;
+                event.preventDefault();
+                event.stopPropagation();
+                capturePointer(event);
+                edgePressState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+                                   edit: edgeDisconnectEdit(this) };
+            });
+            path.addEventListener("click", function (event) {
+                // Physical clicks commit on pointerup; synthetic/accessibility
+                // activation has no pointer sequence and commits here.
+                if (event && event.detail > 0) return;
+                requestTopologyEdit(edgeDisconnectEdit(this));
             });
             path.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    this.click();
+                    requestTopologyEdit(edgeDisconnectEdit(this));
                 }
             });
             elements.edgePaths.appendChild(path);
@@ -851,6 +861,11 @@
     function requestTopologyEdit(edit) {
         if (!state.targetToken || !state.revision || state.pending) return;
         applyTopologyEdit(edit);
+    }
+
+    function edgeDisconnectEdit(path) {
+        return { type: "disconnect", from: path.getAttribute("data-from"),
+                 to: path.getAttribute("data-to"), edgeId: path.getAttribute("data-edge-id") || undefined };
     }
 
     function loadGraphSnapshot(targetToken, callback) {
@@ -1762,6 +1777,45 @@
         renderEdges();
     }
 
+    function nearestConnectionPort(event) {
+        if (!connectionState || !state.graph || !window.StarfieldGraphEdits || !window.StarfieldGraphEdits.canConnect) return null;
+        var nearest = null;
+        var distanceSquared = 22 * 22;
+        for (var nodeId in graphNodeElements) {
+            if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId) || nodeId === connectionState.nodeId) continue;
+            var port = connectionState.direction === "out" ? graphNodeElements[nodeId].input : graphNodeElements[nodeId].output;
+            if (!port) continue;
+            var bounds = port.getBoundingClientRect();
+            var dx = event.clientX - (bounds.left + bounds.width / 2);
+            var dy = event.clientY - (bounds.top + bounds.height / 2);
+            var distance = dx * dx + dy * dy;
+            if (distance > distanceSquared) continue;
+            var from = connectionState.direction === "out" ? connectionState.nodeId : nodeId;
+            var to = connectionState.direction === "in" ? connectionState.nodeId : nodeId;
+            var outputPort = connectionState.direction === "out" ? connectionState.portKey : port.getAttribute("data-port-key");
+            var inputPort = connectionState.direction === "in" ? connectionState.portKey : port.getAttribute("data-port-key");
+            if (!window.StarfieldGraphEdits.canConnect(state.graph, from, to, outputPort, inputPort)) continue;
+            nearest = port;
+            distanceSquared = distance;
+        }
+        return nearest;
+    }
+
+    function updateConnectionPoint(event) {
+        var port = nearestConnectionPort(event);
+        if (connectionState.snapPort && connectionState.snapPort !== port) {
+            connectionState.snapPort.classList.remove("connection-snap");
+        }
+        connectionState.snapPort = port;
+        if (port) {
+            port.classList.add("connection-snap");
+            connectionState.point = portPoint(port.getAttribute("data-node-id"),
+                                              connectionState.direction === "out" ? "top" : "bottom");
+        } else {
+            connectionState.point = canvasPoint(event.clientX, event.clientY);
+        }
+    }
+
     function beginMarquee(event) {
         if (event.button !== 0 || event.isPrimary === false || !elements.graphScroll || state.pending) return;
         if (event.target.closest && (event.target.closest(".graph-node") || event.target.closest(".edge-hit") ||
@@ -1917,6 +1971,12 @@
     }
 
     function moveNodeDrag(event) {
+        if (edgePressState) {
+            var pressDx = event.clientX - edgePressState.startX;
+            var pressDy = event.clientY - edgePressState.startY;
+            if (pressDx * pressDx + pressDy * pressDy > 25) edgePressState.moved = true;
+            return;
+        }
         if (numericScrubState) { moveNumericScrub(event); return; }
         if (curveDragState) { moveCurvePoint(event); return; }
         if (minimapPanState) { moveViewToMinimapPoint(event); return; }
@@ -1931,7 +1991,7 @@
             return;
         }
         if (connectionState) {
-            connectionState.point = canvasPoint(event.clientX, event.clientY);
+            updateConnectionPoint(event);
             renderEdges();
             if (event.preventDefault) event.preventDefault();
             return;
@@ -1965,6 +2025,17 @@
     }
 
     function endNodeDrag(event) {
+        if (edgePressState) {
+            if (!event || (event.pointerId !== undefined && event.pointerId !== edgePressState.pointerId)) return;
+            var edgePress = edgePressState;
+            edgePressState = null;
+            var edgeDx = event.clientX - edgePress.startX;
+            var edgeDy = event.clientY - edgePress.startY;
+            if (event.type !== "pointercancel" && !edgePress.moved && edgeDx * edgeDx + edgeDy * edgeDy <= 25) {
+                requestTopologyEdit(edgePress.edit);
+            }
+            return;
+        }
         if (numericScrubState) {
             if (event && event.pointerId !== undefined && numericScrubState.pointerId !== event.pointerId) return;
             var scrub = numericScrubState;
@@ -2007,8 +2078,8 @@
         }
         if (connectionState) {
             if (event && event.type !== "pointercancel") {
-                var hit = document.elementFromPoint(event.clientX, event.clientY);
-                var port = closestElement(hit, ".port");
+                updateConnectionPoint(event);
+                var port = connectionState.snapPort;
                 if (port && port.getAttribute("data-port-direction") !== connectionState.direction) {
                     var otherNodeId = port.getAttribute("data-node-id");
                     if (otherNodeId && otherNodeId !== connectionState.nodeId) {
@@ -2024,6 +2095,7 @@
                     }
                 }
             }
+            if (connectionState.snapPort) connectionState.snapPort.classList.remove("connection-snap");
             connectionState = null;
             renderEdges();
         }

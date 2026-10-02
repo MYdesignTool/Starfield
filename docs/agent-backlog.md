@@ -1,6 +1,14 @@
 # Agent-ready implementation backlog
 
-## Current P-02D checkpoint — 2026-10-01
+## Current G-06 checkpoint — 2026-10-02
+
+Owner describes build 9 as basically working but reports cancellation dialogs,
+multiple-active-emitter rejection and ineffective wire-click disconnect. Build 10
+implements quiet interrupts, bounded multi-emitter population merge and wire/port
+interaction fixes. SDK build and both CEP syntax checks pass; no test suites
+added/rerun. Deployment and precise owner AE acceptance pending.
+
+## Previous P-02D checkpoint — 2026-10-01
 
 Independent node records and transactions are source-integrated. Owner evidence:
 build 3 renders but crashes on layer selection. Build 4 removes unused hidden
@@ -13,6 +21,16 @@ See [native-node-checkpoint.md](native-node-checkpoint.md).
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 
 ## Current checkpoint
+
+### G-06 — Multiple emitters and normal render cancellation (2026-10-02)
+
+- **Owner:** integration lead; active task.
+- **Dependencies:** G-05, P-02D, M2-05; ADRs 0005, 0012, 0015.
+- **Owned files:** `src/core/GraphEvaluation.cpp`, `include/starfield/core/ParticleSimulation.hpp`, `src/core/ParticleSimulation.cpp`, `ae_plugin/SmartRender.cpp`, `ae_plugin/PluginVersion.h`, `ae_plugin/BuildWindows.ps1`, `cep_panel/js/panel.js`, `cep_panel/js/graph_edits.js`, `cep_panel/css/panel.css`, `cep_panel/README.md`, and matching architecture, roadmap, backlog, ADR, checkpoint, build and compatibility documentation.
+- **Scope:** handle owner build-9 feedback: two normal cancellation dialogs and the one-active-emitter restriction. Keep independent native node effects, saved IDs, graph schema, the C ABI and Render.hpp unchanged. Partition each emitter's births over its own active Particle children; merge live births under Output's single cap. Preserve deterministic identity `(emitter UUID, local birth slot)`, bounded memory/work, force merge and one-pass appearance precedence. Never fill AE's error message for normal cancellation.
+- **Acceptance:** May 2023 SDK candidate builds; owner verifies multi-emitter output and editing cancellation in AE 2023. Do not add/run tests without an owner request. Compilation is not host qualification.
+- **Status:** candidate implemented; SDK build and both CEP syntax checks pass. Deployment and owner verification pending. Owner says build 9 is basically working but reports the three remaining errors; exact node-operation and bit-depth acceptance remains unrecorded.
+- **Owner steering:** fix wire-click disconnect and snap a dragged connection to compatible ports within a constant screen-space radius. The node container must allow wire hit testing; hold automatic refresh during a wire press and commit once on release. Existing native graph transactions remain the save/undo path.
 
 - **BUILD-23 (integration lead):** owner scope is now AE 2023 only. Script/MSBuild defaults and primary docs use the May 2023 SDK and `artifacts/plugin/2023/`; newer-host tasks are deferred. Owns build defaults and policy documentation only.
 - **G-03:** emitter/output core runtime and graph/flat parity implemented in `070c33e`; the force/appearance kernels now complete the Alpha chain (closed-form gravity/drag integration, linear age curves for size/opacity/color, stage-order enforcement) and graph/flat parity is pinned by the core tests. The current core suite passes 11,909 checks and the May 2023 SDK build succeeds.

@@ -40,6 +40,7 @@ $adapterInputs = @(
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
+    'include\starfield\core\ParticleSimulation.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
     'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',
     'include\starfield\core\Time.hpp', 'schema\parameters.json',

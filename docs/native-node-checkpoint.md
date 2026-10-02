@@ -1,5 +1,45 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 10: multi-emitter evaluation and wire editing — 2026-10-02
+
+Owner build-9 evidence is "基本正常但不完全正常", with two cancellation
+dialogs and the core's single-emitter restriction. This is not a blanket pass
+for every node operation. The owner also reports ineffective wire-click
+disconnect and requests port snapping.
+
+G-06/build 10 returns normal render interrupts without return_msg. Each Emitter
+partitions births among its own UUID-ordered Particle children; actual live
+sequences merge under Output's one cap, preserving identity `(emitter UUID,
+local slot)`. Only selected births are simulated into a pre-sized final buffer,
+with no per-emitter particle populations/final sort. Force deduplication and
+one-pass appearance precedence remain in place. ADR 0015 defines cap/order.
+
+CEP's full-canvas node container was intercepting wire hits. Its empty area
+now passes pointer events; wire presses pause automatic refresh and commit one
+disconnect on release. Compatible opposite ports highlight/snap within 22 screen
+pixels; invalid stages, self-links and cycles do not snap. Existing revisioned
+native record transactions persist these operations. The installed CEP Junction
+already targets this workspace; no CEP installation/host settings are changed.
+Close/reopen CEP after loading the new native build.
+
+Packed 32778 (0x800A); main schema 18, native identity revision 2, graph schemas,
+gateway token native-node-sync-6 and C ABI unchanged. No project migration. SDK
+build and both CEP JavaScript syntax checks pass; no tests added/rerun. Build
+log: artifacts/build10-multi-emitter-build.log. Candidate hashes are in the build
+matrix. Candidate publication was disabled with -NoRuntimePublish -NoDistPublish.
+Deployment is pending under standing AE-closed authorization; no process started
+or stopped. Planned backup: artifacts/disabled/p02d-build10-multi-emitter-20261002.
+
+One-step undo after deployment (AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02d-build10-multi-emitter-20261002' -Rollback
+```
+
+Remaining owner checks: multiple Emitter -> Particle paths feeding Output,
+wire click disconnect, snapped reconnection, and rapid editing/time changes
+without cancellation dialogs. Native node undo and save/reopen remain unqualified.
+
 ## Build 9: numeric node disk IDs — 2026-10-02
 
 Owner build-8 evidence: the same duplicate-matchname error persists. Its topic

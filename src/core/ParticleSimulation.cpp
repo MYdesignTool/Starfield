@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <new>
 
 namespace starfield::core {
@@ -155,7 +156,7 @@ Vec3 emission_direction(const Settings& values, std::uint64_t slot) noexcept {
 // lifetime interval is half-open. Negative comp time yields no slots, and the
 // population cap keeps the newest slots (identical birth ordering every time).
 ParticleSlotRange live_slot_range(double time_seconds, double birth_rate, double lifetime,
-                                  std::uint32_t population_cap) {
+                                  std::uint64_t population_cap) {
     if (!(birth_rate > 0.0) || population_cap == 0 || !(time_seconds >= 0.0)) {
         return {};
     }
@@ -181,7 +182,8 @@ ParticleSlotRange live_slot_range(double time_seconds, double birth_rate, double
     return ParticleSlotRange{first, alive};
 }
 
-Result<ParticleSlotRange> checked_live_slot_range(const ValidatedSettings& settings, double time_seconds) {
+Result<ParticleSlotRange> checked_live_slot_range(const ValidatedSettings& settings, double time_seconds,
+                                                std::uint64_t population_cap) {
     if (!std::isfinite(time_seconds)) {
         return Result<ParticleSlotRange>::failure(ErrorCode::invalid_time,
                                                   "non-finite frame time reached the simulation");
@@ -189,13 +191,17 @@ Result<ParticleSlotRange> checked_live_slot_range(const ValidatedSettings& setti
 
     const Settings& values = settings.value;
     const ParticleSlotRange range = live_slot_range(time_seconds, values.birth_rate,
-                                                    values.particle_lifetime_seconds, values.particle_count);
+                                                    values.particle_lifetime_seconds, population_cap);
     if (range.count == 0 && values.birth_rate > 0.0 && values.particle_count > 0 &&
         std::floor(time_seconds * values.birth_rate) > kMaxExactSlot) {
         return Result<ParticleSlotRange>::failure(
             ErrorCode::invalid_time, "emission slot index exceeds the exactly representable range");
     }
     return Result<ParticleSlotRange>::success(range);
+}
+
+Result<ParticleSlotRange> checked_live_slot_range(const ValidatedSettings& settings, double time_seconds) {
+    return checked_live_slot_range(settings, time_seconds, settings.value.particle_count);
 }
 
 struct PartitionRange {
@@ -373,6 +379,68 @@ Result<std::vector<ParticleInstance>> simulate_particles_partition(const Validat
 
 Result<ParticleSlotRange> live_particle_slot_range(const ValidatedSettings& settings, double time_seconds) {
     return checked_live_slot_range(settings, time_seconds);
+}
+
+Result<ParticleSlotSequence> live_particle_branch_slots(const ValidatedSettings& settings, double time_seconds,
+                                                       std::uint32_t partition_count,
+                                                       std::uint32_t partition_index) {
+    using R = Result<ParticleSlotSequence>;
+    if (partition_count == 0 || partition_index >= partition_count) {
+        return R::failure(ErrorCode::invalid_request, "invalid particle slot partition");
+    }
+    // No allocation: even a huge live interval is represented by three integers.
+    const auto live = checked_live_slot_range(settings, time_seconds,
+                                              std::numeric_limits<std::uint64_t>::max());
+    if (!live.has_value()) return R::failure(live.error());
+    auto assigned = partition_range(live.value(), partition_count, partition_index);
+    // Use the simulation's slot-distance age for the half-open boundary too.
+    // Floating-point subtraction in the enclosing range may include a boundary
+    // slot whose computed age is exactly its lifetime, especially in long comps.
+    const double elapsed = time_seconds * settings.value.birth_rate;
+    while (assigned.count > 0 &&
+           (elapsed - static_cast<double>(assigned.first_slot)) / settings.value.birth_rate >=
+               settings.value.particle_lifetime_seconds) {
+        assigned.first_slot += partition_count;
+        --assigned.count;
+    }
+    const auto cap = settings.value.particle_count;
+    if (assigned.count > cap) {
+        assigned.first_slot += (assigned.count - cap) * partition_count;
+        assigned.count = cap;
+    }
+    return R::success({assigned.first_slot, assigned.count, partition_count});
+}
+
+Result<std::size_t> simulate_selected_particles_into(const ValidatedSettings& settings, double time_seconds,
+                                                     std::span<const ParticleSlotTarget> targets,
+                                                     std::span<ParticleInstance> destination,
+                                                     const Cancellation& cancellation,
+                                                     EmitterDimensionContext dimension_context) {
+    using R = Result<std::size_t>;
+    if (!std::isfinite(dimension_context.layer_height_pixels) ||
+        !(dimension_context.layer_height_pixels > 0.0) ||
+        !std::isfinite(dimension_context.pixel_aspect_ratio) ||
+        !(dimension_context.pixel_aspect_ratio > 0.0)) {
+        return R::failure(ErrorCode::invalid_request, "invalid emitter dimension context");
+    }
+    const auto live = checked_live_slot_range(settings, time_seconds,
+                                              std::numeric_limits<std::uint64_t>::max());
+    if (!live.has_value()) return R::failure(live.error());
+    const auto range = live.value();
+    const double slots_elapsed = time_seconds * settings.value.birth_rate;
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+        if ((i % kCancellationCheckInterval) == 0 && cancellation.is_cancelled()) {
+            return R::failure(ErrorCode::cancelled, "cancelled during particle simulation");
+        }
+        const auto& target = targets[i];
+        if (target.destination >= destination.size() || target.slot < range.first_slot ||
+            target.slot - range.first_slot >= range.count) {
+            return R::failure(ErrorCode::invalid_request, "selected particle slot is outside the live range");
+        }
+        destination[target.destination] = evaluate_particle(settings.value, slots_elapsed,
+                                                            target.slot, dimension_context);
+    }
+    return R::success(targets.size());
 }
 
 Result<std::size_t> simulate_particles_partition_into(const ValidatedSettings& settings, double time_seconds,

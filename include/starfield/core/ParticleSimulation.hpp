@@ -1,6 +1,7 @@
 #pragma once
 
 #include "starfield/core/Render.hpp"
+#include "starfield/core/Graph.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +14,9 @@ namespace starfield::core {
 // space (ADR 0003): origin at the layer center, unit = one layer height.
 struct ParticleInstance {
     std::uint64_t id{0};
+    // Graph identity is (emitter_id, id). Standalone simulation uses a zero UUID;
+    // id remains the emitter-local birth slot and seeds its random streams.
+    NodeId emitter_id{};
     double age_seconds{0.0};
     double lifetime_seconds{0.0};
     double size_pixels{0.0};
@@ -27,6 +31,32 @@ struct ParticleSlotRange {
     std::uint64_t first_slot{0};
     std::uint64_t count{0};
 };
+
+// One branch's alive birth slots form a strided sequence. Count measures
+// assigned particles, not the enclosing emitter's contiguous slot interval.
+struct ParticleSlotSequence {
+    std::uint64_t first_slot{0};
+    std::uint64_t count{0};
+    std::uint32_t stride{1};
+};
+
+struct ParticleSlotTarget {
+    std::uint64_t slot{0};
+    std::size_t destination{0};
+};
+
+// Use the branch's own half-open lifetime before applying its candidate cap.
+// The graph merges these sequences and applies Output's single population cap.
+[[nodiscard]] Result<ParticleSlotSequence> live_particle_branch_slots(
+    const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
+    std::uint32_t partition_index);
+
+// Evaluate only slots selected by the graph's global cap into their final
+// positions. Caller supplies distinct destination indices; no allocation/sort.
+[[nodiscard]] Result<std::size_t> simulate_selected_particles_into(
+    const ValidatedSettings& settings, double time_seconds,
+    std::span<const ParticleSlotTarget> targets, std::span<ParticleInstance> destination,
+    const Cancellation& cancellation, EmitterDimensionContext dimension_context = {});
 
 // Deterministic particle evaluation for one absolute time.
 //

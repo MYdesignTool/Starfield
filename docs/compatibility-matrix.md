@@ -1,5 +1,18 @@
 # Behavior inventory
 
+## Build 10 G-06 candidate — 2026-10-02
+
+Owner build-9 evidence: "基本正常但不完全正常", accompanied by graph-evaluation
+and output-encoding cancellation dialogs and multiple-active-emitter rejection.
+Exact Particle/default/add/delete/bit-depth results were not individually recorded.
+New steering reports wire-click disconnect ineffective and requests port snapping.
+
+Source/build 10 clears normal cancellation messages, evaluates multiple emitter
+streams under Output's one cap, fixes wire hit testing, and snaps compatible ports
+within 22 screen pixels. SDK compilation passes; CEP syntax validation recorded
+in the checkpoint. No tests added/rerun; no AE process started/stopped. Deployment
+and all new host behavior remain pending. [Checkpoint](native-node-checkpoint.md).
+
 ## Build 9 Particle registration gate — 2026-10-02
 
 Build 8 still fails with the same duplicate-matchname error. Every node FourCC

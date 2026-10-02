@@ -1,5 +1,17 @@
 # Starfield CEP panel
 
+## Build 10 wire interaction update — 2026-10-02
+
+Click a wire to disconnect it. The empty node container lets pointer events reach
+SVG wires; a wire press pauses automatic refresh and commits once on release.
+Keyboard Enter/Space activation remains available. Drag a port toward a compatible
+opposite port: within 22 screen pixels the port highlights and the preview snaps;
+release commits the connection. Invalid stages, self-links and cycles do not snap.
+No AEX change is needed for these UI gestures. The existing installed CEP junction
+points to this workspace; close/reopen the panel to load the changed sources.
+Gateway token stays native-node-sync-6. Normal cancellation/multiple-emitter runtime
+fixes require build 10's paired adapter/Core. Owner host acceptance remains open.
+
 ## Current panel with native build 9 — 2026-10-02
 
 Build 8 still failed with the same duplicate-matchname error. Build 9 replaces

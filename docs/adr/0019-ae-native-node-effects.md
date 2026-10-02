@@ -1,5 +1,18 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 10 owner feedback follow-up — 2026-10-02
+
+Owner describes build 9 as basically working, with cancellation dialogs and
+the core's multiple-active-emitter rejection. This is narrower than acceptance
+of every node operation. G-06 extends runtime evaluation (ADR 0015), keeps normal
+render interrupts silent (ADR 0005), and fixes CEP wire hit testing/disconnect
+plus compatible-port snapping within 22 screen pixels. Panel edits continue
+through native record transactions; independent saved effects remain the source.
+Main schema 18, native identity revision 2, graph schemas, gateway token and C ABI
+are unchanged. Packed version advances to 32778 (0x800A). No data migration is
+required. Cancellation changes the AE adapter, so one paired AEX/Core deployment
+is necessary; later core-only algorithms retain the hot-update path.
+
 ## Build 9 bounded numeric node disk IDs — 2026-10-02
 
 The owner reports build 8 still fails with the same duplicate-matchname error.

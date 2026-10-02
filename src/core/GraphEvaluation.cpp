@@ -317,7 +317,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
 
         std::vector<std::size_t> topological_order;
         topological_order.reserve(active_count);
-        std::size_t active_emitter = count;
+        std::size_t active_emitter_count = 0;
         std::vector<std::size_t> active_particles;
         while (!ready.empty()) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph execution cancelled");
@@ -326,10 +326,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             const auto& node = *nodes[index];
             topological_order.push_back(index);
             if (node.type_key == kEmitterNode) {
-                if (active_emitter != count) {
-                    return R::failure(ErrorCode::invalid_request, "multiple active emitters are unsupported");
-                }
-                active_emitter = index;
+                ++active_emitter_count;
             } else if (node.type_key == kParticleNode) {
                 active_particles.push_back(index);
             }
@@ -349,7 +346,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
         // Keep the graph valid and render transparent until a complete source
         // path is connected again. Structural/type errors are still rejected by
         // validate_graph above.
-        if (active_emitter == count) return R::success(std::move(result));
+        if (active_emitter_count == 0) return R::success(std::move(result));
 
         // An emitter without an active Particle branch is an incomplete graph,
         // not an implicit single-stream renderer. Keep direct Emitter -> Output
@@ -365,13 +362,10 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             return R::success(std::move(result));
         }
 
-        const ValidatedSettings& validated_emitter = *emitters[active_emitter];
-        Settings emitter_settings = validated_emitter.value;
-        emitter_settings.particle_count = output_particle_count;
         std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
             return nodes[left]->id < nodes[right]->id;
         });
-        const std::size_t particle_count = active_particles.size();
+        const std::size_t branch_count = active_particles.size();
         std::vector<std::size_t> topological_rank(count, count);
         for (std::size_t rank = 0; rank < topological_order.size(); ++rank) {
             topological_rank[topological_order[rank]] = rank;
@@ -385,11 +379,13 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 return R::failure(ErrorCode::invalid_request, "invalid active Particle graph connection");
             }
         }
+        std::vector<std::uint32_t> emitter_branch_counts(count, 0);
         for (const std::size_t particle_index : active_particles) {
-            if (incoming[particle_index].size() != 1 || incoming[particle_index].front() != active_emitter) {
+            if (incoming[particle_index].size() != 1 || !emitters[incoming[particle_index].front()]) {
                 return R::failure(ErrorCode::invalid_request,
-                                  "each active Particle node must connect directly to the active emitter");
+                                  "each active Particle node must connect directly to one emitter");
             }
+            ++emitter_branch_counts[incoming[particle_index].front()];
         }
 
         // An active Force/Appearance node may be included in Output's ancestry
@@ -412,33 +408,19 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             }
         }
 
-        // Emission slots are globally capped and stable, while each Particle branch
-        // can retire its assigned slots at its own lifetime. Generate the bounded
-        // candidate interval using the longest active branch, then compact expired
-        // branch slots in global-ID order below.
-        std::vector<double> branch_lifetimes(particle_count, 0.0);
-        double candidate_lifetime = 0.0;
-        for (std::size_t branch = 0; branch < particle_count; ++branch) {
-            double lifetime = particles[active_particles[branch]]->lifetime_seconds;
-            branch_lifetimes[branch] = lifetime;
-            candidate_lifetime = std::max(candidate_lifetime, lifetime);
-        }
-        Settings slot_settings = emitter_settings;
-        slot_settings.particle_lifetime_seconds = candidate_lifetime;
-        const auto bounded_slots = validate_settings(slot_settings);
-        if (!bounded_slots.notices.empty()) {
-            return R::failure(ErrorCode::invalid_request,
-                              "Particle lifetime values exceed supported bounds");
-        }
-        const auto live_slots_result = live_particle_slot_range(bounded_slots, to_seconds(*normalized));
-        if (!live_slots_result.has_value()) return R::failure(live_slots_result.error());
-        const ParticleSlotRange live_slots = live_slots_result.value();
-
+        struct BranchPlan {
+            ValidatedSettings settings;
+            ParticleSlotSequence slots;
+            std::size_t emitter{0};
+            std::size_t appearance{0};
+        };
+        const double time_seconds = to_seconds(*normalized);
+        std::vector<BranchPlan> branches;
+        branches.reserve(branch_count);
+        std::vector<std::uint32_t> emitter_branch_indices(count, 0);
         std::vector<std::uint32_t> visited(count, 0);
-        std::vector<std::size_t> branch_appearance(particle_count, count);
-        std::vector<ParticleInstance> staged_particles(static_cast<std::size_t>(live_slots.count));
         std::uint64_t traversal_work = 0;
-        for (std::size_t branch = 0; branch < particle_count; ++branch) {
+        for (std::size_t branch = 0; branch < branch_count; ++branch) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "particle branch planning cancelled");
             const std::uint32_t visit_id = static_cast<std::uint32_t>(branch + 1);
             std::vector<std::size_t> stack{active_particles[branch]};
@@ -480,9 +462,10 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 return R::failure(ErrorCode::invalid_request,
                                   "one Particle stream cannot have multiple active Appearance overrides");
             }
-            if (!branch_appearances.empty()) branch_appearance[branch] = branch_appearances.front();
-
-            Settings branch_settings = slot_settings;
+            const std::size_t emitter = incoming[active_particles[branch]].front();
+            Settings branch_settings = emitters[emitter]->value;
+            branch_settings.particle_count = output_particle_count;
+            branch_settings.particle_lifetime_seconds = particles[active_particles[branch]]->lifetime_seconds;
             for (const std::size_t force_index : branch_forces) {
                 if (cancellation.is_cancelled()) {
                     return R::failure(ErrorCode::cancelled, "force-chain evaluation cancelled");
@@ -493,31 +476,101 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 branch_settings.gravity.z += force.gravity.z;
                 branch_settings.linear_drag += force.linear_drag;
             }
-            const auto bounded = validate_settings(branch_settings);
+            auto bounded = validate_settings(branch_settings);
             if (!bounded.notices.empty()) {
                 return R::failure(ErrorCode::invalid_request,
                                   "combined force values exceed supported bounds");
             }
 
-            const auto branch_result = simulate_particles_partition_into(
-                bounded, to_seconds(*normalized), static_cast<std::uint32_t>(particle_count),
-                static_cast<std::uint32_t>(branch), staged_particles, cancellation,
-                dimension_context);
-            if (!branch_result.has_value()) return R::failure(branch_result.error());
+            const auto slots = live_particle_branch_slots(bounded, time_seconds, emitter_branch_counts[emitter],
+                                                          emitter_branch_indices[emitter]++);
+            if (!slots.has_value()) return R::failure(slots.error());
+            branches.push_back({std::move(bounded), slots.value(), emitter,
+                                branch_appearances.empty() ? count : branch_appearances.front()});
         }
 
-        // Particle appearance is the default for its stream; a downstream Appearance
-        // replaces it. Resolve that precedence once, after branch simulation.
-        result.particles.reserve(staged_particles.size());
-        for (auto& instance : staged_particles) {
-            const std::size_t branch = static_cast<std::size_t>(instance.id % particle_count);
-            if (instance.age_seconds >= branch_lifetimes[branch]) continue;
-            instance.lifetime_seconds = branch_lifetimes[branch];
-            const std::size_t override_index = branch_appearance[branch];
-            const AppearanceValues& appearance = override_index == count
-                ? *particles[active_particles[branch]] : *appearances[override_index];
-            apply_appearance(instance, appearance, emitter_settings.seed);
-            result.particles.push_back(std::move(instance));
+        struct SlotCursor {
+            double birth_time{0.0};
+            std::size_t emitter{0}; // nodes[] is UUID-ordered
+            std::size_t branch{0};
+            std::uint64_t slot{0};
+            std::uint64_t remaining{0};
+        };
+        const auto older = [](const SlotCursor& left, const SlotCursor& right) {
+            if (left.birth_time != right.birth_time) return left.birth_time < right.birth_time;
+            if (left.emitter != right.emitter) return left.emitter < right.emitter;
+            return left.slot < right.slot;
+        };
+        // Merge newest live births first, so Output's cap is shared across all
+        // emitters. A cursor skips expired modulo slots by construction: no
+        // per-emitter population buffers or long scans through dead particles.
+        std::vector<SlotCursor> cursor_storage;
+        cursor_storage.reserve(branch_count);
+        std::priority_queue<SlotCursor, std::vector<SlotCursor>, decltype(older)> newest(older,
+                                                                                     std::move(cursor_storage));
+        std::uint64_t candidate_count = 0;
+        for (std::size_t branch = 0; branch < branch_count; ++branch) {
+            const auto& plan = branches[branch];
+            candidate_count += plan.slots.count;
+            if (plan.slots.count == 0) continue;
+            const auto last = plan.slots.first_slot + (plan.slots.count - 1) * plan.slots.stride;
+            newest.push({static_cast<double>(last) / plan.settings.value.birth_rate,
+                         plan.emitter, branch, last, plan.slots.count});
+        }
+        struct SelectedSlot { std::size_t branch; std::uint64_t slot; };
+        std::vector<SelectedSlot> selected;
+        selected.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(output_particle_count, candidate_count)));
+        std::vector<std::size_t> target_counts(branch_count, 0);
+        while (!newest.empty() && selected.size() < output_particle_count) {
+            if ((selected.size() % 4096) == 0 && cancellation.is_cancelled()) {
+                return R::failure(ErrorCode::cancelled, "particle output merge cancelled");
+            }
+            auto cursor = newest.top();
+            newest.pop();
+            selected.push_back({cursor.branch, cursor.slot});
+            ++target_counts[cursor.branch];
+            if (--cursor.remaining > 0) {
+                cursor.slot -= branches[cursor.branch].slots.stride;
+                cursor.birth_time = static_cast<double>(cursor.slot) / branches[cursor.branch].settings.value.birth_rate;
+                newest.push(cursor);
+            }
+        }
+
+        // Reverse the merge order for stable oldest-to-newest compositing, then
+        // bucket slot targets by branch without sorting or growing any buffers.
+        result.particles.resize(selected.size());
+        std::vector<std::size_t> offsets(branch_count + 1, 0);
+        for (std::size_t branch = 0; branch < branch_count; ++branch) {
+            offsets[branch + 1] = offsets[branch] + target_counts[branch];
+        }
+        auto next_target = offsets;
+        std::vector<ParticleSlotTarget> targets(selected.size());
+        for (std::size_t destination = 0; destination < selected.size(); ++destination) {
+            if ((destination % 4096) == 0 && cancellation.is_cancelled()) {
+                return R::failure(ErrorCode::cancelled, "particle output planning cancelled");
+            }
+            const auto& slot = selected[selected.size() - 1 - destination];
+            targets[next_target[slot.branch]++] = {slot.slot, destination};
+        }
+        for (std::size_t branch = 0; branch < branch_count; ++branch) {
+            if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph evaluation cancelled");
+            const auto& plan = branches[branch];
+            const auto branch_targets = std::span<const ParticleSlotTarget>(targets).subspan(offsets[branch],
+                                                                                            target_counts[branch]);
+            const auto simulated = simulate_selected_particles_into(plan.settings, time_seconds, branch_targets,
+                                                                     result.particles, cancellation, dimension_context);
+            if (!simulated.has_value()) return R::failure(simulated.error());
+            const AppearanceValues& appearance = plan.appearance == count
+                ? *particles[active_particles[branch]] : *appearances[plan.appearance];
+            for (std::size_t i = 0; i < branch_targets.size(); ++i) {
+                if ((i % 4096) == 0 && cancellation.is_cancelled()) {
+                    return R::failure(ErrorCode::cancelled, "particle appearance evaluation cancelled");
+                }
+                auto& instance = result.particles[branch_targets[i].destination];
+                instance.emitter_id = nodes[plan.emitter]->id;
+                // One downstream Appearance replaces the Particle curves.
+                apply_appearance(instance, appearance, plan.settings.value.seed);
+            }
         }
         return R::success(std::move(result));
     } catch (const std::bad_alloc&) {
