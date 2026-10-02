@@ -6,7 +6,9 @@ Owner describes build 9 as basically working but reports cancellation dialogs,
 multiple-active-emitter rejection and ineffective wire-click disconnect. Build 10
 implements quiet interrupts, bounded multi-emitter population merge and wire/port
 interaction fixes. SDK build and both CEP syntax checks pass; no test suites
-added/rerun. Deployment and precise owner AE acceptance pending.
+added/rerun. Source pushed as c368bbf, then build 10 deployed with AE absent under
+standing authorization; six hashes and selected runtime Core verified. Precise
+owner AE acceptance remains pending.
 
 ## Previous P-02D checkpoint — 2026-10-01
 
@@ -29,7 +31,7 @@ This backlog is the task source for staged implementation work. Assign one task 
 - **Owned files:** `src/core/GraphEvaluation.cpp`, `include/starfield/core/ParticleSimulation.hpp`, `src/core/ParticleSimulation.cpp`, `ae_plugin/SmartRender.cpp`, `ae_plugin/PluginVersion.h`, `ae_plugin/BuildWindows.ps1`, `cep_panel/js/panel.js`, `cep_panel/js/graph_edits.js`, `cep_panel/css/panel.css`, `cep_panel/README.md`, and matching architecture, roadmap, backlog, ADR, checkpoint, build and compatibility documentation.
 - **Scope:** handle owner build-9 feedback: two normal cancellation dialogs and the one-active-emitter restriction. Keep independent native node effects, saved IDs, graph schema, the C ABI and Render.hpp unchanged. Partition each emitter's births over its own active Particle children; merge live births under Output's single cap. Preserve deterministic identity `(emitter UUID, local birth slot)`, bounded memory/work, force merge and one-pass appearance precedence. Never fill AE's error message for normal cancellation.
 - **Acceptance:** May 2023 SDK candidate builds; owner verifies multi-emitter output and editing cancellation in AE 2023. Do not add/run tests without an owner request. Compilation is not host qualification.
-- **Status:** candidate implemented; SDK build and both CEP syntax checks pass. Deployment and owner verification pending. Owner says build 9 is basically working but reports the three remaining errors; exact node-operation and bit-depth acceptance remains unrecorded.
+- **Status:** SDK build and both CEP syntax checks pass; source pushed as c368bbf before build-10 deployment. AE-absent standing deployment completed; six installed hashes and selected Core verified, one Junction retained, build 9 backed up. Owner verification pending. Owner says build 9 is basically working but reports the three remaining errors; exact node-operation and bit-depth acceptance remains unrecorded.
 - **Owner steering:** fix wire-click disconnect and snap a dragged connection to compatible ports within a constant screen-space radius. The node container must allow wire hit testing; hold automatic refresh during a wire press and commit once on release. Existing native graph transactions remain the save/undo path.
 
 - **BUILD-23 (integration lead):** owner scope is now AE 2023 only. Script/MSBuild defaults and primary docs use the May 2023 SDK and `artifacts/plugin/2023/`; newer-host tasks are deferred. Owns build defaults and policy documentation only.

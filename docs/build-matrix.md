@@ -1,17 +1,20 @@
 # Build and host matrix
 
-## Build 10 G-06 candidate — 2026-10-02
+## Current build 10 G-06 deployment — 2026-10-02
 
 Packed 32778 (0x800A); main schema 18, native identity revision 2, graph schemas
 and CEP native-node-sync-6 unchanged. Multi-emitter evaluation shares one Output
 cap; normal cancellation has no dialog message. CEP wire disconnect/port snapping
 uses the existing native transactions and installed source Junction.
 SDK build and both CEP syntax checks pass; no test suites added/rerun.
-Build used -NoRuntimePublish -NoDistPublish. Deployment/owner acceptance pending.
-Selected installed Core is still StarfieldCore-6D70281C4E756BCA.dll (build 9);
-the candidate will select StarfieldCore-AE18EFC2E9856178.dll.
+Build used -NoRuntimePublish -NoDistPublish. Source pushed as c368bbf before
+deployment. Installed under standing authorization after confirming AE absent;
+all six installed hashes verified. Owner acceptance remains pending. Before:
+build-9 AEXs and Core generation 6D70281C4E756BCA. After: build-10 AEXs and
+selected StarfieldCore-AE18EFC2E9856178.dll (its hash also verified). One existing
+Starfield Junction retained; no AE process start/stop or other host changes.
 
-| Candidate file | SHA-256 |
+| Installed file | SHA-256 |
 |---|---|
 | `StarfieldParticle.aex` | `13D03304FCA41528BD1DE10FAF04B05A1C3D436C2A62ADB0D6AD6D8B059741F3` |
 | `StarfieldEmitter.aex` | `A41FB2A3155DEDC16371565D4ABB54BB2BA1898058AAD09A2CB87EE5F253BE2D` |

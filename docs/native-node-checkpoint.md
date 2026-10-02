@@ -27,8 +27,16 @@ gateway token native-node-sync-6 and C ABI unchanged. No project migration. SDK
 build and both CEP JavaScript syntax checks pass; no tests added/rerun. Build
 log: artifacts/build10-multi-emitter-build.log. Candidate hashes are in the build
 matrix. Candidate publication was disabled with -NoRuntimePublish -NoDistPublish.
-Deployment is pending under standing AE-closed authorization; no process started
-or stopped. Planned backup: artifacts/disabled/p02d-build10-multi-emitter-20261002.
+Source pushed as c368bbf before deployment. **Build 10 is deployed** after an
+immediate read-only check found neither AfterFX nor AfterFX_64, under standing
+owner authorization. All six installed hashes match the build matrix; selected
+versioned Core hash is verified separately. Before: build-9 AEXs and
+StarfieldCore-6D70281C4E756BCA.dll. After: build-10 AEXs and
+StarfieldCore-AE18EFC2E9856178.dll. The existing single Plug-ins/Starfield -> dist
+Junction is retained. No AE process started/stopped or other host state changed.
+Backup: artifacts/disabled/p02d-build10-multi-emitter-20261002/deployment.json.
+Before/after records and deployment log are under artifacts/build10-deploy-*.json
+and artifacts/build10-deployment.log. Later core-only changes retain hot updates.
 
 One-step undo after deployment (AE closed):
 

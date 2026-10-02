@@ -1,6 +1,6 @@
 # Behavior inventory
 
-## Build 10 G-06 candidate — 2026-10-02
+## Current build 10 G-06 deployment — 2026-10-02
 
 Owner build-9 evidence: "基本正常但不完全正常", accompanied by graph-evaluation
 and output-encoding cancellation dialogs and multiple-active-emitter rejection.
@@ -10,8 +10,11 @@ New steering reports wire-click disconnect ineffective and requests port snappin
 Source/build 10 clears normal cancellation messages, evaluates multiple emitter
 streams under Output's one cap, fixes wire hit testing, and snaps compatible ports
 within 22 screen pixels. SDK compilation passes; CEP syntax validation recorded
-in the checkpoint. No tests added/rerun; no AE process started/stopped. Deployment
-and all new host behavior remain pending. [Checkpoint](native-node-checkpoint.md).
+in the checkpoint. No tests added/rerun; no AE process started/stopped. Source
+pushed as c368bbf, then deployed under standing authorization after confirming
+AE absent. Six installed hashes and selected runtime Core verified; one Junction
+retained, build 9 backed up. All new host behavior remains pending owner testing.
+[Before/after state and rollback](native-node-checkpoint.md).
 
 ## Build 9 Particle registration gate — 2026-10-02
 

@@ -7,7 +7,9 @@ working: quiet normal render cancellation, multiple independent emitter streams
 under Output's single live-particle cap, clickable wire disconnect and compatible
 port snapping within 22 screen pixels. May 2023 SDK compilation and CEP JavaScript
 syntax checks are the candidate gates; no test suites added/rerun. Exact AE host
-qualification of these fixes remains open. The older creation checkpoints below
+qualification of these fixes remains open. Build 10 is deployed under standing
+AE-closed authorization with all six hashes verified after source push c368bbf.
+The older creation checkpoints below
 are historical. [Current checkpoint](native-node-checkpoint.md).
 
 Build 9 is deployed: all node disk IDs are explicit numbers in the SDK's

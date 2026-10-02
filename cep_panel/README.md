@@ -10,7 +10,9 @@ release commits the connection. Invalid stages, self-links and cycles do not sna
 No AEX change is needed for these UI gestures. The existing installed CEP junction
 points to this workspace; close/reopen the panel to load the changed sources.
 Gateway token stays native-node-sync-6. Normal cancellation/multiple-emitter runtime
-fixes require build 10's paired adapter/Core. Owner host acceptance remains open.
+fixes require build 10's paired adapter/Core, now deployed through the existing
+single Starfield Junction with installed hashes verified. Owner host acceptance
+remains open. [Backup and one-step rollback](../docs/native-node-checkpoint.md).
 
 ## Current panel with native build 9 — 2026-10-02
 
