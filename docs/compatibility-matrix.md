@@ -2,6 +2,10 @@
 
 ## Build 13 P-02G candidate evidence — 2026-10-02
 
+Source 2751a56 pushed before paired deployment. Build 13 is installed with all
+six hashes/selected Core checked, build-12 backup verified and one existing
+Starfield Junction retained. No AE process started/stopped or GUI session operated.
+
 Owner correction: CEP Origin moves particles; only native Effect Controls Origin
 does not. Source diagnosis finds callback UUID/disk-ID comparisons against uu.id,
 which aliases change_flags during USER_CHANGED_PARAM. Dispatch now uses runtime

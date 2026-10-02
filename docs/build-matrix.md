@@ -1,6 +1,6 @@
 # Build and host matrix
 
-## Build 13 P-02G candidate — 2026-10-02
+## Current build 13 P-02G deployment — 2026-10-02
 
 Packed 32781 (0x800D), main manifest 20, native identity 3/layout 5, Emitter
 graph schema 5, gateway native-node-sync-13, Core ABI 2. Adds native edit dispatch,
@@ -15,7 +15,20 @@ checks are recorded separately. No AE process started/stopped or GUI session run
 Host qualification and remaining reference controls stay open (ADR 0020).
 Logs: artifacts/build13-current-node-build.log, build13-current-node-tests.log,
 build13-native-sync-tests.log, build13-emitter-tests.log and build13-particle-tests.log.
+Six JavaScript sources parse. Source pushed as 2751a56, then installed with AE
+absent through the existing single Junction. Installed and selected Core hashes
+match; saved build-12 files/selector match before-state. Runtime now selects
+StarfieldCore-25F80103DAB9E950.dll. Backup p02g-build13-current-node-interaction-20261002.
 [Deployment status and rollback](native-node-checkpoint.md).
+
+| Installed file | SHA-256 |
+|---|---|
+| `StarfieldParticle.aex` | `9ADA49D5C68831404470E52BEEBDC5E54177764529BD672CE588442BE650A79E` |
+| `StarfieldEmitter.aex` | `B1FB35C7943CAD53D98A4DB95F5F97B838E0520D45E4D8F77509912396FC7C05` |
+| `StarfieldParticleNode.aex` | `93BD55F46B760D49E3CD08048AEFD79EB2592A98A36F4402135B8D3462DDC3F2` |
+| `StarfieldAppearance.aex` | `5E95C8FE843E619291F62B7A7A4D674D3A49127C4F300A29AE08CA9FF84E6A50` |
+| `StarfieldForce.aex` | `B1C3499D8999F9C86B2DD787A9B86AEA4FFE4D0B8ABAD2852AA9F6C8CC33A2BA` |
+| `StarfieldCore.dll` | `25F80103DAB9E950664E841E47F65E603887B4469D2F96427694187D1C3DA71D` |
 
 ## Previous build 12 P-02F deployment — 2026-10-02
 

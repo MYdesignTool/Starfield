@@ -27,7 +27,28 @@ May 2023 SDK /MT candidate builds. Owner-authorized minimal scopes pass:
 Core 28, native sync 14, camera capture 12, Emitter 77, Particle 73 checks;
 three focused CEP suites pass. No AE GUI session operated or broad tests run.
 Candidate build uses -NoRuntimePublish -NoDistPublish. Build and scoped logs stay
-under artifacts/build13-*. Original build 12 remains installed until deployment.
+under artifacts/build13-*.
+
+Source pushed as **2751a56** before deployment. **Build 13 is installed** under
+standing authorization after an immediate read-only check found neither AfterFX
+nor AfterFX_64. All six installed hashes equal the candidate, the selected Core
+equals the pinned DLL, and all six saved build-12 backup hashes plus its selector
+equal the before-state record. Runtime selects StarfieldCore-25F80103DAB9E950.dll.
+The existing single Plug-ins/Starfield -> dist Junction remains unchanged.
+No process starts/stops or registry/CEP host-setting changes occurred.
+
+Before/after: artifacts/build13-deploy-before.json and build13-deploy-after.json.
+Deployment log: artifacts/build13-deploy.log. Backup record:
+artifacts/disabled/p02g-build13-current-node-interaction-20261002/deployment.json.
+CEP still uses the existing source Junction; close/reopen its panel. Fresh native
+development effects are required for layout 5. No actual AE host acceptance is
+claimed from the installed hashes or fake-host checks.
+
+One-step plugin rollback after closing AE (CEP source is tracked separately):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02g-build13-current-node-interaction-20261002' -Rollback
+```
 
 Owner acceptance: native XY/Z and other edits, correct effect selection after
 duplicate/reorder, camera movement/zoom, parent/child stream wiring, multiple

@@ -28,6 +28,9 @@ and extreme 3D layer transforms remain qualification gates.
 Use fresh development effects for native layout 5/Emitter schema 5/Core ABI 2.
 Close/reopen CEP for gateway native-node-sync-13. The paired bundle requires one
 AEX deployment; subsequent compatible Core changes can use hot updates.
+Build 13 is installed after source push 2751a56 and AE-absent checks; all six
+installed/selected Core hashes and build-12 backups are verified. Host acceptance
+is still pending. Use a fresh test layer/main effect and rebuild old test nodes.
 [Deployment status and rollback](../docs/native-node-checkpoint.md).
 
 ## Build 12 shared Particle and numeric controls — 2026-10-02

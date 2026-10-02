@@ -6,6 +6,8 @@ Build 13 candidate fixes native runtime edit dispatch, adds UUID effect selectio
 camera projection and unified Auxiliary sources. Minimum owner-authorized tests
 and the May 2023 SDK build pass; six modified JavaScript sources parse. Core ABI 2,
 Emitter schema 5/native layout 5 require one paired deployment and fresh effects.
+Source 2751a56 was pushed, then build 13 deployed with AE absent. Six installed
+hashes/selected Core and build-12 backups verified; one Junction retained.
 Source/publish/deployment evidence is tracked in native-node-checkpoint.md;
 all new host behavior remains owner qualification work. No AE session operated.
 
