@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-6";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-11";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -399,7 +399,7 @@
 
     function canvasInteractionActive() {
         return !!(dragState || panState || marqueeState || connectionState || edgePressState || minimapPanState || inspectorDragState || curveDragState ||
-                  numericScrubState);
+                  numericScrubState || (elements.contextMenu && !elements.contextMenu.hidden));
     }
 
     function commitNodeLayout() {
@@ -1001,13 +1001,11 @@
         var point = canvasPoint(event.clientX, event.clientY);
         contextGraphPoint = { x: point.x - canvasOffset.x, y: point.y - canvasOffset.y };
         if (elements.disconnectContextAction) elements.disconnectContextAction.hidden = !contextEdge;
-        var selectedCount = 0;
-        for (var selectedId in state.selectedNodeIds) {
-            if (Object.prototype.hasOwnProperty.call(state.selectedNodeIds, selectedId)) selectedCount += 1;
-        }
+        var selectedCount = editableSelectedNodeIds().length;
         var selectionActions = elements.contextMenu.querySelectorAll('[data-action="duplicateNodes"], [data-action="deleteNodes"]');
         for (var i = 0; i < selectionActions.length; i++) selectionActions[i].disabled = selectedCount === 0;
         elements.contextMenu.hidden = false;
+        if (elements.graphScroll && elements.graphScroll.focus) elements.graphScroll.focus();
         var menuWidth = elements.contextMenu.offsetWidth || 190;
         var menuHeight = elements.contextMenu.offsetHeight || 250;
         elements.contextMenu.style.left = Math.max(4, Math.min(window.innerWidth - menuWidth - 4, event.clientX)) + "px";
@@ -1028,8 +1026,20 @@
         try { target.setPointerCapture(event.pointerId); } catch (ignored) { /* window listeners still handle in-panel drags */ }
     }
 
+    function editableSelectedNodeIds() {
+        return state.nodes.filter(function (node) {
+            return state.selectedNodeIds[node.id] && nodeKind(node) !== "output";
+        }).map(function (node) { return node.id; });
+    }
+
+    function deleteSelection() {
+        var ids = editableSelectedNodeIds();
+        if (!ids.length || state.pending || canvasInteractionActive()) return;
+        requestTopologyEdit({ type: "deleteNodes", nodeIds: ids });
+    }
+
     function duplicateSelection(offsetX, offsetY) {
-        var ids = selectedNodeIds();
+        var ids = editableSelectedNodeIds();
         if (!ids.length) return;
         requestTopologyEdit({ type: "duplicateNodes", nodeIds: ids,
                               offset: { x: offsetX || 28, y: offsetY || 28 } });
@@ -1045,14 +1055,15 @@
             edit = { type: "addNode", nodeType: button.getAttribute("data-node-type"),
                      position: contextGraphPoint || { x: 280, y: 40 } };
         } else if (action === "duplicateNodes") {
-            edit = { type: "duplicateNodes", nodeIds: selectedNodeIds(), offset: { x: 28, y: 28 } };
+            edit = { type: "duplicateNodes", nodeIds: editableSelectedNodeIds(), offset: { x: 28, y: 28 } };
         } else if (action === "deleteNodes") {
-            edit = { type: "deleteNodes", nodeIds: selectedNodeIds() };
+            edit = { type: "deleteNodes", nodeIds: editableSelectedNodeIds() };
         } else if (action === "disconnect" && contextEdge) {
             edit = { type: "disconnect", from: contextEdge.from, to: contextEdge.to,
                      edgeId: contextEdge.edgeId || undefined };
         }
         hideGraphContextMenu();
+        if (edit && edit.nodeIds && !edit.nodeIds.length) return;
         if (edit) requestTopologyEdit(edit);
     }
 
@@ -1820,6 +1831,7 @@
         if (event.button !== 0 || event.isPrimary === false || !elements.graphScroll || state.pending) return;
         if (event.target.closest && (event.target.closest(".graph-node") || event.target.closest(".edge-hit") ||
                                      event.target.closest(".graph-minimap"))) return;
+        if (elements.graphScroll.focus) elements.graphScroll.focus();
         capturePointer(event);
         var point = canvasPoint(event.clientX, event.clientY);
         marqueeState = { start: point, current: point, moved: false, additive: !!(event.shiftKey || event.ctrlKey) };
@@ -2597,10 +2609,18 @@
     document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") { hideGraphContextMenu(); return; }
         var target = event.target;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+                       target.tagName === "SELECT" || target.isContentEditable)) return;
+        if ((event.key === "Delete" || event.key === "Backspace") &&
+            !event.ctrlKey && !event.metaKey && !event.altKey && editableSelectedNodeIds().length) {
+            event.preventDefault();
+            if (event.repeat || state.pending) return;
+            hideGraphContextMenu();
+            deleteSelection();
+            return;
+        }
         if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === "d" &&
-            !(target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
-                         target.tagName === "SELECT" || target.isContentEditable)) &&
-            selectedNodeIds().length) {
+            editableSelectedNodeIds().length) {
             event.preventDefault();
             duplicateSelection(28, 28);
         }

@@ -1,6 +1,17 @@
 # Agent-ready implementation backlog
 
-## Current G-06 checkpoint — 2026-10-02
+## Current P-02E checkpoint — 2026-10-02
+
+Owner reports canvas deletion unavailable and redundant collapsed outer topics.
+Build 11 adds Delete/Backspace, filters fixed Output out of delete/duplicate
+selection, and pauses polling while the context menu is open. Actual outer
+topic markers are removed from all native effects; main/native indices and
+gateway bindings are compacted together. Main schema 19, native layout 3,
+gateway native-node-sync-11; surviving disk IDs unchanged, no development
+migration. SDK build and CEP syntax checks are the source gates; owner AE
+acceptance remains open. [Checkpoint](native-node-checkpoint.md).
+
+## Previous G-06 checkpoint — 2026-10-02
 
 Owner describes build 9 as basically working but reports cancellation dialogs,
 multiple-active-emitter rejection and ineffective wire-click disconnect. Build 10
@@ -23,6 +34,14 @@ See [native-node-checkpoint.md](native-node-checkpoint.md).
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 
 ## Current checkpoint
+
+### P-02E — Canvas deletion and flat Effect Controls (2026-10-02)
+
+- **Owner:** integration lead; active task after G-06 integration.
+- **Dependencies:** P-02D, G-06, ADRs 0009, 0011, 0019.
+- **Owned files:** `cep_panel/js/panel.js`, `cep_panel/jsx/starfield_gateway.jsx`, `cep_panel/index.html`, `cep_panel/README.md`, `ae_plugin/NodeEffects.cpp`, `ae_plugin/NodeRecord.hpp`, `ae_plugin/NodeGraphSync.hpp`, `ae_plugin/NativeNodeGraph.cpp`, `ae_plugin/Parameters.hpp/.cpp`, `ae_plugin/GraphParameter.hpp/.cpp`, `ae_plugin/PluginVersion.h`, `schema/parameters.json`, `schema/node-parameters.json`, and matching ADR, architecture, roadmap, parameter mapping, checkpoint, build and compatibility documentation.
+- **Scope:** owner reports canvas node deletion unavailable and redundant collapsed top-level Output/Emitter/Particle/Force parameter topics. Add Delete/Backspace and share editable-selection filtering with the context menu; fixed Output cannot block deletion of selected editable nodes. Pause automatic refresh while the context menu is open. Remove actual outer topic markers and compact native/main stream indices, keeping surviving disk IDs and independent node records. Main manifest revision 19; native layout revision 3; no development migration or placeholder topic streams. Update gateway bindings/token together.
+- **Acceptance:** SDK candidate builds and modified JavaScript parses; owner verifies canvas deletion/native effect removal and directly visible controls in AE 2023. No tests added/run without a request. AEX deployment requires AE absent or separately authorized closure under ADR 0011.
 
 ### G-06 — Multiple emitters and normal render cancellation (2026-10-02)
 

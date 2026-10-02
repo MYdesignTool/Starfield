@@ -2,6 +2,15 @@
 
 ## Current acceptance checkpoint — 2026-10-02
 
+P-02E/build 11 addresses unavailable canvas deletion and redundant collapsed
+outer categories. Delete/Backspace and context-menu actions share editable
+selection, preserving fixed Output. Outer topics are removed with compacted
+main schema 19/native layout 3 indices; surviving disk IDs and Core unchanged.
+Gateway native-node-sync-11 reads the new layout. No development migration.
+SDK build and JS parsing are source gates; owner verifies actual deletion,
+native effect removal, flat controls, undo and reopening in AE 2023.
+[Deployment status](native-node-checkpoint.md).
+
 G-06/build 10 addresses owner feedback after build 9 was described as basically
 working: quiet normal render cancellation, multiple independent emitter streams
 under Output's single live-particle cap, clickable wire disconnect and compatible

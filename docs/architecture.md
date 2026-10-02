@@ -4,6 +4,14 @@ Current target: After Effects 2023 on Windows x64, built with the supplied May 2
 
 ## Goal and boundary
 
+P-02E/build 11 uses flat native parameter layout 3 and main manifest 19: controls
+appear directly beneath their effect headers, with no redundant outer topics.
+Surviving disk IDs stay separate from compacted stream indices; arbitrary
+callback disk ID 31 remains fixed. Gateway native-node-sync-11 and the node
+direct-edit compiler share the new main commit index. Delete/Backspace/context
+menu actions exclude fixed Output and use the existing native record transaction.
+Core/graph schemas are unchanged; no development migration is provided.
+
 G-06/build 10 evaluates multiple Emitters through their own UUID-ordered Particle
 children and merges actual live births under Output's single cap. Internal
 particle identity pairs Emitter UUID with local birth slot. Selected particles
@@ -17,9 +25,9 @@ passes; owner qualification of these fixes is pending.
 Native node parameter identity revision 2 (build 9) uses explicit disk IDs in
 1..9999, defined in `schema/node-parameters.json` and shared `NodeRecord.hpp`.
 Registration and supervised edit lookup use the same identities; compile-time
-checks cover uniqueness, range and stream match-name length. Stream indices and
-graph schemas are unchanged. Unreleased FourCC IDs are not migrated; create fresh
-effects. The main effect's parameter schema remains revision 18.
+checks cover uniqueness, range and stream match-name length. Build 11 compacts
+stream indices while retaining these numeric identities and graph schemas.
+Unreleased FourCC IDs are not migrated; create fresh development effects.
 
 This repository is the clean implementation of a node-based particle effect for After Effects. Existing reverse-engineering notes and binaries live in the parent directory and are reference material only. They are not linked into the build and must not be copied into the new implementation. Use observed user-facing behavior to define independent requirements; implement the algorithms and data structures anew.
 
@@ -164,4 +172,4 @@ prior monolith is backed up for rollback. Half/Third point mapping, split-build
 copy/undo, shapes and basic gravity/size changes also have AE observations. See
 `compatibility-matrix.md`.
 
-M0/M1, M2 rendering, M3 core behavior, G-01–G-06 and CEP graph authoring source are present. Independent node effects own authoring data; the main effect owns Output and a compiled render graph. The gateway reads ordinary records without expressions or CUSTOM_VALUE scripting. Ready marker 89 prevents deleted nodes from being recreated; refresh prunes dangling links and re-keys raw duplicates. The owner describes build 9 as basically working but reports render cancellation dialogs and multiple-emitter rejection. Build 10 implements those fixes plus wire disconnect/snapping. Exact node-operation acceptance, render response, multi-emitter behavior, undo and save/reopen remain owner gates. Automatic bootstrap with CEP closed, animation/history, MFR and GPU remain open.
+M0/M1, M2 rendering, M3 core behavior, G-01–G-06 and CEP graph authoring source are present. Independent node effects own authoring data; the main effect owns Output and a compiled render graph. The gateway reads ordinary records without expressions or CUSTOM_VALUE scripting. Ready marker at index 87 prevents deleted nodes from being recreated; refresh prunes dangling links and re-keys raw duplicates. Build 10 addresses normal cancellation, multiple emitters and wire snapping; build 11 adds canvas deletion and flat Effect Controls. Exact node-operation acceptance, render response, multi-emitter behavior, undo and save/reopen remain owner gates. Automatic bootstrap with CEP closed, animation/history, MFR and GPU remain open.

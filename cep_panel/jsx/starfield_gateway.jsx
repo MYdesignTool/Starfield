@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-6";
+    var GATEWAY_BUILD = "native-node-sync-11";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -27,13 +27,13 @@
     var MAX_GRAPH_NONCE = 1000000;
     var graphNonceCounter = 0;
     var GRAPH_CARRIERS = {
-        revision: { index: 41, name: "Graph Revision" },
-        guard: { index: 42, name: "Panel Graph Sync Guard" },
-        commit: { index: 43, name: "Commit Graph Edit" },
-        receipt: { index: 44, name: "Graph Edit Receipt" },
-        nodeEffectsReady: { index: 89, name: "Node Effects Ready" },
-        checksumHigh: { index: 90, name: "Graph Checksum High" },
-        checksumLow: { index: 91, name: "Graph Checksum Low" }
+        revision: { index: 39, name: "Graph Revision" },
+        guard: { index: 40, name: "Panel Graph Sync Guard" },
+        commit: { index: 41, name: "Commit Graph Edit" },
+        receipt: { index: 42, name: "Graph Edit Receipt" },
+        nodeEffectsReady: { index: 87, name: "Node Effects Ready" },
+        checksumHigh: { index: 88, name: "Graph Checksum High" },
+        checksumLow: { index: 89, name: "Graph Checksum Low" }
     };
     var NATIVE_NODE_TYPES = {
         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
@@ -47,9 +47,9 @@
     // resolution. `min`/`max` mirror the manifest bounds. `displayDecimals` sets
     // panel edit precision; `choices` supplies popup labels. Host validation remains authoritative.
     var BINDINGS = [
-        { key: "particle_count", index: 27, name: "Max Particles", kind: "slider", min: 0, max: 2000000, displayDecimals: 0 },
+        { key: "particle_count", index: 26, name: "Max Particles", kind: "slider", min: 0, max: 2000000, displayDecimals: 0 },
         { key: "birth_rate", index: 3, name: "Particles Per Second", kind: "slider", min: 0, max: 1000000, displayDecimals: 0 },
-        { key: "seed", index: 28, name: "Random Seed", kind: "slider", min: 0, max: 2147483647, displayDecimals: 0 },
+        { key: "seed", index: 27, name: "Random Seed", kind: "slider", min: 0, max: 2147483647, displayDecimals: 0 },
         { key: "particle_lifetime", index: 12, name: "Lifetime", kind: "slider", min: 0, max: 1000000, displayDecimals: 3 },
         { key: "emitter_shape", index: 2, name: "Type", kind: "popup", min: 1, max: 4, displayDecimals: 0,
           choices: ["Point", "Box", "Sphere", "Disc"] },
@@ -60,9 +60,9 @@
         { key: "particle_size", index: 13, name: "Size", kind: "slider", min: 0, max: 100000, displayDecimals: 2 },
         { key: "opacity", index: 15, name: "Opacity", kind: "slider", min: 0, max: 1, displayDecimals: 3 },
         { key: "emitter_size", index: 5, name: "Disc Size", kind: "slider", min: 0, max: 10, displayDecimals: 3 },
-        { key: "emitter_size_x", index: 81, name: "Size X", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
-        { key: "emitter_size_y", index: 82, name: "Size Y", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
-        { key: "emitter_size_z", index: 83, name: "Size Z", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
+        { key: "emitter_size_x", index: 79, name: "Size X", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
+        { key: "emitter_size_y", index: 80, name: "Size Y", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
+        { key: "emitter_size_z", index: 81, name: "Size Z", kind: "slider", min: 0, max: 100000, displayDecimals: 0 },
         { key: "velocity_spread", index: 9, name: "Speed Random", kind: "slider", min: 0, max: 100, displayDecimals: 2 },
         { key: "gravity_x", index: 21, name: "Gravity X", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
         { key: "gravity_y", index: 22, name: "Gravity Y", kind: "slider", min: -1000, max: 1000, displayDecimals: 2 },
@@ -72,8 +72,8 @@
         { key: "color_end", index: 18, name: "Color End", kind: "color", min: 0, max: 255, displayDecimals: 0 },
         { key: "particle_size_end", index: 14, name: "Size Over Life", kind: "slider", min: 0, max: 100, displayDecimals: 1 },
         { key: "opacity_end", index: 16, name: "Opacity Over Life", kind: "slider", min: 0, max: 100, displayDecimals: 1 },
-        { key: "particle_size_random", index: 86, name: "Size Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 },
-        { key: "opacity_random", index: 87, name: "Opacity Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 }
+        { key: "particle_size_random", index: 84, name: "Size Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 },
+        { key: "opacity_random", index: 85, name: "Opacity Random", kind: "slider", min: 0, max: 100, displayDecimals: 0 }
     ];
 
     // Appended, hidden AE streams store bounded age/value pairs in the project.
@@ -90,22 +90,22 @@
                 kind: "slider", min: 0, max: valueMax, displayDecimals: valueDecimals });
         }
     }
-    appendCurveBindings("Size", "size", 45, 46, 100, 1);
-    appendCurveBindings("Opacity", "opacity", 62, 63, 100, 1);
-    BINDINGS.push({ key: "curve_edit_commit", index: 79, name: "Curve Edit Commit",
+    appendCurveBindings("Size", "size", 43, 44, 100, 1);
+    appendCurveBindings("Opacity", "opacity", 60, 61, 100, 1);
+    BINDINGS.push({ key: "curve_edit_commit", index: 77, name: "Curve Edit Commit",
         kind: "slider", min: -1000000, max: 1000000, displayDecimals: 0 });
 
     var LAYOUT_BINDINGS = [
-        { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 33, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 235 },
-        { nodeId: "emitter", axis: "y", key: "layout_emitter_y", index: 34, name: "Layout Emitter Y", min: -1000000000, max: 1000000000, defaultValue: 22 },
-        { nodeId: "force", axis: "x", key: "layout_force_x", index: 35, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 235 },
-        { nodeId: "force", axis: "y", key: "layout_force_y", index: 36, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 178 },
-        // Indices 37/38 keep their shipped storage identity; the panel now assigns
+        { nodeId: "emitter", axis: "x", key: "layout_emitter_x", index: 31, name: "Layout Emitter X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "emitter", axis: "y", key: "layout_emitter_y", index: 32, name: "Layout Emitter Y", min: -1000000000, max: 1000000000, defaultValue: 22 },
+        { nodeId: "force", axis: "x", key: "layout_force_x", index: 33, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "force", axis: "y", key: "layout_force_y", index: 34, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 178 },
+        // Layout Appearance X/Y keep their disk identities; the panel assigns
         // that card to the logical Particle stage instead of Appearance.
-        { nodeId: "particle", axis: "x", key: "layout_appearance_x", index: 37, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 235 },
-        { nodeId: "particle", axis: "y", key: "layout_appearance_y", index: 38, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 100 },
-        { nodeId: "output", axis: "x", key: "layout_output_x", index: 39, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 235 },
-        { nodeId: "output", axis: "y", key: "layout_output_y", index: 40, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 256 }
+        { nodeId: "particle", axis: "x", key: "layout_appearance_x", index: 35, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "particle", axis: "y", key: "layout_appearance_y", index: 36, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 100 },
+        { nodeId: "output", axis: "x", key: "layout_output_x", index: 37, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "output", axis: "y", key: "layout_output_y", index: 38, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 256 }
     ];
 
     // Protocol v1 is a fixed parameter view, not a live graph snapshot. Display
@@ -1033,9 +1033,10 @@
     }
 
     function writeRendererRecord(resolved, record) {
-        var indices = [27, 39, 40], values = [record.maxParticles, record.position.x, record.position.y];
-        for (var i = 0; i < indices.length; i++) {
-            var property = resolved.target.effect.property(indices[i]);
+        var names = ["Max Particles", "Layout Output X", "Layout Output Y"],
+            values = [record.maxParticles, record.position.x, record.position.y];
+        for (var i = 0; i < names.length; i++) {
+            var property = findEffectProperty(resolved.target.effect, names[i]);
             if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
             if (!sameValue(property.value, values[i])) property.setValue(values[i]);
         }
@@ -1043,8 +1044,8 @@
 
     function readRendererRecord(resolved) {
         return { id: "000000000000000000000000000000ff",
-            maxParticles: Number(resolved.target.effect.property(27).value),
-            position: { x: Number(resolved.target.effect.property(39).value), y: Number(resolved.target.effect.property(40).value) } };
+            maxParticles: Number(findEffectProperty(resolved.target.effect, "Max Particles").value),
+            position: { x: Number(findEffectProperty(resolved.target.effect, "Layout Output X").value), y: Number(findEffectProperty(resolved.target.effect, "Layout Output Y").value) } };
     }
 
     function reconcileNativeRecords(layer) {

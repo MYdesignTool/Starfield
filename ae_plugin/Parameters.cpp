@@ -32,14 +32,6 @@
         PF_ADD_FLOAT_SLIDER(NAME, VALID_MIN, VALID_MAX, SLIDER_MIN, SLIDER_MAX, 0, DFLT, PREC, DISP, 0, ID); \
     } while (0)
 
-// PF_END_TOPIC reuses def without clearing it. Group markers must not inherit a
-// preceding slider's union, supervision flags, or the arbitrary-data handle.
-#define STARFIELD_END_TOPIC(ID) \
-    do { \
-        AEFX_CLR_STRUCT(def); \
-        PF_END_TOPIC(ID); \
-    } while (0)
-
 namespace starfield::adapter {
 namespace {
 
@@ -72,7 +64,6 @@ constexpr A_long kOpacityEndDiskId = 'open';
 constexpr A_long kEmitterTopicDiskId = 'topE';
 constexpr A_long kParticleTopicDiskId = 'topP';
 constexpr A_long kPhysicsTopicDiskId = 'topH';
-constexpr A_long kRenderTopicDiskId = 'topR';
 constexpr A_long kLayoutEmitterXDiskId = 'lEx0';
 constexpr A_long kLayoutEmitterYDiskId = 'lEy0';
 constexpr A_long kLayoutForceXDiskId = 'lFx0';
@@ -518,7 +509,6 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kLinearDragDiskId);
     STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 25", 'endH');
 
-    PF_ADD_TOPICX("Output", PF_ParamFlag_START_COLLAPSED, kRenderTopicDiskId);
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 2000000.0f, 1000.0f, PF_Precision_INTEGER,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kMaxParticlesDiskId);
@@ -535,7 +525,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
     def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "Control Source");
-    def.uu.id = kControlSourceId;
+    def.uu.id = kControlSourceDiskId;
     def.u.pd.num_choices = 2;
     def.u.pd.dephault = kLegacyControlSource;
     def.u.pd.value = kLegacyControlSource;
@@ -544,7 +534,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (err != PF_Err_NONE) return err;
 
     PF_ADD_BUTTON("Capture Current Controls", "Capture at Current Time", PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE,
-                  PF_ParamFlag_SUPERVISE, kCaptureControlsId);
+                  PF_ParamFlag_SUPERVISE, kCaptureControlsDiskId);
 
     // The graph's default handle becomes host-owned only after successful ADD_PARAM.
     if (graph_parameter_disabled()) {
@@ -554,14 +544,14 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
         std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
-        def.uu.id = kGraphParameterId; // same project identity, different parameter kind
+        def.uu.id = kGraphParameterDiskId; // same project identity, different parameter kind
         def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
         err = PF_ADD_PARAM(in_data, -1, &def);
         if (err != PF_Err_NONE) return err;
     } else {
         PF_ArbitraryH default_graph = nullptr;
         PF_ArbParamsExtra create{};
-        create.id = kGraphParameterId;
+        create.id = kGraphParameterDiskId;
         create.which_function = PF_Arbitrary_NEW_FUNC;
         create.u.new_func_params.arbPH = &default_graph;
         err = graph_arbitrary_callback(in_data, &create);
@@ -574,17 +564,16 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         def.flags = PF_ParamFlag_NONE;
         def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
         std::snprintf(def.name, sizeof(def.name), "Node Graph Data");
-        def.uu.id = def.u.arb_d.id = kGraphParameterId;
+        def.uu.id = def.u.arb_d.id = kGraphParameterDiskId;
         def.u.arb_d.dephault = default_graph;
         err = PF_ADD_PARAM(in_data, -1, &def);
         if (err != PF_Err_NONE) { in_data->utils->host_dispose_handle(default_graph); return err; }
     }
-    STARFIELD_END_TOPIC(kRenderTopicDiskId);
 
     // Node positions are non-rendering UI state, but they belong to this effect
     // instance so AE can save, duplicate, and undo the layout with the project.
     // Standard hidden sliders remain script-readable/writable, unlike graph_data's
-    // CUSTOM_VALUE stream. Append them after the Render topic to preserve old indices.
+    // CUSTOM_VALUE stream. They follow the compiled graph in the flat layout.
     const struct LayoutCoordinate {
         const char* name;
         A_long disk_id;
@@ -607,17 +596,17 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
     // Revision and checksum receipts are ordinary numeric streams. The panel edits separate node
     // effects and changes the numeric commit stream to compile those records into
-    // the renderer's arbitrary-data graph. Index 42 guards batched Output writes.
+    // the renderer's arbitrary-data graph. Index 40 guards batched Output writes.
     const struct GraphCarrierParameter {
         const char* name;
         A_long disk_id;
         PF_FpLong default_value;
         bool supervised;
     } graph_carrier_parameters[] = {
-        {"Graph Revision", kGraphRevisionId, 0.0, false},
-        {"Panel Graph Sync Guard", kGraphSyncGuardId, 0.0, false},
-        {"Commit Graph Edit", kGraphEditCommitId, 0.0, true},
-        {"Graph Edit Receipt", kGraphEditReceiptId, 0.0, false},
+        {"Graph Revision", kGraphRevisionDiskId, 0.0, false},
+        {"Panel Graph Sync Guard", kGraphSyncGuardDiskId, 0.0, false},
+        {"Commit Graph Edit", kGraphEditCommitDiskId, 0.0, true},
+        {"Graph Edit Receipt", kGraphEditReceiptDiskId, 0.0, false},
     };
     constexpr PF_FpLong kCarrierControlLimit = 1000000.0;
     for (const auto& carrier : graph_carrier_parameters) {
@@ -631,7 +620,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         def.u.fs_d.value = def.u.fs_d.dephault = static_cast<PF_FpShort>(carrier.default_value);
         def.u.fs_d.valid_min = def.u.fs_d.slider_min = -kCarrierControlLimit;
         def.u.fs_d.valid_max = def.u.fs_d.slider_max = kCarrierControlLimit;
-        if (carrier.disk_id == kGraphRevisionId) {
+        if (carrier.disk_id == kGraphRevisionDiskId) {
             def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
             def.u.fs_d.valid_max = def.u.fs_d.slider_max = 16777215.0;
         }
@@ -686,7 +675,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
                                   PF_Precision_INTEGER, true);
     if (err != PF_Err_NONE) return err;
 
-    // New direct full-resolution pixel dimensions are appended in their own topic
+    // Direct full-resolution pixel dimensions are appended as hidden bootstrap controls
     // so all earlier AE indices remain stable. Box/Sphere read their X/Y/Z values.
     STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 80", kEmitterSizeTopicDiskId);
     STARFIELD_ADD_HIDDEN_FLOAT("Size X", 0.0f, 100000.0f, 0.0f, 100000.0f, 100.0f,
@@ -718,7 +707,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
     def.ui_flags = PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE;
     std::snprintf(def.name, sizeof(def.name), "Node Effects Ready");
-    def.uu.id = kNodeEffectsReadyId;
+    def.uu.id = kNodeEffectsReadyDiskId;
     def.u.fs_d.value = def.u.fs_d.dephault = 0.0;
     def.u.fs_d.valid_min = def.u.fs_d.slider_min = 0.0;
     def.u.fs_d.valid_max = def.u.fs_d.slider_max = 1.0;
@@ -727,8 +716,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     err = PF_ADD_PARAM(in_data, -1, &def);
     if (err != PF_Err_NONE) return err;
 
-    for (const auto& checksum : {std::pair{"Graph Checksum High", kGraphChecksumHighId},
-                                 std::pair{"Graph Checksum Low", kGraphChecksumLowId}}) {
+    for (const auto& checksum : {std::pair{"Graph Checksum High", kGraphChecksumHighDiskId},
+                                 std::pair{"Graph Checksum Low", kGraphChecksumLowDiskId}}) {
         AEFX_CLR_STRUCT(def);
         def.param_type = PF_Param_FLOAT_SLIDER;
         def.flags = PF_ParamFlag_CANNOT_TIME_VARY;

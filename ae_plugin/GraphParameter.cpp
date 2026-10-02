@@ -227,7 +227,7 @@ PF_Err create_graph_parameter(PF_InData* data, const core::Graph& graph, PF_Arbi
 }
 
 PF_Err graph_arbitrary_callback(PF_InData* data, PF_ArbParamsExtra* extra) noexcept {
-    if (!handles_available(data) || !extra || extra->id != kGraphParameterId) return PF_Err_BAD_CALLBACK_PARAM;
+    if (!handles_available(data) || !extra || extra->id != kGraphParameterDiskId) return PF_Err_BAD_CALLBACK_PARAM;
     try { return dispatch_arbitrary(data, *extra); }
     catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }

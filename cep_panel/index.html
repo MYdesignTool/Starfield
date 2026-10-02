@@ -37,7 +37,7 @@
         <span>Graph</span>
         <span class="graph-tools"><span class="section-note">Drag nodes · drag empty space to select</span><span id="zoomReadout">100%</span></span>
       </div>
-      <div id="graphScroll" class="graph-scroll">
+      <div id="graphScroll" class="graph-scroll" tabindex="-1">
         <div id="graphViewport" class="graph-viewport">
           <div class="graph-canvas">
           <svg id="graphEdges" class="graph-edges" viewBox="0 0 580 320" role="group" aria-label="Graph connections">
@@ -87,7 +87,7 @@
     <button type="button" role="menuitem" data-action="addNode" data-node-type="appearance">Appearance Override</button>
     <div class="context-menu-separator"></div>
     <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
-    <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected</button>
+    <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected <span>Del / Backspace</span></button>
     <button id="disconnectContextAction" type="button" role="menuitem" data-action="disconnect" hidden>Disconnect This Wire</button>
   </div>
 

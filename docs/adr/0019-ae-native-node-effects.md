@@ -1,5 +1,25 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 11 flat parameter layout and canvas deletion — 2026-10-02
+
+Owner reports unavailable canvas deletion and redundant collapsed top-level topics.
+P-02E removes the actual Output/Emitter/Particle/Appearance/Force group markers;
+surviving value disk IDs stay unchanged. Main registered streams compact from 91
+to 89; graph data/control-source/capture indices shift by one, and metadata after
+the removed Output end marker shifts by two. Native base stream counts decrease
+by two; controls shift by one and identity/link/layout banks by two. Compiler
+indices and gateway bindings change together. Main manifest revision 19, native
+layout revision 3 and packed version 32779 (0x800B); gateway native-node-sync-11.
+Graph schemas and Core C ABI are unchanged. No placeholders replace removed
+topics and no development migration is provided, per owner direction.
+
+Delete/Backspace and the context menu share editable-node selection. Fixed Output
+stays visible and excluded from delete/duplicate selection, so it cannot prevent
+other selected nodes from being removed. Native record transactions remain the
+effect removal, incident-link removal, undo and cache synchronization path.
+Open context menus pause polling to preserve their selection until activation.
+Source implementation and SDK compilation do not establish AE acceptance.
+
 ## Build 10 owner feedback follow-up — 2026-10-02
 
 Owner describes build 9 as basically working, with cancellation dialogs and

@@ -14,19 +14,18 @@
 
 namespace starfield::adapter {
 
-// Settings bindings and their registration-order indices. Output is the only
-// renderer ECW group. Former bootstrap group markers are hidden scalar slots;
-// editable node groups belong to their separate node effects. AE's implicit input
+// Settings bindings and their flat registration-order indices. Editable node
+// controls belong to their separate node effects. AE's implicit input
 // layer occupies index 0, so num_params includes one additional parameter.
 // The output effect retains hidden bootstrap controls for a clean first application,
-// but editable graph values live on separate node effects. Index 91 is the last
-// registered parameter; graph topology edits use the numeric commit trigger at 43.
+// but editable graph values live on separate node effects. Index 89 is the last
+// registered parameter; graph topology edits use the numeric commit trigger at 41.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;
 inline constexpr std::size_t kEffectParameterCount = 21 + kCurveParameterCount +
     kEmitterSizeParameterCount + kParticleVariationParameterCount;
-inline constexpr std::size_t kTotalEffectParameterCount = 91; // controls + Output + numeric metadata
+inline constexpr std::size_t kTotalEffectParameterCount = 89; // controls + numeric metadata
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;
@@ -47,38 +46,47 @@ inline constexpr A_long kGravityXId = 21;
 inline constexpr A_long kGravityYId = 22;
 inline constexpr A_long kGravityZId = 23;
 inline constexpr A_long kLinearDragId = 24;
-inline constexpr A_long kMaxParticlesId = 27;
-inline constexpr A_long kSeedId = 28;
-// 29/30/31 are the control source, capture action and hidden graph parameter. Index 32
-// closes the Render topic; 33..40 are hidden project-saved layout coordinates and
-// 41..44 are the read-only snapshot, Output batch guard, numeric commit trigger and receipt.
+inline constexpr A_long kMaxParticlesId = 26;
+inline constexpr A_long kSeedId = 27;
+// 28/29/30 are the control source, capture action and hidden graph parameter;
+// 31..38 are hidden project-saved layout coordinates and 39..42 are the
+// revision, Output batch guard, numeric commit trigger and receipt.
 inline constexpr A_long kFirstEffectParameterId = 1;
-inline constexpr A_long kLastEffectParameterId = 30; // capture action (29 is control source)
-inline constexpr A_long kLayoutEmitterXId = 33;
-inline constexpr A_long kLayoutEmitterYId = 34;
-inline constexpr A_long kLayoutForceXId = 35;
-inline constexpr A_long kLayoutForceYId = 36;
-inline constexpr A_long kLayoutAppearanceXId = 37;
-inline constexpr A_long kLayoutAppearanceYId = 38;
-inline constexpr A_long kLayoutOutputXId = 39;
-inline constexpr A_long kLayoutOutputYId = 40;
-inline constexpr A_long kGraphRevisionId = 41;
-inline constexpr A_long kGraphSyncGuardId = 42;
-inline constexpr A_long kGraphEditCommitId = 43;
-inline constexpr A_long kGraphEditReceiptId = 44;
-inline constexpr A_long kSizeCurveCountId = 45;
-inline constexpr A_long kSizeCurveFirstPointId = 46; // alternating age/value sliders
-inline constexpr A_long kOpacityCurveCountId = 62;
-inline constexpr A_long kOpacityCurveFirstPointId = 63; // alternating age/value sliders
-inline constexpr A_long kCurveEditCommitId = 79;
-inline constexpr A_long kEmitterSizeXId = 81;
-inline constexpr A_long kEmitterSizeYId = 82;
-inline constexpr A_long kEmitterSizeZId = 83;
-inline constexpr A_long kParticleSizeRandomId = 86;
-inline constexpr A_long kOpacityRandomId = 87;
-inline constexpr A_long kNodeEffectsReadyId = 89;
-inline constexpr A_long kGraphChecksumHighId = 90;
-inline constexpr A_long kGraphChecksumLowId = 91;
+inline constexpr A_long kLastEffectParameterId = 29; // capture action (28 is control source)
+inline constexpr A_long kLayoutEmitterXId = 31;
+inline constexpr A_long kLayoutEmitterYId = 32;
+inline constexpr A_long kLayoutForceXId = 33;
+inline constexpr A_long kLayoutForceYId = 34;
+inline constexpr A_long kLayoutAppearanceXId = 35;
+inline constexpr A_long kLayoutAppearanceYId = 36;
+inline constexpr A_long kLayoutOutputXId = 37;
+inline constexpr A_long kLayoutOutputYId = 38;
+inline constexpr A_long kGraphRevisionId = 39;
+inline constexpr A_long kGraphSyncGuardId = 40;
+inline constexpr A_long kGraphEditCommitId = 41;
+inline constexpr A_long kGraphEditReceiptId = 42;
+inline constexpr A_long kSizeCurveCountId = 43;
+inline constexpr A_long kSizeCurveFirstPointId = 44; // alternating age/value sliders
+inline constexpr A_long kOpacityCurveCountId = 60;
+inline constexpr A_long kOpacityCurveFirstPointId = 61; // alternating age/value sliders
+inline constexpr A_long kCurveEditCommitId = 77;
+inline constexpr A_long kEmitterSizeXId = 79;
+inline constexpr A_long kEmitterSizeYId = 80;
+inline constexpr A_long kEmitterSizeZId = 81;
+inline constexpr A_long kParticleSizeRandomId = 84;
+inline constexpr A_long kOpacityRandomId = 85;
+inline constexpr A_long kNodeEffectsReadyId = 87;
+inline constexpr A_long kGraphChecksumHighId = 88;
+inline constexpr A_long kGraphChecksumLowId = 89;
+
+// Persisted numeric identities are not registration-order indices.
+inline constexpr A_long kGraphRevisionDiskId = 41;
+inline constexpr A_long kGraphSyncGuardDiskId = 42;
+inline constexpr A_long kGraphEditCommitDiskId = 43;
+inline constexpr A_long kGraphEditReceiptDiskId = 44;
+inline constexpr A_long kNodeEffectsReadyDiskId = 89;
+inline constexpr A_long kGraphChecksumHighDiskId = 90;
+inline constexpr A_long kGraphChecksumLowDiskId = 91;
 
 // Pre-render records dependencies by checking out the selected parameter source.
 // The returned immutable graph owns no AE handles or parameter pointers.

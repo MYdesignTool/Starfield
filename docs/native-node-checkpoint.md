@@ -1,5 +1,44 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 11: canvas deletion and flat Effect Controls — 2026-10-02
+
+Owner reports unavailable canvas deletion and unnecessary collapsed outer
+categories. P-02E adds Delete/Backspace and filters fixed Output out of both
+delete and duplicate selections. The context menu pauses polling; marquee/menu
+interactions restore canvas keyboard focus. Native effect removal and incident
+link updates continue through existing guarded transactions.
+
+All actual outer Output/Emitter/Particle/Appearance/Force topic markers are
+removed. Main parameter schema 19 registers indices 1..89; native layout 3
+reduces base counts by two. Main/native compiler indices, direct-edit trigger
+and gateway bindings are updated together. Surviving disk IDs remain unchanged,
+including arbitrary callback ID 31. Gateway native-node-sync-11; packed version
+32779 (0x800B). Core, graph schemas and C ABI remain unchanged. No new hidden
+topic placeholders or development migration. Use fresh development effects.
+
+Candidate build uses -NoRuntimePublish -NoDistPublish. The May 2023 SDK build
+and panel/gateway syntax checks pass; no tests added/rerun. Candidate Core hash
+matches the installed build-10 Core exactly.
+Build log: artifacts/build11-flat-controls-build.log. Native binary deployment
+is required for the layout change; later Core-only changes retain hot updates.
+The installed CEP Junction already points to this checkout, so no separate
+CEP installation or host-wide settings change is required. Close/reopen CEP
+after loading build 11.
+
+Deployment is pending final source review/push and an immediate read-only
+AE-absent check. Proposed backup name: p02e-build11-flat-controls-20261002.
+
+One-step undo after deployment (AE closed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p02e-build11-flat-controls-20261002' -Rollback
+```
+
+Owner checks: Delete/Backspace and context-menu deletion of single/multiple
+nodes, including selections with fixed Output; corresponding native effects
+disappear; directly visible parameters; direct native edits, undo/save/reopen.
+SDK compilation does not establish actual AE acceptance.
+
 ## Build 10: multi-emitter evaluation and wire editing — 2026-10-02
 
 Owner build-9 evidence is "基本正常但不完全正常", with two cancellation

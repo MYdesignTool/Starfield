@@ -6,11 +6,14 @@
 
 namespace starfield::adapter {
 
-// Registration-order indices after manifest revision 6 (topic grouping). See
-// ae_plugin/Parameters.hpp for the control indices they sit next to.
-inline constexpr A_short kGraphParameterId = 31;
-inline constexpr A_long kControlSourceId = 29;
-inline constexpr A_long kCaptureControlsId = 30;
+// Flat registration-order indices (manifest 19). Persisted disk/callback IDs
+// remain independent of indices when structural topic markers are removed.
+inline constexpr A_short kGraphParameterId = 30;
+inline constexpr A_short kGraphParameterDiskId = 31;
+inline constexpr A_long kControlSourceId = 28;
+inline constexpr A_long kControlSourceDiskId = 29;
+inline constexpr A_long kCaptureControlsId = 29;
+inline constexpr A_long kCaptureControlsDiskId = 30;
 inline constexpr A_long kLegacyControlSource = 1;
 inline constexpr A_long kNodeControlSource = 2;
 

@@ -1,5 +1,21 @@
 # Parameter bridge: schema → AE control → core settings
 
+## Flat stream layout — build 11
+
+Main schema 19 removes Output topic indices 26 and 32. Former indices 27..31
+shift by one; indices 33..91 shift by two. Max Particles is now index 26,
+compiled graph 30, Output layout 37/38, guard 40, commit 41, revision 39,
+checksum 88/89 and ready marker 87. Numeric disk identities are separate;
+arbitrary callback disk ID remains 31. Earlier tables below record historical
+layouts; `schema/parameters.json` owns current main indices.
+
+Native layout 3 removes each effect's outer start/end topics. Visible controls
+shift by one, record banks by two. Base counts are Emitter 21, Particle 43,
+Appearance 42 and Force 2. `NodeRecord.hpp` computes all record indices from
+these counts; `schema/node-parameters.json` retains surviving identity revision
+2 disk IDs and reserves removed topic IDs. No topic placeholders or development
+migration; use fresh development effects.
+
 ## Native node disk IDs — build 9
 
 `schema/node-parameters.json` owns native node disk identity revision 2;

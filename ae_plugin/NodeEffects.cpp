@@ -50,15 +50,6 @@ PF_Err add_checked_parameter(PF_InData* in_data, PF_ParamDef& def) noexcept {
     return PF_ADD_PARAM(in_data, -1, &def);
 }
 
-PF_Err add_group(PF_InData* in_data, const char* name, A_long id, bool end) noexcept {
-    PF_ParamDef def{};
-    AEFX_CLR_STRUCT(def);
-    def.param_type = end ? PF_Param_GROUP_END : PF_Param_GROUP_START;
-    std::snprintf(def.name, sizeof(def.name), "%s", name);
-    def.uu.id = id;
-    return add_checked_parameter(in_data, def);
-}
-
 PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
                   PF_FpLong minimum, PF_FpLong maximum, PF_FpLong initial,
                   A_short precision = PF_Precision_HUNDREDTHS,
@@ -211,8 +202,7 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
 }
 
 PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexcept {
-    PF_Err error = add_group(in_data, "Particle", kParticleGroupStartId, false);
-    if (error != PF_Err_NONE) return error;
+    PF_Err error = PF_Err_NONE;
     if (include_lifetime) {
         error = add_slider(in_data, "Lifetime", kLifetimeId, 0.0, 1000000.0, 2.0,
                            PF_Precision_THOUSANDTHS);
@@ -243,13 +233,11 @@ PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexce
     if (error != PF_Err_NONE) return error;
     error = add_curve_bank(in_data, "Opacity", 'o');
     if (error != PF_Err_NONE) return error;
-    return add_group(in_data, "Particle", kParticleGroupEndId, true);
+    return PF_Err_NONE;
 }
 
 PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_group(in_data, "Emitter", kEmitterGroupStartId, false);
-    if (error != PF_Err_NONE) return error;
-    error = add_popup(in_data, "Type", kEmitterTypeId, 4, 1,
+    PF_Err error = add_popup(in_data, "Type", kEmitterTypeId, 4, 1,
                              "Point|Box|Sphere|Disc");
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Particles Per Second", kBirthRateId,
@@ -301,8 +289,6 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     error = add_slider(in_data, "Direction Span", kDirectionSpanId, 0.0, 180.0, 60.0,
                        PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_group(in_data, "Emitter", kEmitterGroupEndId, true);
-    if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::emitter);
     if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
@@ -337,14 +323,10 @@ PF_Err setup_appearance(PF_InData* in_data, PF_OutData* out_data) noexcept {
 }
 
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_group(in_data, "Force", kForceGroupStartId, false);
-    if (error != PF_Err_NONE) return error;
-    error = add_point3d(in_data, "Gravity", kGravityId, 0.0, 0.0, 0.0);
+    PF_Err error = add_point3d(in_data, "Gravity", kGravityId, 0.0, 0.0, 0.0);
     if (error != PF_Err_NONE) return error;
     error = add_slider(in_data, "Linear Drag", kDragId, 0.0, 100.0, 0.0,
                        PF_Precision_THOUSANDTHS);
-    if (error != PF_Err_NONE) return error;
-    error = add_group(in_data, "Force", kForceGroupEndId, true);
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::force);
     if (error != PF_Err_NONE) return error;

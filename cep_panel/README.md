@@ -1,5 +1,21 @@
 # Starfield CEP panel
 
+## Build 11 canvas deletion and flat controls — 2026-10-02
+
+Select editable nodes and press Delete/Backspace, or use Delete Selected in the
+canvas context menu. Fixed Output is excluded from deletion/duplication, so a
+mixed selection still acts on the editable nodes. Open menus pause polling;
+marquee/context-menu interactions move keyboard focus back to the canvas.
+Native record transactions remove the selected AE effects and incident links.
+
+Native build 11 removes the redundant outer Output/Emitter/Particle/Appearance/
+Force categories. Parameters appear directly under each effect header. Main
+schema 19 and native layout 3 compact stream indices without development
+migration; surviving disk IDs and Core remain unchanged. Gateway token is
+`native-node-sync-11`; close/reopen CEP after loading the new AEXs. SDK build and
+JS syntax checks are source gates; owner AE acceptance remains pending.
+[Deployment status and one-step rollback](../docs/native-node-checkpoint.md).
+
 ## Build 10 wire interaction update — 2026-10-02
 
 Click a wire to disconnect it. The empty node container lets pointer events reach

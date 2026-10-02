@@ -20,10 +20,10 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
-        case Kind::emitter: return 23;
-        case Kind::particle: return 45;
-        case Kind::appearance: return 44;
-        case Kind::force: return 4;
+        case Kind::emitter: return 21;
+        case Kind::particle: return 43;
+        case Kind::appearance: return 42;
+        case Kind::force: return 2;
     }
     return 0;
 }
@@ -53,19 +53,19 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 // identities stable independently of stream indices (schema/node-parameters.json).
 namespace disk_ids {
 enum : A_long {
-    kEmitterGroupStartId = 100, kEmitterTypeId = 101, kBirthRateId = 102,
+    kEmitterTypeId = 101, kBirthRateId = 102,
     kSeedId = 103, kEmitterParticleSizeId = 104, kOriginId = 106,
     kVelocityXId = 107, kVelocityYId = 108, kVelocityZId = 109,
     kDiscSizeId = 110, kSpeedRandomId = 111,
     kEmitterSizeXId = 112, kEmitterSizeYId = 113, kEmitterSizeZId = 114,
     kEmissionSpeedId = 115, kEmissionSpeedRandomId = 116,
     kEmissionAngleXId = 117, kEmissionAngleYId = 118, kEmissionAngleZId = 119,
-    kDirectionId = 120, kDirectionSpanId = 121, kEmitterGroupEndId = 122,
-    kParticleGroupStartId = 200, kLifetimeId = 201, kSizeId = 202,
+    kDirectionId = 120, kDirectionSpanId = 121,
+    kLifetimeId = 201, kSizeId = 202,
     kSizeOverLifeId = 203, kOpacityId = 204, kOpacityOverLifeId = 205,
     kColorStartId = 206, kColorEndId = 207, kSizeRandomId = 208,
-    kOpacityRandomId = 209, kParticleGroupEndId = 210,
-    kForceGroupStartId = 300, kGravityId = 301, kDragId = 302, kForceGroupEndId = 303,
+    kOpacityRandomId = 209,
+    kGravityId = 301, kDragId = 302,
     kLayoutXId = 400, kLayoutYId = 401, kConnectionCountId = 402,
     kConnectionFirstId = 500, kUuidFirstId = 600, kSyncGuardId = 608,
     kSizeCurveCountId = 700, kSizeCurveAgeFirstId = 710, kSizeCurveValueFirstId = 720,
@@ -105,14 +105,14 @@ enum : A_long {
 [[nodiscard]] constexpr bool disk_ids_are_unique_and_bounded() noexcept {
     using namespace disk_ids;
     constexpr A_long fixed[] = {
-        kEmitterGroupStartId, kEmitterTypeId, kBirthRateId, kSeedId, kEmitterParticleSizeId,
+        kEmitterTypeId, kBirthRateId, kSeedId, kEmitterParticleSizeId,
         kOriginId, kVelocityXId, kVelocityYId, kVelocityZId, kDiscSizeId, kSpeedRandomId,
         kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId, kEmissionSpeedId,
         kEmissionSpeedRandomId, kEmissionAngleXId, kEmissionAngleYId, kEmissionAngleZId,
-        kDirectionId, kDirectionSpanId, kEmitterGroupEndId, kParticleGroupStartId,
+        kDirectionId, kDirectionSpanId,
         kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
-        kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId, kParticleGroupEndId,
-        kForceGroupStartId, kGravityId, kDragId, kForceGroupEndId,
+        kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId,
+        kGravityId, kDragId,
         kLayoutXId, kLayoutYId, kConnectionCountId, kSyncGuardId,
         kSizeCurveCountId, kOpacityCurveCountId
     };

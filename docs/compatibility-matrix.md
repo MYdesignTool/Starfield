@@ -1,5 +1,23 @@
 # Behavior inventory
 
+## Build 11 P-02E owner feedback — 2026-10-02
+
+Owner reports canvas deletion unavailable; Effect Controls show redundant
+collapsed Output/Emitter/Particle/Force categories. Source review identifies
+missing Delete/Backspace handling and rejection of mixed selections containing
+fixed Output. Build 11 filters editable selection, pauses polling for menus and
+restores canvas focus for marquee/context interactions. Actual native record
+removal still uses the established transaction path.
+
+Actual outer group markers are removed from all five effects. Main indices
+compact to 1..89 (schema 19); native layout 3 compacts value/record indices.
+Surviving disk IDs and Core stay unchanged. Gateway token native-node-sync-11.
+SDK build and JavaScript parsing establish source readiness only; no tests
+added/rerun or AE session operated. Owner checks: single/multiple node deletion,
+native effect disappearance, fixed Output mixed selection, direct parameter
+visibility, native edits, undo and save/reopen.
+[Deployment status and rollback](native-node-checkpoint.md).
+
 ## Current build 10 G-06 deployment — 2026-10-02
 
 Owner build-9 evidence: "基本正常但不完全正常", accompanied by graph-evaluation
