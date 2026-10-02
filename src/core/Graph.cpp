@@ -565,15 +565,19 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor output;
     output.type_key = kOutputNode;
-    output.schema_version = 2;
+    output.schema_version = 3;
     output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 0});
     output.parameters = {
         ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
+        ParameterDescriptor{kTimeRemapEnabled, ParameterKind::uint32, false},
+        ParameterDescriptor{kTimeRemapSeconds, ParameterKind::float64, false},
+        ParameterDescriptor{kPreviewEnabled, ParameterKind::uint32, false},
+        ParameterDescriptor{kPreviewChance, ParameterKind::float64, false},
     };
 
     NodeTypeDescriptor force;
     force.type_key = kForceNode;
-    force.schema_version = 1;
+    force.schema_version = 2;
     force.ports = {
         PortDescriptor{kForceParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kForceParticlesOut, PortDirection::output, kParticleStream, false, 0},
@@ -581,6 +585,13 @@ NodeRegistry make_particle_node_registry() {
     force.parameters = {
         ParameterDescriptor{kGravity, ParameterKind::vector3_float64, true},
         ParameterDescriptor{kLinearDrag, ParameterKind::float64, true},
+        ParameterDescriptor{kGravityRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kWind, ParameterKind::vector3_float64, false},
+        ParameterDescriptor{kSpin, ParameterKind::float64, false},
+        ParameterDescriptor{kSpinFrequency, ParameterKind::float64, false},
+        ParameterDescriptor{kSpinResist, ParameterKind::float64, false},
+        ParameterDescriptor{kSpinDelay, ParameterKind::float64, false},
+        ParameterDescriptor{kWindSpinCurve, ParameterKind::opaque_bytes, false},
     };
 
     NodeTypeDescriptor appearance;

@@ -23,7 +23,7 @@ enum class Kind : A_long { emitter, particle, appearance, force };
         case Kind::emitter: return 30;
         case Kind::particle: return 43;
         case Kind::appearance: return 42;
-        case Kind::force: return 2;
+        case Kind::force: return 27;
     }
     return 0;
 }
@@ -68,7 +68,11 @@ enum : A_long {
     kSizeOverLifeId = 203, kOpacityId = 204, kOpacityOverLifeId = 205,
     kColorStartId = 206, kColorEndId = 207, kSizeRandomId = 208,
     kOpacityRandomId = 209,
-    kGravityId = 301, kDragId = 302,
+    kGravityId = 301, kDragId = 302, // reserved development vector/drag controls
+    kForceGravityId = 304, kAirDensityId = 305, kGravityRandomId = 306,
+    kWindXId = 307, kWindYId = 308, kWindZId = 309,
+    kSpinId = 310, kSpinFrequencyId = 311, kSpinResistId = 312, kSpinDelayId = 313,
+    kWindSpinCurveCountId = 900, kWindSpinCurveAgeFirstId = 910, kWindSpinCurveValueFirstId = 920,
     kLayoutXId = 400, kLayoutYId = 401, kConnectionCountId = 402,
     kConnectionFirstId = 500, kUuidFirstId = 600, kSyncGuardId = 608,
     kSizeCurveCountId = 700, kSizeCurveAgeFirstId = 710, kSizeCurveValueFirstId = 720,
@@ -92,15 +96,15 @@ enum : A_long {
     return chunk >= 0 && chunk < 8 ? disk_ids::kUuidFirstId + chunk : 0;
 }
 [[nodiscard]] constexpr A_long curve_count_id(char bank) noexcept {
-    return bank == 's' ? disk_ids::kSizeCurveCountId : bank == 'o' ? disk_ids::kOpacityCurveCountId : 0;
+    return bank == 's' ? disk_ids::kSizeCurveCountId : bank == 'o' ? disk_ids::kOpacityCurveCountId : bank == 'w' ? disk_ids::kWindSpinCurveCountId : 0;
 }
 [[nodiscard]] constexpr A_long curve_age_id(char bank, A_long point) noexcept {
-    return point >= 0 && point < 8 && (bank == 's' || bank == 'o')
-        ? (bank == 's' ? disk_ids::kSizeCurveAgeFirstId : disk_ids::kOpacityCurveAgeFirstId) + point : 0;
+    return point >= 0 && point < 8 && (bank == 's' || bank == 'o' || bank == 'w')
+        ? (bank == 's' ? disk_ids::kSizeCurveAgeFirstId : bank == 'o' ? disk_ids::kOpacityCurveAgeFirstId : disk_ids::kWindSpinCurveAgeFirstId) + point : 0;
 }
 [[nodiscard]] constexpr A_long curve_value_id(char bank, A_long point) noexcept {
-    return point >= 0 && point < 8 && (bank == 's' || bank == 'o')
-        ? (bank == 's' ? disk_ids::kSizeCurveValueFirstId : disk_ids::kOpacityCurveValueFirstId) + point : 0;
+    return point >= 0 && point < 8 && (bank == 's' || bank == 'o' || bank == 'w')
+        ? (bank == 's' ? disk_ids::kSizeCurveValueFirstId : bank == 'o' ? disk_ids::kOpacityCurveValueFirstId : disk_ids::kWindSpinCurveValueFirstId) + point : 0;
 }
 
 // Check the whole identity allocation, including every generated connection,
@@ -115,11 +119,13 @@ enum : A_long {
         kDirectionId, kDirectionSpanId,
         kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
         kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId,
-        kGravityId, kDragId,
+        kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,
+        kWindXId, kWindYId, kWindZId, kSpinId, kSpinFrequencyId, kSpinResistId, kSpinDelayId,
+        kWindSpinCurveCountId,
         kLayoutXId, kLayoutYId, kConnectionCountId, kSyncGuardId,
         kSizeCurveCountId, kOpacityCurveCountId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 32> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 48> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
@@ -130,7 +136,7 @@ enum : A_long {
     }
     for (A_long point = 0; point < 8; ++point) {
         ids[count++] = uuid_id(point);
-        for (char bank : {'s', 'o'}) {
+        for (char bank : {'s', 'o', 'w'}) {
             ids[count++] = curve_age_id(bank, point);
             ids[count++] = curve_value_id(bank, point);
         }

@@ -1,5 +1,16 @@
 # Build and host matrix
 
+## Build 14 P-02H candidate — 2026-10-02
+
+Packed 32782 / 0x800E; main 21/native identity 3/layout 6; Emitter 5, Particle 2,
+Force 2, Output 3; gateway native-node-sync-14; Core ABI 2 unchanged. Build uses
+May 2023 SDK x64 Release /MT with -NoRuntimePublish -NoDistPublish. Scoped checks:
+58 Core, 79 actual Force selectors, 38 main setup/immutable live-global checkout,
+current-node CEP suite and six source parses. Headers/Win is not present in this
+SDK and is removed from every build/editor input. Fresh effects required.
+Deployment/hash/rollback evidence is recorded in native-node-checkpoint.md;
+compiler/scoped evidence is distinct from AE host qualification.
+
 ## Current build 13 P-02G deployment — 2026-10-02
 
 Packed 32781 (0x800D), main manifest 20, native identity 3/layout 5, Emitter

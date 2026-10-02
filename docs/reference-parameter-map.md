@@ -1,5 +1,16 @@
 # Reference parameter map (observed behavior)
 
+## Build 14 ordinary Force/main slice — 2026-10-02
+
+Scalar Gravity/random, separate Wind X/Y/Z, Spin/frequency/resist/delay and Air
+Density follow the observed ordinary air module's names/order/zero defaults.
+Wind/Spin share an independent saved percentage curve. This is ordinary Force,
+distinct from Physical Forces. Numeric trajectory formulas are independent and
+explicit in ADR 0021; exact reference behavior still needs comparison. Main adds
+functional Time Remapping and Preview/Particle chance; Max Particles defaults to
+the owner's 1000000. See reference-main-force-comparison.md for remaining main
+and Force capabilities. Historical tables below describe earlier checkpoints.
+
 ## Build 13 Emitter/Auxiliary slice — 2026-10-02
 
 The local observed parameter inventory and owner's screenshot confirm Emitter and

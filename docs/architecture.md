@@ -1,5 +1,23 @@
 # Starfield plug-in architecture
 
+## P-02H / build 14
+
+Fresh Output cap is 1000000 (maximum 2000000); low-population evaluation reserves
+actual survivors, and Auxiliary does not reserve the full cap at startup. Force
+schema 2/native layout 6 exposes scalar Gravity/random, Wind X/Y/Z,
+Spin/frequency/resist/delay and Air Density, with a saved percentage curve.
+Piecewise linear wind forcing integrates analytically under total branch drag;
+random attenuation is salted by Force and Emitter UUIDs. Spin and its velocity
+are explicit deterministic displacement equations. Reference numeric parity is
+not inferred from names. Native effects remain separate and node controls flat.
+
+Main manifest 21 appends streams 90..97 for Time Remapping and Preview. Output
+schema 3 saves these globals; pre-render checks out their live animated values
+and makes an immutable graph snapshot. The remapped clock is applied once before
+recursive Auxiliary sampling. Preview filters stable identities after simulation,
+preserving parents and full live counts. Core ABI 2/Render.hpp stay unchanged.
+Fresh development effects required; see ADR 0021 and the main/Force comparison.
+
 ## P-02G / build 13
 
 Native node edit callbacks dispatch by runtime parameter index. PF_ParamDef's

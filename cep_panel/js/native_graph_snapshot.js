@@ -33,8 +33,10 @@
                 });
             });
             var output = snapshot.renderer;
-            graph.nodes.push({id:output.id,type:"org.starfieldfx.nodes.output",schemaVersion:2,
-                parameters:[{key:"1",type:3,value:output.maxParticles}]});
+            graph.nodes.push({id:output.id,type:"org.starfieldfx.nodes.output",schemaVersion:3,
+                parameters:[{key:"1",type:3,value:output.maxParticles},
+                    {key:"2",type:3,value:output.timeRemapEnabled || 0},{key:"3",type:4,value:output.timeRemapSeconds || 0},
+                    {key:"4",type:3,value:output.previewEnabled || 0},{key:"5",type:4,value:typeof output.previewChance === "number" ? output.previewChance : 100}]});
             positions[output.id] = output.position;
             graph = layout.set(graph,positions);
             var bytes = codec.serialize(graph);

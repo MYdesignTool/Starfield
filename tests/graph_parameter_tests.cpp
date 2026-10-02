@@ -713,6 +713,53 @@ void test_numeric_graph_receipt(PF_InData& host) {
 }
 } // namespace
 
+void test_renderer_controls(PF_InData& host) {
+    PF_OutData output{};
+    CHECK(setup_parameters(&host,&output)==PF_Err_NONE);
+    CHECK(output.num_params==98 && registered.size()==97);
+    CHECK(registered[kMaxParticlesId-1].u.fs_d.value==1000000 && registered[kMaxParticlesId-1].u.fs_d.dephault==1000000);
+    CHECK(registered[89].param_type==PF_Param_GROUP_START && registered[89].ui_flags==PF_PUI_NONE);
+    CHECK(registered[93].param_type==PF_Param_GROUP_START && registered[93].ui_flags==PF_PUI_NONE);
+    CHECK(std::strcmp(registered[kTimeRemapEnabledId-1].name,"Time Remapping On / Off")==0 && registered[kTimeRemapEnabledId-1].param_type==PF_Param_CHECKBOX);
+    CHECK(std::strcmp(registered[kPreviewChanceId-1].name,"Particle chance")==0 && registered[kPreviewChanceId-1].u.fs_d.dephault==100);
+    CHECK((registered[kTimeRemapSecondsId-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0);
+    CHECK(registered[kGraphChecksumLowId-1].uu.id==kGraphChecksumLowDiskId);
+    int depth=0; bool balanced=true;
+    for(const auto& p:registered) {
+        if(p.param_type==PF_Param_GROUP_START) ++depth;
+        else if(p.param_type==PF_Param_GROUP_END) --depth;
+        balanced=balanced && depth>=0;
+    }
+    CHECK(balanced && depth==0);
+    bool unique_ids=true;
+    for(std::size_t i=0;i<registered.size();++i) for(std::size_t j=0;j<i;++j)
+        unique_ids=unique_ids && registered[i].uu.id!=registered[j].uu.id;
+    CHECK(unique_ids);
+    for(std::size_t i=0;i<registered.size();++i) parameters[i+1]=registered[i];
+    parameters[kControlSourceId].u.pd.value=kNodeControlSource;
+    CHECK(create_graph_parameter(&host,graph_from_controls(core::Settings{}).value(),&parameters[kGraphParameterId].u.arb_d.value)==0);
+    parameters[kTimeRemapEnabledId].u.bd.value=TRUE;parameters[kTimeRemapSecondsId].u.fs_d.value=1.25;
+    parameters[kPreviewEnabledId].u.bd.value=TRUE;parameters[kPreviewChanceId].u.fs_d.value=25;
+    host.num_params=98;
+    std::shared_ptr<const core::Graph> graph;
+    CHECK(checkout_render_graph(&host,&output,graph)==0 && graph && checked_out.empty());
+    for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode) {
+        for(const auto& p:node.parameters) {
+            if(p.key==core::graph_keys::kTimeRemapSeconds) CHECK(std::get<double>(p.value)==1.25);
+            if(p.key==core::graph_keys::kPreviewChance) CHECK(std::get<double>(p.value)==25);
+        }
+    }
+    const auto frozen=core::serialize_graph(*graph,core::particle_node_registry()).value();
+    parameters[kTimeRemapSecondsId].u.fs_d.value=3;
+    CHECK(core::serialize_graph(*graph,core::particle_node_registry()).value()==frozen);
+    CHECK(std::find(checked_indices.begin(),checked_indices.end(),kTimeRemapSecondsId)!=checked_indices.end());
+    fail_checkout=kPreviewChanceId;
+    CHECK(checkout_render_graph(&host,&output,graph)!=0 && !graph && checked_out.empty());
+    fail_checkout=-1;
+    dispose(parameters[kGraphParameterId].u.arb_d.value);
+    dispose(registered[kGraphParameterId-1].u.arb_d.dephault);
+}
+
 int main() {
     PF_UtilCallbacks utils{};
     utils.host_new_handle = allocate; utils.host_lock_handle = lock;
@@ -722,6 +769,9 @@ int main() {
     host.width = 64; host.height = 64; host.current_time = 24; host.time_step = 1; host.time_scale = 24;
     host.pixel_aspect_ratio = {1, 1};
     // effect_ref intentionally null: arbitrary callbacks must work without one.
+#if defined(STARFIELD_TEST_RENDERER_CONTROLS)
+    test_renderer_controls(host);
+#else
     test_callbacks(host);
     test_parameters(host);
     test_point_control_preview_scale(host);
@@ -730,6 +780,7 @@ int main() {
     test_world_copy_cancellation();
     test_world_output_is_transparent_outside_particles();
     test_numeric_graph_receipt(host);
+#endif
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

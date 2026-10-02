@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-sync-13";
+    var GATEWAY_BUILD = "native-node-sync-14";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -557,7 +557,7 @@
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
             schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 5 :
-                type === "org.starfieldfx.nodes.particle" ? 2 : 1,
+                type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.force" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -596,7 +596,26 @@
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
         } else if (type === "org.starfieldfx.nodes.force") {
-            vector(1, "Gravity"); scalar(2, "Linear Drag");
+            var forceHeight = Number(layer.height);
+            var forceAspect=layer.source ? Number(layer.source.pixelAspect) : 1;
+            if (!isFinite(forceAspect) || forceAspect<=0) forceAspect=1;
+            if (!(forceHeight > 0)) throw new Error("The Force layer dimensions are unavailable.");
+            node.parameters.push({key:"1",type:5,value:[0,-Number(nodeControlValue(effect,"Gravity"))/forceHeight,0]});
+            scalar(2, "Air Density"); scalar(3, "Gravity random");
+            node.parameters.push({key:"4",type:5,value:[Number(nodeControlValue(effect,"Wind X"))*forceAspect/forceHeight,
+                -Number(nodeControlValue(effect,"Wind Y"))/forceHeight,Number(nodeControlValue(effect,"Wind Z"))/forceHeight]});
+            scalar(5,"Spin"); node.parameters[node.parameters.length-1].value /= forceHeight;
+            scalar(6,"Spin Frequency"); scalar(7,"Spin resist"); scalar(8,"Spin Delay (Seconds)");
+            var forceCount = Number(nodeControlValue(effect,"Wind and Spin Curve Count"));
+            if (forceCount) {
+                if (Math.floor(forceCount)!==forceCount || forceCount<2 || forceCount>8) throw new Error("Invalid Force curve count.");
+                var forceBytes=[1,forceCount,0,0];
+                for (var fp=0;fp<forceCount;fp++) {
+                    appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Age")));
+                    appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Value")));
+                }
+                node.parameters.push({key:"9",type:7,value:forceBytes});
+            }
         } else {
             vector(1, "Color Start"); vector(2, "Color End");
             scalar(3, "Size (Pixels)"); scalar(4, "Size Over Life"); scalar(5, "Opacity");
@@ -766,11 +785,25 @@
                     else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Life (Seconds)", value);
                     else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.force") {
-                    if (key === "1") setNodeControl(effect, "Gravity", value);
-                    else if (key === "2") setNodeControl(effect, "Linear Drag", value);
+                    if (key === "1") setNodeControl(effect, "Gravity", -Number(value[1])*Number(layer.height));
+                    else if (key === "2") setNodeControl(effect, "Air Density", value);
+                    else if (key === "3") setNodeControl(effect, "Gravity random", value);
+                    else if (key === "4") {
+                        var windAspect=layer.source ? Number(layer.source.pixelAspect) : 1;
+                        if(!isFinite(windAspect) || windAspect<=0) windAspect=1;
+                        setNodeControl(effect,"Wind X",Number(value[0])*Number(layer.height)/windAspect);
+                        setNodeControl(effect,"Wind Y",-Number(value[1])*Number(layer.height));
+                        setNodeControl(effect,"Wind Z",Number(value[2])*Number(layer.height));
+                    }
+                    else if (key === "5") setNodeControl(effect,"Spin",Number(value)*Number(layer.height));
+                    else if (key === "6") setNodeControl(effect,"Spin Frequency",value);
+                    else if (key === "7") setNodeControl(effect,"Spin resist",value);
+                    else if (key === "8") setNodeControl(effect,"Spin Delay (Seconds)",value);
+                    else if (key === "9") writeNodeCurve(effect,"Wind and Spin",value);
                     else throw new Error("Force graph parameter is not mapped to an AE control: " + key);
                 }
             }
+            if (type === "org.starfieldfx.nodes.force" && !nodeParameter(node,"9")) writeNodeCurve(effect,"Wind and Spin",null);
             if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
@@ -1067,22 +1100,38 @@
             record.maxParticles < 0 || record.maxParticles > 2000000 || Math.floor(record.maxParticles) !== record.maxParticles) {
             throw new Error("The Output record must have its reserved identity, bounded position and integer particle limit.");
         }
+        for (var f=0;f<2;f++) {
+            var flag=record[f===0 ? "timeRemapEnabled" : "previewEnabled"];
+            if (typeof flag!=="undefined" && (typeof flag!=="number" || (flag!==0 && flag!==1))) throw new Error("Invalid Output enable switch.");
+        }
+        if (typeof record.timeRemapSeconds!=="undefined" && (typeof record.timeRemapSeconds!=="number" ||
+            !isFinite(record.timeRemapSeconds) || Math.abs(record.timeRemapSeconds)>1000000)) throw new Error("Invalid Output remapping time.");
+        if (typeof record.previewChance!=="undefined" && (typeof record.previewChance!=="number" ||
+            !isFinite(record.previewChance) || record.previewChance<0 || record.previewChance>100)) throw new Error("Invalid Output preview percentage.");
         return record;
     }
 
     function writeRendererRecord(resolved, record) {
-        var names = ["Max Particles", "Layout Output X", "Layout Output Y"],
-            values = [record.maxParticles, record.position.x, record.position.y];
+        var names = ["Max Particles", "Layout Output X", "Layout Output Y", "Time Remapping On / Off", "Time (Seconds)", "Preview", "Particle chance"],
+            values = [record.maxParticles, record.position.x, record.position.y, record.timeRemapEnabled || 0,
+                record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100];
         for (var i = 0; i < names.length; i++) {
             var property = findEffectProperty(resolved.target.effect, names[i]);
             if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
-            if (!sameValue(property.value, values[i])) property.setValue(values[i]);
+            if (!sameValue(property.value, values[i])) {
+                if (property.numKeys > 0 && typeof property.setValueAtTime === "function") property.setValueAtTime(resolved.target.comp.time,values[i]);
+                else property.setValue(values[i]);
+            }
         }
     }
 
     function readRendererRecord(resolved) {
         return { id: "000000000000000000000000000000ff",
             maxParticles: Number(findEffectProperty(resolved.target.effect, "Max Particles").value),
+            timeRemapEnabled:Number(findEffectProperty(resolved.target.effect,"Time Remapping On / Off").value),
+            timeRemapSeconds:Number(findEffectProperty(resolved.target.effect,"Time (Seconds)").value),
+            previewEnabled:Number(findEffectProperty(resolved.target.effect,"Preview").value),
+            previewChance:Number(findEffectProperty(resolved.target.effect,"Particle chance").value),
             position: { x: Number(findEffectProperty(resolved.target.effect, "Layout Output X").value), y: Number(findEffectProperty(resolved.target.effect, "Layout Output Y").value) } };
     }
 
@@ -1485,7 +1534,9 @@
             // comp time. Do not report the live count as unavailable merely because
             // the legacy Effect Controls streams are no longer authoritative.
             return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
-                           targetToken: token, available: true, graphMode: true, timeSeconds: timeSeconds });
+                           targetToken: token, available: true, graphMode: true, timeSeconds:
+                               Number(findEffectProperty(target.effect,"Time Remapping On / Off").value) ?
+                               Number(findEffectProperty(target.effect,"Time (Seconds)").value) : timeSeconds });
         }
 
         function scalarAtTime(key) {

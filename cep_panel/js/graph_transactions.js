@@ -77,7 +77,12 @@
         var outputs = graph.nodes.filter(function (node) { return node.type === "org.starfieldfx.nodes.output"; });
         if (outputs.length !== 1) throw new Error("The graph must contain one Output owned by its renderer.");
         var node = outputs[0];
-        return { id: node.id, position: positions[node.id], maxParticles: node.parameters[0].value };
+        function value(key,fallback) {
+            for (var i=0;i<node.parameters.length;i++) if (node.parameters[i].key===String(key)) return node.parameters[i].value;
+            return fallback;
+        }
+        return { id: node.id, position: positions[node.id], maxParticles: value(1,1000000),
+            timeRemapEnabled:value(2,0),timeRemapSeconds:value(3,0),previewEnabled:value(4,0),previewChance:value(5,100) };
     }
 
     // AE may round float controls and colors. Missing optional numeric parameters
@@ -114,9 +119,11 @@
                     var value = a || b;
                     var fallback = (node.type === "org.starfieldfx.nodes.particle" || node.type === "org.starfieldfx.nodes.appearance") ?
                         defaults[key] : node.type === "org.starfieldfx.nodes.emitter" ?
-                        ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60,"22":0,"23":0,"24":100,"25":0,"26":100,"27":0,"28":0,"29":0,"30":0})[key] : undefined;
-                    if (fallback === undefined || value.type !== (key === "17" || key === "23" ? 3 : 4) || value.value !== fallback) return false;
-                } else if (a.type === 7 && (key === "7" || key === "8")) {
+                        ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60,"22":0,"23":0,"24":100,"25":0,"26":100,"27":0,"28":0,"29":0,"30":0})[key] :
+                        node.type === "org.starfieldfx.nodes.force" ? ({"3":0,"5":0,"6":0,"7":0,"8":0})[key] :
+                        node.type === "org.starfieldfx.nodes.output" ? ({"2":0,"3":0,"4":0,"5":100})[key] : undefined;
+                    if (fallback === undefined || value.type !== (key === "17" || key === "23" || (node.type === "org.starfieldfx.nodes.output" && (key === "2" || key === "4")) ? 3 : 4) || value.value !== fallback) return false;
+                } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.force" && key === "9"))) {
                     var av = a.value, bv = b.value;
                     if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1]) return false;
                     var ad = new DataView(new Uint8Array(av).buffer), bd = new DataView(new Uint8Array(bv).buffer);

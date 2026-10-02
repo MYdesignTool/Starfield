@@ -1,7 +1,7 @@
 {
   "identityRevision": 3,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Development layout 5 appends Auxiliary controls and registers Emitting after Type; Emitter base count 30, graph schema 5, paired Core ABI 2. No old-project migration; create fresh development effects.",
+  "migrationPolicy": "Development layout 6 replaces Force vector Gravity/Linear Drag with scalar Gravity/random, Wind XYZ, Spin/frequency/resist/delay, Air Density and hidden percentage curve. Force schema 2/base 27; fresh effects, no migration; Core ABI 2 unchanged.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,
@@ -48,7 +48,18 @@
     "inherit_velocity": 129,
     "inherit_size": 130,
     "inherit_opacity": 131,
-    "inherit_color": 132
+    "inherit_color": 132,
+    "force_gravity": 304,
+    "air_density": 305,
+    "gravity_random": 306,
+    "wind_x": 307,
+    "wind_y": 308,
+    "wind_z": 309,
+    "spin": 310,
+    "spin_frequency": 311,
+    "spin_resist": 312,
+    "spin_delay": 313,
+    "wind_spin_curve_count": 900
   },
   "outgoingConnections": {
     "first": 500,
@@ -72,7 +83,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter, Particle and Appearance reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 5,
+  "layoutRevision": 6,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -82,7 +93,9 @@
     303
   ],
   "reservedRemovedControlIds": [
-    106
+    106,
+    301,
+    302
   ],
   "visibleControlPolicy": "Typed limits and normal AE slider ranges are independent. CEP uses explicit scrub steps, never the full typed range. AE slider sensitivity also depends on the host's native interaction.",
   "controls": {
@@ -202,7 +215,7 @@
       "scrubStep": 0.01
     },
     "drag": {
-      "label": "Linear Drag",
+      "label": "Air Density",
       "min": 0,
       "max": 100,
       "default": 0,
@@ -212,19 +225,36 @@
     },
     "gravity": {
       "label": "Gravity",
-      "scrubStep": 0.1
+      "scrubStep": 1,
+      "min": -100000,
+      "max": 100000,
+      "default": 0,
+      "sliderMin": -100,
+      "sliderMax": 100,
+      "unit": "pixels_per_second_squared"
     },
     "over_life": {
       "min": 0,
       "max": 100,
       "scrubStep": 1,
       "unit": "percent"
+    },
+    "spin_delay": {
+      "label": "Spin Delay (Seconds)",
+      "min": 0,
+      "max": 10000,
+      "default": 0,
+      "sliderMin": 0,
+      "sliderMax": 10,
+      "scrubStep": 0.1
     }
   },
   "graphAuthoring": {
     "emitterSchemaVersion": 4,
     "speedRandomPercentKey": 22,
-    "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed."
+    "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
+    "forceSchemaVersion": 2,
+    "outputSchemaVersion": 3
   },
   "nativeControlOrder": {
     "emitter": [
@@ -255,6 +285,23 @@
       "Color End",
       "Size Over Life",
       "Opacity Over Life"
+    ],
+    "force": [
+      "Gravity",
+      "Gravity random",
+      "Wind X",
+      "Wind Y",
+      "Wind Z",
+      "Spin",
+      "Spin Frequency",
+      "Spin resist",
+      "Spin Delay (Seconds)",
+      "Air Density"
     ]
+  },
+  "windSpinCurve": {
+    "ageFirst": 910,
+    "valueFirst": 920,
+    "points": 8
   }
 }

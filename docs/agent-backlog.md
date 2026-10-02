@@ -1,5 +1,15 @@
 # Agent-ready implementation backlog
 
+## Current P-02H candidate — 2026-10-02
+
+Build 14 adds ordinary Force controls/curve, renderer Time Remapping/Preview and
+fresh Max Particles 1000000, with bounded initial Auxiliary storage. SDK/editor
+includes no longer name the nonexistent Headers/Win directory. Minimal requested
+checks pass: Core 58, native Force 79, renderer setup/checkout 38; current-node CEP
+suite and six-source parsing pass. May 2023 SDK candidate builds at packed 32782,
+main 21/native layout 6/Force 2/Output 3/Core ABI 2. No AE session operated.
+Source push precedes installation; deployment evidence goes in the checkpoint.
+
 ## Current P-02G checkpoint — 2026-10-02
 
 Build 13 candidate fixes native runtime edit dispatch, adds UUID effect selection,
@@ -62,6 +72,14 @@ See [native-node-checkpoint.md](native-node-checkpoint.md).
 This backlog is the task source for staged implementation work. Assign one task ID per branch/worktree. Tasks below have explicit file ownership to reduce conflicts; the integrating owner reviews and merges interfaces in dependency order.
 
 ## Current checkpoint
+
+### P-02H — Reference Force, renderer globals and population defaults (2026-10-02)
+
+- **Owner:** integration lead; owner follow-up to P-02G.
+- **Dependencies:** P-02G, ADRs 0002, 0005, 0012, 0015, 0019, 0021.
+- **Owned files:** current core settings/simulation/graph/renderer, native Force records and parameter setup, main renderer controls, CEP gateway/view/edit/curve surface, parameter manifests, SDK include configurations, focused current-node/Force checks and corresponding architecture, mapping, build and deployment documentation.
+- **Scope:** remove the nonexistent May 2023 SDK Headers/Win include; set fresh Output's cap to 1000000 without allocating that cap for small populations. Align ordinary Force with observed Gravity/random, Wind, Spin/frequency/resist/delay, Air Density and a Wind/Spin percentage curve. Add functional Time Remapping and Preview globals on the renderer effect. Retain separately saved node effects. Record every remaining reference main-effect capability explicitly rather than registering inactive controls.
+- **Acceptance:** owner-authorized minimal current-node/native Force/panel checks and May 2023 SDK candidate build; sources pushed before AE-absent deployment through the existing single Junction. Fresh effects for the development layout; exact reference motion and real AE acceptance require owner verification.
 
 ### P-02G — Native edits, effect selection, camera and auxiliary emission (2026-10-02)
 

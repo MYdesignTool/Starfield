@@ -253,7 +253,7 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
         kind = Kind::appearance; type_key = core::graph_keys::kAppearanceNode; schema = 1; return true;
     }
     if (std::strcmp(match_name, kForceMatchName) == 0) {
-        kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 1; return true;
+        kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 2; return true;
     }
     return false;
 }
@@ -316,10 +316,24 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         return true;
     }
     if (kind == Kind::force) {
-        if (!read_three_d(suites, plugin_id, effect, 1, time, vector)) return false;
-        add_value(node, kGravity, vector);
+        if (!read_one_d(suites, plugin_id, effect, 1, time, scalar)) return false;
+        add_value(node, kGravity, core::Vec3{0, -scalar / units.layer_height, 0});
         if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
+        add_value(node, kGravityRandom, scalar);
+        if (!read_one_d(suites, plugin_id, effect, 3, time, vector.x) ||
+            !read_one_d(suites, plugin_id, effect, 4, time, vector.y) ||
+            !read_one_d(suites, plugin_id, effect, 5, time, vector.z)) return false;
+        add_value(node, kWind, core::Vec3{vector.x * units.pixel_aspect_ratio / units.layer_height, -vector.y / units.layer_height, vector.z / units.layer_height});
+        constexpr std::array<core::ParameterKey, 4> spin_keys{kSpin, kSpinFrequency, kSpinResist, kSpinDelay};
+        for (A_long field = 0; field < 4; ++field) {
+            if (!read_one_d(suites, plugin_id, effect, 6 + field, time, scalar)) return false;
+            add_value(node, spin_keys[field], field == 0 ? scalar / units.layer_height : scalar);
+        }
+        if (!read_one_d(suites, plugin_id, effect, 10, time, scalar)) return false;
         add_value(node, kLinearDrag, scalar);
+        core::OpaqueBytes curve; bool present = false;
+        if (!read_curve(suites, plugin_id, effect, 11, 12, time, curve, present)) return false;
+        if (present) add_value(node, kWindSpinCurve, std::move(curve));
         return true;
     }
 
@@ -500,9 +514,20 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             !std::isfinite(params[kLayoutOutputYId]->u.fs_d.value)) return PF_Err_BAD_CALLBACK_PARAM;
         layout_entries.push_back(LayoutEntry{output_id,
             params[kLayoutOutputXId]->u.fs_d.value, params[kLayoutOutputYId]->u.fs_d.value});
-        graph.nodes.push_back(core::GraphNode{output_id, core::graph_keys::kOutputNode, 2,
+        graph.nodes.push_back(core::GraphNode{output_id, core::graph_keys::kOutputNode, 3,
             {{core::graph_keys::kParticleCount,
               static_cast<std::uint32_t>(params[kMaxParticlesId]->u.fs_d.value)}}});
+        auto& output = graph.nodes.back();
+        for (const auto& binding : {std::pair{kTimeRemapEnabledId, core::graph_keys::kTimeRemapEnabled},
+                                   std::pair{kPreviewEnabledId, core::graph_keys::kPreviewEnabled}}) {
+            if (!params[binding.first] || params[binding.first]->param_type != PF_Param_CHECKBOX) return PF_Err_BAD_CALLBACK_PARAM;
+            add_value(output, binding.second, std::uint32_t(params[binding.first]->u.bd.value != 0));
+        }
+        for (const auto& binding : {std::pair{kTimeRemapSecondsId, core::graph_keys::kTimeRemapSeconds},
+                                   std::pair{kPreviewChanceId, core::graph_keys::kPreviewChance}}) {
+            if (!params[binding.first] || params[binding.first]->param_type != PF_Param_FLOAT_SLIDER) return PF_Err_BAD_CALLBACK_PARAM;
+            add_value(output, binding.second, double(params[binding.first]->u.fs_d.value));
+        }
 
         for (const auto& connection : connections) {
             Kind destination_kind = Kind::emitter;

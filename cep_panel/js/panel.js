@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-13";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-node-sync-14";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -66,7 +66,7 @@
     // question (backlog D-05) and a wrong guess would silently move the emitter.
     var PRESETS = {
         defaults: {
-            particle_count: 1000, birth_rate: 30, seed: 1, particle_lifetime: 2, emitter_shape: 1,
+            particle_count: 1000000, birth_rate: 100, seed: 1000, particle_lifetime: 2, emitter_shape: 1,
             velocity_x: 0, velocity_y: 0.3, velocity_z: 0, emitter_size: 0.05,
             emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.15,
             gravity_x: 0, gravity_y: 0, gravity_z: 0, linear_drag: 0,
@@ -74,7 +74,7 @@
             color_start: [255, 255, 255], color_end: [255, 255, 255]
         },
         spark: {
-            particle_count: 4000, birth_rate: 220, seed: 7, particle_lifetime: 1.1, emitter_shape: 1,
+            particle_count: 1000000, birth_rate: 220, seed: 7, particle_lifetime: 1.1, emitter_shape: 1,
             velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0,
             emitter_size_x: 16, emitter_size_y: 16, emitter_size_z: 16, velocity_spread: 1.1,
             gravity_x: 0, gravity_y: -2.6, gravity_z: 0, linear_drag: 0.9,
@@ -82,7 +82,7 @@
             color_start: [255, 240, 180], color_end: [255, 90, 20]
         },
         snow: {
-            particle_count: 2500, birth_rate: 90, seed: 21, particle_lifetime: 6.5, emitter_shape: 2,
+            particle_count: 1000000, birth_rate: 90, seed: 21, particle_lifetime: 6.5, emitter_shape: 2,
             velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1,
             emitter_size_x: 2160, emitter_size_y: 1080, emitter_size_z: 2160, velocity_spread: 0.35,
             gravity_x: 0, gravity_y: -0.05, gravity_z: 0, linear_drag: 0.15,
@@ -90,7 +90,7 @@
             color_start: [235, 245, 255], color_end: [200, 215, 235]
         },
         floating_light: {
-            particle_count: 300, birth_rate: 14, seed: 3, particle_lifetime: 9, emitter_shape: 3,
+            particle_count: 1000000, birth_rate: 14, seed: 3, particle_lifetime: 9, emitter_shape: 3,
             velocity_x: 0, velocity_y: 0.16, velocity_z: 0, emitter_size: 0.9,
             emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.4,
             gravity_x: 0, gravity_y: 0.06, gravity_z: 0, linear_drag: 0.35,
@@ -667,8 +667,7 @@
         }
         if (kind === "force") {
             var gravity = graphParameterValue(node, 1);
-            return "Gravity Y " + shortNumber(parameterValue(node, "gravity_y") || (gravity && gravity[1])) +
-                   " · drag " + shortNumber(parameterValue(node, "linear_drag") || graphParameterValue(node, 2));
+            return "Gravity " + shortNumber(gravity) + " · air " + shortNumber(graphParameterValue(node, 2));
         }
         if (kind === "particle" || kind === "appearance") {
             return "Size " + shortNumber(parameterValue(node, "particle_size") || graphParameterValue(node, 3)) +
@@ -1184,6 +1183,10 @@
         }
         elements.inspectorBody.appendChild(grid);
         var curves = currentCurveState("size", node.id);
+        if (kind === "force" && curves) {
+            elements.inspectorBody.appendChild(renderCurveEditor("size", "Wind and Spin Over Life (%)", curves.size, 100));
+            drawCurvePlot("size");
+        }
         if ((kind === "particle" || kind === "appearance") && curves) {
             elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life (%)", curves.size, 100));
             elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life (%)", curves.opacity, 100));
@@ -1644,7 +1647,7 @@
                 Math.abs(curveState.points[curveState.points.length - 1].value - points[points.length - 1].value) < 1e-9) return;
             var graphChanges = [];
             var endKey = kind === "size" ? keys.sizeEnd : keys.opacityEnd;
-            var endParameter = graphParameterRecord(node, endKey);
+            var endParameter = endKey ? graphParameterRecord(node, endKey) : null;
             if (endParameter && Math.abs(Number(endParameter.value) - points[points.length - 1].value) > 1e-9) {
                 graphChanges.push({ nodeId: node.id, parameterKey: endKey,
                                     valueType: endParameter.type, value: points[points.length - 1].value });

@@ -95,6 +95,53 @@ DragIntegrals drag_integrals(double drag, double age) noexcept {
 // --- Emission direction model (M3-04) ---------------------------------------
 constexpr double kEmissionPi = 3.14159265358979323846;
 
+// Exact integration of piecewise linear acceleration under constant drag.
+// Work depends on the curve's at most eight knots, not particle age/frame rate.
+void apply_force_motion(ParticleInstance& particle, const ForceMotion& force, double drag) noexcept {
+    const double age = particle.age_seconds, life = particle.lifetime_seconds;
+    if (!(age > 0) || !(life > 0)) return;
+    const auto& curve = force.wind_spin_curve;
+    double x = 0, v = 0;
+    const std::size_t segments = curve.count ? curve.count - 1 : 1;
+    double curve_value = 1, curve_slope = 0;
+    for (std::size_t i = 0; i < segments; ++i) {
+        const double start = curve.count ? curve.points[i].age * life : 0;
+        const double end = curve.count ? curve.points[i + 1].age * life : life;
+        if (age < start) break;
+        const double a = curve.count ? curve.points[i].value / 100.0 : 1;
+        const double b = curve.count ? (curve.points[i + 1].value / 100.0 - a) / (end - start) : 0;
+        const double dt = std::min(age, end) - start;
+        const auto f = drag_integrals(drag, dt);
+        double linear_factor;
+        const double z = drag * dt;
+        if (std::abs(z) < 0.01) {
+            linear_factor = dt * dt * dt * (1.0/6 - z/24 + z*z/120 - z*z*z/720 + z*z*z*z/5040);
+        } else linear_factor = (0.5 * dt * dt - f.acceleration_displacement) / drag;
+        x += v * f.velocity_displacement + a * f.acceleration_displacement + b * linear_factor;
+        v = v * std::exp(-z) + a * f.velocity_displacement + b * f.acceleration_displacement;
+        curve_value = a + b * dt; curve_slope = b;
+        if (age <= end) break;
+    }
+    particle.position.x += force.wind.x * x;
+    particle.position.y += force.wind.y * x;
+    particle.position.z += force.wind.z * x;
+    particle.velocity.x += force.wind.x * v;
+    particle.velocity.y += force.wind.y * v;
+    particle.velocity.z += force.wind.z * v;
+    const double spin_age = age - force.spin_delay;
+    if (!(force.spin_radius > 0) || !(spin_age > 0)) return;
+    const double omega = 2 * kPi * (force.spin_frequency > 0 ? force.spin_frequency : 1);
+    const double resistance = force.spin_resist / 100.0;
+    const double envelope = force.spin_radius * std::exp(-resistance * spin_age);
+    const double radius = envelope * curve_value;
+    const double radius_slope = envelope * (curve_slope - resistance * curve_value);
+    const double c = std::cos(omega * spin_age), s = std::sin(omega * spin_age);
+    particle.position.x += radius * (c - 1);
+    particle.position.y += radius * s;
+    particle.velocity.x += radius_slope * (c - 1) - radius * omega * s;
+    particle.velocity.y += radius_slope * s + radius * omega * c;
+}
+
 Vec3 normalize_direction(Vec3 value) noexcept {
     const double length = std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
     if (!(length > 0.0)) return Vec3{0.0, 1.0, 0.0};
@@ -294,17 +341,26 @@ ParticleInstance evaluate_particle(const Settings& values, double slots_elapsed,
 
     // Closed-form integration for each particle age makes arbitrary-time,
     // out-of-order rendering independent of frame stepping and render history.
+    Vec3 gravity = values.gravity;
+    for (const auto& force : values.forces) {
+        const double attenuation = unit_value(values.seed ^ force.random_salt, slot,
+            RandomPurpose::force_gravity) * force.gravity_random_percent / 100.0;
+        gravity.x -= force.gravity.x * attenuation;
+        gravity.y -= force.gravity.y * attenuation;
+        gravity.z -= force.gravity.z * attenuation;
+    }
     const DragIntegrals factors = drag_integrals(values.linear_drag, age);
     particle.position.x = values.emitter_origin.x + birth.x + particle_velocity.x * factors.velocity_displacement +
-                          values.gravity.x * factors.acceleration_displacement;
+                          gravity.x * factors.acceleration_displacement;
     particle.position.y = values.emitter_origin.y + birth.y + particle_velocity.y * factors.velocity_displacement +
-                          values.gravity.y * factors.acceleration_displacement;
+                          gravity.y * factors.acceleration_displacement;
     particle.position.z = values.emitter_origin.z + birth.z + particle_velocity.z * factors.velocity_displacement +
-                          values.gravity.z * factors.acceleration_displacement;
+                          gravity.z * factors.acceleration_displacement;
     const double decay = std::exp(-values.linear_drag * age);
-    particle.velocity = {particle_velocity.x * decay + values.gravity.x * factors.velocity_displacement,
-                         particle_velocity.y * decay + values.gravity.y * factors.velocity_displacement,
-                         particle_velocity.z * decay + values.gravity.z * factors.velocity_displacement};
+    particle.velocity = {particle_velocity.x * decay + gravity.x * factors.velocity_displacement,
+                         particle_velocity.y * decay + gravity.y * factors.velocity_displacement,
+                         particle_velocity.z * decay + gravity.z * factors.velocity_displacement};
+    for (const auto& force : values.forces) apply_force_motion(particle, force, values.linear_drag);
     return particle;
 }
 

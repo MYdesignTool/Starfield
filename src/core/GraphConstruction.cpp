@@ -78,7 +78,9 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         graph.nodes = {
             make_emitter_node(settings, emitter),
             std::move(particle_node),
-            GraphNode{output, kOutputNode, 2, {{kParticleCount, settings.particle_count}}},
+            GraphNode{output, kOutputNode, 3, {{kParticleCount, settings.particle_count},
+                {kTimeRemapEnabled,std::uint32_t{0}},{kTimeRemapSeconds,0.0},
+                {kPreviewEnabled,std::uint32_t{0}},{kPreviewChance,100.0}}},
         };
         graph.edges = {
             GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},
@@ -101,7 +103,7 @@ Result<Graph> make_emitter_particle_force_output_graph(
                                                        emitter_to_particle, particle_to_force);
         if (!base.has_value()) return base;
         Graph graph = base.take_value();
-        graph.nodes.push_back(GraphNode{force, kForceNode, 1, {
+        graph.nodes.push_back(GraphNode{force, kForceNode, 2, {
             {kGravity, settings.gravity}, {kLinearDrag, settings.linear_drag}}});
 
         // The base constructor provides the stable Emitter -> Particle edge and a

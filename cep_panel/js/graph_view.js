@@ -71,12 +71,22 @@
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100 }
         },
         force: {
-            "1": { label: "Gravity", kind: "point3d", decimals: 2, step: 0.1, min: -1000, max: 1000,
-                  legacyKeys: ["gravity_x", "gravity_y", "gravity_z"] },
-            "2": { label: "Linear Drag", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 100, legacyKey: "linear_drag" }
+            "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "2": { label: "Air Density", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 100 },
+            "3": { label: "Gravity random", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit:"%" },
+            "4": { label: "Wind", kind: "point3d", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "5": { label: "Spin", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit:"px" },
+            "6": { label: "Spin Frequency", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 1000 },
+            "7": { label: "Spin resist", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit:"%" },
+            "8": { label: "Spin Delay (Seconds)", kind: "slider", decimals: 1, step: 0.1, min: 0, max: 10000 },
+            "9": { hidden:true }
         },
         output: {
-            "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" }
+            "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
+            "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"]},
+            "3": {label:"Time (Seconds)",kind:"slider",decimals:2,step:0.1,min:-1000000,max:1000000},
+            "4": {label:"Preview",kind:"popup",choices:["Off","On"]},
+            "5": {label:"Particle chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
         }
     };
     var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
@@ -316,6 +326,24 @@
                     if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
                 }
                 var parameter = viewParameter(node, kind, graphParameter, spec);
+                if (kind === "force" && (graphParameter.key === "1" || graphParameter.key === "4")) {
+                    var forceHeight = geometry && Number(geometry.height) > 0 ? Number(geometry.height) : 1;
+                    var forceAspect=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
+                    var axes = graphParameter.key === "1" ? [1] : [0,1,2];
+                    axes.forEach(function(axis) {
+                        var component = viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider"; component.key+=":"+axis;
+                        component.label=graphParameter.key === "1" ? "Gravity" : "Wind "+["X","Y","Z"][axis];
+                        component.forceComponent=axis; component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=forceHeight*(axis===0 ? 1/forceAspect : axis===1 ? -1 : 1);
+                        component.value=graphParameter.value[axis]*component.displayScale;
+                        node.params.push(component);
+                    });
+                    continue;
+                }
+                if (kind === "force" && graphParameter.key === "5" && geometry && Number(geometry.height)>0) {
+                    parameter.value *= Number(geometry.height); parameter.displayScale=Number(geometry.height);
+                }
                 if (kind === "emitter" && geometry && Number(geometry.height) > 0 && Number(geometry.width) > 0) {
                     var height = Number(geometry.height), width = Number(geometry.width);
                     var aspect = Number(geometry.pixelAspect);
@@ -361,11 +389,6 @@
                 var emitterOrder = ["5","23","2","6","12","22","14","15","16","17","18","19","20","21","10","24","25","26","27","28","29","30","3"];
                 node.params.sort(function (a,b) { return emitterOrder.indexOf(a.graphKey)-emitterOrder.indexOf(b.graphKey); });
             }
-            if (kind === "emitter") {
-                var emitterOrder = { "5":0, "2":1, "6":2, "12":3, "22":4, "19":5, "20":6, "21":7,
-                                     "10":8, "14":9, "15":10, "16":11, "17":12, "18":13, "3":14 };
-                node.params.sort(function (left, right) { return emitterOrder[left.graphKey] - emitterOrder[right.graphKey]; });
-            }
             if (kind === "particle" || kind === "appearance") {
                 var particleOrder = { "11": 0, "3": 1, "9": 2, "5": 3, "10": 4,
                                       "1": 5, "2": 6, "4": 7, "6": 8 };
@@ -373,7 +396,15 @@
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });
             }
-            if (node.curveParameterKeys) {
+            if (kind === "force") {
+                var forceOrder=["1","3","4","5","6","7","8","2"];
+                node.params.sort(function(a,b) { return forceOrder.indexOf(a.graphKey)-forceOrder.indexOf(b.graphKey); });
+                var forceCurve=findParameter(source,"9");
+                if (forceCurve && forceCurve.type!==7) fail("invalid_curve","Force curve must use opaque bytes");
+                node.curveParameterKeys={size:"9"};
+                node.curves={size:decodeCurve(forceCurve && forceCurve.value,0,100,100,100)};
+            }
+            if (node.curveParameterKeys && kind !== "force") {
                 var sizeEnd = findParameter(source, "4");
                 var opacityEnd = findParameter(source, "6");
                 var sizeCurve = findParameter(source, "7");
@@ -453,6 +484,11 @@
              countLiveParticles: countLiveParticles, countGraphLiveParticles: countGraphLiveParticles,
              encodeCurve: encodeCurve, decodeCurve: decodeCurve,
              mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {
+                 if (typeof parameter.forceComponent === "number") {
+                     var force=parameter.canonicalForce.slice();
+                     force[parameter.forceComponent]=Number(displayValue)/parameter.displayScale;
+                     return force;
+                 }
                  if (parameter.originComponent) {
                      var origin = parameter.canonicalOrigin.slice(), geometry = parameter.geometry;
                      var height = Number(geometry.height), aspect = Number(geometry.pixelAspect);

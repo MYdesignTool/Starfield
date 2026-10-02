@@ -1,6 +1,7 @@
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/PluginApi.h"
+#include "starfield/core/AgeCurve.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -112,4 +113,64 @@ void test_camera() {
     check(StarfieldCore_GetApi(1,sizeof(api),&api)==0,"ABI 1 cannot load new camera contract");
 }
 }
-int main() {test_auxiliary();test_camera();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_reference_force_and_globals() {
+    check(Settings{}.particle_count==1000000,"fresh Core cap is one million");
+    Settings s; s.birth_rate=1; s.velocity={}; s.velocity_spread=0; s.particle_lifetime_seconds=2;
+    auto made=make_emitter_particle_force_output_graph(s,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(3)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)},EdgeId{uuid(13)});
+    check(made.has_value(),"construct reference Force schema 2");
+    if(!made.has_value()) return;
+    Graph g=made.take_value(); auto& f=g.nodes.back();
+    auto evaluate=[&](double seconds) {return evaluate_particle_graph(g,RationalTime{std::int64_t(seconds*1000000),1000000},never);};
+    auto newest=[&](double seconds) { auto result=evaluate(seconds); check(result.has_value(),"Force graph evaluates"); return result.has_value() && !result.value().particles.empty() ? result.value().particles.back() : ParticleInstance{}; };
+    set(f,kGravity,Vec3{0,-1,0});
+    check(std::abs(newest(.5).position.y+.125)<1e-12,"Gravity is exact constant acceleration");
+    set(f,kWind,Vec3{2,0,0});
+    check(std::abs(newest(.5).position.x-.25)<1e-12,"Wind contributes acceleration");
+    set(f,kLinearDrag,1.0);
+    const auto damped=newest(.5);
+    check(std::abs(damped.position.x-2*(.5+std::expm1(-.5)))<1e-12,"Air Density analytically damps Wind");
+    set(f,kLinearDrag,0.0); set(f,kGravity,Vec3{});
+    AgeCurve ramp{}; ramp.count=2; ramp.points[0]={0,0};ramp.points[1]={1,100};
+    set(f,kWindSpinCurve,encode_age_curve(ramp));
+    const auto curved=newest(.5);
+    check(std::abs(curved.position.x-1.0/48)<1e-12,"Wind curve is integrated over particle life");
+    check(std::abs(curved.velocity.x-.125)<1e-12,"Wind curve exposes exact instantaneous velocity");
+    set(f,kLinearDrag,1e-8);
+    check(std::abs(newest(.5).position.x-curved.position.x)<1e-9,"near-zero drag is numerically continuous");
+    set(f,kLinearDrag,0.0);set(f,kWind,Vec3{});set(f,kWindSpinCurve,encode_age_curve(AgeCurve{{AgeCurvePoint{0,100},AgeCurvePoint{1,100}},2}));
+    set(f,kSpin,1.0);set(f,kSpinFrequency,1.0);
+    const auto spin=newest(.25);
+    check(std::abs(spin.position.x+1)<1e-12 && std::abs(spin.position.y-1)<1e-12,"Spin changes position in 3D particle stream");
+    set(f,kSpinDelay,1.0);
+    check(std::abs(newest(.25).position.x)<1e-12,"Spin Delay defers orbital motion");
+    set(f,kSpin,0.0);set(f,kGravity,Vec3{0,-1,0});set(f,kGravityRandom,100.0);
+    const auto random_a=newest(.5), random_b=newest(.5);
+    check(random_a.position.y==random_b.position.y && random_a.position.y>=-.125 && random_a.position.y<=0,"Gravity random stays deterministic and bounded");
+    set(f,kGravityRandom,101.0);
+    check(!evaluate(.5).has_value(),"invalid Force percentages rejected");
+    set(f,kGravityRandom,0.0);
+    auto& output=g.nodes[2];
+    set(output,kTimeRemapEnabled,std::uint32_t{1});set(output,kTimeRemapSeconds,.5);
+    check(std::abs(newest(100).age_seconds-.5)<1e-12,"main Time Remapping controls simulation time");
+    set(output,kTimeRemapEnabled,std::uint32_t{0});
+    auto small=evaluate(1);
+    check(small.has_value() && small.value().particles.capacity()<1000,"million cap does not reserve a million for tiny populations");
+    s.birth_rate=1000000;
+    auto slots=live_particle_slot_range(validate_settings(s),1);
+    check(slots.has_value() && slots.value().count==1000000,"million cap is respected without slot allocation");
+    Settings plain;plain.birth_rate=1;plain.velocity={};plain.velocity_spread=0;plain.particle_size=12;
+    auto preview=make_emitter_particle_output_graph(plain,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    RenderRequest request{};request.frame.layer_width=request.frame.layer_height=request.frame.frame_width=request.frame.frame_height=64;
+    request.frame={64,64,64,64,{0,0,64,64},{1,1},{1,24},PixelFormat::rgba8,ColorSpace::ae_working_space,AlphaMode::straight,1,Quality::full};
+    request.settings=validate_settings(plain);
+    auto render=[&]() {request.graph=std::make_shared<const Graph>(preview);return CpuParticleRenderer{}.render(request,never);};
+    const auto normal=render();check(normal.has_value() && centroid(normal.value())>0,"normal renderer produces particles");
+    set(preview.nodes[2],kPreviewEnabled,std::uint32_t{1});set(preview.nodes[2],kPreviewChance,0.0);
+    const auto empty=render();check(empty.has_value() && centroid(empty.value())<0,"Preview zero chance produces transparent output");
+    auto population=evaluate_particle_graph(preview,RationalTime{1,1},never);
+    check(population.has_value() && population.value().particles.size()==2,"Preview preserves simulation and Auxiliary parent population");
+    set(preview.nodes[2],kPreviewChance,100.0);const auto all=render();
+    check(all.has_value() && normal.has_value() && all.value().pixels==normal.value().pixels,"Preview 100 matches normal pixels exactly");
+    set(preview.nodes[2],kPreviewChance,101.0);check(!render().has_value(),"invalid global percentages rejected");
+}
+int main() {test_auxiliary();test_camera();test_reference_force_and_globals();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

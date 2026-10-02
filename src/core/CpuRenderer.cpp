@@ -2,6 +2,7 @@
 #include "starfield/core/GraphEvaluation.hpp"
 
 #include "starfield/core/ParticleSimulation.hpp"
+#include "starfield/core/Random.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -233,12 +234,28 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     const PixelGrid grid = make_grid(frame);
     std::uint64_t sprite_pixels = 0;
 
+    double preview_chance = 100;
+    if (request.graph) for (const auto& node : request.graph->nodes) if (node.type_key == graph_keys::kOutputNode) {
+        bool enabled = false;
+        double chance = 100;
+        for (const auto& p : node.parameters) {
+            if (p.key == graph_keys::kPreviewEnabled) enabled = std::get<std::uint32_t>(p.value) != 0;
+            if (p.key == graph_keys::kPreviewChance) chance = std::get<double>(p.value);
+        }
+        if (enabled) preview_chance = chance;
+    }
     std::vector<Sprite> sprites;
     try {
         sprites.reserve(particles.value().size());
         for (std::size_t i = 0; i < particles.value().size(); ++i) {
             if (i % kCancellationParticleInterval == 0 && cancellation.is_cancelled())
                 return OutputResult::failure(ErrorCode::cancelled, "cancelled during camera projection");
+            if (preview_chance < 100) {
+                const auto& particle = particles.value()[i];
+                std::uint64_t identity = particle.id;
+                for (auto byte : particle.emitter_id.value.bytes) identity = mix64(identity ^ byte);
+                if (unit_value(0, identity, RandomPurpose::preview_chance) * 100 >= preview_chance) continue;
+            }
             Sprite sprite{};
             if (project_sprite(particles.value()[i], request, grid, sprite)) sprites.push_back(sprite);
         }

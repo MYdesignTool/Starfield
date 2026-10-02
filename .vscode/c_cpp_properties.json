@@ -5,7 +5,6 @@
       "${workspaceFolder}/ae_plugin",
       "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers",
       "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers/SP",
-      "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Headers/Win",
       "${workspaceFolder}/AdobeSDK/May2023_AfterEffectsSDK/Examples/Util"
     ],
     "starfieldDefines": ["MSWindows", "WIN32", "_WINDOWS", "_CRT_SECURE_NO_WARNINGS"]

@@ -9,6 +9,7 @@
 
 #include "starfield/core/Geometry.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -510,7 +511,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     STARFIELD_ADD_BOOTSTRAP_SLOT("Bootstrap Slot 25", 'endH');
 
     AEFX_CLR_STRUCT(def);
-    PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 100.0f, 1000.0f, PF_Precision_INTEGER,
+    PF_ADD_FLOAT_SLIDERX("Max Particles", 0.0f, 2000000.0f, 0.0f, 100.0f, 1000000.0f, PF_Precision_INTEGER,
                          PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kMaxParticlesDiskId);
 
     AEFX_CLR_STRUCT(def);
@@ -729,6 +730,24 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         err = PF_ADD_PARAM(in_data, -1, &def);
         if (err != PF_Err_NONE) return err;
     }
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_TOPIC("Time Remapping", 920);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_CHECKBOX("Time Remapping On / Off", "", FALSE, PF_ParamFlag_SUPERVISE, 921);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Time (Seconds)", -1000000, 1000000, 0, 10, 0, PF_Precision_HUNDREDTHS,
+                        PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, 922);
+    AEFX_CLR_STRUCT(def);
+    PF_END_TOPIC(923);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_TOPIC("Render Settings", 924);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_CHECKBOX("Preview", "", FALSE, PF_ParamFlag_SUPERVISE, 925);
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_FLOAT_SLIDERX("Particle chance", 0, 100, 0, 100, 100, PF_Precision_TENTHS,
+                        PF_ValueDisplayFlag_PERCENT, PF_ParamFlag_SUPERVISE, 926);
+    AEFX_CLR_STRUCT(def);
+    PF_END_TOPIC(927);
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -857,6 +876,32 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             if (!decoded.has_value()) return graph_error(out_data, decoded.error());
             graph = std::make_shared<const core::Graph>(decoded.take_value());
         } else return PF_Err_BAD_CALLBACK_PARAM;
+        if (in_data->num_params >= static_cast<A_long>(kTotalEffectParameterCount) + 1) {
+            core::Graph snapshot = *graph;
+            constexpr std::array<A_long, 4> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId};
+            constexpr std::array<core::ParameterKey, 4> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
+                core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance};
+            for (std::size_t i = 0; i < indices.size(); ++i) {
+                CheckedParameter global(in_data);
+                err = global.checkout(indices[i]);
+                if (err != PF_Err_NONE) { graph.reset(); return err; }
+                core::ParameterValue value;
+                if (i == 0 || i == 2) {
+                    if (global.value.param_type != PF_Param_CHECKBOX) { graph.reset(); return PF_Err_BAD_CALLBACK_PARAM; }
+                    value = std::uint32_t(global.value.u.bd.value != 0);
+                } else {
+                    if (global.value.param_type != PF_Param_FLOAT_SLIDER) { graph.reset(); return PF_Err_BAD_CALLBACK_PARAM; }
+                    value = double(global.value.u.fs_d.value);
+                }
+                for (auto& output : snapshot.nodes) if (output.type_key == core::graph_keys::kOutputNode) {
+                    output.schema_version = 3;
+                    auto found = std::find_if(output.parameters.begin(), output.parameters.end(), [&](const auto& p) {return p.key == keys[i];});
+                    if (found == output.parameters.end()) output.parameters.push_back({keys[i], value});
+                    else found->value = value;
+                }
+            }
+            graph = std::make_shared<const core::Graph>(std::move(snapshot));
+        }
         if (control_source) *control_source = source.value.u.pd.value;
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
@@ -1005,8 +1050,10 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
         if (extra->param_index == kCurveEditCommitId) {
             return sync_graph_from_controls(in_data, out_data, params);
         }
-        if (!is_bound_control(extra->param_index)) return PF_Err_NONE;
-        if (extra->param_index == kMaxParticlesId && params[kNodeEffectsReadyId] &&
+        const bool renderer_global = extra->param_index == kTimeRemapEnabledId || extra->param_index == kTimeRemapSecondsId ||
+            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId;
+        if (!is_bound_control(extra->param_index) && !renderer_global) return PF_Err_NONE;
+        if ((extra->param_index == kMaxParticlesId || renderer_global) && params[kNodeEffectsReadyId] &&
             params[kNodeEffectsReadyId]->param_type == PF_Param_FLOAT_SLIDER &&
             params[kNodeEffectsReadyId]->u.fs_d.value >= 1.0) {
             return sync_native_graph_with_output_controls(in_data, out_data, params);

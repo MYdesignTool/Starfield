@@ -238,6 +238,18 @@ inline constexpr ParameterKey kInheritColor{30};
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};
 inline constexpr ParameterKey kLinearDrag{2};
+inline constexpr ParameterKey kGravityRandom{3};
+inline constexpr ParameterKey kWind{4};
+inline constexpr ParameterKey kSpin{5};
+inline constexpr ParameterKey kSpinFrequency{6};
+inline constexpr ParameterKey kSpinResist{7};
+inline constexpr ParameterKey kSpinDelay{8};
+inline constexpr ParameterKey kWindSpinCurve{9};
+// Output-scoped globals; optional values default to disabled / 100%.
+inline constexpr ParameterKey kTimeRemapEnabled{2};
+inline constexpr ParameterKey kTimeRemapSeconds{3};
+inline constexpr ParameterKey kPreviewEnabled{4};
+inline constexpr ParameterKey kPreviewChance{5};
 inline constexpr ParameterKey kColorStart{1};
 inline constexpr ParameterKey kColorEnd{2};
 inline constexpr ParameterKey kSizeStart{3};

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace starfield::core {
 namespace {
@@ -144,6 +145,22 @@ ValidatedSettings validate_settings(Settings settings) {
     value.linear_drag = finite_or(value.linear_drag, 0.0, "linear_drag", notices);
     value.linear_drag = clamp(value.linear_drag, 0.0, kMaxLinearDrag,
                               ValidationCode::linear_drag_clamped, "linear_drag", notices);
+
+    bool forces_valid = value.forces.size() <= 4096;
+    for (const auto& force : value.forces) {
+        for (double channel : {force.gravity.x, force.gravity.y, force.gravity.z,
+                               force.wind.x, force.wind.y, force.wind.z})
+            forces_valid = forces_valid && std::isfinite(channel) && std::abs(channel) <= 100000;
+        for (const auto& scalar : {std::pair{force.gravity_random_percent, 100.0}, std::pair{force.spin_radius, 100000.0},
+                                  std::pair{force.spin_frequency, 1000.0}, std::pair{force.spin_resist, 100.0},
+                                  std::pair{force.spin_delay, 10000.0}})
+            forces_valid = forces_valid && std::isfinite(scalar.first) && scalar.first >= 0 && scalar.first <= scalar.second;
+        forces_valid = forces_valid && (force.wind_spin_curve.count == 0 || valid_age_curve(force.wind_spin_curve, 0, 100));
+    }
+    if (!forces_valid) {
+        notices.push_back({ValidationCode::force_motion_invalid, "forces"});
+        value.forces.clear();
+    }
 
     const auto validate_color = [&notices](Vec3& color, const char* field) {
         const auto validate_channel = [&notices, field](double& channel, const char* suffix) {

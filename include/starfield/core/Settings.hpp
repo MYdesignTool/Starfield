@@ -42,6 +42,7 @@ enum class EmitterShape : std::uint8_t {
 
 // Bounds are owned by schema/parameters.json and enforced by validate_settings.
 // Later stages (simulation, rasterizer) may rely on them without re-checking.
+inline constexpr std::uint32_t kDefaultParticleCount = 1'000'000;
 inline constexpr std::uint32_t kMaxParticleCount = 2'000'000;
 inline constexpr double kMaxBirthRate = 1'000'000.0;
 inline constexpr double kMaxLifetimeSeconds = 10'000.0;
@@ -55,7 +56,7 @@ inline constexpr double kMaxVelocity = 1'000.0;
 inline constexpr double kMaxEmitterSize = 10.0;
 inline constexpr double kMaxEmitterSizePixels = 100'000.0;
 inline constexpr double kMaxVelocitySpread = 100.0;
-inline constexpr double kMaxGravityMagnitude = 1'000.0;
+inline constexpr double kMaxGravityMagnitude = 100'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
 inline constexpr double kMaxParticleColor = 64.0;
 inline constexpr double kMaxEmissionSpeed = 100'000.0;
@@ -93,8 +94,22 @@ struct AgeCurve {
 // cone span; `uniform` samples the whole sphere and ignores both.
 enum class DirectionMode : std::uint8_t { directional = 0, uniform = 1 };
 
+struct ForceMotion {
+    // gravity is already included in Settings::gravity; keep its identity here
+    // only to apply independent per-Force random attenuation.
+    Vec3 gravity{};
+    double gravity_random_percent{};
+    Vec3 wind{};
+    double spin_radius{};
+    double spin_frequency{};
+    double spin_resist{};
+    double spin_delay{};
+    AgeCurve wind_spin_curve{};
+    std::uint32_t random_salt{};
+};
+
 struct Settings {
-    std::uint32_t particle_count{1000};
+    std::uint32_t particle_count{kDefaultParticleCount};
     double birth_rate{30.0};
     std::uint32_t seed{1};
     double particle_lifetime_seconds{2.0};
@@ -125,6 +140,7 @@ struct Settings {
     // rate in inverse seconds. Zero preserves the M2 straight-line trajectory.
     Vec3 gravity{};
     double linear_drag{0.0};
+    std::vector<ForceMotion> forces{};
     // Linear age curves. `particle_size` and `opacity` are the birth values;
     // the curve ordinates are percentages of these base values. Color is stored
     // as three working-space channel values; alpha is controlled by opacity.
@@ -178,6 +194,7 @@ enum class ValidationCode : std::uint8_t {
     direction_span_clamped,
     direction_mode_replaced,
     age_curve_invalid,
+    force_motion_invalid,
     non_finite_replaced,
 };
 

@@ -19,7 +19,16 @@ using namespace graph_keys;
 struct ForceValues {
     Vec3 gravity{};
     double linear_drag{0.0};
+    ForceMotion motion{};
 };
+
+ForceMotion motion_for_emitter(const ForceMotion& force, NodeId emitter) noexcept {
+    ForceMotion result = force;
+    std::uint64_t salt = result.random_salt;
+    for (auto byte : emitter.value.bytes) salt = mix64(salt ^ byte);
+    result.random_salt = static_cast<std::uint32_t>(salt);
+    return result;
+}
 
 struct AppearanceValues {
     Vec3 color_start{1.0, 1.0, 1.0};
@@ -122,7 +131,30 @@ Result<ForceValues> read_force(const GraphNode& node) {
     if (!validated.notices.empty()) {
         return Result<ForceValues>::failure(ErrorCode::invalid_request, "force node value is outside supported bounds");
     }
-    return Result<ForceValues>::success(ForceValues{validated.value.gravity, validated.value.linear_drag});
+    ForceValues result{validated.value.gravity, validated.value.linear_drag};
+    result.motion.gravity = result.gravity;
+    auto scalar = [&](ParameterKey key, double maximum, double& destination) {
+        if (const auto* value = find_value(node, key)) destination = std::get<double>(*value);
+        return std::isfinite(destination) && destination >= 0 && destination <= maximum;
+    };
+    if (!scalar(kGravityRandom, 100, result.motion.gravity_random_percent) ||
+        !scalar(kSpin, 100000, result.motion.spin_radius) ||
+        !scalar(kSpinFrequency, 1000, result.motion.spin_frequency) ||
+        !scalar(kSpinResist, 100, result.motion.spin_resist) ||
+        !scalar(kSpinDelay, 10000, result.motion.spin_delay))
+        return Result<ForceValues>::failure(ErrorCode::invalid_request, "Force scalar is outside supported bounds");
+    if (const auto* wind = find_value(node, kWind)) result.motion.wind = std::get<Vec3>(*wind);
+    for (double value : {result.motion.wind.x, result.motion.wind.y, result.motion.wind.z})
+        if (!std::isfinite(value) || std::abs(value) > 100000)
+            return Result<ForceValues>::failure(ErrorCode::invalid_request, "Wind is outside supported bounds");
+    if (const auto* curve = find_value(node, kWindSpinCurve)) {
+        if (!decode_age_curve(std::get<OpaqueBytes>(*curve), result.motion.wind_spin_curve, 0, 100))
+            return Result<ForceValues>::failure(ErrorCode::invalid_request, "invalid Wind and Spin Over Life curve");
+    }
+    std::uint64_t salt = 0;
+    for (auto byte : node.id.value.bytes) salt = mix64(salt ^ byte);
+    result.motion.random_salt = static_cast<std::uint32_t>(salt);
+    return Result<ForceValues>::success(std::move(result));
 }
 
 Result<AppearanceValues> read_appearance(const GraphNode& node) {
@@ -251,7 +283,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
 
         const std::size_t count = nodes.size();
         std::size_t output = count;
-        std::uint32_t output_particle_count = 1000;
+        std::uint32_t output_particle_count = kDefaultParticleCount;
         std::vector<std::optional<ValidatedSettings>> emitters(count);
         std::vector<std::optional<ForceValues>> forces(count);
         std::vector<std::optional<AppearanceValues>> appearances(count);
@@ -274,6 +306,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     return R::failure(ErrorCode::invalid_request, "output Max Particles is outside supported bounds");
                 }
                 output_particle_count = validated_output.value.particle_count;
+                for (auto key : {kTimeRemapEnabled, kPreviewEnabled})
+                    if (const auto* flag = find_value(node, key); flag && std::get<std::uint32_t>(*flag) > 1)
+                        return R::failure(ErrorCode::invalid_request, "invalid renderer enable switch");
+                if (const auto* clock = find_value(node, kTimeRemapSeconds); clock &&
+                    (!std::isfinite(std::get<double>(*clock)) || std::abs(std::get<double>(*clock)) > 1000000))
+                    return R::failure(ErrorCode::invalid_time, "Time Remapping is outside supported bounds");
+                if (const auto* chance = find_value(node, kPreviewChance); chance &&
+                    (!std::isfinite(std::get<double>(*chance)) || std::get<double>(*chance) < 0 || std::get<double>(*chance) > 100))
+                    return R::failure(ErrorCode::invalid_request, "Particle chance must be 0..100 percent");
             } else if (node.type_key == kEmitterNode) {
                 if (const auto* mode = find_value(node, kEmittingMode); mode && std::get<std::uint32_t>(*mode) > 1)
                     return R::failure(ErrorCode::invalid_request, "invalid Emitting mode");
@@ -405,7 +446,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 if (a.particle.emitter_id != b.particle.emitter_id) return a.particle.emitter_id > b.particle.emitter_id;
                 return a.particle.id > b.particle.id;
             };
-            std::vector<Candidate> storage; storage.reserve(output_particle_count);
+            std::vector<Candidate> storage; storage.reserve(std::min<std::uint32_t>(output_particle_count, 4096));
             std::priority_queue<Candidate, std::vector<Candidate>, decltype(before)> kept(before, std::move(storage));
             const double now = to_seconds(*normalized);
             auto retain = [&](ParticleInstance instance, double birth) {
@@ -455,7 +496,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     while (!stack.empty()) {
                         const auto current = stack.back(); stack.pop_back();
                         if (visited[current]) continue; visited[current] = true;
-                        if (forces[current]) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; }
+                        if (forces[current]) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; settings.forces.push_back(motion_for_emitter(forces[current]->motion, nodes[emitter]->id)); }
                         if (appearances[current]) { appearance = *appearances[current]; ++overrides; }
                         for (const auto destination : outgoing[current]) if (active[destination] && !emitters[destination]) stack.push_back(destination);
                     }
@@ -654,6 +695,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     branch_settings.gravity.y += force.gravity.y;
                     branch_settings.gravity.z += force.gravity.z;
                     branch_settings.linear_drag += force.linear_drag;
+                    branch_settings.forces.push_back(motion_for_emitter(force.motion, nodes[emitter]->id));
                 }
                 auto bounded = validate_settings(branch_settings);
                 if (!bounded.notices.empty()) {
@@ -765,6 +807,18 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
 Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
                                                EmitterDimensionContext dimension_context) {
+    for (const auto& node : graph.nodes) if (node.type_key == graph_keys::kOutputNode) {
+        const auto* enabled = find_value(node, graph_keys::kTimeRemapEnabled);
+        const auto* clock = find_value(node, graph_keys::kTimeRemapSeconds);
+        const auto* flag = enabled ? std::get_if<std::uint32_t>(enabled) : nullptr;
+        const auto* seconds_value = clock ? std::get_if<double>(clock) : nullptr;
+        if (flag && *flag == 1 && seconds_value) {
+            const double seconds = *seconds_value;
+            if (!std::isfinite(seconds) || std::abs(seconds) > 1000000)
+                return Result<EvaluatedGraph>::failure(ErrorCode::invalid_time, "invalid remapped time");
+            time = RationalTime{static_cast<std::int64_t>(std::llround(seconds * 1000000)), 1000000};
+        }
+    }
     EvaluationBudget budget;
     return evaluate_graph_impl(graph, time, cancellation, dimension_context, budget, 0);
 }

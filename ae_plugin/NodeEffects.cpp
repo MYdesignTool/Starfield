@@ -74,8 +74,12 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
             case kSizeId: case kEmitterParticleSizeId: case kBirthRateId:
             case kSeedId: case kEmitterSizeXId: case kEmitterSizeYId: case kEmitterSizeZId:
             case kEmissionSpeedId: def.u.fs_d.slider_max = 100.0f; break;
+            case kForceGravityId: case kWindXId: case kWindYId: case kWindZId:
+                def.u.fs_d.slider_min = -100.0f; def.u.fs_d.slider_max = 100.0f; break;
+            case kSpinId: def.u.fs_d.slider_max = 100.0f; break;
+            case kSpinDelayId: def.u.fs_d.slider_max = 10.0f; break;
             case kOriginZId: def.u.fs_d.slider_min = -50.0f; def.u.fs_d.slider_max = 50.0f; break;
-            case kDiscSizeId: case kDragId: def.u.fs_d.slider_max = 1.0f; break;
+            case kSpinFrequencyId: case kAirDensityId: case kDiscSizeId: case kDragId: def.u.fs_d.slider_max = 1.0f; break;
             case kEmissionAngleXId: case kEmissionAngleYId: case kEmissionAngleZId:
                 def.u.fs_d.slider_min = -180.0f; def.u.fs_d.slider_max = 180.0f; break;
         }
@@ -84,7 +88,7 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
     def.u.fs_d.dephault = static_cast<PF_FpShort>(initial);
     def.u.fs_d.precision = precision;
     def.u.fs_d.display_flags = PF_ValueDisplayFlag_NONE;
-    if (id == kOpacityId || id == kSizeRandomId || id == kOpacityRandomId ||
+    if (id == kGravityRandomId || id == kSpinResistId || id == kOpacityId || id == kSizeRandomId || id == kOpacityRandomId ||
         id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId ||
         id == kEmitChanceId || id == kEmitLifeStartId || id == kEmitLifeEndId ||
         id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId) {
@@ -377,10 +381,25 @@ PF_Err setup_appearance(PF_InData* in_data, PF_OutData* out_data) noexcept {
 }
 
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_point3d(in_data, "Gravity", kGravityId, 0.0, 0.0, 0.0);
+    PF_Err error = add_slider(in_data, "Gravity", kForceGravityId, -100000, 100000, 0, PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
-    error = add_slider(in_data, "Linear Drag", kDragId, 0.0, 100.0, 0.0,
-                       PF_Precision_THOUSANDTHS);
+    error = add_slider(in_data, "Gravity random", kGravityRandomId, 0, 100, 0, PF_Precision_TENTHS);
+    if (error != PF_Err_NONE) return error;
+    for (const auto& control : {std::pair{"Wind X", kWindXId}, std::pair{"Wind Y", kWindYId}, std::pair{"Wind Z", kWindZId}}) {
+        error = add_slider(in_data, control.first, control.second, -100000, 100000, 0, PF_Precision_TENTHS);
+        if (error != PF_Err_NONE) return error;
+    }
+    error = add_slider(in_data, "Spin", kSpinId, 0, 100000, 0, PF_Precision_TENTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Spin Frequency", kSpinFrequencyId, 0, 1000, 0, PF_Precision_HUNDREDTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Spin resist", kSpinResistId, 0, 100, 0, PF_Precision_TENTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Spin Delay (Seconds)", kSpinDelayId, 0, 10000, 0, PF_Precision_TENTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_slider(in_data, "Air Density", kAirDensityId, 0, 100, 0, PF_Precision_HUNDREDTHS);
+    if (error != PF_Err_NONE) return error;
+    error = add_curve_bank(in_data, "Wind and Spin", 'w');
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::force);
     if (error != PF_Err_NONE) return error;

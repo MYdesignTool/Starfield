@@ -1,5 +1,16 @@
 # Behavior inventory
 
+## Build 14 P-02H candidate evidence — 2026-10-02
+
+Ordinary Force/reference control names and fresh zero defaults, the million-particle
+cap, renderer remapping/percentage preview and valid SDK include paths are implemented.
+Core 58/native Force 79/main registration/checkout 38 scoped checks pass, together
+with current-node CEP checks and six-source parsing. May 2023 SDK candidate builds.
+No AE session operated. Force native/CEP edits, curves, reference numeric behavior,
+Time Remapping animation, Preview stability, undo/reopen and non-square PAR remain
+owner host gates. Main feature differences are explicitly listed in
+reference-main-force-comparison.md; this is not full Stardust parity.
+
 ## Build 13 P-02G candidate evidence — 2026-10-02
 
 Source 2751a56 pushed before paired deployment. Build 13 is installed with all

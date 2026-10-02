@@ -1,5 +1,16 @@
 # ADR 0019: AE-native effect instances own node records
 
+## Build 14 Force and renderer globals — 2026-10-02
+
+Ordinary Force schema 2 has ten flat scalar controls followed by a 17-stream
+hidden Wind/Spin percentage curve bank (base count 27). New disk IDs 304..313,
+900/910..917/920..927 are explicit; old vector/drag disk IDs 301/302 are reserved.
+Native layout 6. Main manifest 21 retains streams 1..89 and appends functional
+Time Remapping/Render Settings sections at 90..97. Output schema 3 owns the cap
+and optional remap/preview globals. Pre-render samples the animated main values
+without reading sibling effects; node edits still commit immutable native records.
+Core ABI 2 unchanged; fresh effects and no development migration. See ADR 0021.
+
 ## Build 13 native edits, selection and Auxiliary — 2026-10-02
 
 P-02G retains independently saved native effects and immutable graph commits.

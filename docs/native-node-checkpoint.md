@@ -1,5 +1,23 @@
 # P-02D native node checkpoint — 2026-10-02
 
+## Build 14: ordinary Force, renderer globals and population default
+
+P-02H implements scalar Gravity/random, separate Wind XYZ, Spin/frequency/resist/
+delay and Air Density, plus a separately saved Wind/Spin percentage curve. It
+keeps independent native effects and uses analytic, stateless forcing. Main adds
+functional Time Remapping and Preview/Particle chance. Fresh cap and CEP examples
+use 1000000. Low-count scenes do not allocate the full cap. The invalid SDK
+Headers/Win include is removed from editor/MSBuild/test inputs.
+
+Candidate: packed 32782 (0x800E), main 21/native layout 6/Force 2/Output 3/Core
+ABI 2; fresh effects and no development migration. May 2023 SDK x64 Release /MT
+build passes with -NoRuntimePublish -NoDistPublish. Core 58, actual Force selector
+79 and scoped main registration/pre-render checkout 38 checks pass; current-node
+CEP checks and six source parses pass. Scratch logs are artifacts/build14-*.
+Real AE behavior, exact reference motion and remaining main capabilities remain
+open. See ADR 0021 and reference-main-force-comparison.md. Source is pushed before
+the one paired AEX deployment; no AE process started/stopped or GUI operated.
+
 ## Build 13: current-node interaction, camera and Auxiliary — 2026-10-02
 
 P-02G fixes setup-only uu.id/change_flags aliasing in native edit dispatch,

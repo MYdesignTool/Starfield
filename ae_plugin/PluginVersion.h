@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 13: native edit dispatch, camera projection and auxiliary emission.
-#define STARFIELD_VERSION_BUILD 13
-#define STARFIELD_VERSION_PACKED 32781 /* 0x800D */
+// Build 14: reference Force controls, renderer globals and million-particle default.
+#define STARFIELD_VERSION_BUILD 14
+#define STARFIELD_VERSION_PACKED 32782 /* 0x800E */

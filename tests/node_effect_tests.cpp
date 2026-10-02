@@ -2,6 +2,7 @@
 #include "AE_Effect.h"
 #include "AE_EffectCBSuites.h"
 #include "NodeEffects.hpp"
+#include "Param_Utils.h"
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
 #include "SPBasic.h"
@@ -101,6 +102,14 @@ int main() {
               registered[16].u.fs_d.display_flags == PF_ValueDisplayFlag_PERCENT,
               "auxiliary bank starts at runtime stream 17 in percent");
         check(std::strcmp(registered[23].name, "Random Seed") == 0, "seed ends source controls at runtime stream 24");
+    }
+    if constexpr (kind == Kind::force) {
+        check(registered[0].param_type==PF_Param_FLOAT_SLIDER && registered[0].uu.id==disk_ids::kForceGravityId,"Force uses scalar Gravity with a fresh bounded disk identity");
+        check(std::strcmp(registered[1].name,"Gravity random")==0,"Force random control follows Gravity");
+        check(std::strcmp(registered[2].name,"Wind X")==0 && std::strcmp(registered[9].name,"Air Density")==0,"reference wind and air control ordering");
+        check(std::strcmp(registered[10].name,"Wind and Spin Curve Count")==0 && registered[10].uu.id==900,"Force curve bank starts at runtime 11");
+        check(registered[0].u.fs_d.slider_max==100 && registered[0].u.fs_d.valid_max==100000,"Force typed range does not determine scrub sensitivity");
+        check(registered[8].u.fs_d.slider_max==10 && registered[8].u.fs_d.precision==PF_Precision_TENTHS,"Spin delay uses seconds and a useful native range");
     }
     int colors = 0;
     bool controls_constant = true, interpolation_unrestricted = true, colors_supervised = true;

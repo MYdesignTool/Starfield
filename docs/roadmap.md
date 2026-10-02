@@ -1,5 +1,15 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-02H / build 14 — 2026-10-02
+
+Owner requests Force/main reference alignment, million-particle fresh cap and
+removal of an editor SDK include warning. Force motion/curve and renderer Time
+Remapping/Preview are integrated in independent native records. Missing main
+renderers and controls are listed in reference-main-force-comparison.md, without
+inactive UI placeholders. Native layout 6/main 21/Force 2/Output 3; Core ABI 2.
+Minimum targeted checks and candidate build precede source push/deployment.
+Owner AE qualification and exact reference trajectories remain open.
+
 ## Current P-02F deployment — 2026-10-02
 
 Build 12 addresses shared Particle inputs, excessive numeric drag steps and
