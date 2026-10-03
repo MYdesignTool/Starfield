@@ -1,5 +1,42 @@
 # Build and host matrix
 
+## Build 25 deployment — 2026-10-03
+
+Source commit `5c53b59` is pushed. The May 2023 SDK Release /MT full build succeeds;
+3,480 scoped C++ checks pass. Candidate Core ABI3 exposes all five functions and
+rejects ABI2. Read-only checks immediately before install found no AfterFX/AfterFX_64.
+Installed through Deploy-TestBuild.ps1 and the existing single
+Plug-ins/Starfield -> newStardust/dist Junction. Exactly one Starfield host entry
+remains. No AE process launch/stop or host-wide configuration change.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `BFDBF245CEC086337D37E9DD32818BE28D6881B40D176352B33D69525CC8CE72` |
+| StarfieldEmitter.aex | `4CCF9E7D2F9126F7DD5BA6B88ECDE2F0A868FCBFC34636021F9CEA117AB15800` |
+| StarfieldParticleNode.aex | `00471B42C29D8FC669781BB31CC2871EF12E95ECAABCF1FFE28A771DF3189268` |
+| StarfieldAppearance.aex | `34E1EB7E4AA8CA39A9E9577D31934FC9B9456840280C6A9C6EE16C3021087FE4` |
+| StarfieldForce.aex | `8534C8A1EA839FF6E23201B246D37139FED270FB19DDEF098D824B641A3F3B83` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Selected runtime: `StarfieldCore-5637EA2266B32AEE.dll`; selected/pinned Core hashes agree.
+All six installed hashes equal the candidates and all six retained backup hashes
+equal the build24 before-state. Records: `artifacts/build25-deploy-before.json` and
+`artifacts/build25-deploy-after.json`. Backup:
+`artifacts/disabled/m306-build25-temporal-cache-20261003/bundle`. Thirteen unchanged
+CEP files are retained byte-for-byte under panel/, checked against baseline 8857924
+with normalized line endings, plus a verified paired restore manifest. Restore's
+read-only report passes. With AE closed, one-step rollback to build24:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build25-temporal-cache-20261003' -Restore
+```
+
+Existing build24 effects and CEP native-gpu-24 remain compatible. Open the main
+Options once on an existing project to capture optimization metadata; the readout
+shows `History: N certified inputs` and forces rerender. External native edits may
+require another Options recapture for full optimization. Owner AE timings remain
+open; core benchmarks are not AE preview timings. No AE render output was created.
+
 ## M3-06 / build 25 — bounded native history preparation
 
 Owner confirms build24 runs on CUDA device0, but 10,000 PPS / Life 2, no keys
