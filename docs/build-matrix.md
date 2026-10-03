@@ -1,5 +1,49 @@
 # Build and host matrix
 
+## Build 30 deployment - 2026-10-03
+
+Source 755a733 is pushed. A read-only process check immediately before deployment
+found neither AfterFX nor AfterFX_64 running. Deploy-TestBuild installed build30
+through the existing single Plug-ins/Starfield -> newStardust/dist Junction.
+All six installed hashes match candidates; all six retained build29 hashes match
+the before-state. Core and selected runtime are byte-identical to build29/27.
+Thirteen unchanged CEP source files have verified paired snapshots. The read-only
+Restore-TestBuild report passes. No process or host-wide setting was changed.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `C363C9DA6A872EB1F6905CFB1C015BF2A9673C08D0B72D8ED8955104D305BFAF` |
+| StarfieldEmitter.aex | `05472720F3062538DA37D243AEFC20944AEA595F6F6626D00E80879BF64E18C4` |
+| StarfieldParticleNode.aex | `FA4D21E91C6A476249AECC53150753E72303F3EBF844CA25BD966006FF26F7D8` |
+| StarfieldAppearance.aex | `6C6599B2CA20DA5A9E7386320C108218B369F5EE931F85D5346295A46C654ADE` |
+| StarfieldForce.aex | `FEC758EAA84A546240091885A4B1168E09AA3A14AF64A9D06C62393A833AAFAD` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Runtime: StarfieldCore-5637EA2266B32AEE.dll.
+Before/after: artifacts/build30-deploy-before.json and build30-deploy-after.json.
+Backup: artifacts/disabled/m306-build30-evaluate-restored-aliases-20261003/bundle.
+Evidence: artifacts/build30-native-sync.log, build30-native-build.log,
+build30-deploy.log and build30-rollback-check.log. All five AEXs and Core build
+without compiler warnings with May 2023 SDK Release /MT; 5,157 scoped checks pass.
+
+One-step undo to build29, with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build30-evaluate-restored-aliases-20261003' -Rollback
+```
+
+Build29 still requires Options for the owner-tested speed improvement. This
+rollback preserves that known behavior, not automatic startup qualification.
+After restoring build29, the retained build29-rollback-to27.ps1 chain documented
+below remains available. Neither rollback has been executed.
+
+Actual build30 AE startup performance remains unqualified. Requested check:
+open original 10,000 PPS / Life 2 project WITHOUT Options and preview an uncached
+frame; save/close/reopen and preview another uncached frame WITHOUT Options.
+Only afterwards collect Options showing Build30, previous W/P/E/B, render
+Static/Temporal/PF/N and elapsed wait. No-Options success and reopen confirmation
+remain required before the owner-authorized main integration.
+
 ## M3-06 / build 30 - evaluate restored bindings before state certification
 
 The owner rejects build29 startup performance: Options is still required. The
