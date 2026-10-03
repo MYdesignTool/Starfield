@@ -1,5 +1,44 @@
 # Build and host matrix
 
+## Build 28 deployment - 2026-10-03
+
+Source `2714b8e` is pushed. A read-only process check immediately before
+Deploy-TestBuild.ps1 found no AfterFX/AfterFX_64. The existing single
+Plug-ins/Starfield -> newStardust/dist Junction now holds build28 (32796/0x801C).
+All six installed hashes match candidates and all six backup hashes match the
+before-state. Selected Core is byte-identical to build27/26/25, preserving that
+ABI3 qualification. Thirteen unchanged CEP sources have paired verified copies;
+Restore-TestBuild.ps1 read-only verification passes. No process, registry, CEP
+manifest, other extension or host-wide setting was changed.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `35D143F918CF1BC33600FA58AD199E7DDD58343EDCE4BA4A8D4910D43889766E` |
+| StarfieldEmitter.aex | `B092B9BD37E5D8733D84D0E3BA42E3AA4CDB6BD1BA066D5ED1B5126E733FE242` |
+| StarfieldParticleNode.aex | `00F47C9CA212661F219ED6FE47D2F98BE7CCFA5B12FD77DF6744E2ECD0ECE839` |
+| StarfieldAppearance.aex | `86354CCF4E3B1A3E0C0B0B754F52CEB895BE0EB33291238549A5D0299881958F` |
+| StarfieldForce.aex | `FC756C59AC2143B6F3F7AA723159FDE40A00FF5B64B5D74A9F188B015E0B439A` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Selected runtime: `StarfieldCore-5637EA2266B32AEE.dll`.
+Evidence: artifacts/build28-deploy-before.json, build28-deploy-after.json,
+build28-deploy.log and build28-rollback-check.log. Backup build27:
+artifacts/disabled/m306-build28-startup-proofs-20261003/bundle.
+
+With AE closed, one-step rollback to build27:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build28-startup-proofs-20261003' -Restore
+```
+
+3,627 scoped checks and the warning-free full May 2023 SDK Release /MT build pass.
+Owner AE feedback qualifies build27 at about 1-2 seconds after Options, but
+reopening requires Options again. Build28 must be tested by opening the original
+project and previewing an uncached frame before Options; then save/close/reopen
+and preview before Options again. Only after that preview read Options B,
+Static/Temporal, PF/N. First legacy null-data open and non-null saved reopen are
+separate gates. The owner-authorized main merge remains pending this result.
+
 ## M3-06 / build 28 - initialize history proofs when opening projects
 
 The owner confirms build27 cuts uncached-frame preparation from 6-8 seconds to
