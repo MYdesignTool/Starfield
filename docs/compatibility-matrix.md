@@ -23,6 +23,12 @@ General AEGP bootstrap, Particle -> Force wire edit and no-Options first/reopen
 performance remain UNQUALIFIED in AE 2023.5.0 Build52. Complete Appearance
 removal is intentional; development test graphs containing it must be recreated.
 
+Build31 deployed on 2026-10-04 under standing authorization after the immediate
+read-only AE process check. All six installed/old retained hashes, 13 paired CEP
+snapshots, retired Appearance absence, selected Core and the single Junction are
+verified. Deployment/rollback details are in docs/build-matrix.md. Actual host
+qualification remains pending; installing a candidate is not a support claim.
+
 ## M3-06 / build 30 - evaluate restored bindings before state certification
 
 The owner rejects build29 startup performance: Options is still required. The

@@ -17,6 +17,46 @@ removes the new StarfieldHost.aex. Main manifest24/IDs, remaining native schemas
 C ABI3 and SFU1 remain paired. Old graphs containing Appearance must be recreated.
 Gateway native-idle-31; reopen CEP. Main integration waits for AE qualification.
 
+### Build31 deployment - 2026-10-04
+
+Source `934c211` is pushed on `codex/m3-01b-emitter-dimensions`. A read-only
+process check immediately before installation found neither AfterFX nor
+AfterFX_64 running. Deploy-TestBuild.ps1 installed through the existing single
+Plug-ins/Starfield -> newStardust/dist Junction. Six current file hashes match
+candidates; all six old build30 hashes match retained backups. Appearance is
+absent from the loadable bundle and archived with its exact previous hash.
+StarfieldHost is newly installed. Thirteen CEP source snapshots retain both old
+and installed hashes. Core runtime selector matches the installed Core hash.
+The read-only paired Restore-TestBuild report passes. No process was started or
+stopped; registry, caches, CEP installation and host-wide settings were untouched.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `D7DFF0B2C449D8AF7E1C53C4CD7B18D0CCB595853151D62F3A4D6566E439BCC2` |
+| StarfieldEmitter.aex | `8842F67B29587A42B3C01D28B2F0B1E0B76D36E9E59498F9F297EBC418169949` |
+| StarfieldParticleNode.aex | `824418E24382B6829896B342D02F0A081F1DB3E555D38FCB41C211C6C9678038` |
+| StarfieldForce.aex | `35D4F02938F376AEA273CD9C7CFB883B924C2C4981D11938D79CE026ED5101B8` |
+| StarfieldHost.aex | `8DC6B3DE8BEF589D939DB1333BF6DE256F96779D3227328BBDDE16717A4C8B98` |
+| StarfieldCore.dll | `651E3685631A87BB70DEE723A74F57FAE1C75296440A73F74D9FE83E009539AA` |
+
+Runtime: StarfieldCore-651E3685631A87BB.dll. Before/after evidence is
+artifacts/build31-deploy-before.json and build31-deploy-after.json; deployment
+and rollback report are build31-deploy.log and build31-rollback-check.log.
+Backup: artifacts/disabled/m306-build31-idle-particle-style-20261004.
+The pre-edit CEP snapshot was verified before binary installation; an initial
+snapshot path/encoding check refused deployment without changing the bundle.
+
+One-step undo to the exact previous bundle and CEP sources, with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build31-idle-particle-style-20261004' -Restore
+```
+
+Undo restores build30, including its known Options workaround and Appearance,
+and archives the new Host/candidate sources. Rollback has not been executed.
+Actual AE no-Options first/reopen performance and Particle -> Force interaction
+remain owner qualification gates; source is not merged into main.
+
 ### Build31 candidate checks - 2026-10-04
 
 May 2023 SDK, Release x64 /MT build passes for main, Emitter, ParticleNode,
