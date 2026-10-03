@@ -183,3 +183,30 @@ this readout is process-global, like the existing geometry diagnostic.
 2,432 C++ checks total. Scope and timing caveats are in build-matrix.md. AE process
 launch/UI/GPU render is not performed; owner host acceptance remains open. Metadata-
 certified AE PPS profiles and reliable cross-frame cache reuse are still open.
+
+## Build 25 temporal performance contract
+
+Owner AE evidence: CUDA device 0 executes, but 10,000 PPS / Life 2 with no keys or
+other nodes becomes slower at later frames. Native temporal preparation still
+checks out every birth's controls and walks expired births up to the 10,000-second
+global Life bound. GPU raster timings exclude this preparation.
+
+Read authored animation metadata only on the main effect's supervised UI edit / Options
+path. Certify an unanimated field only when its source has no expression or keys.
+Capture the owned numeric alias's all-time PF_State before and after reading metadata;
+accept only equal states. Store numeric proofs, never source stream/effect handles.
+Pre-render verifies those proofs with PF_ParamUtilsSuite3, without AEGP calls. UI
+UPDATE_PARAMS_UI is excluded because that selector returns random PF_State values.
+Any unavailable/changed proof retains historical sampling; equal sampled values are
+never evidence of constancy. Fresh proof capture may be needed after external edits.
+
+Certified static Emitter/Particle/Output graphs (Default timing, Life Random 0)
+use the existing closed-form alive-slot evaluator. Other temporal graphs hoist
+certified constant fields once per frame, use a certified Life upper bound where
+available, and share fixed-lattice emission prefixes only under equal all-time rate
+dependency states and Hz. Caches are bounded, optional, and discarded on changed
+states. Missing suites, eviction or contention use uncached computation. Authored
+expressions/nonlinear interpolation never enter the analytic key path.
+
+Public parameter IDs, native layouts, and C ABI 3 remain unchanged. Actual AE
+end-to-end timing and cache invalidation remain owner qualification gates.

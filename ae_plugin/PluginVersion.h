@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 24: AE native CUDA/OpenCL rendering (C ABI 3).
-#define STARFIELD_VERSION_BUILD 24
-#define STARFIELD_VERSION_PACKED 32792 /* 0x8018 */
+// Build 25: certified static controls and AE emission prefix caching.
+#define STARFIELD_VERSION_BUILD 25
+#define STARFIELD_VERSION_PACKED 32793 /* 0x8019 */

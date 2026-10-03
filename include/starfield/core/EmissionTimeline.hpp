@@ -118,8 +118,11 @@ public:
         if(analytic_ && now>=tail_begin_)
             return double(accumulated_+static_cast<long double>(tail_rate_)*(now-tail_begin_));
         if(segments_.empty()) return 0;
-        auto it=std::upper_bound(segments_.begin(),segments_.end(),now,
-            [](double t,const Segment& s){return t<s.begin;});
+        // At a lattice boundary use the preceding interval, even if a later
+        // frame has appended the next one. This keeps reverse seeks identical
+        // to a fresh timeline ending at that boundary (including rounding).
+        auto it=std::lower_bound(segments_.begin(),segments_.end(),now,
+            [](const Segment& s,double t){return s.begin<t;});
         if(it!=segments_.begin()) --it;
         const double dt=std::clamp(now-it->begin,0.0,it->end-it->begin);
         const double slope=(it->right-it->left)/(it->end-it->begin);

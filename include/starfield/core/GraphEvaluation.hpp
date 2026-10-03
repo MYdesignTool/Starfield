@@ -4,6 +4,7 @@
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/EmitterHistory.hpp"
 #include "starfield/core/EmissionTimeline.hpp"
+#include <memory>
 
 namespace starfield::core {
 
@@ -25,6 +26,10 @@ public:
     [[nodiscard]] virtual Result<std::optional<EmissionRateProfile>> rate_profile(NodeId) {
         return Result<std::optional<EmissionRateProfile>>::success(std::nullopt);
     }
+    // Optional caller-owned prefix lease. The caller certifies dependency identity
+    // and holds exclusive access for its lifetime; missing cache changes no result.
+    [[nodiscard]] virtual std::shared_ptr<EmissionTimeline> emission_timeline(NodeId,unsigned) {return {};}
+    [[nodiscard]] virtual std::optional<double> lifetime_upper_bound(NodeId) {return {};}
     [[nodiscard]] virtual Result<double> lifetime(NodeId id, double seconds) {
         auto sampled=node(id,seconds);
         if(!sampled.has_value()) return Result<double>::failure(sampled.error());

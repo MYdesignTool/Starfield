@@ -1,5 +1,44 @@
 # Starfield plug-in architecture
 
+## M3-06 / build 25 — bounded native history preparation
+
+Owner confirms build24 runs on CUDA device0, but 10,000 PPS / Life 2, no keys
+or extra nodes, becomes slower at later frames. The reverse birth loop continues
+through expired births because the 1,000,000 Output cap exceeds the live population.
+The previous global Life bound is 10,000 seconds; it is not the authored Life.
+
+Build25 (32793 / 0x8019) certifies native source controls on supervised main UI
+commits or Options: no source expression/keys, matching all-time owned-alias PF_State
+before/after metadata capture. Render validates with PF_ParamUtilsSuite3; no render
+AEGP read or retained source handles. Certified fields are hoisted into a frame-local plan.
+Simple static Default Emitter/Particle/Output graphs with Life Random 0 use the
+closed-form alive-slot path, skipping historical checkouts and snapshot encoding.
+Other temporal graphs use certified Life bounds and optional emission prefix leases.
+Linear/hold Life bounds use the complete key envelope; Life Random only shortens Life.
+Bezier/expression Life retains the safe global bound. PPS constants/linear/hold keys
+use analytic integration; nonlinear sources reuse fixed-lattice prefixes under equal
+all-time dependency stamps and 30/60/120 Hz. Changes/errors/contention/eviction fall
+back safely. Complete cached/uncached particle snapshots compare byte-identically.
+
+3,480 focused C++ checks pass: native sync 2,101, camera 12, emission timelines 397,
+emission cache 131, current nodes 379, CUDA/OpenCL drivers 409, main controls 51.
+At cap1,000,000 / PPS10,000 / Life2, t=100 and t=10,000 both perform 20,000 Life
+queries; core temporal evaluation measured 25.442/27.272 ms. The certified static
+core path measured 2.421/2.033 ms. These exclude AE checkout, GPU dispatch and host
+preview overhead and are not an AE frame-time claim.
+
+Main/native layouts, public IDs, CEP native-gpu-24 token and C ABI3 stay unchanged.
+A full paired build is required because the adapter and statically linked Core contract
+both change. Existing build24 effects may remain. For an existing project, click main
+Options once to capture metadata; it shows `History: N certified inputs` and requests
+rerender. External Effect Controls/key/expression edits may require Options recapture
+for full optimization; invalid proofs preserve correct historical rendering meanwhile.
+Automatic recapture after every external edit remains an open workflow gate.
+
+Owner AE gates: real end-to-end timings at t=2/10/100, key/expression invalidation,
+reverse seek, undo/reopen and surrounding effects. No AE process was operated by the
+agent. Do not close M3-06 from compilation or standalone timings.
+
 ## M3-06 / build 24 — AE native CUDA/OpenCL candidate
 
 Build 24 (32792 / 0x8018) implements host-proposed CUDA/OpenCL device setup/setdown,

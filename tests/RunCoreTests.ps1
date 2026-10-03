@@ -5,6 +5,7 @@ param(
     [switch]$CurrentNodes,
     [switch]$Gpu,
     [switch]$EmissionTimeline,
+    [switch]$EmissionCache,
     [switch]$NativeSync,
     [switch]$TraceIncludes,
     [ValidateSet('Emitter', 'Particle', 'Appearance', 'Force')][string]$NodeKind = 'Particle',
@@ -12,7 +13,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
+if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -30,7 +31,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -57,13 +58,14 @@ try {
         $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
     if ($Gpu) { $sources[0] = 'tests\gpu_render_tests.cpp'; $sources += @('ae_plugin\GpuRender.cpp','ae_plugin\SmartRender.cpp','ae_plugin\WorldBridge.cpp','ae_plugin\NodeEffects.cpp') }
+    if ($EmissionCache) { $sources[0] = 'tests\emission_cache_tests.cpp'; $sources += 'ae_plugin\NativeTemporalCache.cpp' }
     if ($CurrentNodes) { $sources[0] = 'tests\current_node_core_tests.cpp' }
     if ($EmissionTimeline) { $sources[0] = 'tests\emission_timeline_tests.cpp' }
     if ($NativeSync) {
         $sources[0] = 'tests\native_sync_tests.cpp'
         $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
-            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp')
+            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\NativeTemporalCache.cpp')
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp') }
 
@@ -82,7 +84,7 @@ try {
     if ($Gpu -or $NodeEffects) { $responseLines += "/I `"$aliasRoot\artifacts\gpu-build\generated`"" }
     if ($RendererControls) { $responseLines += '/DSTARFIELD_TEST_RENDERER_CONTROLS' }
     if ($TraceIncludes) { $responseLines += '/showIncludes' }
-    if ($Gpu -or $Adapter -or $RendererControls -or $NodeEffects -or $NativeSync) {
+    if ($EmissionCache -or $Gpu -or $Adapter -or $RendererControls -or $NodeEffects -or $NativeSync) {
         $sdkHeaders = "$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Headers"
         $responseLines += @('/DMSWindows', '/DWIN32', '/D_WINDOWS', '/D_CRT_SECURE_NO_WARNINGS',
             "/I `"$aliasRoot\ae_plugin`"", "/I `"$sdkHeaders`"", "/I `"$sdkHeaders\SP`"",

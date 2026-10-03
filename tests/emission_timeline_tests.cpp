@@ -1,8 +1,10 @@
 #include "starfield/core/EmissionTimeline.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
+#include "starfield/core/EmitterHistory.hpp"
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <chrono>
 
 using namespace starfield::core;
 namespace {
@@ -87,10 +89,19 @@ struct MetadataSampler final:TemporalGraphSampler {
     Graph graph;
     EmissionRateProfile profile;
     unsigned profile_calls{},rate_calls{},node_calls{};
-    Result<std::optional<EmissionRateProfile>> rate_profile(NodeId) override {
-        ++profile_calls;return Result<std::optional<EmissionRateProfile>>::success(profile);
+    unsigned life_calls{};
+    std::optional<double> bound;
+    bool sampled_rate{};
+    std::shared_ptr<EmissionTimeline> reusable;
+    std::shared_ptr<EmissionTimeline> emission_timeline(NodeId,unsigned) override {return reusable;}
+    std::optional<double> lifetime_upper_bound(NodeId) override {return bound;}
+    Result<double> lifetime(NodeId id,double time) override {
+        ++life_calls;return TemporalGraphSampler::lifetime(id,time);
     }
-    Result<double> rate(NodeId,double) override {++rate_calls;return Result<double>::failure(ErrorCode::internal_failure,"analytic path sampled rate");}
+    Result<std::optional<EmissionRateProfile>> rate_profile(NodeId) override {
+        ++profile_calls;return Result<std::optional<EmissionRateProfile>>::success(sampled_rate?std::nullopt:std::optional<EmissionRateProfile>{profile});
+    }
+    Result<double> rate(NodeId,double t) override {++rate_calls;return sampled_rate?Result<double>::success(100+12*std::sin(t*3)):Result<double>::failure(ErrorCode::internal_failure,"analytic path sampled rate");}
     Result<GraphNode> node(NodeId id,double) override {
         ++node_calls;for(const auto& n:graph.nodes) if(n.id==id) return Result<GraphNode>::success(n);
         return Result<GraphNode>::failure(ErrorCode::invalid_request,"missing fixture node");
@@ -120,5 +131,67 @@ void test_evaluator_metadata() {
     for(auto& p:sampler.graph.nodes.back().parameters) if(p.key==graph_keys::kTimeSamplingHz) p.value=std::uint32_t{24};
     check(!evaluate_temporal_particle_graph(sampler.graph,{1,1},never,{1080,1},sampler).has_value(),"actual evaluator rejects invalid sampling setting");
 }
+void test_alive_window() {
+    Settings settings;settings.birth_rate=10000;settings.particle_count=1000000;settings.particle_lifetime_seconds=2;
+    MetadataSampler sampler;sampler.profile.constant=10000;sampler.bound=2;
+    sampler.graph=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    for(int seconds:{1,100,10000}) {
+        sampler.life_calls=sampler.node_calls=0;
+        const auto started=std::chrono::steady_clock::now();
+        const auto result=evaluate_temporal_particle_graph(sampler.graph,{seconds,1},never,{1080,1},sampler);
+        const double milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
+        check(result.has_value(),"certified Life window evaluates at long comp times");
+        if(result.has_value()) {
+            check(result.value().particles.size()==(seconds==1?10001u:20000u),"large cap does not broaden the alive window");
+            check(result.value().particles.back().id==10000ULL*seconds,"window retains absolute birth ordinals");
+        }
+        check(sampler.life_calls<=20001 && sampler.node_calls<=60003,"history work is bounded by alive births rather than comp time");
+        std::printf("Life window t=%d: %u Life queries, %.3f ms\n",seconds,sampler.life_calls,milliseconds);
+        const auto static_started=std::chrono::steady_clock::now();
+        const auto static_result=evaluate_particle_graph(sampler.graph,{seconds,1},never,{1080,1});
+        const double static_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-static_started).count();
+        check(result.has_value() && static_result.has_value() && static_result.value().particles.size()==result.value().particles.size(),
+              "certified static evaluator preserves the temporal alive count");
+        if(result.has_value() && static_result.has_value() && !result.value().particles.empty()) {
+            const auto& a=result.value().particles.front();const auto& b=static_result.value().particles.front();
+            check(a.id==b.id && std::abs(a.age_seconds-b.age_seconds)<1e-9 && std::abs(a.position.y-b.position.y)<1e-10,
+                  "static shortcut preserves birth identity and motion");
+        }
+        std::printf("Static window t=%d: %.3f ms\n",seconds,static_ms);
+    }
+    // A certified linear/hold envelope may exceed the current Life. Never use
+    // the current value as a history bound: longer-lived earlier births survive.
+    sampler.bound=3;
+    auto& life=sampler.graph.nodes[1];
+    for(auto& p:life.parameters)if(p.key==graph_keys::kParticleLifetimeSeconds)p.value=3.0;
+    const auto larger=evaluate_temporal_particle_graph(sampler.graph,{100,1},never,{1080,1},sampler);
+    check(larger.has_value() && larger.value().particles.size()==30000,"certified envelope includes longer historic lifetimes");
+    sampler.bound=std::numeric_limits<double>::quiet_NaN();
+    check(!evaluate_temporal_particle_graph(sampler.graph,{100,1},never,{1080,1},sampler).has_value(),"invalid Life certification is rejected");
+    sampler.bound.reset();sampler.life_calls=0;
+    const auto unknown=evaluate_temporal_particle_graph(sampler.graph,{1,1},never,{1080,1},sampler);
+    check(unknown.has_value() && unknown.value().particles.size()==10001 && sampler.life_calls==10001,
+          "unknown Life retains historical sampling");
 }
-int main(){test_constant_and_keys();test_sampled_prefixes();test_evaluator_metadata();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_evaluator_prefix_reuse() {
+    Settings settings;settings.birth_rate=100;settings.particle_count=1000000;settings.particle_lifetime_seconds=2;
+    MetadataSampler cached;cached.sampled_rate=true;cached.bound=2;cached.reusable=std::make_shared<EmissionTimeline>();
+    cached.graph=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    unsigned previous_samples{};
+    for(const RationalTime time: {RationalTime{60,30},RationalTime{61,30},RationalTime{30,30}}) {
+        const auto reused=evaluate_temporal_particle_graph(cached.graph,time,never,{1080,1},cached);
+        MetadataSampler fresh;fresh.graph=cached.graph;fresh.bound=2;fresh.sampled_rate=true;
+        const auto rebuilt=evaluate_temporal_particle_graph(fresh.graph,time,never,{1080,1},fresh);
+        check(reused.has_value() && rebuilt.has_value(),"actual temporal evaluator accepts cached and fresh prefixes");
+        if(reused.has_value() && rebuilt.has_value()) {
+            const auto a=encode_evaluated_particles(reused.value(),time),b=encode_evaluated_particles(rebuilt.value(),time);
+            check(a.has_value() && b.has_value() && a.value()==b.value(),"cached and fresh complete particle snapshots are byte-identical");
+        }
+        if(time.value==61)check(cached.rate_calls-previous_samples==3,"next frame samples only one missing rate interval");
+        if(time.value==30)check(cached.rate_calls==previous_samples,"reverse frame does not resample rate history");
+        previous_samples=cached.rate_calls;
+    }
+    check(cached.profile_calls==1,"reused evaluator prefix is not reconfigured each frame");
+}
+}
+int main(){test_constant_and_keys();test_sampled_prefixes();test_evaluator_metadata();test_alive_window();test_evaluator_prefix_reuse();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

@@ -1,5 +1,6 @@
 #include "EmitterHistory.hpp"
 #include "NativeNodeGraph.hpp"
+#include "NativeTemporalCache.hpp"
 #include "Parameters.hpp"
 #include "AE_EffectCB.h"
 #include "starfield/core/GraphEvaluation.hpp"
@@ -37,6 +38,21 @@ public:
     TemporalCapture(PF_InData* d,const core::Graph& g,const core::Cancellation& c,A_long w,A_long h)
         :data(d),cancellation(c),
          plan(g,w,h,d->pixel_aspect_ratio.den?double(d->pixel_aspect_ratio.num)/d->pixel_aspect_ratio.den:1) {}
+    void prepare() {plan.prepare_constants(data);}
+    bool fully_constant() const {return plan.fully_constant();}
+    core::Result<std::optional<core::EmissionRateProfile>> rate_profile(core::NodeId id) override {
+        for(const auto& p:plan.proofs()) if(p.node==id && p.rate)
+            return core::Result<std::optional<core::EmissionRateProfile>>::success(p.rate);
+        return core::Result<std::optional<core::EmissionRateProfile>>::success(std::nullopt);
+    }
+    std::optional<double> lifetime_upper_bound(core::NodeId id) override {
+        for(const auto& p:plan.proofs()) if(p.node==id && p.life_bound)return p.life_bound;
+        return {};
+    }
+    std::shared_ptr<core::EmissionTimeline> emission_timeline(core::NodeId id,unsigned hz) override {
+        for(const auto& b:bindings)if(b.emitter==id)return native_emission_timeline(data,id,b.rate,hz);
+        return {};
+    }
     core::Result<core::GraphNode> node(core::NodeId id,double seconds) override {
         using R=core::Result<core::GraphNode>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"temporal node sampling cancelled");
@@ -71,6 +87,8 @@ public:
     core::Result<double> lifetime(core::NodeId id,double seconds) override {
         using R=core::Result<double>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"Life sampling cancelled");
+        for(const auto& p:plan.proofs())if(p.node==id && p.constant && p.life_bound)
+            return R::success(*p.life_bound);
         const auto found=std::find_if(lifetimes.begin(),lifetimes.end(),[&](const auto& b){return b.particle==id;});
         if(found==lifetimes.end()) return R::failure(core::ErrorCode::invalid_request,"Life binding missing");
         PF_InData sampled{};if(!context(seconds,sampled)) return R::failure(core::ErrorCode::invalid_time,"historical Life time exceeds AE range");
@@ -92,6 +110,19 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
         auto error=read_native_origin_bindings(graph,capture.bindings);
         if(error || capture.bindings.empty()) return error;
         error=read_native_lifetime_bindings(graph,capture.lifetimes);if(error) return error;
+        capture.prepare();
+        // The ordinary evaluator selects only the alive slot interval and uses
+        // closed-form motion. Never select it from merely equal sample values.
+        bool simple=capture.fully_constant();
+        for(const auto& node:graph.nodes) {
+            if(node.type_key==core::graph_keys::kEmitterNode) {
+                for(const auto& p:node.parameters)
+                    if((p.key==core::graph_keys::kEmittingMode || p.key==core::graph_keys::kAuxiliarySource) && std::get<std::uint32_t>(p.value)!=0)simple=false;
+            } else if(node.type_key==core::graph_keys::kParticleNode) {
+                for(const auto& p:node.parameters)if(p.key==core::graph_keys::kLifeRandom && std::get<double>(p.value)!=0)simple=false;
+            } else if(node.type_key!=core::graph_keys::kOutputNode)simple=false;
+        }
+        if(simple)return PF_Err_NONE; // Core CPU/GPU path evaluates the static graph once.
         const core::RationalTime time{data->current_time,data->time_scale};
         const auto evaluated=core::evaluate_temporal_particle_graph(graph,time,cancellation,
             {double(std::max<A_long>(height>0?height:data->height,1)),

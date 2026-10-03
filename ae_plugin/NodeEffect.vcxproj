@@ -63,6 +63,7 @@
     <ClCompile Include="NodeGraphSync.cpp" />
     <ClCompile Include="NativeGraphCommit.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />
+    <ClCompile Include="NativeTemporalCache.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />

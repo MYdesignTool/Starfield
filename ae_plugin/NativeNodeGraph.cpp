@@ -1,5 +1,6 @@
 #include "AEConfig.h"
 #include "NativeNodeGraph.hpp"
+#include "NativeTemporalCache.hpp"
 
 #include "AE_EffectCB.h"
 #include "AE_GeneralPlug.h"
@@ -42,6 +43,7 @@ struct RawField {
     node_sync::ValueKind type{};
     A_long slot{-1};
     std::array<double, 3> value{};
+    std::array<bool, 3> constant{}; // frame-local, never serialized
 };
 struct RawNode {
     core::NodeId id{};
@@ -658,6 +660,8 @@ struct NativeAnimationPlan::Impl {
     std::map<core::NodeId, core::GraphNode> templates;
     core::LayerUnits units;
     bool decoded{};
+    std::vector<NativeControlProof> proofs;
+    bool all_constant{};
     Impl(const core::Graph& graph,A_long width,A_long height,double aspect)
         :units{double(std::max<A_long>(width,1)),double(std::max<A_long>(height,1)),aspect} {
         decoded=std::isfinite(aspect) && aspect>0 && read_binding_record(graph,nodes);
@@ -668,6 +672,28 @@ NativeAnimationPlan::NativeAnimationPlan(const core::Graph& graph,A_long width,A
     :impl_(std::make_unique<Impl>(graph,width,height,aspect)) {}
 NativeAnimationPlan::~NativeAnimationPlan()=default;
 bool NativeAnimationPlan::valid() const noexcept {return impl_ && impl_->decoded;}
+const std::vector<NativeControlProof>& NativeAnimationPlan::proofs() const noexcept {return impl_->proofs;}
+bool NativeAnimationPlan::fully_constant() const noexcept {return valid() && impl_->all_constant;}
+void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept {
+    if(!valid() || !data) return;
+    impl_->proofs=validated_native_control_proofs(data);
+    impl_->all_constant=!impl_->nodes.empty();
+    for(auto& node:impl_->nodes) for(auto& field:node.fields) if(field.present && field.slot>=0) {
+        for(A_long c=0;c<component_count(field.type);++c) {
+            const auto stream=kNativeBindingFirstIndex+field.slot+c;
+            const auto found=std::find_if(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==node.id && p.stream==stream && p.constant;});
+            if(found==impl_->proofs.end()) {impl_->all_constant=false;continue;}
+            PF_ParamDef value{};
+            const auto error=PF_CHECKOUT_PARAM(data,stream,data->current_time,data->time_step,data->time_scale,&value);
+            if(error) {impl_->all_constant=false;continue;}
+            const bool ok=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) && value.u.fs_d.value!=kNativeBindingUnavailable;
+            const double scalar=ok?value.u.fs_d.value:0;
+            const auto checkin=PF_CHECKIN_PARAM(data,&value);
+            if(!ok || checkin) {impl_->all_constant=false;continue;}
+            field.value[c]=scalar;field.constant[c]=true;
+        }
+    }
+}
 PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNode& output,
                                   A_long* failed_stream) const noexcept {
     if(failed_stream) *failed_stream=-1;
@@ -682,6 +708,7 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
         auto raw=*found;
         for(auto& field:raw.fields) if(field.present && field.slot>=0) {
             for(A_long component=0;component<component_count(field.type);++component) {
+                if(field.constant[component]) continue;
                 PF_ParamDef sampled{};
                 const A_long index=kNativeBindingFirstIndex+field.slot+component;
                 if(failed_stream) *failed_stream=index;
@@ -1079,4 +1106,94 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
     catch (...) { stage("exception"); return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
+// UI-only metadata capture. Optional optimization: unavailable metadata retains
+// the exact historical path and never interrupts an authored transaction.
+void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,AEGP_PluginID id) noexcept try {
+    if(!data || !data->effect_ref || !data->pica_basicP || !id) return;
+    std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes) || nodes.empty())return;
+    SuiteSet suites(data);if(suites.acquire())return;
+    struct ExtraSuites {
+        SPBasicSuite* basic;const PF_ParamUtilsSuite3* utils{};const AEGP_KeyframeSuite5* keys{};
+        ~ExtraSuites() {
+            if(utils)basic->ReleaseSuite(kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3);
+            if(keys)basic->ReleaseSuite(kAEGPKeyframeSuite,kAEGPKeyframeSuiteVersion5);
+        }
+    } extra{data->pica_basicP};
+    if(extra.basic->AcquireSuite(kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3,reinterpret_cast<const void**>(&extra.utils)) ||
+       !extra.utils || !extra.utils->PF_GetCurrentState || !extra.utils->PF_AreStatesIdentical)return;
+    (void)extra.basic->AcquireSuite(kAEGPKeyframeSuite,kAEGPKeyframeSuiteVersion5,reinterpret_cast<const void**>(&extra.keys));
+    if(!suites.stream->AEGP_CanVaryOverTime || !suites.stream->AEGP_GetExpressionState || !extra.keys || !extra.keys->AEGP_GetStreamNumKFs)return;
+    AEGP_LayerH layer{};A_long count{};
+    if(suites.pf_interface->AEGP_GetEffectLayer(data->effect_ref,&layer) || !layer ||
+        suites.effect->AEGP_GetLayerNumEffects(layer,&count) || count<0 || count>10000)return;
+    std::vector<NativeControlProof> result;
+    for(A_long i=0;i<count;++i) {
+        AEGP_EffectRefH ref{};if(suites.effect->AEGP_GetLayerEffectByIndex(id,layer,i,&ref) || !ref)return;
+        EffectRef effect(suites.effect,ref);AEGP_InstalledEffectKey key{};char name[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+        if(suites.effect->AEGP_GetInstalledKeyFromLayerEffect(ref,&key) || suites.effect->AEGP_GetEffectMatchName(key,name))return;
+        Kind kind{};const char* type{};std::uint16_t schema{};
+        if(!decode_node_kind(name,kind,type,schema))continue;
+        core::Uuid128 uuid{};const A_Time zero{0,1};
+        if(!read_uuid(suites,id,ref,native_nodes::uuid_first_index(kind),zero,uuid))continue;
+        const auto node=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.id==core::NodeId{uuid} && n.kind==kind;});
+        if(node==nodes.end())continue;
+        for(A_long index=1;index<static_cast<A_long>(node->fields.size());++index) {
+            const auto& field=node->fields[index];if(!field.present || field.slot<0)continue;
+            std::array<PF_State,3> before{};bool eligible=true;
+            const auto first=kNativeBindingFirstIndex+field.slot;
+            for(A_long c=0;c<component_count(field.type);++c)
+                if(extra.utils->PF_GetCurrentState(data->effect_ref,first+c,nullptr,nullptr,&before[c]))eligible=false;
+            if(!eligible)continue;
+            AEGP_StreamRefH raw{};if(suites.stream->AEGP_GetNewEffectStreamByIndex(id,ref,index,&raw) || !raw)continue;
+            StreamRef stream(suites.stream,raw);A_Boolean can_vary=FALSE,expression=FALSE;A_long keys=0;
+            if(suites.stream->AEGP_CanVaryOverTime(raw,&can_vary))continue;
+            // AE rejects expression queries on CANNOT_TIME_VARY streams.
+            if(can_vary && (suites.stream->AEGP_GetExpressionState(id,raw,&expression) ||
+                extra.keys->AEGP_GetStreamNumKFs(raw,&keys) || keys<0))continue;
+            if(expression)continue;
+            const bool constant=keys==0;
+            std::optional<core::EmissionRateProfile> profile;
+            const bool scalar_curve=(kind==Kind::emitter && index==3) || (kind==Kind::particle && index==2);
+            if(scalar_curve && keys<=4096) {
+                core::EmissionRateProfile values;bool ok=true;
+                if(!keys) {
+                    AEGP_StreamValue2 value{};
+                    if(suites.stream->AEGP_GetNewStreamValue(id,raw,AEGP_LTimeMode_LayerTime,&zero,TRUE,&value))ok=false;
+                    else {values.constant=value.val.one_d;suites.stream->AEGP_DisposeStreamValue(&value);}
+                } else if(!extra.keys->AEGP_GetKeyframeTime || !extra.keys->AEGP_GetNewKeyframeValue || !extra.keys->AEGP_GetKeyframeInterpolation)ok=false;
+                else {
+                    std::vector<AEGP_KeyframeInterpolationType> incoming;
+                    for(A_long k=0;k<keys && ok;++k) {
+                        A_Time time{};AEGP_StreamValue2 value{};AEGP_KeyframeInterpolationType in{},out{};
+                        if(extra.keys->AEGP_GetKeyframeTime(raw,k,AEGP_LTimeMode_LayerTime,&time) || time.scale<=0 ||
+                            extra.keys->AEGP_GetKeyframeInterpolation(raw,k,&in,&out) ||
+                            extra.keys->AEGP_GetNewKeyframeValue(id,raw,k,&value)) {ok=false;break;}
+                        const double number=value.val.one_d;suites.stream->AEGP_DisposeStreamValue(&value);
+                        if(k<keys-1 && out!=AEGP_KeyInterp_LINEAR && out!=AEGP_KeyInterp_HOLD) {ok=false;break;}
+                        values.keys.push_back({double(time.value)/time.scale,number,out==AEGP_KeyInterp_HOLD?core::RateInterpolation::hold:core::RateInterpolation::linear});
+                        incoming.push_back(in);
+                    }
+                    for(std::size_t k=1;k<values.keys.size() && ok;++k)
+                        if(values.keys[k-1].outgoing==core::RateInterpolation::linear && incoming[k]!=AEGP_KeyInterp_LINEAR)ok=false;
+                }
+                core::EmissionTimeline validator;
+                if(ok && validator.configure(30,&values).has_value()) profile=std::move(values);
+            }
+            if(!constant && !profile)continue;
+            for(A_long c=0;c<component_count(field.type);++c) {
+                PF_State after{};A_Boolean same=FALSE;
+                if(extra.utils->PF_GetCurrentState(data->effect_ref,first+c,nullptr,nullptr,&after) ||
+                    extra.utils->PF_AreStatesIdentical(data->effect_ref,&before[c],&after,&same) || !same)continue;
+                NativeControlProof proof{node->id,first+c,after,constant,{},{}};
+                if(profile && kind==Kind::emitter)proof.rate=profile;
+                if(profile && kind==Kind::particle) {
+                    double maximum=profile->constant;for(const auto& p:profile->keys)maximum=std::max(maximum,p.value);
+                    if(maximum<=core::kMaxLifetimeSeconds)proof.life_bound=maximum;
+                }
+                result.push_back(std::move(proof));
+            }
+        }
+    }
+    remember_native_control_proofs(data,std::move(result));
+} catch(...) {}
 } // namespace starfield::adapter

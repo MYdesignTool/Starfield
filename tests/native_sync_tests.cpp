@@ -1,5 +1,6 @@
 #include "NodeEffects.hpp"
 #include "NativeNodeGraph.hpp"
+#include "NativeTemporalCache.hpp"
 #include <string>
 #include <fstream>
 #include "NodeRecord.hpp"
@@ -28,7 +29,7 @@ namespace {
 using namespace starfield::adapter;
 namespace core = starfield::core;
 namespace records = starfield::adapter::native_nodes;
-int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{};
+int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{}, aegp_suite_requests{};
 void check(bool condition, const char* message) {
     ++checks; if (!condition) { ++failures; std::printf("FAILED: %s\n", message); }
 }
@@ -65,6 +66,9 @@ AEGP_EffectSuite4 effect{};
 AEGP_StreamSuite6 stream{};
 AEGP_UtilitySuite6 utility{};
 AEGP_MemorySuite1 memory{};
+PF_ParamUtilsSuite3 param_utils{};
+AEGP_KeyframeSuite5 keyframes{};
+bool temporal_metadata_enabled{}, metadata_rate_keys{}, metadata_life_keys{}, metadata_bezier{}, metadata_life_expression{};unsigned metadata_epoch{};
 std::array<std::u16string, kNativeBindingCapacity> expressions;
 std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 A_long fail_expression = -1;
@@ -74,6 +78,7 @@ AEGP_ItemSuite9 items{};
 PF_InData renderer_data{};
 A_Err acquire(const char* name, int32, const void** out) {
     ++suite_requests;
+    if (std::strstr(name,"AEGP")) ++aegp_suite_requests;
     if (!std::strcmp(name, kAEGPPFInterfaceSuite)) *out = &pf;
     else if (!std::strcmp(name, kAEGPEffectSuite)) *out = &effect;
     else if (!std::strcmp(name, kAEGPStreamSuite)) *out = &stream;
@@ -81,6 +86,8 @@ A_Err acquire(const char* name, int32, const void** out) {
     else if (!std::strcmp(name, kAEGPLayerSuite)) *out = &layers;
     else if (!std::strcmp(name, kAEGPItemSuite)) *out = &items;
     else if (!std::strcmp(name, kAEGPMemorySuite)) *out = &memory;
+    else if (temporal_metadata_enabled && !std::strcmp(name,kPFParamUtilsSuite)) *out=&param_utils;
+    else if (temporal_metadata_enabled && !std::strcmp(name,kAEGPKeyframeSuite)) *out=&keyframes;
     else return 1;
     ++acquisitions; return 0;
 }
@@ -243,7 +250,8 @@ int main() {
     };
     stream.AEGP_DisposeStream = [](AEGP_StreamRefH ref)->A_Err { --live_refs; delete reinterpret_cast<Ref*>(ref); return 0; };
     stream.AEGP_GetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean* enabled)->A_Err {
-        *enabled = expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex]; return 0;
+        auto* key=reinterpret_cast<Ref*>(ref);
+        *enabled = key->effect ? FALSE : expression_enabled[key->index - kNativeBindingFirstIndex]; return 0;
     };
     stream.AEGP_GetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_MemHandle* result)->A_Err {
         *result = reinterpret_cast<AEGP_MemHandle>(new std::u16string(expressions[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex])); return 0;
@@ -434,7 +442,7 @@ int main() {
     auto smartfx_graph = animated_graph;
     check(sample_native_node_animation(&renderer_data,smartfx_graph,1920,1080)==0,
           "SmartFX samples registered animation streams without a delivered parameter array");
-    const auto suites_before=suite_requests;
+    const auto suites_before=aegp_suite_requests;
     NativeAnimationPlan animation_plan(animated_graph,1920,1080,1);
     check(animation_plan.valid(),"prepared animation plan decodes bindings once");
     std::vector<std::byte> first_animated_pixels;
@@ -487,7 +495,7 @@ int main() {
                 "animation changes actual pixels and reverse-order sampling repeats exactly");
         } else std::printf("Animated render detail: %s\n",rendered.error().detail);
     }
-    check(suite_requests==suites_before && live_refs==0,"render sampling acquires no AEGP suites or references");
+    check(aegp_suite_requests==suites_before && live_refs==0,"render sampling acquires no AEGP suites or references");
     auto invalid_record=animated_graph;
     for(auto& record:invalid_record.optional_records)
         if(record.size()>=12 && record[0]==std::byte{2} && record[1]==std::byte{0x80}) record[4]=std::byte{0};
@@ -570,7 +578,7 @@ int main() {
             else if(time==24) check(history_pixels==pixels.value().pixels,"history pixels repeat exactly in reverse frame order");
         }
     }
-    check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==saved_before_history && suite_requests==suites_before,
+    check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==saved_before_history && aegp_suite_requests==suites_before,
           "birth history neither mutates saved project graph nor acquires AEGP suites");
     fixture_animated_rate=true;
     auto rate_history=birth_graph;renderer_data.current_time=48;PF_OutData rate_output{};
@@ -601,6 +609,66 @@ int main() {
     check(sample_native_node_animation(&renderer_data,unresolved_graph,1920,1080,&missing_stream,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
           missing_stream==kNativeBindingFirstIndex && std::strcmp(failed_stage,"parameter value")==0,
           "unresolved expression output cannot silently zero particle settings");
+
+    // Real UI metadata reader and native static preparation, using ParamUtils
+    // tokens for the owned aliases. No AEGP suite is queried in render preparation.
+    temporal_metadata_enabled=true;
+    param_utils.PF_GetCurrentState=[](PF_ProgPtr,PF_ParamIndex,const A_Time* start,const A_Time* duration,PF_State* state)->PF_Err {
+        check(!start && !duration,"native proof covers all time");*state={};std::memcpy(state,&metadata_epoch,sizeof(metadata_epoch));return 0;
+    };
+    param_utils.PF_AreStatesIdentical=[](PF_ProgPtr,const PF_State* a,const PF_State* b,A_Boolean* same)->PF_Err {*same=std::memcmp(a,b,sizeof(*a))==0;return 0;};
+    stream.AEGP_CanVaryOverTime=[](AEGP_StreamRefH ref,A_Boolean* vary)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*vary=(metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2);return 0;};
+    stream.AEGP_GetExpressionState=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean* enabled)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*enabled=metadata_life_expression && r->effect==2 && r->index==2;return 0;};
+    keyframes.AEGP_GetStreamNumKFs=[](AEGP_StreamRefH ref,A_long* count)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*count=((metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2))?2:0;return 0;};
+    keyframes.AEGP_GetKeyframeTime=[](AEGP_StreamRefH,AEGP_KeyframeIndex k,AEGP_LTimeMode,A_Time* t)->A_Err {*t={k*10,1};return 0;};
+    keyframes.AEGP_GetKeyframeInterpolation=[](AEGP_StreamRefH,AEGP_KeyframeIndex,AEGP_KeyframeInterpolationType* in,AEGP_KeyframeInterpolationType* out)->A_Err {*in=*out=metadata_bezier?AEGP_KeyInterp_BEZIER:AEGP_KeyInterp_LINEAR;return 0;};
+    keyframes.AEGP_GetNewKeyframeValue=[](AEGP_PluginID,AEGP_StreamRefH ref,AEGP_KeyframeIndex k,AEGP_StreamValue2* v)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*v={};v->streamH=ref;v->val.one_d=r->effect==2?3-k*2:10000+k*10000;return 0;};
+    emitter.values[3].one_d=10000;particle.values[2].one_d=2;
+    renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
+        *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=evaluated_binding(index,0);return 0;
+    };
+    auto static_graph=animated_graph;
+    // Drop the Force from this reference fixture: owner reports Emitter/Particle only.
+    core::NodeId particle_id{},output_id{};
+    for(const auto& n:static_graph.nodes) {if(n.type_key==core::graph_keys::kParticleNode)particle_id=n.id;if(n.type_key==core::graph_keys::kOutputNode)output_id=n.id;}
+    std::erase_if(static_graph.nodes,[](const auto& n){return n.type_key==core::graph_keys::kForceNode;});
+    std::erase_if(static_graph.edges,[&](const auto& e){return !std::any_of(static_graph.nodes.begin(),static_graph.nodes.end(),[&](const auto& n){return n.id==e.source_node;}) || !std::any_of(static_graph.nodes.begin(),static_graph.nodes.end(),[&](const auto& n){return n.id==e.destination_node;});});
+    static_graph.edges.push_back({core::EdgeId{core::Uuid128{{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,99}}},particle_id,core::graph_keys::kParticleParticlesOut,output_id,core::graph_keys::kOutputParticles});
+    for(auto& n:static_graph.nodes)for(auto& p:n.parameters) {
+        if(n.type_key==core::graph_keys::kEmitterNode && p.key==core::graph_keys::kBirthRate)p.value=10000.0;
+        if(n.type_key==core::graph_keys::kParticleNode && p.key==core::graph_keys::kParticleLifetimeSeconds)p.value=2.0;
+    }
+    capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    auto proofs=validated_native_control_proofs(&renderer_data);
+    check(!proofs.empty() && std::all_of(proofs.begin(),proofs.end(),[](const auto& p){return p.constant;}),"source metadata certifies genuinely unanimated aliases");
+    NativeAnimationPlan constant_plan(static_graph,1920,1080,1);constant_plan.prepare_constants(&renderer_data);
+    check(constant_plan.fully_constant(),"native plan verifies static controls once per frame");
+    renderer_data.current_time=2400;
+    const auto certified_render_suites=aegp_suite_requests;
+    const auto record_count=static_graph.optional_records.size();PF_OutData fast_output{};
+    check(capture_emitter_origin_history(&renderer_data,&fast_output,static_graph,1920,1080,core::NeverCancelled{})==0 && static_graph.optional_records.size()==record_count,
+        "100-second static scene skips historical traversal and particle snapshot encoding");
+    check(aegp_suite_requests==certified_render_suites,"certified render preparation still acquires no AEGP suites");
+    ++metadata_epoch;check(validated_native_control_proofs(&renderer_data).empty(),"edited alias cannot reuse constant metadata");
+    metadata_rate_keys=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    proofs=validated_native_control_proofs(&renderer_data);
+    auto keyed=std::find_if(proofs.begin(),proofs.end(),[](const auto& p){return p.rate && p.rate->keys.size()==2;});
+    check(keyed!=proofs.end() && !keyed->constant,"UI keyframe reader distinguishes linear PPS from constant");
+    if(keyed!=proofs.end()) {core::EmissionTimeline timeline;check(timeline.configure(30,&*keyed->rate).has_value() && timeline.integral(10)==150000,"native linear PPS uses exact key area");}
+    metadata_life_keys=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    proofs=validated_native_control_proofs(&renderer_data);
+    check(std::any_of(proofs.begin(),proofs.end(),[](const auto& p){return !p.constant && p.life_bound && *p.life_bound==3;}),
+          "linear Life uses its complete key envelope instead of current Life");
+    metadata_bezier=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    proofs=validated_native_control_proofs(&renderer_data);
+    check(std::none_of(proofs.begin(),proofs.end(),[](const auto& p){return p.life_bound.has_value();}),
+          "Bezier Life cannot certify a key-value-only bound");
+    metadata_bezier=false;metadata_life_expression=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    proofs=validated_native_control_proofs(&renderer_data);
+    check(std::none_of(proofs.begin(),proofs.end(),[](const auto& p){return p.life_bound.has_value();}),
+          "expression Life cannot certify a key envelope");
+    temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
+
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {

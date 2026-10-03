@@ -1,6 +1,8 @@
 #include "Diagnostics.hpp"
 #include "CoreLoader.hpp"
 #include "GpuRender.hpp"
+#include "NativeTemporalCache.hpp"
+#include "GraphCarrier.hpp"
 
 #include "Parameters.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -135,6 +137,10 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         std::shared_ptr<const core::Graph> graph;
         const auto graph_err = checkout_render_graph(in_data, out_data, graph, &control_source);
         if (graph_err != PF_Err_NONE) return graph_err;
+        capture_native_temporal_metadata(in_data,*graph,graph_carrier_plugin_id());
+        const auto certified=validated_native_control_proofs(in_data).size();
+        writer.line("History: %zu certified inputs\n",certified);
+        if(certified)out_data->out_flags|=PF_OutFlag_FORCE_RERENDER;
         const auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
         if (!encoded.has_value()) {
             writer.line("SF 0.1.0 graph serialization failed: %s\n", encoded.error().detail);

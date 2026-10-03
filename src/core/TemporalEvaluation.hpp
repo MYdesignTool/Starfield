@@ -18,18 +18,24 @@ Vec3 temporal_spin_velocity(const ForceMotion& values,double age,double lifetime
 
 struct EmissionClock {
     EmissionTimeline timeline;
+    std::shared_ptr<EmissionTimeline> cached;
+    EmissionTimeline& value() {return cached?*cached:timeline;}
     bool configured{};
     Result<bool> extend(NodeId id,double now,TemporalGraphSampler& sampler,
                          const Cancellation& cancel,std::uint64_t& work,unsigned hz) {
         using R=Result<bool>;
         if(!configured) {
+            cached=sampler.emission_timeline(id,hz);
+            if(cached && cached->frequency()==hz && cached->initialized())configured=true;
+        }
+        if(!configured) {
             auto profile=sampler.rate_profile(id);
             if(!profile.has_value()) return R::failure(profile.error());
-            auto ready=timeline.configure(hz,profile.value()?&*profile.value():nullptr);
+            auto ready=value().configure(hz,profile.value()?&*profile.value():nullptr);
             if(!ready.has_value()) return ready;
             configured=true;
         }
-        return timeline.extend(now,[&](double time){return sampler.rate(id,time);},cancel,work);
+        return value().extend(now,[&](double time){return sampler.rate(id,time);},cancel,work);
     }
 };
 
@@ -212,14 +218,14 @@ public:
             auto extended=clock.extend(branch.emitter->id,once?0:now,sampler,cancel,work,static_cast<unsigned>(hz));
             if(!extended.has_value()) return R::failure(extended.error());
             // t=0 has a birth iff the emitter is enabled at that instant.
-            if(!once && now==0 && !clock.timeline.initialized()) {
+            if(!once && now==0 && !clock.value().initialized()) {
                 auto e=clock.extend(branch.emitter->id,1/hz,sampler,cancel,work,static_cast<unsigned>(hz));
                 if(!e.has_value()) return R::failure(e.error());
             }
-            double total=clock.timeline.integral(now);
+            double total=clock.value().integral(now);
             std::uint64_t last{};
             if(once) {
-                auto initial=clock.timeline.analytic()?Result<double>::success(clock.timeline.initial_rate()):sampler.rate(branch.emitter->id,0);
+                auto initial=clock.value().analytic()?Result<double>::success(clock.value().initial_rate()):sampler.rate(branch.emitter->id,0);
                 if(!initial.has_value()) return R::failure(initial.error());
                 if(!std::isfinite(initial.value()) || initial.value()<0 || initial.value()>kMaxBirthRate)
                     return R::failure(ErrorCode::invalid_request,"Once batch count outside bounds");
@@ -227,19 +233,22 @@ public:
                 if(!count) continue;
                 last=count-1;
             } else {
-                if(clock.timeline.first_positive()<0 || clock.timeline.first_positive()>now) continue;
+                if(clock.value().first_positive()<0 || clock.value().first_positive()>now) continue;
                 if(!std::isfinite(total) || total>9'007'199'254'740'991.0)
                     return R::failure(ErrorCode::invalid_time,"emission ordinal exceeds exact range");
                 last=static_cast<std::uint64_t>(std::floor(total+1e-10));
             }
             if(last<branch.partition) continue;
             std::uint64_t slot=last-(last-branch.partition)%branch.stride;
+            const auto life_bound=sampler.lifetime_upper_bound(branch.particle->id);
+            if(life_bound && (!std::isfinite(*life_bound) || *life_bound<0 || *life_bound>kMaxLifetimeSeconds))
+                return R::failure(ErrorCode::invalid_request,"invalid certified Life bound");
             for(;;) {
                 if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"birth history cancelled");
                 if(++work>kTemporalWorkLimit) return R::failure(ErrorCode::work_limit_exceeded,"birth history work limit");
-                const double birth=once?0:clock.timeline.birth(slot);
+                const double birth=once?0:clock.value().birth(slot);
                 if(birth<0 || birth>now+1e-9) return R::failure(ErrorCode::invalid_time,"birth inversion outside frame");
-                if(now-birth>=kMaxLifetimeSeconds || (kept.size()==cap && birth<kept.top().birth)) break;
+                if(now-birth>=life_bound.value_or(kMaxLifetimeSeconds) || (kept.size()==cap && birth<kept.top().birth)) break;
                 // Expired births need one Life query, not every birth property.
                 auto lifetime=sampler.lifetime(branch.particle->id,birth);
                 if(!lifetime.has_value()) return R::failure(lifetime.error());

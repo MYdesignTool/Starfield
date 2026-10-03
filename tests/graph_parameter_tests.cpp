@@ -21,6 +21,7 @@ using namespace starfield;
 using namespace starfield::adapter;
 
 namespace starfield::adapter {
+void capture_native_temporal_metadata(PF_InData*,const core::Graph&,AEGP_PluginID) noexcept {}
 bool fake_native_compile = false;
 struct NativeBindingTransaction::Impl {};
 NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH)

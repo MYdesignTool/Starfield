@@ -22,6 +22,9 @@ public:
     NativeAnimationPlan(const NativeAnimationPlan&) = delete;
     NativeAnimationPlan& operator=(const NativeAnimationPlan&) = delete;
     [[nodiscard]] bool valid() const noexcept;
+    void prepare_constants(PF_InData*) noexcept;
+    [[nodiscard]] bool fully_constant() const noexcept;
+    [[nodiscard]] const std::vector<struct NativeControlProof>& proofs() const noexcept;
     [[nodiscard]] PF_Err sample(PF_InData*, core::NodeId, core::GraphNode&,
                               A_long* failed_stream = nullptr) const noexcept;
 private:

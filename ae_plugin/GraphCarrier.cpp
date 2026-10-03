@@ -1,5 +1,6 @@
 #include "GraphCarrier.hpp"
 #include "NativeNodeGraph.hpp"
+#include "NativeTemporalCache.hpp"
 #include "Parameters.hpp"
 #include "SPBasic.h"
 
@@ -95,6 +96,7 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         params[kControlSourceId]->u.pd.value = kNodeControlSource;
         params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
         bindings.accept();
+        capture_native_temporal_metadata(data,graph,graph_carrier_plugin_id());
         set_numeric(params, kGraphEditReceiptId, nonce);
         if (output) output->out_flags |= PF_OutFlag_FORCE_RERENDER;
         return PF_Err_NONE;
