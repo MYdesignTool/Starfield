@@ -70,7 +70,7 @@
             { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
-            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"7",type:3,value:30}]
+            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30}]
     };
 
     function defaultGradient() {

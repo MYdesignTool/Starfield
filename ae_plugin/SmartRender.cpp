@@ -3,6 +3,7 @@
 #include "AE_Macros.h"
 #include "CoreLoader.hpp"
 #include "Camera.hpp"
+#include "GpuRender.hpp"
 #include "Diagnostics.hpp"
 #include "Parameters.hpp"
 #include "EmitterHistory.hpp"
@@ -140,6 +141,9 @@ private:
 // returns and frees the block through the callback below.
 struct PreRenderState {
     core::OpaqueBytes graph_bytes;
+    SfCoreGpuSceneResult gpu_scene{};
+    A_long gpu_world_width{},gpu_world_height{};
+    ~PreRenderState() { if(generation && gpu_scene.struct_size==sizeof(gpu_scene)) generation->api().release_gpu_scene(&gpu_scene); }
     std::shared_ptr<const CoreGeneration> generation;
     PF_LRect result_rect{};
     PF_LRect max_result_rect{};
@@ -190,13 +194,8 @@ std::int32_t scaled_origin(A_long rect_origin, double pixel_per_rect) noexcept {
     return static_cast<std::int32_t>(std::lround(scaled));
 }
 
-PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth, const PreRenderState& state,
-                    PF_EffectWorld* output_world) noexcept {
-    WorldLayout output_layout{};
-    if (!describe_world(*output_world, output_layout)) {
-        return PF_Err_INTERNAL_STRUCT_DAMAGED;
-    }
-
+PF_Err make_request(PF_InData* in_data,PF_OutData* out_data,HostBitDepth depth,const PreRenderState& state,
+    const WorldLayout& output_layout,HostCancellation& cancellation,SfCoreRenderRequest& request) noexcept {
     HostGeometry geometry;
     geometry.pixel_per_rect_x = observed_ratio(output_layout.width, state.result_rect.right - state.result_rect.left);
     geometry.pixel_per_rect_y =
@@ -244,29 +243,42 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
     frame.pixel_aspect_ratio = rational_scale_value(state.par, host_pixel_aspect_ratio(*in_data));
     frame.quality = in_data->quality == PF_Quality_HI ? core::Quality::full : core::Quality::draft;
 
+
+    request.struct_size = sizeof(request);
+    request.frame = SfCoreFrame{
+        frame.layer_width, frame.layer_height, frame.frame_width, frame.frame_height,
+        {frame.region_of_interest.left, frame.region_of_interest.top,
+         frame.region_of_interest.right, frame.region_of_interest.bottom},
+        frame.time.value, frame.time.scale, frame.frame_duration.value, frame.frame_duration.scale,
+        static_cast<std::uint32_t>(frame.format), static_cast<std::uint32_t>(frame.color_space),
+        static_cast<std::uint32_t>(frame.alpha_mode), static_cast<std::uint32_t>(frame.quality),
+        frame.pixel_aspect_ratio};
+    request.graph_bytes = state.graph_bytes.data();
+    request.graph_byte_count = state.graph_bytes.size();
+    const PF_Err camera_error = capture_camera(in_data, request);
+    if (camera_error) {
+        std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
+        return camera_error;
+    }
+    request.is_cancelled = [](void* context) -> std::int32_t {
+        return static_cast<HostCancellation*>(context)->is_cancelled() ? 1 : 0;
+    };
+    request.cancel_context = &cancellation;
+    return PF_Err_NONE;
+}
+
+PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth, const PreRenderState& state,
+                    PF_EffectWorld* output_world) noexcept {
+    WorldLayout output_layout{};
+    if (!describe_world(*output_world, output_layout)) {
+        return PF_Err_INTERNAL_STRUCT_DAMAGED;
+    }
+
     try {
         HostCancellation cancellation(in_data);
         SfCoreRenderRequest request{};
-        request.struct_size = sizeof(request);
-        request.frame = SfCoreFrame{
-            frame.layer_width, frame.layer_height, frame.frame_width, frame.frame_height,
-            {frame.region_of_interest.left, frame.region_of_interest.top,
-             frame.region_of_interest.right, frame.region_of_interest.bottom},
-            frame.time.value, frame.time.scale, frame.frame_duration.value, frame.frame_duration.scale,
-            static_cast<std::uint32_t>(frame.format), static_cast<std::uint32_t>(frame.color_space),
-            static_cast<std::uint32_t>(frame.alpha_mode), static_cast<std::uint32_t>(frame.quality),
-            frame.pixel_aspect_ratio};
-        request.graph_bytes = state.graph_bytes.data();
-        request.graph_byte_count = state.graph_bytes.size();
-        const PF_Err camera_error = capture_camera(in_data, request);
-        if (camera_error) {
-            std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
-            return camera_error;
-        }
-        request.is_cancelled = [](void* context) -> std::int32_t {
-            return static_cast<HostCancellation*>(context)->is_cancelled() ? 1 : 0;
-        };
-        request.cancel_context = &cancellation;
+        const auto request_error=make_request(in_data,out_data,depth,state,output_layout,cancellation,request);
+        if(request_error) return request_error;
         SfCoreRenderResult rendered{};
         rendered.struct_size = sizeof(rendered);
         const auto& api = state.generation->api();
@@ -286,7 +298,7 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
         }
         if (rendered.pixel_byte_count > std::numeric_limits<std::size_t>::max() ||
             (rendered.pixel_byte_count > 0 && rendered.pixels == nullptr) ||
-            rendered.pixel_format != static_cast<std::uint32_t>(frame.format)) {
+            rendered.pixel_format != request.frame.pixel_format) {
             report_core_failure(out_data, "core returned an invalid pixel buffer");
             return PF_Err_INTERNAL_STRUCT_DAMAGED;
         }
@@ -315,7 +327,7 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
 } // namespace
 
 PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept try {
-    if (in_data == nullptr || extra == nullptr || extra->input == nullptr || extra->output == nullptr ||
+    if (in_data == nullptr || out_data==nullptr || extra == nullptr || extra->input == nullptr || extra->output == nullptr ||
         extra->cb == nullptr || extra->cb->checkout_layer == nullptr) {
         return PF_Err_BAD_CALLBACK_PARAM;
     }
@@ -408,10 +420,35 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
                                                      &generation_identity);
     if (cache_err != PF_Err_NONE) return cache_err;
 
+    bool prefer_gpu=true;
+    for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode)
+        for(const auto& p:node.parameters) if(p.key==core::graph_keys::kAcceleration)
+            prefer_gpu=std::get<std::uint32_t>(p.value)==0;
+    bool gpu_possible=false;
+    if(prefer_gpu && gpu_device_matches(extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index)) {
+        // Pre-render eligibility includes actual scene construction and bounds.
+        // This candidate expects GPU rectangles in render-resolution pixels; a GPU
+        // checkout with different geometry is rejected, never clipped or guessed.
+        const WorldLayout predicted{result.left,result.top,std::uint32_t(std::max<A_long>(0,result.right-result.left)),
+            std::uint32_t(std::max<A_long>(0,result.bottom-result.top)),0};
+        HostCancellation cancellation(in_data); SfCoreRenderRequest scene_request{};
+        const auto request_error=make_request(in_data,out_data,HostBitDepth::bpc32,*state,predicted,cancellation,scene_request);
+        if(request_error) return request_error;
+        state->gpu_scene.struct_size=sizeof(state->gpu_scene);
+        const auto status=state->generation->api().prepare_gpu_scene(&scene_request,&state->gpu_scene);
+        if(status==SF_CORE_OK && state->gpu_scene.status==SF_CORE_OK) {
+            state->gpu_world_width=static_cast<A_long>(predicted.width);state->gpu_world_height=static_cast<A_long>(predicted.height);
+            gpu_possible=true;
+        } else if(status!=SF_CORE_UNSUPPORTED_FORMAT) {
+            if(status!=SF_CORE_CANCELLED) report_core_failure(out_data,state->gpu_scene.detail);
+            else out_data->return_msg[0]='\0';
+            return host_error_for_status(status,cancellation.abort_error());
+        }
+    }
     extra->output->result_rect = result;
     extra->output->max_result_rect = layer_rect;
     extra->output->solid = PF_Boolean{0}; // the composite always carries alpha
-    extra->output->flags = 0;
+    extra->output->flags = gpu_possible?PF_RenderOutputFlag_GPU_RENDER_POSSIBLE:0;
     extra->output->pre_render_data = state.release();
     extra->output->delete_pre_render_data_func = delete_pre_render_state;
     return PF_Err_NONE;
@@ -466,7 +503,16 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         return PF_Err_BAD_CALLBACK_PARAM;
     }
 
-    const PF_Err err = render_frame(in_data, out_data, depth, *state, output_world);
+    PF_Err err{};
+    if(extra->input->what_gpu!=PF_GPU_Framework_NONE) {
+        if(state->gpu_scene.status!=SF_CORE_OK || state->gpu_scene.struct_size!=sizeof(state->gpu_scene) ||
+            output_world->width!=state->gpu_world_width || output_world->height!=state->gpu_world_height)
+            return PF_Err_BAD_CALLBACK_PARAM;
+        // Ratio is 1 here, as checked against the pre-render world's dimensions.
+        // The actual GPU buffer is validated by GPU suites, never world.data.
+        err=render_gpu_scene(in_data,out_data,extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index,
+            state->gpu_scene,output_world,output_world->origin_x,output_world->origin_y,true);
+    } else {err=render_frame(in_data,out_data,depth,*state,output_world);if(!err) record_cpu_execution();}
 
     return err;
 }

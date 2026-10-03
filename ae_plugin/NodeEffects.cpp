@@ -1,5 +1,6 @@
 #include "AEConfig.h"
 #include "NodeEffects.hpp"
+#include "GpuRender.hpp"
 
 #include "AE_EffectCB.h"
 #include "AE_EffectCBSuites.h"
@@ -19,7 +20,7 @@ static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
                                           PF_OutFlag_DEEP_COLOR_AWARE |
                                           PF_OutFlag_PIX_INDEPENDENT));
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
-                                           PF_OutFlag2_FLOAT_COLOR_AWARE));
+                                           PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32));
 
 enum class NodeEffectKind { emitter, particle, appearance, force };
 
@@ -464,7 +465,7 @@ PF_Err pre_render_passthrough(PF_InData* in_data, PF_PreRenderExtra* extra) noex
     extra->output->result_rect = result.result_rect;
     extra->output->max_result_rect = result.max_result_rect;
     extra->output->solid = result.solid;
-    extra->output->flags = 0;
+    extra->output->flags = starfield::adapter::gpu_device_matches(extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index)?PF_RenderOutputFlag_GPU_RENDER_POSSIBLE:0;
     extra->output->pre_render_data = nullptr;
     extra->output->delete_pre_render_data_func = nullptr;
     return PF_Err_NONE;
@@ -494,7 +495,8 @@ PF_Err smart_render_passthrough(PF_InData* in_data, PF_SmartRenderExtra* extra) 
     if (error) return error;
     PF_EffectWorld* output = nullptr;
     error = extra->cb->checkout_output(in_data->effect_ref, &output);
-    if (!error) error = copy_smart_world(in_data, input, output);
+    if (!error) error = extra->input->what_gpu==PF_GPU_Framework_NONE?copy_smart_world(in_data,input,output):
+        starfield::adapter::copy_gpu_pixels(in_data,extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index,input,output);
     // A successful pixel checkout is checked in even if output/suite/copy fails.
     const PF_Err checkin_error = extra->cb->checkin_layer_pixels(in_data->effect_ref, kNodeInputCheckout);
     return error ? error : checkin_error;
@@ -538,6 +540,11 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             return render_passthrough(in_data, params, output);
         case PF_Cmd_SMART_PRE_RENDER:
             return pre_render_passthrough(in_data, static_cast<PF_PreRenderExtra*>(extra));
+        case PF_Cmd_GPU_DEVICE_SETUP:
+            return starfield::adapter::gpu_device_setup(in_data,out_data,static_cast<PF_GPUDeviceSetupExtra*>(extra));
+        case PF_Cmd_GPU_DEVICE_SETDOWN:
+            return starfield::adapter::gpu_device_setdown(in_data,static_cast<PF_GPUDeviceSetdownExtra*>(extra));
+        case PF_Cmd_SMART_RENDER_GPU:
         case PF_Cmd_SMART_RENDER:
             return smart_render_passthrough(in_data, static_cast<PF_SmartRenderExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:

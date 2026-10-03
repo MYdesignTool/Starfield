@@ -145,3 +145,41 @@ https://ae-plugins.docsforadobe.dev/effect-basics/command-selectors/;
 https://ae-plugins.docsforadobe.dev/intro/gpu-build-instructions/;
 local May 2023 AE_Effect.h and AE_EffectGPUSuites.h;
 local observed Stardust parameter inventory and read-only ParticleGL.
+
+## Build 24 implementation checkpoint
+
+GPU integration is now implemented as an AE 2023 candidate, not host-qualified.
+The May 2023 selectors accept only actual CUDA/OpenCL proposals. System Driver/ICD
+entry points use AE-owned contexts/queues. CUDA modules use build-time PTX, OpenCL
+programs compile our source on the offered device. No context/device/queue is created
+by the product. Explicit buffers and pinned inputs use the PF GPU device suite;
+output/input GPU worlds are borrowed and validated for format, device and size.
+Uploads are explicitly completed before kernels, including out-of-order OpenCL queues.
+Cancellation is polled between 128-row batches. Setup failure is a CPU negotiation;
+once GPU output is delivered, failures return a host error and never call the CPU writer.
+
+C ABI 3 adds SfGpuSprite (80 bytes), SfCoreGpuSceneResult, prepare_gpu_scene and
+release_gpu_scene. Loader requires all ABI 3 functions and rejects ABI 2. Core owns
+scene arrays until the same leased generation releases them. The adapter uploads
+three arrays: projected sprites, tile offsets, ordered tile indices. Stable camera
+sorting/order matches CPU; one GPU thread owns each pixel. No floating-point atomic
+compositing, private graphics context, AE pointer in Core, or product image readback.
+Simulation/temporal sampling remain on CPU. CPU and GPU share projection/shape math;
+GPU arithmetic is float, so parity is bounded rather than bit-exact raster equality.
+
+GPU scene limits are 32M tile indices and 512M tile pixel visits; an over-budget
+scene reports unsupported eligibility during pre-render, clearing GPU_RENDER_POSSIBLE.
+It is never truncated. The four separate native node AEXs also implement GPU setup,
+pre-render eligibility, SMART_RENDER_GPU copy, and setdown; their pass-through kernels
+preserve pixel bits/cropped world origins without staging allocation or CPU image copies.
+Node controls/layout IDs are unchanged. Main appends GPU Rendering 613..615,
+Acceleration 614/disk 1611 (GPU=1 / CPU=2); Output key 6 stores GPU=0 / CPU=1.
+Main manifest/schema 24 and C ABI 3 require a fresh main effect and paired deployment.
+The CEP readiness token is native-gpu-24. Time Sampling and all native layouts stay
+as in build 23. Options reports the last executed main frame's CUDA/OpenCL/CPU path;
+this readout is process-global, like the existing geometry diagnostic.
+
+409 actual-driver/fake-host GPU checks plus the remaining scoped suites pass,
+2,432 C++ checks total. Scope and timing caveats are in build-matrix.md. AE process
+launch/UI/GPU render is not performed; owner host acceptance remains open. Metadata-
+certified AE PPS profiles and reliable cross-frame cache reuse are still open.

@@ -14,6 +14,7 @@
 #include "PluginFlags.h"
 #include "PluginVersion.h"
 #include "SmartRender.hpp"
+#include "GpuRender.hpp"
 
 static_assert(STARFIELD_VERSION_STAGE == PF_Stage_DEVELOP);
 static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
@@ -32,7 +33,7 @@ static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_P
 static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_REVEALS_ZERO_ALPHA | PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                        PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG |
                                        PF_OutFlag2_I_MIX_GUID_DEPENDENCIES | PF_OutFlag2_I_USE_3D_CAMERA |
-                                       PF_OutFlag2_AUTOMATIC_WIDE_TIME_INPUT),
+                                       PF_OutFlag2_AUTOMATIC_WIDE_TIME_INPUT | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
 
 namespace {
@@ -97,6 +98,11 @@ PF_Err dispatch(PF_Cmd cmd,
             return PF_Err_NONE;
         case PF_Cmd_SMART_PRE_RENDER:
             return starfield::adapter::pre_render(in_data, out_data, static_cast<PF_PreRenderExtra*>(extra));
+        case PF_Cmd_GPU_DEVICE_SETUP:
+            return starfield::adapter::gpu_device_setup(in_data,out_data,static_cast<PF_GPUDeviceSetupExtra*>(extra));
+        case PF_Cmd_GPU_DEVICE_SETDOWN:
+            return starfield::adapter::gpu_device_setdown(in_data,static_cast<PF_GPUDeviceSetdownExtra*>(extra));
+        case PF_Cmd_SMART_RENDER_GPU:
         case PF_Cmd_SMART_RENDER:
             return starfield::adapter::smart_render(in_data, out_data, static_cast<PF_SmartRenderExtra*>(extra));
         case PF_Cmd_ARBITRARY_CALLBACK:

@@ -48,7 +48,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel><TreatWarningAsError>false</TreatWarningAsError><SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>MSWindows;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;$(NodeKindDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\artifacts\gpu-build\generated;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers;$(STARFIELD_AE_SDK_ROOT)\Examples\Headers\SP;$(STARFIELD_AE_SDK_ROOT)\Examples\Resources;$(STARFIELD_AE_SDK_ROOT)\Examples\Util;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard><ConformanceMode>true</ConformanceMode><ExceptionHandling>Sync</ExceptionHandling>
       <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
@@ -59,6 +59,7 @@
   <ItemGroup>
     <ClCompile Include="NodeEffectMain.cpp" />
     <ClCompile Include="NodeEffects.cpp" />
+    <ClCompile Include="GpuRender.cpp" />
     <ClCompile Include="NodeGraphSync.cpp" />
     <ClCompile Include="NativeGraphCommit.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />

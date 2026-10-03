@@ -1,6 +1,7 @@
 #include "starfield/core/PluginApi.h"
 
 #include "starfield/core/CpuRenderer.hpp"
+#include "starfield/core/SpriteScene.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -57,6 +58,92 @@ private:
     const SfCoreRenderRequest& request_;
 };
 
+core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderRequest& input) {
+    auto graph = decode_graph(input.graph_bytes, input.graph_byte_count);
+    if (!graph.has_value()) return core::Result<core::RenderRequest>::failure(graph.error());
+    const SfCoreFrame& source = input.frame;
+    core::RenderRequest request;
+    auto& frame = request.frame;
+    frame.layer_width = source.layer_width;
+    frame.layer_height = source.layer_height;
+    frame.frame_width = source.frame_width;
+    frame.frame_height = source.frame_height;
+    frame.region_of_interest = {source.roi.left, source.roi.top, source.roi.right, source.roi.bottom};
+    frame.time = {source.time_value, source.time_scale};
+    frame.frame_duration = {source.duration_value, source.duration_scale};
+    if (source.pixel_format > 2 || source.color_space > 2 || source.alpha_mode > 1 || source.quality > 1) {
+        return core::Result<core::RenderRequest>::failure(core::ErrorCode::unsupported_format,"unsupported frame enum value");
+    }
+    frame.format = static_cast<core::PixelFormat>(source.pixel_format);
+    frame.color_space = static_cast<core::ColorSpace>(source.color_space);
+    frame.alpha_mode = static_cast<core::AlphaMode>(source.alpha_mode);
+    frame.quality = static_cast<core::Quality>(source.quality);
+    frame.pixel_aspect_ratio = source.pixel_aspect_ratio;
+    request.graph = std::make_shared<const core::Graph>(graph.take_value());
+    request.graph_revision = input.graph_revision;
+    if (input.camera_enabled > 1) {
+        return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"invalid camera flag");
+    }
+    request.camera.enabled = input.camera_enabled != 0;
+    std::copy_n(input.layer_to_view, 16, request.camera.layer_to_view.begin());
+    std::copy_n(input.image_to_layer, 9, request.camera.image_to_layer.begin());
+    request.camera.focal_x = input.focal_x;
+    request.camera.focal_y = input.focal_y;
+    request.camera.center_x = input.center_x;
+    request.camera.center_y = input.center_y;
+    request.camera.near_clip = input.near_clip;
+    return core::Result<core::RenderRequest>::success(std::move(request));
+}
+
+SfCoreStatus SF_CORE_CALL prepare_gpu_scene(const SfCoreRenderRequest* input, SfCoreGpuSceneResult* output) {
+    if (output == nullptr || output->struct_size != sizeof(SfCoreGpuSceneResult)) return SF_CORE_INVALID_REQUEST;
+    *output = SfCoreGpuSceneResult{};
+    output->struct_size = sizeof(SfCoreGpuSceneResult);
+    if (input == nullptr || input->struct_size != sizeof(SfCoreRenderRequest)) {
+        output->status = SF_CORE_INVALID_REQUEST;
+        detail(output->detail, "core render ABI request size mismatch");
+        return output->status;
+    }
+    try {
+        auto decoded = decode_render_request(*input);
+        if (!decoded.has_value()) {
+            output->status = status_for(decoded.error().code);
+            detail(output->detail,decoded.error().detail);
+            return output->status;
+        }
+        auto request = decoded.take_value();
+        const CallbackCancellation cancellation(*input);
+        auto scene = core::prepare_sprite_scene(request, cancellation);
+        if (!scene.has_value()) {
+            output->status = status_for(scene.error().code);
+            detail(output->detail, scene.error().detail);
+            return output->status;
+        }
+        auto owned = std::make_unique<core::SpriteScene>(scene.take_value());
+        output->region = {owned->region.left,owned->region.top,owned->region.right,owned->region.bottom};
+        output->tile_size = 16;
+        output->tiles_x = owned->tiles_x; output->tiles_y = owned->tiles_y;
+        output->sprite_count = static_cast<uint32_t>(owned->sprites.size());
+        output->index_count = static_cast<uint32_t>(owned->indices.size());
+        output->sprites = owned->sprites.data(); output->tile_offsets = owned->offsets.data();
+        output->tile_indices = owned->indices.data(); output->opaque_handle = owned.release();
+        output->status = SF_CORE_OK;
+        return SF_CORE_OK;
+    } catch (const std::bad_alloc&) {
+        output->status = SF_CORE_ALLOCATION_FAILED;
+        detail(output->detail, "GPU scene allocation failed");
+    } catch (...) {
+        output->status = SF_CORE_INTERNAL_FAILURE;
+        detail(output->detail, "GPU scene unexpected exception");
+    }
+    return output->status;
+}
+void SF_CORE_CALL release_gpu_scene(SfCoreGpuSceneResult* result) {
+    if (!result || result->struct_size != sizeof(SfCoreGpuSceneResult)) return;
+    delete static_cast<core::SpriteScene*>(result->opaque_handle);
+    *result = {}; result->struct_size = sizeof(SfCoreGpuSceneResult);
+}
+
 SfCoreStatus SF_CORE_CALL render(const SfCoreRenderRequest* input, SfCoreRenderResult* output) {
     if (output == nullptr || output->struct_size != sizeof(SfCoreRenderResult)) return SF_CORE_INVALID_REQUEST;
     *output = SfCoreRenderResult{};
@@ -67,47 +154,13 @@ SfCoreStatus SF_CORE_CALL render(const SfCoreRenderRequest* input, SfCoreRenderR
         return output->status;
     }
     try {
-        auto graph = decode_graph(input->graph_bytes, input->graph_byte_count);
-        if (!graph.has_value()) {
-            output->status = status_for(graph.error().code);
-            detail(output->detail, graph.error().detail);
+        auto decoded = decode_render_request(*input);
+        if (!decoded.has_value()) {
+            output->status = status_for(decoded.error().code);
+            detail(output->detail,decoded.error().detail);
             return output->status;
         }
-        const SfCoreFrame& source = input->frame;
-        core::RenderRequest request;
-        auto& frame = request.frame;
-        frame.layer_width = source.layer_width;
-        frame.layer_height = source.layer_height;
-        frame.frame_width = source.frame_width;
-        frame.frame_height = source.frame_height;
-        frame.region_of_interest = {source.roi.left, source.roi.top, source.roi.right, source.roi.bottom};
-        frame.time = {source.time_value, source.time_scale};
-        frame.frame_duration = {source.duration_value, source.duration_scale};
-        if (source.pixel_format > 2 || source.color_space > 2 || source.alpha_mode > 1 || source.quality > 1) {
-            output->status = SF_CORE_UNSUPPORTED_FORMAT;
-            detail(output->detail, "unsupported frame enum value");
-            return output->status;
-        }
-        frame.format = static_cast<core::PixelFormat>(source.pixel_format);
-        frame.color_space = static_cast<core::ColorSpace>(source.color_space);
-        frame.alpha_mode = static_cast<core::AlphaMode>(source.alpha_mode);
-        frame.quality = static_cast<core::Quality>(source.quality);
-        frame.pixel_aspect_ratio = source.pixel_aspect_ratio;
-        request.graph = std::make_shared<const core::Graph>(graph.take_value());
-        request.graph_revision = input->graph_revision;
-        if (input->camera_enabled > 1) {
-            output->status = SF_CORE_INVALID_REQUEST;
-            detail(output->detail, "invalid camera flag");
-            return output->status;
-        }
-        request.camera.enabled = input->camera_enabled != 0;
-        std::copy_n(input->layer_to_view, 16, request.camera.layer_to_view.begin());
-        std::copy_n(input->image_to_layer, 9, request.camera.image_to_layer.begin());
-        request.camera.focal_x = input->focal_x;
-        request.camera.focal_y = input->focal_y;
-        request.camera.center_x = input->center_x;
-        request.camera.center_y = input->center_y;
-        request.camera.near_clip = input->near_clip;
+        auto request = decoded.take_value();
         const CallbackCancellation cancellation(*input);
         const core::CpuParticleRenderer renderer;
         auto rendered = renderer.render(request, cancellation);
@@ -186,6 +239,6 @@ extern "C" SF_CORE_EXPORT int32_t SF_CORE_CALL StarfieldCore_GetApi(
     uint32_t abi_version, uint32_t api_struct_size, SfCoreApi* out_api) {
     if (out_api == nullptr || abi_version != SF_CORE_ABI_VERSION || api_struct_size != sizeof(SfCoreApi))
         return 0;
-    *out_api = SfCoreApi{sizeof(SfCoreApi), SF_CORE_ABI_VERSION, render, release_render_result, inspect};
+    *out_api = SfCoreApi{sizeof(SfCoreApi), SF_CORE_ABI_VERSION, render, release_render_result, inspect, prepare_gpu_scene, release_gpu_scene};
     return 1;
 }

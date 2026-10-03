@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-particle-controls-23";
+    var GATEWAY_BUILD = "native-gpu-24";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1183,14 +1183,15 @@
             !isFinite(record.timeRemapSeconds) || Math.abs(record.timeRemapSeconds)>1000000)) throw new Error("Invalid Output remapping time.");
         if (typeof record.previewChance!=="undefined" && (typeof record.previewChance!=="number" ||
             !isFinite(record.previewChance) || record.previewChance<0 || record.previewChance>100)) throw new Error("Invalid Output preview percentage.");
+        if(typeof record.acceleration!=="undefined" && record.acceleration!==0 && record.acceleration!==1) throw new Error("Invalid Acceleration preference.");
         return record;
     }
 
     function writeRendererRecord(resolved, record) {
         if(record.timeSamplingHz && record.timeSamplingHz!==30 && record.timeSamplingHz!==60 && record.timeSamplingHz!==120) throw new Error("Invalid time sampling frequency.");
-        var names = ["Max Particles", "Layout Output X", "Layout Output Y", "Time Remapping On / Off", "Time (Seconds)", "Preview", "Particle chance", "Time Sampling"],
+        var names = ["Max Particles", "Layout Output X", "Layout Output Y", "Time Remapping On / Off", "Time (Seconds)", "Preview", "Particle chance", "Time Sampling", "Acceleration"],
             values = [record.maxParticles, record.position.x, record.position.y, record.timeRemapEnabled || 0,
-                record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100, ({30:1,60:2,120:3})[record.timeSamplingHz || 30]];
+                record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100, ({30:1,60:2,120:3})[record.timeSamplingHz || 30], (record.acceleration || 0)+1];
         for (var i = 0; i < names.length; i++) {
             var property = findEffectProperty(resolved.target.effect, names[i]);
             if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
@@ -1208,6 +1209,7 @@
             timeRemapSeconds:Number(findEffectProperty(resolved.target.effect,"Time (Seconds)").value),
             previewEnabled:Number(findEffectProperty(resolved.target.effect,"Preview").value),
             previewChance:Number(findEffectProperty(resolved.target.effect,"Particle chance").value),
+            acceleration:Number(findEffectProperty(resolved.target.effect,"Acceleration").value)-1,
             timeSamplingHz:[30,60,120][Number(findEffectProperty(resolved.target.effect,"Time Sampling").value)-1],
             position: { x: Number(findEffectProperty(resolved.target.effect, "Layout Output X").value), y: Number(findEffectProperty(resolved.target.effect, "Layout Output Y").value) } };
     }

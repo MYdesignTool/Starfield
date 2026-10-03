@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 2u
+#define SF_CORE_ABI_VERSION 3u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -92,12 +92,35 @@ typedef struct SfCoreInspectResult {
     uint64_t node_count, edge_count, live_particle_count;
 } SfCoreInspectResult;
 
+/* Numeric, immutable, ROI-relative scene. No host pointers cross this ABI.
+ * All arrays belong to opaque_handle and are released by the same DLL generation.
+ * Tiles are 16x16; indices in each tile preserve back-to-front sprite order. */
+typedef struct SfGpuSprite {
+    float x, y, inverse_ax, inverse_ay, inverse_bx, inverse_by;
+    float edge_scale, feather, red, green, blue, opacity;
+    int32_t left, top, right, bottom;
+    uint32_t shape, reserved[3];
+} SfGpuSprite;
+typedef struct SfCoreGpuSceneResult {
+    uint32_t struct_size;
+    SfCoreStatus status;
+    char detail[128];
+    SfCoreRect region;
+    uint32_t tile_size, tiles_x, tiles_y, sprite_count, index_count;
+    const SfGpuSprite* sprites;
+    const uint32_t* tile_offsets; /* tiles_x * tiles_y + 1 entries */
+    const uint32_t* tile_indices;
+    void* opaque_handle;
+} SfCoreGpuSceneResult;
+
 typedef struct SfCoreApi {
     uint32_t struct_size;
     uint32_t abi_version;
     SfCoreStatus (SF_CORE_CALL *render)(const SfCoreRenderRequest*, SfCoreRenderResult*);
     void (SF_CORE_CALL *release_render_result)(SfCoreRenderResult*);
     SfCoreStatus (SF_CORE_CALL *inspect)(const SfCoreInspectRequest*, SfCoreInspectResult*);
+    SfCoreStatus (SF_CORE_CALL *prepare_gpu_scene)(const SfCoreRenderRequest*, SfCoreGpuSceneResult*);
+    void (SF_CORE_CALL *release_gpu_scene)(SfCoreGpuSceneResult*);
 } SfCoreApi;
 
 /* Returns 1 only when the complete requested ABI is available. The caller must

@@ -98,10 +98,11 @@
         },
         output: {
             "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
-            "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"]},
+            "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
             "3": {label:"Time (Seconds)",kind:"slider",decimals:2,step:0.1,min:-1000000,max:1000000},
-            "4": {label:"Preview",kind:"popup",choices:["Off","On"]},
+            "4": {label:"Preview",kind:"popup",choices:["Off","On"],values:[0,1]},
             "5": {label:"Particle chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "6": {label:"Acceleration",kind:"popup",choices:["GPU","CPU"],values:[0,1]},
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };

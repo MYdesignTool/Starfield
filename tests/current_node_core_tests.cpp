@@ -113,7 +113,7 @@ void test_camera() {
     check(behind.has_value() && centroid(behind.value())<0,"behind-camera sprites clipped");
     request.camera.focal_x=std::numeric_limits<double>::quiet_NaN();
     check(!CpuParticleRenderer{}.render(request,never).has_value(),"non-finite camera rejects");
-    SfCoreApi api{};check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"paired ABI 2 loads");
+    SfCoreApi api{};check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"paired ABI 3 loads");
     check(StarfieldCore_GetApi(1,sizeof(api),&api)==0,"ABI 1 cannot load new camera contract");
 }
 }

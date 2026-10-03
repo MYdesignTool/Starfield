@@ -85,7 +85,7 @@ int main() {
     PF_InData host{}; PF_OutData out{};
     host.inter.add_param = add_parameter;
     check(EffectMain(PF_Cmd_GLOBAL_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "global setup succeeds");
-    check(out.out_flags2 == (PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_SMART_RENDER),
+    check(out.out_flags2 == (PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),
           "float awareness always advertises implemented SmartFX");
     check(out.out_flags == STARFIELD_NODE_OUT_FLAGS, "node remains internal/menu-hidden");
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");

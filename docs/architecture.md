@@ -1,5 +1,41 @@
 # Starfield plug-in architecture
 
+## M3-06 / build 24 — AE native CUDA/OpenCL candidate
+
+Build 24 (32792 / 0x8018) implements host-proposed CUDA/OpenCL device setup/setdown,
+per-frame SmartFX eligibility and SMART_RENDER_GPU into AE GPU_BGRA128 output.
+Main Acceleration is GPU by default, with a CPU selection at index 614/disk 1611.
+The four control-node effects also implement GPU pass-through to avoid our own
+CPU image copy between nodes. Main/node PiPL and runtime capability flags agree.
+Unimplemented frameworks or initialization failures reject GPU support cleanly.
+MFR, Compute Cache and DirectX support remain disabled; no private graphics context.
+
+Core C ABI 3 adds an immutable, typed, ROI-relative sprite/tile scene and paired
+release callback. CPU simulation/history/projection prepare the scene; GPU kernels
+perform deterministic ordered rasterization. CPU/GPU share camera/shape geometry.
+There is no full-frame CPU staging image or GPU image readback in the product GPU
+path. Numeric scene uploads still cost time. GPU scene budgets reject before GPU
+output checkout and negotiate CPU without truncating particles.
+
+May 2023 SDK full Release /MT build succeeds. 2,432 scoped C++ checks and focused
+JS round trips pass. 409 actual-driver checks exercise CUDA and OpenCL (including
+an out-of-order OpenCL queue), main SmartFX and the real node-effect GPU selectors,
+Circle/Rectangle/Cloud, camera, HDR/alpha, padded rows/ROI, cancellation, partial
+allocation failure, ABI rejection and cleanup. Small-scene maximum float component
+difference versus CPU is 0.00000175834; this is scoped evidence, not a global error bound.
+A standalone 512x512, 20,001-sprite benchmark takes roughly 3.4–3.7 ms preparation
+plus 1.2–1.6 ms allocation/upload/kernel/synchronization, versus 67–69 ms CPU rendering.
+AE parameter/history capture, device startup and surrounding host effects are excluded.
+Actual AE GPU dispatch, preview scales/ROI, render queue and end-to-end timings remain
+owner qualification gates. Do not claim AE GPU support from these tests alone.
+
+Fresh main effects are required (main manifest/schema 24, registered count 616
+including implicit input). Existing IDs 1..612 and native node layouts are unchanged.
+Reopen CEP for native-gpu-24. Full paired AEX/Core deployment is required for ABI 3;
+no old-project migration. AE-certified PPS metadata and cross-frame prefix-cache
+invalidation/reuse remain open; build 24 still samples native PPS.
+
+
 ## M3-06 / build 23 — Particle controls and temporal preparation
 
 AE 2023 / May 2023 SDK candidate, packed version 32791 (0x8017). Emitting now

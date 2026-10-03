@@ -80,7 +80,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
             std::move(particle_node),
             GraphNode{output, kOutputNode, 4, {{kParticleCount, settings.particle_count},
                 {kTimeRemapEnabled,std::uint32_t{0}},{kTimeRemapSeconds,0.0},
-                {kPreviewEnabled,std::uint32_t{0}},{kPreviewChance,100.0},{kTimeSamplingHz,std::uint32_t{30}}}},
+                {kPreviewEnabled,std::uint32_t{0}},{kPreviewChance,100.0},{kAcceleration,std::uint32_t{0}},{kTimeSamplingHz,std::uint32_t{30}}}},
         };
         graph.edges = {
             GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},

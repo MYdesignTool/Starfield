@@ -820,6 +820,9 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         if(!params[kTimeSamplingHzId] || params[kTimeSamplingHzId]->param_type!=PF_Param_POPUP ||
            params[kTimeSamplingHzId]->u.pd.value<1 || params[kTimeSamplingHzId]->u.pd.value>3) return PF_Err_BAD_CALLBACK_PARAM;
         add_value(output,core::graph_keys::kTimeSamplingHz,std::uint32_t(30u<<(params[kTimeSamplingHzId]->u.pd.value-1)));
+        if(!params[kAccelerationId] || params[kAccelerationId]->param_type!=PF_Param_POPUP ||
+            params[kAccelerationId]->u.pd.value<1 || params[kAccelerationId]->u.pd.value>2) return PF_Err_BAD_CALLBACK_PARAM;
+        add_value(output,core::graph_keys::kAcceleration,std::uint32_t(params[kAccelerationId]->u.pd.value-1));
         for (const auto& binding : {std::pair{kTimeRemapEnabledId, core::graph_keys::kTimeRemapEnabled},
                                    std::pair{kPreviewEnabledId, core::graph_keys::kPreviewEnabled}}) {
             if (!params[binding.first] || params[binding.first]->param_type != PF_Param_CHECKBOX) return PF_Err_BAD_CALLBACK_PARAM;

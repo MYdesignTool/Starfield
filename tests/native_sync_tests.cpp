@@ -179,7 +179,7 @@ int main() {
     particle.values[49].one_d=2;particle.values[50].one_d=0;particle.values[52].one_d=100;
     particle.values[51].color={1,1,1,1};particle.values[53].color={1,1,1,1};
     particle.values[66].one_d=1;particle.values[75].one_d=2;
-    main.values[kTimeSamplingHzId].one_d=1;
+    main.values[kTimeSamplingHzId].one_d=1;main.values[kAccelerationId].one_d=1;main.values[kAccelerationId].one_d=1;
     connection(1, records::Kind::emitter, 2, 11);
     connection(2, records::Kind::particle, 4, 12);
     connection(3, records::Kind::force, 255, 13);
@@ -418,7 +418,7 @@ int main() {
     emitter.values[1].one_d = 1;
     emitter.values[6].one_d = 0;
     renderer_data.inter.checkout_param = [](PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
-        if(index<kNativeBindingFirstIndex || index==kTimeSamplingHzId) {
+        if(index<kNativeBindingFirstIndex || index==kTimeSamplingHzId || index==kAccelerationId) {
             *output=fixtures[0].params.at(index);
             if(index==kGraphParameterId) output->u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(fixtures[0].values[index].arbH);
             if(index==kControlSourceId) output->u.pd.value=static_cast<A_long>(fixtures[0].values[index].one_d);

@@ -1,8 +1,17 @@
+# Build 24 / AE native GPU candidate
+
+Reopen CEP and create a fresh main effect for main manifest 24 / C ABI 3.
+Acceleration in main/Output defaults to GPU; CPU is selectable. AE must offer an
+implemented CUDA/OpenCL device. Unsupported proposals and per-frame budgets can
+choose CPU. Options shows the last main render path (process-global diagnostic).
+No host project GPU setting is changed by the installer. Actual AE GPU rendering,
+preview scales and render queue remain owner qualification gates.
+
 # Starfield CEP panel
 
 ## Build 23 — reference Particle and independent Emitting timing
 
-Close/reopen CEP for gateway native-particle-controls-23 after the paired AEX/Core
+Close/reopen CEP for gateway native-gpu-24 after the paired AEX/Core
 update. Recreate the development main/Emitter/Particle effects. Emitting is timing
 (Default / Once / Sequenced / Randomized); creating Auxiliary sets a separate
 source flag. Direction defaults Uniform. Particle exposes Life Random,

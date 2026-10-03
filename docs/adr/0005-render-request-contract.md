@@ -178,3 +178,12 @@ unit changes require a paired host readout and adapter regression.
 
 Threaded rendering (MFR), Compute Cache, GPU backends, float-color advertisement beyond the
 implemented 32-bpc path, and sequence serialization stay out of M2 and require their own ADRs.
+
+## M3-06 GPU scene extension (ADR 0026)
+
+CPU RenderRequest/RenderOutput remain unchanged. ABI 3 separately exposes immutable
+numeric projected sprite/tile arrays. AE GPU worlds are never passed into Core.
+The GPU adapter produces BGRA128 directly into the borrowed AE world; the portable
+scene is ROI-relative and preserves camera sorting, appearance and stable ordering.
+This candidate requires owner AE GPU ROI/downsample qualification. The CPU contract
+and selectable fallback remain the reference; no entire-frame GPU readback is added.

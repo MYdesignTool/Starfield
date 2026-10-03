@@ -3,6 +3,7 @@ param(
     [switch]$RendererControls,
     [switch]$NodeEffects,
     [switch]$CurrentNodes,
+    [switch]$Gpu,
     [switch]$EmissionTimeline,
     [switch]$NativeSync,
     [switch]$TraceIncludes,
@@ -11,7 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
+if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -29,7 +30,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -47,13 +48,15 @@ try {
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',
         'src\core\PluginApi.cpp',
-        'src\core\CpuRenderer.cpp'
+        'src\core\CpuRenderer.cpp',
+        'src\core\SpriteScene.cpp'
     )
 
     if ($Adapter -or $RendererControls) {
         $sources[0] = 'tests\graph_parameter_tests.cpp'
         $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
+    if ($Gpu) { $sources[0] = 'tests\gpu_render_tests.cpp'; $sources += @('ae_plugin\GpuRender.cpp','ae_plugin\SmartRender.cpp','ae_plugin\WorldBridge.cpp','ae_plugin\NodeEffects.cpp') }
     if ($CurrentNodes) { $sources[0] = 'tests\current_node_core_tests.cpp' }
     if ($EmissionTimeline) { $sources[0] = 'tests\emission_timeline_tests.cpp' }
     if ($NativeSync) {
@@ -62,7 +65,7 @@ try {
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
             'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp')
     }
-    if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp') }
+    if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp') }
 
     $responseLines = @(
         '/nologo',
@@ -76,14 +79,16 @@ try {
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
     )
+    if ($Gpu -or $NodeEffects) { $responseLines += "/I `"$aliasRoot\artifacts\gpu-build\generated`"" }
     if ($RendererControls) { $responseLines += '/DSTARFIELD_TEST_RENDERER_CONTROLS' }
     if ($TraceIncludes) { $responseLines += '/showIncludes' }
-    if ($Adapter -or $RendererControls -or $NodeEffects -or $NativeSync) {
+    if ($Gpu -or $Adapter -or $RendererControls -or $NodeEffects -or $NativeSync) {
         $sdkHeaders = "$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Headers"
         $responseLines += @('/DMSWindows', '/DWIN32', '/D_WINDOWS', '/D_CRT_SECURE_NO_WARNINGS',
             "/I `"$aliasRoot\ae_plugin`"", "/I `"$sdkHeaders`"", "/I `"$sdkHeaders\SP`"",
             "/I `"$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Util`"")
     }
+    if ($Gpu) { $responseLines += "/DSTARFIELD_NODE_KIND_EMITTER" }
     if ($NodeEffects) { $responseLines += "/DSTARFIELD_NODE_KIND_$($NodeKind.ToUpperInvariant())" }
     if ($NativeSync) { $responseLines += '/DSTARFIELD_NODE_KIND_EMITTER' }
     $responseLines += $sources | ForEach-Object { "`"$aliasRoot\$_`"" }

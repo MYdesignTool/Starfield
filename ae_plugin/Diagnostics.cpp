@@ -1,5 +1,6 @@
 #include "Diagnostics.hpp"
 #include "CoreLoader.hpp"
+#include "GpuRender.hpp"
 
 #include "Parameters.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -126,6 +127,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // PF_OutData::return_msg holds 255 characters. Keep the stable render identity,
     // shape and preview geometry ahead of optional controls; avoid printing two
     // identical world triples on the common path.
+    const auto gpu=last_gpu_execution();
+    if(gpu.rendered) writer.line("Last frame: %s device%lu\n",gpu.framework==PF_GPU_Framework_CUDA?"CUDA":gpu.framework==PF_GPU_Framework_OPENCL?"OpenCL":"CPU",static_cast<unsigned long>(gpu.device_index));
+    else writer.line("Last frame: not rendered\n");
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;

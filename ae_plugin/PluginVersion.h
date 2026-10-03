@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 23: reference Particle controls and time sampling.
-#define STARFIELD_VERSION_BUILD 23
-#define STARFIELD_VERSION_PACKED 32791 /* 0x8017 */
+// Build 24: AE native CUDA/OpenCL rendering (C ABI 3).
+#define STARFIELD_VERSION_BUILD 24
+#define STARFIELD_VERSION_PACKED 32792 /* 0x8018 */

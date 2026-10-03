@@ -37,6 +37,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\core\CpuRenderer.cpp" />
+    <ClCompile Include="..\src\core\SpriteScene.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />

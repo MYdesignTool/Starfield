@@ -145,7 +145,7 @@ CoreLoadResult load_selected(bool force_check) {
     }
     if (!api_ok ||
         api.struct_size != sizeof(SfCoreApi) || api.abi_version != SF_CORE_ABI_VERSION ||
-        api.render == nullptr || api.release_render_result == nullptr || api.inspect == nullptr) {
+        api.render == nullptr || api.release_render_result == nullptr || api.inspect == nullptr || api.prepare_gpu_scene == nullptr || api.release_gpu_scene == nullptr) {
         FreeLibrary(module);
         std::lock_guard lock(g_mutex);
         result.generation = g_current;

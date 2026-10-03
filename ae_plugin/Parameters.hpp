@@ -31,7 +31,8 @@ inline constexpr A_long kNativeBindingCapacity = 512;
 inline constexpr A_long kNativeBindingFirstDiskId = 1000;
 // Exact power of two, outside every authored range, survives host float storage.
 inline constexpr double kNativeBindingUnavailable = -1099511627776.0;
-inline constexpr std::size_t kTotalEffectParameterCount = 100 + kNativeBindingCapacity;
+inline constexpr std::size_t kTotalEffectParameterCount = 103 + kNativeBindingCapacity;
+inline constexpr A_long kAccelerationId = 614; // popup GPU=1 / CPU=2
 inline constexpr A_long kTimeSamplingHzId = 611; // popup 1/2/3 -> 30/60/120 Hz
 
 inline constexpr A_long kTypeId = 2;

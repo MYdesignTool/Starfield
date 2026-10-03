@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 1,
-  "schemaVersion": 23,
-  "revisionNote": "M3-06 AE 2023 development manifest 23 appends Time Sampling 30/60/120 Hz at runtime 611/disk 1601; default 30 Hz. Existing main and numeric binding disk IDs unchanged. Fresh main/native Emitter/Particle effects; ADR 0026.",
+  "manifestVersion": 24,
+  "schemaVersion": 24,
+  "revisionNote": "Build 24 adds main Acceleration GPU/CPU, default GPU, with native AE CUDA/OpenCL negotiation; C ABI 3 requires paired AEX/Core. Existing IDs are unchanged; fresh development effects.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -21,6 +21,20 @@
       "label": "Render Settings",
       "endIndex": 97,
       "endDiskId": 927
+    },
+    {
+      "index": 610,
+      "diskId": 1600,
+      "label": "Simulation Settings",
+      "endIndex": 612,
+      "endDiskId": 1602
+    },
+    {
+      "index": 613,
+      "diskId": 1610,
+      "label": "GPU Rendering",
+      "endIndex": 615,
+      "endDiskId": 1612
     }
   ],
   "parameters": [
@@ -1281,6 +1295,42 @@
         120
       ],
       "note": "Simulation Settings topic at 610 and end at 612; derived inputs 98..609 unchanged."
+    },
+    {
+      "id": 614,
+      "diskId": 1611,
+      "key": "acceleration",
+      "label": "Acceleration",
+      "type": "popup",
+      "default": 1,
+      "animated": false,
+      "choices": [
+        "GPU",
+        "CPU"
+      ],
+      "values": [
+        0,
+        1
+      ],
+      "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
+    },
+    {
+      "id": 614,
+      "diskId": 1611,
+      "key": "acceleration",
+      "label": "Acceleration",
+      "type": "popup",
+      "default": 1,
+      "animated": false,
+      "choices": [
+        "GPU",
+        "CPU"
+      ],
+      "values": [
+        0,
+        1
+      ],
+      "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
     }
   ],
   "nativeRenderBindings": {

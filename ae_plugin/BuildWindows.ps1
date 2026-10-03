@@ -6,6 +6,8 @@ param(
     [switch]$CoreOnly,
     [switch]$NoRuntimePublish,
     [switch]$NoDistPublish,
+    [string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'),
+    [string]$NvrtcPath = 'artifacts\gpu-build\nvrtc-12.4.127\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll',
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 
@@ -17,6 +19,13 @@ if (-not $CoreOnly -and -not $NoDistPublish -and
     throw 'Close AE before publishing AEX files into dist, or build with -NoDistPublish -NoRuntimePublish.'
 }
 if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSBuildPath" }
+
+if (-not $CoreOnly) {
+    $resolvedNvrtc = Join-Path $repositoryRoot $NvrtcPath
+    if (-not (Test-Path -LiteralPath $resolvedNvrtc)) { throw 'Missing workspace NVRTC build input. Run tools/Prepare-GpuBuildInputs.ps1 -Download first; no system installation is needed.' }
+    & $PythonPath (Join-Path $repositoryRoot 'tools\Build-GpuKernels.py') --nvrtc $resolvedNvrtc --output (Join-Path $repositoryRoot 'artifacts\gpu-build\generated\GpuKernels.hpp')
+    if ($LASTEXITCODE -ne 0) { throw 'GPU kernel compilation failed.' }
+}
 
 # A CoreOnly build is safe only while every source that feeds the installed AEX
 # and the cross-DLL ABI remains unchanged from the last full build. Algorithm
@@ -32,6 +41,8 @@ $adapterInputs = @(
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
+    'ae_plugin\GpuRender.cpp', 'ae_plugin\GpuRender.hpp', 'ae_plugin\gpu\SpriteKernel.h',
+    'tools\Build-GpuKernels.py',
     'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\EmitterHistory.hpp',
     'ae_plugin\WorldBridge.cpp', 'ae_plugin\WorldBridge.hpp',
     'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h', 'ae_plugin\BuildPiPL.ps1',
