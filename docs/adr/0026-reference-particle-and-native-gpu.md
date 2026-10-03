@@ -302,3 +302,34 @@ https://ae-expressions.docsforadobe.dev/objects/property/#name
 https://ae-expressions.docsforadobe.dev/objects/property/#propertygroup
 SmartFX pairs and ownership:
 https://ae-plugins.docsforadobe.dev/smartfx/smartfx/#pf_cmd_smart_render
+
+## Build 28 private sequence-data migration - 2026-10-03
+
+Owner confirms build27 improves uncached-frame waits to about 1-2 seconds only
+when Options first refreshes runtime metadata. Accept a main-effect lifecycle
+marker, not persistence of optimization proofs. Builds <=27 used null main
+sequence data. Build28's private sequence schema is exactly ASCII SFU1 (four
+bytes); it is already flat and byte ordered. No pointer, source/effect handle,
+PF_State, graph value, prefix or particle cache is saved. Graph ARB, native IDs,
+public effect identities and Core ABI3 are unchanged. Flat data requires no new
+PiPL flattening/threading flags; code implements SETUP, RESETUP, FLATTEN, SETDOWN.
+
+Migration: accept null and allocate SFU1 at setup/resetup or flatten/save; accept
+an existing SFU1 unchanged; reject unknown size/version without overwriting it.
+Save under build28 then reopen to exercise non-null RESETUP. SDK AE_Effect.h's
+null-data warning means an older saved null project can lack RESETUP altogether;
+first cold legacy open must be qualified separately. Old candidates ignore this
+flat marker and continue to render from graph ARB; rollback must not restore a
+saved PF token. A render-only/worker setup only maintains the flat allocation.
+UI setup/resetup reads current source key/expression metadata and brackets it
+with current all-time owned-alias PF states. No render-thread AEGP or retained
+source handles, registry changes, process operations, idle hook or generic edit
+transport is introduced. Capture is optional; unavailable metadata uses the
+existing exact temporal path. Subsequent DRAW may retry an early restoration.
+
+Focused tests cover null save, byte ordering/schema checks, original/reopened
+marker ownership, cold UI capture without Options/DRAW, key invalidation,
+render-only/worker exclusions, partial params checkout and disposal balance.
+Actual AE first-open/first-save/reopen, copy/undo and first-frame preparation
+remain gates. Main integration is explicitly authorized by the owner and awaits
+this startup qualification; M3-06's broader visual parity gates remain open.

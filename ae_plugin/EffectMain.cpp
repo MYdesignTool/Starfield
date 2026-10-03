@@ -91,12 +91,18 @@ PF_Err dispatch(PF_Cmd cmd,
             if(const auto error=starfield::adapter::setup_parameters(in_data,out_data);error)return error;
             return starfield::adapter::register_native_temporal_ui(in_data);
         case PF_Cmd_SEQUENCE_SETUP:
-            // Persistent graph state is an AE arbitrary parameter (ADR 0008).
-            out_data->sequence_data = nullptr;
-            return PF_Err_NONE;
+            return starfield::adapter::setup_native_temporal_sequence(in_data,out_data,params,
+                starfield::adapter::graph_carrier_plugin_id(),false);
         case PF_Cmd_SEQUENCE_RESETUP:
+            return starfield::adapter::setup_native_temporal_sequence(in_data,out_data,params,
+                starfield::adapter::graph_carrier_plugin_id(),true);
         case PF_Cmd_SEQUENCE_FLATTEN:
+            // Schema-1 lifecycle marker is already flat; graph lives in ARB.
+            return starfield::adapter::flatten_native_temporal_sequence(in_data,out_data);
         case PF_Cmd_SEQUENCE_SETDOWN:
+            starfield::adapter::setdown_native_temporal_sequence(in_data);
+            out_data->sequence_data=nullptr;
+            return PF_Err_NONE;
         case PF_Cmd_GLOBAL_SETDOWN:
             return PF_Err_NONE;
         case PF_Cmd_SMART_PRE_RENDER:

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 27: acyclic UUID lookup and constant-node reuse across birth times.
-#define STARFIELD_VERSION_BUILD 27
-#define STARFIELD_VERSION_PACKED 32795 /* 0x801B */
+// Build 28: UI project-load metadata initialization with a flat lifecycle marker.
+#define STARFIELD_VERSION_BUILD 28
+#define STARFIELD_VERSION_PACKED 32796 /* 0x801C */

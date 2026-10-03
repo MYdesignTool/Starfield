@@ -4,6 +4,7 @@
 #include "SPBasic.h"
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -17,14 +18,19 @@ std::thread::id ui_thread;
 std::vector<UIStamp> ui_stamps;
 NativeUITiming ui_timing;
 struct UITimer {
-    bool refreshed{};
+    bool refreshed{},sequence{};
     std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
     ~UITimer() {
         const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
         std::lock_guard lock(ui_mutex);++ui_timing.calls;
-        ui_timing.refreshes+=refreshed;ui_timing.last_ms=ms;ui_timing.max_ms=std::max(ui_timing.max_ms,ms);
+        ui_timing.refreshes+=refreshed;ui_timing.sequence_refreshes+=refreshed && sequence;
+        ui_timing.last_ms=ms;ui_timing.max_ms=std::max(ui_timing.max_ms,ms);
     }
 };
+constexpr char kSequenceMarker[4]={'S','F','U','1'}; // Byte ordered, already flat POD.
+bool on_ui_thread() {
+    std::lock_guard lock(ui_mutex);return ui_thread==std::this_thread::get_id();
+}
 thread_local bool refreshing{};
 struct RefreshScope {
     RefreshScope() {refreshing=true;}
@@ -85,4 +91,60 @@ void refresh_native_temporal_ui(PF_InData* data,PF_ParamDef* params[],
     ui_stamps.push_back({data->effect_ref,after});
     // No project writes, undo records, render requests or handled-event flags.
 } catch(...) {} // Optional UI optimization cannot reject an authored edit.
+
+PF_Err flatten_native_temporal_sequence(PF_InData* data,PF_OutData* out) noexcept {
+    if(!data || !out || !data->utils || !data->utils->host_new_handle ||
+        !data->utils->host_lock_handle || !data->utils->host_unlock_handle ||
+        !data->utils->host_dispose_handle || !data->utils->host_get_handle_size)return PF_Err_BAD_CALLBACK_PARAM;
+    out->sequence_data=data->sequence_data;
+    if(out->sequence_data) {
+        if(data->utils->host_get_handle_size(out->sequence_data)!=sizeof(kSequenceMarker))return PF_Err_INTERNAL_STRUCT_DAMAGED;
+        const auto* bytes=data->utils->host_lock_handle(out->sequence_data);
+        if(!bytes)return PF_Err_OUT_OF_MEMORY;
+        const bool valid=std::memcmp(bytes,kSequenceMarker,sizeof(kSequenceMarker))==0;
+        data->utils->host_unlock_handle(out->sequence_data);
+        return valid?PF_Err_NONE:PF_Err_INTERNAL_STRUCT_DAMAGED;
+    }
+    // Provision legacy null data on save as well as setup/resetup. Some older
+    // projects may not receive RESETUP until non-null data has been saved.
+    out->sequence_data=data->utils->host_new_handle(sizeof(kSequenceMarker));
+    if(!out->sequence_data)return PF_Err_OUT_OF_MEMORY;
+    if(auto* bytes=data->utils->host_lock_handle(out->sequence_data)) {
+        std::memcpy(bytes,kSequenceMarker,sizeof(kSequenceMarker));
+        data->utils->host_unlock_handle(out->sequence_data);
+        return PF_Err_NONE;
+    }
+    data->utils->host_dispose_handle(out->sequence_data);
+    out->sequence_data=nullptr;return PF_Err_OUT_OF_MEMORY;
+}
+PF_Err setup_native_temporal_sequence(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],
+    AEGP_PluginID id,bool resetup) noexcept try {
+    if(const auto error=flatten_native_temporal_sequence(data,out);error)return error;
+    if(refreshing || (resetup && (data->in_flags & PF_InFlag_PROJECT_IS_RENDER_ONLY)) ||
+        !on_ui_thread() || !data->effect_ref || !data->pica_basicP || !id)return PF_Err_NONE;
+    RefreshScope scope;UITimer timer;timer.sequence=true;
+    PF_ParamDef checked{};bool owned=false;PF_ArbitraryH handle{};
+    // A partial/absent params array is not an excuse to index beyond it.
+    if(params && data->num_params>kGraphParameterId && params[kGraphParameterId] &&
+        params[kGraphParameterId]->param_type==PF_Param_ARBITRARY_DATA)
+        handle=params[kGraphParameterId]->u.arb_d.value;
+    else if(data->inter.checkout_param && data->inter.checkin_param) {
+        if(PF_CHECKOUT_PARAM(data,kGraphParameterId,data->current_time,data->time_step,
+            data->time_scale?data->time_scale:1,&checked))return PF_Err_NONE;
+        owned=true;if(checked.param_type==PF_Param_ARBITRARY_DATA)handle=checked.u.arb_d.value;
+    }
+    struct Checkin {PF_InData* data;PF_ParamDef* value;bool owned;
+        ~Checkin(){if(owned)(void)PF_CHECKIN_PARAM(data,value);}} checkin{data,&checked,owned};
+    const auto graph=read_graph_parameter(data,handle);
+    if(!graph.has_value())return PF_Err_NONE;
+    timer.refreshed=true;
+    capture_native_temporal_metadata(data,graph.value(),id);
+    // Do not suppress a later DRAW retry: sibling effects may still be restoring.
+    // No writes to project streams, no saved PF states and no generic messages.
+    return PF_Err_NONE;
+} catch(...) {return PF_Err_NONE;}
+void setdown_native_temporal_sequence(PF_InData* data) noexcept {
+    if(data && data->sequence_data && data->utils && data->utils->host_dispose_handle)
+        data->utils->host_dispose_handle(data->sequence_data);
+}
 }

@@ -736,6 +736,57 @@ int main() {
     auto render_copy=renderer_data;render_copy.effect_ref=reinterpret_cast<PF_ProgPtr>(2);
     NativeAnimationPlan copied_plan(static_graph,1920,1080,1);copied_plan.prepare_constants(&render_copy);
     check(copied_plan.fully_constant(),"render callback copy uses UI-certified static graph");
+    // Cold project lifecycle without Options, DRAW or CEP. The flat marker is
+    // retained by the host across save/reopen, not the process-global PF states.
+    auto legacy_save=ui_data;legacy_save.sequence_data=nullptr;PF_OutData legacy_flat{};
+    const auto legacy_suite_reads=aegp_suite_requests;
+    check(flatten_native_temporal_sequence(&legacy_save,&legacy_flat)==0 && legacy_flat.sequence_data &&
+        size_handle(legacy_flat.sequence_data)==4 && std::memcmp(lock_handle(legacy_flat.sequence_data),"SFU1",4)==0,
+        "legacy null save provisions byte-ordered schema-1 marker");
+    check(aegp_suite_requests==legacy_suite_reads,"flattening never reads AEGP metadata");
+    legacy_save.sequence_data=legacy_flat.sequence_data;
+    check(flatten_native_temporal_sequence(&legacy_save,&legacy_flat)==0 && legacy_flat.sequence_data==legacy_save.sequence_data,
+        "already flat marker is preserved without another allocation");
+    static_cast<char*>(lock_handle(legacy_save.sequence_data))[3]='2';
+    check(flatten_native_temporal_sequence(&legacy_save,&legacy_flat)==PF_Err_INTERNAL_STRUCT_DAMAGED,
+        "unknown lifecycle schema is rejected without replacing its data");
+    static_cast<char*>(lock_handle(legacy_save.sequence_data))[3]='1';setdown_native_temporal_sequence(&legacy_save);
+    auto sequence_data=ui_data;sequence_data.sequence_data=nullptr;
+    PF_OutData sequence_output{};
+    remember_native_control_proofs(&sequence_data,{});
+    const auto sequence_writes=sets;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,false)==0 &&
+        sequence_output.sequence_data && size_handle(sequence_output.sequence_data)==sizeof(std::uint32_t),
+        "legacy null sequence receives a flat lifecycle marker");
+    check(!validated_native_control_proofs(&sequence_data).empty(),"UI sequence setup certifies metadata without Options or DRAW");
+    sequence_data.sequence_data=sequence_output.sequence_data;
+    const auto saved_marker=clone(sequence_data.sequence_data);
+    setdown_native_temporal_sequence(&sequence_data);sequence_data.sequence_data=saved_marker;
+    remember_native_control_proofs(&sequence_data,{});++metadata_epoch;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0 &&
+        sequence_output.sequence_data==saved_marker && !validated_native_control_proofs(&sequence_data).empty(),
+        "save/reopen resetup rebuilds process metadata from source controls");
+    check(last_native_ui_timing().sequence_refreshes>=2 && sets==sequence_writes,
+        "sequence bootstrap is timed and writes no project streams");
+    metadata_rate_keys=true;++metadata_epoch;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0,
+        "reopen reads current keyframe metadata");
+    NativeAnimationPlan reopened_keyed(static_graph,1920,1080,1);reopened_keyed.prepare_constants(&sequence_data);
+    check(!reopened_keyed.fully_constant(),"animated PPS on reopen cannot reuse a previous constant proof");
+    metadata_rate_keys=false;
+    const auto sequence_suites=aegp_suite_requests;
+    sequence_data.in_flags=PF_InFlag_PROJECT_IS_RENDER_ONLY;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0 &&
+        aegp_suite_requests==sequence_suites,"render-only resetup performs no AEGP metadata queries");
+    sequence_data.in_flags=PF_InFlag_NONE;
+    std::thread sequence_worker([&]{check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0,
+        "worker sequence resetup retains flat marker");});sequence_worker.join();
+    check(aegp_suite_requests==sequence_suites,"worker sequence callback never reads AEGP source controls");
+    sequence_data.num_params=0;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
+        !validated_native_control_proofs(&sequence_data).empty(),
+        "absent sequence params array uses a balanced own graph checkout");
+    setdown_native_temporal_sequence(&sequence_data);
     dispose(ui_graph_handle);
     temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
 

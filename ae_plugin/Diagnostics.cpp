@@ -154,8 +154,8 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
             static_cast<unsigned long long>(history.node_queries),static_cast<unsigned long long>(history.node_samples));
     }
     const auto setup=last_gpu_setup_timing();const auto ui=last_native_ui_timing();
-    writer.line("Init max%.1fms/%llu UI max%.1fms/%llu\n",setup.max_ms,static_cast<unsigned long long>(setup.calls),
-        ui.max_ms,static_cast<unsigned long long>(ui.refreshes));
+    writer.line("Init max%.1fms/%llu UI max%.1fms/%llu B%llu\n",setup.max_ms,static_cast<unsigned long long>(setup.calls),
+        ui.max_ms,static_cast<unsigned long long>(ui.refreshes),static_cast<unsigned long long>(ui.sequence_refreshes));
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;

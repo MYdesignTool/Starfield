@@ -1,5 +1,41 @@
 # Behavior inventory
 
+## M3-06 / build 28 - initialize history proofs when opening projects
+
+The owner confirms build27 cuts uncached-frame preparation from 6-8 seconds to
+approximately 1-2 seconds, but only after clicking Options, including after saving
+and reopening. This qualifies a visible improvement, not full frame-time parity.
+The constant/key metadata registry is process-local; the DRAW refresh added in
+build26 is not delivered for every unopened/unselected main effect.
+
+Build28 (32796 / 0x801C) reads optional source metadata in main-thread
+SEQUENCE_SETUP/RESETUP, before preview needs it. Worker/render-only callbacks
+perform no AEGP source queries. Options and DRAW remain optional refresh routes;
+source keys/expressions and all-time PF states are revalidated after every load.
+No equality-of-values shortcut is used. Diagnostics B counts sequence refresh
+attempts; Static/Temporal and PF/N indicate actual render-side use.
+
+Qualification: 3,627 scoped checks pass (native sync 3,615; camera 12); all five
+AEXs and Core build with May 2023 SDK Release /MT without compiler warnings.
+Evidence: artifacts/build28-native-sync.log and build28-native-build.log.
+
+Private main sequence-data schema SFU1 consists of exactly four byte-ordered ASCII
+bytes, with no handles, references, PF states, graph values or cached particles.
+Legacy null data is provisioned during setup/resetup and also during flatten/save;
+unknown non-null schema/size is rejected without replacement. SETDOWN releases the
+host allocation. Saved non-null data provides a RESETUP opportunity on reopening.
+An old null-data project may lack that callback; first cold legacy open and first
+save/reopen are separate AE acceptance gates. Partial/absent sequence parameters
+use a balanced checkout of the main effect's own graph ARB. Source metadata can
+be unavailable while siblings restore; later DRAW can retry. Fake-host results
+cannot establish AE callback order or availability.
+
+Scope: EffectMain, NativeTemporalUI, Diagnostics, PluginVersion, scoped native
+sync tests and these records; no Core/Render transport, source node controls,
+public parameter IDs, match names, graph codec, CEP or PiPL flag changes. The
+private sequence migration is recorded in ADR0026. Full paired AEX deployment
+is necessary. The owner-authorized main merge awaits no-Options reopen validation.
+
 ## M3-06 / build 27 - native dependency lookup and constant-node reuse
 
 Owner AE2023 feedback for build26 confirms that delay no longer grows with time,
