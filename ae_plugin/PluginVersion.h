@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 25: certified static controls and AE emission prefix caching.
-#define STARFIELD_VERSION_BUILD 25
-#define STARFIELD_VERSION_PACKED 32793 /* 0x8019 */
+// Build 26: cross-context dependency matching and actual preparation diagnostics.
+#define STARFIELD_VERSION_BUILD 26
+#define STARFIELD_VERSION_PACKED 32794 /* 0x801A */

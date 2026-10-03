@@ -9,6 +9,13 @@
 
 namespace starfield::adapter {
 
+struct PreRenderTimings {
+    bool valid{},complete{};
+    double seconds{},total_ms{},controls_ms{},history_ms{},scene_ms{};
+};
+[[nodiscard]] PreRenderTimings last_pre_render_timings() noexcept;
+struct SmartRenderTiming {bool valid{},complete{};double seconds{},total_ms{};};
+[[nodiscard]] SmartRenderTiming last_smart_render_timing() noexcept;
 [[nodiscard]] PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept;
 [[nodiscard]] PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtra* extra) noexcept;
 

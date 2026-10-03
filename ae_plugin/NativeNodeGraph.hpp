@@ -24,6 +24,9 @@ public:
     [[nodiscard]] bool valid() const noexcept;
     void prepare_constants(PF_InData*) noexcept;
     [[nodiscard]] bool fully_constant() const noexcept;
+    [[nodiscard]] std::size_t input_count() const noexcept;
+    [[nodiscard]] std::size_t constant_count() const noexcept;
+    [[nodiscard]] std::uint64_t checkout_count() const noexcept;
     [[nodiscard]] const std::vector<struct NativeControlProof>& proofs() const noexcept;
     [[nodiscard]] PF_Err sample(PF_InData*, core::NodeId, core::GraphNode&,
                               A_long* failed_stream = nullptr) const noexcept;

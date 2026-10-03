@@ -12,6 +12,7 @@
  *   PF_OutFlag_USE_OUTPUT_EXTENT      = 1 << 6   (0x00000040)
  *   PF_OutFlag_I_DO_DIALOG            = 1 << 5   (0x00000020)  diagnostic readout
  *   PF_OutFlag_NON_PARAM_VARY         = 1 << 2   (0x00000004)  absolute-time particles
+ *   PF_OutFlag_CUSTOM_UI             = 1 << 15 (0x00008000)  UI DRAW metadata refresh
  *   PF_OutFlag2_SUPPORTS_SMART_RENDER = 1 << 10  (0x00000400)
  *   PF_OutFlag2_REVEALS_ZERO_ALPHA    = 1 << 7   (0x00000080)
  *   PF_OutFlag2_FLOAT_COLOR_AWARE     = 1 << 12  (0x00001000)
@@ -26,8 +27,8 @@
  * unset until their milestones are implemented and qualified.
  */
 /* Birth-position sampling checks out historical parameters. SmartFX tracks
- * those dependencies automatically; no history cache survives a frame. */
-#define STARFIELD_OUT_FLAGS 0x02000466L  /* prior flags plus WIDE_TIME_INPUT */
+ * those dependencies automatically; optional prefixes require matching all-time states. */
+#define STARFIELD_OUT_FLAGS 0x02008466L  /* WIDE_TIME_INPUT plus implemented COMP DRAW callback */
 #define STARFIELD_OUT_FLAGS2 0x0222148AL /* includes native GPU F32 capability; accepted per-device/per-frame */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

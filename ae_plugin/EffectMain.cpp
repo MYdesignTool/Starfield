@@ -15,6 +15,7 @@
 #include "PluginVersion.h"
 #include "SmartRender.hpp"
 #include "GpuRender.hpp"
+#include "NativeTemporalUI.hpp"
 
 static_assert(STARFIELD_VERSION_STAGE == PF_Stage_DEVELOP);
 static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
@@ -28,7 +29,7 @@ static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
 // are what keeps the PiPL resource from drifting away from the runtime values.
 static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT |
                                       PF_OutFlag_USE_OUTPUT_EXTENT | PF_OutFlag_I_DO_DIALOG | PF_OutFlag_NON_PARAM_VARY |
-                                      PF_OutFlag_WIDE_TIME_INPUT),
+                                      PF_OutFlag_WIDE_TIME_INPUT | PF_OutFlag_CUSTOM_UI),
               "PiPL AE_Effect_Global_OutFlags must match the runtime declaration");
 static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_REVEALS_ZERO_ALPHA | PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                        PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG |
@@ -47,6 +48,7 @@ PF_Err about(PF_InData* in_data, PF_OutData* out_data) noexcept {
 }
 
 PF_Err global_setup(PF_InData* in_data, PF_OutData* out_data) noexcept {
+    starfield::adapter::initialize_native_temporal_ui();
     out_data->my_version = PF_VERSION(STARFIELD_VERSION_MAJOR,
                                       STARFIELD_VERSION_MINOR,
                                       STARFIELD_VERSION_BUG,
@@ -86,7 +88,8 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_GLOBAL_SETUP:
             return global_setup(in_data, out_data);
         case PF_Cmd_PARAMS_SETUP:
-            return starfield::adapter::setup_parameters(in_data, out_data);
+            if(const auto error=starfield::adapter::setup_parameters(in_data,out_data);error)return error;
+            return starfield::adapter::register_native_temporal_ui(in_data);
         case PF_Cmd_SEQUENCE_SETUP:
             // Persistent graph state is an AE arbitrary parameter (ADR 0008).
             out_data->sequence_data = nullptr;
@@ -116,6 +119,10 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_DO_DIALOG:
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
+        case PF_Cmd_EVENT:
+            starfield::adapter::refresh_native_temporal_ui(in_data,params,static_cast<PF_EventExtra*>(extra),
+                starfield::adapter::graph_carrier_plugin_id());
+            return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);
         default:

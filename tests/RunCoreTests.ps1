@@ -65,7 +65,7 @@ try {
         $sources[0] = 'tests\native_sync_tests.cpp'
         $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
-            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\NativeTemporalCache.cpp')
+            'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalUI.cpp')
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp') }
 

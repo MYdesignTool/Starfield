@@ -49,6 +49,7 @@
     <ClCompile Include="NativeGraphCommit.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />
     <ClCompile Include="NativeTemporalCache.cpp" />
+    <ClCompile Include="NativeTemporalUI.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />

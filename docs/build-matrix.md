@@ -1,5 +1,46 @@
 # Build and host matrix
 
+## M3-06 / build 26 — UI/render proof matching and actual preparation costs
+
+Owner reports build25 remains slow or becomes slower at later frames. Its
+Options `History` count was measured in the UI and did not prove render-side
+use. The strict equality of UI/render `effect_ref` was an invalid instance-key
+assumption: the SDK defines it as an opaque callback reference. Whether this
+was the owner's actual failure remains an AE qualification question.
+
+Build26 (32794 / 0x801A) matches proofs by current graph node UUID, owned alias
+index, and AE's all-time dependency-state comparison. A different callback
+reference alone no longer rejects a proof or prefix. Copied layers with unequal
+states remain isolated. Prefix versions are bounded and matched by host state;
+UI analytic-profile publication also invalidates sampled prefixes created by
+render copies. Comparison errors and unavailable proofs retain exact sampling.
+
+Main CUSTOM_UI is implemented through a zero-sized COMP registration and EVENT
+DRAW handler; PiPL/runtime flags agree at 0x02008466. On AE's recorded main thread,
+DRAW refreshes numeric metadata after dependency changes. Equal all-time non-layer
+states skip source reads. No overlay, ECW area, project write, undo record or
+rerender request is created. Worker/non-DRAW/reentrant calls are ignored before
+SDK access. This automatic path depends on the main effect receiving composition
+DRAW events (selection and visible layer controls); Options remains an explicit
+refresh when no DRAW callback arrives. No render/sequence-worker AEGP query is added.
+
+Options now snapshots real last pre-render costs before UI refresh: total,
+controls/history/scene milliseconds, Static/Temporal path, constant/total inputs,
+actual history PF checkouts, PPS and Life queries. Smart Render wall time includes
+GPU upload, dispatch, synchronization, resource cleanup and host world checkouts.
+These are coherent process-global
+last-call diagnostics, not an instance-specific or full preview-time measurement.
+UI proofs are labelled separately. Main/native parameter layouts and IDs, CEP
+native-gpu-24, and Core C ABI3 remain unchanged; full paired AEX build is required.
+
+Focused checks cover distinct UI/render references with equal dependencies,
+copy isolation, key/expression invalidation, undo, prefix publication, static
+history bypass, UI callback/throttling/thread safety and real preparation timing.
+3,253 scoped checks pass: native sync 2,671, camera 12, emission cache 157,
+CUDA/OpenCL drivers 413. May 2023 SDK Release /MT builds all five AEXs and Core.
+Actual AE t=2/10/100 performance, cross-project state equality, UI event delivery,
+key/expression edits and reopen remain owner gates. M3-06 stays open.
+
 ## Build 25 deployment — 2026-10-03
 
 Source commit `5c53b59` is pushed. The May 2023 SDK Release /MT full build succeeds;

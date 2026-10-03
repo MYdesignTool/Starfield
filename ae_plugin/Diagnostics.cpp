@@ -3,6 +3,8 @@
 #include "GpuRender.hpp"
 #include "NativeTemporalCache.hpp"
 #include "GraphCarrier.hpp"
+#include "EmitterHistory.hpp"
+#include "SmartRender.hpp"
 
 #include "Parameters.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -132,14 +134,31 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     const auto gpu=last_gpu_execution();
     if(gpu.rendered) writer.line("Last frame: %s device%lu\n",gpu.framework==PF_GPU_Framework_CUDA?"CUDA":gpu.framework==PF_GPU_Framework_OPENCL?"OpenCL":"CPU",static_cast<unsigned long>(gpu.device_index));
     else writer.line("Last frame: not rendered\n");
+    const auto execution=last_smart_render_timing();
+    if(execution.valid)writer.line("Render t%.3f: %.1fms%s\n",execution.seconds,execution.total_ms,execution.complete?"":" failed");
+    // Snapshot real render preparation BEFORE UI proof capture. A UI-side proof
+    // count alone cannot establish that the renderer matched or used any proof.
+    const auto timing=last_pre_render_timings();
+    const auto history=last_native_history_trace();
+    if(timing.valid) {
+        writer.line("Last prep t%.3f: %.1fms%s\n",timing.seconds,timing.total_ms,timing.complete?"":" failed");
+        writer.line("controls %.1f history %.1f scene %.1fms\n",timing.controls_ms,timing.history_ms,timing.scene_ms);
+    }
+    if(history.path!=NativeHistoryPath::unavailable) {
+        writer.line("%s t%.3f %zu/%zu inputs; PF %llu R%llu L%llu\n",
+            history.path==NativeHistoryPath::static_graph?"Static":history.path==NativeHistoryPath::temporal?"Temporal":"Failed",
+            history.seconds,history.constants,history.inputs,static_cast<unsigned long long>(history.checkouts),
+            static_cast<unsigned long long>(history.rate_queries),static_cast<unsigned long long>(history.life_queries));
+    }
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;
         const auto graph_err = checkout_render_graph(in_data, out_data, graph, &control_source);
         if (graph_err != PF_Err_NONE) return graph_err;
         capture_native_temporal_metadata(in_data,*graph,graph_carrier_plugin_id());
-        const auto certified=validated_native_control_proofs(in_data).size();
-        writer.line("History: %zu certified inputs\n",certified);
+        std::vector<core::NodeId> ids;for(const auto& node:graph->nodes)ids.push_back(node.id);
+        const auto certified=validated_native_control_proofs(in_data,ids).size();
+        writer.line("UI proofs: %zu\n",certified);
         if(certified)out_data->out_flags|=PF_OutFlag_FORCE_RERENDER;
         const auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
         if (!encoded.has_value()) {

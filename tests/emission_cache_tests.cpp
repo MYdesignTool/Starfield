@@ -19,6 +19,9 @@ SPErr release(const char*,int32){--references;return 0;}
 PF_Err state(PF_ProgPtr ref,PF_ParamIndex index,const A_Time* start,const A_Time* duration,PF_State* out) {
     check(!start && !duration,"state covers all time");
     *out={};unsigned identity=unsigned(reinterpret_cast<std::uintptr_t>(ref));
+    // AE UI/render callbacks can have distinct opaque references while their
+    // logical dependency states match. Ref 3 represents a copied, edited layer.
+    if(identity==2)identity=1;
     std::memcpy(out,&identity,sizeof(identity));std::memcpy(reinterpret_cast<char*>(out)+4,&epochs[index],4);return 0;
 }
 PF_Err same(PF_ProgPtr,const PF_State* a,const PF_State* b,A_Boolean* result) {
@@ -35,8 +38,15 @@ int main() {
     NeverCancelled never;PF_State stamp{};state(data.effect_ref,91,nullptr,nullptr,&stamp);
     NativeControlProof proof{id(1),91,stamp,true,EmissionRateProfile{10000,{}},2};
     remember_native_control_proofs(&data,{proof});
+    auto render_copy=data;render_copy.effect_ref=reinterpret_cast<PF_ProgPtr>(2);
+    auto other_layer=data;other_layer.effect_ref=reinterpret_cast<PF_ProgPtr>(3);
     auto valid=validated_native_control_proofs(&data);
     check(valid.size()==1 && valid[0].constant && valid[0].rate->constant==10000,"matching authored proof validates");
+    const std::array wanted{id(1)},unrelated{id(9)};
+    valid=validated_native_control_proofs(&render_copy,wanted);
+    check(valid.size()==1 && valid[0].constant,"render callback copy matches UI proof by host dependency state");
+    check(validated_native_control_proofs(&render_copy,unrelated).empty(),"unrelated graph cannot adopt a numerically identical alias proof");
+    check(validated_native_control_proofs(&other_layer,wanted).empty(),"copied layer UUID alone cannot certify different dependencies");
     ++epochs[91];check(validated_native_control_proofs(&data).empty(),"value/key/expression dependency change rejects proof");
     --epochs[91];compare_error=true;check(validated_native_control_proofs(&data).empty(),"comparison error cannot certify constant");compare_error=false;
     for(unsigned hz:{30u,60u,120u}) {
@@ -47,10 +57,12 @@ int main() {
         check(timeline->extend(2,rate,never,work).has_value(),"first frame builds prefix");
         check(samples==int(hz*6),"first frame queries fixed lattice only");
         auto held=timeline.get();
-        check(!native_emission_timeline(&data,id(hz),92,hz),"contention chooses uncached fallback without waiting");
+        check(!native_emission_timeline(&render_copy,id(hz),92,hz),"render copy contention chooses uncached fallback without waiting");
         const auto old_integral=timeline->integral(2);timeline.reset();
-        auto reused=native_emission_timeline(&data,id(hz),92,hz);
-        check(reused.get()==held,"unchanged dependency reuses completed prefix");
+        auto reused=native_emission_timeline(&render_copy,id(hz),92,hz);
+        check(reused.get()==held,"distinct render callback reference reuses completed prefix");
+        auto isolated=native_emission_timeline(&other_layer,id(hz),92,hz);
+        check(isolated && isolated.get()!=held && !isolated->initialized(),"copied layer rate cannot use another layer's prefix");isolated.reset();
         samples=0;work=0;check(reused->extend(2.0+1.0/hz,rate,never,work).has_value(),"next frame extends one interval");
         check(samples==3,"next frame does not resample previous history");
         samples=0;check(reused->extend(1,rate,never,work).has_value() && samples==0,"reverse seek reuses earlier prefix");
@@ -62,6 +74,13 @@ int main() {
         ++epochs[92];auto changed=native_emission_timeline(&data,id(hz),92,hz);
         check(changed && changed.get()!=reused.get() && !changed->initialized(),"edited curve cannot use old prefix");
         --epochs[92];
+        changed.reset();reused.reset();
+        auto undone=native_emission_timeline(&data,id(hz),92,hz);
+        check(undone && undone.get()==held,"undo reuses only the matching complete dependency version");undone.reset();
+        PF_State rate_stamp{};state(data.effect_ref,92,nullptr,nullptr,&rate_stamp);
+        remember_native_control_proofs(&data,{{id(hz),92,rate_stamp,true,EmissionRateProfile{10,{}},{}}});
+        auto recertified=native_emission_timeline(&render_copy,id(hz),92,hz);
+        check(recertified && !recertified->initialized(),"UI profile publication replaces a render copy's sampled prefix");
     }
     auto oversized=native_emission_timeline(&data,id(4),93,30);
     check(oversized && oversized->configure(30).has_value(),"bounded cache fixture ready");

@@ -245,11 +245,19 @@ void test_smartfx(PF_InData& in,PF_OutData& out,void* gpu_data,PF_EffectWorld& w
     PF_PreRenderCallbacks callbacks{};callbacks.checkout_layer=checkout_metadata;callbacks.GuidMixInPtr=mix_guid;
     PF_PreRenderOutput pre_output{};PF_PreRenderExtra pre{&pre_input,&pre_output,&callbacks};
     check(adapter::pre_render(&in,&out,&pre)==0 && (pre_output.flags&PF_RenderOutputFlag_GPU_RENDER_POSSIBLE),"SmartFX pre-render prepares and qualifies actual GPU scene");
+    const auto timing=adapter::last_pre_render_timings();
+    check(timing.valid && timing.complete && timing.seconds==1 && timing.total_ms>=0 &&
+        timing.controls_ms>=0 && timing.history_ms>=0 && timing.scene_ms>=0 &&
+        timing.total_ms>=timing.controls_ms+timing.history_ms+timing.scene_ms,
+        "actual pre-render timing separates controls, history and scene work");
     PF_SmartRenderInput render_input{};render_input.bitdepth=32;render_input.what_gpu=info.device_framework;
     render_input.device_index=7;render_input.gpu_data=gpu_data;render_input.pre_render_data=pre_output.pre_render_data;
     PF_SmartRenderCallbacks render_callbacks{checkout_input,checkin_input,checkout_output};PF_SmartRenderExtra render{&render_input,&render_callbacks};
     smart_world=&world;write(std::vector<std::byte>(world_bytes,std::byte{0x7e}));
     check(adapter::smart_render(&in,&out,&render)==0,"native SmartFX GPU transport dispatches into borrowed AE world");
+    const auto execution=adapter::last_smart_render_timing();
+    check(execution.valid && execution.complete && execution.seconds==1 && execution.total_ms>=0,
+        "actual SmartFX execution records upload, kernel, sync and cleanup wall time");
     check(adapter::last_gpu_execution().rendered && adapter::last_gpu_execution().framework==info.device_framework,"GPU trace records executed framework");
     check(input_checkouts==input_checkins,"SmartFX input checked in after GPU render");
     const auto actual=read();const core::NeverCancelled never;const core::CpuParticleRenderer cpu;

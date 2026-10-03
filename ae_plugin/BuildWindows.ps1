@@ -39,6 +39,7 @@ $adapterInputs = @(
     'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\NativeGraphCommit.hpp',
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
     'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalCache.hpp',
+    'ae_plugin\NativeTemporalUI.cpp', 'ae_plugin\NativeTemporalUI.hpp',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',

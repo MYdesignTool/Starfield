@@ -662,6 +662,8 @@ struct NativeAnimationPlan::Impl {
     bool decoded{};
     std::vector<NativeControlProof> proofs;
     bool all_constant{};
+    std::size_t input_count{},constant_count{};
+    std::uint64_t checkout_count{};
     Impl(const core::Graph& graph,A_long width,A_long height,double aspect)
         :units{double(std::max<A_long>(width,1)),double(std::max<A_long>(height,1)),aspect} {
         decoded=std::isfinite(aspect) && aspect>0 && read_binding_record(graph,nodes);
@@ -674,16 +676,25 @@ NativeAnimationPlan::~NativeAnimationPlan()=default;
 bool NativeAnimationPlan::valid() const noexcept {return impl_ && impl_->decoded;}
 const std::vector<NativeControlProof>& NativeAnimationPlan::proofs() const noexcept {return impl_->proofs;}
 bool NativeAnimationPlan::fully_constant() const noexcept {return valid() && impl_->all_constant;}
-void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept {
+std::size_t NativeAnimationPlan::input_count() const noexcept {return impl_->input_count;}
+std::size_t NativeAnimationPlan::constant_count() const noexcept {return impl_->constant_count;}
+std::uint64_t NativeAnimationPlan::checkout_count() const noexcept {return impl_->checkout_count;}
+void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept try {
     if(!valid() || !data) return;
-    impl_->proofs=validated_native_control_proofs(data);
+    std::vector<core::NodeId> ids;for(const auto& [id,node]:impl_->templates)ids.push_back(id);
+    impl_->proofs=validated_native_control_proofs(data,ids);
     impl_->all_constant=!impl_->nodes.empty();
-    for(auto& node:impl_->nodes) for(auto& field:node.fields) if(field.present && field.slot>=0) {
+    impl_->input_count=impl_->constant_count=0;
+    for(auto& node:impl_->nodes) {
+      if(!impl_->templates.contains(node.id))continue;
+      for(auto& field:node.fields) if(field.present && field.slot>=0) {
         for(A_long c=0;c<component_count(field.type);++c) {
+            ++impl_->input_count;field.constant[c]=false;
             const auto stream=kNativeBindingFirstIndex+field.slot+c;
             const auto found=std::find_if(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==node.id && p.stream==stream && p.constant;});
             if(found==impl_->proofs.end()) {impl_->all_constant=false;continue;}
             PF_ParamDef value{};
+            ++impl_->checkout_count;
             const auto error=PF_CHECKOUT_PARAM(data,stream,data->current_time,data->time_step,data->time_scale,&value);
             if(error) {impl_->all_constant=false;continue;}
             const bool ok=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) && value.u.fs_d.value!=kNativeBindingUnavailable;
@@ -691,9 +702,12 @@ void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept {
             const auto checkin=PF_CHECKIN_PARAM(data,&value);
             if(!ok || checkin) {impl_->all_constant=false;continue;}
             field.value[c]=scalar;field.constant[c]=true;
+            ++impl_->constant_count;
         }
+      }
     }
-}
+    impl_->all_constant=impl_->input_count>0 && impl_->constant_count==impl_->input_count;
+} catch(...) {if(impl_)impl_->all_constant=false;}
 PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNode& output,
                                   A_long* failed_stream) const noexcept {
     if(failed_stream) *failed_stream=-1;
@@ -712,6 +726,7 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
                 PF_ParamDef sampled{};
                 const A_long index=kNativeBindingFirstIndex+field.slot+component;
                 if(failed_stream) *failed_stream=index;
+                ++impl_->checkout_count;
                 const auto error=PF_CHECKOUT_PARAM(data,index,data->current_time,data->time_step,data->time_scale,&sampled);
                 if(error) return error;
                 const bool valid_value=sampled.param_type==PF_Param_FLOAT_SLIDER &&

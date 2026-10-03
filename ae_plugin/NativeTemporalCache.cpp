@@ -2,6 +2,7 @@
 #include "SPBasic.h"
 #include <algorithm>
 #include <array>
+#include <map>
 #include <mutex>
 #include <utility>
 
@@ -24,9 +25,11 @@ struct ParamUtils {
             suite->PF_AreStatesIdentical(data->effect_ref,&a,&b,&equal)==0 && equal;
     }
 };
-struct ProofSet {PF_ProgPtr instance{};std::vector<NativeControlProof> proofs;};
+// This token only deduplicates UI publications. It is never dereferenced or
+// required to equal a render callback's opaque reference.
+struct ProofSet {PF_ProgPtr publisher{};std::vector<NativeControlProof> proofs;};
 struct Prefix {
-    PF_ProgPtr instance{};core::NodeId node{};A_long stream{};unsigned hz{};PF_State state{};
+    core::NodeId node{};A_long stream{};unsigned hz{};PF_State state{};
     std::mutex mutex;core::EmissionTimeline timeline;
 };
 std::mutex registry_mutex;
@@ -47,21 +50,36 @@ struct PrefixLease {
 void remember_native_control_proofs(PF_InData* data,std::vector<NativeControlProof> values) noexcept try {
     if(!data || !data->effect_ref) return;
     std::lock_guard lock(registry_mutex);
-    std::erase_if(proofs,[&](const auto& p){return p.instance==data->effect_ref;});
+    // Invalidate sampled prefixes when a UI publication supplies an analytic
+    // profile, including prefixes created by a different render callback copy.
+    const auto affected=[&](const auto& p) {
+        const auto matches=[&](const auto& proof){return proof.node==p->node && proof.stream==p->stream;};
+        if(std::any_of(values.begin(),values.end(),matches)) return true;
+        for(const auto& old:proofs) if(old.publisher==data->effect_ref &&
+            std::any_of(old.proofs.begin(),old.proofs.end(),matches)) return true;
+        return false;
+    };
+    std::erase_if(prefixes,affected);
+    std::erase_if(proofs,[&](const auto& p){return p.publisher==data->effect_ref;});
     if(proofs.size()>=kMaxProofInstances) proofs.erase(proofs.begin());
     proofs.push_back({data->effect_ref,std::move(values)});
-    // A newly certified analytic profile must replace a sampled prefix.
-    std::erase_if(prefixes,[&](const auto& p){return p->instance==data->effect_ref;});
 } catch(...) {} // Optimization failure never rejects an authored edit.
-std::vector<NativeControlProof> validated_native_control_proofs(PF_InData* data) noexcept try {
+std::vector<NativeControlProof> validated_native_control_proofs(PF_InData* data,
+    std::span<const core::NodeId> nodes) noexcept try {
     std::vector<NativeControlProof> candidates,result;
     {std::lock_guard lock(registry_mutex);
-        if(data) for(const auto& p:proofs) if(p.instance==data->effect_ref) {candidates=p.proofs;break;}}
+        // Newest first; copied layers may retain the same graph UUIDs, so the
+        // host state comparison below is mandatory even after a UUID match.
+        for(auto set=proofs.rbegin();set!=proofs.rend();++set) for(const auto& proof:set->proofs)
+            if(nodes.empty() || std::find(nodes.begin(),nodes.end(),proof.node)!=nodes.end()) candidates.push_back(proof);}
     if(candidates.empty())return result;
     ParamUtils utils(data);
+    std::map<A_long,std::optional<PF_State>> current_states;
     for(auto& proof:candidates) {
-        PF_State current{};
-        if(utils.state(proof.stream,current) && utils.same(proof.state,current)) result.push_back(std::move(proof));
+        if(std::any_of(result.begin(),result.end(),[&](const auto& p){return p.node==proof.node && p.stream==proof.stream;}))continue;
+        auto [current,inserted]=current_states.try_emplace(proof.stream);
+        if(inserted) {PF_State state{};if(utils.state(proof.stream,state))current->second=state;}
+        if(current->second && utils.same(proof.state,*current->second)) result.push_back(std::move(proof));
     }
     return result;
 } catch(...) {return {};}
@@ -71,15 +89,15 @@ std::shared_ptr<core::EmissionTimeline> native_emission_timeline(PF_InData* data
     if(!utils.state(stream,state) || (hz!=30 && hz!=60 && hz!=120)) return {};
     std::vector<std::shared_ptr<Prefix>> candidates;
     {std::lock_guard lock(registry_mutex);
-        for(const auto& p:prefixes) if(p->instance==data->effect_ref && p->node==node && p->stream==stream && p->hz==hz) candidates.push_back(p);}
+        for(const auto& p:prefixes) if(p->node==node && p->stream==stream && p->hz==hz) candidates.push_back(p);}
     std::shared_ptr<Prefix> chosen;
     for(const auto& p:candidates) if(utils.same(p->state,state)) {chosen=p;break;}
     if(!chosen) {
-        chosen=std::make_shared<Prefix>();chosen->instance=data->effect_ref;chosen->node=node;
+        chosen=std::make_shared<Prefix>();chosen->node=node;
         chosen->stream=stream;chosen->hz=hz;chosen->state=state;
         std::lock_guard lock(registry_mutex);
-        // Retire stale entries; active frame leases keep their own data alive.
-        std::erase_if(prefixes,[&](const auto& p){return p->instance==data->effect_ref && p->node==node && p->stream==stream && p->hz==hz;});
+        // Keep separate dependency versions for copied layers / concurrent frame
+        // copies. Only equal host states can share data; the registry is bounded.
         if(prefixes.size()>=kMaxPrefixes) prefixes.erase(prefixes.begin());
         prefixes.push_back(chosen);
     }

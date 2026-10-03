@@ -13,9 +13,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <limits>
 
@@ -37,6 +39,37 @@ namespace starfield::adapter {
 namespace {
 
 namespace core = starfield::core;
+std::mutex timing_mutex;
+PreRenderTimings preparation_timings;
+SmartRenderTiming execution_timing;
+struct PreparationTimer {
+    using Clock=std::chrono::steady_clock;
+    Clock::time_point start{Clock::now()};
+    PreRenderTimings value;
+    explicit PreparationTimer(const PF_InData* data) {
+        value.valid=true;
+        if(data && data->time_scale)value.seconds=double(data->current_time)/data->time_scale;
+    }
+    static double elapsed(Clock::time_point from) {
+        return std::chrono::duration<double,std::milli>(Clock::now()-from).count();
+    }
+    ~PreparationTimer() {
+        value.total_ms=elapsed(start);
+        std::lock_guard lock(timing_mutex);preparation_timings=value;
+    }
+};
+struct ExecutionTimer {
+    PreparationTimer::Clock::time_point start{PreparationTimer::Clock::now()};
+    SmartRenderTiming value;
+    explicit ExecutionTimer(const PF_InData* data) {
+        value.valid=true;
+        if(data && data->time_scale)value.seconds=double(data->current_time)/data->time_scale;
+    }
+    ~ExecutionTimer() {
+        value.total_ms=PreparationTimer::elapsed(start);
+        std::lock_guard lock(timing_mutex);execution_timing=value;
+    }
+};
 
 // Pre-render checks out empty input metadata to obtain AE's layer bounds and
 // full-resolution reference geometry. Smart Render still pairs the checkout with an
@@ -326,7 +359,14 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
 
 } // namespace
 
+PreRenderTimings last_pre_render_timings() noexcept {
+    std::lock_guard lock(timing_mutex);return preparation_timings;
+}
+SmartRenderTiming last_smart_render_timing() noexcept {
+    std::lock_guard lock(timing_mutex);return execution_timing;
+}
 PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* extra) noexcept try {
+    PreparationTimer timer(in_data);
     if (in_data == nullptr || out_data==nullptr || extra == nullptr || extra->input == nullptr || extra->output == nullptr ||
         extra->cb == nullptr || extra->cb->checkout_layer == nullptr) {
         return PF_Err_BAD_CALLBACK_PARAM;
@@ -350,8 +390,10 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     if (input_err != PF_Err_NONE) return input_err;
 
     std::shared_ptr<const core::Graph> graph;
+    const auto controls_start=PreparationTimer::Clock::now();
     const auto graph_err = checkout_render_graph(in_data, out_data, graph, nullptr,
                                                  input_result.ref_width, input_result.ref_height);
+    timer.value.controls_ms=PreparationTimer::elapsed(controls_start);
     if (graph_err != PF_Err_NONE) {
         // Failing here is safe resource-wise: pre-render checkouts belong to the frame,
         // only the smart-render phase checks them in, and AE tears the frame down when
@@ -360,8 +402,10 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     }
     core::Graph frame_graph=*graph;
     HostCancellation history_cancel(in_data);
+    const auto history_start=PreparationTimer::Clock::now();
     const auto history_error=capture_emitter_origin_history(in_data,out_data,frame_graph,
         input_result.ref_width,input_result.ref_height,history_cancel);
+    timer.value.history_ms=PreparationTimer::elapsed(history_start);
     if(history_error) return history_error;
     graph=std::make_shared<const core::Graph>(std::move(frame_graph));
     auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
@@ -426,6 +470,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
             prefer_gpu=std::get<std::uint32_t>(p.value)==0;
     bool gpu_possible=false;
     if(prefer_gpu && gpu_device_matches(extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index)) {
+        const auto scene_start=PreparationTimer::Clock::now();
         // Pre-render eligibility includes actual scene construction and bounds.
         // This candidate expects GPU rectangles in render-resolution pixels; a GPU
         // checkout with different geometry is rejected, never clipped or guessed.
@@ -436,6 +481,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         if(request_error) return request_error;
         state->gpu_scene.struct_size=sizeof(state->gpu_scene);
         const auto status=state->generation->api().prepare_gpu_scene(&scene_request,&state->gpu_scene);
+        timer.value.scene_ms=PreparationTimer::elapsed(scene_start);
         if(status==SF_CORE_OK && state->gpu_scene.status==SF_CORE_OK) {
             state->gpu_world_width=static_cast<A_long>(predicted.width);state->gpu_world_height=static_cast<A_long>(predicted.height);
             gpu_possible=true;
@@ -451,6 +497,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     extra->output->flags = gpu_possible?PF_RenderOutputFlag_GPU_RENDER_POSSIBLE:0;
     extra->output->pre_render_data = state.release();
     extra->output->delete_pre_render_data_func = delete_pre_render_state;
+    timer.value.complete=true;
     return PF_Err_NONE;
 } catch (const std::bad_alloc&) {
     return PF_Err_OUT_OF_MEMORY;
@@ -459,6 +506,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
 }
 
 PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtra* extra) noexcept {
+    ExecutionTimer timer(in_data);
     if (in_data == nullptr || out_data == nullptr || extra == nullptr || extra->input == nullptr ||
         extra->cb == nullptr || extra->cb->checkout_layer_pixels == nullptr ||
         extra->cb->checkout_output == nullptr) {
@@ -514,6 +562,7 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
             state->gpu_scene,output_world,output_world->origin_x,output_world->origin_y,true);
     } else {err=render_frame(in_data,out_data,depth,*state,output_world);if(!err) record_cpu_execution();}
 
+    timer.value.complete=err==PF_Err_NONE;
     return err;
 }
 

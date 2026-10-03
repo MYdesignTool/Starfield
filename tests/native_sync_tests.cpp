@@ -1,6 +1,7 @@
 #include "NodeEffects.hpp"
 #include "NativeNodeGraph.hpp"
 #include "NativeTemporalCache.hpp"
+#include "NativeTemporalUI.hpp"
 #include <string>
 #include <fstream>
 #include "NodeRecord.hpp"
@@ -23,6 +24,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <thread>
 
 int run_camera_capture_tests();
 namespace {
@@ -648,6 +650,10 @@ int main() {
     const auto record_count=static_graph.optional_records.size();PF_OutData fast_output{};
     check(capture_emitter_origin_history(&renderer_data,&fast_output,static_graph,1920,1080,core::NeverCancelled{})==0 && static_graph.optional_records.size()==record_count,
         "100-second static scene skips historical traversal and particle snapshot encoding");
+    const auto actual=last_native_history_trace();
+    check(actual.path==NativeHistoryPath::static_graph && actual.seconds==100 && actual.inputs>0 &&
+        actual.constants==actual.inputs && actual.checkouts==actual.inputs && actual.rate_queries==0 && actual.life_queries==0,
+        "actual render trace reports constant hoisting and zero birth history reads");
     check(aegp_suite_requests==certified_render_suites,"certified render preparation still acquires no AEGP suites");
     ++metadata_epoch;check(validated_native_control_proofs(&renderer_data).empty(),"edited alias cannot reuse constant metadata");
     metadata_rate_keys=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
@@ -667,6 +673,42 @@ int main() {
     proofs=validated_native_control_proofs(&renderer_data);
     check(std::none_of(proofs.begin(),proofs.end(),[](const auto& p){return p.life_bound.has_value();}),
           "expression Life cannot certify a key envelope");
+    // Actual UI DRAW path: automatic recapture, unchanged dependency throttling,
+    // worker rejection, and no project/event mutation.
+    metadata_rate_keys=metadata_life_keys=metadata_life_expression=false;
+    remember_native_control_proofs(&renderer_data,{});
+    auto ui_data=renderer_data;ui_data.num_params=kGraphParameterId+1;
+    ui_data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* info)->PF_Err {
+        check(info && info->events==PF_CustomEFlag_COMP && !info->comp_ui_width && !info->comp_ui_height,
+            "metadata UI registers only zero-sized composition events");return 0;
+    };
+    check(register_native_temporal_ui(&ui_data)==0,"UI metadata callback registration succeeds");
+    PF_ArbitraryH ui_graph_handle{};
+    check(create_graph_parameter(&ui_data,static_graph,&ui_graph_handle)==0,"UI metadata graph fixture created");
+    PF_ParamDef ui_graph_param{};ui_graph_param.param_type=PF_Param_ARBITRARY_DATA;ui_graph_param.u.arb_d.value=ui_graph_handle;
+    std::array<PF_ParamDef*,kGraphParameterId+1> ui_params{};ui_params[kGraphParameterId]=&ui_graph_param;
+    PF_EventExtra ui_event{};ui_event.e_type=PF_Event_DO_CLICK;ui_event.evt_out_flags=PF_EO_NEVER_UPDATE;
+    initialize_native_temporal_ui();const auto event_suites=suite_requests;
+    refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+    check(suite_requests==event_suites,"non-DRAW event performs no metadata SDK access");
+    ui_event.e_type=PF_Event_DRAW;const auto ui_writes=sets;
+    refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+    check(!validated_native_control_proofs(&ui_data).empty(),"UI DRAW automatically captures native animation metadata");
+    const auto stable_aegp=aegp_suite_requests;
+    refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+    check(aegp_suite_requests==stable_aegp,"unchanged UI dependencies skip source stream reads");
+    ++metadata_epoch;
+    std::thread worker([&]{refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);});worker.join();
+    check(aegp_suite_requests==stable_aegp,"worker DRAW cannot access AEGP metadata");
+    refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+    check(aegp_suite_requests>stable_aegp && !validated_native_control_proofs(&ui_data).empty(),
+        "authored dependency edit triggers automatic UI recapture");
+    check(sets==ui_writes && ui_event.evt_out_flags==PF_EO_NEVER_UPDATE,
+        "UI refresh creates no undo writes, rerender or handled-event flags");
+    auto render_copy=renderer_data;render_copy.effect_ref=reinterpret_cast<PF_ProgPtr>(2);
+    NativeAnimationPlan copied_plan(static_graph,1920,1080,1);copied_plan.prepare_constants(&render_copy);
+    check(copied_plan.fully_constant(),"render callback copy uses UI-certified static graph");
+    dispose(ui_graph_handle);
     temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
 
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
