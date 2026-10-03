@@ -1,5 +1,41 @@
 # Build and host matrix
 
+## Build 27 deployment - 2026-10-03
+
+Source `a625321` is pushed. Immediately before installation, a read-only process
+check found neither AfterFX nor AfterFX_64. Deploy-TestBuild.ps1 replaced build26
+through the existing single Plug-ins/Starfield -> newStardust/dist Junction.
+All six installed hashes match candidates; all six backup hashes match the before
+state. Core remains byte-identical to build25/26, retaining their ABI3 qualification.
+Thirteen unchanged CEP files have a paired verified snapshot. No process, registry,
+CEP manifest or host-wide setting was changed. Host root still contains one Starfield
+entry. Restore-TestBuild.ps1 read-only verification succeeds.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `D3CD28BECF8F5B0EF3BE2661849E350D7B990B6DFE3F25BF975AD1E3500816B6` |
+| StarfieldEmitter.aex | `834F649C26B918FB8F86946B2EF6305982BC2AFA1BEF5895E9C883DBF230B4DC` |
+| StarfieldParticleNode.aex | `7BB26742AC6BBE446C04BE52A5F10FE776C5E476CD303C5907DBC79390185894` |
+| StarfieldAppearance.aex | `BB77C076CCCF7FB6D09A0836EE56892839FA2DD287A2D30A9E06428DA584982E` |
+| StarfieldForce.aex | `2E5C8ECB93965CA0322F483205330AF6317E801E5240FF25A9A4A38914969B84` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Selected Core: `StarfieldCore-5637EA2266B32AEE.dll`.
+Before/after: artifacts/build27-deploy-before.json and build27-deploy-after.json.
+Backup: artifacts/disabled/m306-build27-acyclic-bindings-20261003/bundle.
+With AE closed, one-step rollback to build26:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build27-acyclic-bindings-20261003' -Restore
+```
+
+Open the existing test project and click main Options once: `Bindings v27` confirms
+owned expression refresh. Then evaluate uncached PPS10,000/Life2 frames and provide
+elapsed seconds plus the actual Options readout. The new lookup defect is proved in
+source/generated-expression regressions; improvement of the owner's 6-8 second AE
+wait is not yet measured. 3,383 scoped C++ checks and JS regressions pass; all five
+AEXs build with May 2023 SDK Release /MT. Main integration awaits this qualification.
+
 ## M3-06 / build 27 - native dependency lookup and constant-node reuse
 
 Owner AE2023 feedback for build26 confirms that delay no longer grows with time,
