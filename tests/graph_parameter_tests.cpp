@@ -739,6 +739,10 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(std::strcmp(registered[kTimeRemapEnabledId-1].name,"Time Remapping On / Off")==0 && registered[kTimeRemapEnabledId-1].param_type==PF_Param_CHECKBOX);
     CHECK(std::strcmp(registered[kPreviewChanceId-1].name,"Particle chance")==0 && registered[kPreviewChanceId-1].u.fs_d.dephault==100);
     CHECK((registered[kTimeRemapSecondsId-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0);
+    CHECK(registered[kTimeSamplingHzId-1].param_type==PF_Param_POPUP);
+    CHECK(registered[kTimeSamplingHzId-1].u.pd.value==1 && registered[kTimeSamplingHzId-1].u.pd.dephault==1);
+    CHECK(std::strcmp(registered[kTimeSamplingHzId-1].u.pd.u.namesptr,"30 Hz|60 Hz|120 Hz")==0);
+    CHECK((registered[kTimeSamplingHzId-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)!=0);
     CHECK(registered[kGraphChecksumLowId-1].uu.id==kGraphChecksumLowDiskId);
     int depth=0; bool balanced=true;
     for(const auto& p:registered) {
@@ -756,6 +760,7 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(create_graph_parameter(&host,graph_from_controls(core::Settings{}).value(),&parameters[kGraphParameterId].u.arb_d.value)==0);
     parameters[kTimeRemapEnabledId].u.bd.value=TRUE;parameters[kTimeRemapSecondsId].u.fs_d.value=1.25;
     parameters[kPreviewEnabledId].u.bd.value=TRUE;parameters[kPreviewChanceId].u.fs_d.value=25;
+    parameters[kTimeSamplingHzId].u.pd.value=3;
     host.num_params=0; // SmartFX delivers no params[]; global streams still exist.
     std::shared_ptr<const core::Graph> graph;
     CHECK(checkout_render_graph(&host,&output,graph)==0 && graph && checked_out.empty());
@@ -763,6 +768,7 @@ void test_renderer_controls(PF_InData& host) {
         for(const auto& p:node.parameters) {
             if(p.key==core::graph_keys::kTimeRemapSeconds) CHECK(std::get<double>(p.value)==1.25);
             if(p.key==core::graph_keys::kPreviewChance) CHECK(std::get<double>(p.value)==25);
+            if(p.key==core::graph_keys::kTimeSamplingHz) CHECK(std::get<std::uint32_t>(p.value)==120);
         }
     }
     const auto frozen=core::serialize_graph(*graph,core::particle_node_registry()).value();

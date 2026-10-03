@@ -20,8 +20,8 @@ if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSB
 
 # A CoreOnly build is safe only while every source that feeds the installed AEX
 # and the cross-DLL ABI remains unchanged from the last full build. Algorithm
-# sources (CpuRenderer, GraphEvaluation, ParticleSimulation, Random, PluginApi.cpp)
-# are intentionally absent here.
+# sources linked only into the DLL (CpuRenderer and PluginApi.cpp) are absent.
+# Historical graph/simulation sources also feed the AEX and must be fingerprinted.
 $adapterInputs = @(
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
     'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
@@ -44,6 +44,7 @@ $adapterInputs = @(
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\EmitterHistory.hpp',
+    'include\starfield\core\EmissionTimeline.hpp',
     'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp',
     'include\starfield\core\ParticleSimulation.hpp',
     'include\starfield\core\Random.hpp',

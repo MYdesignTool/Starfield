@@ -46,6 +46,10 @@ struct AppearanceValues {
     AgeCurve opacity_curve{};
     std::uint32_t color_mode{1};
     ColorGradient gradient{white_gradient()};
+    double life_random_percent{}, size_y{10}, feather_percent{}, angle_random_percent{}, speed_random_percent{};
+    std::uint32_t shape{}, orient_to{}, up_axis{2};
+    bool limit_to_2d{true};
+    Vec3 angles{}, rotation_speed{};
 };
 
 constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
@@ -221,7 +225,54 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     if(const auto* gradient=find_value(node,kColorGradient))
         if(!decode_color_gradient(std::get<OpaqueBytes>(*gradient),result.gradient))
             return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"invalid Color Gradient");
+    if(node.type_key==kParticleNode) {
+        const auto scalar=[&](ParameterKey key,double maximum,double& value) {
+            if(const auto* v=find_value(node,key)) value=std::get<double>(*v);
+            return std::isfinite(value) && value>=0 && value<=maximum;
+        };
+        const auto enumeration=[&](ParameterKey key,std::uint32_t maximum,std::uint32_t& value) {
+            if(const auto* v=find_value(node,key)) value=std::get<std::uint32_t>(*v);
+            return value<=maximum;
+        };
+        std::uint32_t limit=1;
+        if(!scalar(kLifeRandom,100,result.life_random_percent) || !scalar(kSizeY,100000,result.size_y) ||
+           !scalar(kParticleFeather,100,result.feather_percent) || !scalar(kAngleRandom,100,result.angle_random_percent) ||
+           !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,2,result.shape) ||
+           !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
+            return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
+        result.limit_to_2d=limit!=0;
+        for(auto [key,value]:{std::pair{kParticleAngles,&result.angles},std::pair{kRotationSpeed,&result.rotation_speed}}) {
+            if(const auto* v=find_value(node,key)) *value=std::get<Vec3>(*v);
+            for(double axis:{value->x,value->y,value->z}) if(!std::isfinite(axis) || axis < -32768 || axis > 32768)
+                return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"Particle angle outside native Angle range");
+        }
+    }
     return Result<AppearanceValues>::success(std::move(result));
+}
+
+double birth_lifetime(const AppearanceValues& values,std::uint32_t seed,std::uint64_t identity) noexcept {
+    return values.lifetime_seconds*(1-values.life_random_percent/100*unit_value(seed,identity,RandomPurpose::particle_life));
+}
+void apply_particle_properties(ParticleInstance& particle,const AppearanceValues& values,
+    std::uint32_t seed,Vec3 birth_position) noexcept {
+    particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
+    particle.feather_percent=values.feather_percent;
+    particle.size_y_pixels=values.size_start>0?particle.size_pixels*values.size_y/values.size_start:0;
+    const double spin_scale=1-values.speed_random_percent/100*unit_value(seed,particle.id,RandomPurpose::particle_spin);
+    const double angle_offset=(2*unit_value(seed,particle.id,RandomPurpose::particle_angle)-1)*180*values.angle_random_percent/100;
+    particle.rotation_degrees={values.angles.x+values.rotation_speed.x*particle.age_seconds*spin_scale,
+        values.angles.y+values.rotation_speed.y*particle.age_seconds*spin_scale,
+        values.angles.z+values.rotation_speed.z*particle.age_seconds*spin_scale+angle_offset};
+    if(values.orient_to) {
+        const auto direction=values.orient_to==1?particle.velocity:Vec3{birth_position.x-particle.position.x,
+            birth_position.y-particle.position.y,birth_position.z-particle.position.z};
+        const double planar=std::hypot(direction.x,direction.y);
+        if(planar>1e-12 || std::abs(direction.z)>1e-12) {
+            constexpr double degrees=180/3.14159265358979323846;
+            particle.rotation_degrees.z+=std::atan2(-direction.y,direction.x)*degrees;
+            if(!values.limit_to_2d) particle.rotation_degrees.y+=std::atan2(-direction.z,planar)*degrees;
+        }
+    }
 }
 
 void apply_appearance(ParticleInstance& particle, const AppearanceValues& appearance,
@@ -331,7 +382,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     (!std::isfinite(std::get<double>(*chance)) || std::get<double>(*chance) < 0 || std::get<double>(*chance) > 100))
                     return R::failure(ErrorCode::invalid_request, "Particle chance must be 0..100 percent");
             } else if (node.type_key == kEmitterNode) {
-                if (const auto* mode = find_value(node, kEmittingMode); mode && std::get<std::uint32_t>(*mode) > 1)
+                if (const auto* mode = find_value(node, kEmittingMode); mode && std::get<std::uint32_t>(*mode) > 3)
                     return R::failure(ErrorCode::invalid_request, "invalid Emitting mode");
                 for (const auto key : {kEmitChance, kEmitLifeStart, kEmitLifeEnd, kInheritVelocity, kInheritSize, kInheritOpacity, kInheritColor}) {
                     if (const auto* value = find_value(node, key); value && (std::get<double>(*value) < 0 || std::get<double>(*value) > 100))
@@ -435,12 +486,12 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         }
 
         const auto auxiliary = [&](std::size_t index) {
-            const auto* mode = find_value(*nodes[index], kEmittingMode);
+            const auto* mode = find_value(*nodes[index], kAuxiliarySource);
             return mode && std::get<std::uint32_t>(*mode) == 1;
         };
         bool has_auxiliary = false;
         for (const auto index : topological_order) if (emitters[index]) {
-            if (!auxiliary(index) && !incoming[index].empty()) return R::failure(ErrorCode::invalid_request, "a parent input requires Auxiliary Emitting mode");
+            if (!auxiliary(index) && !incoming[index].empty()) return R::failure(ErrorCode::invalid_request, "a parent input requires an Auxiliary source");
             has_auxiliary = has_auxiliary || auxiliary(index);
         }
         if (has_auxiliary) {
@@ -564,6 +615,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             inherited.color_start = {blend(inherited.color_start.x, parent.color.x, color), blend(inherited.color_start.y, parent.color.y, color), blend(inherited.color_start.z, parent.color.z, color)};
                             inherited.color_end = {blend(inherited.color_end.x, parent.color.x, color), blend(inherited.color_end.y, parent.color.y, color), blend(inherited.color_end.z, parent.color.z, color)};
                             apply_appearance(instance, inherited, child_settings.value.seed);
+
                             const double inherited_velocity = percent(kInheritVelocity, 0);
                             const double integral = settings.linear_drag > 0 ? -std::expm1(-settings.linear_drag * instance.age_seconds) / settings.linear_drag : instance.age_seconds;
                             const double decay = std::exp(-settings.linear_drag * instance.age_seconds);
@@ -579,6 +631,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             instance.velocity.x += parent.velocity.x * inherited_velocity * decay;
                             instance.velocity.y += parent.velocity.y * inherited_velocity * decay;
                             instance.velocity.z += parent.velocity.z * inherited_velocity * decay;
+                            apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
+                                Vec3{parent.position.x+birth_origin.x,parent.position.y+birth_origin.y,parent.position.z+birth_origin.z});
                             retain(std::move(instance), birth);
                         }
                     }
@@ -811,6 +865,9 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 }
                 auto& instance = result.particles[branch_targets[i].destination];
                 instance.emitter_id = nodes[plan.emitter]->id;
+                Vec3 birth_position=plan.settings.value.emitter_origin;
+                if(particles[plan.particle]->orient_to==2)
+                    birth_position=simulate_particle_at_age(plan.settings.value,0,instance.id,dimension_context).position;
                 if(origins) {
                     const double birth=double(branch_targets[i].slot)/plan.settings.value.birth_rate;
                     const auto sampled=origins->sample(instance.emitter_id,birth);
@@ -818,9 +875,13 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     instance.position.x += sampled.value().x-plan.settings.value.emitter_origin.x;
                     instance.position.y += sampled.value().y-plan.settings.value.emitter_origin.y;
                     instance.position.z += sampled.value().z-plan.settings.value.emitter_origin.z;
+                    birth_position.x+=sampled.value().x-plan.settings.value.emitter_origin.x;
+                    birth_position.y+=sampled.value().y-plan.settings.value.emitter_origin.y;
+                    birth_position.z+=sampled.value().z-plan.settings.value.emitter_origin.z;
                 }
                 // One downstream Appearance replaces the Particle curves.
                 apply_appearance(instance, appearance, plan.settings.value.seed);
+                apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position);
             }
         }
         budget.work += result.particles.size();
@@ -847,6 +908,60 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
     if(frozen) {
         if(cancellation.is_cancelled()) return Result<EvaluatedGraph>::failure(ErrorCode::cancelled,"temporal render cancelled");
         return decode_evaluated_particles(*frozen,time);
+    }
+    // Static graph entry points share Once timing and variable survivor selection
+    // with the historical evaluator.
+    // These values are constant by the graph contract, not by sampling inference.
+    bool once=false;
+    for(const auto& node:graph.nodes) if(node.type_key==kEmitterNode) {
+        if(const auto* mode=find_value(node,kEmittingMode)) {
+            const auto* value=std::get_if<std::uint32_t>(mode);
+            once=once || (value && *value==1);
+        }
+    }
+    for(const auto& node:graph.nodes) if(node.type_key==kParticleNode) {
+        if(const auto* random=find_value(node,kLifeRandom)) {
+            const auto* value=std::get_if<double>(random);
+            once=once || (value && *value>0);
+        }
+    }
+    if(once) {
+        auto decoded=decode_emitter_origin_history(graph);
+        if(!decoded.has_value()) return Result<EvaluatedGraph>::failure(decoded.error());
+        auto history=decoded.take_value();
+        if(!origin_sampler && history.present) origin_sampler=&history;
+        class StaticSampler final:public TemporalGraphSampler {
+            const Graph& graph_;
+            EmitterOriginSampler* origins_;
+        public:
+            StaticSampler(const Graph& graph,EmitterOriginSampler* origins):graph_(graph),origins_(origins) {}
+            Result<GraphNode> node(NodeId id,double seconds) override {
+                for(const auto& n:graph_.nodes) if(n.id==id) {
+                    auto copy=n;
+                    if(origins_ && n.type_key==kEmitterNode) {
+                        auto origin=origins_->sample(id,seconds);
+                        if(!origin.has_value()) return Result<GraphNode>::failure(origin.error());
+                        for(auto& parameter:copy.parameters) if(parameter.key==kEmitterOrigin) parameter.value=origin.value();
+                    }
+                    return Result<GraphNode>::success(std::move(copy));
+                }
+                return Result<GraphNode>::failure(ErrorCode::invalid_request,"missing static node");
+            }
+            Result<double> rate(NodeId id,double) override {
+                for(const auto& n:graph_.nodes) if(n.id==id) {
+                    if(const auto* rate=find_value(n,kBirthRate)) if(const auto* value=std::get_if<double>(rate))
+                        return Result<double>::success(*value);
+                }
+                return Result<double>::failure(ErrorCode::invalid_request,"missing static emission rate");
+            }
+            Result<std::optional<EmissionRateProfile>> rate_profile(NodeId id) override {
+                auto value=rate(id,0);
+                if(!value.has_value()) return Result<std::optional<EmissionRateProfile>>::failure(value.error());
+                EmissionRateProfile profile;profile.constant=value.value();
+                return Result<std::optional<EmissionRateProfile>>::success(std::move(profile));
+            }
+        } sampler(graph,origin_sampler);
+        return evaluate_temporal_particle_graph(graph,time,cancellation,dimension_context,sampler);
     }
     for (const auto& node : graph.nodes) if (node.type_key == graph_keys::kOutputNode) {
         const auto* enabled = find_value(node, graph_keys::kTimeRemapEnabled);

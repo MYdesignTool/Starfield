@@ -3,6 +3,7 @@
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/EmitterHistory.hpp"
+#include "starfield/core/EmissionTimeline.hpp"
 
 namespace starfield::core {
 
@@ -20,6 +21,10 @@ public:
     virtual ~TemporalGraphSampler() = default;
     [[nodiscard]] virtual Result<GraphNode> node(NodeId, double seconds) = 0;
     [[nodiscard]] virtual Result<double> rate(NodeId, double seconds) = 0;
+    // Only metadata can certify constancy/linear interpolation, not equal samples.
+    [[nodiscard]] virtual Result<std::optional<EmissionRateProfile>> rate_profile(NodeId) {
+        return Result<std::optional<EmissionRateProfile>>::success(std::nullopt);
+    }
     [[nodiscard]] virtual Result<double> lifetime(NodeId id, double seconds) {
         auto sampled=node(id,seconds);
         if(!sampled.has_value()) return Result<double>::failure(sampled.error());

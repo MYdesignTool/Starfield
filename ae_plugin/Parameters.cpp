@@ -760,6 +760,13 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         const auto binding_error = PF_ADD_PARAM(in_data, -1, &def);
         if (binding_error) return binding_error;
     }
+    AEFX_CLR_STRUCT(def);
+    PF_ADD_TOPIC("Simulation Settings", 1600);
+    AEFX_CLR_STRUCT(def);
+    def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_SUPERVISE;
+    PF_ADD_POPUP("Time Sampling", 3, 1, "30 Hz|60 Hz|120 Hz", 1601);
+    AEFX_CLR_STRUCT(def);
+    PF_END_TOPIC(1602);
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -904,9 +911,9 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             // These registered controls are read through callbacks in SmartFX,
             // independently of the count of parameters delivered in params[].
             core::Graph snapshot = *graph;
-            constexpr std::array<A_long, 4> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId};
-            constexpr std::array<core::ParameterKey, 4> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
-                core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance};
+            constexpr std::array<A_long, 5> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId};
+            constexpr std::array<core::ParameterKey, 5> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
+                core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance,core::graph_keys::kTimeSamplingHz};
             for (std::size_t i = 0; i < indices.size(); ++i) {
                 CheckedParameter global(in_data);
                 err = global.checkout(indices[i]);
@@ -915,12 +922,17 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                 if (i == 0 || i == 2) {
                     if (global.value.param_type != PF_Param_CHECKBOX) { graph.reset(); return PF_Err_BAD_CALLBACK_PARAM; }
                     value = std::uint32_t(global.value.u.bd.value != 0);
+                } else if(i==4) {
+                    if(global.value.param_type!=PF_Param_POPUP || global.value.u.pd.value<1 || global.value.u.pd.value>3) {
+                        graph.reset();return PF_Err_BAD_CALLBACK_PARAM;
+                    }
+                    value=std::uint32_t(30u<<(global.value.u.pd.value-1));
                 } else {
                     if (global.value.param_type != PF_Param_FLOAT_SLIDER) { graph.reset(); return PF_Err_BAD_CALLBACK_PARAM; }
                     value = double(global.value.u.fs_d.value);
                 }
                 for (auto& output : snapshot.nodes) if (output.type_key == core::graph_keys::kOutputNode) {
-                    output.schema_version = 3;
+                    output.schema_version = 4;
                     auto found = std::find_if(output.parameters.begin(), output.parameters.end(), [&](const auto& p) {return p.key == keys[i];});
                     if (found == output.parameters.end()) output.parameters.push_back({keys[i], value});
                     else found->value = value;
@@ -1077,7 +1089,7 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
             return sync_graph_from_controls(in_data, out_data, params);
         }
         const bool renderer_global = extra->param_index == kTimeRemapEnabledId || extra->param_index == kTimeRemapSecondsId ||
-            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId;
+            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId || extra->param_index==kTimeSamplingHzId;
         if (!is_bound_control(extra->param_index) && !renderer_global) return PF_Err_NONE;
         if ((extra->param_index == kMaxParticlesId || renderer_global) && params[kNodeEffectsReadyId] &&
             params[kNodeEffectsReadyId]->param_type == PF_Param_FLOAT_SLIDER &&

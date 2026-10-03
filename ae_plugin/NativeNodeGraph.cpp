@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <new>
 #include <string>
 #include <utility>
@@ -45,14 +46,15 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, 61> fields{};
+    std::array<RawField, 76> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
     return type == node_sync::ValueKind::scalar ? 1 : type == node_sync::ValueKind::point2 ? 2 : 3;
 }
-constexpr A_long animated_last_index(Kind kind) noexcept {
-    return kind == Kind::emitter ? 30 : kind == Kind::particle ? 9 : kind == Kind::appearance ? 8 : 10;
+constexpr bool animated_index(Kind kind,A_long index) noexcept {
+    if(kind==Kind::particle) return (index>=1 && index<=14) || (index>=66 && index<=75);
+    return index>=1 && index<=(kind==Kind::emitter?30:kind==Kind::appearance?8:10);
 }
 
 struct SuiteSet {
@@ -237,8 +239,8 @@ bool read_uint(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect
     double value = 0.0;
     if (!read_one_d(suites, plugin_id, effect, index, time, value) || value < 0.0 ||
         value > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) return suites.fail(index);
-    if ((suites.playback && index <= animated_last_index(suites.playback->kind)) ||
-        (suites.recording && index <= animated_last_index(suites.recording->kind))) value = std::round(value);
+    if ((suites.playback && animated_index(suites.playback->kind,index)) ||
+        (suites.recording && animated_index(suites.recording->kind,index))) value = std::round(value);
     if (std::floor(value) != value) return suites.fail(index);
     output = static_cast<std::uint32_t>(value);
     return true;
@@ -346,7 +348,7 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
         append_u16(bytes, count);
         for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
             auto& field = node.fields[index]; if (!field.present) continue;
-            if (index <= animated_last_index(node.kind)) {
+            if (animated_index(node.kind,index)) {
                 field.slot = slot; slot += component_count(field.type);
                 if (slot > kNativeBindingCapacity) return {};
             }
@@ -382,7 +384,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 60) return false;
+            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 75) return false;
             node.kind = static_cast<Kind>(kind);
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -393,13 +395,13 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 field.type = static_cast<node_sync::ValueKind>(type);
                 field.slot = slot == 0xffffu ? -1 : static_cast<A_long>(slot);
                 if (field.slot >= 0) {
-                    if (index > static_cast<std::uint64_t>(animated_last_index(node.kind)) ||
+                    if (!animated_index(node.kind,static_cast<A_long>(index)) ||
                         field.slot + component_count(field.type) > kNativeBindingCapacity) return false;
                     for (A_long c = 0; c < component_count(field.type); ++c) {
                         if (used[field.slot + c]) return false;
                         used[field.slot + c] = true;
                     }
-                } else if (index <= static_cast<std::uint64_t>(animated_last_index(node.kind))) return false;
+                } else if (animated_index(node.kind,static_cast<A_long>(index))) return false;
                 for (auto& scalar : field.value) {
                     if (!read(8, value)) return false;
                     scalar = std::bit_cast<double>(value);
@@ -431,10 +433,10 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
 
 bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key, std::uint16_t& schema) noexcept {
     if (std::strcmp(match_name, kEmitterMatchName) == 0) {
-        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 5; return true;
+        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 6; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
-        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 3; return true;
+        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 4; return true;
     }
     if (std::strcmp(match_name, kAppearanceMatchName) == 0) {
         kind = Kind::appearance; type_key = core::graph_keys::kAppearanceNode; schema = 1; return true;
@@ -492,8 +494,10 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
             if (!read_one_d(suites, plugin_id, effect, 8 + axis, time, scalar)) return false;
             add_value(node, size_keys[static_cast<std::size_t>(axis)], scalar);
         }
-        if (!read_uint(suites, plugin_id, effect, 2, time, integer) || integer < 1 || integer > 2) return false;
+        if (!read_uint(suites, plugin_id, effect, 2, time, integer) || integer < 1 || integer > 4) return false;
         add_value(node, kEmittingMode, integer - 1u);
+        if(!read_uint(suites,plugin_id,effect,31,time,integer) || integer>1) return false;
+        add_value(node,kAuxiliarySource,integer);
         constexpr std::array<core::ParameterKey, 7> auxiliary_keys{kEmitChance, kEmitLifeStart, kEmitLifeEnd,
             kInheritVelocity, kInheritSize, kInheritOpacity, kInheritColor};
         for (A_long field = 0; field < 7; ++field) {
@@ -525,14 +529,14 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     }
 
     const bool particle = kind == Kind::particle;
-    const A_long color_start_index = particle ? 7 : 5;
-    const A_long color_end_index = particle ? 7 : 6;
-    const A_long size_index = particle ? 2 : 1;
-    const A_long size_end_index = particle ? 8 : 7;
-    const A_long opacity_index = particle ? 4 : 3;
-    const A_long opacity_end_index = particle ? 9 : 8;
-    const A_long size_random_index = particle ? 3 : 2;
-    const A_long opacity_random_index = particle ? 5 : 4;
+    const A_long color_start_index = particle ? 10 : 5;
+    const A_long color_end_index = particle ? 10 : 6;
+    const A_long size_index = particle ? 4 : 1;
+    const A_long size_end_index = particle ? 13 : 7;
+    const A_long opacity_index = particle ? 7 : 3;
+    const A_long opacity_end_index = particle ? 14 : 8;
+    const A_long size_random_index = particle ? 6 : 2;
+    const A_long opacity_random_index = particle ? 8 : 4;
     if (!read_color(suites, plugin_id, effect, color_start_index, time, vector)) return false;
     add_value(node, kColorStart, vector);
     if(!particle) {
@@ -541,13 +545,15 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     }
     if(particle) {
         std::uint32_t mode{},count{};
-        if(!read_uint(suites,plugin_id,effect,6,time,mode) || mode<1 || mode>4 ||
-            !read_uint(suites,plugin_id,effect,44,time,count) || count<2 || count>8) return false;
+        if(!read_uint(suites,plugin_id,effect,9,time,mode) || mode<1 || mode>4 ||
+            !read_uint(suites,plugin_id,effect,49,time,count) || count<2 || count>8) return false;
         add_value(node,kParticleColorMode,mode-1);
         core::ColorGradient gradient;gradient.count=static_cast<std::uint8_t>(count);
-        for(std::uint32_t i=0;i<count;++i)
-            if(!read_one_d(suites,plugin_id,effect,45+2*i,time,gradient.stops[i].position) ||
-                !read_color(suites,plugin_id,effect,46+2*i,time,gradient.stops[i].color)) return false;
+        for(std::uint32_t i=0;i<count;++i) {
+            if(!read_one_d(suites,plugin_id,effect,50+2*i,time,gradient.stops[i].position) ||
+                !read_color(suites,plugin_id,effect,51+2*i,time,gradient.stops[i].color)) return false;
+            gradient.stops[i].position/=100;
+        }
         auto bytes=core::encode_color_gradient(gradient);if(bytes.empty()) return false;
         add_value(node,kColorGradient,std::move(bytes));
     }
@@ -564,13 +570,29 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     if (!read_one_d(suites, plugin_id, effect, opacity_random_index, time, scalar)) return false;
     add_value(node, kOpacityRandom, scalar);
     if (particle) {
-        if (!read_one_d(suites, plugin_id, effect, 1, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
         add_value(node, kParticleLifetimeSeconds, scalar);
+        for(auto [index,key]:{std::pair{3,kLifeRandom},std::pair{5,kSizeY},std::pair{11,kParticleFeather},
+                            std::pair{70,kAngleRandom},std::pair{74,kRotationSpeedRandom}}) {
+            if(!read_one_d(suites,plugin_id,effect,index,time,scalar)) return false;
+            add_value(node,key,scalar);
+        }
+        for(auto [index,key]:{std::pair{1,kParticleShape},std::pair{12,kUpAxis},
+                            std::pair{66,kOrientTo},std::pair{75,kLimitTo2D}}) {
+            if(!read_uint(suites,plugin_id,effect,index,time,integer) || integer<1) return false;
+            add_value(node,key,integer-1);
+        }
+        for(auto [first,key]:{std::pair{67,kParticleAngles},std::pair{71,kRotationSpeed}}) {
+            if(!read_one_d(suites,plugin_id,effect,first,time,vector.x) ||
+               !read_one_d(suites,plugin_id,effect,first+1,time,vector.y) ||
+               !read_one_d(suites,plugin_id,effect,first+2,time,vector.z)) return false;
+            add_value(node,key,vector);
+        }
     }
 
-    const A_long size_curve_count_index = particle ? 10 : 9;
+    const A_long size_curve_count_index = particle ? 15 : 9;
     const A_long size_curve_first_index = size_curve_count_index + 1;
-    const A_long opacity_curve_count_index = particle ? 27 : 26;
+    const A_long opacity_curve_count_index = particle ? 32 : 26;
     const A_long opacity_curve_first_index = opacity_curve_count_index + 1;
     core::OpaqueBytes curve{};
     bool has_curve = false;
@@ -630,6 +652,61 @@ core::PortKey destination_port(Kind kind) noexcept {
 }
 
 } // namespace
+
+struct NativeAnimationPlan::Impl {
+    std::vector<RawNode> nodes;
+    std::map<core::NodeId, core::GraphNode> templates;
+    core::LayerUnits units;
+    bool decoded{};
+    Impl(const core::Graph& graph,A_long width,A_long height,double aspect)
+        :units{double(std::max<A_long>(width,1)),double(std::max<A_long>(height,1)),aspect} {
+        decoded=std::isfinite(aspect) && aspect>0 && read_binding_record(graph,nodes);
+        for(const auto& node:graph.nodes) templates.emplace(node.id,node);
+    }
+};
+NativeAnimationPlan::NativeAnimationPlan(const core::Graph& graph,A_long width,A_long height,double aspect)
+    :impl_(std::make_unique<Impl>(graph,width,height,aspect)) {}
+NativeAnimationPlan::~NativeAnimationPlan()=default;
+bool NativeAnimationPlan::valid() const noexcept {return impl_ && impl_->decoded;}
+PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNode& output,
+                                  A_long* failed_stream) const noexcept {
+    if(failed_stream) *failed_stream=-1;
+    try {
+        if(!valid()) return PF_Err_BAD_CALLBACK_PARAM;
+        const auto original=impl_->templates.find(id);
+        if(original==impl_->templates.end()) return PF_Err_BAD_CALLBACK_PARAM;
+        output=original->second;
+        const auto found=std::find_if(impl_->nodes.begin(),impl_->nodes.end(),[&](const auto& n){return n.id==id;});
+        if(found==impl_->nodes.end()) return PF_Err_NONE;
+        if(!data || !data->inter.checkout_param || !data->inter.checkin_param) return PF_Err_BAD_CALLBACK_PARAM;
+        auto raw=*found;
+        for(auto& field:raw.fields) if(field.present && field.slot>=0) {
+            for(A_long component=0;component<component_count(field.type);++component) {
+                PF_ParamDef sampled{};
+                const A_long index=kNativeBindingFirstIndex+field.slot+component;
+                if(failed_stream) *failed_stream=index;
+                const auto error=PF_CHECKOUT_PARAM(data,index,data->current_time,data->time_step,data->time_scale,&sampled);
+                if(error) return error;
+                const bool valid_value=sampled.param_type==PF_Param_FLOAT_SLIDER &&
+                    std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value!=kNativeBindingUnavailable;
+                const double value=valid_value?sampled.u.fs_d.value:0;
+                const auto checked_in=PF_CHECKIN_PARAM(data,&sampled);
+                if(!valid_value) return PF_Err_BAD_CALLBACK_PARAM;
+                if(checked_in) return checked_in;
+                field.value[component]=value;
+            }
+        }
+        const auto expected=raw.kind==Kind::emitter?core::graph_keys::kEmitterNode:
+            raw.kind==Kind::particle?core::graph_keys::kParticleNode:
+            raw.kind==Kind::appearance?core::graph_keys::kAppearanceNode:core::graph_keys::kForceNode;
+        if(output.type_key!=expected) return PF_Err_BAD_CALLBACK_PARAM;
+        SuiteSet reader(nullptr);
+        reader.playback=&raw;
+        output.parameters.clear();
+        return read_node_parameters(reader,0,nullptr,raw.kind,{},impl_->units,output)?PF_Err_NONE:PF_Err_BAD_CALLBACK_PARAM;
+    } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+      catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
 
 PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                  core::Graph& graph, bool& found_node_effects, AEGP_PluginID plugin_id,
@@ -736,10 +813,13 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             !std::isfinite(params[kLayoutOutputYId]->u.fs_d.value)) return PF_Err_BAD_CALLBACK_PARAM;
         layout_entries.push_back(LayoutEntry{output_id,
             params[kLayoutOutputXId]->u.fs_d.value, params[kLayoutOutputYId]->u.fs_d.value});
-        graph.nodes.push_back(core::GraphNode{output_id, core::graph_keys::kOutputNode, 3,
+        graph.nodes.push_back(core::GraphNode{output_id, core::graph_keys::kOutputNode, 4,
             {{core::graph_keys::kParticleCount,
               static_cast<std::uint32_t>(params[kMaxParticlesId]->u.fs_d.value)}}});
         auto& output = graph.nodes.back();
+        if(!params[kTimeSamplingHzId] || params[kTimeSamplingHzId]->param_type!=PF_Param_POPUP ||
+           params[kTimeSamplingHzId]->u.pd.value<1 || params[kTimeSamplingHzId]->u.pd.value>3) return PF_Err_BAD_CALLBACK_PARAM;
+        add_value(output,core::graph_keys::kTimeSamplingHz,std::uint32_t(30u<<(params[kTimeSamplingHzId]->u.pd.value-1)));
         for (const auto& binding : {std::pair{kTimeRemapEnabledId, core::graph_keys::kTimeRemapEnabled},
                                    std::pair{kPreviewEnabledId, core::graph_keys::kPreviewEnabled}}) {
             if (!params[binding.first] || params[binding.first]->param_type != PF_Param_CHECKBOX) return PF_Err_BAD_CALLBACK_PARAM;
@@ -932,7 +1012,7 @@ PF_Err read_native_lifetime_bindings(const core::Graph& graph,std::vector<Native
     try {
         std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes)) return PF_Err_BAD_CALLBACK_PARAM;
         for(const auto& node:nodes) if(node.kind==Kind::particle) {
-            const auto& life=node.fields[1];
+            const auto& life=node.fields[2];
             if(!life.present || life.slot<0 || life.type!=node_sync::ValueKind::scalar) return PF_Err_BAD_CALLBACK_PARAM;
             bindings.push_back({node.id,kNativeBindingFirstIndex+life.slot});
         }

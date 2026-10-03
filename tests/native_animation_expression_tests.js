@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const expressions = JSON.parse(fs.readFileSync(path.join(root, "artifacts/native-animation-expressions.json"), "utf8"));
-assert.equal(expressions.length, 52);
+assert.equal(expressions.length, 67);
 function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {value:n === 7 ? uuid : 0};
@@ -11,8 +11,8 @@ function node(firstUuid, uuid, values) {
     Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
 }
 let frameTime=0;
-const emitter = node(98, 1, {4:()=>[250+frameTime*100,500]}), particle = node(128,2,{6:1,7:[0.3,0.5,0.7,1]});
-const force = node(95,4,{}), duplicate = node(98,777,{4:[999,999]});
+const emitter = node(99, 1, {4:()=>[250+frameTime*100,500]}), particle = node(143,2,{9:1,10:[0.3,0.5,0.7,1]});
+const force = node(95,4,{}), duplicate = node(99,777,{4:[999,999]});
 for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
     const parade = {numProperties:effects.length};
     const layer = name => {assert.equal(name,"ADBE Effect Parade");return parade;};
@@ -22,16 +22,16 @@ for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[fo
         /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
         const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx.param(105).value === 1") ? emitter : expression.includes("fx.param(135).value === 2") ? particle : force;
+        const source = expression.includes("fx.param(106).value === 1") ? emitter : expression.includes("fx.param(150).value === 2") ? particle : force;
         let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
     }
 }
-const originExpression=expressions.find(expr=>expr.includes("fx.param(105).value === 1") && expr.includes("result = fx.param(4).value[0]"));
+const originExpression=expressions.find(expr=>expr.includes("fx.param(106).value === 1") && expr.includes("result = fx.param(4).value[0]"));
 const missingLayer=()=>({numProperties:0});missingLayer.effect=()=>{throw new Error("missing effect");};
 assert.equal(vm.runInNewContext(originExpression,{thisLayer:missingLayer}),-1099511627776,"missing UUID cannot turn particle settings into zero");
-const failingEmitter=node(98,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
+const failingEmitter=node(99,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
 const failingLayer=()=>({numProperties:1});failingLayer.effect=()=>failingEmitter;
 assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer}),/Origin XY evaluation failed/,
     "source-property failures are not caught as unrelated effects");

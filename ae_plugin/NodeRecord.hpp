@@ -20,8 +20,8 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
-        case Kind::emitter: return 30;
-        case Kind::particle: return 60;
+        case Kind::emitter: return 31;
+        case Kind::particle: return 75;
         case Kind::appearance: return 42;
         case Kind::force: return 27;
     }
@@ -53,6 +53,12 @@ enum class Kind : A_long { emitter, particle, appearance, force };
 // identities stable independently of stream indices (schema/node-parameters.json).
 namespace disk_ids {
 enum : A_long {
+    kAuxiliarySourceId = 136,
+    kLifeRandomId = 212, kParticleShapeId = 213, kSizeYId = 214,
+    kFeatherId = 216, kUpAxisId = 217, kOrientToId = 218,
+    kParticleAngleXId = 219, kParticleAngleYId = 220, kParticleAngleZId = 221,
+    kParticleAngleRandomId = 222, kRotationSpeedXId = 223, kRotationSpeedYId = 224,
+    kRotationSpeedZId = 225, kRotationSpeedRandomId = 226, kLimitTo2DId = 227,
     kParticleColorModeId = 211, kColorGradientCountId = 930,
     kColorGradientPositionFirstId = 940, kColorGradientColorFirstId = 950,
     kEmitterTypeId = 101, kBirthRateId = 102,
@@ -121,6 +127,8 @@ enum : A_long {
         kDirectionId, kDirectionSpanId,
         kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
         kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId,
+        kAuxiliarySourceId,kLifeRandomId,kParticleShapeId,kSizeYId,kFeatherId,kUpAxisId,kOrientToId,
+        kParticleAngleXId,kParticleAngleYId,kParticleAngleZId,kParticleAngleRandomId,kRotationSpeedXId,kRotationSpeedYId,kRotationSpeedZId,kRotationSpeedRandomId,kLimitTo2DId,
         kParticleColorModeId, kColorGradientCountId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,
         kWindXId, kWindYId, kWindZId, kSpinId, kSpinFrequencyId, kSpinResistId, kSpinDelayId,

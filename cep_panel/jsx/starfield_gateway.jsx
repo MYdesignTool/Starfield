@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-node-animation-19";
+    var GATEWAY_BUILD = "native-particle-controls-23";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -508,7 +508,7 @@
         // Validate the whole payload before mutating any native property.
         setNodeControl(effect,"Color Gradient Count",count);
         for(var point=0;point<count;point++) {
-            setNodeControl(effect,"Color Gradient "+point+" Position",stops[point].position);
+            setNodeControl(effect,"Color Gradient "+point+" Position",stops[point].position*100);
             setNodeControl(effect,"Color Gradient "+point+" Color",stops[point].color.concat([1]));
         }
     }
@@ -591,8 +591,8 @@
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
-            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 5 :
-                type === "org.starfieldfx.nodes.particle" ? 3 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
+            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 6 :
+                type === "org.starfieldfx.nodes.particle" ? 4 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -627,6 +627,7 @@
             scalar(22, "Speed Random");
             scalar(17, "Direction", 3); node.parameters[node.parameters.length - 1].value--;
             scalar(23, "Emitting", 3); node.parameters[node.parameters.length - 1].value--;
+            scalar(31,"Auxiliary Source",3);
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
@@ -659,7 +660,7 @@
                 if(Math.floor(colorCount)!==colorCount || colorCount<2 || colorCount>8) throw new Error("Invalid Color Gradient count.");
                 var colorBytes=[1,colorCount,0,0];
                 for(var stop=0;stop<colorCount;stop++) {
-                    appendFloat64(colorBytes,Number(nodeControlValue(effect,"Color Gradient "+stop+" Position")));
+                    appendFloat64(colorBytes,Number(nodeControlValue(effect,"Color Gradient "+stop+" Position"))/100);
                     var stopColor=nodeControlValue(effect,"Color Gradient "+stop+" Color");
                     for(var channel=0;channel<3;channel++) appendFloat64(colorBytes,Number(stopColor[channel]));
                 }
@@ -669,7 +670,19 @@
             node.parameters[node.parameters.length - 1].value /= 100;
             scalar(6, "Opacity Over Life");
             scalar(9, "Size Random"); scalar(10, "Opacity Random");
-            if (type === "org.starfieldfx.nodes.particle") scalar(11, "Life (Seconds)");
+            if (type === "org.starfieldfx.nodes.particle") {
+                scalar(11,"Life (Seconds)");scalar(14,"Life Random");scalar(16,"Size Y (Pixels)");
+                scalar(19,"Angle Random");scalar(21,"Speed Random");scalar(23,"Particle Feather");
+                var enums=[[15,"Shape"],[17,"Orient To"],[22,"Limit to 2D"],[24,"Up Axis"]];
+                for(var ei=0;ei<enums.length;ei++) {
+                    scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
+                }
+                for(var group=0;group<2;group++) {
+                    var label=group?"Speed":"Angle";
+                    node.parameters.push({key:group?"20":"18",type:5,value:[Number(nodeControlValue(effect,label+" X")),
+                        Number(nodeControlValue(effect,label+" Y")),Number(nodeControlValue(effect,label+" Z"))]});
+                }
+            }
             var curves = [[7,"Size"],[8,"Opacity"]];
             for (var c = 0; c < curves.length; c++) {
                 var label = curves[c][1], count = Number(nodeControlValue(effect, label + " Curve Count"));
@@ -815,6 +828,7 @@
                     else if (key === "21") setNodeControl(effect, "Size Z", value);
                     else if (key === "22") setNodeControl(effect, "Speed Random", value);
                     else if (key === "23") setNodeControl(effect, "Emitting", Number(value) + 1);
+                    else if(key === "31") setNodeControl(effect,"Auxiliary Source",Number(value));
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
@@ -835,7 +849,16 @@
                     else if (key === "9") setNodeControl(effect, "Size Random", value);
                     else if (key === "10") setNodeControl(effect, "Opacity Random", value);
                     else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Life (Seconds)", value);
-                    else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
+                    else if(type==="org.starfieldfx.nodes.particle") {
+                        var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Speed Random","23":"Particle Feather"};
+                        var enums={"15":"Shape","17":"Orient To","22":"Limit to 2D","24":"Up Axis"};
+                        if(scalars[key]) setNodeControl(effect,scalars[key],value);
+                        else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
+                        else if(key==="18" || key==="20") {
+                            var group=key==="18"?"Angle":"Speed";
+                            for(var axis=0;axis<3;axis++) setNodeControl(effect,group+" "+["X","Y","Z"][axis],value[axis]);
+                        } else throw new Error("Particle graph parameter is not mapped to an AE control: "+key);
+                    } else throw new Error("Particle graph parameter is not mapped to an AE control: " + key);
                 } else if (type === "org.starfieldfx.nodes.force") {
                     if (key === "1") setNodeControl(effect, "Gravity", -Number(value[1])*Number(layer.height));
                     else if (key === "2") setNodeControl(effect, "Air Density", value);
@@ -1164,9 +1187,10 @@
     }
 
     function writeRendererRecord(resolved, record) {
-        var names = ["Max Particles", "Layout Output X", "Layout Output Y", "Time Remapping On / Off", "Time (Seconds)", "Preview", "Particle chance"],
+        if(record.timeSamplingHz && record.timeSamplingHz!==30 && record.timeSamplingHz!==60 && record.timeSamplingHz!==120) throw new Error("Invalid time sampling frequency.");
+        var names = ["Max Particles", "Layout Output X", "Layout Output Y", "Time Remapping On / Off", "Time (Seconds)", "Preview", "Particle chance", "Time Sampling"],
             values = [record.maxParticles, record.position.x, record.position.y, record.timeRemapEnabled || 0,
-                record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100];
+                record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100, ({30:1,60:2,120:3})[record.timeSamplingHz || 30]];
         for (var i = 0; i < names.length; i++) {
             var property = findEffectProperty(resolved.target.effect, names[i]);
             if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
@@ -1184,6 +1208,7 @@
             timeRemapSeconds:Number(findEffectProperty(resolved.target.effect,"Time (Seconds)").value),
             previewEnabled:Number(findEffectProperty(resolved.target.effect,"Preview").value),
             previewChance:Number(findEffectProperty(resolved.target.effect,"Particle chance").value),
+            timeSamplingHz:[30,60,120][Number(findEffectProperty(resolved.target.effect,"Time Sampling").value)-1],
             position: { x: Number(findEffectProperty(resolved.target.effect, "Layout Output X").value), y: Number(findEffectProperty(resolved.target.effect, "Layout Output Y").value) } };
     }
 
@@ -1258,12 +1283,12 @@
                 }
                 var initial = [];
                 if (!emitter) {
-                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:5,
+                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:6,
                         parameters:[{key:"6",type:5,value:[0,0,0]}],position:{x:180,y:22},outgoing:[]};
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:3,
+                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:4,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }

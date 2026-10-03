@@ -107,6 +107,19 @@ int main() {
               "auxiliary bank starts at runtime stream 17 in percent");
         check(std::strcmp(registered[23].name, "Random Seed") == 0, "seed ends source controls at runtime stream 24");
     }
+    if constexpr(kind==Kind::particle) {
+        check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
+        check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
+        check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");
+        for(A_long index:{67,68,69,71,72,73}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
+        check(std::strcmp(registered[49].name,"Color Gradient 0 Position")==0 && (registered[49].ui_flags&PF_PUI_DISABLED),"gradient endpoint positions stay structural");
+        check((registered[50].ui_flags&PF_PUI_INVISIBLE)==0,"gradient endpoint color is visible in Effect Controls");
+    }
+    if constexpr(kind==Kind::emitter) {
+        check(registered[1].u.pd.num_choices==4,"Emitting exposes timing choices");
+        check(registered[14].u.pd.value==2,"Direction defaults Uniform");
+        check(std::strcmp(registered[30].name,"Auxiliary Source")==0,"Auxiliary source is a separate structural control");
+    }
     if constexpr (kind == Kind::force) {
         check(registered[0].param_type==PF_Param_FLOAT_SLIDER && registered[0].uu.id==disk_ids::kForceGravityId,"Force uses scalar Gravity with a fresh bounded disk identity");
         check(std::strcmp(registered[1].name,"Gravity random")==0,"Force random control follows Gravity");
@@ -118,11 +131,11 @@ int main() {
     int colors = 0;
     bool controls_constant = true, controls_animated = true, interpolation_unrestricted = true, colors_supervised = true;
     A_long control_index = 0;
-    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 9 : kind == Kind::appearance ? 8 : 10;
+    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 14 : kind == Kind::appearance ? 8 : 10;
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
-        if (control_index <= last_animated && !(kind==Kind::emitter && control_index==2))
+        if ((control_index <= last_animated || (kind==Kind::particle && control_index>=66 && control_index<=75)) && !(kind==Kind::emitter && control_index==2))
             controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
         else controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
         interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;

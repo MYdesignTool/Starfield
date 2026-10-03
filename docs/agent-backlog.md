@@ -1,5 +1,24 @@
 # Agent-ready implementation backlog
 
+## M3-06 — reference Particle controls and GPU performance
+
+Active owner task; ADR 0026 owns the render/particle/transport contracts, shared
+core and platform render sources, adapter sampling/node/main parameters, schema,
+CEP, focused checks and build/deployment documentation. Fix Emitting/Auxiliary,
+Uniform defaults, Life Random, procedural shapes/rotation/color ordering. Implement
+AE-native CUDA/OpenCL rendering and default GPU selection; optimize temporal sampling.
+AE 2023 only, fresh development effects, single-Junction standing deployment.
+ADR 0026 was revised on 2026-10-03 after owner review: AE proposes the GPU framework;
+use device setup/setdown, per-frame eligibility and SMART_RENDER_GPU with shared AE
+worlds. No private D3D12/OpenGL context or full-frame CPU readback. The May 2023 SDK
+has no DirectX backend contract. GPU implementation/host qualification are still open.
+
+Build 23 completes the reference control/timing and prepared-node-sampling phase;
+2,017 scoped C++ checks and focused JS checks pass. Core rate metadata/analytic
+integration and prefix cache are implemented; AE metadata capture/invalidation
+and cross-frame reuse remain open. Native GPU handlers/backends/default GPU UI
+remain open. See build-matrix.md and compatibility-matrix.md; do not close M3-06.
+
 ## M3-05 — temporal controls and Particle color / build 22
 
 Status: source implemented, 1,420 scoped checks pass, SDK build and deployment

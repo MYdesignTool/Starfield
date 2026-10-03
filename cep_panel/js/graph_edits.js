@@ -16,7 +16,7 @@
         appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 5, particle: 3, force: 2, appearance: 1, output: 3 };
+    var SCHEMA_VERSIONS = { emitter: 6, particle: 4, force: 2, appearance: 1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
@@ -34,10 +34,10 @@
             { key: "11", type: 4, value: 0 }, { key: "14", type: 4, value: 0 },
             { key: "12", type: 4, value: 100 },
             { key: "15", type: 4, value: 0 }, { key: "16", type: 4, value: 0 },
-            { key: "17", type: 3, value: 0 }, { key: "18", type: 4, value: 60 },
+            { key: "17", type: 3, value: 1 }, { key: "18", type: 4, value: 60 },
             { key: "19", type: 4, value: 100 }, { key: "20", type: 4, value: 100 },
             { key: "21", type: 4, value: 100 }, { key: "22", type: 4, value: 0 },
-            {key:"23",type:3,value:0}, {key:"24",type:4,value:100},
+            {key:"23",type:3,value:0},{key:"31",type:3,value:0}, {key:"24",type:4,value:100},
             {key:"25",type:4,value:0}, {key:"26",type:4,value:100},
             {key:"27",type:4,value:0}, {key:"28",type:4,value:0},
             {key:"29",type:4,value:0}, {key:"30",type:4,value:0}
@@ -49,7 +49,13 @@
             { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 100 },
             { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 100 },
             { key: "11", type: 4, value: 2 },
-            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
+            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 },
+            { key: "14", type: 4, value: 0 }, { key: "15", type: 3, value: 0 },
+            { key: "16", type: 4, value: 10 }, { key: "17", type: 3, value: 0 },
+            { key: "18", type: 5, value: [0,0,0] }, { key: "19", type: 4, value: 0 },
+            { key: "20", type: 5, value: [0,0,0] }, { key: "21", type: 4, value: 0 },
+            { key: "22", type: 3, value: 1 }, { key: "23", type: 4, value: 0 },
+            { key: "24", type: 3, value: 2 }
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },
@@ -64,7 +70,7 @@
             { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
-            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100}]
+            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"7",type:3,value:30}]
     };
 
     function defaultGradient() {
@@ -154,7 +160,7 @@
                  parameters: DEFAULTS[kind].map(function (parameter) {
                      return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
                  }) };
-        if (auxiliary) result.parameters.filter(function (p) { return p.key === "23"; })[0].value = 1;
+        if (auxiliary) result.parameters.filter(function (p) { return p.key === "31"; })[0].value = 1;
         return result;
     }
 
@@ -181,8 +187,8 @@
             fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
         }
         if (destination.type === TYPES.emitter) {
-            var mode = destination.parameters.filter(function (p) { return p.key === "23"; })[0];
-            if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Select Auxiliary in the Emitter's Emitting menu before connecting a parent stream.");
+            var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
+            if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
         }
         if (source.type === TYPES.appearance && destination.type !== TYPES.output && destination.type !== TYPES.emitter) {
             fail("invalid_stage", "an Appearance override connects to Output");
@@ -432,7 +438,7 @@
         graph.edges = graph.edges.filter(function (edge) {
             var target = nodeById(graph, edge.destinationNode);
             if (!target || target.type !== TYPES.emitter) return true;
-            var mode = target.parameters.filter(function (p) { return p.key === "23"; })[0];
+            var mode = target.parameters.filter(function (p) { return p.key === "31"; })[0];
             return mode && Number(mode.value) === 1;
         });
     }

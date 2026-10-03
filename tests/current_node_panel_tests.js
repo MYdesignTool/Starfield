@@ -3,12 +3,17 @@ const assert=require("node:assert/strict"), fs=require("node:fs"), vm=require("n
 const edits=require("../cep_panel/js/graph_edits.js"), view=require("../cep_panel/js/graph_view.js");
 const snapshot=require("../cep_panel/js/native_graph_snapshot.js"), codec=require("../cep_panel/js/graph_codec.js");
 const uuid=n=>n.toString(16).padStart(32,"0");let next=10;
-const output={id:uuid(255),type:edits.types.output,schemaVersion:3,parameters:[{key:"1",type:3,value:1000000}]};
+const output={id:uuid(255),type:edits.types.output,schemaVersion:4,parameters:[{key:"1",type:3,value:1000000},{key:"7",type:3,value:30}]};
 let graph={version:1,nodes:[output],edges:[],optionalRecords:[]};
 const add=kind=>{graph=edits.apply(graph,{type:"addNode",nodeType:kind},()=>uuid(next++));return graph.nodes[graph.nodes.length-1];};
 const emitter=add("emitter"), particle=add("particle"), auxiliary=add("auxiliary"), child=add("particle");
-assert.equal(auxiliary.schemaVersion,5);
-assert.equal(auxiliary.parameters.find(p=>p.key==="23").value,1);
+assert.equal(auxiliary.schemaVersion,6);
+assert.equal(emitter.parameters.find(p=>p.key==="17").value,1,"Uniform is the default");
+assert.equal(auxiliary.parameters.find(p=>p.key==="23").value,0,"Auxiliary uses independent Emitting timing");
+assert.deepEqual(view.project(graph,null,{width:3840,height:2160,pixelAspect:1}).nodes.find(n=>n.id===particle.id).params.slice(0,5).map(p=>p.label),
+    ["Shape","Life (Seconds)","Life Random","Size (Pixels)","Size Y (Pixels)"]);
+assert.equal(view.parameterToGraphValue(view.project(graph,null).nodes.find(n=>n.kind==="output").params.find(p=>p.graphKey==="7"),3),120);
+assert.equal(auxiliary.parameters.find(p=>p.key==="31").value,1);
 for(const [from,to] of [[emitter.id,particle.id],[particle.id,auxiliary.id],[auxiliary.id,child.id],[child.id,output.id]])
     graph=edits.apply(graph,{type:"connect",from,to},()=>uuid(next++));
 assert.equal(graph.edges.find(e=>e.destinationNode===auxiliary.id).destinationPort,"2");
@@ -34,10 +39,10 @@ assert.equal(auxView.label,"Auxiliary");assert.equal(auxView.inputPort,"2");asse
 assert.deepEqual(auxView.params.slice(0,7).map(p=>p.label),["Type","Emitting","Particles Per Second","Origin XY","Origin Z","Speed","Speed Random"]);
 assert.equal(emitterView.params.some(p=>p.label.startsWith("Inherit")),false);
 assert.equal(auxView.params.find(p=>p.label==="Emit Chance").scrubStep,1);
-assert.equal(projected.nodes.find(n=>n.id===particle.id).params[0].scrubStep,.1);
+assert.equal(projected.nodes.find(n=>n.id===particle.id).params.find(p=>p.graphKey==="11").scrubStep,.1);
 assert.equal(view.activeEmitterParameters(graph),null,"never present an inaccurate auxiliary live count");
-const changed=edits.apply(graph,{type:"setParameters",changes:[{nodeId:auxiliary.id,parameterKey:"23",valueType:3,value:0}]});
-assert.equal(changed.edges.some(e=>e.destinationNode===auxiliary.id),false,"switching to Default disconnects parent stream in same transaction");
+const changed=edits.apply(graph,{type:"setParameters",changes:[{nodeId:auxiliary.id,parameterKey:"31",valueType:3,value:0}]});
+assert.equal(changed.edges.some(e=>e.destinationNode===auxiliary.id),false,"disabling Auxiliary source disconnects parent stream in same transaction");
 const transactions=require("../cep_panel/js/graph_transactions.js");
 const base={initialized:true,graphHex:codec.toHex(graph),geometry:{width:3840,height:2160,pixelAspect:1},revision:1};
 let addedGraph,transactionResult;

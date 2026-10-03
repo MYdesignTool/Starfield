@@ -9,7 +9,7 @@ namespace {
 using namespace graph_keys;
 
 GraphNode make_emitter_node(const Settings& settings, NodeId id) {
-    GraphNode node{id, kEmitterNode, 5, {
+    GraphNode node{id, kEmitterNode, 6, {
         {kBirthRate, settings.birth_rate},
         {kSeed, settings.seed},
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},
@@ -56,7 +56,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         const double size_end = settings.appearance_enabled ? settings.particle_size_end : 100.0;
         const double opacity_end = settings.appearance_enabled ? settings.opacity_end : 100.0;
 
-        GraphNode particle_node{particle, kParticleNode, 3, {
+        GraphNode particle_node{particle, kParticleNode, 4, {
             {kColorStart, color_start}, {kColorEnd, color_end},
             {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
             {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};
@@ -78,9 +78,9 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         graph.nodes = {
             make_emitter_node(settings, emitter),
             std::move(particle_node),
-            GraphNode{output, kOutputNode, 3, {{kParticleCount, settings.particle_count},
+            GraphNode{output, kOutputNode, 4, {{kParticleCount, settings.particle_count},
                 {kTimeRemapEnabled,std::uint32_t{0}},{kTimeRemapSeconds,0.0},
-                {kPreviewEnabled,std::uint32_t{0}},{kPreviewChance,100.0}}},
+                {kPreviewEnabled,std::uint32_t{0}},{kPreviewChance,100.0},{kTimeSamplingHz,std::uint32_t{30}}}},
         };
         graph.edges = {
             GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},

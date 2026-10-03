@@ -1,8 +1,8 @@
 {
-  "identityRevision": 3,
+  "identityRevision": 4,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Development Particle schema 3/base 60 adds Color mode/gradient; Emitter Angle X/Y/Z change from sliders to native Angle controls with disk IDs 133–135. Fresh Emitter/Particle effects required; no legacy migration. Other stream indices and layouts remain unchanged. ADR 0025; Core ABI 2 unchanged.",
-  "animation": "Birth controls sample at birth; PPS and Force integrate over time. Emitting is structural and constant. Identity/layout/topology and curve/gradient knot banks remain constant. ADR 0025.",
+  "migrationPolicy": "M3-06 development Emitter schema 6/base 31 separates Auxiliary Source from Emitting timing; Particle schema 4/base 75 adds birth lifetime randomness, shapes and rotation. Fresh main/Emitter/Particle effects required; no legacy migration. Main manifest 23 appends Time Sampling; transient 0x8004 particle snapshot version 2. ADR 0026.",
+  "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,
@@ -62,7 +62,23 @@
     "spin_delay": 313,
     "wind_spin_curve_count": 900,
     "particle_color_mode": 211,
-    "color_gradient_count": 930
+    "color_gradient_count": 930,
+    "auxiliary_source": 136,
+    "life_random": 212,
+    "particle_shape": 213,
+    "size_y": 214,
+    "particle_feather": 216,
+    "up_axis": 217,
+    "orient_to": 218,
+    "particle_angle_x": 219,
+    "particle_angle_y": 220,
+    "particle_angle_z": 221,
+    "particle_angle_random": 222,
+    "rotation_speed_x": 223,
+    "rotation_speed_y": 224,
+    "rotation_speed_z": 225,
+    "rotation_speed_random": 226,
+    "limit_to_2d": 227
   },
   "outgoingConnections": {
     "first": 500,
@@ -86,7 +102,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter, Particle and Appearance reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 7,
+  "layoutRevision": 8,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -260,16 +276,17 @@
     }
   },
   "graphAuthoring": {
-    "emitterSchemaVersion": 5,
+    "emitterSchemaVersion": 6,
     "speedRandomPercentKey": 22,
     "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
     "forceSchemaVersion": 2,
-    "outputSchemaVersion": 3,
-    "particleSchemaVersion": 3
+    "outputSchemaVersion": 4,
+    "particleSchemaVersion": 4
   },
   "nativeControlOrder": {
     "emitter": [
       "Type",
+      "Emitting",
       "Particles Per Second",
       "Origin XY",
       "Origin Z",
@@ -287,15 +304,31 @@
       "Random Seed"
     ],
     "particle": [
+      "Shape",
       "Life (Seconds)",
+      "Life Random",
       "Size (Pixels)",
+      "Size Y (Pixels)",
       "Size Random",
       "Opacity",
       "Opacity Random",
       "Particle Color",
       "Color",
+      "Particle Feather",
+      "Up Axis",
       "Size Over Life",
-      "Opacity Over Life"
+      "Opacity Over Life",
+      "Color Gradient",
+      "Orient To",
+      "Angle X",
+      "Angle Y",
+      "Angle Z",
+      "Angle Random",
+      "Speed X",
+      "Speed Y",
+      "Speed Z",
+      "Speed Random",
+      "Limit to 2D"
     ],
     "force": [
       "Gravity",
@@ -321,9 +354,10 @@
     "points": 8,
     "graphKey": 13,
     "modeGraphKey": 12,
-    "nativeCountIndex": 44,
-    "nativePositionFirstIndex": 45,
-    "nativeColorFirstIndex": 46,
-    "nativeStride": 2
+    "nativeCountIndex": 49,
+    "nativePositionFirstIndex": 50,
+    "nativeColorFirstIndex": 51,
+    "nativeStride": 2,
+    "nativePositionUnits": "0–100 percent"
   }
 }

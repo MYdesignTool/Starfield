@@ -3,6 +3,7 @@ param(
     [switch]$RendererControls,
     [switch]$NodeEffects,
     [switch]$CurrentNodes,
+    [switch]$EmissionTimeline,
     [switch]$NativeSync,
     [switch]$TraceIncludes,
     [ValidateSet('Emitter', 'Particle', 'Appearance', 'Force')][string]$NodeKind = 'Particle',
@@ -10,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
+if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -28,7 +29,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -54,6 +55,7 @@ try {
         $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
     }
     if ($CurrentNodes) { $sources[0] = 'tests\current_node_core_tests.cpp' }
+    if ($EmissionTimeline) { $sources[0] = 'tests\emission_timeline_tests.cpp' }
     if ($NativeSync) {
         $sources[0] = 'tests\native_sync_tests.cpp'
         $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',

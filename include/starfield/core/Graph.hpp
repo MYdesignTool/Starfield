@@ -229,6 +229,7 @@ inline constexpr ParameterKey kEmitterSizeZ{21};
 // their independent world-unit jitter input (key 13).
 inline constexpr ParameterKey kEmissionSpeedRandomPercent{22};
 inline constexpr ParameterKey kEmittingMode{23};
+inline constexpr ParameterKey kAuxiliarySource{31};
 inline constexpr ParameterKey kEmitChance{24};
 inline constexpr ParameterKey kEmitLifeStart{25};
 inline constexpr ParameterKey kEmitLifeEnd{26};
@@ -266,6 +267,12 @@ inline constexpr ParameterKey kOpacityRandom{10};
 inline constexpr ParameterKey kParticleLifetimeSeconds{11};
 inline constexpr ParameterKey kParticleColorMode{12};
 inline constexpr ParameterKey kColorGradient{13};
+inline constexpr ParameterKey kLifeRandom{14}, kParticleShape{15}, kSizeY{16}, kOrientTo{17};
+inline constexpr ParameterKey kParticleAngles{18}, kAngleRandom{19}, kRotationSpeed{20}, kRotationSpeedRandom{21};
+inline constexpr ParameterKey kLimitTo2D{22}, kParticleFeather{23}, kUpAxis{24};
+inline constexpr ParameterKey kAcceleration{6}; // Output: 0 CPU / 1 GPU
+inline constexpr ParameterKey kTimeSamplingHz{7};
+
 } // namespace graph_keys
 
 [[nodiscard]] NodeRegistry make_particle_node_registry();

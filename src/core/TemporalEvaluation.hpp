@@ -2,7 +2,7 @@
 // temporal paths share the same parameter validation and appearance functions.
 
 namespace {
-constexpr double kTemporalHz = 120.0;
+constexpr double kDefaultTemporalHz = 30.0;
 constexpr std::uint64_t kTemporalWorkLimit = 20'000'000;
 
 Vec3 temporal_spin_velocity(const ForceMotion& values,double age,double lifetime) {
@@ -17,71 +17,19 @@ Vec3 temporal_spin_velocity(const ForceMotion& values,double age,double lifetime
 }
 
 struct EmissionClock {
-    struct Interval { double left{}, right{}, cumulative{}; };
-    std::vector<Interval> intervals;
-    long double accumulated{};
-    double first_positive{-1};
-    Result<bool> extend(NodeId id, double now, TemporalGraphSampler& sampler,
-                        const Cancellation& cancel, std::uint64_t& work) {
+    EmissionTimeline timeline;
+    bool configured{};
+    Result<bool> extend(NodeId id,double now,TemporalGraphSampler& sampler,
+                         const Cancellation& cancel,std::uint64_t& work,unsigned hz) {
         using R=Result<bool>;
-        if (now<0) return R::success(true);
-        const double needed=std::ceil(now*kTemporalHz);
-        if(!std::isfinite(needed) || needed>2'000'000)
-            return R::failure(ErrorCode::work_limit_exceeded,"emission timeline exceeds bounded duration");
-        while(intervals.size()<static_cast<std::size_t>(needed)) {
-            if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"emission history cancelled");
-            if((work+=3)>kTemporalWorkLimit) return R::failure(ErrorCode::work_limit_exceeded,"emission history work limit");
-            const double t=double(intervals.size())/kTemporalHz;
-            auto left=sampler.rate(id,t), mid=sampler.rate(id,t+0.5/kTemporalHz), right=sampler.rate(id,t+1/kTemporalHz);
-            if(!left.has_value()) return R::failure(left.error());
-            if(!mid.has_value()) return R::failure(mid.error());
-            if(!right.has_value()) return R::failure(right.error());
-            double a=left.value(), b=right.value();
-            for(double value:{a,b,mid.value()}) if(!std::isfinite(value)||value<0||value>kMaxBirthRate)
-                return R::failure(ErrorCode::invalid_request,"animated emission rate outside bounds");
-            // Preserve holds at exact lattice boundaries. Smooth interpolation
-            // is piecewise linear; nonlinear AE curves are sampled at 120 Hz.
-            if(a!=b && mid.value()==a) b=a;
-            else if(a!=b && mid.value()==b) a=b;
-            if(first_positive<0 && (a>0||b>0)) first_positive=t;
-            intervals.push_back({a,b,double(accumulated)});
-            accumulated+=(static_cast<long double>(a)+b)/(2*kTemporalHz);
-            if(accumulated>9'007'199'254'740'991.0L)
-                return R::failure(ErrorCode::invalid_time,"emission ordinal exceeds exact range");
+        if(!configured) {
+            auto profile=sampler.rate_profile(id);
+            if(!profile.has_value()) return R::failure(profile.error());
+            auto ready=timeline.configure(hz,profile.value()?&*profile.value():nullptr);
+            if(!ready.has_value()) return ready;
+            configured=true;
         }
-        return R::success(true);
-    }
-    double integral(double now) const {
-        if(now<=0 || intervals.empty()) return 0;
-        const auto i=std::min<std::size_t>(static_cast<std::size_t>(std::floor(now*kTemporalHz)),intervals.size()-1);
-        const auto& s=intervals[i];
-        const double dt=std::clamp(now-double(i)/kTemporalHz,0.0,1/kTemporalHz);
-        return s.cumulative+s.left*dt+0.5*(s.right-s.left)*kTemporalHz*dt*dt;
-    }
-    double birth(std::uint64_t ordinal) const {
-        if(ordinal==0) return first_positive;
-        const double target=double(ordinal);
-        auto it=std::upper_bound(intervals.begin(),intervals.end(),target,
-            [](double value,const Interval& interval){return value<interval.cumulative;});
-        if(it!=intervals.begin()) --it;
-        // Plateau equality belongs to the earliest threshold crossing.
-        while(it!=intervals.begin() && it->cumulative==target) --it;
-        const auto index=static_cast<std::size_t>(it-intervals.begin());
-        const double amount=std::max(0.0,target-it->cumulative);
-        const double slope=(it->right-it->left)*kTemporalHz;
-        double dt;
-        if(std::abs(slope)<1e-12) dt=it->left>0?amount/it->left:0;
-        else {
-            const double discriminant=std::max(0.0,it->left*it->left+2*slope*amount);
-            const double denominator=it->left+std::sqrt(discriminant);
-            dt=denominator>0 ? 2*amount/denominator : 0;
-        }
-        double fraction=std::clamp(dt*kTemporalHz,0.0,1.0);
-        // The same threshold can lie at the previous interval's end or the
-        // next one's beginning. Canonicalize that boundary across frame lengths.
-        if(fraction<1e-10) fraction=0;
-        if(fraction>1-1e-10) fraction=1;
-        return (double(index)+fraction)/kTemporalHz;
+        return timeline.extend(now,[&](double time){return sampler.rate(id,time);},cancel,work);
     }
 };
 
@@ -91,6 +39,8 @@ class TemporalEvaluator {
     EmitterDimensionContext dimensions;
     std::map<NodeId,EmissionClock> clocks;
     std::uint64_t work{};
+    double hz{kDefaultTemporalHz};
+    std::map<std::pair<NodeId,double>,ForceValues> force_samples;
     using R=Result<EvaluatedGraph>;
     struct Branch {
         const GraphNode* emitter{};
@@ -107,6 +57,19 @@ class TemporalEvaluator {
             return Result<GraphNode>::failure(ErrorCode::invalid_request,"historical node identity changed");
         return result;
     }
+    Result<ForceValues> force_at(const GraphNode& node,double time) {
+        const auto key=std::make_pair(node.id,time);
+        if(auto found=force_samples.find(key);found!=force_samples.end())
+            return Result<ForceValues>::success(found->second);
+        auto sampled=at(node,time);
+        if(!sampled.has_value()) return Result<ForceValues>::failure(sampled.error());
+        auto values=read_force(sampled.value());
+        if(values.has_value()) {
+            if(force_samples.size()>=65536) force_samples.clear();
+            force_samples.emplace(key,values.value());
+        }
+        return values;
+    }
     Result<bool> motion(ParticleInstance& particle,const Branch& branch,
                         double birth,double now,std::uint32_t seed) {
         using M=Result<bool>;
@@ -117,14 +80,13 @@ class TemporalEvaluator {
         while(t<now && !branch.forces.empty()) {
             if(cancel.is_cancelled()) return M::failure(ErrorCode::cancelled,"force history cancelled");
             if(++work>kTemporalWorkLimit) return M::failure(ErrorCode::work_limit_exceeded,"force history work limit");
-            const double end=std::min(now,(std::floor(t*kTemporalHz+1e-8)+1)/kTemporalHz);
+            const double end=std::min(now,(std::floor(t*hz+1e-8)+1)/hz);
             if(!(end>t)) return M::failure(ErrorCode::invalid_time,"force integration did not advance");
             const double dt=end-t, midpoint=(t+end)/2, age=midpoint-birth;
             Vec3 acceleration{}, spin_velocity{};
             double drag=0;
             for(const auto* force_node:branch.forces) {
-                auto sampled=at(*force_node,midpoint);if(!sampled.has_value()) return M::failure(sampled.error());
-                auto force=read_force(sampled.value());if(!force.has_value()) return M::failure(force.error());
+                auto force=force_at(*force_node,midpoint);if(!force.has_value()) return M::failure(force.error());
                 const auto values=motion_for_emitter(force.value().motion,branch.emitter->id);
                 const double attenuation=unit_value(seed^values.random_salt,particle.id,RandomPurpose::force_gravity)*values.gravity_random_percent/100;
                 const double envelope=evaluate_age_curve(values.wind_spin_curve,
@@ -160,8 +122,7 @@ class TemporalEvaluator {
             // Report the instantaneous field velocity for Auxiliary inheritance;
             // do not feed it back into physical velocity during integration.
             for(const auto* force_node:branch.forces) {
-                auto sampled=at(*force_node,now);if(!sampled.has_value()) return M::failure(sampled.error());
-                auto force=read_force(sampled.value());if(!force.has_value()) return M::failure(force.error());
+                auto force=force_at(*force_node,now);if(!force.has_value()) return M::failure(force.error());
                 const auto spin=temporal_spin_velocity(force.value().motion,now-birth,particle.lifetime_seconds);
                 particle.velocity.x+=spin.x;particle.velocity.y+=spin.y;
             }
@@ -169,8 +130,8 @@ class TemporalEvaluator {
         return M::success(true);
     }
 public:
-    TemporalEvaluator(TemporalGraphSampler& s,const Cancellation& c,EmitterDimensionContext d)
-        :sampler(s),cancel(c),dimensions(d) {}
+    TemporalEvaluator(TemporalGraphSampler& s,const Cancellation& c,EmitterDimensionContext d,unsigned frequency)
+        :sampler(s),cancel(c),dimensions(d),hz(frequency) {}
     R evaluate(const Graph& graph,double now,unsigned depth=0) {
         if(depth>16) return R::failure(ErrorCode::work_limit_exceeded,"auxiliary history depth limit");
         const auto validation=validate_graph(graph,particle_node_registry());
@@ -244,22 +205,39 @@ public:
         std::priority_queue<Candidate,std::vector<Candidate>,decltype(older)> kept(older,std::move(storage));
         for(const auto& branch:branches) {
             auto& clock=clocks[branch.emitter->id];
-            auto extended=clock.extend(branch.emitter->id,now,sampler,cancel,work);
+            const auto* timing=find_value(*branch.emitter,kEmittingMode);
+            if(timing && std::get<std::uint32_t>(*timing)>3)
+                return R::failure(ErrorCode::invalid_request,"invalid Emitting mode");
+            const bool once=timing && std::get<std::uint32_t>(*timing)==1;
+            auto extended=clock.extend(branch.emitter->id,once?0:now,sampler,cancel,work,static_cast<unsigned>(hz));
             if(!extended.has_value()) return R::failure(extended.error());
             // t=0 has a birth iff the emitter is enabled at that instant.
-            if(now==0 && clock.intervals.empty()) {
-                auto e=clock.extend(branch.emitter->id,1/kTemporalHz,sampler,cancel,work);
+            if(!once && now==0 && !clock.timeline.initialized()) {
+                auto e=clock.extend(branch.emitter->id,1/hz,sampler,cancel,work,static_cast<unsigned>(hz));
                 if(!e.has_value()) return R::failure(e.error());
             }
-            if(clock.first_positive<0 || clock.first_positive>now) continue;
-            const double total=clock.integral(now);
-            auto last=static_cast<std::uint64_t>(std::floor(total+1e-10));
+            double total=clock.timeline.integral(now);
+            std::uint64_t last{};
+            if(once) {
+                auto initial=clock.timeline.analytic()?Result<double>::success(clock.timeline.initial_rate()):sampler.rate(branch.emitter->id,0);
+                if(!initial.has_value()) return R::failure(initial.error());
+                if(!std::isfinite(initial.value()) || initial.value()<0 || initial.value()>kMaxBirthRate)
+                    return R::failure(ErrorCode::invalid_request,"Once batch count outside bounds");
+                const auto count=static_cast<std::uint64_t>(std::floor(initial.value()));
+                if(!count) continue;
+                last=count-1;
+            } else {
+                if(clock.timeline.first_positive()<0 || clock.timeline.first_positive()>now) continue;
+                if(!std::isfinite(total) || total>9'007'199'254'740'991.0)
+                    return R::failure(ErrorCode::invalid_time,"emission ordinal exceeds exact range");
+                last=static_cast<std::uint64_t>(std::floor(total+1e-10));
+            }
             if(last<branch.partition) continue;
             std::uint64_t slot=last-(last-branch.partition)%branch.stride;
             for(;;) {
                 if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"birth history cancelled");
                 if(++work>kTemporalWorkLimit) return R::failure(ErrorCode::work_limit_exceeded,"birth history work limit");
-                const double birth=clock.birth(slot);
+                const double birth=once?0:clock.timeline.birth(slot);
                 if(birth<0 || birth>now+1e-9) return R::failure(ErrorCode::invalid_time,"birth inversion outside frame");
                 if(now-birth>=kMaxLifetimeSeconds || (kept.size()==cap && birth<kept.top().birth)) break;
                 // Expired births need one Life query, not every birth property.
@@ -272,7 +250,7 @@ public:
                     slot-=branch.stride;continue;
                 }
                 auto emitter_node=at(*branch.emitter,birth);if(!emitter_node.has_value()) return R::failure(emitter_node.error());
-                if(const auto* mode=find_value(emitter_node.value(),kEmittingMode);mode && std::get<std::uint32_t>(*mode)>1)
+                if(const auto* mode=find_value(emitter_node.value(),kEmittingMode);mode && std::get<std::uint32_t>(*mode)>3)
                     return R::failure(ErrorCode::invalid_request,"invalid Emitting mode");
                 for(auto key:{kEmitChance,kEmitLifeStart,kEmitLifeEnd,kInheritVelocity,kInheritSize,kInheritOpacity,kInheritColor})
                     if(const auto* value=find_value(emitter_node.value(),key);value &&
@@ -290,7 +268,7 @@ public:
                     }
                     Settings settings=emitter.value().value;settings.particle_lifetime_seconds=life;
                     const auto percent=[&](ParameterKey key,double fallback) {const auto* v=find_value(emitter_node.value(),key);return v?std::get<double>(*v)/100:fallback;};
-                    const auto* mode=find_value(emitter_node.value(),kEmittingMode);
+                    const auto* mode=find_value(emitter_node.value(),kAuxiliarySource);
                     const bool auxiliary=mode && std::get<std::uint32_t>(*mode)==1;
                     std::vector<ParticleInstance> parents;
                     if(auxiliary && !incoming[branch.emitter->id].empty()) {
@@ -330,6 +308,9 @@ public:
                                 color={blend(color.x,parent.color.x,inherit),blend(color.y,parent.color.y,inherit),blend(color.z,parent.color.z,inherit)};
                             }
                         }
+                        const double actual_life=birth_lifetime(particle_values.value(),own.seed,identity);
+                        if(age>=actual_life) continue;
+                        own.particle_lifetime_seconds=actual_life;
                         own.gravity={};own.linear_drag=0;own.forces.clear();
                         auto instance=simulate_particle_at_age(own,0,identity,dimensions);
                         instance.id=identity;instance.emitter_id=branch.emitter->id;instance.age_seconds=age;
@@ -338,8 +319,10 @@ public:
                             const double inherit=percent(kInheritVelocity,0);
                             instance.velocity.x+=parent.velocity.x*inherit;instance.velocity.y+=parent.velocity.y*inherit;instance.velocity.z+=parent.velocity.z*inherit;
                         }
+                        const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
                         apply_appearance(instance,looks,own.seed);
+                        apply_particle_properties(instance,particle_values.value(),own.seed,birth_position);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));
                         else if(older(candidate,kept.top())) {kept.pop();kept.push(std::move(candidate));}
@@ -365,12 +348,16 @@ Result<EvaluatedGraph> evaluate_temporal_particle_graph(const Graph& graph,Ratio
             !std::isfinite(dimensions.pixel_aspect_ratio) || dimensions.pixel_aspect_ratio<=0)
             return R::failure(ErrorCode::invalid_request,"invalid temporal evaluation context");
         double now=double(time.value)/time.scale;
+        unsigned frequency=30;
         for(const auto& node:graph.nodes) if(node.type_key==kOutputNode) {
+            if(const auto* value=find_value(node,kTimeSamplingHz)) frequency=std::get<std::uint32_t>(*value);
             const auto* flag=find_value(node,kTimeRemapEnabled);const auto* clock=find_value(node,kTimeRemapSeconds);
             if(flag && clock && std::get<std::uint32_t>(*flag)==1) now=std::get<double>(*clock);
         }
         if(!std::isfinite(now)) return R::failure(ErrorCode::invalid_time,"invalid temporal time");
-        TemporalEvaluator evaluator(sampler,cancellation,dimensions);
+        if(frequency!=30 && frequency!=60 && frequency!=120)
+            return R::failure(ErrorCode::invalid_request,"time sampling must be 30, 60 or 120 Hz");
+        TemporalEvaluator evaluator(sampler,cancellation,dimensions,frequency);
         return evaluator.evaluate(graph,now);
     } catch(const std::bad_alloc&) {return R::failure(ErrorCode::allocation_failed,"temporal allocation failed");}
       catch(...) {return R::failure(ErrorCode::internal_failure,"temporal evaluation failed");}

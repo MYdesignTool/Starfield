@@ -30,7 +30,7 @@ Graph auxiliary_graph() {
     check(made.has_value(),"construct primary source");
     Graph graph=made.take_value();
     auto emitter=graph.nodes[0]; emitter.id=NodeId{uuid(4)};
-    set(emitter,kEmittingMode,std::uint32_t{1}); set(emitter,kBirthRate,2.0); set(emitter,kVelocity,Vec3{});
+    set(emitter,kAuxiliarySource,std::uint32_t{1}); set(emitter,kBirthRate,2.0); set(emitter,kVelocity,Vec3{});
     auto child=graph.nodes[1]; child.id=NodeId{uuid(5)}; set(child,kParticleLifetimeSeconds,2.0);
     graph.nodes.push_back(emitter); graph.nodes.push_back(child);
     graph.edges[1]={EdgeId{uuid(12)},NodeId{uuid(2)},kParticleParticlesOut,emitter.id,kEmitterParents};
@@ -397,6 +397,17 @@ void test_birth_parameter_matrix() {
         {"Size X",kEmitterNode,kEmitterSizeX,400.0},{"Size Y",kEmitterNode,kEmitterSizeY,500.0},
         {"Size Z",kEmitterNode,kEmitterSizeZ,600.0},{"Disc extent",kEmitterNode,kEmitterSize,.8},
         {"Life",kParticleNode,kParticleLifetimeSeconds,1.5},
+        {"Life Random",kParticleNode,kLifeRandom,50.0},
+        {"Particle Shape",kParticleNode,kParticleShape,std::uint32_t{1}},
+        {"Size Y",kParticleNode,kSizeY,3.0},
+        {"Particle angles",kParticleNode,kParticleAngles,Vec3{30,60,90}},
+        {"Particle spin",kParticleNode,kRotationSpeed,Vec3{20,30,40}},
+        {"Angle random",kParticleNode,kAngleRandom,75.0},
+        {"Spin random",kParticleNode,kRotationSpeedRandom,75.0},
+        {"Orient To",kParticleNode,kOrientTo,std::uint32_t{1}},
+        {"Limit to 2D",kParticleNode,kLimitTo2D,std::uint32_t{0}},
+        {"Feather",kParticleNode,kParticleFeather,75.0},
+        {"Up Axis",kParticleNode,kUpAxis,std::uint32_t{1}},
         {"Size",kParticleNode,kSizeStart,40.0},{"Opacity",kParticleNode,kOpacityStart,.25},
         {"Size Random",kParticleNode,kSizeRandom,75.0},{"Opacity Random",kParticleNode,kOpacityRandom,75.0},
         {"Color",kParticleNode,kColorStart,Vec3{.2,.4,.6}},
@@ -420,8 +431,57 @@ void test_birth_parameter_matrix() {
             check(std::abs(found->position.x-expected.position.x)<1e-9 && std::abs(found->position.y-expected.position.y)<1e-9 &&
                 std::abs(found->position.z-expected.position.z)<1e-9 && std::abs(found->size_pixels-expected.size_pixels)<1e-9 &&
                 std::abs(found->opacity-expected.opacity)<1e-9 && std::abs(found->color.x-expected.color.x)<1e-9 &&
-                std::abs(found->lifetime_seconds-expected.lifetime_seconds)<1e-9,change.name);
+                std::abs(found->lifetime_seconds-expected.lifetime_seconds)<1e-9 &&
+                found->shape==expected.shape && found->limit_to_2d==expected.limit_to_2d && found->up_axis==expected.up_axis &&
+                found->size_y_pixels==expected.size_y_pixels && found->feather_percent==expected.feather_percent &&
+                std::abs(found->rotation_degrees.x-expected.rotation_degrees.x)<1e-9 &&
+                std::abs(found->rotation_degrees.y-expected.rotation_degrees.y)<1e-9 &&
+                std::abs(found->rotation_degrees.z-expected.rotation_degrees.z)<1e-9,change.name);
         }
     }
 }
-int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_particle_geometry() {
+    Settings settings;settings.birth_rate=20;settings.particle_lifetime_seconds=2;settings.particle_count=5;
+    auto graph=make_emitter_particle_output_graph(settings,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    set(graph.nodes[1],kLifeRandom,100.0);
+    auto random=evaluate_particle_graph(graph,{2,1},never);
+    check(random.has_value() && random.value().particles.size()==5,"Life Random cap counts actual survivors");
+    if(random.has_value()) for(const auto& p:random.value().particles)
+        check(p.age_seconds<p.lifetime_seconds && p.lifetime_seconds<=2,"random lifetime is bounded and expired births are excluded");
+    set(graph.nodes[1],kLifeRandom,101.0);check(!evaluate_particle_graph(graph,{2,1},never).has_value(),"invalid Life Random is rejected");
+    EvaluatedGraph frozen;ParticleInstance particle;particle.id=7;particle.lifetime_seconds=2;particle.age_seconds=.5;
+    particle.size_pixels=20;particle.size_y_pixels=6;particle.opacity=.5;
+    const auto render=[&](ParticleInstance value,PixelFormat format=PixelFormat::rgba8,RectI roi={0,0,100,100}) {
+        frozen.particles={value};auto bytes=encode_evaluated_particles(frozen,{1,2});
+        check(bytes.has_value(),"sprite snapshot encodes additional fields");
+        auto captured=graph;captured.optional_records={bytes.take_value()};
+        RenderRequest request;request.settings=validate_settings(settings);request.graph=std::make_shared<const Graph>(captured);
+        request.frame={100,100,100,100,roi,{1,2},{1,24},format,ColorSpace::ae_working_space,AlphaMode::straight,1,Quality::full};
+        return CpuParticleRenderer{}.render(request,never);
+    };
+    particle.shape=0;auto circle=render(particle);particle.shape=1;auto rectangle=render(particle);
+    particle.shape=2;auto cloud=render(particle);
+    check(circle.has_value() && rectangle.has_value() && cloud.has_value(),"Circle Rectangle and clustered Cloud render");
+    if(circle.has_value() && rectangle.has_value() && cloud.has_value()) {
+        check(circle.value().pixels!=rectangle.value().pixels && circle.value().pixels!=cloud.value().pixels,"shape choice changes output pixels");
+        check(std::to_integer<unsigned>(rectangle.value().pixels[(50*100+50)*4+3])==128,"rectangle retains translucent alpha without black matte");
+    }
+    particle.shape=1;particle.rotation_degrees.z=90;auto rotated=render(particle);
+    check(rotated.has_value() && rectangle.has_value() && rotated.value().pixels!=rectangle.value().pixels,"Z angle rotates nonsquare rectangles");
+    particle.rotation_degrees={90,0,0};particle.limit_to_2d=false;auto edge=render(particle);
+    check(edge.has_value() && std::all_of(edge.value().pixels.begin(),edge.value().pixels.end(),[](auto b){return b==std::byte{0};}),"3D edge-on rectangle has no coverage");
+    particle.rotation_degrees={};particle.limit_to_2d=true;particle.feather_percent=80;auto feather=render(particle);
+    check(feather.has_value() && rectangle.has_value() && feather.value().pixels!=rectangle.value().pixels,"Particle Feather changes rectangle coverage");
+    for(auto format:{PixelFormat::rgba8,PixelFormat::rgba16,PixelFormat::rgba32f}) {
+        auto full=render(particle,format),crop=render(particle,format,{43,47,57,53});
+        check(full.has_value() && crop.has_value(),"rotated and feathered sprites render every bit depth and ROI");
+        if(full.has_value() && crop.has_value()) for(unsigned y=0;y<6;++y)
+            check(std::memcmp(crop.value().pixels.data()+y*crop.value().row_bytes,
+                full.value().pixels.data()+(y+47)*full.value().row_bytes+43*bytes_per_pixel(format),crop.value().row_bytes)==0,"ROI pixels match full frame");
+    }
+    auto bytes=encode_evaluated_particles(frozen,{1,2});auto restored=decode_evaluated_particles(bytes.value(),{1,2});
+    check(restored.has_value() && restored.value().particles[0].shape==particle.shape &&
+        restored.value().particles[0].feather_percent==particle.feather_percent,"version 2 preserves sprite fields");
+    auto malformed=bytes.take_value();malformed[2]=std::byte{1};check(!decode_evaluated_particles(malformed,{1,2}).has_value(),"unpaired old transient snapshot is rejected");
+}
+int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();test_particle_geometry();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

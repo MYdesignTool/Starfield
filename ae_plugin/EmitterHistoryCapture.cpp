@@ -14,9 +14,8 @@ namespace starfield::adapter {
 namespace {
 class TemporalCapture final : public core::TemporalGraphSampler {
     PF_InData* data;
-    const core::Graph& graph;
     const core::Cancellation& cancellation;
-    A_long width,height;
+    NativeAnimationPlan plan;
     std::map<std::pair<core::NodeId,double>,core::GraphNode> nodes;
     std::map<std::pair<core::NodeId,double>,double> rates;
     bool context(double seconds,PF_InData& sampled) {
@@ -36,20 +35,19 @@ public:
     std::vector<NativeLifetimeBinding> lifetimes;
     PF_Err error{};A_long stream{-1};double birth{};
     TemporalCapture(PF_InData* d,const core::Graph& g,const core::Cancellation& c,A_long w,A_long h)
-        :data(d),graph(g),cancellation(c),width(w),height(h) {}
+        :data(d),cancellation(c),
+         plan(g,w,h,d->pixel_aspect_ratio.den?double(d->pixel_aspect_ratio.num)/d->pixel_aspect_ratio.den:1) {}
     core::Result<core::GraphNode> node(core::NodeId id,double seconds) override {
         using R=core::Result<core::GraphNode>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"temporal node sampling cancelled");
         const auto key=std::make_pair(id,seconds);
         if(auto found=nodes.find(key);found!=nodes.end()) return R::success(found->second);
         PF_InData sampled{};if(!context(seconds,sampled)) return R::failure(core::ErrorCode::invalid_time,"historical time exceeds AE range");
-        auto snapshot=graph;
-        error=sample_native_node_animation(&sampled,snapshot,width,height,&stream,nullptr,&id);
+        core::GraphNode value;
+        error=plan.sample(&sampled,id,value,&stream);
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical node parameter checkout/conversion failed");
-        auto found=std::find_if(snapshot.nodes.begin(),snapshot.nodes.end(),[&](const auto& n){return n.id==id;});
-        if(found==snapshot.nodes.end()) return R::failure(core::ErrorCode::invalid_request,"historical node missing");
         if(nodes.size()>=4096) nodes.clear();
-        nodes.emplace(key,*found);return R::success(std::move(*found));
+        nodes.emplace(key,value);return R::success(std::move(value));
     }
     core::Result<double> rate(core::NodeId id,double seconds) override {
         using R=core::Result<double>;

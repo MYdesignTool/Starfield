@@ -21,6 +21,12 @@ struct ParticleInstance {
     double lifetime_seconds{0.0};
     double size_pixels{0.0};
     double opacity{0.0};
+    std::uint32_t shape{0}; // Circle / Rectangle / Cloud
+    double size_y_pixels{0.0}; // 0 means use diameter in standalone settings
+    Vec3 rotation_degrees{};
+    double feather_percent{0};
+    bool limit_to_2d{true};
+    std::uint32_t up_axis{2};
     Vec3 color{1.0, 1.0, 1.0};
     Vec3 position{};
     Vec3 velocity{}; // instantaneous world units/s, used by auxiliary inheritance

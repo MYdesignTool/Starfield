@@ -1,5 +1,18 @@
 # Starfield CEP panel
 
+## Build 23 — reference Particle and independent Emitting timing
+
+Close/reopen CEP for gateway native-particle-controls-23 after the paired AEX/Core
+update. Recreate the development main/Emitter/Particle effects. Emitting is timing
+(Default / Once / Sequenced / Randomized); creating Auxiliary sets a separate
+source flag. Direction defaults Uniform. Particle exposes Life Random,
+Circle/Rectangle/Cloud, Size Y, Feather, Up Axis, Orient To, Angle X/Y/Z,
+Angle Random, spin Speed X/Y/Z / Speed Random and Limit to 2D in reference order.
+Native angle/spin controls use AE turns/degrees and dials. Color modes and the
+saved 2–8-stop CEP gradient remain independent of Size/Opacity over-life curves.
+Main Output exposes Time Sampling: 30/60/120 Hz, default 30. Build 23 is CPU-only;
+AE native GPU integration remains open in ADR 0026.
+
 ## Build 14 current controls
 
 Reopen CEP for gateway native-node-animation-19 after installing the paired build.

@@ -40,14 +40,15 @@
             "19": { label: "Size X", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
             "20": { label: "Size Y", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
             "21": { label: "Size Z", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" },
-            "23": { label:"Emitting",kind:"popup",decimals:0,step:1,min:1,max:2,displayOffset:1,choices:["Default","Auxiliary"] },
+            "23": { label:"Emitting",kind:"popup",decimals:0,step:1,min:1,max:4,displayOffset:1,choices:["Default","Once","Sequenced","Randomized"] },
             "24": {label:"Emit Chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "25": {label:"Emit Life Start",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "26": {label:"Emit Life End",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "27": {label:"Inherit Velocity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "28": {label:"Inherit Size",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "29": {label:"Inherit Opacity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
-            "30": {label:"Inherit Color",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
+            "30": {label:"Inherit Color",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "31": {hidden:true}
         },
         particle: {
             "1": { label: "Color", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
@@ -61,7 +62,18 @@
             "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "opacity_end" },
             "9": { label: "Size Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "particle_size_random" },
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
-            "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" }
+            "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" },
+            "14": {label:"Life Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "15": {label:"Shape",kind:"popup",min:1,max:3,displayOffset:1,choices:["Circle","Rectangle","Cloud"]},
+            "16": {label:"Size Y (Pixels)",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
+            "17": {label:"Orient To",kind:"popup",min:1,max:3,displayOffset:1,choices:["None","Motion(particle)","Emitter"]},
+            "18": {label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "19": {label:"Angle Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "20": {label:"Speed",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°/s"},
+            "21": {label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "22": {label:"Limit to 2D",kind:"popup",min:1,max:2,displayOffset:1,choices:["Off","On"]},
+            "23": {label:"Particle Feather",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "24": {label:"Up Axis",kind:"popup",min:1,max:3,displayOffset:1,choices:["X","Y","Z"]}
         },
         appearance: {
             "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255 },
@@ -89,7 +101,8 @@
             "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"]},
             "3": {label:"Time (Seconds)",kind:"slider",decimals:2,step:0.1,min:-1000000,max:1000000},
             "4": {label:"Preview",kind:"popup",choices:["Off","On"]},
-            "5": {label:"Particle chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
+            "5": {label:"Particle chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
     var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
@@ -148,7 +161,7 @@
         var particles = [];
         for (var n = 0; n < graph.nodes.length; n++) {
             if (kindFor(graph.nodes[n].type) === "emitter" && active["$" + graph.nodes[n].id]) {
-                var emitting = findParameter(graph.nodes[n], "23");
+                var emitting = findParameter(graph.nodes[n], "31");
                 if (emitting && Number(emitting.value) === 1) return null; // sampled parent populations require native evaluation
                 emitters.push(graph.nodes[n]);
             } else if (kindFor(graph.nodes[n].type) === "particle" && active["$" + graph.nodes[n].id]) {
@@ -218,7 +231,7 @@
     }
 
     function graphValueToDisplay(value, spec) {
-        if (spec.kind === "popup") return Number(value) + (spec.displayOffset || 0);
+        if (spec.kind === "popup") return spec.values ? spec.values.indexOf(Number(value))+1 : Number(value) + (spec.displayOffset || 0);
         if (spec.kind === "color") return value.map(function (channel) { return channel * spec.scale; });
         return Object.prototype.toString.call(value) === "[object Array]" ? value.slice() : Number(value) * (spec.scale || 1);
     }
@@ -237,6 +250,7 @@
             min: spec && typeof spec.min === "number" ? spec.min : undefined,
             max: spec && typeof spec.max === "number" ? spec.max : undefined,
             choices: spec && spec.choices ? spec.choices.slice() : undefined,
+            enumValues: spec && spec.values ? spec.values.slice() : undefined,
             unit: spec && spec.unit ? spec.unit : undefined,
             legacyKey: spec ? spec.legacyKey : undefined,
             legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
@@ -332,7 +346,7 @@
             var source = graph.nodes[i];
             var kind = kindFor(source.type);
             if (!kind) fail("unknown_node_type", "the panel cannot display node type " + source.type);
-            var emitting = findParameter(source,"23");
+            var emitting = findParameter(source,"31");
             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
             var shape = findParameter(source,"5");
             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
@@ -364,6 +378,17 @@
                     if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
                 }
                 var parameter = viewParameter(node, kind, graphParameter, spec);
+                if(kind==="particle" && ["18","20"].indexOf(graphParameter.key)>=0) {
+                    [0,1,2].forEach(function(axis) {
+                        var component=viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider";component.key+=":"+axis;
+                        component.label=spec.label+" "+["X","Y","Z"][axis];
+                        component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=1;component.value=graphParameter.value[axis];
+                        node.params.push(component);
+                    });
+                    continue;
+                }
                 if (kind === "force" && (graphParameter.key === "1" || graphParameter.key === "4")) {
                     var forceHeight = geometry && Number(geometry.height) > 0 ? Number(geometry.height) : 1;
                     var forceAspect=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
@@ -428,8 +453,8 @@
                 node.params.sort(function (a,b) { return emitterOrder.indexOf(a.graphKey)-emitterOrder.indexOf(b.graphKey); });
             }
             if (kind === "particle" || kind === "appearance") {
-                var particleOrder = { "11": 0, "3": 1, "9": 2, "5": 3, "10": 4,
-                                      "12": 5, "1": 6, "2": 7, "4": 8, "6": 9 };
+                var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
+                    "12":8,"1":9,"2":10,"23":11,"24":12,"4":13,"6":14,"17":15,"18":16,"19":17,"20":18,"21":19,"22":20};
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });
@@ -538,7 +563,7 @@
                      } else origin[2] = Number(displayValue) / height;
                      return origin;
                  }
-                 if (parameter.kind === "popup") return Number(displayValue) - parameter.displayOffset;
+                 if (parameter.kind === "popup") return parameter.enumValues ? parameter.enumValues[Number(displayValue)-1] : Number(displayValue) - parameter.displayOffset;
                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
                  return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
              } };

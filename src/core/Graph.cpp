@@ -506,7 +506,7 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor emitter;
     emitter.type_key = kEmitterNode;
-    emitter.schema_version = 5;
+    emitter.schema_version = 6;
     emitter.ports.push_back(PortDescriptor{kEmitterParents, PortDirection::input, kParticleStream, false, 0});
     emitter.ports.push_back(PortDescriptor{kEmitterParticles, PortDirection::output, kParticleStream, false, 0});
     emitter.parameters = {
@@ -533,6 +533,7 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kEmitterSizeZ, ParameterKind::float64, false},
         ParameterDescriptor{kEmissionSpeedRandomPercent, ParameterKind::float64, false},
         ParameterDescriptor{kEmittingMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kAuxiliarySource, ParameterKind::uint32, false},
         ParameterDescriptor{kEmitChance, ParameterKind::float64, false},
         ParameterDescriptor{kEmitLifeStart, ParameterKind::float64, false},
         ParameterDescriptor{kEmitLifeEnd, ParameterKind::float64, false},
@@ -544,7 +545,7 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor particle;
     particle.type_key = kParticleNode;
-    particle.schema_version = 3;
+    particle.schema_version = 4;
     particle.ports = {
         PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
@@ -563,11 +564,23 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kParticleLifetimeSeconds, ParameterKind::float64, true},
         ParameterDescriptor{kParticleColorMode, ParameterKind::uint32, false},
         ParameterDescriptor{kColorGradient, ParameterKind::opaque_bytes, false},
+        ParameterDescriptor{kLifeRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kSizeY, ParameterKind::float64, false},
+        ParameterDescriptor{kAngleRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kRotationSpeedRandom, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleFeather, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleShape, ParameterKind::uint32, false},
+        ParameterDescriptor{kOrientTo, ParameterKind::uint32, false},
+        ParameterDescriptor{kLimitTo2D, ParameterKind::uint32, false},
+        ParameterDescriptor{kUpAxis, ParameterKind::uint32, false},
+        ParameterDescriptor{kParticleAngles, ParameterKind::vector3_float64, false},
+        ParameterDescriptor{kRotationSpeed, ParameterKind::vector3_float64, false},
+
     };
 
     NodeTypeDescriptor output;
     output.type_key = kOutputNode;
-    output.schema_version = 3;
+    output.schema_version = 4;
     output.ports.push_back(PortDescriptor{kOutputParticles, PortDirection::input, kParticleStream, true, 0});
     output.parameters = {
         ParameterDescriptor{kParticleCount, ParameterKind::uint32, true},
@@ -575,6 +588,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kTimeRemapSeconds, ParameterKind::float64, false},
         ParameterDescriptor{kPreviewEnabled, ParameterKind::uint32, false},
         ParameterDescriptor{kPreviewChance, ParameterKind::float64, false},
+        ParameterDescriptor{kAcceleration, ParameterKind::uint32, false},
+        ParameterDescriptor{kTimeSamplingHz, ParameterKind::uint32, false},
     };
 
     NodeTypeDescriptor force;

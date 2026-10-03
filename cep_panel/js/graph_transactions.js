@@ -82,7 +82,7 @@
             return fallback;
         }
         return { id: node.id, position: positions[node.id], maxParticles: value(1,1000000),
-            timeRemapEnabled:value(2,0),timeRemapSeconds:value(3,0),previewEnabled:value(4,0),previewChance:value(5,100) };
+            timeRemapEnabled:value(2,0),timeRemapSeconds:value(3,0),previewEnabled:value(4,0),previewChance:value(5,100),timeSamplingHz:value(7,30) };
     }
 
     // AE may round float controls and colors. Missing optional numeric parameters

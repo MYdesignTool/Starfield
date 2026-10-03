@@ -1,5 +1,47 @@
 # Build and host matrix
 
+## M3-06 / build 23 — Particle controls and temporal preparation
+
+AE 2023 / May 2023 SDK candidate, packed version 32791 (0x8017). Emitting now
+means Default / Once / Sequenced / Randomized; Auxiliary Source is separate.
+Unordered Point/Box/Sphere/Disc sources use default ordering for Sequenced/Randomized;
+Once births an initial PPS-sized batch. Direction defaults to Uniform.
+Particle schema 4 adds Life Random, Circle/Rectangle/Cloud, Size Y, Feather,
+Up Axis, Orient To, Angle X/Y/Z and spin Speed X/Y/Z with native AE Angle controls,
+Angle/Speed Random and Limit to 2D. Existing four color modes/gradient are retained;
+the initial gradient colors are visible in Effect Controls. Cloud is an independent,
+fixed five-circle procedural cluster, not the complete reference Cloud settings.
+Shapes and rotation preserve transparent output in 8/16/32-bpc CPU rendering.
+
+Main manifest 23 appends Simulation Settings 610..612: Time Sampling at index 611 /
+disk 1601 offers 30/60/120 Hz, default 30. Emitter schema 6/base 31 and Particle
+schema 4/base 75 require fresh development effects. Output schema 4 carries Hz.
+Transient 0x8004 version 2 preserves the added sprite fields in paired AEX/Core;
+C ABI 2 and Render.hpp remain unchanged. Reopen CEP for ready marker
+native-particle-controls-23. No old-project compatibility path is added.
+
+Historical capture now decodes bindings once per frame and samples one node
+without copying the entire graph; Force conversions share a bounded evaluation
+cache. Core EmissionTimeline implements metadata-certified rate*t, exact linear/hold
+integration and fixed-lattice prefix reuse/inversion. 367 focused checks prove those
+Core paths. **AE rate metadata capture, reliable invalidation, and prefix reuse across
+AE frames are still open; the current adapter still samples PPS.** No constant curve
+is guessed from equal samples, and no render-thread AEGP read is introduced.
+
+GPU ADR 0026 follows host CUDA/OpenCL negotiation, GPU_DEVICE_SETUP/SETDOWN,
+per-frame GPU_RENDER_POSSIBLE and SMART_RENDER_GPU into AE GPU_BGRA128 worlds.
+The May 2023 SDK has no DirectX contract. GPU handlers/kernels, main Acceleration
+selection, actual AE GPU qualification and end-to-end timings remain open. Build 23
+is CPU-only and retains disabled GPU/MFR/Compute Cache capability flags.
+
+Scoped qualification: 2,017 C++ checks across current-node behavior/pixels,
+native sync/camera, emission timelines, all four node registrations and main
+renderer controls; focused JS checks cover production gateway round trips,
+generated UUID expressions/keyframe preservation, gradient encoding, panel
+startup/error retention and node interactions. All pass. The paired five AEXs
+and Core build with the May 2023 SDK Release /MT. No AE session is operated;
+owner host rendering/keyframes/undo/reopen remain open.
+
 ## M3-05 / build 22 — temporal controls, Particle color and native Angle
 
 Owner confirms build 21 Origin birth behavior. Build 22 integrates historical

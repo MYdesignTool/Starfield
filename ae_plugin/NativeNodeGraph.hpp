@@ -14,6 +14,21 @@ struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}, rate{};
 struct NativeLifetimeBinding { core::NodeId particle; A_long stream{}; };
 [[nodiscard]] PF_Err read_native_lifetime_bindings(const core::Graph&,std::vector<NativeLifetimeBinding>&) noexcept;
 
+// Decode once per frame; historical reads copy only the requested raw node.
+class NativeAnimationPlan {
+public:
+    NativeAnimationPlan(const core::Graph&, A_long width, A_long height, double aspect);
+    ~NativeAnimationPlan();
+    NativeAnimationPlan(const NativeAnimationPlan&) = delete;
+    NativeAnimationPlan& operator=(const NativeAnimationPlan&) = delete;
+    [[nodiscard]] bool valid() const noexcept;
+    [[nodiscard]] PF_Err sample(PF_InData*, core::NodeId, core::GraphNode&,
+                              A_long* failed_stream = nullptr) const noexcept;
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
 // UI-only transaction. Restores changed dependency expressions unless accepted.
 class NativeBindingTransaction {
 public:
