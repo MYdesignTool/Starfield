@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstddef>
@@ -20,6 +21,16 @@
 namespace starfield::adapter {
 namespace {
 std::atomic<std::uint64_t> execution_trace{};
+std::mutex setup_trace_mutex;
+GpuSetupTiming setup_trace;
+struct SetupTimer {
+    std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+    ~SetupTimer() {
+        const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+        std::lock_guard lock(setup_trace_mutex);++setup_trace.calls;
+        setup_trace.last_ms=ms;setup_trace.max_ms=std::max(setup_trace.max_ms,ms);
+    }
+};
 // Only the documented dynamically loaded API subset is declared here. No vendor
 // runtime, private device/context/queue creation, or allocation API is used.
 using DevicePtr = std::uint64_t;
@@ -162,12 +173,16 @@ GpuExecutionInfo last_gpu_execution() noexcept {
     const auto trace=execution_trace.load(std::memory_order_relaxed);
     return {bool(trace>>63),static_cast<PF_GPU_Framework>(trace&255),static_cast<A_u_long>((trace>>8)&0xffffffff)};
 }
+GpuSetupTiming last_gpu_setup_timing() noexcept {
+    std::lock_guard lock(setup_trace_mutex);return setup_trace;
+}
 void record_cpu_execution() noexcept { execution_trace.store(1ull<<63,std::memory_order_relaxed); }
 bool gpu_device_matches(const void* data,PF_GPU_Framework framework,A_u_long index) noexcept {
     const auto* d=device(data);
     return d && d->kernel && d->info.device_framework==framework && d->index==index;
 }
 PF_Err gpu_device_setup(PF_InData* in,PF_OutData* out,PF_GPUDeviceSetupExtra* extra) noexcept try {
+    SetupTimer timer;
     if(!in || !out || !extra || !extra->input || !extra->output) return PF_Err_BAD_CALLBACK_PARAM;
     extra->output->gpu_data=nullptr;
     out->out_flags2 &= ~PF_OutFlag2_SUPPORTS_GPU_RENDER_F32;

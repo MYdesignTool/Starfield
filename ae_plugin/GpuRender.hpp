@@ -6,6 +6,8 @@
 
 namespace starfield::adapter {
 struct GpuExecutionInfo { bool rendered{}; PF_GPU_Framework framework{}; A_u_long device_index{}; };
+struct GpuSetupTiming {std::uint64_t calls{};double last_ms{},max_ms{};};
+[[nodiscard]] GpuSetupTiming last_gpu_setup_timing() noexcept;
 [[nodiscard]] GpuExecutionInfo last_gpu_execution() noexcept;
 void record_cpu_execution() noexcept;
 [[nodiscard]] PF_Err gpu_device_setup(PF_InData*,PF_OutData*,PF_GPUDeviceSetupExtra*) noexcept;

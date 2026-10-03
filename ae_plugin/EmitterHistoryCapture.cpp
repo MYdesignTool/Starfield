@@ -56,8 +56,8 @@ public:
         :data(d),cancellation(c),
          plan(g,w,h,d->pixel_aspect_ratio.den?double(d->pixel_aspect_ratio.num)/d->pixel_aspect_ratio.den:1),trace(t) {}
     ~TemporalCapture() {trace.checkouts+=plan.checkout_count();}
-    void prepare() {
-        plan.prepare_constants(data);trace.certified=plan.proofs().size();
+    void prepare(bool allow_static_bypass) {
+        plan.prepare_constants(data,allow_static_bypass);trace.certified=plan.proofs().size();
         trace.inputs=plan.input_count();trace.constants=plan.constant_count();
     }
     bool fully_constant() const {return plan.fully_constant();}
@@ -78,10 +78,14 @@ public:
         ++trace.node_queries;
         using R=core::Result<core::GraphNode>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"temporal node sampling cancelled");
+        if(const auto* constant=plan.constant_node(id)) {
+            ++trace.constant_node_hits;return R::success(*constant);
+        }
         const auto key=std::make_pair(id,seconds);
         if(auto found=nodes.find(key);found!=nodes.end()) return R::success(found->second);
         PF_InData sampled{};if(!context(seconds,sampled)) return R::failure(core::ErrorCode::invalid_time,"historical time exceeds AE range");
         core::GraphNode value;
+        ++trace.node_samples;
         error=plan.sample(&sampled,id,value,&stream);
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical node parameter checkout/conversion failed");
         if(nodes.size()>=4096) nodes.clear();
@@ -140,10 +144,9 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
         auto error=read_native_origin_bindings(graph,capture.bindings);
         if(error || capture.bindings.empty()) {if(!error)trace.trace.path=NativeHistoryPath::unavailable;return error;}
         error=read_native_lifetime_bindings(graph,capture.lifetimes);if(error) return error;
-        capture.prepare();
         // The ordinary evaluator selects only the alive slot interval and uses
         // closed-form motion. Never select it from merely equal sample values.
-        bool simple=capture.fully_constant();
+        bool simple=true;
         for(const auto& node:graph.nodes) {
             if(node.type_key==core::graph_keys::kEmitterNode) {
                 for(const auto& p:node.parameters)
@@ -152,7 +155,8 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
                 for(const auto& p:node.parameters)if(p.key==core::graph_keys::kLifeRandom && std::get<double>(p.value)!=0)simple=false;
             } else if(node.type_key!=core::graph_keys::kOutputNode)simple=false;
         }
-        if(simple) {trace.trace.path=NativeHistoryPath::static_graph;return PF_Err_NONE;}
+        capture.prepare(simple);
+        if(simple && capture.fully_constant()) {trace.trace.path=NativeHistoryPath::static_graph;return PF_Err_NONE;}
         // Core CPU/GPU path evaluates a certified static graph only once.
         const core::RationalTime time{data->current_time,data->time_scale};
         const auto evaluated=core::evaluate_temporal_particle_graph(graph,time,cancellation,

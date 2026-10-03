@@ -1,5 +1,49 @@
 # Build and host matrix
 
+## M3-06 / build 27 - native dependency lookup and constant-node reuse
+
+Owner AE2023 feedback for build26 confirms that delay no longer grows with time,
+but uncached frames still take a subjective 6-8 seconds even with CEP closed.
+Options reports roughly 39 ms preparation and 11 ms CUDA rendering in one sample.
+Those selector timings exclude AE work before/after entry. The earlier screenshot
+with 56/57 constants used Life queries; the fully certified Static path used zero
+birth-node queries. Therefore the proposed (node, birth-time) cache-miss analysis
+cannot by itself explain the observed Static-frame wait.
+
+Source inspection finds a distinct dependency defect: UUID lookup scanned every
+effect and read numeric properties before establishing that they were UUID fields.
+Emitter UUID indices 99..106 and Particle indices 143..150 overlap the renderer's
+98..609 expression inputs. This could introduce self/cross-renderer expression
+dependencies. Build27 (32795 / 0x801B) skips the expression's own effect by
+propertyGroup(1).propertyIndex and gates other effects by the fixed hidden property
+name before reading all eight UUID words. Effect display names/order remain free.
+A generated-expression regression proves the old lookup reads renderer values and
+the new lookup performs zero such reads. Actual AE latency impact remains a hypothesis.
+
+Constant nodes are converted once per frame and reused across every birth time,
+including mixed/Force graphs; dynamic nodes retain exact-time sampling. Equality
+of sampled values never certifies a node. Static simple graphs reuse the already
+sampled current-frame graph without a second batch of alias checkouts. Dependency
+changes discard the optimization. No render-thread AEGP access is introduced.
+
+Options upgrades the generated owned bindings in existing development projects;
+click it once after deployment. Source keys/expressions and graph values are preserved.
+Diagnostics include node requests/actual samples (N), separate main GPU setup and
+UI refresh maxima, and the render's own prepared time (p). A time/duration-mismatched
+SmartFX pair is rejected before borrowed pixel access, with equivalent rational times
+accepted. Process-global last-call diagnostics do not measure full AE preview time.
+
+Qualification: 3,383 scoped C++ checks pass (native sync 2,938; camera 12;
+actual CUDA/OpenCL drivers 433), plus generated-expression/keyframe JS checks.
+May 2023 SDK Release /MT builds all five AEXs and Core without compiler warnings.
+Evidence: artifacts/build27-native-sync.log, build27-expressions.log,
+build27-gpu.log and build27-native-build.log. These are not AE frame-time results.
+
+Main/native IDs, parameter counts, schemas, PiPL flags, CEP native-gpu-24 and Core
+C ABI3 stay unchanged. Full paired AEX deployment is required. AE 6-8 second latency,
+key/expression edits, copy/reorder/undo/reopen remain owner gates; M3-06 stays open.
+The requested main integration is pending this candidate's qualification.
+
 ## Build 26 deployment — 2026-10-03
 
 Source `e1fb3d6` is pushed. Read-only process checks immediately before installation

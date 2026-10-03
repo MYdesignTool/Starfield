@@ -256,7 +256,7 @@ void test_smartfx(PF_InData& in,PF_OutData& out,void* gpu_data,PF_EffectWorld& w
     smart_world=&world;write(std::vector<std::byte>(world_bytes,std::byte{0x7e}));
     check(adapter::smart_render(&in,&out,&render)==0,"native SmartFX GPU transport dispatches into borrowed AE world");
     const auto execution=adapter::last_smart_render_timing();
-    check(execution.valid && execution.complete && execution.seconds==1 && execution.total_ms>=0,
+    check(execution.valid && execution.complete && execution.paired && execution.seconds==1 && execution.prepared_seconds==1 && execution.total_ms>=0,
         "actual SmartFX execution records upload, kernel, sync and cleanup wall time");
     check(adapter::last_gpu_execution().rendered && adapter::last_gpu_execution().framework==info.device_framework,"GPU trace records executed framework");
     check(input_checkouts==input_checkins,"SmartFX input checked in after GPU render");
@@ -269,6 +269,15 @@ void test_smartfx(PF_InData& in,PF_OutData& out,void* gpu_data,PF_EffectWorld& w
         equal &= std::abs(a[0]-b[2])<.0002 && std::abs(a[1]-b[1])<.0002 && std::abs(a[2]-b[0])<.0002 && std::abs(a[3]-b[3])<.0002;
     }
     check(equal,"pre-render scene and GPU transport agree with CPU projection/time/ROI");
+    const auto checkouts_before=input_checkouts;
+    in.current_time=2;
+    check(adapter::smart_render(&in,&out,&render)==PF_Err_BAD_CALLBACK_PARAM && input_checkouts==checkouts_before && read()==actual,
+        "another frame cannot reuse a time-dependent GPU scene or touch borrowed pixels");
+    check(!adapter::last_smart_render_timing().paired,"diagnostics identify mismatched render/preparation times");
+    in.current_time=2;in.time_step=2;in.time_scale=2;
+    check(adapter::smart_render(&in,&out,&render)==0 && read()==actual,
+        "equivalent rational time and duration preserve the matching scene");
+    in.current_time=1;in.time_step=1;in.time_scale=1;
     pre_output.delete_pre_render_data_func(pre_output.pre_render_data);
     auto graph=*smart_graph;set(graph.nodes.back(),core::graph_keys::kAcceleration,std::uint32_t{1});smart_graph=std::make_shared<const core::Graph>(std::move(graph));
     pre_output={};check(adapter::pre_render(&in,&out,&pre)==0 && !(pre_output.flags&PF_RenderOutputFlag_GPU_RENDER_POSSIBLE),"CPU preference clears per-frame GPU eligibility");
@@ -336,6 +345,9 @@ void test_backend(PF_GPU_Framework framework) {
         (out.out_flags2&PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),"real device setup accepts compiled backend");
     if(!setup_output.gpu_data){destroy_device();return;}
     check(adapter::gpu_device_matches(setup_output.gpu_data,framework,7),"device/framework identity matched");
+    const auto setup_timing=adapter::last_gpu_setup_timing();
+    check(setup_timing.calls>0 && setup_timing.last_ms>=0 && setup_timing.max_ms>=setup_timing.last_ms,
+        "device setup initialization has its own timing outside SmartFX");
     check(!adapter::gpu_device_matches(setup_output.gpu_data,framework,6),"other device rejected");
     PF_EffectWorld world{};world.width=56;world.height=44;world.rowbytes=56*16+64;world.origin_x=4;world.origin_y=2;
     world_bytes=std::size_t(world.rowbytes)*world.height;check(alloc_device(nullptr,7,world_bytes,&world_buffer)==0,"test GPU output allocated");

@@ -22,7 +22,8 @@ public:
     NativeAnimationPlan(const NativeAnimationPlan&) = delete;
     NativeAnimationPlan& operator=(const NativeAnimationPlan&) = delete;
     [[nodiscard]] bool valid() const noexcept;
-    void prepare_constants(PF_InData*) noexcept;
+    void prepare_constants(PF_InData*, bool allow_static_bypass = false) noexcept;
+    [[nodiscard]] const core::GraphNode* constant_node(core::NodeId) const noexcept;
     [[nodiscard]] bool fully_constant() const noexcept;
     [[nodiscard]] std::size_t input_count() const noexcept;
     [[nodiscard]] std::size_t constant_count() const noexcept;

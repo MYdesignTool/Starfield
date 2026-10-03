@@ -5,7 +5,9 @@
 // and the geometry it computed, so a mismatch between the parameter UI and the
 // render path can be identified without a debugger.
 //
-// It is read-only: it never changes output pixels, sequence data, or settings.
+// Options also refreshes our generated native dependency bindings on existing
+// development effects. Source keyframes, source expressions and graph values
+// are preserved; Core reload and proof refresh can request a new render.
 // The contents are a support/diagnostic aid, not part of the rendered contract.
 
 #include "AEConfig.h"

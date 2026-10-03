@@ -173,6 +173,7 @@ private:
 // Pre-render facts handed to the render phase. AE takes ownership after pre-render
 // returns and frees the block through the callback below.
 struct PreRenderState {
+    A_long time{},step{};A_u_long scale{};
     core::OpaqueBytes graph_bytes;
     SfCoreGpuSceneResult gpu_scene{};
     A_long gpu_world_width{},gpu_world_height{};
@@ -438,6 +439,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         return PF_Err_OUT_OF_MEMORY;
     }
     state->graph_bytes = encoded.take_value();
+    state->time=in_data->current_time;state->step=in_data->time_step;state->scale=in_data->time_scale;
     state->generation = loaded.generation;
     state->result_rect = result;
     state->max_result_rect = layer_rect;
@@ -519,6 +521,16 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         // loudly instead of guessing coordinates.
         report_failure(out_data, core::make_error(core::ErrorCode::internal_failure, "pre-render state missing"));
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
+    }
+    timer.value.prepared_seconds=state->scale?double(state->time)/state->scale:0;
+    timer.value.paired=state->scale && in_data->time_scale &&
+        std::int64_t(state->time)*in_data->time_scale==std::int64_t(in_data->current_time)*state->scale &&
+        std::int64_t(state->step)*in_data->time_scale==std::int64_t(in_data->time_step)*state->scale;
+    // GPU scenes and historical snapshots contain particles for exactly one
+    // time. A mismatched callback pair must never silently reuse those pixels.
+    if(!timer.value.paired) {
+        report_core_failure(out_data,"SmartFX render time differs from its prepared scene");
+        return PF_Err_BAD_CALLBACK_PARAM;
     }
 
     HostBitDepth depth{};

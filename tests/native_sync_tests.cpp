@@ -645,6 +645,21 @@ int main() {
     check(!proofs.empty() && std::all_of(proofs.begin(),proofs.end(),[](const auto& p){return p.constant;}),"source metadata certifies genuinely unanimated aliases");
     NativeAnimationPlan constant_plan(static_graph,1920,1080,1);constant_plan.prepare_constants(&renderer_data);
     check(constant_plan.fully_constant(),"native plan verifies static controls once per frame");
+    check(constant_plan.constant_node(particle_id)!=nullptr,"constant particle node is converted once per frame");
+    const auto constant_checkouts=constant_plan.checkout_count();
+    for(A_long t:{1,2,2400}) {
+        auto sample_data=renderer_data;sample_data.current_time=t;core::GraphNode sample;
+        const auto error=constant_plan.sample(&sample_data,particle_id,sample);
+        const auto* expected=constant_plan.constant_node(particle_id);
+        const auto* a=sample.parameters.empty()?nullptr:std::get_if<core::Vec3>(&sample.parameters[0].value);
+        const auto* b=!expected || expected->parameters.empty()?nullptr:std::get_if<core::Vec3>(&expected->parameters[0].value);
+        check(error==0 && expected && a && b &&
+            sample.parameters.size()==constant_plan.constant_node(particle_id)->parameters.size() &&
+            sample.parameters[0].key==constant_plan.constant_node(particle_id)->parameters[0].key &&
+            a->x==b->x && a->y==b->y && a->z==b->z,
+            "distinct birth times reuse certified node without changing values");
+    }
+    check(constant_plan.checkout_count()==constant_checkouts,"constant node reuse performs zero historical PF checkouts");
     renderer_data.current_time=2400;
     const auto certified_render_suites=aegp_suite_requests;
     const auto record_count=static_graph.optional_records.size();PF_OutData fast_output{};
@@ -652,10 +667,23 @@ int main() {
         "100-second static scene skips historical traversal and particle snapshot encoding");
     const auto actual=last_native_history_trace();
     check(actual.path==NativeHistoryPath::static_graph && actual.seconds==100 && actual.inputs>0 &&
-        actual.constants==actual.inputs && actual.checkouts==actual.inputs && actual.rate_queries==0 && actual.life_queries==0,
-        "actual render trace reports constant hoisting and zero birth history reads");
+        actual.constants==actual.inputs && actual.checkouts==0 && actual.rate_queries==0 && actual.life_queries==0 && actual.node_queries==0,
+        "static current-frame graph performs no duplicate hoisting or birth history reads");
     check(aegp_suite_requests==certified_render_suites,"certified render preparation still acquires no AEGP suites");
+    auto complex_graph=animated_graph;renderer_data.current_time=48;
+    capture_native_temporal_metadata(&renderer_data,complex_graph,1);
+    PF_OutData complex_output{};
+    check(capture_emitter_origin_history(&renderer_data,&complex_output,complex_graph,1920,1080,core::NeverCancelled{})==0,
+        "constant nodes work inside a temporal graph containing Force");
+    const auto complex_trace=last_native_history_trace();
+    check(complex_trace.path==NativeHistoryPath::temporal && complex_trace.node_queries>0 &&
+        complex_trace.node_samples==0 && complex_trace.constant_node_hits==complex_trace.node_queries &&
+        complex_trace.checkouts==complex_trace.inputs,
+        "distinct births reuse constant Emitter/Particle/Force without node conversions or historical checkouts");
     ++metadata_epoch;check(validated_native_control_proofs(&renderer_data).empty(),"edited alias cannot reuse constant metadata");
+    constant_plan.prepare_constants(&renderer_data);
+    check(!constant_plan.fully_constant() && !constant_plan.constant_node(particle_id),
+        "changed dependencies clear converted constant nodes before resampling");
     metadata_rate_keys=true;capture_native_temporal_metadata(&renderer_data,static_graph,1);
     proofs=validated_native_control_proofs(&renderer_data);
     auto keyed=std::find_if(proofs.begin(),proofs.end(),[](const auto& p){return p.rate && p.rate->keys.size()==2;});

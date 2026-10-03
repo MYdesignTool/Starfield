@@ -3,6 +3,7 @@
 #include "GraphParameter.hpp"
 #include "SPBasic.h"
 #include <algorithm>
+#include <chrono>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -14,6 +15,16 @@ struct UIStamp {PF_ProgPtr publisher{};PF_State state{};};
 std::mutex ui_mutex;
 std::thread::id ui_thread;
 std::vector<UIStamp> ui_stamps;
+NativeUITiming ui_timing;
+struct UITimer {
+    bool refreshed{};
+    std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+    ~UITimer() {
+        const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+        std::lock_guard lock(ui_mutex);++ui_timing.calls;
+        ui_timing.refreshes+=refreshed;ui_timing.last_ms=ms;ui_timing.max_ms=std::max(ui_timing.max_ms,ms);
+    }
+};
 thread_local bool refreshing{};
 struct RefreshScope {
     RefreshScope() {refreshing=true;}
@@ -37,7 +48,10 @@ struct ParamUtils {
 };
 }
 void initialize_native_temporal_ui() noexcept {
-    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();
+    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();ui_timing={};
+}
+NativeUITiming last_native_ui_timing() noexcept {
+    std::lock_guard lock(ui_mutex);return ui_timing;
 }
 PF_Err register_native_temporal_ui(PF_InData* data) noexcept {
     if(!data || !data->inter.register_ui)return PF_Err_BAD_CALLBACK_PARAM;
@@ -55,10 +69,12 @@ void refresh_native_temporal_ui(PF_InData* data,PF_ParamDef* params[],
         if(ui_thread!=std::this_thread::get_id())return; // Before any SDK operation.
         for(const auto& entry:ui_stamps)if(entry.publisher==data->effect_ref){old=entry.state;break;}}
     RefreshScope scope;
+    UITimer timer;
     ParamUtils utils(data);PF_State before{};
     if(!utils.state(before) || (old && utils.same(*old,before)))return;
     const auto graph=read_graph_parameter(data,params[kGraphParameterId]->u.arb_d.value);
     if(!graph.has_value())return;
+    timer.refreshed=true;
     capture_native_temporal_metadata(data,graph.value(),plugin_id);
     std::vector<core::NodeId> ids;for(const auto& node:graph.value().nodes)ids.push_back(node.id);
     if(validated_native_control_proofs(data,ids).empty())return; // Retry optional unavailable metadata later.

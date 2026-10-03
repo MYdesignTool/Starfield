@@ -420,8 +420,15 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
 std::u16string binding_expression(const RawNode& node, A_long index, A_long component) {
     // PropertyGroup and Effect are host objects; use documented methods.
     std::string text = "var count = thisLayer(\"ADBE Effect Parade\").numProperties; var result = -1099511627776;\n";
-    text += "for (var n = 1; n <= count; n++) { var fx = thisLayer.effect(n); var match = false; try { match = ";
+    text += "var owner = thisProperty.propertyGroup(1).propertyIndex;\n";
+    text += "for (var n = 1; n <= count; n++) { if (n === owner) continue; var fx = thisLayer.effect(n); var match = false; try { match = ";
     const auto first = native_nodes::uuid_first_index(node.kind);
+    // Other effects can have animated inputs at these same numeric indices.
+    // In particular, the renderer's 98..609 aliases overlap node UUID indices.
+    // Check the metadata property name before reading ANY numeric value, so a
+    // search never evaluates our own bindings (or another renderer's bindings).
+    // Display names of effects remain irrelevant; all eight UUID words follow.
+    text += "fx.param(" + std::to_string(first) + ").name === \"Node UUID 0\" && ";
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         if (chunk) text += " && ";
         const unsigned word = (node.id.value.bytes[chunk * 2] << 8u) | node.id.value.bytes[chunk * 2 + 1];
@@ -658,6 +665,7 @@ core::PortKey destination_port(Kind kind) noexcept {
 struct NativeAnimationPlan::Impl {
     std::vector<RawNode> nodes;
     std::map<core::NodeId, core::GraphNode> templates;
+    std::map<core::NodeId, core::GraphNode> constant_nodes;
     core::LayerUnits units;
     bool decoded{};
     std::vector<NativeControlProof> proofs;
@@ -679,10 +687,32 @@ bool NativeAnimationPlan::fully_constant() const noexcept {return valid() && imp
 std::size_t NativeAnimationPlan::input_count() const noexcept {return impl_->input_count;}
 std::size_t NativeAnimationPlan::constant_count() const noexcept {return impl_->constant_count;}
 std::uint64_t NativeAnimationPlan::checkout_count() const noexcept {return impl_->checkout_count;}
-void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept try {
+const core::GraphNode* NativeAnimationPlan::constant_node(core::NodeId id) const noexcept {
+    if(!valid())return nullptr;
+    const auto found=impl_->constant_nodes.find(id);
+    return found==impl_->constant_nodes.end()?nullptr:&found->second;
+}
+void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_bypass) noexcept try {
     if(!valid() || !data) return;
+    impl_->constant_nodes.clear();
     std::vector<core::NodeId> ids;for(const auto& [id,node]:impl_->templates)ids.push_back(id);
     impl_->proofs=validated_native_control_proofs(data,ids);
+    // The caller's graph already contains current-frame owned-alias values.
+    // A simple, completely certified graph needs no second set of checkouts.
+    // Partially certified and complex graphs still hoist raw historical inputs.
+    if(allow_static_bypass) {
+        std::size_t inputs=0,constants=0;
+        for(const auto& node:impl_->nodes)if(impl_->templates.contains(node.id))
+            for(const auto& field:node.fields)if(field.present && field.slot>=0)
+                for(A_long c=0;c<component_count(field.type);++c) {
+                    ++inputs;const auto stream=kNativeBindingFirstIndex+field.slot+c;
+                    if(std::any_of(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==node.id && p.stream==stream && p.constant;}))++constants;
+                }
+        if(inputs && inputs==constants) {
+            impl_->input_count=inputs;impl_->constant_count=constants;impl_->all_constant=true;
+            impl_->constant_nodes=impl_->templates;return;
+        }
+    }
     impl_->all_constant=!impl_->nodes.empty();
     impl_->input_count=impl_->constant_count=0;
     for(auto& node:impl_->nodes) {
@@ -707,6 +737,16 @@ void NativeAnimationPlan::prepare_constants(PF_InData* data) noexcept try {
       }
     }
     impl_->all_constant=impl_->input_count>0 && impl_->constant_count==impl_->input_count;
+    // Reuse a complete constant node across every distinct birth time. Never
+    // infer this from equal samples; every bound component must have a proof.
+    for(const auto& node:impl_->nodes)if(impl_->templates.contains(node.id)) {
+        bool constant=true;
+        for(const auto& field:node.fields)if(field.present && field.slot>=0)
+            for(A_long c=0;c<component_count(field.type);++c)constant &= field.constant[c];
+        if(!constant)continue;
+        core::GraphNode value;
+        if(sample(data,node.id,value)==PF_Err_NONE)impl_->constant_nodes.emplace(node.id,std::move(value));
+    }
 } catch(...) {if(impl_)impl_->all_constant=false;}
 PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNode& output,
                                   A_long* failed_stream) const noexcept {
@@ -715,6 +755,7 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
         if(!valid()) return PF_Err_BAD_CALLBACK_PARAM;
         const auto original=impl_->templates.find(id);
         if(original==impl_->templates.end()) return PF_Err_BAD_CALLBACK_PARAM;
+        if(const auto* constant=constant_node(id)){output=*constant;return PF_Err_NONE;}
         output=original->second;
         const auto found=std::find_if(impl_->nodes.begin(),impl_->nodes.end(),[&](const auto& n){return n.id==id;});
         if(found==impl_->nodes.end()) return PF_Err_NONE;
