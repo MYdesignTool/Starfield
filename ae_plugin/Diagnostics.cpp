@@ -155,8 +155,9 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
     const auto setup=last_gpu_setup_timing();const auto ui=last_native_ui_timing();
     const auto metadata=last_native_metadata_trace(); // Before Options can warm/capture again.
-    writer.line("Init %.1fms UI %.1fms B%llu W%zu/%zu P%zu E%ld\n",setup.max_ms,ui.max_ms,
-        static_cast<unsigned long long>(ui.sequence_refreshes),metadata.evaluated,metadata.inputs,metadata.proofs,static_cast<long>(metadata.error));
+    writer.line("Init %.1fms UI %.1fms I%llu/%llu E%ld W%zu/%zu P%zu\n",setup.max_ms,ui.max_ms,
+        static_cast<unsigned long long>(ui.idle_refreshes),static_cast<unsigned long long>(ui.idle_calls),
+        static_cast<long>(ui.idle_error),metadata.evaluated,metadata.inputs,metadata.proofs);
     A_long control_source = -1;
     try {
         std::shared_ptr<const core::Graph> graph;
@@ -172,7 +173,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         capture_native_temporal_metadata(in_data,*graph,graph_carrier_plugin_id());
         std::vector<core::NodeId> ids;for(const auto& node:graph->nodes)ids.push_back(node.id);
         const auto certified=validated_native_control_proofs(in_data,ids).size();
-        writer.line("Build 30; proofs %zu\n",certified);
+        writer.line("Build 31; proofs %zu\n",certified);
         if(certified)out_data->out_flags|=PF_OutFlag_FORCE_RERENDER;
         const auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
         if (!encoded.has_value()) {

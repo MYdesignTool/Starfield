@@ -268,7 +268,7 @@
         255,
         255
       ],
-      "note": "Appearance stage:  birth color. 8-bit channels map to working-space 0..1 with no color-space conversion (ADR 0005); alpha comes from Opacity.",
+      "note": "Particle style:  birth color. 8-bit channels map to working-space 0..1 with no color-space conversion (ADR 0005); alpha comes from Opacity.",
       "hidden": true
     },
     {
@@ -281,7 +281,7 @@
         255,
         255
       ],
-      "note": "Appearance stage:  color approached as age reaches lifetime. Equal to Color Start by default.",
+      "note": "Particle style:  color approached as age reaches lifetime. Equal to Color Start by default.",
       "hidden": true
     },
     {
@@ -438,7 +438,7 @@
       "callbackId": 31,
       "hidden": true,
       "animated": false,
-      "default": "emitter_force_appearance_output_graph",
+      "default": "emitter_particle_force_output_graph",
       "note": "Canonical schema-1 graph bytes; AE owns copy,  persistence and undo (ADR 0008). Hidden renderer-owned stream; arbitrary callback disk ID 31 remains unchanged."
     },
     {
@@ -499,8 +499,8 @@
     },
     {
       "id": 35,
-      "key": "layout_appearance_x",
-      "label": "Layout Appearance X",
+      "key": "layout_particle_x",
+      "label": "Layout Particle X",
       "type": "float_slider",
       "default": 180,
       "min": -1000000000,
@@ -513,8 +513,8 @@
     },
     {
       "id": 36,
-      "key": "layout_appearance_y",
-      "label": "Layout Appearance Y",
+      "key": "layout_particle_y",
+      "label": "Layout Particle Y",
       "type": "float_slider",
       "default": 358,
       "min": -1000000000,

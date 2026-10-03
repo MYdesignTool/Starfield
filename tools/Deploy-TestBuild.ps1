@@ -18,8 +18,10 @@ $oldRuntime = Join-Path $repo 'artifacts\runtime'
 $backup = Join-Path $repo "artifacts\disabled\$BackupName"
 $recordPath = Join-Path $backup 'deployment.json'
 $names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNode.aex',
-           'StarfieldAppearance.aex', 'StarfieldForce.aex', 'StarfieldCore.dll')
-$rootNames = @($names) + @($names | ForEach-Object { [IO.Path]::ChangeExtension($_, '.pdb') })
+           'StarfieldForce.aex', 'StarfieldHost.aex', 'StarfieldCore.dll')
+$retiredNames = @('StarfieldAppearance.aex')
+$allowedNames = @($names) + @($retiredNames)
+$rootNames = @($allowedNames) + @($allowedNames | ForEach-Object { [IO.Path]::ChangeExtension($_, '.pdb') })
 $sources = @{}
 foreach ($name in $names) {
     $kind = if ($name -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
@@ -64,7 +66,7 @@ function Restore-Deployment($record) {
     $archive = Join-Path $backup 'candidate'
     New-Item -ItemType Directory -Path $archive -Force | Out-Null
     foreach ($entry in $record.files) {
-        if ($names -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
+        if ($allowedNames -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
         $target = Join-Path $bundle $entry.name
         if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination (Join-Path $archive $entry.name) }
         if ($entry.existed) { Copy-Item -LiteralPath (Join-Path $backup "bundle\$($entry.name)") -Destination $target }
@@ -76,8 +78,11 @@ if ($Rollback) {
     $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
     if (Test-Path -LiteralPath (Join-Path $backup 'rolled-back.txt')) { throw 'Already rolled back.' }
     foreach ($entry in $record.files) {
-        if ($names -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
-        if ((Get-FileHash -LiteralPath (Join-Path $bundle $entry.name) -Algorithm SHA256).Hash -ne $entry.installedHash) {
+        if ($allowedNames -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
+        $taskTarget = Join-Path $bundle $entry.name
+        if (-not $entry.installedHash) {
+            if (Test-Path -LiteralPath $taskTarget) { throw "Retired file reappeared after deployment: $taskTarget" }
+        } elseif ((Get-FileHash -LiteralPath $taskTarget -Algorithm SHA256).Hash -ne $entry.installedHash) {
             throw "Bundle changed after this deployment: $($entry.name)"
         }
     }
@@ -101,11 +106,12 @@ New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backu
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
     selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName=''}
 if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
-foreach ($name in $names) {
+foreach ($name in $allowedNames) {
     $target = Join-Path $bundle $name
     $exists = Test-Path -LiteralPath $target
     if ($exists) { Copy-Item -LiteralPath $target -Destination (Join-Path $backup "bundle\$name") }
-    $record.files += [ordered]@{name=$name; existed=$exists; installedHash=(Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash}
+    $hash = if ($names -contains $name) { (Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash } else { $null }
+    $record.files += [ordered]@{name=$name; existed=$exists; installedHash=$hash}
 }
 $coreHash = (Get-FileHash -LiteralPath $sources['StarfieldCore.dll'] -Algorithm SHA256).Hash
 $record.runtimeName = "StarfieldCore-$($coreHash.Substring(0,16)).dll"
@@ -118,6 +124,10 @@ try {
     if (Test-Path -LiteralPath $oldLink) { Move-Item -LiteralPath $oldLink -Destination (Join-Path $backup 'host\StarfieldRuntime') }
     foreach ($entry in $record.files) {
         $target = Join-Path $bundle $entry.name
+        if (-not $entry.installedHash) {
+            if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination (Join-Path $backup $entry.name) }
+            continue
+        }
         Copy-Item -LiteralPath $sources[$entry.name] -Destination $target -Force
         if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $entry.installedHash) { throw "Hash mismatch: $target" }
     }

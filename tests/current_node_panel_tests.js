@@ -4,6 +4,8 @@ const edits=require("../cep_panel/js/graph_edits.js"), view=require("../cep_pane
 const snapshot=require("../cep_panel/js/native_graph_snapshot.js"), codec=require("../cep_panel/js/graph_codec.js");
 const uuid=n=>n.toString(16).padStart(32,"0");let next=10;
 const output={id:uuid(255),type:edits.types.output,schemaVersion:4,parameters:[{key:"1",type:3,value:1000000},{key:"7",type:3,value:30}]};
+assert.equal(edits.types.appearance,undefined,"Appearance is not registered as a node");
+assert.ok(!fs.readFileSync(path.join(__dirname,"../cep_panel/index.html"),"utf8").includes('data-node-type="appearance"'),"Appearance has no creation action");
 let graph={version:1,nodes:[output],edges:[],optionalRecords:[]};
 const add=kind=>{graph=edits.apply(graph,{type:"addNode",nodeType:kind},()=>uuid(next++));return graph.nodes[graph.nodes.length-1];};
 const emitter=add("emitter"), particle=add("particle"), auxiliary=add("auxiliary"), child=add("particle");

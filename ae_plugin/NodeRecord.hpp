@@ -16,13 +16,12 @@ inline constexpr A_long kMaxOutgoingEdges = 4;
 inline constexpr A_long kConnectionUuidChunks = 8;
 inline constexpr A_long kConnectionRecordChunks = 16; // destination UUID + edge UUID
 
-enum class Kind : A_long { emitter, particle, appearance, force };
+enum class Kind : A_long { emitter=0, particle=1, force=3 }; // 2 is not a node kind.
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return 31;
         case Kind::particle: return 75;
-        case Kind::appearance: return 42;
         case Kind::force: return 27;
     }
     return 0;

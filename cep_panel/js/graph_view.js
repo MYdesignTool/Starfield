@@ -12,7 +12,6 @@
         emitter: "org.starfieldfx.nodes.emitter",
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
-        appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
     var SPECS = {
@@ -75,16 +74,6 @@
             "23": {label:"Particle Feather",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "24": {label:"Up Axis",kind:"popup",min:1,max:3,displayOffset:1,choices:["X","Y","Z"]}
         },
-        appearance: {
-            "1": { label: "Color Start", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255 },
-            "2": { label: "Color End", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255 },
-            "3": { label: "Size (Pixels)", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit: "px" },
-            "4": { label: "Size Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
-            "5": { label: "Opacity", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%" },
-            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
-            "9": { label: "Size Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100 },
-            "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100 }
-        },
         force: {
             "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
             "2": { label: "Air Density", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 100 },
@@ -107,7 +96,7 @@
         }
     };
     var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
-                   appearance: "Appearance", output: "Output" };
+                   output: "Output" };
 
     function fail(code, message) {
         var error = new Error(message);
@@ -354,7 +343,7 @@
                          inputPort: kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
                          outputPort: kind === "output" ? null : (kind === "emitter" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,
-                         curveParameterKeys: kind === "particle" || kind === "appearance"
+                         curveParameterKeys: kind === "particle"
                             ? { size: "7", opacity: "8", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
                             : null };
             byId[node.id] = node;
@@ -367,7 +356,7 @@
             for (var p = 0; p < source.parameters.length; p++) {
                 var graphParameter = source.parameters[p];
                 var spec = specs[graphParameter.key];
-                if (kind === "particle" || kind === "appearance") {
+                if (kind === "particle") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
@@ -441,7 +430,7 @@
                 }
                 node.params.push(parameter);
             }
-            if (kind === "particle" || kind === "appearance") {
+            if (kind === "particle") {
                 ["9", "10"].forEach(function (key) {
                     if (!findParameter(source, key)) {
                         node.params.push(viewParameter(node, kind,
@@ -453,7 +442,7 @@
                 var emitterOrder = ["5","23","2","6","12","22","14","15","16","17","18","19","20","21","10","24","25","26","27","28","29","30","3"];
                 node.params.sort(function (a,b) { return emitterOrder.indexOf(a.graphKey)-emitterOrder.indexOf(b.graphKey); });
             }
-            if (kind === "particle" || kind === "appearance") {
+            if (kind === "particle") {
                 var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
                     "12":8,"1":9,"2":10,"23":11,"24":12,"4":13,"6":14,"17":15,"18":16,"19":17,"20":18,"21":19,"22":20};
                 node.params.sort(function (left, right) {

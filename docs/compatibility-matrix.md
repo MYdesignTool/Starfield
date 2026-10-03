@@ -1,5 +1,28 @@
 # Behavior inventory
 
+## M3-06 / build 31 - post-load bootstrap and Appearance removal
+
+Build30 failed owner no-Options startup qualification: W57/57 P57 E0 but
+Temporal0/57, PF193372 and history1671.3ms (CUDA16.3ms). Build31 (32799/0x801F)
+adds a session-resident General AEGP for bounded, read-only main-thread idle
+certification after load; sequence callbacks only maintain SFU1. Actual generic
+PF context availability and no-Options first/reopen preview remain owner gates.
+See ADR0026 for the protocol, lifetime rules, retry/state checks and limitations.
+
+Owner explicitly requires complete Appearance removal without compatibility.
+Only Emitter (including Auxiliary), Particle, Force and Output remain registered.
+Particle owns style/Over Life; connection/layout edits only write node records.
+The retired AEX is archived on installation; one-step rollback restores it and
+removes the new StarfieldHost.aex. Main manifest24/IDs, remaining native schemas,
+C ABI3 and SFU1 remain paired. Old graphs containing Appearance must be recreated.
+Gateway native-idle-31; reopen CEP. Main integration waits for AE qualification.
+
+Build31 candidate compilation and all scoped fake-host/core/panel suites pass;
+exact counts and ignored evidence paths are in docs/build-matrix.md. The new
+General AEGP bootstrap, Particle -> Force wire edit and no-Options first/reopen
+performance remain UNQUALIFIED in AE 2023.5.0 Build52. Complete Appearance
+removal is intentional; development test graphs containing it must be recreated.
+
 ## M3-06 / build 30 - evaluate restored bindings before state certification
 
 The owner rejects build29 startup performance: Options is still required. The

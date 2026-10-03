@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-gpu-24";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-idle-31";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -322,7 +322,7 @@
     }
 
     var NODE_TYPES = {
-        emitter: true, particle: true, force: true, appearance: true, output: true
+        emitter: true, particle: true, force: true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
@@ -453,7 +453,7 @@
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
         var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed",
-                       appearance: "#ca8bea", output: "#83c9b1" };
+                       output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
             if (!isSupportedNode(state.nodes[i])) continue;
             var position = displayPosition(positionFor(state.nodes[i], i));
@@ -669,7 +669,7 @@
             var gravity = graphParameterValue(node, 1);
             return "Gravity " + shortNumber(gravity) + " · air " + shortNumber(graphParameterValue(node, 2));
         }
-        if (kind === "particle" || kind === "appearance") {
+        if (kind === "particle") {
             return "Size " + shortNumber(parameterValue(node, "particle_size") || graphParameterValue(node, 3)) +
                    " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
         }
@@ -1165,7 +1165,7 @@
         }
         elements.inspectorTitle.textContent = node.label;
         var kind = nodeKind(node);
-        elements.inspectorMeta.textContent = kind === "particle" || kind === "appearance"
+        elements.inspectorMeta.textContent = kind === "particle"
             ? "Size / Opacity over life" : node.params.length + " parameters";
         if (!node.params.length) {
             elements.inspectorBody.innerHTML = "<p class=\"inspector-note\">This node has no parameters.</p>";
@@ -1176,7 +1176,7 @@
         var grid = document.createElement("div");
         grid.className = "parameter-grid";
         for (var p = 0; p < node.params.length; p++) {
-            if ((kind === "particle" || kind === "appearance") &&
+            if ((kind === "particle") &&
                 (node.params[p].legacyKey === "particle_size_end" || node.params[p].legacyKey === "opacity_end" ||
                  node.params[p].graphKey === "4" || node.params[p].graphKey === "6")) continue;
             grid.appendChild(renderParameter(node.params[p]));
@@ -1188,7 +1188,7 @@
             elements.inspectorBody.appendChild(renderCurveEditor("size", "Wind and Spin Over Life (%)", curves.size, 100));
             drawCurvePlot("size");
         }
-        if ((kind === "particle" || kind === "appearance") && curves) {
+        if ((kind === "particle") && curves) {
             elements.inspectorBody.appendChild(renderCurveEditor("size", "Size Over Life (%)", curves.size, 100));
             elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life (%)", curves.opacity, 100));
             drawCurvePlot("size");

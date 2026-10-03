@@ -77,8 +77,6 @@ int main() {
     constexpr Kind kind = Kind::emitter;
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
     constexpr Kind kind = Kind::particle;
-#elif defined(STARFIELD_NODE_KIND_APPEARANCE)
-    constexpr Kind kind = Kind::appearance;
 #else
     constexpr Kind kind = Kind::force;
 #endif
@@ -131,7 +129,7 @@ int main() {
     int colors = 0;
     bool controls_constant = true, controls_animated = true, interpolation_unrestricted = true, colors_supervised = true;
     A_long control_index = 0;
-    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 14 : kind == Kind::appearance ? 8 : 10;
+    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 14 : 10;
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
@@ -147,7 +145,7 @@ int main() {
     check(controls_animated, "all public node controls permit keyframes");
     check(controls_constant, "topology identity and curve banks stay constant");
     check(interpolation_unrestricted, "constant streams do not request unnecessary interpolation restrictions");
-    check(colors == (kind == Kind::particle ? 9 : kind == Kind::appearance ? 2 : 0), "Particle registers Color plus eight saved gradient stops");
+    check(colors == (kind == Kind::particle ? 9 : 0), "Particle registers Color plus eight saved gradient stops");
     check(colors_supervised, "color edits retain the supervised synchronization callback");
 
     host.current_time = 33; host.time_step = 1; host.time_scale = 24;

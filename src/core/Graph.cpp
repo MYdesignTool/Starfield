@@ -611,30 +611,9 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kWindSpinCurve, ParameterKind::opaque_bytes, false},
     };
 
-    NodeTypeDescriptor appearance;
-    appearance.type_key = kAppearanceNode;
-    appearance.schema_version = 1;
-    appearance.ports = {
-        PortDescriptor{kAppearanceParticlesIn, PortDirection::input, kParticleStream, true, 0},
-        PortDescriptor{kAppearanceParticlesOut, PortDirection::output, kParticleStream, false, 0},
-    };
-    appearance.parameters = {
-        ParameterDescriptor{kColorStart, ParameterKind::vector3_float64, true},
-        ParameterDescriptor{kColorEnd, ParameterKind::vector3_float64, true},
-        ParameterDescriptor{kSizeStart, ParameterKind::float64, true},
-        ParameterDescriptor{kSizeEnd, ParameterKind::float64, true},
-        ParameterDescriptor{kOpacityStart, ParameterKind::float64, true},
-        ParameterDescriptor{kOpacityEnd, ParameterKind::float64, true},
-        ParameterDescriptor{kSizeOverLifeCurve, ParameterKind::opaque_bytes, false},
-        ParameterDescriptor{kOpacityOverLifeCurve, ParameterKind::opaque_bytes, false},
-        ParameterDescriptor{kSizeRandom, ParameterKind::float64, false},
-        ParameterDescriptor{kOpacityRandom, ParameterKind::float64, false},
-    };
-
     registry.types.push_back(std::move(emitter));
     registry.types.push_back(std::move(particle));
     registry.types.push_back(std::move(force));
-    registry.types.push_back(std::move(appearance));
     registry.types.push_back(std::move(output));
     return registry;
 }

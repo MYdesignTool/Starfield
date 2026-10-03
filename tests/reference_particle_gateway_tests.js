@@ -4,7 +4,9 @@ const edits=require("../cep_panel/js/graph_edits.js"),view=require("../cep_panel
 const global={};
 const source=fs.readFileSync(require.resolve("../cep_panel/jsx/starfield_gateway.jsx"),"utf8")
     .replace("    function readNativeNode(effect, layer) {","    $.global.testRead=readNativeNode;\n    function readNativeNode(effect, layer) {")
-    .replace("    function setNodeParameters(effect, node, layer) {","    $.global.testWrite=setNodeParameters;\n    function setNodeParameters(effect, node, layer) {");
+    .replace("    function setNodeParameters(effect, node, layer) {","    $.global.testWrite=setNodeParameters;\n    function setNodeParameters(effect, node, layer) {")
+    .replace("    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes) {",
+        "    $.global.testEnsure=ensureNativeNodeEffects;\n    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes) {");
 const context=vm.createContext({$:{global},app:{}});
 vm.runInContext(source,context);
 const layer={width:1920,height:1080,source:{pixelAspect:1}};
@@ -17,7 +19,9 @@ function effect(kind) {
         "Speed Random":0,"Limit to 2D":2,"Type":1,"Emitting":1,"Particles Per Second":100,"Origin XY":[960,540],"Origin Z":0,
         "Speed":100,"Size X":100,"Size Y":100,"Size Z":100,"Disc Size":.05,"Direction":2,"Direction Span":60,"Random Seed":1000,
         "Velocity X":0,"Velocity Y":0,"Velocity Z":0,"Particle Size":10,"Velocity Random":0,"Emit Chance":100,
-        "Emit Life Start":0,"Emit Life End":100,"Inherit Velocity":0,"Inherit Size":0,"Inherit Opacity":0,"Inherit Color":0};
+        "Emit Life Start":0,"Emit Life End":100,"Inherit Velocity":0,"Inherit Size":0,"Inherit Opacity":0,"Inherit Color":0,
+        "Gravity":0,"Gravity random":0,"Air Density":0,"Wind X":0,"Wind Y":0,"Wind Z":0,
+        "Spin":0,"Spin Frequency":0,"Spin resist":0,"Spin Delay (Seconds)":0,"Wind and Spin Curve Count":0};
     for(let i=0;i<8;i++) {
         values["Node UUID "+i]=i===7?1:0;
         values[`Color Gradient ${i} Position`]=i===1?100:0;
@@ -31,11 +35,12 @@ function effect(kind) {
         values[`Connection ${slot} Edge UUID ${word}`]=0;
     }
     const props=Object.fromEntries(Object.entries(values).map(([name,value])=>[name,{name,value,numKeys:0,
-        canSetExpression:false,setValue(v){this.value=v;}}]));
+        canSetExpression:false,writes:0,setValue(v){this.value=v;this.writes++;}}]));
     return {matchName:"org.starfieldfx.node."+kind,props,property:name=>props[name]||null};
 }
 const uuid=n=>n.toString(16).padStart(32,"0");let graph={version:1,nodes:[],edges:[],optionalRecords:[]};
-for(const kind of ["particle","emitter","auxiliary"]) {
+const hosts=[],authoredNodes=[];
+for(const kind of ["particle","emitter","auxiliary","force"]) {
     graph=edits.apply(graph,{type:"addNode",nodeType:kind},()=>uuid(graph.nodes.length+1));
     const authored=structuredClone(graph.nodes.at(-1)),host=effect(kind==="auxiliary"?"emitter":kind);
     authored.position={x:0,y:0};authored.outgoing=[];
@@ -48,22 +53,42 @@ for(const kind of ["particle","emitter","auxiliary"]) {
     context.payload=JSON.stringify(authored);
     global.testWrite(host,vm.runInContext("JSON.parse(payload)",context),layer);
     const restored=global.testRead(host,layer);
-    assert.equal(restored.schemaVersion,kind==="particle"?4:6);
+    assert.equal(restored.schemaVersion,kind==="particle"?4:kind==="force"?2:6);
     for(const p of authored.parameters) {
         const actual=restored.parameters.find(v=>v.key===p.key);
         assert.ok(actual,`${kind} key ${p.key} round trips`);
         const expected=Array.isArray(p.value)||ArrayBuffer.isView(p.value)?Array.from(p.value):p.value;
-        const value=Array.isArray(actual.value)?Array.from(actual.value):actual.value;
+        const value=Array.isArray(actual.value)?Array.from(actual.value,v=>v===0?0:v):actual.value===0?0:actual.value;
         assert.deepEqual(value,expected,`${kind} key ${p.key} retains its own value`);
     }
     if(kind==="particle") {
         assert.equal(host.props["Color Gradient 1 Position"].value,30);
         assert.equal(host.props["Angle Y"].value,60);
         assert.equal(host.props["Speed Y"].value,50);
-    } else {
+    } else if(kind!=="force") {
         assert.equal(host.props["Emitting"].value,1);
         assert.equal(host.props["Auxiliary Source"].value,kind==="auxiliary"?1:0);
     }
     assert.equal(host.props["Panel Sync Guard"].value,0);
+    for(let word=0;word<8;word++) host.props["Node UUID "+word].value=parseInt(authored.id.slice(word*4,word*4+4),16);
+    hosts.push(host);authoredNodes.push(authored);
 }
-console.log("Reference Particle/Emitter gateway round-trip checks passed.");
+const parade={numProperties:hosts.length,property:i=>hosts[i-1]};
+layer.property=name=>name==="ADBE Effect Parade"?parade:null;
+const inRealm=value=>{context.payload=JSON.stringify(value);return vm.runInContext("JSON.parse(payload)",context);};
+const before=structuredClone(authoredNodes),connected=structuredClone(before);
+connected[0].outgoing=[{id:uuid(90),target:connected[3].id}];
+connected[3].position={x:100,y:200};
+const publicWrites=()=>hosts.map(host=>Object.fromEntries(Object.entries(host.props)
+    .filter(([name])=>!/^(Node |Connection |Outgoing )/.test(name)).map(([name,p])=>[name,p.writes])));
+const untouched=publicWrites();
+global.testEnsure(layer,inRealm(connected),true,inRealm(before));
+assert.deepEqual(publicWrites(),untouched,"Particle -> Force and layout edits never rewrite authored controls");
+assert.equal(hosts[0].props["Outgoing Connection Count"].value,1);
+assert.equal(hosts[3].props["Node Layout X"].value,100);
+global.testEnsure(layer,inRealm(before),true,inRealm(connected));
+assert.deepEqual(publicWrites(),untouched,"rollback only restores changed connection/layout records");
+assert.equal(hosts[0].props["Outgoing Connection Count"].value,0);
+assert.equal(hosts[3].props["Node Layout X"].value,0);
+assert.throws(()=>global.testWrite(hosts[0],inRealm(authoredNodes[3]),layer),/type mismatch/);
+console.log("Reference Particle/Emitter/Force round-trip and topology-only commit/rollback checks passed.");

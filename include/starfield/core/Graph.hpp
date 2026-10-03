@@ -183,7 +183,7 @@ struct GraphValidationResult {
 // traversed by the renderer.
 [[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
 
-// Stable built-in schemas used by the emitter -> Particle -> force -> appearance
+// Stable built-in schemas used by the emitter -> Particle -> force
 // -> Output graph. Output carries the renderer-wide particle cap. Keys in this namespace are
 // graph ParameterKeys and are not AE parameter IDs.
 namespace graph_keys {
@@ -191,7 +191,6 @@ inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-s
 inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
 inline constexpr const char* kParticleNode = "org.starfieldfx.nodes.particle";
 inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
-inline constexpr const char* kAppearanceNode = "org.starfieldfx.nodes.appearance";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
 inline constexpr PortKey kEmitterParticles{1};
 inline constexpr PortKey kEmitterParents{2};
@@ -199,8 +198,6 @@ inline constexpr PortKey kParticleParticlesIn{1};
 inline constexpr PortKey kParticleParticlesOut{2};
 inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
-inline constexpr PortKey kAppearanceParticlesIn{1};
-inline constexpr PortKey kAppearanceParticlesOut{2};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};
@@ -237,7 +234,7 @@ inline constexpr ParameterKey kInheritVelocity{27};
 inline constexpr ParameterKey kInheritSize{28};
 inline constexpr ParameterKey kInheritOpacity{29};
 inline constexpr ParameterKey kInheritColor{30};
-// Parameter keys are scoped to their node type; force and appearance nodes may
+// Parameter keys are scoped to their node type; Force and Particle nodes may
 // therefore use compact local key ranges without aliasing emitter parameters.
 inline constexpr ParameterKey kGravity{1};
 inline constexpr ParameterKey kLinearDrag{2};

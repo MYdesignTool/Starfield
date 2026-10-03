@@ -22,7 +22,7 @@ static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                            PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32));
 
-enum class NodeEffectKind { emitter, particle, appearance, force };
+enum class NodeEffectKind { emitter, particle, force };
 
 // Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
 // Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
@@ -33,8 +33,6 @@ constexpr PF_ParamFlags kNodeEditableFlags = PF_ParamFlag_SUPERVISE;
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::emitter;
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::particle;
-#elif defined(STARFIELD_NODE_KIND_APPEARANCE)
-constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::appearance;
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::force;
 #else
@@ -247,20 +245,9 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
     return PF_Err_NONE;
 }
 
-PF_Err add_particle_parameters(PF_InData* in_data, bool include_lifetime) noexcept {
+PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
     PF_Err error = PF_Err_NONE;
-    if(!include_lifetime) {
-        error=add_slider(in_data,"Size (Pixels)",kSizeId,0,100000,10,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Size Random",kSizeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Opacity",kOpacityId,0,100,100,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Opacity Random",kOpacityRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
-        error=add_color(in_data,"Color Start",kColorStartId);if(error)return error;
-        error=add_color(in_data,"Color End",kColorEndId);if(error)return error;
-        error=add_slider(in_data,"Size Over Life",kSizeOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Opacity Over Life",kOpacityOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
-        error=add_curve_bank(in_data,"Size",'s');if(error)return error;
-        error=add_curve_bank(in_data,"Opacity",'o');if(error)return error;
-    } else {
+    {
         error=add_popup(in_data,"Shape",kParticleShapeId,3,1,"Circle|Rectangle|Cloud");if(error)return error;
         error=add_slider(in_data,"Life (Seconds)",kLifetimeId,0,10000,2,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Life Random",kLifeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
@@ -390,7 +377,7 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
 }
 
 PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_particle_parameters(in_data, true);
+    PF_Err error = add_particle_parameters(in_data);
     if (error != PF_Err_NONE) return error;
     error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::particle);
     if (error != PF_Err_NONE) return error;
@@ -398,18 +385,6 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);
-    return PF_Err_NONE;
-}
-
-PF_Err setup_appearance(PF_InData* in_data, PF_OutData* out_data) noexcept {
-    PF_Err error = add_particle_parameters(in_data, false);
-    if (error != PF_Err_NONE) return error;
-    error = add_node_record(in_data, starfield::adapter::native_nodes::Kind::appearance);
-    if (error != PF_Err_NONE) return error;
-    error = add_node_identity(in_data);
-    if (error != PF_Err_NONE) return error;
-    out_data->num_params = starfield::adapter::native_nodes::parameter_count(
-        starfield::adapter::native_nodes::Kind::appearance);
     return PF_Err_NONE;
 }
 
@@ -523,8 +498,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 return setup_emitter(in_data, out_data);
             } else if constexpr (kNodeEffectKind == NodeEffectKind::particle) {
                 return setup_particle(in_data, out_data);
-            } else if constexpr (kNodeEffectKind == NodeEffectKind::appearance) {
-                return setup_appearance(in_data, out_data);
+
             } else {
                 return setup_force(in_data, out_data);
             }

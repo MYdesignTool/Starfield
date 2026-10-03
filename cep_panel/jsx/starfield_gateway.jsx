@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-gpu-24";
+    var GATEWAY_BUILD = "native-idle-31";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -38,7 +38,6 @@
     var NATIVE_NODE_TYPES = {
         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
-        "org.starfieldfx.nodes.appearance": { kind: "appearance", label: "Appearance", matchName: "org.starfieldfx.node.appearance" },
         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" }
     };
 
@@ -100,10 +99,9 @@
         { nodeId: "emitter", axis: "y", key: "layout_emitter_y", index: 32, name: "Layout Emitter Y", min: -1000000000, max: 1000000000, defaultValue: 22 },
         { nodeId: "force", axis: "x", key: "layout_force_x", index: 33, name: "Layout Force X", min: -1000000000, max: 1000000000, defaultValue: 235 },
         { nodeId: "force", axis: "y", key: "layout_force_y", index: 34, name: "Layout Force Y", min: -1000000000, max: 1000000000, defaultValue: 178 },
-        // Layout Appearance X/Y keep their disk identities; the panel assigns
-        // that card to the logical Particle stage instead of Appearance.
-        { nodeId: "particle", axis: "x", key: "layout_appearance_x", index: 35, name: "Layout Appearance X", min: -1000000000, max: 1000000000, defaultValue: 235 },
-        { nodeId: "particle", axis: "y", key: "layout_appearance_y", index: 36, name: "Layout Appearance Y", min: -1000000000, max: 1000000000, defaultValue: 100 },
+        // Layout Particle belongs to the explicit Particle node.
+        { nodeId: "particle", axis: "x", key: "layout_particle_x", index: 35, name: "Layout Particle X", min: -1000000000, max: 1000000000, defaultValue: 235 },
+        { nodeId: "particle", axis: "y", key: "layout_particle_y", index: 36, name: "Layout Particle Y", min: -1000000000, max: 1000000000, defaultValue: 100 },
         { nodeId: "output", axis: "x", key: "layout_output_x", index: 37, name: "Layout Output X", min: -1000000000, max: 1000000000, defaultValue: 235 },
         { nodeId: "output", axis: "y", key: "layout_output_y", index: 38, name: "Layout Output Y", min: -1000000000, max: 1000000000, defaultValue: 256 }
     ];
@@ -459,7 +457,7 @@
     function setNodeControl(effect, name, value) {
         var property = findEffectProperty(effect, name);
         if (!property || typeof property.setValue !== "function") {
-            throw new Error("Node effect parameter is missing: " + name);
+            throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ")");
         }
         try {
             if (!sameValue(property.value, value)) {
@@ -570,7 +568,7 @@
 
     function nodeControlValue(effect, name) {
         var property = findEffectProperty(effect, name);
-        if (!property) throw new Error("Node effect parameter is missing: " + name);
+        if (!property) throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ")");
         return property.value;
     }
 
@@ -665,7 +663,7 @@
                     for(var channel=0;channel<3;channel++) appendFloat64(colorBytes,Number(stopColor[channel]));
                 }
                 node.parameters.push({key:"13",type:7,value:colorBytes});
-            } else {vector(1, "Color Start"); vector(2, "Color End");}
+            }
             scalar(3, "Size (Pixels)"); scalar(4, "Size Over Life"); scalar(5, "Opacity");
             node.parameters[node.parameters.length - 1].value /= 100;
             scalar(6, "Opacity Over Life");
@@ -789,6 +787,9 @@
     }
 
     function setNodeParameters(effect, node, layer) {
+        if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
+            throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
+        }
         setNodeControl(effect, "Panel Sync Guard", 1);
         try {
             writeNodeRecord(effect, node);
@@ -832,12 +833,8 @@
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
-                } else if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
-                    if (key === "1" || key === "2") {
-                        if(type!=="org.starfieldfx.nodes.particle" || key==="1")
-                            setNodeControl(effect,type==="org.starfieldfx.nodes.particle"?"Color":key === "1" ? "Color Start" : "Color End",
-                                [value[0], value[1], value[2], 1]);
-                    }
+                } else if (type === "org.starfieldfx.nodes.particle") {
+                    if (key === "1") setNodeControl(effect,"Color",[value[0],value[1],value[2],1]);
                     else if(key==="12" && type==="org.starfieldfx.nodes.particle") setNodeControl(effect,"Particle Color",Number(value)+1);
                     else if(key==="13" && type==="org.starfieldfx.nodes.particle") writeNodeColorGradient(effect,value);
                     else if (key === "3") setNodeControl(effect, "Size (Pixels)", value);
@@ -879,7 +876,7 @@
                 }
             }
             if (type === "org.starfieldfx.nodes.force" && !nodeParameter(node,"9")) writeNodeCurve(effect,"Wind and Spin",null);
-            if (type === "org.starfieldfx.nodes.particle" || type === "org.starfieldfx.nodes.appearance") {
+            if (type === "org.starfieldfx.nodes.particle") {
                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
             }
@@ -980,7 +977,7 @@
         }
     }
 
-    function sameAuthoredNode(left, right) {
+    function sameNodeParameters(left, right) {
         if (!left || !right || left.type !== right.type || left.schemaVersion !== right.schemaVersion) return false;
         function close(a,b) {
             if (a instanceof Array && b instanceof Array) {
@@ -991,8 +988,7 @@
             if (typeof a === "number" && typeof b === "number") return Math.abs(a-b) <= 1e-9 + Math.max(Math.abs(a),Math.abs(b))*1e-12;
             return a === b;
         }
-        if (!close(left.position.x,right.position.x) || !close(left.position.y,right.position.y) ||
-            JSON.stringify(left.outgoing) !== JSON.stringify(right.outgoing) || left.parameters.length !== right.parameters.length) return false;
+        if (left.parameters.length !== right.parameters.length) return false;
         var byKey={};
         for(var p=0;p<left.parameters.length;p++) byKey["$"+left.parameters[p].key]=left.parameters[p];
         for(var q=0;q<right.parameters.length;q++) {
@@ -1012,7 +1008,12 @@
             else {
                 var existingType = nativeNodeTypeByMatch(effect.matchName);
                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
-                if (writeExisting && !sameAuthoredNode(previous["$"+node.id],node)) setNodeParameters(effect, node, layer);
+                if (writeExisting) {
+                    var before = previous["$"+node.id];
+                    if (!sameNodeParameters(before,node)) setNodeParameters(effect, node, layer);
+                    else if (before.position.x !== node.position.x || before.position.y !== node.position.y ||
+                        JSON.stringify(before.outgoing) !== JSON.stringify(node.outgoing)) writeNodeRecord(effect,node);
+                }
             }
         }
     }
@@ -1409,7 +1410,9 @@
         } catch (error) {
             var rollbackMessage = "";
             try {
-                ensureNativeNodeEffects(layer, previousNodes, true);
+                // Inspect what actually survived a partial commit. Rewriting every
+                // parameter would also touch unrelated controls and animation.
+                ensureNativeNodeEffects(layer, previousNodes, true, readNativeNodes(layer));
                 removeNativeNodeEffects(layer, addedNodeIds(previousNodes, desiredNodes));
                 var restored = graphCarrierTarget(request);
                 if (restored.error) throw new Error(restored.error.message);

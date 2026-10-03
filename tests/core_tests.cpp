@@ -171,7 +171,7 @@ GraphNode make_test_emitter(std::uint8_t id) {
     GraphNode node;
     node.id = NodeId{test_uuid(id)};
     node.type_key = kEmitterNode;
-    node.schema_version = 3;
+    node.schema_version = 6;
     node.parameters = {
         {kBirthRate, 30.0},
         {kSeed, std::uint32_t{1}},
@@ -188,13 +188,13 @@ GraphNode make_test_emitter(std::uint8_t id) {
 
 GraphNode make_test_output(std::uint8_t id, std::uint32_t particle_count = 100) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kOutputNode, 2, {
+    return GraphNode{NodeId{test_uuid(id)}, kOutputNode, 4, {
         {kParticleCount, particle_count}}};
 }
 
 GraphNode make_test_particle(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 2, {
+    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 4, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
         {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0},
         {kParticleLifetimeSeconds, 2.0}}};
@@ -202,15 +202,8 @@ GraphNode make_test_particle(std::uint8_t id) {
 
 GraphNode make_test_force(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kForceNode, 1, {
+    return GraphNode{NodeId{test_uuid(id)}, kForceNode, 2, {
         {kGravity, Vec3{}}, {kLinearDrag, 0.0}}};
-}
-
-GraphNode make_test_appearance(std::uint8_t id) {
-    using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kAppearanceNode, 1, {
-        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0}}};
 }
 
 Graph make_basic_graph() {
@@ -247,7 +240,7 @@ void test_graph_contract() {
     Graph staged = graph;
     staged.nodes.push_back(make_test_particle(3));
     staged.nodes.push_back(make_test_force(4));
-    staged.nodes.push_back(make_test_appearance(5));
+    staged.nodes.push_back(make_test_force(5));
     CHECK(validate_test_graph(staged).ok()); // isolated editable nodes may wait for a connection
     CHECK(serialize_graph(staged, particle_node_registry()).has_value());
 
@@ -275,6 +268,9 @@ void test_graph_contract() {
 
     bad = graph;
     bad.nodes[0].type_key = "org.starfieldfx.nodes.not-registered";
+    CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_node_type);
+
+    bad.nodes[0].type_key = "org.starfieldfx.nodes.appearance";
     CHECK(validate_test_graph(bad).error.code == GraphErrorCode::unknown_node_type);
 
     bad = graph;
@@ -340,7 +336,8 @@ void test_graph_contract() {
     const auto wrong_direction_emitter = find_type(wrong_direction_registry, kEmitterNode);
     CHECK(wrong_direction_emitter != wrong_direction_registry.types.end());
     if (wrong_direction_emitter != wrong_direction_registry.types.end()) {
-        wrong_direction_emitter->ports[0].direction = PortDirection::input;
+        for(auto& port:wrong_direction_emitter->ports)
+            if(port.key==kEmitterParticles)port.direction=PortDirection::input;
     }
     CHECK(validate_graph(graph, wrong_direction_registry).error.code == GraphErrorCode::port_direction_mismatch);
 
@@ -356,7 +353,7 @@ void test_graph_contract() {
     two_emitters.nodes.insert(two_emitters.nodes.begin(), make_test_emitter(3));
     two_emitters.edges.push_back(GraphEdge{EdgeId{test_uuid(2)}, NodeId{test_uuid(3)}, kEmitterParticles,
                                            NodeId{test_uuid(2)}, kOutputParticles});
-    CHECK(validate_test_graph(two_emitters).error.code == GraphErrorCode::duplicate_input_connection);
+    CHECK(validate_test_graph(two_emitters).ok()); // Output accepts multiple particle-stream inputs.
 
     NodeRegistry pass_registry;
     pass_registry.types.push_back(make_test_pass_node("org.starfieldfx.nodes.pass"));
@@ -1499,7 +1496,7 @@ void test_graph_evaluation() {
             graph.nodes.push_back(make_test_emitter(22));
             graph.nodes.push_back(make_test_particle(23));
             graph.nodes.push_back(make_test_force(24));
-            graph.nodes.push_back(make_test_appearance(25));
+            graph.nodes.push_back(make_test_force(25));
             std::reverse(graph.nodes.begin(), graph.nodes.end());
             for (auto& node : graph.nodes) std::reverse(node.parameters.begin(), node.parameters.end());
             auto snapshot = std::make_shared<const Graph>(graph);
@@ -1591,15 +1588,11 @@ void test_graph_evaluation() {
     bad = graph;
     bad.edges = {GraphEdge{EdgeId{test_uuid(80)}, emitter, kEmitterParticles, output, kOutputParticles}};
     const auto missing_particle = evaluate_particle_graph(bad, RationalTime{1, 1}, never);
-    CHECK(missing_particle.has_value() && missing_particle.value().particles.empty());
+    CHECK(!missing_particle.has_value() && missing_particle.error().code==ErrorCode::invalid_request);
     auto missing_particle_request = build_request(Scene{});
     missing_particle_request.graph = std::make_shared<const Graph>(bad);
     const auto missing_particle_pixels = renderer.render(missing_particle_request, never);
-    CHECK(missing_particle_pixels.has_value());
-    if (missing_particle_pixels.has_value()) {
-        CHECK(std::all_of(missing_particle_pixels.value().pixels.begin(), missing_particle_pixels.value().pixels.end(),
-            [](std::byte value) { return value == std::byte{0}; }));
-    }
+    CHECK(!missing_particle_pixels.has_value() && missing_particle_pixels.error().code==ErrorCode::invalid_request);
     bad = graph;
     bad.nodes.push_back(make_test_force(81));
     bad.edges = {
@@ -1701,22 +1694,20 @@ void test_graph_disconnect_and_reconnect() {
     }
 }
 
-// Regression coverage for the emitter -> Particle -> force -> appearance -> output chain: the
+// Regression coverage for the emitter -> Particle -> force -> output chain: the
 // closed-form gravity/drag integration, age-driven size/opacity/color, stage-order
-// enforcement, and graph/flat pixel parity. Added with the force/appearance kernels.
-void test_force_and_appearance() {
+// enforcement, and graph/flat pixel parity.
+void test_force_and_particle_style() {
     using namespace graph_keys;
     const NeverCancelled never;
     const CpuParticleRenderer renderer;
     const NodeId emitter{test_uuid(9)};
     const NodeId particle{test_uuid(5)};
     const NodeId force{test_uuid(4)};
-    const NodeId appearance{test_uuid(6)};
     const NodeId output{test_uuid(1)};
     const EdgeId emitter_to_particle{test_uuid(10)};
     const EdgeId particle_to_force{test_uuid(11)};
-    const EdgeId force_to_appearance{test_uuid(12)};
-    const EdgeId appearance_to_output{test_uuid(13)};
+    const EdgeId force_to_output{test_uuid(12)};
 
     Settings settings;
     settings.particle_count = 256;
@@ -1746,16 +1737,16 @@ void test_force_and_appearance() {
     settings.opacity_over_life.points[1] = AgeCurvePoint{0.5, 25.0};
     settings.opacity_over_life.points[2] = AgeCurvePoint{1.0, 0.0};
 
-    auto made = make_emitter_particle_force_appearance_output_graph(
-        settings, emitter, particle, force, appearance, output, emitter_to_particle,
-        particle_to_force, force_to_appearance, appearance_to_output);
+    auto made = make_emitter_particle_force_output_graph(
+        settings, emitter, particle, force, output, emitter_to_particle,
+        particle_to_force, force_to_output);
     CHECK(made.has_value());
     if (!made.has_value()) return;
     const Graph graph = made.take_value();
     const auto graph_validation = validate_graph(graph, particle_node_registry());
     CHECK(graph_validation.ok());
 
-    // The five-stage graph survives the bounded codec byte for byte.
+    // The four-stage graph survives the bounded codec byte for byte.
     const auto serialized = serialize_graph(graph, particle_node_registry());
     CHECK(serialized.has_value());
     if (serialized.has_value()) {
@@ -1772,7 +1763,7 @@ void test_force_and_appearance() {
     CHECK(evaluated.has_value());
     if (evaluated.has_value()) {
         // Stage order follows dependencies, not UUIDs.
-        CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, particle, force, appearance, output}));
+        CHECK(evaluated.value().evaluated_nodes == std::vector<NodeId>({emitter, particle, force, output}));
         const double k = settings.linear_drag;
         bool saw_birth = false;
         for (const auto& particle : evaluated.value().particles) {
@@ -1837,7 +1828,7 @@ void test_force_and_appearance() {
     // The appearance stage must reach the pixels: a red end color differs visibly.
     Graph red = graph;
     for (auto& node : red.nodes) {
-        if (node.type_key != kAppearanceNode) continue;
+        if (node.type_key != kParticleNode) continue;
         for (auto& parameter : node.parameters) {
             if (parameter.key == kColorEnd) parameter.value = Vec3{1.0, 0.0, 0.0};
         }
@@ -1847,35 +1838,6 @@ void test_force_and_appearance() {
     const auto red_pixels = renderer.render(red_request, never);
     CHECK(red_pixels.has_value());
     if (red_pixels.has_value() && actual.has_value()) CHECK(red_pixels.value().pixels != actual.value().pixels);
-
-    // Stage order is enforced, not assumed: appearance before force is rejected.
-    Graph swapped = graph;
-    swapped.edges = {
-        GraphEdge{emitter_to_particle, emitter, kEmitterParticles, particle, kParticleParticlesIn},
-        GraphEdge{particle_to_force, particle, kParticleParticlesOut, appearance, kAppearanceParticlesIn},
-        GraphEdge{force_to_appearance, appearance, kAppearanceParticlesOut, force, kForceParticlesIn},
-        GraphEdge{appearance_to_output, force, kForceParticlesOut, output, kOutputParticles},
-    };
-    CHECK(validate_graph(swapped, particle_node_registry()).ok());
-    const auto reversed = evaluate_particle_graph(swapped, time, never);
-    CHECK(!reversed.has_value());
-    if (!reversed.has_value()) CHECK(reversed.error().code == ErrorCode::invalid_request);
-
-    // Two chained appearance stages are structurally legal but rejected at runtime.
-    Graph chained = graph;
-    const NodeId second_appearance{test_uuid(31)};
-    const EdgeId second_edge{test_uuid(32)};
-    chained.nodes.push_back(GraphNode{second_appearance, kAppearanceNode, 1, {
-        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 4.0}, {kSizeEnd, 4.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}});
-    chained.edges[3] = GraphEdge{second_edge, appearance, kAppearanceParticlesOut,
-                                 second_appearance, kAppearanceParticlesIn};
-    chained.edges.push_back(GraphEdge{appearance_to_output, second_appearance,
-                                      kAppearanceParticlesOut, output, kOutputParticles});
-    CHECK(validate_graph(chained, particle_node_registry()).ok());
-    const auto two_appearances = evaluate_particle_graph(chained, time, never);
-    CHECK(!two_appearances.has_value());
-    if (!two_appearances.has_value()) CHECK(two_appearances.error().code == ErrorCode::invalid_request);
 
     // Node values are range checked before they can reach the simulation.
     Graph huge_gravity = graph;
@@ -1892,9 +1854,9 @@ void test_force_and_appearance() {
     // A tiny drag exercises the series branch and must stay near the no-drag limit.
     Settings tiny = settings;
     tiny.linear_drag = 1e-5;
-    const auto tiny_graph = make_emitter_particle_force_appearance_output_graph(
-        tiny, emitter, particle, force, appearance, output, emitter_to_particle,
-        particle_to_force, force_to_appearance, appearance_to_output);
+    const auto tiny_graph = make_emitter_particle_force_output_graph(
+        tiny, emitter, particle, force, output, emitter_to_particle,
+        particle_to_force, force_to_output);
     CHECK(tiny_graph.has_value());
     if (tiny_graph.has_value()) {
         const auto tiny_result = evaluate_particle_graph(tiny_graph.value(), time, never);
@@ -1910,14 +1872,14 @@ void test_force_and_appearance() {
     }
 
     // Identity collisions and out-of-range settings fail at construction time.
-    CHECK(!make_emitter_particle_force_appearance_output_graph(
-        settings, emitter, emitter, force, appearance, output, emitter_to_particle,
-        particle_to_force, force_to_appearance, appearance_to_output).has_value());
+    CHECK(!make_emitter_particle_force_output_graph(
+        settings, emitter, emitter, force, output, emitter_to_particle,
+        particle_to_force, force_to_output).has_value());
     Settings invalid;
     invalid.opacity = 1.5;
-    CHECK(!make_emitter_particle_force_appearance_output_graph(
-        invalid, emitter, particle, force, appearance, output, emitter_to_particle,
-        particle_to_force, force_to_appearance, appearance_to_output).has_value());
+    CHECK(!make_emitter_particle_force_output_graph(
+        invalid, emitter, particle, force, output, emitter_to_particle,
+        particle_to_force, force_to_output).has_value());
 }
 
 void test_particle_branches_and_ordered_buffer() {
@@ -1927,9 +1889,7 @@ void test_particle_branches_and_ordered_buffer() {
     const NodeId particle_a{test_uuid(5)};
     const NodeId particle_b{test_uuid(6)};
     const NodeId output{test_uuid(1)};
-    const NodeId appearance{test_uuid(7)};
     const NodeId bypass_force{test_uuid(30)};
-    const NodeId bypass_appearance{test_uuid(31)};
 
     Settings settings;
     settings.particle_count = 10;
@@ -1986,8 +1946,16 @@ void test_particle_branches_and_ordered_buffer() {
     CHECK(std::none_of(graph.nodes[0].parameters.begin(), graph.nodes[0].parameters.end(),
                        [](const NodeParameter& parameter) { return parameter.key.value == 4; }));
 
-    // A second Particle branch has its own appearance. The first branch's
-    // downstream Appearance node replaces all three Particle curves.
+    // Each Particle owns its style; no downstream override node exists.
+    for(auto& node:graph.nodes) if(node.id==particle_a) for(auto& parameter:node.parameters) {
+        if(parameter.key==kColorStart) parameter.value=Vec3{1,0,0};
+        if(parameter.key==kColorEnd) parameter.value=Vec3{.5,0,0};
+        if(parameter.key==kSizeStart) parameter.value=4.0;
+        if(parameter.key==kSizeEnd) parameter.value=100.0;
+        if(parameter.key==kOpacityStart) parameter.value=.2;
+        if(parameter.key==kOpacityEnd) parameter.value=100.0;
+    }
+    // A second Particle branch owns its independent style curves.
     AgeCurve branch_size_curve{};
     branch_size_curve.count = 3;
     branch_size_curve.points[0] = AgeCurvePoint{0.0, 100.0};
@@ -1998,19 +1966,12 @@ void test_particle_branches_and_ordered_buffer() {
     branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 100.0};
     branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 50.0};
     branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 25.0};
-    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 2, {
+    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 4, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
         {kSizeStart, 9.0}, {kSizeEnd, 25.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 25.0},
         {kParticleLifetimeSeconds, 1.0},
         {kSizeOverLifeCurve, encode_age_curve(branch_size_curve)},
         {kOpacityOverLifeCurve, encode_age_curve(branch_opacity_curve)}}});
-    graph.nodes.push_back(GraphNode{appearance, kAppearanceNode, 1, {
-        {kColorStart, Vec3{1.0, 0.0, 0.0}}, {kColorEnd, Vec3{0.5, 0.0, 0.0}},
-        {kSizeStart, 4.0}, {kSizeEnd, 100.0}, {kOpacityStart, 0.2}, {kOpacityEnd, 100.0}}});
-    graph.edges[1] = GraphEdge{EdgeId{test_uuid(11)}, particle_a, kParticleParticlesOut,
-                               appearance, kAppearanceParticlesIn};
-    graph.edges.push_back(GraphEdge{EdgeId{test_uuid(12)}, appearance, kAppearanceParticlesOut,
-                                    output, kOutputParticles});
     graph.edges.push_back(GraphEdge{EdgeId{test_uuid(13)}, emitter, kEmitterParticles,
                                     particle_b, kParticleParticlesIn});
     graph.edges.push_back(GraphEdge{EdgeId{test_uuid(14)}, particle_b, kParticleParticlesOut,
@@ -2073,7 +2034,7 @@ void test_particle_branches_and_ordered_buffer() {
     // An active force path that bypasses Particle is rejected explicitly rather
     // than being silently omitted from the rendered graph.
     Graph force_bypass = graph;
-    force_bypass.nodes.push_back(GraphNode{bypass_force, kForceNode, 1, {
+    force_bypass.nodes.push_back(GraphNode{bypass_force, kForceNode, 2, {
         {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
     force_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(32)}, emitter, kEmitterParticles,
                                            bypass_force, kForceParticlesIn});
@@ -2087,26 +2048,10 @@ void test_particle_branches_and_ordered_buffer() {
         CHECK(std::strcmp(rejected_force_bypass.error().detail, "invalid active Particle graph connection") == 0);
     }
 
-    Graph appearance_bypass = graph;
-    appearance_bypass.nodes.push_back(GraphNode{bypass_appearance, kAppearanceNode, 1, {
-        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 1.0}, {kSizeEnd, 1.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 1.0}}});
-    appearance_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(34)}, emitter, kEmitterParticles,
-                                                bypass_appearance, kAppearanceParticlesIn});
-    appearance_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(35)}, bypass_appearance,
-                                                kAppearanceParticlesOut, output, kOutputParticles});
-    CHECK(validate_graph(appearance_bypass, particle_node_registry()).ok());
-    const auto rejected_appearance_bypass = evaluate_particle_graph(appearance_bypass, RationalTime{5, 4}, never);
-    CHECK(!rejected_appearance_bypass.has_value());
-    if (!rejected_appearance_bypass.has_value()) {
-        CHECK(rejected_appearance_bypass.error().code == ErrorCode::invalid_request);
-        CHECK(std::strcmp(rejected_appearance_bypass.error().detail, "invalid active Particle graph connection") == 0);
-    }
-
     // A disconnected Force can be active through Output beside a valid Particle
     // branch; reject it rather than accepting the graph and silently dropping it.
     Graph orphan_force = graph;
-    orphan_force.nodes.push_back(GraphNode{bypass_force, kForceNode, 1, {
+    orphan_force.nodes.push_back(GraphNode{bypass_force, kForceNode, 2, {
         {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
     orphan_force.edges.push_back(GraphEdge{EdgeId{test_uuid(36)}, bypass_force,
                                            kForceParticlesOut, output, kOutputParticles});
@@ -2116,24 +2061,9 @@ void test_particle_branches_and_ordered_buffer() {
     if (!rejected_orphan_force.has_value()) {
         CHECK(rejected_orphan_force.error().code == ErrorCode::invalid_request);
         CHECK(std::strcmp(rejected_orphan_force.error().detail,
-                          "every active Force/Appearance path must descend from a Particle node") == 0);
+                          "every active Force path must descend from a Particle node") == 0);
     }
 
-    Graph orphan_appearance = graph;
-    orphan_appearance.nodes.push_back(GraphNode{bypass_appearance, kAppearanceNode, 1, {
-        {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
-        {kSizeStart, 1.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0}}});
-    orphan_appearance.edges.push_back(GraphEdge{EdgeId{test_uuid(37)}, bypass_appearance,
-                                                kAppearanceParticlesOut, output, kOutputParticles});
-    CHECK(validate_graph(orphan_appearance, particle_node_registry()).ok());
-    const auto rejected_orphan_appearance = evaluate_particle_graph(orphan_appearance,
-                                                                     RationalTime{5, 4}, never);
-    CHECK(!rejected_orphan_appearance.has_value());
-    if (!rejected_orphan_appearance.has_value()) {
-        CHECK(rejected_orphan_appearance.error().code == ErrorCode::invalid_request);
-        CHECK(std::strcmp(rejected_orphan_appearance.error().detail,
-                          "every active Force/Appearance path must descend from a Particle node") == 0);
-    }
 }
 
 // Emission direction model (M3-04): the reference emitter's Speed plus a direction axis,
@@ -2166,6 +2096,7 @@ void test_emission_direction() {
     };
 
     Settings base;
+    base.direction_mode = DirectionMode::directional;
     base.velocity = Vec3{};
     base.velocity_spread = 0.0;
     base.gravity = Vec3{};
@@ -2323,7 +2254,7 @@ int main() {
     test_core_plugin_api();
     test_emission_direction();
     test_particle_branches_and_ordered_buffer();
-    test_force_and_appearance();
+    test_force_and_particle_style();
     test_graph_evaluation();
     test_graph_disconnect_and_reconnect();
     test_rational_time();

@@ -100,3 +100,13 @@ Compilation and fake-host checks do not establish AE host acceptance.
 
 SDK references: local May 2023 AE_GeneralPlug.h StreamSuite6/EffectSuite4 and
 [AEGP suites](https://ae-plugins.docsforadobe.dev/aegps/aegp-suites/).
+
+## Build31 read-only bootstrap exception
+
+The removed build15/16 generic edit transport stays removed. ADR0026 introduces
+a separate private v1 POD bootstrap requested by a proper General AEGP on UI idle.
+It requires its own usable PF context, acknowledges optional missing context and
+never transports authored edits, borrowed callbacks or source handles. It makes
+no project/selection/undo writes and sets no generic FORCE_RERENDER flag. Worker
+and render-only contexts stop before AEGP access. Actual AE2023 delivery/context
+and startup performance need owner qualification; this is not an edit receiver.

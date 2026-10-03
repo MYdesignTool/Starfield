@@ -1,3 +1,16 @@
+# Build31 current development surface
+
+Appearance is removed by owner request. Emitter/Auxiliary, Particle, Force and
+Output are the current nodes; Particle owns color/gradient, size/opacity and
+Over Life. Recreate graphs containing Appearance. Remaining native disk IDs,
+Particle schema4/base75, Emitter schema6/base31, Force schema2/base27 and CoreABI3
+are paired; the unused Color End disk ID207 definition is retained.
+Main layout35/36 now has Particle labels; main manifest24 and public IDs stay.
+Reopen CEP for native-idle-31. Connection/layout edits preserve authored controls
+and keys. StarfieldHost.aex adds bounded read-only initialization on active-comp
+UI idle, requiring real AE2023 no-Options qualification. Older sections below are
+historical checkpoints, not the current node inventory. See ADR0026.
+
 # AE adapter (M2/M3-01/M3-01B)
 
 The adapter registers 24 render controls plus graph data, source selection and explicit

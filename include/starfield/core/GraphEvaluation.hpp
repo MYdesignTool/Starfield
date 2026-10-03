@@ -69,12 +69,4 @@ public:
     const Settings& settings, NodeId emitter, NodeId particle, NodeId force, NodeId output,
     EdgeId emitter_to_particle, EdgeId particle_to_force, EdgeId force_to_output);
 
-// Construct the current single-emitter Alpha chain with one force and one
-// appearance stage. The settings' gravity/drag and age-curve fields are written
-// to their corresponding nodes, not to the emitter node.
-[[nodiscard]] Result<Graph> make_emitter_particle_force_appearance_output_graph(
-    const Settings& settings, NodeId emitter, NodeId particle, NodeId force,
-    NodeId appearance, NodeId output, EdgeId emitter_to_particle,
-    EdgeId particle_to_force, EdgeId force_to_appearance, EdgeId appearance_to_output);
-
 } // namespace starfield::core

@@ -125,48 +125,4 @@ Result<Graph> make_emitter_particle_force_output_graph(
     }
 }
 
-Result<Graph> make_emitter_particle_force_appearance_output_graph(
-    const Settings& settings, NodeId emitter, NodeId particle, NodeId force,
-    NodeId appearance, NodeId output, EdgeId emitter_to_particle,
-    EdgeId particle_to_force, EdgeId force_to_appearance, EdgeId appearance_to_output) {
-    using R = Result<Graph>;
-    try {
-        auto base = make_emitter_particle_force_output_graph(
-            settings, emitter, particle, force, output, emitter_to_particle,
-            particle_to_force, force_to_appearance);
-        if (!base.has_value()) return base;
-        Graph graph = base.take_value();
-        GraphNode appearance_node{appearance, kAppearanceNode, 1, {
-            {kColorStart, settings.color_start}, {kColorEnd, settings.color_end},
-            {kSizeStart, settings.particle_size}, {kSizeEnd, settings.particle_size_end},
-            {kOpacityStart, settings.opacity}, {kOpacityEnd, settings.opacity_end}}};
-        if (settings.size_over_life.count != 0) {
-            appearance_node.parameters.push_back({kSizeOverLifeCurve, encode_age_curve(settings.size_over_life)});
-        }
-        if (settings.opacity_over_life.count != 0) {
-            appearance_node.parameters.push_back({kOpacityOverLifeCurve, encode_age_curve(settings.opacity_over_life)});
-        }
-        if (settings.particle_size_random_percent != 0.0) {
-            appearance_node.parameters.push_back({kSizeRandom, settings.particle_size_random_percent});
-        }
-        if (settings.opacity_random_percent != 0.0) {
-            appearance_node.parameters.push_back({kOpacityRandom, settings.opacity_random_percent});
-        }
-        graph.nodes.push_back(std::move(appearance_node));
-        if (graph.edges.size() != 3 || graph.edges[2].source_node != force ||
-            graph.edges[2].destination_node != output) {
-            return R::failure(ErrorCode::internal_failure,
-                              "particle-force graph did not contain its expected output edge");
-        }
-        graph.edges[2] = GraphEdge{force_to_appearance, force, kForceParticlesOut,
-                                   appearance, kAppearanceParticlesIn};
-        graph.edges.push_back(GraphEdge{appearance_to_output, appearance,
-                                        kAppearanceParticlesOut, output, kOutputParticles});
-        return validate_constructed_graph(std::move(graph), "particle-force-appearance graph validation failed");
-    } catch (const std::bad_alloc&) {
-        return R::failure(ErrorCode::allocation_failed, "particle-force-appearance graph allocation failed");
-    } catch (...) {
-        return R::failure(ErrorCode::internal_failure, "particle-force-appearance graph construction failed");
-    }
-}
 } // namespace starfield::core

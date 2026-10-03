@@ -36,7 +36,6 @@ using native_nodes::Kind;
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
 constexpr char kEmitterMatchName[] = "org.starfieldfx.node.emitter";
 constexpr char kParticleMatchName[] = "org.starfieldfx.node.particle";
-constexpr char kAppearanceMatchName[] = "org.starfieldfx.node.appearance";
 constexpr char kForceMatchName[] = "org.starfieldfx.node.force";
 
 struct RawField {
@@ -57,7 +56,7 @@ constexpr A_long component_count(node_sync::ValueKind type) noexcept {
 }
 constexpr bool animated_index(Kind kind,A_long index) noexcept {
     if(kind==Kind::particle) return (index>=1 && index<=14) || (index>=66 && index<=75);
-    return index>=1 && index<=(kind==Kind::emitter?30:kind==Kind::appearance?8:10);
+    return index>=1 && index<=(kind==Kind::emitter?30:10);
 }
 
 struct SuiteSet {
@@ -387,7 +386,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || kind > 3 || !read(2, fields) || fields > 75) return false;
+            if (!read(2, kind) || (kind > 3 || kind == 2) || !read(2, fields) || fields > 75) return false;
             node.kind = static_cast<Kind>(kind);
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -447,9 +446,6 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
         kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 4; return true;
-    }
-    if (std::strcmp(match_name, kAppearanceMatchName) == 0) {
-        kind = Kind::appearance; type_key = core::graph_keys::kAppearanceNode; schema = 1; return true;
     }
     if (std::strcmp(match_name, kForceMatchName) == 0) {
         kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 2; return true;
@@ -538,22 +534,17 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         return true;
     }
 
-    const bool particle = kind == Kind::particle;
-    const A_long color_start_index = particle ? 10 : 5;
-    const A_long color_end_index = particle ? 10 : 6;
-    const A_long size_index = particle ? 4 : 1;
-    const A_long size_end_index = particle ? 13 : 7;
-    const A_long opacity_index = particle ? 7 : 3;
-    const A_long opacity_end_index = particle ? 14 : 8;
-    const A_long size_random_index = particle ? 6 : 2;
-    const A_long opacity_random_index = particle ? 8 : 4;
+    if(kind!=Kind::particle)return false;
+    const A_long color_start_index = 10;
+    const A_long size_index = 4;
+    const A_long size_end_index = 13;
+    const A_long opacity_index = 7;
+    const A_long opacity_end_index = 14;
+    const A_long size_random_index = 6;
+    const A_long opacity_random_index = 8;
     if (!read_color(suites, plugin_id, effect, color_start_index, time, vector)) return false;
     add_value(node, kColorStart, vector);
-    if(!particle) {
-        if(!read_color(suites,plugin_id,effect,color_end_index,time,vector)) return false;
-        add_value(node,kColorEnd,vector);
-    }
-    if(particle) {
+    {
         std::uint32_t mode{},count{};
         if(!read_uint(suites,plugin_id,effect,9,time,mode) || mode<1 || mode>4 ||
             !read_uint(suites,plugin_id,effect,49,time,count) || count<2 || count>8) return false;
@@ -579,7 +570,7 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     add_value(node, kSizeRandom, scalar);
     if (!read_one_d(suites, plugin_id, effect, opacity_random_index, time, scalar)) return false;
     add_value(node, kOpacityRandom, scalar);
-    if (particle) {
+    {
         if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
         add_value(node, kParticleLifetimeSeconds, scalar);
         for(auto [index,key]:{std::pair{3,kLifeRandom},std::pair{5,kSizeY},std::pair{11,kParticleFeather},
@@ -600,9 +591,9 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         }
     }
 
-    const A_long size_curve_count_index = particle ? 15 : 9;
+    const A_long size_curve_count_index = 15;
     const A_long size_curve_first_index = size_curve_count_index + 1;
-    const A_long opacity_curve_count_index = particle ? 32 : 26;
+    const A_long opacity_curve_count_index = 32;
     const A_long opacity_curve_first_index = opacity_curve_count_index + 1;
     core::OpaqueBytes curve{};
     bool has_curve = false;
@@ -644,7 +635,6 @@ core::PortKey source_port(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return kEmitterParticles;
         case Kind::particle: return kParticleParticlesOut;
-        case Kind::appearance: return kAppearanceParticlesOut;
         case Kind::force: return kForceParticlesOut;
     }
     return {};
@@ -655,7 +645,6 @@ core::PortKey destination_port(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return kEmitterParents;
         case Kind::particle: return kParticleParticlesIn;
-        case Kind::appearance: return kAppearanceParticlesIn;
         case Kind::force: return kForceParticlesIn;
     }
     return {};
@@ -782,7 +771,7 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
         }
         const auto expected=raw.kind==Kind::emitter?core::graph_keys::kEmitterNode:
             raw.kind==Kind::particle?core::graph_keys::kParticleNode:
-            raw.kind==Kind::appearance?core::graph_keys::kAppearanceNode:core::graph_keys::kForceNode;
+            core::graph_keys::kForceNode;
         if(output.type_key!=expected) return PF_Err_BAD_CALLBACK_PARAM;
         SuiteSet reader(nullptr);
         reader.playback=&raw;
@@ -930,7 +919,6 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                 if (node.id == connection.destination) {
                     found_destination = true;
                     if (node.type_key == core::graph_keys::kParticleNode) destination_kind = Kind::particle;
-                    else if (node.type_key == core::graph_keys::kAppearanceNode) destination_kind = Kind::appearance;
                     else if (node.type_key == core::graph_keys::kForceNode) destination_kind = Kind::force;
                     break;
                 }
@@ -1151,7 +1139,7 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             if (node == graph.nodes.end()) return PF_Err_BAD_CALLBACK_PARAM;
             const auto expected = raw.kind == Kind::emitter ? core::graph_keys::kEmitterNode :
                 raw.kind == Kind::particle ? core::graph_keys::kParticleNode :
-                raw.kind == Kind::appearance ? core::graph_keys::kAppearanceNode : core::graph_keys::kForceNode;
+core::graph_keys::kForceNode;
             stage("node type");
             if (node->type_key != expected) return PF_Err_BAD_CALLBACK_PARAM;
             node->parameters.clear(); reader.playback = &raw;

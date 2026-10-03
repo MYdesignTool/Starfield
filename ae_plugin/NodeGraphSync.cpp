@@ -28,11 +28,6 @@ constexpr char kRegistrationName[] = "Starfield Particle Node Sync";
 constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
     starfield::adapter::native_nodes::Kind::particle);
 constexpr A_long kNodeKind = 1;
-#elif defined(STARFIELD_NODE_KIND_APPEARANCE)
-constexpr char kRegistrationName[] = "Starfield Appearance Node Sync";
-constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
-    starfield::adapter::native_nodes::Kind::appearance);
-constexpr A_long kNodeKind = 2;
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 constexpr char kRegistrationName[] = "Starfield Force Node Sync";
 constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(

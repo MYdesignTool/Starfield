@@ -117,7 +117,7 @@
                 var key = keys[p], a = params[key], b = savedParams[key];
                 if (!a || !b) {
                     var value = a || b;
-                    var fallback = (node.type === "org.starfieldfx.nodes.particle" || node.type === "org.starfieldfx.nodes.appearance") ?
+                    var fallback = (node.type === "org.starfieldfx.nodes.particle") ?
                         defaults[key] : node.type === "org.starfieldfx.nodes.emitter" ?
                         ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60,"22":0,"23":0,"24":100,"25":0,"26":100,"27":0,"28":0,"29":0,"30":0})[key] :
                         node.type === "org.starfieldfx.nodes.force" ? ({"3":0,"5":0,"6":0,"7":0,"8":0})[key] :
@@ -131,7 +131,7 @@
                         if (!near(ad.getFloat64(offset, true), bd.getFloat64(offset, true))) return false;
                     }
                 } else if (a.type !== b.type || !near(a.value, b.value,
-                    (node.type === "org.starfieldfx.nodes.particle" || node.type === "org.starfieldfx.nodes.appearance") && (key === "1" || key === "2"))) return false;
+                    (node.type === "org.starfieldfx.nodes.particle") && (key === "1" || key === "2"))) return false;
             }
         }
         var edges = {};

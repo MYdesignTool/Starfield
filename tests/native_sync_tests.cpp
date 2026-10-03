@@ -784,13 +784,17 @@ int main() {
     };
     PF_ParamDef* forbidden_sequence_params[1]{nullptr};
     PF_OutData sequence_output{};
+    const auto idle_bootstrap=[&] {NativeBootstrapRequest request;
+        refresh_native_temporal_idle(&sequence_data,1,request);return request;};
     remember_native_control_proofs(&sequence_data,{});
     const auto sequence_writes=sets;
     lazy_dependencies=true;dependencies_evaluated.fill(false);
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,false)==0 &&
         sequence_output.sequence_data && size_handle(sequence_output.sequence_data)==sizeof(std::uint32_t),
         "legacy null sequence receives a flat lifecycle marker");
-    check(!validated_native_control_proofs(&sequence_data).empty(),"UI sequence setup certifies metadata without Options or DRAW");
+    check(validated_native_control_proofs(&sequence_data).empty(),"sequence setup never certifies unfinished project state");
+    ++metadata_epoch; // AE finishes restoring dependencies AFTER sequence setup.
+    check(idle_bootstrap().proofs>0,"post-load idle certifies metadata without Options or DRAW");
     const auto warmed=last_native_metadata_trace();
     check(warmed.inputs>0 && warmed.evaluated==warmed.inputs && warmed.proofs>0 && !warmed.error,
         "cold setup evaluates all active aliases before publishing dependency proofs");
@@ -810,10 +814,12 @@ int main() {
     setdown_native_temporal_sequence(&sequence_data);sequence_data.sequence_data=saved_marker;
     remember_native_control_proofs(&sequence_data,{});++metadata_epoch;dependencies_evaluated.fill(false);
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0 &&
-        sequence_output.sequence_data==saved_marker && !validated_native_control_proofs(&sequence_data).empty(),
-        "save/reopen resetup rebuilds process metadata from source controls");
-    check(last_native_ui_timing().sequence_refreshes>=2 && sets==sequence_writes,
-        "sequence bootstrap is timed and writes no project streams");
+        sequence_output.sequence_data==saved_marker && validated_native_control_proofs(&sequence_data).empty(),
+        "save/reopen resetup only restores the flat marker");
+    ++metadata_epoch;
+    check(idle_bootstrap().proofs>0,"post-load idle rebuilds process metadata after reopen");
+    check(last_native_ui_timing().idle_refreshes>=2 && last_native_ui_timing().sequence_refreshes==0 && sets==sequence_writes,
+        "idle bootstrap is timed and writes no project streams");
     NativeAnimationPlan reopened_constant(static_graph,1920,1080,1);reopened_constant.prepare_constants(&cold_render);
     check(reopened_constant.fully_constant(),"save/reopen warms process-local dependencies again without Options");
     const auto active_alias=validated_native_control_proofs(&sequence_data).front().stream;
@@ -834,6 +840,7 @@ int main() {
     metadata_rate_keys=true;++metadata_epoch;
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0,
         "reopen reads current keyframe metadata");
+    (void)idle_bootstrap();
     auto keyed_render=sequence_data;keyed_render.inter=sequence_inter;
     NativeAnimationPlan reopened_keyed(static_graph,1920,1080,1);reopened_keyed.prepare_constants(&keyed_render);
     check(!reopened_keyed.fully_constant(),"animated PPS on reopen cannot reuse a previous constant proof");
@@ -850,19 +857,27 @@ int main() {
         "UI and worker sequence callbacks never invoke AE's forbidden PF checkout/checkin");
     sequence_data.num_params=0;sequence_data.inter.checkout_param=nullptr;sequence_data.inter.checkin_param=nullptr;
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
-        !validated_native_control_proofs(&sequence_data).empty(),
-        "absent sequence params reads owned graph through AEGP without PF callbacks");
+        idle_bootstrap().proofs>0,
+        "idle does not require generic params or PF checkout callbacks");
     const auto sequence_handles=handles.size();const auto sequence_refs=live_refs;
     fail_read=kGraphParameterId;remember_native_control_proofs(&sequence_data,{});
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
-        validated_native_control_proofs(&sequence_data).empty(),"unavailable load-time graph is an optional miss");
+        idle_bootstrap().error!=0 && validated_native_control_proofs(&sequence_data).empty(),"unavailable idle graph is an optional miss");
     check(handles.size()==sequence_handles && live_refs==sequence_refs,"failed startup read balances handles and streams");
     wrong_type=kGraphParameterId;
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
-        validated_native_control_proofs(&sequence_data).empty(),"wrong startup graph type is rejected before union access");
+        idle_bootstrap().error!=0 && validated_native_control_proofs(&sequence_data).empty(),"wrong idle graph type is rejected before union access");
     check(handles.size()==sequence_handles && live_refs==sequence_refs,"wrong-type startup read releases owned references");
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
-        !validated_native_control_proofs(&sequence_data).empty(),"subsequent valid startup read can recover without Options");
+        idle_bootstrap().proofs>0,"subsequent valid idle read can recover without Options");
+    const auto idle_suites=aegp_suite_requests;
+    NativeBootstrapRequest invalid_idle;invalid_idle.version=2;refresh_native_temporal_idle(&sequence_data,1,invalid_idle);
+    check(!invalid_idle.acknowledged && aegp_suite_requests==idle_suites,"unknown idle protocol is ignored before host access");
+    NativeBootstrapRequest absent;refresh_native_temporal_idle(nullptr,1,absent);
+    check(absent.acknowledged && absent.error!=0 && aegp_suite_requests==idle_suites,"weak generic PF context is an acknowledged optional miss");
+    std::thread idle_worker([&]{NativeBootstrapRequest request;refresh_native_temporal_idle(&sequence_data,1,request);
+        check(request.acknowledged && request.error!=0,"worker idle message cannot access UI metadata");});idle_worker.join();
+    check(aegp_suite_requests==idle_suites,"idle worker guard runs before any AEGP call");
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));main.values[kGraphParameterId].arbH=sequence_old_graph;
     setdown_native_temporal_sequence(&sequence_data);
     dispose(ui_graph_handle);

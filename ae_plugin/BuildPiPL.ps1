@@ -5,7 +5,8 @@ param(
     [string]$FlagHeaderPath = '',
     [string]$VersionHeaderPath = '',
     [string]$OutFlagsName = 'STARFIELD_OUT_FLAGS',
-    [string]$OutFlags2Name = 'STARFIELD_OUT_FLAGS2'
+    [string]$OutFlags2Name = 'STARFIELD_OUT_FLAGS2',
+    [switch]$GeneralPlugin
 )
 
 $ErrorActionPreference = 'Continue'
@@ -46,10 +47,19 @@ $flagText = [System.IO.File]::ReadAllText($FlagHeaderPath)
 $versionText = [System.IO.File]::ReadAllText($VersionHeaderPath)
 $resourceText = [System.IO.File]::ReadAllText($generatedRc)
 
-foreach ($entry in @(
+$entries = @(
         @{ Name = $OutFlagsName; Text = $flagText; Source = $FlagHeaderPath },
         @{ Name = $OutFlags2Name; Text = $flagText; Source = $FlagHeaderPath },
-        @{ Name = 'STARFIELD_VERSION_PACKED'; Text = $versionText; Source = $VersionHeaderPath })) {
+        @{ Name = 'STARFIELD_VERSION_PACKED'; Text = $versionText; Source = $VersionHeaderPath })
+if ($GeneralPlugin) {
+    $preprocessed = [IO.File]::ReadAllText((Join-Path $IntermediateDir 'StarfieldPiPL.rr'))
+    if ($preprocessed -notmatch 'Kind\s*\{\s*AEGP\s*\}' -or
+        $preprocessed -notmatch 'CodeWin64X86\s*\{\s*"StarfieldHostEntry"\s*\}') {
+        throw 'General PiPL must declare AEGP and the independent StarfieldHostEntry export.'
+    }
+    $entries = @($entries | Where-Object { $_.Name -eq 'STARFIELD_VERSION_PACKED' })
+}
+foreach ($entry in $entries) {
     $match = [regex]::Match($entry.Text, "#define\s+$($entry.Name)\s+(0x[0-9A-Fa-f]+|\d+)")
     if (-not $match.Success) { throw "Could not read $($entry.Name) from $($entry.Source)" }
 
@@ -61,7 +71,16 @@ foreach ($entry in @(
         [System.Convert]::ToUInt32($literal)
     }
 
-    if ($resourceText -notmatch "(?<![\d])$value\s*L") {
+    $valuePattern = "(?<![\d])$value\s*L"
+    if ($GeneralPlugin) {
+        $low = $value -band 65535
+        $high = $value -shr 16
+        $valuePattern = '"srev"[\s\S]*?4,\s*0x0,\s*' + $low + ',\s*' + $high + ','
+        if ($resourceText -notmatch '"xgEA"' -or $resourceText -notmatch '"StarfieldHostEntry\\0') {
+            throw 'Generated General PiPL has an incorrect kind or entry point.'
+        }
+    }
+    if ($resourceText -notmatch $valuePattern) {
         throw "Generated PiPL does not declare $($entry.Name) = $value ($literal). The PiPL resource is stale: delete the intermediate directory and rebuild."
     }
 }

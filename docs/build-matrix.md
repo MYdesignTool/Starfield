@@ -1,5 +1,46 @@
 # Build and host matrix
 
+## M3-06 / build 31 - post-load bootstrap and Appearance removal
+
+Build30 failed owner no-Options startup qualification: W57/57 P57 E0 but
+Temporal0/57, PF193372 and history1671.3ms (CUDA16.3ms). Build31 (32799/0x801F)
+adds a session-resident General AEGP for bounded, read-only main-thread idle
+certification after load; sequence callbacks only maintain SFU1. Actual generic
+PF context availability and no-Options first/reopen preview remain owner gates.
+See ADR0026 for the protocol, lifetime rules, retry/state checks and limitations.
+
+Owner explicitly requires complete Appearance removal without compatibility.
+Only Emitter (including Auxiliary), Particle, Force and Output remain registered.
+Particle owns style/Over Life; connection/layout edits only write node records.
+The retired AEX is archived on installation; one-step rollback restores it and
+removes the new StarfieldHost.aex. Main manifest24/IDs, remaining native schemas,
+C ABI3 and SFU1 remain paired. Old graphs containing Appearance must be recreated.
+Gateway native-idle-31; reopen CEP. Main integration waits for AE qualification.
+
+### Build31 candidate checks - 2026-10-04
+
+May 2023 SDK, Release x64 /MT build passes for main, Emitter, ParticleNode,
+Force, StarfieldHost and paired Core. Candidate construction used
+`-NoDistPublish -NoRuntimePublish`, leaving the installed build30 untouched.
+Evidence: artifacts/build31-native-build.log.
+
+| Scope | Checks | Failures | Evidence under artifacts/ |
+| --- | ---: | ---: | --- |
+| Core regression, including rejected retired Appearance type | 11,895 | 0 | build31-core-regression.log |
+| Native synchronization / camera capture | 5,363 + 12 | 0 | build31-native-sync.log |
+| Current nodes, gradient, rotation, Auxiliary and camera | 379 | 0 | build31-current-core.log |
+| General AEGP lifetime, bounded scan and optional misses | 14 | 0 | build31-host-bootstrap.log |
+| Emitter / Particle / Force native effects | 84 / 85 / 80 | 0 | build31-node-Emitter.log / build31-node-Particle.log / build31-node-Force.log |
+
+Current panel, Particle/Emitter/Force round trips, topology-only commit/rollback,
+and startup/retained-error JavaScript suites pass. Logs are
+build31-current-panel.log, build31-node-connection-tests.log and
+build31-panel-startup.log. Isolated deployment report/install/retired-module/
+installed-hash/single-junction/exact rollback checks pass in
+build31-isolated-deploy.log; the fixture never touches the real installation.
+These checks do not establish actual AE generic-context availability, first-load
+performance, reopen performance, or Particle-to-Force host interaction.
+
 ## Build 30 deployment - 2026-10-03
 
 Source 755a733 is pushed. A read-only process check immediately before deployment

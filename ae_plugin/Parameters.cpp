@@ -69,8 +69,8 @@ constexpr A_long kLayoutEmitterXDiskId = 'lEx0';
 constexpr A_long kLayoutEmitterYDiskId = 'lEy0';
 constexpr A_long kLayoutForceXDiskId = 'lFx0';
 constexpr A_long kLayoutForceYDiskId = 'lFy0';
-constexpr A_long kLayoutAppearanceXDiskId = 'lAx0';
-constexpr A_long kLayoutAppearanceYDiskId = 'lAy0';
+constexpr A_long kLayoutParticleXDiskId = 'lAx0';
+constexpr A_long kLayoutParticleYDiskId = 'lAy0';
 constexpr A_long kLayoutOutputXDiskId = 'lOx0';
 constexpr A_long kLayoutOutputYDiskId = 'lOy0';
 constexpr A_long kSizeCurveCountDiskId = 'szct';
@@ -584,8 +584,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         {"Layout Emitter Y", kLayoutEmitterYDiskId, 22.0},
         {"Layout Force X", kLayoutForceXDiskId, 180.0},
         {"Layout Force Y", kLayoutForceYDiskId, 190.0},
-        {"Layout Appearance X", kLayoutAppearanceXDiskId, 180.0},
-        {"Layout Appearance Y", kLayoutAppearanceYDiskId, 358.0},
+        {"Layout Particle X", kLayoutParticleXDiskId, 180.0},
+        {"Layout Particle Y", kLayoutParticleYDiskId, 358.0},
         {"Layout Output X", kLayoutOutputXDiskId, 180.0},
         {"Layout Output Y", kLayoutOutputYDiskId, 526.0},
     };

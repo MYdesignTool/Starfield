@@ -13,15 +13,13 @@
         emitter: "org.starfieldfx.nodes.emitter",
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
-        appearance: "org.starfieldfx.nodes.appearance",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 6, particle: 4, force: 2, appearance: 1, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 6, particle: 4, force: 2, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
-        "org.starfieldfx.nodes.appearance": { input: "1", output: "2" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
@@ -62,12 +60,6 @@
             { key: "3", type: 4, value: 0 }, { key: "4", type: 5, value: [0,0,0] },
             { key: "5", type: 4, value: 0 }, { key: "6", type: 4, value: 0 },
             { key: "7", type: 4, value: 0 }, { key: "8", type: 4, value: 0 }
-        ],
-        appearance: [
-            { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
-            { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 100 },
-            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 100 },
-            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 }
         ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
             {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30}]
@@ -189,9 +181,6 @@
         if (destination.type === TYPES.emitter) {
             var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
             if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
-        }
-        if (source.type === TYPES.appearance && destination.type !== TYPES.output && destination.type !== TYPES.emitter) {
-            fail("invalid_stage", "an Appearance override connects to Output");
         }
         // Reject a cycle before producing a request. The native validator still checks
         // the complete graph, including node-specific stage rules and resource limits.
@@ -366,12 +355,8 @@
             if (!sourceSelected && !destinationSelected) continue;
             var source = nodeById(graph, edge.sourceNode);
             var destination = nodeById(graph, edge.destinationNode);
-            if (!source || !destination || source.type === TYPES.appearance || destination.type === TYPES.appearance) {
-                // Multiple Appearance overrides on one stream are outside the graph
-                // contract, so copied paths touching an Appearance stay disconnected.
-                continue;
-            }
 
+            if (!source || !destination) continue;
             var copiedSource = sourceSelected ? ids["$" + edge.sourceNode] : edge.sourceNode;
             var copiedDestination = destinationSelected ? ids["$" + edge.destinationNode] : edge.destinationNode;
             graph.edges.push(makeEdge(graph, idFactory, copiedSource, copiedDestination,
@@ -411,7 +396,7 @@
             }
             if (change.remove === true) {
                 if (found < 0) continue;
-                if ((node.type !== TYPES.particle && node.type !== TYPES.appearance) ||
+                if ((node.type !== TYPES.particle) ||
                     (change.parameterKey !== "7" && change.parameterKey !== "8")) {
                     fail("invalid_parameter", "only optional over-life curve parameters can be removed");
                 }
@@ -420,7 +405,7 @@
             }
             var value = copyValue(change.value);
             if (found < 0) {
-                if ((node.type !== TYPES.particle && node.type !== TYPES.appearance) ||
+                if ((node.type !== TYPES.particle) ||
                     (change.parameterKey !== "7" && change.parameterKey !== "8" && !(node.type===TYPES.particle && change.parameterKey==="13")) ||
                     change.valueType !== 7 || !(value instanceof Uint8Array)) {
                     fail("missing_parameter", "the requested graph parameter is not present");

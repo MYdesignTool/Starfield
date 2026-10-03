@@ -387,3 +387,53 @@ public keys/indices, all topic and alias indices/disk IDs, complete indices1..61
 GPU default and 30/60/120 Hz default30. It fails before correction (95 != 96)
 and passes afterwards; artifacts/build30-manifest-before.log and -after.log.
 This is a descriptor correction and does not require replacing the installed AEX.
+
+## M3-06 / build 31 - post-load bootstrap, Particle-owned style
+
+Owner rejects build30: Options remains necessary. The latest AE screenshot shows
+W57/57 P57 E0, B2, but Temporal 0/57, PF193372, N6668/6668 and history 1671.3ms;
+CUDA rendering is 16.3ms. Successful sequence capture does not mean its states
+are usable by rendering. That qualification gate is FAILED, not complete.
+
+Build31 (32799 / 0x801F) moves automatic certification to a session-resident
+General AEGP, StarfieldHost.aex. Its main-thread idle callback reacquires the active
+composition's effects and sends a synchronous private read-only generic message
+to the main renderer. Only numeric scan cursors survive; no source handles or PF
+callbacks cross the message boundary. Scan work is bounded to 64 visits / four
+messages / 250ms, at most one tick per 500ms. Sequence callbacks only maintain
+the flat four-byte SFU1 marker; no AEGP or PF parameter reads occur during restore.
+
+The receiver acknowledges unavailable/partial PF contexts without returning an
+AE error, evaluates aliases before capturing source metadata and all-time states,
+then render still validates every state. No project streams, selections, undo,
+registry, host-wide settings or render flags are written by this bootstrap.
+Three post-load captures precede deduplication; later dependency changes retry.
+Render-only/worker contexts never access AEGP. General AEGP owns idle/death hooks
+for the session; registration failures remain resident and inert. The active-comp
+scope and availability of the actual generic PF context require owner AE2023
+qualification. Background render-queue initialization is not claimed.
+
+The owner explicitly requires COMPLETE Appearance removal, without old-project
+compatibility (2026-10-04). Delete its independent effect build/PiPL, node registry,
+constructor, authoring entries and static/temporal override traversal. Particle
+owns color, size, opacity and Over Life. Retired node kinds are rejected; graphs
+containing Appearance must be recreated. Its native disk ID 207 definition is
+retained unused; Particle's Color/gradient banks are retained. Main layout
+labels/keys 35/36 are renamed Particle, keeping their IDs. Main manifest24,
+remaining node schemas, C ABI3 and SFU1 are unchanged.
+Deployment archives the retired AEX instead of leaving it loadable, and rollback
+restores the exact previous bundle including absence of the new Host module.
+
+Connection/layout-only CEP edits now write records only, preserving all authored
+parameters and keys; rollback compares the actual surviving native snapshot.
+Current Particle mapping uses Color, not Color Start. The reported missing field
+is not reproduced in the current gateway fixture; stale gateway execution is a
+hypothesis, not confirmed. Token native-idle-31 forces a fresh gateway handshake;
+errors include actual effect match/name, and parameter writes reject wrong kinds.
+
+Owned M3-06 scope extends to StarfieldHost.cpp/.vcxproj/PiPL, NativeBootstrap,
+NativeTemporalUI/cache/graph/diagnostics/version, build/deploy tools, removal of
+Appearance throughout core/adapter/CEP/manifests, and the necessary scoped tests.
+No-Options first preview/save/reopen and Particle -> Force need actual host
+qualification before the authorized main merge. Fake-host results alone cannot
+close this task. Build/tests/deployment evidence is recorded separately below.

@@ -51,7 +51,6 @@ class TemporalEvaluator {
     struct Branch {
         const GraphNode* emitter{};
         const GraphNode* particle{};
-        const GraphNode* appearance{};
         std::vector<const GraphNode*> forces;
         std::uint64_t partition{}, stride{};
     };
@@ -184,10 +183,6 @@ public:
                 if(downstream->type_key==kEmitterNode) continue;
                 if(downstream->type_key==kOutputNode) terminal=true;
                 if(downstream->type_key==kForceNode) base.forces.push_back(downstream);
-                if(downstream->type_key==kAppearanceNode) {
-                    if(base.appearance) return R::failure(ErrorCode::invalid_request,"multiple Appearance overrides");
-                    base.appearance=downstream;
-                }
                 for(auto dest:outgoing[next]) if(active[dest]) stack.push_back(dest);
             }
             if(!terminal) continue;
@@ -267,14 +262,10 @@ public:
                         return R::failure(ErrorCode::invalid_request,"Auxiliary percentage outside 0..100");
                 auto emitter=read_emitter(emitter_node.value());if(!emitter.has_value()) return R::failure(emitter.error());
                 auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
-                auto particle_values=read_appearance(particle_node.value());if(!particle_values.has_value()) return R::failure(particle_values.error());
+                auto particle_values=read_particle(particle_node.value());if(!particle_values.has_value()) return R::failure(particle_values.error());
                 const double life=particle_values.value().lifetime_seconds,age=std::max(0.0,now-birth);
                 if(age<life) {
                     auto appearance=particle_values;
-                    if(branch.appearance) {
-                        auto sampled=at(*branch.appearance,birth);if(!sampled.has_value()) return R::failure(sampled.error());
-                        appearance=read_appearance(sampled.value());if(!appearance.has_value()) return R::failure(appearance.error());
-                    }
                     Settings settings=emitter.value().value;settings.particle_lifetime_seconds=life;
                     const auto percent=[&](ParameterKey key,double fallback) {const auto* v=find_value(emitter_node.value(),key);return v?std::get<double>(*v)/100:fallback;};
                     const auto* mode=find_value(emitter_node.value(),kAuxiliarySource);
@@ -330,7 +321,7 @@ public:
                         }
                         const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
-                        apply_appearance(instance,looks,own.seed);
+                        apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values.value(),own.seed,birth_position);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));

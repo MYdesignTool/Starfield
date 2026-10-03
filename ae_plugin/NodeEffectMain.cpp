@@ -10,9 +10,6 @@
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
 #define STARFIELD_NODE_NAME "Starfield Particle Node"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.particle"
-#elif defined(STARFIELD_NODE_KIND_APPEARANCE)
-#define STARFIELD_NODE_NAME "Starfield Appearance"
-#define STARFIELD_NODE_MATCH "org.starfieldfx.node.appearance"
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 #define STARFIELD_NODE_NAME "Starfield Force"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.force"

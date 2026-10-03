@@ -13,9 +13,12 @@
 namespace starfield::adapter {
 namespace {
 struct UIStamp {PF_ProgPtr publisher{};PF_State state{};};
+struct IdleStamp {PF_ProgPtr publisher{};PF_State state{};unsigned captures{};
+};
 std::mutex ui_mutex;
 std::thread::id ui_thread;
 std::vector<UIStamp> ui_stamps;
+std::vector<IdleStamp> idle_stamps;
 NativeUITiming ui_timing;
 struct UITimer {
     bool refreshed{},sequence{};
@@ -54,7 +57,7 @@ struct ParamUtils {
 };
 }
 void initialize_native_temporal_ui() noexcept {
-    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();ui_timing={};
+    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();idle_stamps.clear();ui_timing={};
 }
 NativeUITiming last_native_ui_timing() noexcept {
     std::lock_guard lock(ui_mutex);return ui_timing;
@@ -92,6 +95,42 @@ void refresh_native_temporal_ui(PF_InData* data,PF_ParamDef* params[],
     // No project writes, undo records, render requests or handled-event flags.
 } catch(...) {} // Optional UI optimization cannot reject an authored edit.
 
+void refresh_native_temporal_idle(PF_InData* data,AEGP_PluginID id,NativeBootstrapRequest& request) noexcept try {
+    if(request.magic!=0x53464931 || request.bytes!=sizeof(request) || request.version!=1)return;
+    request.acknowledged=1;request.error=PF_Err_BAD_CALLBACK_PARAM;
+    struct IdleTiming {
+        NativeBootstrapRequest& request;
+        ~IdleTiming(){std::lock_guard lock(ui_mutex);++ui_timing.idle_calls;
+            ui_timing.idle_refreshes+=request.refreshed;ui_timing.idle_error=request.error;}
+    } idle_timing{request};
+    if(refreshing || !on_ui_thread() || !data || !data->effect_ref || !data->pica_basicP || !data->utils ||
+        (data->in_flags & PF_InFlag_PROJECT_IS_RENDER_ONLY) || !id)return;
+    RefreshScope scope;ParamUtils utils(data);PF_State before{};
+    if(!utils.state(before))return;
+    std::optional<IdleStamp> old;
+    {std::lock_guard lock(ui_mutex);
+        for(const auto& entry:idle_stamps)if(entry.publisher==data->effect_ref){old=entry;break;}}
+    const auto existing=validated_native_control_proofs(data);
+    // Loading can settle over more than one idle tick. Capture three times, then
+    // deduplicate unchanged state, preserving sampled PPS prefixes. A dependency
+    // change or missing proof always retries without a dialog.
+    if(old && old->captures>=3 && utils.same(old->state,before) && !existing.empty()) {
+        request.proofs=static_cast<std::uint32_t>(existing.size());request.error=PF_Err_NONE;return;
+    }
+    UITimer timer;timer.refreshed=true;request.refreshed=1;
+    request.error=capture_current_native_temporal_metadata(data,id);
+    if(request.error)return;
+    const auto trace=last_native_metadata_trace();request.error=trace.error;
+    const auto certified=validated_native_control_proofs(data);
+    request.proofs=static_cast<std::uint32_t>(certified.size());
+    if(request.error || certified.empty())return;
+    PF_State after{};if(!utils.state(after) || !utils.same(before,after))return;
+    std::lock_guard lock(ui_mutex);
+    std::erase_if(idle_stamps,[&](const auto& entry){return entry.publisher==data->effect_ref;});
+    if(idle_stamps.size()>=32)idle_stamps.erase(idle_stamps.begin());
+    idle_stamps.push_back({data->effect_ref,after,old?old->captures+1:1});
+} catch(...) {request.error=PF_Err_BAD_CALLBACK_PARAM;}
+
 PF_Err flatten_native_temporal_sequence(PF_InData* data,PF_OutData* out) noexcept {
     if(!data || !out || !data->utils || !data->utils->host_new_handle ||
         !data->utils->host_lock_handle || !data->utils->host_unlock_handle ||
@@ -120,14 +159,10 @@ PF_Err flatten_native_temporal_sequence(PF_InData* data,PF_OutData* out) noexcep
 PF_Err setup_native_temporal_sequence(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],
     AEGP_PluginID id,bool resetup) noexcept try {
     (void)params; // Parameter checkout and array delivery are not a sequence contract.
-    if(const auto error=flatten_native_temporal_sequence(data,out);error)return error;
-    if(refreshing || (resetup && (data->in_flags & PF_InFlag_PROJECT_IS_RENDER_ONLY)) ||
-        !on_ui_thread() || !data->effect_ref || !data->pica_basicP || !id)return PF_Err_NONE;
-    RefreshScope scope;UITimer timer;timer.sequence=true;
-    timer.refreshed=capture_current_native_temporal_metadata(data,id)==PF_Err_NONE;
-    // Do not suppress a later DRAW retry: sibling effects may still be restoring.
-    // No writes to project streams, no saved PF states and no generic messages.
-    return PF_Err_NONE;
+    (void)id;(void)resetup;
+    // Restoration is not a certification point: AE may still replace the
+    // dependency state after this callback. The General AEGP retries after load.
+    return flatten_native_temporal_sequence(data,out);
 } catch(...) {return PF_Err_NONE;}
 void setdown_native_temporal_sequence(PF_InData* data) noexcept {
     if(data && data->sequence_data && data->utils && data->utils->host_dispose_handle)

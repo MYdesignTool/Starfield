@@ -32,7 +32,7 @@ ForceMotion motion_for_emitter(const ForceMotion& force, NodeId emitter) noexcep
     return result;
 }
 
-struct AppearanceValues {
+struct ParticleValues {
     Vec3 color_start{1.0, 1.0, 1.0};
     Vec3 color_end{1.0, 1.0, 1.0};
     double size_start{8.0};
@@ -165,15 +165,15 @@ Result<ForceValues> read_force(const GraphNode& node) {
     return Result<ForceValues>::success(std::move(result));
 }
 
-Result<AppearanceValues> read_appearance(const GraphNode& node) {
+Result<ParticleValues> read_particle(const GraphNode& node) {
     const auto* color_start = find_value(node, kColorStart);
     const auto* color_end = find_value(node, kColorEnd);
     const auto* size_start = find_value(node, kSizeStart);
     const auto* size_end = find_value(node, kSizeEnd);
     const auto* opacity_start = find_value(node, kOpacityStart);
     const auto* opacity_end = find_value(node, kOpacityEnd);
-    if (!color_start || (!color_end && node.type_key!=kParticleNode) || !size_start || !size_end || !opacity_start || !opacity_end) {
-        return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance node is missing values");
+    if (!color_start || !size_start || !size_end || !opacity_start || !opacity_end) {
+        return Result<ParticleValues>::failure(ErrorCode::invalid_request, "Particle node is missing values");
     }
     Settings settings;
     settings.color_start = std::get<Vec3>(*color_start);
@@ -197,20 +197,20 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     if (size_curve) {
         const auto* bytes = std::get_if<OpaqueBytes>(size_curve);
         if (!bytes || !decode_age_curve(*bytes, settings.size_over_life, 0.0, 100.0)) {
-            return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance size curve is invalid");
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request, "Particle size curve is invalid");
         }
     }
     if (opacity_curve) {
         const auto* bytes = std::get_if<OpaqueBytes>(opacity_curve);
         if (!bytes || !decode_age_curve(*bytes, settings.opacity_over_life, 0.0, 100.0)) {
-            return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance opacity curve is invalid");
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request, "Particle opacity curve is invalid");
         }
     }
     auto validated = validate_settings(settings);
     if (!validated.notices.empty()) {
-        return Result<AppearanceValues>::failure(ErrorCode::invalid_request, "appearance node value is outside supported bounds");
+        return Result<ParticleValues>::failure(ErrorCode::invalid_request, "Particle node value is outside supported bounds");
     }
-    AppearanceValues result{
+    ParticleValues result{
         validated.value.color_start, validated.value.color_end,
         validated.value.particle_size, validated.value.particle_size_end,
         validated.value.opacity, validated.value.opacity_end,
@@ -220,11 +220,11 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
     result.gradient.stops[0]={0,result.color_start};result.gradient.stops[1]={1,result.color_end};
     if(const auto* mode=find_value(node,kParticleColorMode)) {
         result.color_mode=std::get<std::uint32_t>(*mode);
-        if(result.color_mode>3) return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"invalid Particle Color mode");
+        if(result.color_mode>3) return Result<ParticleValues>::failure(ErrorCode::invalid_request,"invalid Particle Color mode");
     }
     if(const auto* gradient=find_value(node,kColorGradient))
         if(!decode_color_gradient(std::get<OpaqueBytes>(*gradient),result.gradient))
-            return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"invalid Color Gradient");
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"invalid Color Gradient");
     if(node.type_key==kParticleNode) {
         const auto scalar=[&](ParameterKey key,double maximum,double& value) {
             if(const auto* v=find_value(node,key)) value=std::get<double>(*v);
@@ -239,21 +239,21 @@ Result<AppearanceValues> read_appearance(const GraphNode& node) {
            !scalar(kParticleFeather,100,result.feather_percent) || !scalar(kAngleRandom,100,result.angle_random_percent) ||
            !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,2,result.shape) ||
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
-            return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
         for(auto [key,value]:{std::pair{kParticleAngles,&result.angles},std::pair{kRotationSpeed,&result.rotation_speed}}) {
             if(const auto* v=find_value(node,key)) *value=std::get<Vec3>(*v);
             for(double axis:{value->x,value->y,value->z}) if(!std::isfinite(axis) || axis < -32768 || axis > 32768)
-                return Result<AppearanceValues>::failure(ErrorCode::invalid_request,"Particle angle outside native Angle range");
+                return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle angle outside native Angle range");
         }
     }
-    return Result<AppearanceValues>::success(std::move(result));
+    return Result<ParticleValues>::success(std::move(result));
 }
 
-double birth_lifetime(const AppearanceValues& values,std::uint32_t seed,std::uint64_t identity) noexcept {
+double birth_lifetime(const ParticleValues& values,std::uint32_t seed,std::uint64_t identity) noexcept {
     return values.lifetime_seconds*(1-values.life_random_percent/100*unit_value(seed,identity,RandomPurpose::particle_life));
 }
-void apply_particle_properties(ParticleInstance& particle,const AppearanceValues& values,
+void apply_particle_properties(ParticleInstance& particle,const ParticleValues& values,
     std::uint32_t seed,Vec3 birth_position) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
     particle.feather_percent=values.feather_percent;
@@ -275,7 +275,7 @@ void apply_particle_properties(ParticleInstance& particle,const AppearanceValues
     }
 }
 
-void apply_appearance(ParticleInstance& particle, const AppearanceValues& appearance,
+void apply_particle_style(ParticleInstance& particle, const ParticleValues& appearance,
                       std::uint32_t seed) noexcept {
     const double age_fraction = particle.lifetime_seconds > 0.0
         ? std::clamp(particle.age_seconds / particle.lifetime_seconds, 0.0, 1.0) : 0.0;
@@ -301,10 +301,9 @@ bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destinatio
     const auto& from = source.type_key;
     const auto& to = destination.type_key;
     if (from == kEmitterNode) return to == kParticleNode;
-    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kAppearanceNode;
-    if (from == kParticleNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
-    if (from == kForceNode) return to == kForceNode || to == kAppearanceNode || to == kOutputNode;
-    if (from == kAppearanceNode) return to == kOutputNode;
+    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode;
+    if (from == kParticleNode) return to == kForceNode || to == kOutputNode;
+    if (from == kForceNode) return to == kForceNode || to == kOutputNode;
     return false;
 }
 
@@ -352,8 +351,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::uint32_t output_particle_count = kDefaultParticleCount;
         std::vector<std::optional<ValidatedSettings>> emitters(count);
         std::vector<std::optional<ForceValues>> forces(count);
-        std::vector<std::optional<AppearanceValues>> appearances(count);
-        std::vector<std::optional<AppearanceValues>> particles(count);
+        std::vector<std::optional<ParticleValues>> particles(count);
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -392,17 +390,13 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 if (!value.has_value()) return R::failure(value.error());
                 emitters[i] = value.take_value();
             } else if (node.type_key == kParticleNode) {
-                auto value = read_appearance(node);
+                auto value = read_particle(node);
                 if (!value.has_value()) return R::failure(value.error());
                 particles[i] = value.take_value();
             } else if (node.type_key == kForceNode) {
                 auto value = read_force(node);
                 if (!value.has_value()) return R::failure(value.error());
                 forces[i] = value.take_value();
-            } else if (node.type_key == kAppearanceNode) {
-                auto value = read_appearance(node);
-                if (!value.has_value()) return R::failure(value.error());
-                appearances[i] = value.take_value();
             } else {
                 return R::failure(ErrorCode::invalid_request, "node has no evaluation kernel");
             }
@@ -556,17 +550,14 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     Settings settings = emitters[emitter]->value;
                     settings.particle_count = output_particle_count;
                     settings.particle_lifetime_seconds = particles[child]->lifetime_seconds;
-                    AppearanceValues appearance = *particles[child];
+                    ParticleValues appearance = *particles[child];
                     std::vector<bool> visited(count, false); stack = {child};
-                    unsigned overrides = 0;
                     while (!stack.empty()) {
                         const auto current = stack.back(); stack.pop_back();
                         if (visited[current]) continue; visited[current] = true;
                         if (forces[current]) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; settings.forces.push_back(motion_for_emitter(forces[current]->motion, nodes[emitter]->id)); }
-                        if (appearances[current]) { appearance = *appearances[current]; ++overrides; }
                         for (const auto destination : outgoing[current]) if (active[destination] && !emitters[destination]) stack.push_back(destination);
                     }
-                    if (overrides > 1) return R::failure(ErrorCode::invalid_request, "multiple Appearance overrides on Auxiliary stream");
                     auto validated_settings = validate_settings(settings);
                     if (!validated_settings.notices.empty()) return R::failure(ErrorCode::invalid_request, "auxiliary force values outside bounds");
                     if (now < 0 || settings.particle_lifetime_seconds <= 0) continue;
@@ -614,7 +605,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             const double color = percent(kInheritColor, 0);
                             inherited.color_start = {blend(inherited.color_start.x, parent.color.x, color), blend(inherited.color_start.y, parent.color.y, color), blend(inherited.color_start.z, parent.color.z, color)};
                             inherited.color_end = {blend(inherited.color_end.x, parent.color.x, color), blend(inherited.color_end.y, parent.color.y, color), blend(inherited.color_end.z, parent.color.z, color)};
-                            apply_appearance(instance, inherited, child_settings.value.seed);
+                            apply_particle_style(instance, inherited, child_settings.value.seed);
 
                             const double inherited_velocity = percent(kInheritVelocity, 0);
                             const double integral = settings.linear_drag > 0 ? -std::expm1(-settings.linear_drag * instance.age_seconds) / settings.linear_drag : instance.age_seconds;
@@ -645,13 +636,13 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
 
         // An emitter without an active Particle branch is an incomplete graph,
         // not an implicit single-stream renderer. Disconnected Output ancestry
-        // stays transparent; active force/appearance bypasses are rejected.
+        // stays transparent; active force bypasses are rejected.
         if (active_particles.empty()) {
             for (const std::size_t index : topological_order) {
                 const auto type = nodes[index]->type_key;
-                if (type == kForceNode || type == kAppearanceNode) {
+                if (type == kForceNode) {
                     return R::failure(ErrorCode::invalid_request,
-                                      "active Force/Appearance paths require a connected Particle node");
+                                      "active Force paths require a connected Particle node");
                 }
             }
             return R::success(std::move(result));
@@ -678,7 +669,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             }
         }
 
-        // An active Force/Appearance node may be included in Output's ancestry
+        // An active Force node may be included in Output's ancestry
         // without being reachable from any Particle stream (for example, a
         // disconnected Force wired directly to Output beside a valid branch).
         // Reject that topology instead of silently dropping its effect.
@@ -691,10 +682,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     has_particle_source[index] = has_particle_source[index] || has_particle_source[source];
                 }
             }
-            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key == kAppearanceNode) &&
+            if ((nodes[index]->type_key == kForceNode) &&
                 !has_particle_source[index]) {
                 return R::failure(ErrorCode::invalid_request,
-                                  "every active Force/Appearance path must descend from a Particle node");
+                                  "every active Force path must descend from a Particle node");
             }
         }
 
@@ -702,7 +693,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             ValidatedSettings settings;
             ParticleSlotSequence slots;
             std::size_t emitter{0};
-            std::size_t appearance{0};
             std::size_t particle{0};
         };
         const double time_seconds = to_seconds(*normalized);
@@ -718,7 +708,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             const std::uint32_t visit_id = static_cast<std::uint32_t>(particle_branch + 1);
             std::vector<std::size_t> stack{particle_index};
             std::vector<std::size_t> branch_forces;
-            std::vector<std::size_t> branch_appearances;
             visited[particle_index] = visit_id;
             while (!stack.empty()) {
                 if (cancellation.is_cancelled()) {
@@ -732,7 +721,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 ++traversal_work;
                 const auto& node = *nodes[current];
                 if (node.type_key == kForceNode) branch_forces.push_back(current);
-                else if (node.type_key == kAppearanceNode) branch_appearances.push_back(current);
 
                 for (const std::size_t destination : outgoing[current]) {
                     if (traversal_work >= kMaxBranchTraversalWork) {
@@ -750,11 +738,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 return topological_rank[left] < topological_rank[right];
             };
             std::sort(branch_forces.begin(), branch_forces.end(), by_dependency);
-            std::sort(branch_appearances.begin(), branch_appearances.end(), by_dependency);
-            if (branch_appearances.size() > 1) {
-                return R::failure(ErrorCode::invalid_request,
-                                  "one Particle stream cannot have multiple active Appearance overrides");
-            }
             // Plan the shared Particle's downstream topology once, then create
             // independent birth sequences for each direct emitter input.
             for (const std::size_t emitter : incoming[particle_index]) {
@@ -782,7 +765,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                                                               emitter_branch_indices[emitter]++);
                 if (!slots.has_value()) return R::failure(slots.error());
                 branches.push_back({std::move(bounded), slots.value(), emitter,
-                                    branch_appearances.empty() ? count : branch_appearances.front(), particle_index});
+                                    particle_index});
             }
         }
 
@@ -857,8 +840,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             const auto simulated = simulate_selected_particles_into(plan.settings, time_seconds, branch_targets,
                                                                      result.particles, cancellation, dimension_context);
             if (!simulated.has_value()) return R::failure(simulated.error());
-            const AppearanceValues& appearance = plan.appearance == count
-                ? *particles[plan.particle] : *appearances[plan.appearance];
+            const ParticleValues& appearance = *particles[plan.particle];
             for (std::size_t i = 0; i < branch_targets.size(); ++i) {
                 if ((i % 4096) == 0 && cancellation.is_cancelled()) {
                     return R::failure(ErrorCode::cancelled, "particle appearance evaluation cancelled");
@@ -879,8 +861,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     birth_position.y+=sampled.value().y-plan.settings.value.emitter_origin.y;
                     birth_position.z+=sampled.value().z-plan.settings.value.emitter_origin.z;
                 }
-                // One downstream Appearance replaces the Particle curves.
-                apply_appearance(instance, appearance, plan.settings.value.seed);
+                // Particle owns all per-life style curves.
+                apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position);
             }
         }

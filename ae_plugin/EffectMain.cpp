@@ -125,6 +125,11 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_DO_DIALOG:
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
+        case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra)starfield::adapter::refresh_native_temporal_idle(in_data,
+                starfield::adapter::graph_carrier_plugin_id(),
+                *static_cast<starfield::adapter::NativeBootstrapRequest*>(extra));
+            return PF_Err_NONE;
         case PF_Cmd_EVENT:
             starfield::adapter::refresh_native_temporal_ui(in_data,params,static_cast<PF_EventExtra*>(extra),
                 starfield::adapter::graph_carrier_plugin_id());

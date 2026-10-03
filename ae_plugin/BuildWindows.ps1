@@ -40,6 +40,8 @@ $adapterInputs = @(
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
     'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalCache.hpp',
     'ae_plugin\NativeTemporalUI.cpp', 'ae_plugin\NativeTemporalUI.hpp',
+    'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp',
+    'ae_plugin\StarfieldHostPiPL.r', 'ae_plugin\StarfieldHost.vcxproj',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
@@ -52,7 +54,7 @@ $adapterInputs = @(
     'ae_plugin\NodeEffectFlags.h', 'ae_plugin\NodeEffectMain.cpp',
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\NodeEffect.vcxproj',
-    'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeAppearancePiPL.r', 'ae_plugin\NodeForcePiPL.r',
+    'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
@@ -121,7 +123,7 @@ try {
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
 
-    foreach ($nodeKind in @('Emitter', 'Particle', 'Appearance', 'Force')) {
+    foreach ($nodeKind in @('Emitter', 'Particle', 'Force')) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"
         $nodeArguments = @(
@@ -133,6 +135,11 @@ try {
         & $MSBuildPath @nodeArguments
         if ($LASTEXITCODE -ne 0) { throw "$nodeKind node effect MSBuild failed with exit code $LASTEXITCODE" }
     }
+    $hostArguments = @((Join-Path $drive 'ae_plugin\StarfieldHost.vcxproj'), '/t:Build', '/m',
+        "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath",
+        "/p:OutDir=$outputDir\", "/p:IntDir=$intermediateDir\host\", '/v:minimal')
+    & $MSBuildPath @hostArguments
+    if ($LASTEXITCODE -ne 0) { throw "General AEGP MSBuild failed with exit code $LASTEXITCODE" }
     [IO.File]::WriteAllText($fingerprintPath, $adapterFingerprint, [Text.Encoding]::ASCII)
     }
 
@@ -196,7 +203,7 @@ try {
         }
         Write-Host ''
         Write-Host "Installable build: $(Join-Path $publishedDir 'StarfieldParticle.aex')" -ForegroundColor Green
-        foreach ($nodeModule in @('StarfieldEmitter', 'StarfieldParticleNode', 'StarfieldAppearance', 'StarfieldForce')) {
+        foreach ($nodeModule in @('StarfieldEmitter', 'StarfieldParticleNode', 'StarfieldForce', 'StarfieldHost')) {
             $builtNodeAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\$nodeModule.aex"
             if (-not (Test-Path -LiteralPath $builtNodeAex)) { throw "Node build reported success but $builtNodeAex is missing." }
             Copy-Item -LiteralPath $builtNodeAex -Destination (Join-Path $publishedDir "$nodeModule.aex") -Force

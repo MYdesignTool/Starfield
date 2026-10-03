@@ -33,16 +33,12 @@
     <TargetName>StarfieldParticleNode</TargetName><NodePiPL>NodeParticlePiPL.r</NodePiPL>
     <NodeKindDefine>STARFIELD_NODE_KIND_PARTICLE</NodeKindDefine>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(NodeKind)'=='Appearance'">
-    <TargetName>StarfieldAppearance</TargetName><NodePiPL>NodeAppearancePiPL.r</NodePiPL>
-    <NodeKindDefine>STARFIELD_NODE_KIND_APPEARANCE</NodeKindDefine>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(NodeKind)'=='Force'">
     <TargetName>StarfieldForce</TargetName><NodePiPL>NodeForcePiPL.r</NodePiPL>
     <NodeKindDefine>STARFIELD_NODE_KIND_FORCE</NodeKindDefine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(NodePiPL)'==''">
-    <NodeKindError>NodeKind must be Emitter, Particle, Appearance, or Force.</NodeKindError>
+    <NodeKindError>NodeKind must be Emitter, Particle, or Force.</NodeKindError>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
