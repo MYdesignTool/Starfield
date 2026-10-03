@@ -1,5 +1,50 @@
 # Build and host matrix
 
+## Build 29 deployment - 2026-10-03
+
+Source `e4111ab` is pushed. After the owner closed AE, the read-only process check
+immediately before installation found no AfterFX/AfterFX_64. Deploy-TestBuild.ps1
+installed build29 (32797/0x801D) through the existing single
+Plug-ins/Starfield -> newStardust/dist Junction. All six installed hashes match
+candidates and all six build28 backup hashes match the before-state. Core and its
+selected runtime remain byte-identical to build27/26/25, retaining ABI3 evidence.
+Thirteen unchanged CEP files have paired verified snapshots. The normal rollback
+report passes. No process, registry, CEP manifest or host-wide setting was changed.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `40814E561F0305270A09FD33B44F55D25A1E7B3E990186342977C25BCE8C530E` |
+| StarfieldEmitter.aex | `78E0D8DB76AB6412C8FC547E472C460C19A5DB508C2798AA803DA2FF5F4EF937` |
+| StarfieldParticleNode.aex | `3E3D536F9A7A11E828826ADA9F51FA5795C010416A6AAA27ABFDDC9AF33A75CA` |
+| StarfieldAppearance.aex | `910BF74394111EF62318671421E5D14EAF6CF4906B8E5E161CA4592970FAB584` |
+| StarfieldForce.aex | `2C2B6084F7BC7C999AB5C8731049D8D46A7EC0EE7850264ADE38C0255EB76E03` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Runtime: `StarfieldCore-5637EA2266B32AEE.dll`.
+Before/after: artifacts/build29-deploy-before.json and build29-deploy-after.json.
+Backup: artifacts/disabled/m306-build29-sequence-stream-read-20261003/bundle.
+Evidence: artifacts/build29-deploy.log and build29-rollback-check.log.
+
+The current before-state is build28, which the owner rejected for the sequence
+checkout error. For recovery to the owner-tested build27 (with its Options startup
+workaround), an ignored, local helper verifies both retained stages and defaults
+to a read-only report. It performs the two existing Restore-TestBuild steps only
+with -Restore. Newer candidates remain in their backups. The hash chain is verified
+without executing rollback: artifacts/build29-stable-rollback-check.log.
+With AE closed, one command restores build27:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\artifacts\build29-rollback-to27.ps1' -Restore
+```
+
+3,974 scoped checks pass, including sequence fixtures that deny PF checkout/checkin;
+all five AEXs and Core build with May 2023 SDK Release /MT without compiler warnings.
+Owner testing is requested: open original project without Options, preview uncached
+frame, save/close/reopen and preview without Options, then collect full Options
+Static/Temporal, PF/N, B and elapsed wait. Removal of the direct forbidden call is
+verified; actual AE startup availability/speed is not yet qualified. Main integration
+remains pending this result under the owner's existing authorization.
+
 ## M3-06 / build 29 - remove forbidden sequence parameter callbacks
 
 Owner rejects build28: AE2023 reports effect cannot use checkout/checkin callbacks
