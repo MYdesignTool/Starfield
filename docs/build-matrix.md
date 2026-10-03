@@ -1,5 +1,39 @@
 # Build and host matrix
 
+## Build 24 deployment — 2026-10-03
+
+Source commit `38c4b92` is pushed to the owner repository. Read-only process checks
+before install found no AfterFX/AfterFX_64. Installed via Deploy-TestBuild.ps1 and
+the existing single Plug-ins/Starfield -> newStardust/dist Junction; host root
+still contains exactly one Starfield entry. No AE process launch/stop or host-wide
+configuration change. CEP uses the existing Junction to this checkout.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `3AFCA47F6FA01C2BBE42814905AE102AF28F33ED14FE5D47CE38FADAE9334BB6` |
+| StarfieldEmitter.aex | `7AA109EE683D58D8C81C993D85BA55FAA44A8788619F6D7CBE10C195149C93A5` |
+| StarfieldParticleNode.aex | `819CDCAA94FA2E7C2DAEA5C36177E6575F03377BC5EF6B1599F9DCEA27DFFBB0` |
+| StarfieldAppearance.aex | `1E322FFB4E2B1EBBE14603B8D7F2F190420A1434EEC85EE76E9667B7994C2260` |
+| StarfieldForce.aex | `F537CECD5C29D705C1AD9306F3ADD20007A426FD11444A7C25A06B013A178FD0` |
+| StarfieldCore.dll | `132AC20B775611D48F39C6DCCD55F0EA6932DBA1EAE7DD462698A0CDD594E001` |
+
+Selected runtime: `StarfieldCore-132AC20B775611D4.dll`; selected and pinned Core hashes agree.
+All six retained old hashes agree with build23 before-state. Before/after records:
+`artifacts/build24-deploy-before.json` and `artifacts/build24-deploy-after.json`.
+Backup: `artifacts/disabled/m306-build24-native-gpu-20261003/bundle`; 13 previous CEP
+sources from commit 24de13f are retained under panel/, with verified paired manifest.
+The read-only paired restore report passes. Close AE for one-step undo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build24-native-gpu-20261003' -Restore
+```
+
+Fresh main effect required (616 registered params, manifest 24). Reopen CEP for
+`native-gpu-24`. Acceleration defaults to GPU. Options reports the last executed
+main frame path; no AE GPU selector/render qualification was performed by the agent.
+No AE render output was created. Temporal metadata/cache gates remain open.
+
+
 ## M3-06 / build 24 — AE native CUDA/OpenCL candidate
 
 Build 24 (32792 / 0x8018) implements host-proposed CUDA/OpenCL device setup/setdown,
