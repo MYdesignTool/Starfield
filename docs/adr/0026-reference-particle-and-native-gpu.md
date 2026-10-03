@@ -376,3 +376,14 @@ animation and denied sequence callbacks. W/P/E diagnostics snapshot the automati
 attempt before Options changes it. No public identity/schema/flag/Core changes,
 idle hook, generic transport, project edits or retained host handles are added.
 Main integration remains gated on actual startup without Options and reopen speed.
+
+## Manifest descriptor audit - 2026-10-03
+
+The manifest repeated the identical Acceleration descriptor (index614/disk1611/key
+acceleration). Remove only the redundant copy; schema24, defaults, released IDs,
+compiled registration and runtime values are unchanged. Correct stale migration
+prose to main24/C ABI3. The current-node panel check now proves uniqueness of
+public keys/indices, all topic and alias indices/disk IDs, complete indices1..615,
+GPU default and 30/60/120 Hz default30. It fails before correction (95 != 96)
+and passes afterwards; artifacts/build30-manifest-before.log and -after.log.
+This is a descriptor correction and does not require replacing the installed AEX.

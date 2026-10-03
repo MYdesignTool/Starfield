@@ -33,7 +33,25 @@ assert.equal(forceView.params.find(p=>p.label==="Spin Delay (Seconds)").scrubSte
 assert.equal(forceView.params.find(p=>p.label==="Spin Frequency").scrubStep,.01);
 assert.equal(forceView.curveParameterKeys.size,"9");
 assert.deepEqual(forceView.curves.size.points,[{age:0,value:100},{age:1,value:100}]);
-assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname,"../schema/parameters.json"))).parameters.find(p=>p.key==="particle_count").default,1000000);
+const manifest=JSON.parse(fs.readFileSync(path.join(__dirname,"../schema/parameters.json")));
+const unique=(values,label)=>assert.equal(new Set(values).size,values.length,label+" must be unique");
+unique(manifest.parameters.map(p=>p.id),"Main public stream IDs");
+unique(manifest.parameters.map(p=>p.key),"Main public parameter keys");
+const binding=manifest.nativeRenderBindings;
+const registeredIndices=manifest.parameters.map(p=>p.id).concat(manifest.topics.flatMap(t=>[t.index,t.endIndex]),
+    Array.from({length:binding.count},(_,i)=>binding.firstIndex+i));
+unique(registeredIndices,"Main registered indices including topics and aliases");
+assert.deepEqual(registeredIndices.slice().sort((a,b)=>a-b),Array.from({length:615},(_,i)=>i+1),
+    "The manifest describes each current main parameter exactly once");
+unique(manifest.parameters.map(p=>p.diskId===undefined?p.id:p.diskId).concat(
+    manifest.topics.flatMap(t=>[t.diskId,t.endDiskId]),Array.from({length:binding.count},(_,i)=>binding.firstDiskId+i)),
+    "Main disk IDs including topics and aliases");
+assert.equal(manifest.parameters.find(p=>p.key==="particle_count").default,1000000);
+const acceleration=manifest.parameters.find(p=>p.key==="acceleration"), sampling=manifest.parameters.find(p=>p.key==="time_sampling_hz");
+assert.deepEqual([acceleration.id,acceleration.diskId,acceleration.default],[614,1611,1]);
+assert.deepEqual(acceleration.choices,["GPU","CPU"]);assert.deepEqual(acceleration.values,[0,1]);
+assert.deepEqual([sampling.id,sampling.diskId,sampling.default],[611,1601,1]);
+assert.deepEqual(sampling.values,[30,60,120]);
 const auxView=projected.nodes.find(n=>n.id===auxiliary.id), emitterView=projected.nodes.find(n=>n.id===emitter.id);
 assert.equal(auxView.label,"Auxiliary");assert.equal(auxView.inputPort,"2");assert.equal(emitterView.inputPort,null);
 assert.deepEqual(auxView.params.slice(0,7).map(p=>p.label),["Type","Emitting","Particles Per Second","Origin XY","Origin Z","Speed","Speed Random"]);

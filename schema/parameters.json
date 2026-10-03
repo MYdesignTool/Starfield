@@ -1313,24 +1313,6 @@
         1
       ],
       "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
-    },
-    {
-      "id": 614,
-      "diskId": 1611,
-      "key": "acceleration",
-      "label": "Acceleration",
-      "type": "popup",
-      "default": 1,
-      "animated": false,
-      "choices": [
-        "GPU",
-        "CPU"
-      ],
-      "values": [
-        0,
-        1
-      ],
-      "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
     }
   ],
   "nativeRenderBindings": {
@@ -1346,7 +1328,7 @@
   },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Unreleased manifest 23 keeps indices 1..609 and appends Simulation Settings 610..612. Emitter schema 6/base 31, Particle schema 4/base 75 and Output schema 4 require fresh development effects; no old-project migration. GPU scene ABI is a separate pending change in ADR 0026.",
+    "migrationPolicy": "Unreleased manifest 24 keeps indices 1..609, appends Simulation Settings 610..612 and GPU Rendering 613..615. Emitter schema 6/base 31, Particle schema 4/base 75 and Output schema 4 require fresh development effects; no old-project migration. GPU scene C ABI 3 requires paired AEX/Core; private SFU1 main sequence data is a separate lifecycle marker. ADR 0026.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."

@@ -1,7 +1,7 @@
 {
   "identityRevision": 4,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "M3-06 development Emitter schema 6/base 31 separates Auxiliary Source from Emitting timing; Particle schema 4/base 75 adds birth lifetime randomness, shapes and rotation. Fresh main/Emitter/Particle effects required; no legacy migration. Main manifest 23 appends Time Sampling; transient 0x8004 particle snapshot version 2. ADR 0026.",
+  "migrationPolicy": "M3-06 development Emitter schema 6/base 31 separates Auxiliary Source from Emitting timing; Particle schema 4/base 75 adds birth lifetime randomness, shapes and rotation. Fresh main/Emitter/Particle effects required; no legacy migration. Main manifest 24 appends Time Sampling and default GPU Acceleration; transient 0x8004 particle snapshot version 2 and paired C ABI 3. ADR 0026.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "fixed": {
     "emitter_type": 101,
