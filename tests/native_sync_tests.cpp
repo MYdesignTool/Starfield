@@ -751,11 +751,24 @@ int main() {
     check(flatten_native_temporal_sequence(&legacy_save,&legacy_flat)==PF_Err_INTERNAL_STRUCT_DAMAGED,
         "unknown lifecycle schema is rejected without replacing its data");
     static_cast<char*>(lock_handle(legacy_save.sequence_data))[3]='1';setdown_native_temporal_sequence(&legacy_save);
+    const auto sequence_old_graph=main.values[kGraphParameterId].arbH;
+    main.values[kGraphParameterId].arbH=reinterpret_cast<AEGP_ArbBlockVal>(clone(ui_graph_handle));
     auto sequence_data=ui_data;sequence_data.sequence_data=nullptr;
+    // AE forbids PF checkout/checkin in SEQUENCE_RESETUP. Missing callback
+    // functions and a deliberately undersized array must both be harmless.
+    const auto sequence_inter=sequence_data.inter;
+    static unsigned forbidden_sequence_checkouts{},forbidden_sequence_checkins{};
+    sequence_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex,A_long,A_long,A_u_long,PF_ParamDef*)->PF_Err {
+        ++forbidden_sequence_checkouts;return PF_Err_BAD_CALLBACK_PARAM;
+    };
+    sequence_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err {
+        ++forbidden_sequence_checkins;return PF_Err_BAD_CALLBACK_PARAM;
+    };
+    PF_ParamDef* forbidden_sequence_params[1]{nullptr};
     PF_OutData sequence_output{};
     remember_native_control_proofs(&sequence_data,{});
     const auto sequence_writes=sets;
-    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,false)==0 &&
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,false)==0 &&
         sequence_output.sequence_data && size_handle(sequence_output.sequence_data)==sizeof(std::uint32_t),
         "legacy null sequence receives a flat lifecycle marker");
     check(!validated_native_control_proofs(&sequence_data).empty(),"UI sequence setup certifies metadata without Options or DRAW");
@@ -763,29 +776,44 @@ int main() {
     const auto saved_marker=clone(sequence_data.sequence_data);
     setdown_native_temporal_sequence(&sequence_data);sequence_data.sequence_data=saved_marker;
     remember_native_control_proofs(&sequence_data,{});++metadata_epoch;
-    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0 &&
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0 &&
         sequence_output.sequence_data==saved_marker && !validated_native_control_proofs(&sequence_data).empty(),
         "save/reopen resetup rebuilds process metadata from source controls");
     check(last_native_ui_timing().sequence_refreshes>=2 && sets==sequence_writes,
         "sequence bootstrap is timed and writes no project streams");
     metadata_rate_keys=true;++metadata_epoch;
-    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0,
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0,
         "reopen reads current keyframe metadata");
-    NativeAnimationPlan reopened_keyed(static_graph,1920,1080,1);reopened_keyed.prepare_constants(&sequence_data);
+    auto keyed_render=sequence_data;keyed_render.inter=sequence_inter;
+    NativeAnimationPlan reopened_keyed(static_graph,1920,1080,1);reopened_keyed.prepare_constants(&keyed_render);
     check(!reopened_keyed.fully_constant(),"animated PPS on reopen cannot reuse a previous constant proof");
     metadata_rate_keys=false;
     const auto sequence_suites=aegp_suite_requests;
     sequence_data.in_flags=PF_InFlag_PROJECT_IS_RENDER_ONLY;
-    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0 &&
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0 &&
         aegp_suite_requests==sequence_suites,"render-only resetup performs no AEGP metadata queries");
     sequence_data.in_flags=PF_InFlag_NONE;
-    std::thread sequence_worker([&]{check(setup_native_temporal_sequence(&sequence_data,&sequence_output,ui_params.data(),1,true)==0,
+    std::thread sequence_worker([&]{check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0,
         "worker sequence resetup retains flat marker");});sequence_worker.join();
     check(aegp_suite_requests==sequence_suites,"worker sequence callback never reads AEGP source controls");
-    sequence_data.num_params=0;
+    check(forbidden_sequence_checkouts==0 && forbidden_sequence_checkins==0,
+        "UI and worker sequence callbacks never invoke AE's forbidden PF checkout/checkin");
+    sequence_data.num_params=0;sequence_data.inter.checkout_param=nullptr;sequence_data.inter.checkin_param=nullptr;
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
         !validated_native_control_proofs(&sequence_data).empty(),
-        "absent sequence params array uses a balanced own graph checkout");
+        "absent sequence params reads owned graph through AEGP without PF callbacks");
+    const auto sequence_handles=handles.size();const auto sequence_refs=live_refs;
+    fail_read=kGraphParameterId;remember_native_control_proofs(&sequence_data,{});
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
+        validated_native_control_proofs(&sequence_data).empty(),"unavailable load-time graph is an optional miss");
+    check(handles.size()==sequence_handles && live_refs==sequence_refs,"failed startup read balances handles and streams");
+    wrong_type=kGraphParameterId;
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
+        validated_native_control_proofs(&sequence_data).empty(),"wrong startup graph type is rejected before union access");
+    check(handles.size()==sequence_handles && live_refs==sequence_refs,"wrong-type startup read releases owned references");
+    check(setup_native_temporal_sequence(&sequence_data,&sequence_output,nullptr,1,true)==0 &&
+        !validated_native_control_proofs(&sequence_data).empty(),"subsequent valid startup read can recover without Options");
+    dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));main.values[kGraphParameterId].arbH=sequence_old_graph;
     setdown_native_temporal_sequence(&sequence_data);
     dispose(ui_graph_handle);
     temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});

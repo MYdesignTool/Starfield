@@ -119,26 +119,12 @@ PF_Err flatten_native_temporal_sequence(PF_InData* data,PF_OutData* out) noexcep
 }
 PF_Err setup_native_temporal_sequence(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],
     AEGP_PluginID id,bool resetup) noexcept try {
+    (void)params; // Parameter checkout and array delivery are not a sequence contract.
     if(const auto error=flatten_native_temporal_sequence(data,out);error)return error;
     if(refreshing || (resetup && (data->in_flags & PF_InFlag_PROJECT_IS_RENDER_ONLY)) ||
         !on_ui_thread() || !data->effect_ref || !data->pica_basicP || !id)return PF_Err_NONE;
     RefreshScope scope;UITimer timer;timer.sequence=true;
-    PF_ParamDef checked{};bool owned=false;PF_ArbitraryH handle{};
-    // A partial/absent params array is not an excuse to index beyond it.
-    if(params && data->num_params>kGraphParameterId && params[kGraphParameterId] &&
-        params[kGraphParameterId]->param_type==PF_Param_ARBITRARY_DATA)
-        handle=params[kGraphParameterId]->u.arb_d.value;
-    else if(data->inter.checkout_param && data->inter.checkin_param) {
-        if(PF_CHECKOUT_PARAM(data,kGraphParameterId,data->current_time,data->time_step,
-            data->time_scale?data->time_scale:1,&checked))return PF_Err_NONE;
-        owned=true;if(checked.param_type==PF_Param_ARBITRARY_DATA)handle=checked.u.arb_d.value;
-    }
-    struct Checkin {PF_InData* data;PF_ParamDef* value;bool owned;
-        ~Checkin(){if(owned)(void)PF_CHECKIN_PARAM(data,value);}} checkin{data,&checked,owned};
-    const auto graph=read_graph_parameter(data,handle);
-    if(!graph.has_value())return PF_Err_NONE;
-    timer.refreshed=true;
-    capture_native_temporal_metadata(data,graph.value(),id);
+    timer.refreshed=capture_current_native_temporal_metadata(data,id)==PF_Err_NONE;
     // Do not suppress a later DRAW retry: sibling effects may still be restoring.
     // No writes to project streams, no saved PF states and no generic messages.
     return PF_Err_NONE;

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 28: UI project-load metadata initialization with a flat lifecycle marker.
-#define STARFIELD_VERSION_BUILD 28
-#define STARFIELD_VERSION_PACKED 32796 /* 0x801C */
+// Build 29: load metadata through AEGP streams; no forbidden sequence checkout.
+#define STARFIELD_VERSION_BUILD 29
+#define STARFIELD_VERSION_PACKED 32797 /* 0x801D */

@@ -333,3 +333,27 @@ render-only/worker exclusions, partial params checkout and disposal balance.
 Actual AE first-open/first-save/reopen, copy/undo and first-frame preparation
 remain gates. Main integration is explicitly authorized by the owner and awaits
 this startup qualification; M3-06's broader visual parity gates remain open.
+
+## Build 29 correction after owner rejection of build 28
+
+AE2023 explicitly forbids PF parameter checkout/checkin during SEQUENCE_RESETUP,
+as confirmed by owner error 25:83 on opening and running the project. Build28's
+missing-array fallback violated this selector contract. Revoke that approach;
+its passing fake-host checks were insufficient because the fixture allowed the
+forbidden operation. Do not treat sequence params[] as a usable parameter snapshot.
+
+On UI SETUP/RESETUP, read the current main effect's graph through
+AEGP_GetNewEffectForEffect -> AEGP_GetNewEffectStreamByIndex -> typed ARB
+AEGP_GetNewStreamValue (pre-expression, time zero because graph ARB is constant).
+Copy the graph before disposing the returned stream value, then dispose the
+stream and effect. The metadata reader preserves all-time PF_State bracketing
+and render validation; no PF_CHECKOUT_PARAM/PF_CHECKIN_PARAM is used in this
+lifecycle route. Worker/render-only callbacks skip source queries. Missing graph
+or unavailable metadata falls back to exact temporal rendering without an error
+return from SETUP/RESETUP. Existing SFU1 schema/migration is unchanged. No idle hook,
+generic edit transport, source key/value writes or public parameter changes.
+
+Regression fixtures must deny sequence checkout/checkin, test absent callbacks
+and undersized arrays, and cover ARB type/read failures and reference disposal.
+Real AE callback/stream availability and no-Options startup are separate gates;
+source inspection proves removal of the reported call but cannot prove host speed.

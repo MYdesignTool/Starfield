@@ -1,6 +1,7 @@
 #include "AEConfig.h"
 #include "NativeNodeGraph.hpp"
 #include "NativeTemporalCache.hpp"
+#include "GraphParameter.hpp"
 
 #include "AE_EffectCB.h"
 #include "AE_GeneralPlug.h"
@@ -1164,6 +1165,39 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
 
 // UI-only metadata capture. Optional optimization: unavailable metadata retains
 // the exact historical path and never interrupts an authored transaction.
+PF_Err capture_current_native_temporal_metadata(PF_InData* data,AEGP_PluginID id) noexcept try {
+    if(!data || !data->effect_ref || !data->pica_basicP || !id)return PF_Err_BAD_CALLBACK_PARAM;
+    SuiteSet suites(data);if(const auto error=suites.acquire();error)return error;
+    if(!suites.pf_interface->AEGP_GetNewEffectForEffect || !suites.effect->AEGP_DisposeEffect ||
+        !suites.stream->AEGP_GetNewEffectStreamByIndex || !suites.stream->AEGP_GetStreamType ||
+        !suites.stream->AEGP_GetNewStreamValue || !suites.stream->AEGP_DisposeStreamValue ||
+        !suites.stream->AEGP_DisposeStream)return PF_Err_BAD_CALLBACK_PARAM;
+    AEGP_EffectRefH raw_effect{};
+    auto error=suites.pf_interface->AEGP_GetNewEffectForEffect(id,data->effect_ref,&raw_effect);
+    if(error || !raw_effect)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    EffectRef effect(suites.effect,raw_effect);
+    AEGP_StreamRefH raw_stream{};
+    error=suites.stream->AEGP_GetNewEffectStreamByIndex(id,raw_effect,kGraphParameterId,&raw_stream);
+    if(error || !raw_stream)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    StreamRef stream(suites.stream,raw_stream);
+    AEGP_StreamType type=AEGP_StreamType_NO_DATA;
+    error=suites.stream->AEGP_GetStreamType(raw_stream,&type);
+    if(error || type!=AEGP_StreamType_ARB)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    const A_Time zero{0,1};AEGP_StreamValue2 value{};
+    error=suites.stream->AEGP_GetNewStreamValue(id,raw_stream,AEGP_LTimeMode_LayerTime,&zero,TRUE,&value);
+    if(error)return static_cast<PF_Err>(error);
+    struct ValueRef {
+        const AEGP_StreamSuite6* suite;AEGP_StreamValue2* value;
+        ~ValueRef(){suite->AEGP_DisposeStreamValue(value);}
+    } owned_value{suites.stream,&value};
+    // Copy the graph while the returned ARB value is still alive. This is an
+    // AEGP UI stream read, never PF parameter checkout/checkin during RESETUP.
+    const auto graph=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));
+    if(!graph.has_value())return PF_Err_BAD_CALLBACK_PARAM;
+    capture_native_temporal_metadata(data,graph.value(),id);
+    return PF_Err_NONE;
+} catch(...) {return PF_Err_BAD_CALLBACK_PARAM;}
+
 void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,AEGP_PluginID id) noexcept try {
     if(!data || !data->effect_ref || !data->pica_basicP || !id) return;
     std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes) || nodes.empty())return;

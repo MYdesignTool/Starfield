@@ -23,6 +23,9 @@ void remember_native_control_proofs(PF_InData*,std::vector<NativeControlProof>) 
 // Only call from the main USER_CHANGED_PARAM / DO_DIALOG / EVENT::DRAW UI paths, after its
 // owned dependency expressions are installed. Never UPDATE_PARAMS_UI or render.
 void capture_native_temporal_metadata(PF_InData*,const core::Graph&,AEGP_PluginID) noexcept;
+// Main UI lifecycle reader. AEGP graph stream/value ownership is callback-local;
+// no PF parameter checkout/checkin and no access to sequence params[].
+[[nodiscard]] PF_Err capture_current_native_temporal_metadata(PF_InData*,AEGP_PluginID) noexcept;
 // UI/render callback references are not persistent instance identities. Match
 // node UUID + alias index and require AE to compare the entire dependency state.
 [[nodiscard]] std::vector<NativeControlProof> validated_native_control_proofs(

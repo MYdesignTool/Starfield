@@ -1,5 +1,35 @@
 # Build and host matrix
 
+## M3-06 / build 29 - remove forbidden sequence parameter callbacks
+
+Owner rejects build28: AE2023 reports effect cannot use checkout/checkin callbacks
+in SEQUENCE_RESETUP (25:83), both on project open and during use. The absent-array
+fallback added in build28 was invalid. Its fake host allowed a callback AE forbids;
+that coverage did not qualify the host selector. Automatic startup remains unproven.
+
+Build29 (32797 / 0x801D) never reads sequence params[] and never calls PF parameter
+checkout/checkin in SETUP/RESETUP. On the recorded main UI thread only, it obtains
+the current effect's graph stream through AEGP_PFInterfaceSuite1/StreamSuite6,
+checks ARB type, copies the graph while the returned value is alive, then reads
+source metadata through the existing reader. Value, stream and effect references
+are released in reverse order within the callback. Missing graph/type/suites is
+an optional miss; it neither rejects project opening nor publishes a guessed proof.
+All-time owned-alias states still bracket source metadata and are checked in render.
+Worker/render-only resetup skips AEGP entirely. No render-thread AEGP, retained
+source handle, idle hook or cross-effect generic message is added.
+
+Qualification: 3,974 scoped checks pass (native sync 3,962; camera 12). The full
+May 2023 SDK Release /MT candidate builds all five AEXs and Core without compiler
+warnings. Evidence: artifacts/build29-native-sync.log and build29-native-build.log.
+
+Schema SFU1 remains exactly four flat bytes; graph codec, node controls, public
+IDs, Core ABI3, CEP and PiPL flags are unchanged. Full paired AEX deployment is
+required. Focused tests now deny PF checkout/checkin in sequence callbacks, pass
+an undersized params array, omit callback functions, inject graph read/type failures,
+and check stream/ARB cleanup, recovery, keys and worker exclusions. Actual AE
+open/run without 25:83, no-Options first preview and save/reopen performance are
+mandatory gates before the owner-authorized main integration.
+
 ## Build 28 deployment - 2026-10-03
 
 Source `2714b8e` is pushed. A read-only process check immediately before
@@ -64,8 +94,8 @@ Legacy null data is provisioned during setup/resetup and also during flatten/sav
 unknown non-null schema/size is rejected without replacement. SETDOWN releases the
 host allocation. Saved non-null data provides a RESETUP opportunity on reopening.
 An old null-data project may lack that callback; first cold legacy open and first
-save/reopen are separate AE acceptance gates. Partial/absent sequence parameters
-use a balanced checkout of the main effect's own graph ARB. Source metadata can
+save/reopen are separate AE acceptance gates. Build28's partial/absent-array checkout fallback was subsequently rejected by AE
+(25:83); build29 replaces it with an AEGP graph stream read. Source metadata can
 be unavailable while siblings restore; later DRAW can retry. Fake-host results
 cannot establish AE callback order or availability.
 
