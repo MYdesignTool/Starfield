@@ -42,6 +42,47 @@ startup/error retention and node interactions. All pass. The paired five AEXs
 and Core build with the May 2023 SDK Release /MT. No AE session is operated;
 owner host rendering/keyframes/undo/reopen remain open.
 
+### Build 23 deployment — 2026-10-03
+
+Source `5950362` is pushed to `codex/m3-01b-emitter-dimensions` in the owner repo.
+A read-only check confirmed neither AfterFX nor AfterFX_64 running. Deployment
+used the standing authorization and Deploy-TestBuild.ps1, through the existing
+single Plug-ins/Starfield Junction. No AE process was started/stopped or operated.
+The existing CEP extension Junction still points to this checkout's cep_panel;
+no host/profile/registry/cache settings or extension Junction were changed.
+
+Verified all six installed/candidate hashes, six previous bundle backup hashes,
+the old selector backup and the selected/pinned Core hash. Before/after records:
+artifacts/build23-deploy-before.json and artifacts/build23-deploy-after.json.
+Selected Core: `StarfieldCore-32BC9BF7387D312A.dll`.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `D78257C2E102C49830E04810143AD8F49D5E44F9BEF56E788199D3F21815A550` |
+| StarfieldEmitter.aex | `466FEB12A813FF81E4D72F18702D43401792A78073A6557E72A6F9777453F183` |
+| StarfieldParticleNode.aex | `B622FCAF4D472EEA46C72BC5A47A57B6B7C72D453EDA6FF788347FD605BBFFE1` |
+| StarfieldAppearance.aex | `F7F2CC49443160127E2B10183C34692C4557C5B940D9C459B707CAAE260DB7BA` |
+| StarfieldForce.aex | `30453C25AAC0E9D8EF85FD29512AE54AF76600B8916B296BBFB1EB3746331E26` |
+| StarfieldCore.dll | `32BC9BF7387D312A08D7A3BCF7CB0740D4D85B3AA6A98C409E56F46D7D5D9389` |
+
+Backup: artifacts/disabled/m306-build23-particle-controls-20261003/bundle.
+Thirteen baseline CEP files from 2d4dff6 are saved in its panel/ directory, with
+old/installed hashes in panel-snapshot.json. Restore-TestBuild.ps1's report and
+isolated rollback regression verify report-only behavior, refusal to overwrite
+subsequent source edits, retained candidate sources and restored bundle hashes.
+
+One-step paired rollback, with AE closed, from this checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build23-particle-controls-20261003' -Restore
+```
+
+This restores the prior AEX/Core and CEP source files and retains the candidate.
+The restored CEP files appear as Git working-tree changes. Do not use a
+binary-only rollback for this paired native-layout/CEP update. Fresh development
+main/Emitter/Particle effects and a reopened CEP panel are required for build 23;
+owner AE behavior/animation acceptance remains open. GPU implementation and AE
+rate metadata/invalidation are still open M3-06 work.
 ## M3-05 / build 22 — temporal controls, Particle color and native Angle
 
 Owner confirms build 21 Origin birth behavior. Build 22 integrates historical

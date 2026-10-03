@@ -42,6 +42,11 @@ startup/error retention and node interactions. All pass. The paired five AEXs
 and Core build with the May 2023 SDK Release /MT. No AE session is operated;
 owner host rendering/keyframes/undo/reopen remain open.
 
+Build 23 is deployed with AE absent. Six installed files, selected/pinned Core,
+prior backups/selector and the 13-file paired CEP rollback snapshot were verified.
+See build-matrix.md for hashes, before/after records and the one-step paired undo.
+Fresh development effects and a reopened CEP panel are required. Actual owner
+AE rendering, new controls, keyframes, undo/reopen and GPU qualification remain open.
 ## M3-05 / build 22 — temporal controls, Particle color and native Angle
 
 Owner confirms build 21 Origin birth behavior. Build 22 integrates historical
