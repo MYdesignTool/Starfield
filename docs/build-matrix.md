@@ -1,5 +1,41 @@
 # Build and host matrix
 
+## Build 26 deployment — 2026-10-03
+
+Source `e1fb3d6` is pushed. Read-only process checks immediately before installation
+found no AfterFX/AfterFX_64. Deploy-TestBuild.ps1 upgraded build25 to build26 through
+exactly the existing Plug-ins/Starfield -> newStardust/dist Junction. No process,
+registry, CEP manifest or host-wide setting was changed. The host root still has
+exactly one Starfield entry. All six installed hashes match the candidates; all
+six retained hashes match the before-state. Core and its selected runtime are
+byte-identical to build25, so its five-function ABI3 evidence remains applicable.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | `843F5CC4A6115D11A0E0D2EB51AF65BF1752842561730D80FFE62816EE2AC4EA` |
+| StarfieldEmitter.aex | `377B63010CF2E11C0F352CC1D6CF2E7D24EB7D78781980413C38444B36B8C980` |
+| StarfieldParticleNode.aex | `AE08BFC54D2EDA25A1B106042A5094129B5F3FFD48DB23584A77188B8BFBC85F` |
+| StarfieldAppearance.aex | `7156C7E8CB33C2B48CCEB38420B631A4110E2F701F6BE484C6E4714273A10C8F` |
+| StarfieldForce.aex | `4B7B2D236493B9FFBAF68221ABAA07400CF8F8E68E1086BBEF769CD2761F1458` |
+| StarfieldCore.dll | `5637EA2266B32AEED6A191FD18ED33C0B50DA83F221DC3FB54DAE3ED60D18B05` |
+
+Selected Core: `StarfieldCore-5637EA2266B32AEE.dll`. Evidence:
+artifacts/build26-deploy-before.json and artifacts/build26-deploy-after.json.
+Backup: artifacts/disabled/m306-build26-render-proofs-20261003/bundle.
+Thirteen unchanged CEP files and a paired restore manifest are retained in panel/;
+Restore-TestBuild.ps1's read-only verification passes. With AE closed, one-step
+rollback to build25:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm306-build26-render-proofs-20261003' -Restore
+```
+
+3,253 scoped checks pass; the five AEXs build with May 2023 SDK Release /MT.
+Parameter layouts, CEP token and Core ABI stay compatible with build25. Owner
+AE performance remains open; request actual Options readouts after t=2/100 frames
+at PPS10,000 / Life2. The new diagnostics distinguish render preparation from
+Smart Render wall time and real renderer proof use from optional UI metadata.
+
 ## M3-06 / build 26 — UI/render proof matching and actual preparation costs
 
 Owner reports build25 remains slow or becomes slower at later frames. Its
