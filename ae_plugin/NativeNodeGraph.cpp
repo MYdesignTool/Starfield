@@ -1199,6 +1199,10 @@ PF_Err capture_current_native_temporal_metadata(PF_InData* data,AEGP_PluginID id
 } catch(...) {return PF_Err_BAD_CALLBACK_PARAM;}
 
 void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,AEGP_PluginID id) noexcept try {
+    struct Trace {
+        NativeMetadataTrace value{0,0,0,PF_Err_BAD_CALLBACK_PARAM};
+        ~Trace(){record_native_metadata_trace(value);}
+    } trace;
     if(!data || !data->effect_ref || !data->pica_basicP || !id) return;
     std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes) || nodes.empty())return;
     SuiteSet suites(data);if(suites.acquire())return;
@@ -1216,6 +1220,40 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
     AEGP_LayerH layer{};A_long count{};
     if(suites.pf_interface->AEGP_GetEffectLayer(data->effect_ref,&layer) || !layer ||
         suites.effect->AEGP_GetLayerNumEffects(layer,&count) || count<0 || count>10000)return;
+    trace.value.error=PF_Err_NONE;
+    // Restored expressions can have lazy dependencies. Options used to be the
+    // only route that evaluated these aliases before PF_GetCurrentState. A token
+    // captured first can become obsolete on the first render's evaluation.
+    // Evaluate EVERY active alias before ANY proof token, using owned AEGP UI
+    // values, not the forbidden sequence PF checkout/checkin callbacks.
+    AEGP_EffectRefH raw_renderer{};
+    auto error=suites.pf_interface->AEGP_GetNewEffectForEffect(id,data->effect_ref,&raw_renderer);
+    if(error || !raw_renderer){trace.value.error=static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);return;}
+    EffectRef renderer(suites.effect,raw_renderer);
+    std::array<bool,kNativeBindingCapacity> evaluated{};
+    const A_Time warm_time=data->time_scale?A_Time{data->current_time,data->time_scale}:A_Time{0,1};
+    for(const auto& node:nodes) for(const auto& field:node.fields) {
+        if(!field.present || field.slot<0)continue;
+        for(A_long c=0;c<component_count(field.type);++c) {
+            ++trace.value.inputs;
+            const auto slot=field.slot+c;
+            if(slot<0 || slot>=kNativeBindingCapacity){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
+            AEGP_StreamRefH raw{};
+            error=suites.stream->AEGP_GetNewEffectStreamByIndex(id,raw_renderer,kNativeBindingFirstIndex+slot,&raw);
+            if(error || !raw){trace.value.error=static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);continue;}
+            StreamRef stream(suites.stream,raw);AEGP_StreamType type{};A_Boolean enabled=FALSE;
+            error=suites.stream->AEGP_GetStreamType(raw,&type);
+            if(!error && type==AEGP_StreamType_OneD)error=suites.stream->AEGP_GetExpressionState(id,raw,&enabled);
+            if(error || type!=AEGP_StreamType_OneD || !enabled){trace.value.error=static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);continue;}
+            AEGP_StreamValue2 value{};
+            error=suites.stream->AEGP_GetNewStreamValue(id,raw,AEGP_LTimeMode_LayerTime,&warm_time,FALSE,&value);
+            if(error){trace.value.error=static_cast<PF_Err>(error);continue;}
+            const double number=value.val.one_d;
+            suites.stream->AEGP_DisposeStreamValue(&value);
+            if(!std::isfinite(number) || number==kNativeBindingUnavailable){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
+            evaluated[slot]=true;++trace.value.evaluated;
+        }
+    }
     std::vector<NativeControlProof> result;
     for(A_long i=0;i<count;++i) {
         AEGP_EffectRefH ref{};if(suites.effect->AEGP_GetLayerEffectByIndex(id,layer,i,&ref) || !ref)return;
@@ -1232,7 +1270,7 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
             std::array<PF_State,3> before{};bool eligible=true;
             const auto first=kNativeBindingFirstIndex+field.slot;
             for(A_long c=0;c<component_count(field.type);++c)
-                if(extra.utils->PF_GetCurrentState(data->effect_ref,first+c,nullptr,nullptr,&before[c]))eligible=false;
+                if(!evaluated[field.slot+c] || extra.utils->PF_GetCurrentState(data->effect_ref,first+c,nullptr,nullptr,&before[c]))eligible=false;
             if(!eligible)continue;
             AEGP_StreamRefH raw{};if(suites.stream->AEGP_GetNewEffectStreamByIndex(id,ref,index,&raw) || !raw)continue;
             StreamRef stream(suites.stream,raw);A_Boolean can_vary=FALSE,expression=FALSE;A_long keys=0;
@@ -1284,6 +1322,7 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
             }
         }
     }
+    trace.value.proofs=result.size();
     remember_native_control_proofs(data,std::move(result));
 } catch(...) {}
 } // namespace starfield::adapter

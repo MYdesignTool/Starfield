@@ -17,11 +17,16 @@ struct NativeControlProof {
     std::optional<core::EmissionRateProfile> rate;
     std::optional<double> life_bound;
 };
+struct NativeMetadataTrace {std::size_t inputs{},evaluated{},proofs{};PF_Err error{};};
+void record_native_metadata_trace(const NativeMetadataTrace&) noexcept;
+[[nodiscard]] NativeMetadataTrace last_native_metadata_trace() noexcept;
 // UI proof publication; no host handles are retained. Render reads use only
 // the caller's own numeric aliases and ParamUtils, never AEGP streams.
 void remember_native_control_proofs(PF_InData*,std::vector<NativeControlProof>) noexcept;
-// Only call from the main USER_CHANGED_PARAM / DO_DIALOG / EVENT::DRAW UI paths, after its
-// owned dependency expressions are installed. Never UPDATE_PARAMS_UI or render.
+// Main UI lifecycle / USER_CHANGED_PARAM / DO_DIALOG / EVENT::DRAW only, after
+// owned expressions are installed. Evaluate them before capturing dependency
+// states; never PF parameter checkout in sequence callbacks. Never render or
+// UPDATE_PARAMS_UI. Failed/disabled aliases cannot publish optimization proofs.
 void capture_native_temporal_metadata(PF_InData*,const core::Graph&,AEGP_PluginID) noexcept;
 // Main UI lifecycle reader. AEGP graph stream/value ownership is callback-local;
 // no PF parameter checkout/checkin and no access to sequence params[].

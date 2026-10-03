@@ -33,6 +33,7 @@ struct Prefix {
     std::mutex mutex;core::EmissionTimeline timeline;
 };
 std::mutex registry_mutex;
+NativeMetadataTrace metadata_trace;
 std::vector<ProofSet> proofs;
 std::vector<std::shared_ptr<Prefix>> prefixes;
 constexpr std::size_t kMaxProofInstances=32,kMaxPrefixes=8,kMaxCachedSegments=131072;
@@ -46,6 +47,12 @@ struct PrefixLease {
             entry->timeline=core::EmissionTimeline{};
     }
 };
+}
+void record_native_metadata_trace(const NativeMetadataTrace& trace) noexcept {
+    std::lock_guard lock(registry_mutex);metadata_trace=trace;
+}
+NativeMetadataTrace last_native_metadata_trace() noexcept {
+    std::lock_guard lock(registry_mutex);return metadata_trace;
 }
 void remember_native_control_proofs(PF_InData* data,std::vector<NativeControlProof> values) noexcept try {
     if(!data || !data->effect_ref) return;

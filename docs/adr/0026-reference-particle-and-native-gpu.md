@@ -357,3 +357,22 @@ Regression fixtures must deny sequence checkout/checkin, test absent callbacks
 and undersized arrays, and cover ARB type/read failures and reference disposal.
 Real AE callback/stream availability and no-Options startup are separate gates;
 source inspection proves removal of the reported call but cannot prove host speed.
+
+## Build 30 correction after unusable build29 startup proofs
+
+Owner evidence B2 with render Temporal 0/57 proves sequence attempts occurred,
+but not that PF states matched at render. Options additionally evaluates every
+owned alias before certification. Accept a read-only, bounded AEGP alias warmup
+in the already permitted main UI metadata reader, before capturing ANY PF state.
+Do not install/repair expressions during sequence restoration and do not use PF
+checkout/checkin. Typed, enabled, finite alias values excluding the unavailable
+sentinel are required. Failed aliases cannot publish constant/rate/life proofs.
+All source metadata/state bracketing and render comparison remain mandatory.
+
+The lazy dependency-generation explanation is a hypothesis until AE qualification.
+The regression fixture intentionally changes an alias's state on first evaluation
+and exercises cold load and reopen, type/read/nonfinite/disabled failures, source
+animation and denied sequence callbacks. W/P/E diagnostics snapshot the automatic
+attempt before Options changes it. No public identity/schema/flag/Core changes,
+idle hook, generic transport, project edits or retained host handles are added.
+Main integration remains gated on actual startup without Options and reopen speed.

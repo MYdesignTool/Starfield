@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <memory>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 #include <thread>
@@ -73,6 +74,10 @@ AEGP_KeyframeSuite5 keyframes{};
 bool temporal_metadata_enabled{}, metadata_rate_keys{}, metadata_life_keys{}, metadata_bezier{}, metadata_life_expression{};unsigned metadata_epoch{};
 std::array<std::u16string, kNativeBindingCapacity> expressions;
 std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
+bool lazy_dependencies{};
+std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
+std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
+A_long nonfinite_alias=-1;
 A_long fail_expression = -1;
 bool disable_next_expression{};
 AEGP_LayerSuite9 layers{};
@@ -128,6 +133,11 @@ PF_Err direct_edit(node_sync::NativeEdit& request) {
 }
 }
 double evaluated_binding(A_long index, A_long time) {
+    const auto slot=index-kNativeBindingFirstIndex;
+    if(lazy_dependencies && !dependencies_evaluated[slot]) {
+        dependencies_evaluated[slot]=true;++dependency_generations[slot];
+    }
+    if(index==nonfinite_alias)return std::numeric_limits<double>::quiet_NaN();
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
     std::size_t id = expr.find(u"fx.param(106).value === 1") != std::u16string::npos ? 1 :
@@ -615,12 +625,20 @@ int main() {
     // Real UI metadata reader and native static preparation, using ParamUtils
     // tokens for the owned aliases. No AEGP suite is queried in render preparation.
     temporal_metadata_enabled=true;
-    param_utils.PF_GetCurrentState=[](PF_ProgPtr,PF_ParamIndex,const A_Time* start,const A_Time* duration,PF_State* state)->PF_Err {
-        check(!start && !duration,"native proof covers all time");*state={};std::memcpy(state,&metadata_epoch,sizeof(metadata_epoch));return 0;
+    param_utils.PF_GetCurrentState=[](PF_ProgPtr,PF_ParamIndex index,const A_Time* start,const A_Time* duration,PF_State* state)->PF_Err {
+        check(!start && !duration,"native proof covers all time");*state={};std::memcpy(state,&metadata_epoch,sizeof(metadata_epoch));
+        unsigned generation{};
+        if(index>=kNativeBindingFirstIndex && index<kNativeBindingFirstIndex+kNativeBindingCapacity)
+            generation=dependency_generations[index-kNativeBindingFirstIndex];
+        else for(const auto n:dependency_generations)generation+=n;
+        std::memcpy(reinterpret_cast<char*>(state)+sizeof(metadata_epoch),&generation,sizeof(generation));return 0;
     };
     param_utils.PF_AreStatesIdentical=[](PF_ProgPtr,const PF_State* a,const PF_State* b,A_Boolean* same)->PF_Err {*same=std::memcmp(a,b,sizeof(*a))==0;return 0;};
     stream.AEGP_CanVaryOverTime=[](AEGP_StreamRefH ref,A_Boolean* vary)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*vary=(metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2);return 0;};
-    stream.AEGP_GetExpressionState=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean* enabled)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*enabled=metadata_life_expression && r->effect==2 && r->index==2;return 0;};
+    stream.AEGP_GetExpressionState=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean* enabled)->A_Err {
+        auto* r=reinterpret_cast<Ref*>(ref);
+        *enabled=!r->effect?expression_enabled[r->index-kNativeBindingFirstIndex]:metadata_life_expression && r->effect==2 && r->index==2;return 0;
+    };
     keyframes.AEGP_GetStreamNumKFs=[](AEGP_StreamRefH ref,A_long* count)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*count=((metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2))?2:0;return 0;};
     keyframes.AEGP_GetKeyframeTime=[](AEGP_StreamRefH,AEGP_KeyframeIndex k,AEGP_LTimeMode,A_Time* t)->A_Err {*t={k*10,1};return 0;};
     keyframes.AEGP_GetKeyframeInterpolation=[](AEGP_StreamRefH,AEGP_KeyframeIndex,AEGP_KeyframeInterpolationType* in,AEGP_KeyframeInterpolationType* out)->A_Err {*in=*out=metadata_bezier?AEGP_KeyInterp_BEZIER:AEGP_KeyInterp_LINEAR;return 0;};
@@ -768,19 +786,51 @@ int main() {
     PF_OutData sequence_output{};
     remember_native_control_proofs(&sequence_data,{});
     const auto sequence_writes=sets;
+    lazy_dependencies=true;dependencies_evaluated.fill(false);
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,false)==0 &&
         sequence_output.sequence_data && size_handle(sequence_output.sequence_data)==sizeof(std::uint32_t),
         "legacy null sequence receives a flat lifecycle marker");
     check(!validated_native_control_proofs(&sequence_data).empty(),"UI sequence setup certifies metadata without Options or DRAW");
+    const auto warmed=last_native_metadata_trace();
+    check(warmed.inputs>0 && warmed.evaluated==warmed.inputs && warmed.proofs>0 && !warmed.error,
+        "cold setup evaluates all active aliases before publishing dependency proofs");
+    auto cold_render=sequence_data;cold_render.inter=sequence_inter;
+    NativeAnimationPlan cold_plan(static_graph,1920,1080,1);cold_plan.prepare_constants(&cold_render);
+    check(cold_plan.fully_constant() && !validated_native_control_proofs(&cold_render).empty(),
+        "first render retains warmed proofs after evaluating restored expressions");
+    // Negative control: a pre-evaluation token becomes obsolete when the host
+    // lazily establishes expression dependencies, exactly the missing old step.
+    dependencies_evaluated.fill(false);
+    const auto cold_proofs=validated_native_control_proofs(&cold_render);
+    for(const auto& proof:cold_proofs)(void)evaluated_binding(proof.stream,0);
+    check(!cold_proofs.empty() && validated_native_control_proofs(&cold_render).empty(),
+        "fixture proves pre-evaluation states fail after lazy dependency discovery");
     sequence_data.sequence_data=sequence_output.sequence_data;
     const auto saved_marker=clone(sequence_data.sequence_data);
     setdown_native_temporal_sequence(&sequence_data);sequence_data.sequence_data=saved_marker;
-    remember_native_control_proofs(&sequence_data,{});++metadata_epoch;
+    remember_native_control_proofs(&sequence_data,{});++metadata_epoch;dependencies_evaluated.fill(false);
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0 &&
         sequence_output.sequence_data==saved_marker && !validated_native_control_proofs(&sequence_data).empty(),
         "save/reopen resetup rebuilds process metadata from source controls");
     check(last_native_ui_timing().sequence_refreshes>=2 && sets==sequence_writes,
         "sequence bootstrap is timed and writes no project streams");
+    NativeAnimationPlan reopened_constant(static_graph,1920,1080,1);reopened_constant.prepare_constants(&cold_render);
+    check(reopened_constant.fully_constant(),"save/reopen warms process-local dependencies again without Options");
+    const auto active_alias=validated_native_control_proofs(&sequence_data).front().stream;
+    const auto assert_missing_alias=[&] {
+        const auto available=validated_native_control_proofs(&sequence_data);
+        check(last_native_metadata_trace().error!=0 &&
+            std::none_of(available.begin(),available.end(),[&](const auto& p){return p.stream==active_alias;}),
+            "an alias that cannot be evaluated cannot certify a constant or analytical profile");
+    };
+    const auto failure_refs=live_refs;const auto failure_handles=handles.size();
+    fail_read=active_alias;capture_native_temporal_metadata(&sequence_data,static_graph,1);assert_missing_alias();
+    wrong_type=active_alias;capture_native_temporal_metadata(&sequence_data,static_graph,1);assert_missing_alias();
+    nonfinite_alias=active_alias;capture_native_temporal_metadata(&sequence_data,static_graph,1);assert_missing_alias();nonfinite_alias=-1;
+    expression_enabled[active_alias-kNativeBindingFirstIndex]=FALSE;
+    capture_native_temporal_metadata(&sequence_data,static_graph,1);assert_missing_alias();
+    expression_enabled[active_alias-kNativeBindingFirstIndex]=TRUE;
+    check(live_refs==failure_refs && handles.size()==failure_handles,"failed alias warmups release every value and stream");
     metadata_rate_keys=true;++metadata_epoch;
     check(setup_native_temporal_sequence(&sequence_data,&sequence_output,forbidden_sequence_params,1,true)==0,
         "reopen reads current keyframe metadata");
@@ -816,6 +866,7 @@ int main() {
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));main.values[kGraphParameterId].arbH=sequence_old_graph;
     setdown_native_temporal_sequence(&sequence_data);
     dispose(ui_graph_handle);
+    lazy_dependencies=false;
     temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
 
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));

@@ -1,5 +1,43 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-06 / build 30 - evaluate restored bindings before state certification
+
+The owner rejects build29 startup performance: Options is still required. The
+2026-10-03 screenshot reports B2 (two sequence capture attempts), Temporal 0/57,
+PF58 / N2/2, followed by 57 valid proofs after Options. This establishes that
+bootstrap ran but does not establish usable render proofs. It reports no last
+GPU frame and preparation at time zero; it is not a preview latency measurement.
+
+Source inspection identifies a missing step: Options' binding transaction reads
+all active aliases after expressions before capture, whereas startup only read
+PF states and source metadata. Lazy expression dependency discovery may change a
+pre-evaluation state during first rendering. This is a hypothesis about AE, not
+host confirmation. Build30 (32798 / 0x801E) evaluates all recorded active aliases
+through callback-local AEGP UI streams BEFORE any proof state is captured. It
+checks OneD type, expression enabled, finite value and unavailable sentinel.
+Only successfully evaluated components are eligible for the existing source
+metadata plus before/after all-time state certification and render revalidation.
+No expression, source value/key, project stream or selection is written.
+
+Scoped fake-host tests model a dependency generation changing on first expression
+evaluation. A negative control demonstrates that pre-evaluation tokens become
+invalid. Cold setup and save/reopen then retain proofs after first render reads;
+read/type/nonfinite/disabled-expression failures publish no proof for that input
+and release references. Denied PF checkout/checkin in sequence callbacks, absent
+params, source keys/expressions and worker/render-only exclusions remain covered.
+5,157 scoped checks pass (native sync 5,145; camera 12); evidence is
+artifacts/build30-native-sync.log. Native build/deployment is recorded separately.
+
+Diagnostics snapshot the previous automatic reader BEFORE Options refreshes it:
+W is evaluated/active aliases, P published proofs, E optional warmup error; B
+remains sequence attempts. Build30/proofs is the subsequent explicit Options
+result. Process-global readings may belong to another effect callback.
+Actual AE no-Options first preview and save/reopen are still mandatory gates.
+The owner-authorized main integration waits for those results. Core ABI3, public
+IDs, match names, graph codec, SFU1 sequence schema, CEP and PiPL flags are unchanged.
+Owned scope: NativeNodeGraph, NativeTemporalCache, Diagnostics, PluginVersion,
+scoped native sync fixture and these M3-06/ADR0026 records.
+
 ## M3-06 / build 29 - remove forbidden sequence parameter callbacks
 
 Owner rejects build28: AE2023 reports effect cannot use checkout/checkin callbacks
