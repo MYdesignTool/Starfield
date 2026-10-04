@@ -12,6 +12,10 @@ native undo/redo, save/close/reopen, CEP roundtrip and rendered age colors.
 Also confirm native keyframes and no-Options first/reopen performance remain
 usable. Texture/source/model/alpha/new Transfer Mode families remain open.
 Main manifest24 and CoreABI3 are unchanged. No newer-host qualification is claimed.
+Build32 was deployed under standing authorization with AE absent; installed/
+retained binary hashes, 14 paired panel entries and one Junction were verified.
+The paired one-step build31 rollback is in build-matrix.md. Host testing remains
+open; candidate deployment does not qualify native UI events.
 
 ## Owner acceptance / main integration - 2026-10-04
 

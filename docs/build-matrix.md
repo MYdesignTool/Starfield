@@ -29,6 +29,40 @@ and binary restoration: build32-paired-rollback.log. It touches no live bundle.
 Exported actual native draw commands: gradient-editor-preview.svg and .png;
 layout inspected locally. This is not evidence of actual AE UI qualification.
 
+### Build32 deployment - 2026-10-04
+
+Candidate commit d70c6c8, packed version32800/0x8020, deployed after an immediate
+read-only check found no AfterFX/AfterFX_64. Standing owner authorization / ADR0011
+applies. Existing `Plug-ins/Starfield -> newStardust/dist` Junction retained;
+six installed binary hashes and six retained build31 hashes verified. Appearance
+remains absent. No registry/cache/process operations or new host entries occurred.
+The existing CEP Junction points at the checkout; 13 old sources are saved and
+14 candidate entries verified, including the prior absence of gradient_editor.js.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 7729C1071BF3BBFDAA443A35CDCA9B16D183A5A181EF2553D210D3D73E05D976 |
+| StarfieldEmitter.aex | 876AFB6C3A73D26052EBC87934EDD3855F104404B41AB9A4742CC4F63BB89F14 |
+| StarfieldParticleNode.aex | 25BF375C91F099D365E9641FD6E887E9B75A028D9483507183ED0E1A80DBA2ED |
+| StarfieldForce.aex | 900BAAA9C3D0B8DECC68324B4907C92B406419AC7CF1165BE30612981644BB14 |
+| StarfieldHost.aex | 43F342C9FA80FB939B98A37770B43A40368B146A7C327E017CF64FCE42E6EC52 |
+| StarfieldCore.dll | 9C6CABFCD28D6CD5C984A91AE54834682C0AD4B143953A30ABF40EB5895F285A |
+
+Selector: StarfieldCore-9C6CABFCD28D6CD5.dll; selected runtime bytes match Core.
+Before/after evidence: artifacts/build32-deploy-before.json and
+build32-deploy-after.json. Deployment / read-only rollback report:
+build32-deploy.log / build32-rollback-check.log.
+Backup: artifacts/disabled/m307-build32-native-gradient-20261004.
+Fresh Particle effects/graphs and native-gradient-32 CEP are required. Actual AE
+events/undo/reopen/render qualification stays open; installation is not a host pass.
+
+One-step paired undo, after closing AE (retains the candidate and restores build31
+binary/CEP hashes; removes the newly introduced panel source from the checkout):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm307-build32-native-gradient-20261004' -Restore
+```
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

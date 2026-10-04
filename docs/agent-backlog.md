@@ -16,6 +16,8 @@ Particle effects; no legacy migration. Keep unsupported source/texture/blend
 families in later cards instead of advertising inert controls.
 Status: implementation/build/scoped checks complete. Actual AE UI/undo/reopen/
 render qualification remains open; see build-matrix.md for the candidate evidence.
+Candidate d70c6c8 / build32 is deployed with verified hashes and paired rollback;
+main remains at owner-accepted 8857303. No automatic merge of this new work.
 
 ## Owner acceptance / main integration - 2026-10-04
 
