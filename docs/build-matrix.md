@@ -27,6 +27,36 @@ gradient-editor-preview.svg/.png; these are fake-host, not AE bitmap evidence.
 Actual AE warning-free expansion/drawing, stop edits/undo/reopen and fresh-node
 metadata remain host gates. Build33 has failed bitmap qualification.
 
+### Build34 deployment - 2026-10-04
+
+Candidate bfbca0c deployed under standing authorization with neither AfterFX nor
+AfterFX_64 running. The former build33 six-file bundle is retained under
+artifacts/disabled/m307-build34-drawbot-format-20261004. Six installed and six
+backup SHA-256 values match the source artifacts and recorded pre-install bytes;
+all 14 CEP hashes are unchanged. Core retains the build33 hash and matching
+StarfieldCore-9C6CABFCD28D6CD5.dll selector. The existing single Starfield Junction
+remains; retired Appearance remains absent. Host UI testing is still pending.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | CBCE9AC0393D589365752FAFE91204B807685958C97027DDAD5B086367B7D8A4 |
+| StarfieldEmitter.aex | 8496AC86488CE730662A7FBB31D5E79DC67AC133E0B1ED2535B826E1FAAE4226 |
+| StarfieldParticleNode.aex | 5466D8EE3B4D1E06C5743243DA725D5C27671CA6B18790AC15ED346FB069C5C2 |
+| StarfieldForce.aex | B1EBEA911DDCA124FA7E0CC2B980840D9D07FAD57179056F5AD6576EE9B41D76 |
+| StarfieldHost.aex | 0DBDB79235E4719CC4B7298A1B5CE8DBD0E8C90089D37C59BCFC258ACBC503C8 |
+| StarfieldCore.dll | 9C6CABFCD28D6CD5C984A91AE54834682C0AD4B143953A30ABF40EB5895F285A |
+
+Before/after records: artifacts/build34-deploy-before.json / build34-deploy-after.json;
+installation log: build34-deploy.log. One-step undo to build33 with AE closed
+(the CEP sources already match that bundle):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm307-build34-drawbot-format-20261004' -Rollback
+```
+
+Build33's rollback to build32 can then be used before the paired build32-to-build31
+restore below; each receipt validates the installed hashes before restoring.
+
 ## M3-07 / build33 native UI correction candidate - 2026-10-04
 
 Owner rejected build32 native UI qualification: add-stop compile failure,

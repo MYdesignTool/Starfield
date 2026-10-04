@@ -12,6 +12,8 @@ this change. Required: expand/repaint without warnings, continuous gradient at
 normal/narrow widths, add/drag/color/undo/reopen, and fresh Emitter/Force hidden
 metadata. Reuse build32/33 nodes; schema5/base81 and all data contracts are unchanged.
 Main remains at accepted build31 (8857303); no automatic candidate integration.
+Candidate bfbca0c / build34 is deployed with six installed/backup hashes and
+unchanged CEP/Core verified. Backup/one-step rollback are in build-matrix.md.
 
 ## M3-07 / build33 correction qualification
 

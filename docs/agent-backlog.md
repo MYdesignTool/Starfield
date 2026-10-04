@@ -10,6 +10,9 @@ native AE qualification and fresh-node hidden metadata remain open.
 Build34 implementation/full May2023 compilation and 3943 focused checks pass;
 see build-matrix.md for scopes/logs. Native AE warning-free drawing and editing
 are pending. No schema or renderer changes; main remains at accepted build31.
+Candidate bfbca0c / build34 is now deployed with verified before/after hashes and
+unchanged CEP/Core. Retest warning-free expansion and native edits before main
+integration; rollback is recorded in build-matrix.md.
 
 Build33 follow-up: owner rejects build32 native UI (adding-stop compile failure,
 strip seams and internal controls visible even on fresh Emitter/Force). Correct

@@ -1,4 +1,13 @@
-# Build33 native UI correction
+# Build34 native gradient pixel-format correction
+
+Owner build33 gradient expansion triggers repeated Unsupported Pixel Format
+warnings. Build34 queries Drawbot BGRA/ARGB support/preferences, uses matching
+opaque 32-bit pixels and retains path drawing if image APIs are unavailable.
+Context-local guards stop failure/reentrant retries. No supported parameter,
+schema or layout changes; AE warning-free editor qualification remains pending.
+See ADR0027 and build-matrix.md.
+
+## Build33 native UI correction
 
 Build32 owner testing found gradient seams, adding-stop compile failure and
 internal metadata visible on fresh Emitter/Force. Build33 restores zero standard/
