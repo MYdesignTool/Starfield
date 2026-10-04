@@ -14,7 +14,7 @@ function effect(kind) {
     const values={"Panel Sync Guard":0,"Node Layout X":0,"Node Layout Y":0,"Outgoing Connection Count":0,
         "Auxiliary Source":0,"Shape":1,"Life (Seconds)":2,"Life Random":0,"Size (Pixels)":10,"Size Y (Pixels)":10,
         "Size Random":0,"Opacity":100,"Opacity Random":0,"Particle Color":1,"Color":[1,1,1,1],"Particle Feather":0,"Up Axis":3,
-        "Size Over Life":100,"Opacity Over Life":100,"Size Curve Count":0,"Opacity Curve Count":0,"Color Gradient Count":2,
+        "Size Over Life":100,"Opacity Over Life":100,"Size Curve Count":0,"Opacity Curve Count":0,"Color Gradient":2,
         "Orient To":1,"Angle X":0,"Angle Y":0,"Angle Z":0,"Angle Random":0,"Speed X":0,"Speed Y":0,"Speed Z":0,
         "Speed Random":0,"Limit to 2D":2,"Type":1,"Emitting":1,"Particles Per Second":100,"Origin XY":[960,540],"Origin Z":0,
         "Speed":100,"Size X":100,"Size Y":100,"Size Z":100,"Disc Size":.05,"Direction":2,"Direction Span":60,"Random Seed":1000,
@@ -53,7 +53,7 @@ for(const kind of ["particle","emitter","auxiliary","force"]) {
     context.payload=JSON.stringify(authored);
     global.testWrite(host,vm.runInContext("JSON.parse(payload)",context),layer);
     const restored=global.testRead(host,layer);
-    assert.equal(restored.schemaVersion,kind==="particle"?4:kind==="force"?2:6);
+    assert.equal(restored.schemaVersion,kind==="particle"?5:kind==="force"?2:6);
     for(const p of authored.parameters) {
         const actual=restored.parameters.find(v=>v.key===p.key);
         assert.ok(actual,`${kind} key ${p.key} round trips`);

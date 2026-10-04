@@ -15,4 +15,5 @@ DllExport PF_Err PluginDataEntryFunction2(PF_PluginDataPtr, PF_PluginDataCB2, SP
 [[nodiscard]] PF_Err register_node_graph_sync(PF_InData* in_data) noexcept;
 [[nodiscard]] PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data,
                                                PF_ParamDef* params[],
-                                               const PF_UserChangedParamExtra* extra) noexcept;
+                                               const PF_UserChangedParamExtra* extra,
+                                               bool particle_gradient=false) noexcept;

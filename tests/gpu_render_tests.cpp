@@ -26,7 +26,7 @@
 #include <chrono>
 
 PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
-PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*) noexcept {return PF_Err_NONE;}
+PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*,bool) noexcept {return PF_Err_NONE;}
 using namespace starfield;
 static std::shared_ptr<const core::Graph> smart_graph;
 namespace starfield::adapter {

@@ -1,5 +1,18 @@
 # Behavior inventory
 
+## M3-07 / build32 qualification
+
+Owner-accepted build31 is on main/origin main at 8857303; build32 remains on
+codex/m3-07-particle-gradient. May2023 SDK native compilation, scoped fake-host
+checks and exported Drawbot layout inspection pass (build-matrix.md). These are
+candidate evidence; native editor events in AE2023.5.0 Build52 are not yet exercised.
+Use a fresh Particle effect/graph (schema5/base81), select Color Over Life and
+exercise add/drag/double-click/delete, Flip, Copy/Paste and presets. Confirm
+native undo/redo, save/close/reopen, CEP roundtrip and rendered age colors.
+Also confirm native keyframes and no-Options first/reopen performance remain
+usable. Texture/source/model/alpha/new Transfer Mode families remain open.
+Main manifest24 and CoreABI3 are unchanged. No newer-host qualification is claimed.
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

@@ -3,6 +3,7 @@
 #include "AEConfig.h"
 #include "AE_Effect.h"
 
+#include "ParticleLayout.hpp"
 #include <array>
 #include <iterator>
 
@@ -21,7 +22,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3 }; // 2 is not a node 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return 31;
-        case Kind::particle: return 75;
+        case Kind::particle: return particle_layout::last;
         case Kind::force: return 27;
     }
     return 0;
@@ -58,6 +59,9 @@ enum : A_long {
     kParticleAngleXId = 219, kParticleAngleYId = 220, kParticleAngleZId = 221,
     kParticleAngleRandomId = 222, kRotationSpeedXId = 223, kRotationSpeedYId = 224,
     kRotationSpeedZId = 225, kRotationSpeedRandomId = 226, kLimitTo2DId = 227,
+    kParticlePropertiesId=2910, kParticlePropertiesEndId=2911,
+    kParticleOverLifeId=2912, kParticleOverLifeEndId=2913,
+    kParticleRotationId=2914, kParticleRotationEndId=2915,
     kParticleColorModeId = 211, kColorGradientCountId = 930,
     kColorGradientPositionFirstId = 940, kColorGradientColorFirstId = 950,
     kEmitterTypeId = 101, kBirthRateId = 102,
@@ -129,6 +133,8 @@ enum : A_long {
         kAuxiliarySourceId,kLifeRandomId,kParticleShapeId,kSizeYId,kFeatherId,kUpAxisId,kOrientToId,
         kParticleAngleXId,kParticleAngleYId,kParticleAngleZId,kParticleAngleRandomId,kRotationSpeedXId,kRotationSpeedYId,kRotationSpeedZId,kRotationSpeedRandomId,kLimitTo2DId,
         kParticleColorModeId, kColorGradientCountId,
+        kParticlePropertiesId, kParticlePropertiesEndId, kParticleOverLifeId,
+        kParticleOverLifeEndId, kParticleRotationId, kParticleRotationEndId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,
         kWindXId, kWindYId, kWindZId, kSpinId, kSpinFrequencyId, kSpinResistId, kSpinDelayId,
         kWindSpinCurveCountId,

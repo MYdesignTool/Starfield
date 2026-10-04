@@ -18,11 +18,11 @@ for(let i=0;i<8;i++) for(const suffix of ["Position","Color"])
     properties.push({name:`Color Gradient ${i} ${suffix}`,value:suffix==="Color"?[1,1,1,1]:0,numKeys:0,canSetExpression:false,
         get expressionEnabled(){throw new Error("constant bank must not query expressions");},
         setValue(value){this.value=value;values.set(this.name,value);}});
-properties.push({name:"Color Gradient Count",value:2,numKeys:0,canSetExpression:false,setValue(value){values.set(this.name,value);}});
+properties.push({name:"Color Gradient",value:2,numKeys:0,canSetExpression:false,setValue(value){values.set(this.name,value);}});
 const effect={matchName:"org.starfieldfx.node.particle",numProperties:properties.length,
     property(index){return typeof index==="number"?properties[index-1]:properties.find(p=>p.name===index);}};
 global.testGradientWrite(effect,Array.from(bytes));
-assert.equal(values.get("Color Gradient Count"),3);
+assert.equal(values.get("Color Gradient"),3);
 assert.equal(values.get("Color Gradient 1 Position"),30);
 assert.deepEqual(Array.from(values.get("Color Gradient 2 Color")),[0,0,1,1]);
 const count=values.size,bad=Array.from(bytes);bad[1]=8;
@@ -30,7 +30,7 @@ assert.throws(()=>global.testGradientWrite(effect,bad),/Invalid/);
 assert.equal(values.size,count,"malformed gradient never partially writes native banks");
 const nodeId="00000000000000000000000000000001",copyId="00000000000000000000000000000002";
 let graph=edits.apply({nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:"particle"},()=>nodeId);
-assert.equal(graph.nodes[0].schemaVersion,4);
+assert.equal(graph.nodes[0].schemaVersion,5);
 assert.equal(graph.nodes[0].parameters.find(p=>p.key==="12").value,0);
 assert.equal(view.decodeGradient(graph.nodes[0].parameters.find(p=>p.key==="13").value).length,2);
 graph=edits.apply(graph,{type:"setParameters",changes:[{nodeId,parameterKey:"13",valueType:7,value:bytes}]});

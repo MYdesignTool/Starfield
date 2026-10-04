@@ -40,6 +40,9 @@ inline const char* stage_name(Stage stage) noexcept {
 // Local UI edit context; borrowed refs live only until direct publication returns.
 // No cross-effect transport, persistent schema or render-thread state.
 struct NativeEdit {
+    struct Field { A_long index{}; ValueKind kind{}; std::array<double,4> value{}; };
+    std::array<Field,17> additional_fields{};
+    std::uint32_t additional_count{};
     std::uint32_t node_kind{};
     A_long parameter_index{};
     std::array<std::uint16_t, 8> uuid{};
@@ -62,10 +65,16 @@ static_assert(std::is_trivially_copyable_v<NativeEdit>);
 inline bool valid_edit(const NativeEdit& edit) noexcept {
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
-    if (edit.node_kind > 3 ||
-        edit.parameter_index <= 0 || edit.parameter_index > 43 || !any ||
+    if (edit.node_kind > 3 || edit.node_kind == 2 || edit.additional_count>17 ||
+        edit.parameter_index <= 0 || edit.parameter_index > 81 || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
+    for(unsigned i=0;i<edit.additional_count;++i) {
+        const auto& field=edit.additional_fields[i];
+        if(field.index<1 || field.index>81 || static_cast<unsigned>(field.kind)>3)return false;
+        for(double value:field.value)if(!std::isfinite(value))return false;
+        for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
+    }
     return true;
 }
 

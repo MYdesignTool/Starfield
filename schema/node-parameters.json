@@ -1,7 +1,7 @@
 {
   "identityRevision": 4,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "M3-06 development Emitter schema 6/base 31 separates Auxiliary Source from Emitting timing; Particle schema 4/base 75 adds birth lifetime randomness, shapes and rotation. Fresh main/Emitter/Particle effects required; no legacy migration. Main manifest 24 appends Time Sampling and default GPU Acceleration; transient 0x8004 particle snapshot version 2 and paired C ABI 3. ADR 0026. Build31 removes Appearance by owner request; recreate development effects/graphs containing that node. No migration or compatibility binary.",
+  "migrationPolicy": "Build32 development Particle schema 5/base 81 replaces schema 4/base 75 with organized control groups and a native Color Gradient editor. Recreate Particle effects/graphs; no legacy migration, as authorized by the owner. Existing disk IDs and match names stay paired; group disk IDs 2910..2915 are new. Emitter schema 6/base 31, Force schema 2/base 27, main manifest 24, transient snapshot version 2 and C ABI 3 stay unchanged. Appearance was removed in build31; graphs containing that node must also be recreated. ADRs 0026/0027.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "fixed": {
     "emitter_type": 101,
@@ -78,7 +78,13 @@
     "rotation_speed_y": 224,
     "rotation_speed_z": 225,
     "rotation_speed_random": 226,
-    "limit_to_2d": 227
+    "limit_to_2d": 227,
+    "particle_properties_group": 2910,
+    "particle_properties_end": 2911,
+    "particle_over_life_group": 2912,
+    "particle_over_life_end": 2913,
+    "particle_rotation_group": 2914,
+    "particle_rotation_end": 2915
   },
   "outgoingConnections": {
     "first": 500,
@@ -102,7 +108,7 @@
     "points": 8
   },
   "sharedOpacity": "Emitter and Particle reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 8,
+  "layoutRevision": 9,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -281,7 +287,7 @@
     "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
     "forceSchemaVersion": 2,
     "outputSchemaVersion": 4,
-    "particleSchemaVersion": 4
+    "particleSchemaVersion": 5
   },
   "nativeControlOrder": {
     "emitter": [
@@ -307,6 +313,7 @@
       "Shape",
       "Life (Seconds)",
       "Life Random",
+      "Particle Properties",
       "Size (Pixels)",
       "Size Y (Pixels)",
       "Size Random",
@@ -314,11 +321,13 @@
       "Opacity Random",
       "Particle Color",
       "Color",
+      "Color Gradient",
       "Particle Feather",
       "Up Axis",
+      "Over Life",
       "Size Over Life",
       "Opacity Over Life",
-      "Color Gradient",
+      "Rotation",
       "Orient To",
       "Angle X",
       "Angle Y",
@@ -354,9 +363,9 @@
     "points": 8,
     "graphKey": 13,
     "modeGraphKey": 12,
-    "nativeCountIndex": 49,
-    "nativePositionFirstIndex": 50,
-    "nativeColorFirstIndex": 51,
+    "nativeCountIndex": 12,
+    "nativePositionFirstIndex": 13,
+    "nativeColorFirstIndex": 14,
     "nativeStride": 2,
     "nativePositionUnits": "0–100 percent"
   }

@@ -24,6 +24,7 @@
     <OutDir>$(ProjectDir)..\artifacts\plugin\2023\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\artifacts\plugin\2023\obj\$(Platform)\$(Configuration)\node-$(NodeKind)\</IntDir>
     <TargetExt>.aex</TargetExt>
+    <NodeOutFlags>STARFIELD_NODE_OUT_FLAGS</NodeOutFlags><NodeOutFlags2>STARFIELD_NODE_OUT_FLAGS2</NodeOutFlags2>
   </PropertyGroup>
   <PropertyGroup Condition="'$(NodeKind)'=='Emitter'">
     <TargetName>StarfieldEmitter</TargetName><NodePiPL>NodeEmitterPiPL.r</NodePiPL>
@@ -32,6 +33,7 @@
   <PropertyGroup Condition="'$(NodeKind)'=='Particle'">
     <TargetName>StarfieldParticleNode</TargetName><NodePiPL>NodeParticlePiPL.r</NodePiPL>
     <NodeKindDefine>STARFIELD_NODE_KIND_PARTICLE</NodeKindDefine>
+    <NodeOutFlags>STARFIELD_PARTICLE_OUT_FLAGS</NodeOutFlags><NodeOutFlags2>STARFIELD_PARTICLE_OUT_FLAGS2</NodeOutFlags2>
   </PropertyGroup>
   <PropertyGroup Condition="'$(NodeKind)'=='Force'">
     <TargetName>StarfieldForce</TargetName><NodePiPL>NodeForcePiPL.r</NodePiPL>
@@ -55,6 +57,7 @@
   <ItemGroup>
     <ClCompile Include="NodeEffectMain.cpp" />
     <ClCompile Include="NodeEffects.cpp" />
+    <ClCompile Include="ParticleGradientUI.cpp" />
     <ClCompile Include="GpuRender.cpp" />
     <ClCompile Include="NodeGraphSync.cpp" />
     <ClCompile Include="NativeGraphCommit.cpp" />
@@ -70,7 +73,7 @@
     <ClCompile Include="..\src\core\Time.cpp" />
     <CustomBuild Include="$(NodePiPL)">
       <Message>Generating $(NodeKind) node PiPL resource</Message>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName STARFIELD_NODE_OUT_FLAGS -OutFlags2Name STARFIELD_NODE_OUT_FLAGS2</Command>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName $(NodeOutFlags) -OutFlags2Name $(NodeOutFlags2)</Command>
       <Outputs>$(IntDir)StarfieldPiPL.rr;$(IntDir)StarfieldPiPL.rrc;$(IntDir)StarfieldPiPL.rc</Outputs>
       <AdditionalInputs>$(MSBuildProjectDirectory)\NodeEffectFlags.h;$(MSBuildProjectDirectory)\NodeRecord.hpp;$(MSBuildProjectDirectory)\PluginVersion.h;$(MSBuildProjectDirectory)\NodeEffectMain.cpp;$(MSBuildProjectDirectory)\NodeEffects.cpp;$(MSBuildProjectDirectory)\NodeEffects.hpp;$(MSBuildProjectDirectory)\NodeGraphSync.cpp;$(MSBuildProjectDirectory)\NodeGraphSync.hpp</AdditionalInputs>
     </CustomBuild>

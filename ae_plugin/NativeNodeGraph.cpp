@@ -32,6 +32,7 @@ namespace {
 
 namespace core = starfield::core;
 using native_nodes::Kind;
+namespace particle_layout=native_nodes::particle_layout;
 
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
 constexpr char kEmitterMatchName[] = "org.starfieldfx.node.emitter";
@@ -48,14 +49,14 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, 76> fields{};
+    std::array<RawField, particle_layout::last+1> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
     return type == node_sync::ValueKind::scalar ? 1 : type == node_sync::ValueKind::point2 ? 2 : 3;
 }
 constexpr bool animated_index(Kind kind,A_long index) noexcept {
-    if(kind==Kind::particle) return (index>=1 && index<=14) || (index>=66 && index<=75);
+    if(kind==Kind::particle) return native_nodes::particle_layout::animated(index);
     return index>=1 && index<=(kind==Kind::emitter?30:10);
 }
 
@@ -136,6 +137,12 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
         output = sampled[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
     }
 
+    if(suites.edit && effect==suites.edited_effect) for(unsigned i=0;i<suites.edit->additional_count;++i) {
+        const auto& field=suites.edit->additional_fields[i];if(field.index!=index)continue;
+        if(field.kind!=node_sync::ValueKind::scalar)return suites.fail(index);
+        suites.edit_applied=true;output = field.value[0];
+        return record_value(suites,index,node_sync::ValueKind::scalar,{output,0.0,0.0});
+    }
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::scalar) return suites.fail(index);
         suites.edit_applied = true; output = suites.edit->value[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
@@ -217,6 +224,12 @@ bool read_color(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
         output = {sampled[0], sampled[1], sampled[2]}; return record_value(suites, index, node_sync::ValueKind::color, {output.x, output.y, output.z});
     }
 
+    if(suites.edit && effect==suites.edited_effect) for(unsigned i=0;i<suites.edit->additional_count;++i) {
+        const auto& field=suites.edit->additional_fields[i];if(field.index!=index)continue;
+        if(field.kind!=node_sync::ValueKind::color)return suites.fail(index);
+        suites.edit_applied=true;output = {field.value[0],field.value[1],field.value[2]};
+        return record_value(suites,index,node_sync::ValueKind::color,{output.x,output.y,output.z});
+    }
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::color) return suites.fail(index);
         suites.edit_applied = true; output = {suites.edit->value[0], suites.edit->value[1], suites.edit->value[2]}; return record_value(suites, index, node_sync::ValueKind::color, {output.x, output.y, output.z});
@@ -386,7 +399,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || (kind > 3 || kind == 2) || !read(2, fields) || fields > 75) return false;
+            if (!read(2, kind) || (kind > 3 || kind == 2) || !read(2, fields) || fields > 81) return false;
             node.kind = static_cast<Kind>(kind);
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -445,7 +458,7 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
         kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 6; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
-        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 4; return true;
+        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 5; return true;
     }
     if (std::strcmp(match_name, kForceMatchName) == 0) {
         kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 2; return true;
@@ -535,24 +548,24 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     }
 
     if(kind!=Kind::particle)return false;
-    const A_long color_start_index = 10;
-    const A_long size_index = 4;
-    const A_long size_end_index = 13;
-    const A_long opacity_index = 7;
-    const A_long opacity_end_index = 14;
-    const A_long size_random_index = 6;
-    const A_long opacity_random_index = 8;
+    const A_long color_start_index = particle_layout::color;
+    const A_long size_index = particle_layout::size;
+    const A_long size_end_index = particle_layout::size_over_life;
+    const A_long opacity_index = particle_layout::opacity;
+    const A_long opacity_end_index = particle_layout::opacity_over_life;
+    const A_long size_random_index = particle_layout::size_random;
+    const A_long opacity_random_index = particle_layout::opacity_random;
     if (!read_color(suites, plugin_id, effect, color_start_index, time, vector)) return false;
     add_value(node, kColorStart, vector);
     {
         std::uint32_t mode{},count{};
-        if(!read_uint(suites,plugin_id,effect,9,time,mode) || mode<1 || mode>4 ||
-            !read_uint(suites,plugin_id,effect,49,time,count) || count<2 || count>8) return false;
+        if(!read_uint(suites,plugin_id,effect,particle_layout::color_mode,time,mode) || mode<1 || mode>4 ||
+            !read_uint(suites,plugin_id,effect,particle_layout::gradient,time,count) || count<2 || count>8) return false;
         add_value(node,kParticleColorMode,mode-1);
         core::ColorGradient gradient;gradient.count=static_cast<std::uint8_t>(count);
         for(std::uint32_t i=0;i<count;++i) {
-            if(!read_one_d(suites,plugin_id,effect,50+2*i,time,gradient.stops[i].position) ||
-                !read_color(suites,plugin_id,effect,51+2*i,time,gradient.stops[i].color)) return false;
+            if(!read_one_d(suites,plugin_id,effect,particle_layout::gradient_first+2*i,time,gradient.stops[i].position) ||
+                !read_color(suites,plugin_id,effect,particle_layout::gradient_first+2*i+1,time,gradient.stops[i].color)) return false;
             gradient.stops[i].position/=100;
         }
         auto bytes=core::encode_color_gradient(gradient);if(bytes.empty()) return false;
@@ -573,17 +586,17 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     {
         if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
         add_value(node, kParticleLifetimeSeconds, scalar);
-        for(auto [index,key]:{std::pair{3,kLifeRandom},std::pair{5,kSizeY},std::pair{11,kParticleFeather},
-                            std::pair{70,kAngleRandom},std::pair{74,kRotationSpeedRandom}}) {
+        for(auto [index,key]:{std::pair{particle_layout::life_random,kLifeRandom},std::pair{particle_layout::size_y,kSizeY},std::pair{particle_layout::feather,kParticleFeather},
+                            std::pair{particle_layout::angle_random,kAngleRandom},std::pair{particle_layout::speed_random,kRotationSpeedRandom}}) {
             if(!read_one_d(suites,plugin_id,effect,index,time,scalar)) return false;
             add_value(node,key,scalar);
         }
-        for(auto [index,key]:{std::pair{1,kParticleShape},std::pair{12,kUpAxis},
-                            std::pair{66,kOrientTo},std::pair{75,kLimitTo2D}}) {
+        for(auto [index,key]:{std::pair{particle_layout::shape,kParticleShape},std::pair{particle_layout::up_axis,kUpAxis},
+                            std::pair{particle_layout::orient,kOrientTo},std::pair{particle_layout::limit_2d,kLimitTo2D}}) {
             if(!read_uint(suites,plugin_id,effect,index,time,integer) || integer<1) return false;
             add_value(node,key,integer-1);
         }
-        for(auto [first,key]:{std::pair{67,kParticleAngles},std::pair{71,kRotationSpeed}}) {
+        for(auto [first,key]:{std::pair{particle_layout::angle,kParticleAngles},std::pair{particle_layout::speed,kRotationSpeed}}) {
             if(!read_one_d(suites,plugin_id,effect,first,time,vector.x) ||
                !read_one_d(suites,plugin_id,effect,first+1,time,vector.y) ||
                !read_one_d(suites,plugin_id,effect,first+2,time,vector.z)) return false;
@@ -591,9 +604,9 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         }
     }
 
-    const A_long size_curve_count_index = 15;
+    const A_long size_curve_count_index = particle_layout::size_curve;
     const A_long size_curve_first_index = size_curve_count_index + 1;
-    const A_long opacity_curve_count_index = 32;
+    const A_long opacity_curve_count_index = particle_layout::opacity_curve;
     const A_long opacity_curve_first_index = opacity_curve_count_index + 1;
     core::OpaqueBytes curve{};
     bool has_curve = false;

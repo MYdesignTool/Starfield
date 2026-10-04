@@ -14,6 +14,9 @@
 #include "AE_GeneralPlug.h"
 #include "SPBasic.h"
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/ColorGradient.hpp"
+#include "GradientEditorModel.hpp"
+#include "ParticleLayout.hpp"
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SequenceCodec.hpp"
 #include <array>
@@ -141,7 +144,7 @@ double evaluated_binding(A_long index, A_long time) {
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
     std::size_t id = expr.find(u"fx.param(106).value === 1") != std::u16string::npos ? 1 :
-        expr.find(u"fx.param(150).value === 2") != std::u16string::npos ? 2 : 3;
+        expr.find(u"fx.param(156).value === 2") != std::u16string::npos ? 2 : 3;
     const std::u16string needle=u"result = fx.param(";
     auto from=expr.find(needle)+needle.size(); auto to=expr.find(u")",from);
     const auto digits=expr.substr(from,to-from);
@@ -153,8 +156,8 @@ double evaluated_binding(A_long index, A_long time) {
         if(id==1 && source==4) return component ? value.two_d.y : value.two_d.x + time;
         return component==0 ? value.color.redF*(1.0-time/48.0) : component==1 ? value.color.greenF : value.color.blueF;
     }
-    return (id==2 && source==4) || (id==3 && source==1) ? value.one_d+time :
-        (id==2 && source==7) ? 100.0-time : (id==2 && source==2) ? 2.0+time/24.0 : value.one_d;
+    return (id==2 && source==5) || (id==3 && source==1) ? value.one_d+time :
+        (id==2 && source==8) ? 100.0-time : (id==2 && source==2) ? 2.0+time/24.0 : value.one_d;
 }
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -191,13 +194,13 @@ int main() {
     for (int i : {8, 9, 10, 17, 19, 25, 26}) emitter.values[i].one_d = 100;
     emitter.values[15].one_d = 1; emitter.values[16].one_d = 60;
     particle.values[1].one_d=1;particle.values[2].one_d=2;
-    particle.values[4].one_d=10;particle.values[5].one_d=10;
-    particle.values[7].one_d=100;particle.values[9].one_d=1;
-    particle.values[10].color={1,1,1,1};particle.values[12].one_d=3;
-    particle.values[13].one_d=100;particle.values[14].one_d=100;
-    particle.values[49].one_d=2;particle.values[50].one_d=0;particle.values[52].one_d=100;
-    particle.values[51].color={1,1,1,1};particle.values[53].color={1,1,1,1};
-    particle.values[66].one_d=1;particle.values[75].one_d=2;
+    particle.values[5].one_d=10;particle.values[6].one_d=10;
+    particle.values[8].one_d=100;particle.values[10].one_d=1;
+    particle.values[11].color={1,1,1,1};particle.values[30].one_d=3;
+    particle.values[33].one_d=100;particle.values[34].one_d=100;
+    particle.values[12].one_d=2;particle.values[13].one_d=0;particle.values[15].one_d=100;
+    particle.values[14].color={1,1,1,1};particle.values[16].color={1,1,1,1};
+    particle.values[71].one_d=1;particle.values[80].one_d=2;
     main.values[kTimeSamplingHzId].one_d=1;main.values[kAccelerationId].one_d=1;main.values[kAccelerationId].one_d=1;
     connection(1, records::Kind::emitter, 2, 11);
     connection(2, records::Kind::particle, 4, 12);
@@ -325,22 +328,62 @@ int main() {
     check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && sets == before_sets, "metadata awaits CEP transaction");
     auto life = edit(1, 2, 9); check(direct_edit(life) == 0 && life.accepted, "Particle Life publishes independently");
     particle.values[2].one_d = 9; // Host saves Life after its native callback returns.
-    auto local_edit = edit(1, 4, 15); PF_OutData local_output{};
+    auto local_edit = edit(1, 5, 15); PF_OutData local_output{};
     check(commit_native_graph_edit(&local_edit, 701, &local_output) == 0 && local_edit.accepted,
           "publication needs no renderer callback or registered main AEGP ID");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kParticleLifetimeSeconds)) == 9, "Particle lifetime saved");
-    auto opacity = edit(1, 7, 25); check(direct_edit(opacity) == 0, "Particle opacity publishes");
+    auto opacity = edit(1, 8, 25); check(direct_edit(opacity) == 0, "Particle opacity publishes");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kOpacityStart)) == .25, "percent opacity normalized");
-    auto color = edit(1, 10, 0); color.value_kind = node_sync::ValueKind::color; color.value = {.2, .3, .4, 1};
+    auto color = edit(1, 11, 0); color.value_kind = node_sync::ValueKind::color; color.value = {.2, .3, .4, 1};
     check(direct_edit(color) == 0, "color publishes with delayed stream");
     check(std::get<core::Vec3>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kColorStart)).x == .2, "color value replaces only selected color");
+    {
+        namespace layout=records::particle_layout;
+        const auto palette=gradient_editor::preset(2);
+        auto bank=edit(1,layout::gradient,palette.count);
+        bank.additional_fields[bank.additional_count++]={layout::gradient,node_sync::ValueKind::scalar,{double(palette.count),0,0,0}};
+        for(unsigned i=0;i<8;++i) {
+            const auto stop=i<palette.count?palette.stops[i]:core::ColorStop{1,{1,1,1}};
+            bank.additional_fields[bank.additional_count++]={layout::gradient_first+2*static_cast<A_long>(i),
+                node_sync::ValueKind::scalar,{stop.position*100,0,0,0}};
+            bank.additional_fields[bank.additional_count++]={layout::gradient_first+2*static_cast<A_long>(i)+1,
+                node_sync::ValueKind::color,{stop.color.x,stop.color.y,stop.color.z,1}};
+        }
+        const auto previous_bytes=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
+        const double previous_revision=main.values[kGraphRevisionId].one_d;
+        auto rejected=bank;fail_set=kGraphParameterId;
+        check(direct_edit(rejected)!=0 && !rejected.accepted &&
+              main.values[kGraphRevisionId].one_d==previous_revision &&
+              handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==previous_bytes,
+              "whole-gradient failed publication preserves previous graph and revision");
+        auto duplicate=bank;duplicate.additional_fields[1].index=layout::gradient;
+        check(!node_sync::valid_edit(duplicate),"duplicate gradient override rejected before publication");
+        auto nonfinite=bank;nonfinite.additional_fields[3].value[0]=std::numeric_limits<double>::quiet_NaN();
+        check(!node_sync::valid_edit(nonfinite),"nonfinite bank override rejected before publication");
+        auto wrong_bank=bank;wrong_bank.additional_fields[2].kind=node_sync::ValueKind::scalar;
+        check(direct_edit(wrong_bank)!=0 && !wrong_bank.accepted,"wrong typed gradient bank cannot publish");
+        check(particle.values[layout::gradient].one_d==2 && direct_edit(bank)==0 && bank.accepted,
+              "whole-gradient publication uses callback bank while AEGP still holds two old stops");
+        core::ColorGradient decoded{};
+        const auto published=saved_graph();
+        const auto& bytes=std::get<core::OpaqueBytes>(parameter(published,core::graph_keys::kParticleNode,core::graph_keys::kColorGradient));
+        check(core::decode_color_gradient(bytes,decoded) && decoded.count==palette.count,
+              "whole-gradient graph contains all five new stops atomically");
+        for(unsigned i=0;i<palette.count;++i)check(
+            decoded.stops[i].position==palette.stops[i].position &&
+            decoded.stops[i].color.x==palette.stops[i].color.x &&
+            decoded.stops[i].color.y==palette.stops[i].color.y &&
+            decoded.stops[i].color.z==palette.stops[i].color.z,"published bank retains new position and RGB together");
+        auto reset=edit(1,layout::gradient,2);
+        check(direct_edit(reset)==0,"fixture restores previous bank without callback overrides");
+    }
     auto gravity = edit(3, 1, 1080); check(direct_edit(gravity) == 0, "Force Gravity publishes");
     check(std::get<core::Vec3>(parameter(saved_graph(), core::graph_keys::kForceNode, core::graph_keys::kGravity)).y == -1, "Gravity units remain intact");
-    for (int count : {15, 32}) {
+    for (int count : {35, 52}) {
         particle.values[count].one_d = 2; particle.values[count + 1].one_d = 0;
         particle.values[count + 2].one_d = 100; particle.values[count + 3].one_d = 1; particle.values[count + 4].one_d = 0;
     }
-    auto curve = edit(1, 19, 60); check(direct_edit(curve) == 0, "single curve bank value commits");
+    auto curve = edit(1, 39, 60); check(direct_edit(curve) == 0, "single curve bank value commits");
     graph = saved_graph();
     core::AgeCurve size_curve{}, opacity_curve{};
     const bool size_ok = core::decode_age_curve(std::get<core::OpaqueBytes>(parameter(graph, core::graph_keys::kParticleNode, core::graph_keys::kSizeOverLifeCurve)), size_curve, 0, 100);
@@ -349,36 +392,36 @@ int main() {
     const double old_revision = main.values[kGraphRevisionId].one_d;
     const auto old_bytes = handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
     const auto old_handle_count = handles.size();
-    auto missing_control = edit(1, 4, 20); fail_read = kMaxParticlesId;
+    auto missing_control = edit(1, 5, 20); fail_read = kMaxParticlesId;
     check(direct_edit(missing_control) != 0 && !missing_control.accepted &&
           missing_control.stage == node_sync::Stage::controls && missing_control.stream_index == kMaxParticlesId,
           "missing main control reports stage and stream index");
-    auto missing_context = edit(1, 4, 20); missing_context.layer = nullptr;
+    auto missing_context = edit(1, 5, 20); missing_context.layer = nullptr;
     check(direct_edit(missing_context) != 0 && missing_context.stage == node_sync::Stage::context,
           "missing borrowed context rejected with context diagnostic");
-    auto bad_override = edit(1, 4, 20); bad_override.value_kind = node_sync::ValueKind::color;
+    auto bad_override = edit(1, 5, 20); bad_override.value_kind = node_sync::ValueKind::color;
     check(direct_edit(bad_override) != 0 && bad_override.stage == node_sync::Stage::compile &&
-          bad_override.stream_index == 4, "node compiler identifies wrong edited stream type");
-    auto typed_receipt = edit(1, 4, 20); wrong_type = kGraphChecksumHighId;
+          bad_override.stream_index == 5, "node compiler identifies wrong edited stream type");
+    auto typed_receipt = edit(1, 5, 20); wrong_type = kGraphChecksumHighId;
     const int sets_before_type_check = sets;
     check(direct_edit(typed_receipt) != 0 && typed_receipt.stage == node_sync::Stage::capture &&
           typed_receipt.stream_index == kGraphChecksumHighId && sets == sets_before_type_check,
           "non-scalar receipt rejected before reading union or writing streams");
-    auto invalid = edit(1, 4, 20); invalid.uuid[7] = 500;
+    auto invalid = edit(1, 5, 20); invalid.uuid[7] = 500;
     check(direct_edit(invalid) != 0 && !invalid.accepted && main.values[kGraphRevisionId].one_d == old_revision, "missing UUID rejected before publish");
-    auto failed = edit(1, 4, 20); fail_set = kGraphParameterId;
+    auto failed = edit(1, 5, 20); fail_set = kGraphParameterId;
     check(direct_edit(failed) != 0 && !failed.accepted && main.values[kGraphRevisionId].one_d == old_revision &&
           failed.stage == node_sync::Stage::publish_graph && failed.stream_index == kGraphParameterId, "failed graph write restores revision and reports graph phase");
     check(handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes == old_bytes, "failed write retains old graph");
-    failed = edit(1, 4, 20); fail_set = kGraphChecksumLowId;
+    failed = edit(1, 5, 20); fail_set = kGraphChecksumLowId;
     check(direct_edit(failed) != 0 && !failed.accepted && main.values[kGraphRevisionId].one_d == old_revision &&
           failed.stage == node_sync::Stage::publish_scalars && failed.stream_index == kGraphChecksumLowId,
           "failed metadata write restores revision and reports scalar phase");
-    failed = edit(1, 4, 20); corrupt_receipt = true;
+    failed = edit(1, 5, 20); corrupt_receipt = true;
     check(direct_edit(failed) != 0 && !failed.accepted && main.values[kGraphRevisionId].one_d == old_revision &&
           failed.stage == node_sync::Stage::verify_scalars && failed.stream_index == kGraphChecksumHighId,
           "changed integer receipt fails exact readback and restores graph");
-    failed = edit(1, 4, 20); ignore_graph = true;
+    failed = edit(1, 5, 20); ignore_graph = true;
     check(direct_edit(failed) != 0 && !failed.accepted && main.values[kGraphRevisionId].one_d == old_revision &&
           failed.stage == node_sync::Stage::verify_graph && failed.stream_index == kGraphParameterId,
           "silent ignored graph write reports graph readback and rolls back");
@@ -390,7 +433,7 @@ int main() {
     check(calls == 0, "all native edits work without entering the renderer effect selector");
     check(handles.size() == old_handle_count && live_refs == 0 && acquisitions == 0, "all publication handles/suites balanced");
     main.values[kGraphRevisionId].one_d = 16777214;
-    auto max_receipt = edit(1, 4, 20);
+    auto max_receipt = edit(1, 5, 20);
     check(direct_edit(max_receipt) == 0 && max_receipt.accepted && max_receipt.revision == 16777215 &&
           main.values[kGraphRevisionId].one_d == 16777215,
           "largest integer revision survives host float storage and exact verification");
@@ -417,7 +460,7 @@ int main() {
     for (A_long i=0; i<67; ++i) expressions[i] = u"0"; // Force a binding rewrite, then fail graph publication.
     const auto before_failed_binding = expressions;
     fail_set = kGraphParameterId;
-    auto binding_failure = edit(1, 4, 22);
+    auto binding_failure = edit(1, 5, 22);
     main.values[kGraphRevisionId].one_d = 100; // Avoid revision exhaustion for this transaction.
     check(direct_edit(binding_failure) != 0 && expressions == before_failed_binding,
           "graph publication failure restores all changed binding expressions");
@@ -471,7 +514,7 @@ int main() {
         const auto prepared_bytes=core::serialize_graph(prepared,core::particle_node_registry());
         check(expected_bytes.has_value() && prepared_bytes.has_value() && expected_bytes.value()==prepared_bytes.value(),
               "prepared node sampling matches full graph sampling exactly in both time directions");
-        check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kSizeStart))==particle.values[4].one_d+time,
+        check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kSizeStart))==particle.values[5].one_d+time,
               "size samples forward intermediate and reverse times");
         const auto sampled_origin=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kEmitterNode,core::graph_keys::kEmitterOrigin));
         check(std::abs(sampled_origin.x-(emitter.values[4].two_d.x+time-960)/1080)<1e-12,"animated point converts full-resolution pixels");
@@ -480,7 +523,7 @@ int main() {
         check(std::get<double>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kParticleLifetimeSeconds))==2.0+time/24.0,
               "animated lifetime samples seconds");
         const auto animated_color=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kParticleNode,core::graph_keys::kColorStart));
-        check(animated_color.x==particle.values[10].color.redF*(1.0-time/48.0),"animated color samples RGB components");
+        check(animated_color.x==particle.values[11].color.redF*(1.0-time/48.0),"animated color samples RGB components");
         const auto animated_gravity=std::get<core::Vec3>(parameter(sampled,core::graph_keys::kForceNode,core::graph_keys::kGravity));
         check(std::abs(animated_gravity.y+(fixtures[3].values[1].one_d+time)/1080.0)<1e-12,"animated Force converts pixels to world units");
         std::shared_ptr<const core::Graph> owned_graph;

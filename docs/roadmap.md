@@ -1,5 +1,15 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-07 / build32 - Particle gradient editor
+
+Main/origin main contains the owner-accepted build31 at 8857303. Subsequent work
+is on codex/m3-07-particle-gradient. Implement the native multi-stop Color
+Gradient and matching CEP Flip/Copy/Paste/presets, plus supported Particle control
+organization from the supplied screenshot. ADR0027 / reference-parameter-map.md
+define the supported surface and remaining texture/source/model/alpha/blend work.
+Candidate compilation and scoped checks pass; actual AE2023 editor interaction,
+undo/reopen, rendered colors and retained animation/performance are owner gates.
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

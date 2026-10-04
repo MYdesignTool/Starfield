@@ -1,4 +1,19 @@
-# Build31 current development surface
+# Build32 Particle Color Gradient
+
+Accepted build31 is on main; development continues on
+codex/m3-07-particle-gradient. Reopen CEP for native-gradient-32. Create a fresh
+Particle effect/graph for the new Particle schema5 control layout.
+
+In AE Effect Controls choose Particle Color > Color Over Life. The Color Gradient
+bar supports adding and dragging stops, double-clicking to choose a color, and
+Alt-click or Delete/Backspace to remove an interior stop. Flip, Copy/Paste and
+presets apply the complete gradient. CEP has the same complete-gradient actions;
+each editor keeps its own session clipboard. Endpoints stay at 0% and 100%.
+Supported parameters are organized as Particle Properties, Over Life and Rotation.
+See ADR0027 and docs/reference-parameter-map.md for remaining reference families
+and the actual AE2023 qualification gate.
+
+## Accepted build31 checkpoint
 
 Appearance is removed by owner request. Emitter/Auxiliary, Particle, Force and
 Output are the current nodes; Particle owns color/gradient, size/opacity and

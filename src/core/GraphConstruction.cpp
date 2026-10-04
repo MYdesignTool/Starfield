@@ -56,7 +56,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         const double size_end = settings.appearance_enabled ? settings.particle_size_end : 100.0;
         const double opacity_end = settings.appearance_enabled ? settings.opacity_end : 100.0;
 
-        GraphNode particle_node{particle, kParticleNode, 4, {
+        GraphNode particle_node{particle, kParticleNode, 5, {
             {kColorStart, color_start}, {kColorEnd, color_end},
             {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
             {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};

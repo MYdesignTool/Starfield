@@ -8,6 +8,7 @@
 #include "Param_Utils.h"
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
+#include "ParticleGradientUI.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
@@ -21,6 +22,8 @@ static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
                                           PF_OutFlag_PIX_INDEPENDENT));
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                            PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32));
+static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
+static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
 enum class NodeEffectKind { emitter, particle, force };
 
@@ -51,12 +54,12 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
                   PF_FpLong minimum, PF_FpLong maximum, PF_FpLong initial,
                   A_short precision = PF_Precision_HUNDREDTHS,
                   PF_ParamFlags flags = kNodeEditableFlags,
-                  A_long ui_flags = PF_PUI_NONE) noexcept {
+                  A_long ui_flags = PF_PUI_NONE, A_short height=0) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_FLOAT_SLIDER;
     def.flags = flags;
-    def.ui_flags = ui_flags;
+    def.ui_flags = ui_flags;def.ui_height=height;def.ui_width=300;
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.fs_d.valid_min = static_cast<PF_FpShort>(minimum);
@@ -245,12 +248,19 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
     return PF_Err_NONE;
 }
 
+PF_Err particle_group(PF_InData* data,const char* name,A_long id,bool end=false,bool collapsed=false) noexcept {
+    PF_ParamDef def{};def.param_type=end?PF_Param_GROUP_END:PF_Param_GROUP_START;def.uu.id=id;
+    def.flags=collapsed?PF_ParamFlag_START_COLLAPSED:0;std::snprintf(def.name,sizeof(def.name),"%s",name);
+    return add_checked_parameter(data,def);
+}
+
 PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
     PF_Err error = PF_Err_NONE;
     {
         error=add_popup(in_data,"Shape",kParticleShapeId,3,1,"Circle|Rectangle|Cloud");if(error)return error;
         error=add_slider(in_data,"Life (Seconds)",kLifetimeId,0,10000,2,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Life Random",kLifeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
+        error=particle_group(in_data,"Particle Properties",kParticlePropertiesId);if(error)return error;
         error=add_slider(in_data,"Size (Pixels)",kSizeId,0,100000,10,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Size Y (Pixels)",kSizeYId,0,100000,10,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Size Random",kSizeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
@@ -258,23 +268,27 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
         error=add_slider(in_data,"Opacity Random",kOpacityRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=add_popup(in_data,"Particle Color",kParticleColorModeId,4,1,"Solid color|Color over life|Random from gradient|Loop from grad");if(error)return error;
         error=add_color(in_data,"Color",kColorStartId);if(error)return error;
+        error=add_slider(in_data,"Color Gradient",kColorGradientCountId,2,8,2,PF_Precision_INTEGER,kNodeConstantFlags|PF_ParamFlag_SUPERVISE,PF_PUI_CONTROL,178);if(error)return error;
+        for(A_long i=0;i<8;++i) {
+            char name[48]{};
+            const auto ui=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
+            const auto flags=PF_ParamFlag_CANNOT_TIME_VARY|PF_ParamFlag_SUPERVISE;
+            std::snprintf(name,sizeof(name),"Color Gradient %ld Position",static_cast<long>(i));
+            error=add_slider(in_data,name,kColorGradientPositionFirstId+i,0,100,i==1?100:double(i)*100/7,
+                PF_Precision_TENTHS,flags,ui);if(error)return error;
+            std::snprintf(name,sizeof(name),"Color Gradient %ld Color",static_cast<long>(i));
+            error=add_color(in_data,name,kColorGradientColorFirstId+i,flags,ui);if(error)return error;
+        }
         error=add_slider(in_data,"Particle Feather",kFeatherId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=add_popup(in_data,"Up Axis",kUpAxisId,3,3,"X|Y|Z");if(error)return error;
+        error=particle_group(in_data,"",kParticlePropertiesEndId,true);if(error)return error;
+        error=particle_group(in_data,"Over Life",kParticleOverLifeId,false,true);if(error)return error;
         error=add_slider(in_data,"Size Over Life",kSizeOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Opacity Over Life",kOpacityOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
         error=add_curve_bank(in_data,"Size",'s');if(error)return error;
         error=add_curve_bank(in_data,"Opacity",'o');if(error)return error;
-        error=add_slider(in_data,"Color Gradient Count",kColorGradientCountId,2,8,2,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
-        for(A_long i=0;i<8;++i) {
-            char name[48]{};
-            const auto ui=i<2?PF_PUI_NONE:PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
-            const auto flags=PF_ParamFlag_CANNOT_TIME_VARY|PF_ParamFlag_SUPERVISE;
-            std::snprintf(name,sizeof(name),"Color Gradient %ld Position",static_cast<long>(i));
-            error=add_slider(in_data,name,kColorGradientPositionFirstId+i,0,100,i==1?100:double(i)*100/7,
-                PF_Precision_TENTHS,flags,ui | (i<2?PF_PUI_DISABLED:0));if(error)return error;
-            std::snprintf(name,sizeof(name),"Color Gradient %ld Color",static_cast<long>(i));
-            error=add_color(in_data,name,kColorGradientColorFirstId+i,flags,ui);if(error)return error;
-        }
+        error=particle_group(in_data,"",kParticleOverLifeEndId,true);if(error)return error;
+        error=particle_group(in_data,"Rotation",kParticleRotationId,false,true);if(error)return error;
         error=add_popup(in_data,"Orient To",kOrientToId,3,1,"None|Motion(particle)|Emitter");if(error)return error;
         for(auto axis:{std::pair{"X",kParticleAngleXId},std::pair{"Y",kParticleAngleYId},std::pair{"Z",kParticleAngleZId}}) {
             char name[24]{};std::snprintf(name,sizeof(name),"Angle %s",axis.first);
@@ -287,6 +301,7 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
         }
         error=add_slider(in_data,"Speed Random",kRotationSpeedRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=add_popup(in_data,"Limit to 2D",kLimitTo2DId,2,2,"Off|On");if(error)return error;
+        error=particle_group(in_data,"",kParticleRotationEndId,true);if(error)return error;
     }
     return PF_Err_NONE;
 }
@@ -385,7 +400,8 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);
-    return PF_Err_NONE;
+    PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
+    return in_data->inter.register_ui?PF_REGISTER_UI(in_data,&ui):PF_Err_NONE;
 }
 
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
@@ -485,8 +501,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             out_data->my_version = PF_VERSION(STARFIELD_VERSION_MAJOR, STARFIELD_VERSION_MINOR,
                                               STARFIELD_VERSION_BUG, STARFIELD_VERSION_STAGE,
                                               STARFIELD_VERSION_BUILD);
-            out_data->out_flags = STARFIELD_NODE_OUT_FLAGS;
-            out_data->out_flags2 = STARFIELD_NODE_OUT_FLAGS2;
+            out_data->out_flags = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
+            out_data->out_flags2 = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2;
             if (register_node_graph_sync(in_data) != PF_Err_NONE) {
                 std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
                               "Starfield node parameter synchronization is unavailable.");
@@ -508,8 +524,14 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_SEQUENCE_RESETUP:
         case PF_Cmd_SEQUENCE_FLATTEN:
         case PF_Cmd_SEQUENCE_SETDOWN:
-        case PF_Cmd_GLOBAL_SETDOWN:
             return PF_Err_NONE;
+        case PF_Cmd_GLOBAL_SETDOWN:
+            if constexpr(kNodeEffectKind==NodeEffectKind::particle)starfield::adapter::clear_particle_gradient_ui();
+            return PF_Err_NONE;
+        case PF_Cmd_EVENT:
+            if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
+                return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+            } else return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);
         case PF_Cmd_SMART_PRE_RENDER:
@@ -525,6 +547,10 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
             return sync_node_graph_parameter(in_data, out_data, params,
                 static_cast<const PF_UserChangedParamExtra*>(extra));
+        case PF_Cmd_UPDATE_PARAMS_UI:
+            if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
+                return starfield::adapter::particle_gradient_param_ui(in_data,params);
+            } else return PF_Err_NONE;
         default:
             return PF_Err_NONE;
     }

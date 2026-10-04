@@ -1,5 +1,18 @@
 # Starfield plug-in architecture
 
+## M3-07 / build32 - native Particle gradient editor
+
+Accepted build31 is on main/origin main at 8857303. Build32 is developed on
+codex/m3-07-particle-gradient. ADR0027 defines native Drawbot gradient events,
+bounded session UI state, native undo flags, whole-bank publication and the shared
+Particle stream layout. Particle schema5/base81 uses new group IDs and existing
+authored IDs; graph codec, main manifest24, CoreABI3, simulation and GPU remain
+unchanged. Fresh Particle effects/graphs are required in development.
+Gradient drawing/update callbacks only draw/update UI; click/drag/key callbacks
+publish one complete stop bank, including values not yet visible to AEGP reads.
+Native reader/binding schema and the Particle registry are updated together.
+The paired rollback records both saved CEP files and newly introduced sources.
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

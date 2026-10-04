@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 31: post-load read-only UI bootstrap and topology-only panel writes.
-#define STARFIELD_VERSION_BUILD 31
-#define STARFIELD_VERSION_PACKED 32799 /* 0x801F */
+// Build 32: native Particle gradient editor and reference control organization.
+#define STARFIELD_VERSION_BUILD 32
+#define STARFIELD_VERSION_PACKED 32800 /* 0x8020 */

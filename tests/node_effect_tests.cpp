@@ -15,7 +15,7 @@
 // Actual node EffectMain; only the independent graph-sync callback is replaced.
 PF_Err register_node_graph_sync(PF_InData*) noexcept { return PF_Err_NONE; }
 PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
-                                 const PF_UserChangedParamExtra*) noexcept { return PF_Err_NONE; }
+                                 const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
 
 namespace {
 int checks = 0, failures = 0;
@@ -83,9 +83,9 @@ int main() {
     PF_InData host{}; PF_OutData out{};
     host.inter.add_param = add_parameter;
     check(EffectMain(PF_Cmd_GLOBAL_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "global setup succeeds");
-    check(out.out_flags2 == (PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),
+    check(out.out_flags2 == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2),
           "float awareness always advertises implemented SmartFX");
-    check(out.out_flags == STARFIELD_NODE_OUT_FLAGS, "node remains internal/menu-hidden");
+    check(out.out_flags == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS), "node remains internal/menu-hidden with declared UI capabilities");
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
@@ -109,9 +109,11 @@ int main() {
         check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
         check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
         check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");
-        for(A_long index:{67,68,69,71,72,73}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
-        check(std::strcmp(registered[49].name,"Color Gradient 0 Position")==0 && (registered[49].ui_flags&PF_PUI_DISABLED),"gradient endpoint positions stay structural");
-        check((registered[50].ui_flags&PF_PUI_INVISIBLE)==0,"gradient endpoint color is visible in Effect Controls");
+        for(A_long index:{72,73,74,76,77,78}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
+        check(std::strcmp(registered[12].name,"Color Gradient 0 Position")==0 && (registered[12].flags&PF_ParamFlag_CANNOT_TIME_VARY),"gradient endpoint positions stay structural");
+        check((registered[13].ui_flags&PF_PUI_INVISIBLE)!=0,"gradient colors are edited by the native visual control");
+        check(std::strcmp(registered[11].name,"Color Gradient")==0 && (registered[11].ui_flags&PF_PUI_CONTROL) && registered[11].ui_height==178,"native gradient control replaces numerical stop banks");
+        check(registered[3].param_type==PF_Param_GROUP_START && registered[30].param_type==PF_Param_GROUP_END,"Particle Properties grouping preserves root Life controls");
     }
     if constexpr(kind==Kind::emitter) {
         check(registered[1].u.pd.num_choices==4,"Emitting exposes timing choices");
@@ -133,7 +135,7 @@ int main() {
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
-        if ((control_index <= last_animated || (kind==Kind::particle && control_index>=66 && control_index<=75)) && !(kind==Kind::emitter && control_index==2))
+        if ((kind==Kind::particle?particle_layout::animated(control_index):control_index<=last_animated) && !(kind==Kind::emitter && control_index==2))
             controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
         else controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
         interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;

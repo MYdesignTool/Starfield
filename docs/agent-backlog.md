@@ -1,5 +1,22 @@
 # Agent-ready implementation backlog
 
+## M3-07 - Particle Color Over Life editor and control organization
+
+Owner: primary agent. Depends on owner-accepted build31 / ADR0026. Development
+branch: codex/m3-07-particle-gradient; main retains the accepted checkpoint.
+Implement the supplied native Effect Controls gradient interaction and matching
+CEP actions, reorganize supported Particle controls by reference names/order,
+and verify edits, serialization, rollback, keyframes and drawing resource lifetime.
+Owned files/contract: ADR0027, native gradient model/editor, NodeEffects/flags,
+NodeRecord/NativeNodeGraph/NodeGraphSync, build/version, node schema, CEP gradient
+UI/gateway, Particle schema registry (Graph.cpp/GraphConstruction.cpp), paired
+CEP rollback tooling/tests, and matching build/compatibility/reference docs.
+No Render.hpp or renderer changes. New stream order requires fresh development
+Particle effects; no legacy migration. Keep unsupported source/texture/blend
+families in later cards instead of advertising inert controls.
+Status: implementation/build/scoped checks complete. Actual AE UI/undo/reopen/
+render qualification remains open; see build-matrix.md for the candidate evidence.
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

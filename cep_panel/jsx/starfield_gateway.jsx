@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-idle-31";
+    var GATEWAY_BUILD = "native-gradient-32";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -504,7 +504,7 @@
         }
         if(stops[0].position!==0 || stops[count-1].position!==1) throw new Error("Color Gradient endpoints must be 0 and 100%.");
         // Validate the whole payload before mutating any native property.
-        setNodeControl(effect,"Color Gradient Count",count);
+        setNodeControl(effect,"Color Gradient",count);
         for(var point=0;point<count;point++) {
             setNodeControl(effect,"Color Gradient "+point+" Position",stops[point].position*100);
             setNodeControl(effect,"Color Gradient "+point+" Color",stops[point].color.concat([1]));
@@ -590,7 +590,7 @@
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
             schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 6 :
-                type === "org.starfieldfx.nodes.particle" ? 4 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
+                type === "org.starfieldfx.nodes.particle" ? 5 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -654,7 +654,7 @@
             if(type==="org.starfieldfx.nodes.particle") {
                 vector(1,"Color");
                 scalar(12,"Particle Color",3);node.parameters[node.parameters.length-1].value-=1;
-                var colorCount=Number(nodeControlValue(effect,"Color Gradient Count"));
+                var colorCount=Number(nodeControlValue(effect,"Color Gradient"));
                 if(Math.floor(colorCount)!==colorCount || colorCount<2 || colorCount>8) throw new Error("Invalid Color Gradient count.");
                 var colorBytes=[1,colorCount,0,0];
                 for(var stop=0;stop<colorCount;stop++) {
@@ -1291,7 +1291,7 @@
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:4,
+                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:5,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }

@@ -194,7 +194,7 @@ GraphNode make_test_output(std::uint8_t id, std::uint32_t particle_count = 100) 
 
 GraphNode make_test_particle(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 4, {
+    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 5, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
         {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0},
         {kParticleLifetimeSeconds, 2.0}}};
@@ -1966,7 +1966,7 @@ void test_particle_branches_and_ordered_buffer() {
     branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 100.0};
     branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 50.0};
     branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 25.0};
-    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 4, {
+    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 5, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
         {kSizeStart, 9.0}, {kSizeEnd, 25.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 25.0},
         {kParticleLifetimeSeconds, 1.0},

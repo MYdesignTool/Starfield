@@ -1,5 +1,34 @@
 # Build and host matrix
 
+## M3-07 / build32 candidate - 2026-10-04
+
+Accepted build31 was fast-forwarded and pushed to main/origin main at 8857303.
+Build32 (32800 / 0x8020) is on codex/m3-07-particle-gradient, with a native
+Drawbot Color Gradient, complete-bank transactions, Particle schema5/base81,
+reference control groups and matching CEP actions. See ADR0027.
+
+Candidate built with May2023 SDK /MT using:
+`powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`.
+No candidate is published to the live bundle by this command. Full main/node/
+GeneralHost/Core build passes; evidence: artifacts/build32-native-build.log.
+
+| Scope | Checks | Failures | Evidence under artifacts/ |
+|---|---:|---:|---|
+| Core regression | 11895 | 0 | build32-core-regression.log |
+| Native synchronization / camera capture | 5427 + 12 | 0 | build32-native-sync.log |
+| Native gradient events, bank rollback and drawing resources | 346 | 0 | build32-GradientEditor.log |
+| Current particle/force/camera nodes | 379 | 0 | build32-current-core.log |
+| Emitter / Particle / Force modules | 84 / 87 / 80 | 0 | build32-node-Emitter.log / build32-node-Particle.log / build32-node-Force.log |
+| GPU adapter driver | 433 | 0 | build32-Gpu.log |
+
+Focused JS checks cover generated native expressions, gradient codec/native bank,
+clipboard/presets, reference Particle gateway, current panel and startup. Their
+logs are build32-<test filename>.log. The isolated paired-panel rollback covers
+legacy manifests, changed-source/path rejection, newly introduced source retention
+and binary restoration: build32-paired-rollback.log. It touches no live bundle.
+Exported actual native draw commands: gradient-editor-preview.svg and .png;
+layout inspected locally. This is not evidence of actual AE UI qualification.
+
 ## Owner acceptance / main integration - 2026-10-04
 
 The owner reports the build31 issues are basically resolved and explicitly

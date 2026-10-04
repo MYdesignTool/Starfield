@@ -545,7 +545,7 @@ NodeRegistry make_particle_node_registry() {
 
     NodeTypeDescriptor particle;
     particle.type_key = kParticleNode;
-    particle.schema_version = 4;
+    particle.schema_version = 5;
     particle.ports = {
         PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},

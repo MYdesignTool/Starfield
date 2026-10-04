@@ -1,4 +1,40 @@
-# Build31 current development surface
+# Build32 current development surface
+
+The owner accepted build31 for main; main/origin main now contain 8857303.
+New work is on codex/m3-07-particle-gradient. Particle uses schema5/base81;
+create fresh development Particle effects/graphs. See ADR0027. Older checkpoints
+below retain their historical schema and qualification statements.
+
+The supplied 2026-10-04 screenshot owns the visible control organization:
+
+| Location | Supported controls in order |
+|---|---|
+| Root | Shape, Life (Seconds), Life Random |
+| Particle Properties | Size (Pixels), rectangle Size Y (Pixels), Size Random, Opacity, Opacity Random, Particle Color, Color, Color Gradient, Particle Feather, Up Axis |
+| Over Life | Size Over Life, Opacity Over Life; existing curves remain editable in CEP |
+| Rotation | Orient To, Angle X/Y/Z, Angle Random, Rotation Speed X/Y/Z, Rotation Speed Random, Limit to 2D |
+
+Life defaults to 2 seconds, supports typed values up to 10000, and uses tenths
+with a 0..10 normal slider range. Random/opacity controls retain percentage units;
+angles retain native AE rotation controls. Existing supported rendering meanings
+are unchanged; labels and groups alone do not establish numerical parity.
+
+Native Color Gradient displays 2..8 RGB stops with linear interpolation. Click
+the bar to add, drag an interior marker, double-click a marker for the AE picker,
+and Alt-click or Delete/Backspace to remove an interior stop. Endpoints stay fixed.
+Flip, Copy, Paste and White/Fire/Spectrum presets operate on the complete bank.
+CEP has matching complete-gradient actions; the two editors have separate session
+clipboards. AE Color remains visible as in the screenshot; Particle Color selects
+solid, over-life, random or looping evaluation. Constant gradient stop banks use
+native change flags and graph publication; other authored controls remain animated.
+
+Texture ratio, Ignore Perspective, source/model shapes, gradient alpha and new
+Transfer Mode behavior require their own render contracts and remain open work.
+No placeholder switches are added for those unsupported families. Native drawing
+commands were inspected locally; actual AE UI/undo/reopen/render remains an owner
+qualification gate. Official behavior reference: https://superluminal.tv/user-guide.
+
+## Accepted build31 checkpoint
 
 Appearance is removed by owner request. Emitter/Auxiliary, Particle, Force and
 Output are the current nodes; Particle owns color/gradient, size/opacity and

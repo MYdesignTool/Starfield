@@ -52,6 +52,7 @@ $adapterInputs = @(
     'ae_plugin\PluginFlags.h', 'ae_plugin\PluginVersion.h', 'ae_plugin\BuildPiPL.ps1',
     'ae_plugin\StarfieldPiPL.r', 'ae_plugin\Starfield.vcxproj',
     'ae_plugin\NodeEffectFlags.h', 'ae_plugin\NodeEffectMain.cpp',
+    'ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\ParticleGradientUI.hpp', 'ae_plugin\ParticleLayout.hpp', 'ae_plugin\GradientEditorModel.hpp',
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',

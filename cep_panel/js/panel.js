@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-idle-31";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-gradient-32";
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;
@@ -1203,16 +1203,25 @@
         var title=document.createElement("strong");title.textContent="Color Gradient";section.appendChild(title);
         var stops=node.gradient.map(function(stop){return {position:stop.position,color:stop.color.slice()};}),selected=0;
         var bar=document.createElement("div");bar.className="gradient-bar";section.appendChild(bar);
+        var tools=window.StarfieldGradientTools;
+        var toolbar=document.createElement("div");toolbar.className="gradient-toolbar";section.appendChild(toolbar);
+        var interpolation=document.createElement("span");interpolation.textContent="Linear";toolbar.appendChild(interpolation);
+        var flip=document.createElement("button");flip.textContent="Flip";toolbar.appendChild(flip);
+        var copy=document.createElement("button");copy.textContent="Copy";toolbar.appendChild(copy);
+        var paste=document.createElement("button");paste.textContent="Paste";paste.disabled=!tools.paste();toolbar.appendChild(paste);
+        var presets=document.createElement("select");presets.setAttribute("aria-label","Color Gradient Presets");toolbar.appendChild(presets);
+        var placeholder=document.createElement("option");placeholder.textContent="Presets…";placeholder.value="";presets.appendChild(placeholder);
+        tools.presets().forEach(function(p,index){var option=document.createElement("option");option.textContent=p.name;option.value=String(index);presets.appendChild(option);});
         var controls=document.createElement("div");controls.className="gradient-controls";section.appendChild(controls);
         var color=document.createElement("input");color.type="color";color.setAttribute("aria-label","Selected gradient color");controls.appendChild(color);
         var position=document.createElement("input");position.type="number";position.min=0;position.max=100;position.step=0.1;
         position.setAttribute("aria-label","Gradient stop position (%)");controls.appendChild(position);
         var remove=document.createElement("button");remove.textContent="Remove";controls.appendChild(remove);
         var add=document.createElement("button");add.textContent="Add";controls.appendChild(add);
-        var instruction=document.createElement("small");instruction.textContent="Click the bar to add a stop; drag a marker to move it.";section.appendChild(instruction);
+        var instruction=document.createElement("small");instruction.textContent="Click the bar to add; drag a marker to move; double-click to edit its color.";section.appendChild(instruction);
         function hex(rgb) {return "#"+rgb.map(function(c){return ("0"+Math.round(Math.max(0,Math.min(1,c))*255).toString(16)).slice(-2);}).join("");}
         function commit() {
-            if(state.pending) return;
+            if(state.pending || !tools.valid(stops)) return;
             applyTopologyEdit({type:"setParameters",changes:[{nodeId:node.id,parameterKey:"13",valueType:7,value:window.StarfieldGraphView.encodeGradient(stops)}]});
         }
         function draw() {
@@ -1222,11 +1231,12 @@
                 var marker=document.createElement("button");marker.className="gradient-stop"+(selected===index?" selected":"");
                 marker.style.left=stop.position*100+"%";marker.style.backgroundColor=hex(stop.color);
                 marker.setAttribute("aria-label","Gradient stop "+(index+1));bar.appendChild(marker);
-                marker.addEventListener("click",function(event){event.stopPropagation();selected=index;draw();});
+                marker.addEventListener("click",function(event){event.stopPropagation();selected=index;selectStop();});
+                marker.addEventListener("dblclick",function(event){event.stopPropagation();selected=index;selectStop();color.click();});
                 marker.addEventListener("pointerdown",function(event){
                     if(event.button!==0 || state.pending) return;
                     event.preventDefault();event.stopPropagation();selected=index;
-                    if(index===0 || index===stops.length-1) {draw();return;}
+                    if(index===0 || index===stops.length-1) {selectStop();return;}
                     var moved=false,original=stop.position;
                     function move(e) {
                         var rect=bar.getBoundingClientRect(),value=(e.clientX-rect.left)/rect.width;
@@ -1237,10 +1247,16 @@
                     function up(e){
                         window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
                         if(e.type==="pointercancel"){stop.position=original;draw();}
-                        else if(moved) commit();else draw();
+                        else if(moved) commit();else selectStop();
                     }
                     window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up);
                 });
+            });
+            selectStop();
+        }
+        function selectStop() {
+            Array.prototype.forEach.call(bar.children,function(marker,index){
+                marker.className="gradient-stop"+(selected===index?" selected":"");
             });
             color.value=hex(stops[selected].color);position.value=(stops[selected].position*100).toFixed(1);
             position.disabled=selected===0 || selected===stops.length-1;
@@ -1265,6 +1281,11 @@
             }
         });
         remove.addEventListener("click",function(){if(selected>0 && selected<stops.length-1 && stops.length>2){stops.splice(selected,1);selected=0;commit();}});
+        flip.addEventListener("click",function(){if(state.pending)return;stops=tools.flip(stops);selected=stops.length-1-selected;commit();});
+        copy.addEventListener("click",function(){tools.copy(stops);paste.disabled=false;});
+        paste.addEventListener("click",function(){if(state.pending)return;var copied=tools.paste();if(copied){stops=copied;selected=0;commit();}});
+        presets.addEventListener("change",function(){if(state.pending || presets.value==="")return;
+            stops=tools.presets()[Number(presets.value)].stops;selected=0;commit();});
         add.addEventListener("click",function(){
             var widest=1;for(var i=2;i<stops.length;i++) if(stops[i].position-stops[i-1].position>stops[widest].position-stops[widest-1].position)widest=i;
             insert((stops[widest].position+stops[widest-1].position)/2);

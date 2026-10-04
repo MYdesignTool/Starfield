@@ -2,6 +2,7 @@
 
 #include "AE_GeneralPlug.h"
 #include "NodeRecord.hpp"
+#include "ParticleLayout.hpp"
 #include "NodeGraphSync.hpp"
 #include "NativeGraphCommit.hpp"
 #include "SPBasic.h"
@@ -196,7 +197,7 @@ PF_Err register_node_graph_sync(PF_InData* in_data) noexcept {
 }
 
 PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
-                                const PF_UserChangedParamExtra* extra) noexcept {
+                                const PF_UserChangedParamExtra* extra,bool particle_gradient) noexcept {
     if (!in_data || !params || !extra || extra->param_index <= 0 ||
         extra->param_index > kLastParameterIndex) return PF_Err_NONE;
     const PF_ParamDef* guard = params[kSyncGuardIndex];
@@ -217,6 +218,16 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         edit.parameter_index = extra->param_index;
         edit.uuid = node_id;
         if (!capture_edit(*in_data, *changed, edit)) return PF_Err_BAD_CALLBACK_PARAM;
+        if(particle_gradient) {
+            if(kind!=starfield::adapter::native_nodes::Kind::particle)return PF_Err_BAD_CALLBACK_PARAM;
+            namespace layout=starfield::adapter::native_nodes::particle_layout;
+            for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
+                if(!params[index])return PF_Err_BAD_CALLBACK_PARAM;
+                auto field_edit=edit;
+                if(!capture_edit(*in_data,*params[index],field_edit))return PF_Err_BAD_CALLBACK_PARAM;
+                edit.additional_fields[edit.additional_count++]={index,field_edit.value_kind,field_edit.value};
+            }
+        }
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;

@@ -12,7 +12,7 @@ function node(firstUuid, uuid, values) {
 }
 let frameTime=0;
 const thisProperty={propertyGroup(level){assert.equal(level,1);return {propertyIndex:0};}};
-const emitter = node(99, 1, {4:()=>[250+frameTime*100,500]}), particle = node(143,2,{9:1,10:[0.3,0.5,0.7,1]});
+const emitter = node(99, 1, {4:()=>[250+frameTime*100,500]}), particle = node(149,2,{10:1,11:[0.3,0.5,0.7,1]});
 const force = node(95,4,{}), duplicate = node(99,777,{4:[999,999]});
 for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
     const parade = {numProperties:effects.length};
@@ -23,7 +23,7 @@ for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[fo
         /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
         const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx.param(106).value === 1") ? emitter : expression.includes("fx.param(150).value === 2") ? particle : force;
+        const source = expression.includes("fx.param(106).value === 1") ? emitter : expression.includes("fx.param(156).value === 2") ? particle : force;
         let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
@@ -36,7 +36,7 @@ const failingEmitter=node(99,1,{4:()=>{throw new Error("Origin XY evaluation fai
 const failingLayer=()=>({numProperties:1});failingLayer.effect=()=>failingEmitter;
 assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer,thisProperty}),/Origin XY evaluation failed/,
     "source-property failures are not caught as unrelated effects");
-// Renderer aliases overlap the native UUID indices (99..106, 143..150).
+// Renderer aliases overlap the native UUID indices (99..106, 149..156).
 // Looking at their numeric values while searching creates expression-to-
 // expression dependencies, including a dependency on the current alias itself.
 let unrelatedReads=0;
