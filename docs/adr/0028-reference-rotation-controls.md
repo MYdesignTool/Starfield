@@ -1,5 +1,14 @@
 # ADR 0028: procedural particle rotation and emitter orientation
 
+## Build38 default dial state
+
+The owner supplies collapsed Emitter Angle/Orient rows as the required initial
+appearance. The shared native angle registration sets PF_ParamFlag_START_COLLAPSED
+for Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This is a creation
+default only: subsequent UPDATE_PARAMS_UI callbacks do not force it and existing
+user expansion remains respected. IDs, saved values, keyframes and schemas are
+unchanged. Native compilation does not qualify actual AE dial appearance.
+
 Status: implemented; integrated deployment and AE comparison pending, M3-08. Owner supplies the Rotation Properties
 inventory and Random Limit choices None / All Axis / X / Y / Z on 2026-10-04.
 M3-07 movable gradient work is committed separately; integration remains on the

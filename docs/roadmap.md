@@ -1,5 +1,13 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-03 / build38 - qualify atomic preset operations
+
+Close the inspected cached-ready/global-function lifecycle gap with atomic
+gateway loading/invocation and response generation checks. Requalify Add/Replace
+against native target records and collapsed angle defaults. The owner rejects
+build37 title overpaint; the residual AE disclosure arrow remains unresolved.
+Do not label this whole UI request complete or merge it into accepted main31.
+
 ## P-03 / build37 - qualify application and navigation
 
 Catalog loading passes owner testing, but application/title removal fail. Unify

@@ -116,7 +116,7 @@ PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
 
 PF_Err add_angle(PF_InData* in_data,const char* name,A_long id) noexcept {
     PF_ParamDef def{};
-    def.param_type=PF_Param_ANGLE;def.flags=kNodeEditableFlags;def.uu.id=id;
+    def.param_type=PF_Param_ANGLE;def.flags=kNodeEditableFlags|PF_ParamFlag_START_COLLAPSED;def.uu.id=id;
     std::snprintf(def.name,sizeof(def.name),"%s",name);
     def.u.ad.value=def.u.ad.dephault=0; // Native AE turns + degrees and dial.
     return add_checked_parameter(in_data,def);

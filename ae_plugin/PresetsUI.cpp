@@ -59,7 +59,8 @@ void draw(PF_InData* data,PF_EventExtra* event) {
     DRAWBOT_DrawRef ref{};DRAWBOT_SupplierRef source{};DRAWBOT_SurfaceRef target{};
     if(ui->PF_GetDrawingReference(event->contextH,&ref) || !ref || bot->GetSupplier(ref,&source) || bot->GetSurface(ref,&target) || !source || !target)return;
     if(event->effect_win.area==PF_EA_PARAM_TITLE) {
-        // The complete title belongs to this custom UI, including AE's twirly.
+        // Paint only the supplied title rectangle. AE's disclosure gutter is
+        // outside this owned area and cannot be erased by this callback.
         Suite<DRAWBOT_PathSuite1> paths(data->pica_basicP,kDRAWBOT_PathSuite,kDRAWBOT_PathSuite_Version1);
         Suite<PFAppSuite6> app(data->pica_basicP,kPFAppSuite,kPFAppSuiteVersion6);
         if(!paths)return;

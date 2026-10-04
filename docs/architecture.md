@@ -1,5 +1,16 @@
 # Starfield plug-in architecture
 
+## P-03 / build38 - atomic preset bridge and dial defaults
+
+Owner build37 evidence isolates a retained Particle2 target record; current named
+native records and graph planners author Particle6. The stale producer is not
+confirmed. Preset operations now load and invoke the gateway in one evalScript
+turn with checked request/reply generation, retaining pinned identities and graph
+transaction/readback/rollback guards. Native angles start collapsed without UI
+callbacks overriding user expansion. Title paint failed to remove AE's disclosure
+arrow; no public hide flag has been found and this issue remains unresolved.
+All persistent IDs, node schemas, main26, Core/Render and bitmap remain unchanged.
+
 ## P-03 / build37 - preset version source and title ownership
 
 Owner build36 evidence qualifies catalog loading, but rejects preset application

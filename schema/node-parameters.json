@@ -3,6 +3,7 @@
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "migrationPolicy": "Development Particle schema6/base102 and Emitter schema7/base34: recreate test effects/graphs; no legacy migration per owner. Disk IDs remain explicit; new rotation and emitter Orient IDs are independent. Main binding layout24 and C ABI3 unchanged; transient evaluated-particle snapshot3/200 bytes requires paired native/Core deployment and rollback. ADR0028.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
+  "angleUiDefaults": "All native PF_Param_ANGLE controls start collapsed (PF_ParamFlag_START_COLLAPSED), including Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This changes the initial UI state only, preserves user expansion, and keeps keyframes/IDs/schemas unchanged. Build38 / ADR0028.",
   "fixed": {
     "emitter_type": 101,
     "birth_rate": 102,

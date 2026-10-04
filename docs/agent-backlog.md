@@ -19,6 +19,16 @@ before the next deployment; main remains owner-accepted build31.
 
 ## P-03 - Main picture launcher and preset manager
 
+Build38 follow-up: owner supplies precise Updated project Particle2/expected6
+failure and rejects build37 title painting. Own the preset bridge lifecycle:
+atomic gateway load/invocation, request/reply generation checks and paired38
+resources. Actual origin of stale metadata remains a hypothesis; strict schemas
+are not weakened. Extend this card's NodeEffects.cpp/schema/docs ownership to
+default-collapse native angle dials, without altering M3-08 values/IDs/contracts.
+Remaining banner disclosure arrow has no located public May2023 hide flag and
+is unresolved; preserve the owned drawing rectangle. No tests requested or run.
+Actual AE Add/Replace and initial dial appearance remain qualification gates.
+
 Build37 follow-up: owner confirms build36 catalog loading, but preset application
 fails schema validation; parent navigation is missing and native blank title still
 has a twirly. Owner also removes the CEP Example feature. Unify schema validation

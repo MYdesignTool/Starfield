@@ -6,6 +6,33 @@ generated picture in the main Effect Controls and a clickable preset manager.
 
 ## Build36 owner feedback
 
+### Build38 follow-up: rejected title fix and retained schema evidence
+
+Owner build37 reports `Updated project: particle has unsupported node schema 2;
+expected 6`. Catalog validation therefore passed; the retained target graph is
+the failing phase. Static inspection finds no Particle2 producer in the current
+planner, named native control reader, native compiler, codec or layout copy.
+This does not prove which previously loaded runtime produced the stale metadata.
+The manager's cached `ready` boolean nevertheless leaves a concrete lifecycle gap:
+later operations invoke whichever global SFLD functions are then installed in AE.
+
+Load the checkout gateway and invoke the requested operation inside one evalScript
+turn. Check readiness after loading, stamp every reply with gatewayBuild, and check
+that stamp before accepting the response. The pinned project/comp/layer/effect
+token remains DOM-derived, and revision/recordStamp checks, rollback and strict
+node schema validation remain intact. Request generation, page resources and
+bundle version advance together to38. No saved graph is retagged or migrated and
+no AE cache/registry/process changes are made. This closes the inspected lifecycle
+gap; actual AE Add/Replace remains an owner gate, not a claimed verified fix.
+
+Owner evidence also rejects the build37 title overpaint: the arrow remains.
+Only the callback's supplied title rectangle is painted; do not paint outside it
+or cover neighboring AE UI. The May2023 headers define PF_PUI_CONTROL as the
+foldable body and offer no located public flag for suppressing its disclosure
+gutter. Keep the visible/clickable banner and its current parameter registration;
+removing this remaining arrow is unresolved. Build38 also defaults all native
+angle controls to collapsed per the new owner screenshot (ADR0028).
+
 ### Build37 follow-up
 
 The owner confirms the manager now shows its catalog and pinned target, but Add

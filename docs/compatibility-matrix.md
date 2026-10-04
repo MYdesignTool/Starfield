@@ -1,5 +1,16 @@
 # Behavior inventory
 
+## P-03 / build38 qualification
+
+Owner build37 reports retained Updated project Particle2/expected6; preset
+application and title-arrow removal remain failed. Current source has no located
+Particle2 producer, so stale runtime origin is unconfirmed. Build38 loads/invokes
+the gateway atomically and checks reply generation. Native angle dials start
+collapsed; existing user expansion is preserved. Actual Add/Replace and initial
+dial appearance need owner AE2023 evidence. The main image's remaining disclosure
+arrow is unresolved, with no located supported May2023 hide flag. No tests are
+requested or run in this follow-up; compilation alone is not host qualification.
+
 ## P-03 / build37 qualification
 
 Owner build36 screenshots confirm catalog/folder rendering, selection preview and

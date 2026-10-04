@@ -1,5 +1,21 @@
 # Build and host matrix
 
+## P-03 / build38 candidate - 2026-10-04
+
+Owner build37 rejects Add (Updated project Particle2/expected6) and the remaining
+banner arrow. Static inspection isolates a cached-ready/global-function lifecycle
+gap, without confirming the exact stale runtime producer. Build38 (32806/0x8026)
+loads and calls the current gateway in one evalScript turn and checks request/reply
+generation. All native angle dials start collapsed. Title painting cannot remove
+the host disclosure gutter; this requested arrow removal remains unresolved.
+Main26/index1/disk1631, node E7/P6/F2/O4, CoreABI3 and artwork remain unchanged.
+
+May2023 SDK /MT candidate-only build succeeds with no compiler warnings/errors:
+artifacts/build38-native.log. Node --check validates preset_manager, panel and
+the gateway via stdin (no host execution). No tests were requested or run. Actual
+AE Add/Replace and default dial appearance are still owner qualification gates.
+Continue on codex/m3-07-particle-gradient; accepted main31 is not advanced.
+
 ## P-03 / build37 candidate - 2026-10-04
 
 Owner build36 evidence confirms the catalog loads, but Add reports unsupported

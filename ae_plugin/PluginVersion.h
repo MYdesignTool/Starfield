@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 37: preset schema source, folder navigation and custom title paint.
-#define STARFIELD_VERSION_BUILD 37
-#define STARFIELD_VERSION_PACKED 32805 /* 0x8025 */
+// Build 38: atomic preset gateway dispatch and collapsed native rotation dials.
+#define STARFIELD_VERSION_BUILD 38
+#define STARFIELD_VERSION_PACKED 32806 /* 0x8026 */

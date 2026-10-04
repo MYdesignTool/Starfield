@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-37";
+    var GATEWAY_BUILD = "native-presets-38";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -140,6 +140,7 @@
     function reply(payload) {
         payload.protocol = PROTOCOL;
         payload.version = VERSION;
+        payload.gatewayBuild = GATEWAY_BUILD;
         return JSON.stringify(payload);
     }
 
@@ -154,6 +155,7 @@
         var request = null;
         try { request = JSON.parse(text); } catch (error) { return null; }
         if (!request || request.protocol !== PROTOCOL || request.version !== VERSION) return null;
+        if (request.gatewayBuild && request.gatewayBuild !== GATEWAY_BUILD) return null;
         if (typeof request.operation !== "string") return null;
         return request;
     }
