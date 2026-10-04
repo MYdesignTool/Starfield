@@ -376,7 +376,8 @@ int main() {
     check(std::get<core::Vec3>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kColorStart)).x == .2, "color value replaces only selected color");
     {
         namespace layout=records::particle_layout;
-        const auto palette=gradient_editor::preset(2);
+        auto palette=gradient_editor::preset(2);
+        palette.stops[0].position=.1;palette.stops[palette.count-1].position=.9;
         auto bank=edit(1,layout::gradient,palette.count);
         bank.additional_fields[bank.additional_count++]={layout::gradient,node_sync::ValueKind::scalar,{double(palette.count),0,0,0}};
         for(unsigned i=0;i<8;++i) {

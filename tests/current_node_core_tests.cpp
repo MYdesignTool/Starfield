@@ -360,6 +360,12 @@ void test_particle_gradient() {
     auto sampled=evaluate_color_gradient(decoded,.15);
     check(sampled.x==.5 && sampled.y==.5 && sampled.z==0,"gradient honors nonuniform stop positions");
     auto invalid=bytes;invalid[2]=std::byte{1};check(!decode_color_gradient(invalid,decoded),"gradient reserved bytes checked");
+    auto inset=gradient;inset.stops[0].position=.2;inset.stops[2].position=.8;
+    const auto inset_bytes=encode_color_gradient(inset);
+    check(!inset_bytes.empty() && decode_color_gradient(inset_bytes,decoded),"inset first/last positions round trip in the gradient codec");
+    check(evaluate_color_gradient(decoded,0).x==1 && evaluate_color_gradient(decoded,1).z==1,"inset gradient holds both end colors without extrapolation");
+    const auto interior=evaluate_color_gradient(decoded,.25);
+    check(std::abs(interior.x-.5)<1e-12 && std::abs(interior.y-.5)<1e-12,"interpolation uses the actual movable boundary positions");
     gradient.stops[1].position=0;check(encode_color_gradient(gradient).empty(),"duplicate color stops rejected");
     TemporalFixture fixture;Settings settings;settings.birth_rate=2;settings.particle_lifetime_seconds=4;
     settings.velocity={};settings.velocity_spread=0;
@@ -376,6 +382,14 @@ void test_particle_gradient() {
         if(mode==1) check(p.color.x>0 && p.color.y>0 && later.color.z>0,"Color over life walks through multi-stop gradient");
         if(mode==2) check(p.color.x==later.color.x && p.color.y==later.color.y && p.color.z==later.color.z,"random gradient color stays attached to particle identity");
         if(mode==3) check(p.color.x!=later.color.x || p.color.y!=later.color.y || p.color.z!=later.color.z,"loop gradient ages from stable random offset");
+    }
+    set(fixture.graph.nodes[1],kColorGradient,inset_bytes);
+    for(std::uint32_t mode=1;mode<4;++mode) {
+        set(fixture.graph.nodes[1],kParticleColorMode,mode);
+        auto rendered=evaluate_temporal_particle_graph(fixture.graph,{1,1},never,{1080,1},fixture);
+        check(rendered.has_value(),"all gradient modes accept movable boundary colors during temporal evaluation");
+        if(rendered.has_value())for(const auto& p:rendered.value().particles)
+            check(p.color.x>=0 && p.color.x<=1 && p.color.y>=0 && p.color.y<=1 && p.color.z>=0 && p.color.z<=1,"movable boundaries never extrapolate invalid particle colors");
     }
 }
 void test_birth_parameter_matrix() {

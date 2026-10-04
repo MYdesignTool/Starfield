@@ -8,6 +8,8 @@ assert.throws(()=>view.encodeGradient([{position:0,color:[1,1,1]},{position:0,co
 assert.throws(()=>view.decodeGradient(bytes.slice(0,-1)),/Malformed/);
 const hdr=view.encodeGradient([{position:0,color:[3,0,0]},{position:1,color:[0,2,0]}]);
 assert.equal(view.decodeGradient(hdr)[0].color[0],3,"gradient codec preserves float colors");
+const inset=[{position:.2,color:[1,0,0]},{position:.8,color:[0,0,1]}];
+const insetBytes=view.encodeGradient(inset);assert.deepEqual(view.decodeGradient(insetBytes),inset);
 const global={};
 const source=fs.readFileSync(require.resolve("../cep_panel/jsx/starfield_gateway.jsx"),"utf8")
     .replace("    function writeNodeColorGradient(effect, bytes) {",
@@ -28,6 +30,8 @@ assert.deepEqual(Array.from(values.get("Color Gradient 2 Color")),[0,0,1,1]);
 const count=values.size,bad=Array.from(bytes);bad[1]=8;
 assert.throws(()=>global.testGradientWrite(effect,bad),/Invalid/);
 assert.equal(values.size,count,"malformed gradient never partially writes native banks");
+global.testGradientWrite(effect,Array.from(insetBytes));
+assert.equal(values.get("Color Gradient 0 Position"),20);assert.equal(values.get("Color Gradient 1 Position"),80);
 const nodeId="00000000000000000000000000000001",copyId="00000000000000000000000000000002";
 let graph=edits.apply({nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:"particle"},()=>nodeId);
 assert.equal(graph.nodes[0].schemaVersion,5);

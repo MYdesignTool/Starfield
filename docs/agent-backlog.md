@@ -2,6 +2,14 @@
 
 ## M3-07 - Particle Color Over Life editor and control organization
 
+Owner reports build34 usable, then requests movable first/last markers. The
+gradient implementation now permits all stops within [0,1], preserves color
+identity while dragging across stops, and holds the nearest color outside their
+range. Native/CEP/JSX/codec/renderer validation agree. Implementation checks:
+3431 gradient UI, 394 current-node core, 5717 native sync + 12 camera, zero failures;
+both gradient JS suites pass. This closes the implementation slice; integrated
+candidate deployment and actual AE end-marker qualification follow the next cards.
+
 Build34 follow-up: owner build33 testing is blocked by a repeating Unsupported
 Pixel Format warning on gradient expansion. Correct unnegotiated 24RGB image
 creation using supplier BGRA/ARGB capabilities, opaque 32-bit bytes, safe path

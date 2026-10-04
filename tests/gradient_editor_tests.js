@@ -11,6 +11,17 @@ const twice=tools.flip(tools.flip(presets[2].stops));assert.equal(JSON.stringify
 const invalid=tools.paste();invalid[1].position=0;assert(!tools.valid(invalid));assert(!tools.copy(invalid));
 assert.equal(tools.flip(invalid),null);
 const bad=tools.paste();bad[1].color[0]=NaN;assert(!tools.valid(bad));
+let inset=[{position:.2,color:[1,0,0]},{position:.8,color:[0,0,1]}];
+assert(tools.valid(inset));assert.equal(JSON.stringify(tools.sample(inset,0)),"[1,0,0]");
+assert.equal(JSON.stringify(tools.sample(inset,1)),"[0,0,1]");
+let moved=tools.move(inset,0,.9);assert.equal(moved.index,1);assert.equal(moved.stops[1].color[0],1);
+assert(tools.valid(moved.stops));assert.equal(inset[0].position,.2,"drag does not mutate its input");
+moved=tools.move(moved.stops,1,.8);assert(tools.valid(moved.stops));
+assert(Math.abs(moved.stops[1].position-moved.stops[0].position)>=.001-1e-12);
+assert.equal(tools.move(inset,0,NaN),null);assert.equal(tools.move(inset,2,.5),null);
+assert(tools.insert(inset,0));assert(tools.insert(inset,1));assert.equal(tools.insert(inset,.2),null);
+assert.equal(JSON.stringify(tools.insert(inset,.1).stops[0].color),"[1,0,0]");
+assert.equal(JSON.stringify(tools.flip(inset).map(s=>s.position)),"[0.19999999999999996,0.8]");
 const html=fs.readFileSync(require("path").join(__dirname,"../cep_panel/index.html"),"utf8");
 assert(html.indexOf('js/gradient_editor.js')<html.indexOf('js/panel.js'));
 const schema=JSON.parse(fs.readFileSync(require("path").join(__dirname,"../schema/node-parameters.json"),"utf8"));

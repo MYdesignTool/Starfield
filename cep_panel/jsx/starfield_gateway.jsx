@@ -502,7 +502,6 @@
             }
             stops.push({position:position,color:color});
         }
-        if(stops[0].position!==0 || stops[count-1].position!==1) throw new Error("Color Gradient endpoints must be 0 and 100%.");
         // Validate the whole payload before mutating any native property.
         setNodeControl(effect,"Color Gradient",count);
         for(var point=0;point<count;point++) {

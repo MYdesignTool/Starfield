@@ -20,7 +20,7 @@ inline bool valid_color_gradient(const ColorGradient& gradient) {
         for(double value:{stop.color.x,stop.color.y,stop.color.z})
             if(!std::isfinite(value) || value<0 || value>kMaxParticleColor) return false;
     }
-    return gradient.stops[0].position==0 && gradient.stops[gradient.count-1].position==1;
+    return true;
 }
 inline OpaqueBytes encode_color_gradient(const ColorGradient& gradient) {
     if(!valid_color_gradient(gradient)) return {};
@@ -46,6 +46,7 @@ inline bool decode_color_gradient(const OpaqueBytes& bytes,ColorGradient& gradie
 }
 inline Vec3 evaluate_color_gradient(const ColorGradient& gradient,double position) {
     position=std::clamp(position,0.0,1.0);
+    if(position<=gradient.stops[0].position)return gradient.stops[0].color;
     for(std::size_t i=1;i<gradient.count;++i) if(position<=gradient.stops[i].position) {
         const auto& a=gradient.stops[i-1];const auto& b=gradient.stops[i];
         const double f=(position-a.position)/(b.position-a.position);

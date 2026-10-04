@@ -310,7 +310,6 @@
             }
             stops.push({position:position,color:color});
         }
-        if(stops[0].position!==0 || stops[stops.length-1].position!==1) fail("invalid_gradient","Color Gradient endpoints must be 0 and 100%.");
         return stops;
     }
     function encodeGradient(stops) {

@@ -1236,17 +1236,15 @@
                 marker.addEventListener("pointerdown",function(event){
                     if(event.button!==0 || state.pending) return;
                     event.preventDefault();event.stopPropagation();selected=index;
-                    if(index===0 || index===stops.length-1) {selectStop();return;}
-                    var moved=false,original=stop.position;
+                    var moved=false,original=stops.map(function(s){return {position:s.position,color:s.color.slice()};});
                     function move(e) {
                         var rect=bar.getBoundingClientRect(),value=(e.clientX-rect.left)/rect.width;
-                        stop.position=Math.max(stops[index-1].position+0.001,Math.min(stops[index+1].position-0.001,value));
-                        moved=true;marker.style.left=stop.position*100+"%";position.value=(stop.position*100).toFixed(1);
-                        bar.style.background="linear-gradient(to right,"+stops.map(function(s){return hex(s.color)+" "+s.position*100+"%";}).join(",")+")";
+                        var result=tools.move(stops,selected,value);if(!result)return;
+                        moved=true;stops=result.stops;selected=result.index;draw();
                     }
                     function up(e){
                         window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
-                        if(e.type==="pointercancel"){stop.position=original;draw();}
+                        if(e.type==="pointercancel"){stops=original;selected=index;draw();}
                         else if(moved) commit();else selectStop();
                     }
                     window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up);
@@ -1259,28 +1257,19 @@
                 marker.className="gradient-stop"+(selected===index?" selected":"");
             });
             color.value=hex(stops[selected].color);position.value=(stops[selected].position*100).toFixed(1);
-            position.disabled=selected===0 || selected===stops.length-1;
-            remove.disabled=position.disabled || stops.length<=2;add.disabled=stops.length>=8;
+            position.disabled=false;
+            remove.disabled=stops.length<=2;add.disabled=stops.length>=8;
         }
         function insert(value) {
-            if(stops.length>=8) return;
-            value=Math.max(0.001,Math.min(0.999,value));
-            for(var i=1;i<stops.length;i++) if(value<stops[i].position) {
-                if(value-stops[i-1].position<0.001 || stops[i].position-value<0.001) return;
-                var left=stops[i-1],right=stops[i],fraction=(value-left.position)/(right.position-left.position);
-                stops.splice(i,0,{position:value,color:left.color.map(function(c,ch){return c+(right.color[ch]-c)*fraction;})});
-                selected=i;commit();return;
-            }
+            var result=tools.insert(stops,value);if(result){stops=result.stops;selected=result.index;commit();}
         }
         bar.addEventListener("click",function(event){if(event.target!==bar)return;var rect=bar.getBoundingClientRect();insert((event.clientX-rect.left)/rect.width);});
         color.addEventListener("change",function(){var value=color.value;stops[selected].color=[1,3,5].map(function(start){return parseInt(value.substr(start,2),16)/255;});commit();});
         position.addEventListener("change",function(){
             var value=Number(position.value)/100;
-            if(isFinite(value) && selected>0 && selected<stops.length-1) {
-                stops[selected].position=Math.max(stops[selected-1].position+0.001,Math.min(stops[selected+1].position-0.001,value));commit();
-            }
+            var result=tools.move(stops,selected,value);if(result){stops=result.stops;selected=result.index;commit();}
         });
-        remove.addEventListener("click",function(){if(selected>0 && selected<stops.length-1 && stops.length>2){stops.splice(selected,1);selected=0;commit();}});
+        remove.addEventListener("click",function(){if(stops.length>2){stops.splice(selected,1);selected=0;commit();}});
         flip.addEventListener("click",function(){if(state.pending)return;stops=tools.flip(stops);selected=stops.length-1-selected;commit();});
         copy.addEventListener("click",function(){tools.copy(stops);paste.disabled=false;});
         paste.addEventListener("click",function(){if(state.pending)return;var copied=tools.paste();if(copied){stops=copied;selected=0;commit();}});

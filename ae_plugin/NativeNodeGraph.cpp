@@ -571,7 +571,7 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
             gradient.stops[i].position/=100;
             if(gradient.stops[i].position<0 || gradient.stops[i].position>1 ||
                (i && gradient.stops[i].position<=gradient.stops[i-1].position) ||
-               (i==0 && gradient.stops[i].position!=0) || (i+1==count && gradient.stops[i].position!=1))
+               gradient.stops[i].position<0 || gradient.stops[i].position>1)
                 return suites.fail(particle_layout::gradient_first+2*i);
         }
         auto bytes=core::encode_color_gradient(gradient);if(bytes.empty())return suites.fail(particle_layout::gradient);

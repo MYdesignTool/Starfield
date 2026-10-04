@@ -124,10 +124,16 @@ int main() {
     check(!model::rasterize_opaque32(gradient,std::numeric_limits<unsigned>::max(),62,model::PixelOrder::bgra,pixels),"dimension overflow rejected before stride arithmetic");
     check(starfield::core::encode_color_gradient(original)==starfield::core::encode_color_gradient(gradient),"double flip retains complete gradient");
     check(model::insert(gradient,std::numeric_limits<double>::quiet_NaN())<0,"nonfinite add rejected");
-    check(!model::move(gradient,0,.3) && !model::erase(gradient,0),"endpoints cannot move/delete");
+    auto ends=gradient;
+    const auto first_color=ends.stops[0].color,last_color=ends.stops[ends.count-1].color;
+    check(model::move(ends,0,.1)==0 && model::move(ends,ends.count-1,.9)==ends.count-1 && model::valid(ends),"first and last markers move inside the gradient range");
+    check(starfield::core::evaluate_color_gradient(ends,0).x==first_color.x && starfield::core::evaluate_color_gradient(ends,1).x==last_color.x,"moved end colors extend across the uncovered range");
+    check(model::erase(ends,0) && model::erase(ends,ends.count-1) && ends.count==3,"any marker can be removed while retaining at least two stops");
+    check(model::move(ends,-1,.3)<0 && model::move(ends,0,std::numeric_limits<double>::quiet_NaN())<0,"invalid and nonfinite moves rejected");
     const auto added=model::insert(gradient,.125);check(added==1 && gradient.count==6,"insert preserves interpolated color");
-    check(model::move(gradient,added,5) && gradient.stops[added].position<gradient.stops[added+1].position,"drag clamps before adjacent stop");
-    check(model::erase(gradient,added) && gradient.count==5,"interior delete retains valid gradient");
+    const auto crossed=model::move(gradient,added,5);
+    check(crossed>added && model::valid(gradient) && gradient.stops[crossed].position<1,"drag crosses other stops and avoids coincident positions");
+    check(model::erase(gradient,crossed) && gradient.count==5,"delete follows the moved marker identity");
     while(gradient.count<8) {double widest=0;unsigned slot=1;for(unsigned i=1;i<gradient.count;++i)if(gradient.stops[i].position-gradient.stops[i-1].position>widest){widest=gradient.stops[i].position-gradient.stops[i-1].position;slot=i;}
         check(model::insert(gradient,(gradient.stops[slot].position+gradient.stops[slot-1].position)/2)>=0,"bounded add");}
     check(model::insert(gradient,.1)<0,"ninth stop rejected");
@@ -143,14 +149,20 @@ int main() {
     event.effect_win.current_frame.right=310;event.effect_win.current_frame.bottom=180;
     auto click=[&](A_short x,A_short y,A_long count=1,PF_Modifiers modifiers=0){event.e_type=PF_Event_DO_CLICK;event.u.do_click={};event.u.do_click.screen_point.h=x;event.u.do_click.screen_point.v=y;event.u.do_click.num_clicks=count;event.u.do_click.modifiers=modifiers;
         return particle_gradient_event(&data,&out,params.data(),&event);};
+    check(click(8,70)==0 && event.u.do_click.send_drag,"first native marker starts drag");
+    event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.h=52;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && std::abs(values[layout::gradient_first].u.fs_d.value-20)<.001,"first native marker authors an inset position");
+    check(click(228,70)==0 && event.u.do_click.send_drag,"last native marker starts drag");
+    event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.h=184;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && std::abs(values[layout::gradient_first+2].u.fs_d.value-80)<.001,"last native marker authors an inset position");
     check(click(118,30)==0 && values[layout::gradient].u.fs_d.value==3,"bar click adds actual native stop");
     check(click(118,70)==0 && event.u.do_click.send_drag,"interior marker starts native drag");
     event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.h=200;event.u.do_click.screen_point.v=70;event.u.do_click.last_time=TRUE;
-    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && values[layout::gradient_first+2].u.fs_d.value>80,"drag changes authored position");
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && event.u.do_click.continue_refcon[0]==3 && values[layout::gradient_first+4].u.fs_d.value>80,"drag reorders authored positions and updates the continuation marker");
     const int before_cancel=publications;cancel=true;check(click(200,70,2)==0 && publications==before_cancel,"cancelled picker does not author");cancel=false;
-    check(click(200,70,2)==0 && values[layout::gradient_first+3].u.cd.value.blue==204,"native picker authors selected stop color");
-    check(click(200,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"Alt-click deletes only interior stop");
-    check(click(8,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"endpoint delete is harmless");
+    check(click(200,70,2)==0 && values[layout::gradient_first+5].u.cd.value.blue==204,"native picker follows the reordered stop color");
+    check(click(200,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"Alt-click deletes a moved last stop");
+    check(click(52,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"two-stop gradient cannot lose another marker");
     check(click(145,105)==0,"presets menu opens");check(click(145,130)==0 && values[layout::gradient].u.fs_d.value==5,"preset authors all saved stops");
     check(click(15,105)==0,"copy changes no source values");
     const auto before=values;reject=true;check(click(248,45)==PF_Err_BAD_CALLBACK_PARAM,"publication failure returned");reject=false;

@@ -3,6 +3,24 @@
 Status: candidate implementation/build/scoped checks complete on development
 branch; AE 2023 qualification pending.
 
+## Movable gradient boundaries - 2026-10-04
+
+Owner reports build34 warning/drawing is usable and requests movable first/last
+stops. M3-07 also owns ColorGradient.hpp validation/evaluation and corresponding
+core checks for this follow-up. All 2..8 stops may occupy any strictly ordered
+positions in [0,1]. Evaluation holds the nearest stop color outside their range;
+it never extrapolates colors below zero or above the last stop. Native/CEP drag
+may cross other markers, preserving color identity and updating selection/index.
+Dragging avoids coincident stops with a .001 gap. Any stop may be removed while
+retaining at least two. Validation, codecs, native graph reading and JSX writing
+accept the same domain. Default/presets remain anchored at 0/1.
+The byte encoding stays version1; old anchored gradients remain valid. Previous
+development binaries reject inset gradients, so rollback requires their paired
+Core/native/CEP bundle and recreating or re-anchoring such test gradients. This
+is an explicit development-domain expansion, not a legacy migration.
+Renderer/C ABI boundaries remain unchanged. Rotation screenshot follow-up and
+the newly requested main preset launcher/manager are subsequent owned cards.
+
 ## Build34 correction after owner feedback - 2026-10-04
 
 Owner build33 testing is blocked by repeated "Unsupported Pixel Format" warnings

@@ -8,11 +8,11 @@ namespace starfield::adapter::gradient_editor {
 using core::ColorGradient;
 constexpr double gap=0.001;
 inline bool valid(const ColorGradient& value) noexcept {
-    if(value.count<2 || value.count>8 || value.stops[0].position!=0 ||
-        value.stops[value.count-1].position!=1)return false;
+    if(value.count<2 || value.count>8)return false;
     for(unsigned i=0;i<value.count;++i) {
         const auto& stop=value.stops[i];
-        if(!std::isfinite(stop.position) || (i && stop.position<=value.stops[i-1].position))return false;
+        if(!std::isfinite(stop.position) || stop.position<0 || stop.position>1 ||
+           (i && stop.position<=value.stops[i-1].position))return false;
         for(double channel:{stop.color.x,stop.color.y,stop.color.z})
             if(!std::isfinite(channel) || channel<0 || channel>1)return false;
     }
@@ -40,23 +40,37 @@ inline bool rasterize_opaque32(const ColorGradient& value,unsigned width,unsigne
 }
 inline int insert(ColorGradient& value,double position) noexcept {
     if(!valid(value) || !std::isfinite(position) || value.count==8)return -1;
-    position=std::clamp(position,gap,1-gap);
-    for(unsigned i=1;i<value.count;++i)if(position<value.stops[i].position) {
-        if(position-value.stops[i-1].position<gap || value.stops[i].position-position<gap)return -1;
-        const auto color=core::evaluate_color_gradient(value,position);
-        for(unsigned j=value.count;j>i;--j)value.stops[j]=value.stops[j-1];
-        value.stops[i]={position,color};++value.count;return static_cast<int>(i);
+    position=std::clamp(position,0.0,1.0);
+    unsigned index=0;
+    for(unsigned i=0;i<value.count;++i) {
+        if(std::abs(position-value.stops[i].position)<gap-1e-12)return -1;
+        if(value.stops[i].position<position)++index;
     }
-    return -1;
+    const auto color=core::evaluate_color_gradient(value,position);
+    for(unsigned j=value.count;j>index;--j)value.stops[j]=value.stops[j-1];
+    value.stops[index]={position,color};++value.count;return static_cast<int>(index);
 }
-inline bool move(ColorGradient& value,int index,double position) noexcept {
-    if(!valid(value) || !std::isfinite(position) || index<=0 || index>=value.count-1)return false;
-    const double lo=value.stops[index-1].position+gap,hi=value.stops[index+1].position-gap;
-    if(lo>hi)return false;
-    value.stops[index].position=std::clamp(position,lo,hi);return true;
+inline int move(ColorGradient& value,int index,double position) noexcept {
+    if(!valid(value) || !std::isfinite(position) || index<0 || index>=value.count)return -1;
+    const auto stop=value.stops[index];auto remaining=value;
+    for(unsigned i=static_cast<unsigned>(index);i+1<remaining.count;++i)remaining.stops[i]=remaining.stops[i+1];
+    --remaining.count;position=std::clamp(position,0.0,1.0);
+    double closest=2,chosen=stop.position;
+    const auto consider=[&](double candidate) {
+        if(candidate<0 || candidate>1)return;
+        for(unsigned i=0;i<remaining.count;++i)
+            if(std::abs(candidate-remaining.stops[i].position)<gap-1e-12)return;
+        if(const auto distance=std::abs(candidate-position);distance<closest){closest=distance;chosen=candidate;}
+    };
+    consider(position);consider(0);consider(1);
+    for(unsigned i=0;i<remaining.count;++i){consider(remaining.stops[i].position-gap);consider(remaining.stops[i].position+gap);}
+    if(closest==2)return -1;
+    unsigned next=0;while(next<remaining.count && remaining.stops[next].position<chosen)++next;
+    for(unsigned i=remaining.count;i>next;--i)remaining.stops[i]=remaining.stops[i-1];
+    remaining.stops[next]={chosen,stop.color};++remaining.count;value=remaining;return static_cast<int>(next);
 }
 inline bool erase(ColorGradient& value,int index) noexcept {
-    if(!valid(value) || value.count<=2 || index<=0 || index>=value.count-1)return false;
+    if(!valid(value) || value.count<=2 || index<0 || index>=value.count)return false;
     for(unsigned j=static_cast<unsigned>(index);j+1<value.count;++j)value.stops[j]=value.stops[j+1];
     --value.count;return true;
 }

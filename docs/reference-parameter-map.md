@@ -1,4 +1,12 @@
-# Build34 native gradient pixel-format correction
+# Movable gradient boundaries - current development
+
+Owner build34 feedback reports the warning/drawing problem resolved. All stops,
+including the first and last, now move across the whole 0..100% interval and can
+cross/reorder without exchanging colors. Remove is available for any stop while
+retaining two. Out-of-range evaluation holds the nearest color. Native/CEP/JSX
+and codec acceptance agree (ADR0027); actual AE interaction remains a retest gate.
+
+## Build34 native gradient pixel-format correction
 
 Owner build33 gradient expansion triggers repeated Unsupported Pixel Format
 warnings. Build34 queries Drawbot BGRA/ARGB support/preferences, uses matching
@@ -40,7 +48,8 @@ are unchanged; labels and groups alone do not establish numerical parity.
 
 Native Color Gradient displays 2..8 RGB stops with linear interpolation. Click
 the bar to add, drag an interior marker, double-click a marker for the AE picker,
-and Alt-click or Delete/Backspace to remove an interior stop. Endpoints stay fixed.
+and Alt-click or Delete/Backspace to remove a stop while retaining at least two.
+All markers move; uncovered ends retain the nearest color.
 Flip, Copy, Paste and White/Fire/Spectrum presets operate on the complete bank.
 CEP has matching complete-gradient actions; the two editors have separate session
 clipboards. AE Color remains visible as in the screenshot; Particle Color selects

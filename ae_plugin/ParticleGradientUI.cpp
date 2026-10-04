@@ -239,13 +239,14 @@ PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* para
                 state.selected=nearest;
                 if(click.modifiers&PF_Mod_OPT_ALT_KEY){changed=model::erase(value,nearest);state.selected=0;}
                 else if(click.num_clicks>=2)changed=pick(data,value.stops[nearest].color);
-                else if(nearest>0 && nearest<value.count-1){click.send_drag=TRUE;click.continue_refcon[0]=nearest+1;}
+                else {click.send_drag=TRUE;click.continue_refcon[0]=nearest+1;}
             } else if(v<b.y+62){const auto inserted=model::insert(value,b.position(h));if(inserted>=0){state.selected=inserted;changed=true;}}
         } else return PF_Err_NONE;
     } else if(event->e_type==PF_Event_DRAG) {
         const auto index=event->u.do_click.continue_refcon[0]-1;
-        if(index<1 || index>=value.count-1)return PF_Err_NONE;
-        state.selected=static_cast<int>(index);changed=model::move(value,state.selected,b.position(event->u.do_click.screen_point.h));
+        if(index<0 || index>=value.count)return PF_Err_NONE;
+        const auto next=model::move(value,static_cast<int>(index),b.position(event->u.do_click.screen_point.h));
+        if(next>=0){state.selected=next;event->u.do_click.continue_refcon[0]=next+1;changed=true;}
     } else if(event->e_type==PF_Event_KEYDOWN) {
         const auto code=PF_KEYCODE_GET_CONTROL_CODE(event->u.key_down.keycode);
         if(code!=PF_ControlCode_Delete && code!=PF_ControlCode_Backspace)return PF_Err_NONE;
