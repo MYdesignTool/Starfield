@@ -109,10 +109,10 @@ int main() {
               "source mode is runtime stream 2");
         check(std::strcmp(registered[3].name, "Origin XY") == 0 && registered[3].param_type == PF_Param_POINT,
               "native XY is runtime point stream 4");
-        check(std::strcmp(registered[16].name, "Emit Chance") == 0 &&
-              registered[16].u.fs_d.display_flags == PF_ValueDisplayFlag_PERCENT,
-              "auxiliary bank starts at runtime stream 17 in percent");
-        check(std::strcmp(registered[23].name, "Random Seed") == 0, "seed ends source controls at runtime stream 24");
+        check(std::strcmp(registered[19].name, "Emit Chance") == 0 &&
+              registered[19].u.fs_d.display_flags == PF_ValueDisplayFlag_PERCENT,
+              "auxiliary bank starts at runtime stream 20 in percent");
+        check(std::strcmp(registered[26].name, "Random Seed") == 0, "seed ends source controls at runtime stream 27");
     }
     if constexpr(kind==Kind::particle) {
         bool bank_unsupervised=true;
@@ -122,7 +122,7 @@ int main() {
         check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
         check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
         check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");
-        for(A_long index:{72,73,74,76,77,78}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
+        for(A_long index:{72,73,74,77,78,79,80}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
         check(std::strcmp(registered[12].name,"Color Gradient 0 Position")==0 && (registered[12].flags&PF_ParamFlag_CANNOT_TIME_VARY),"gradient endpoint positions stay structural");
         check((registered[13].ui_flags&PF_PUI_INVISIBLE)!=0,"gradient colors are edited by the native visual control");
         check(std::strcmp(registered[11].name,"Color Gradient")==0 && (registered[11].ui_flags&PF_PUI_CONTROL) && registered[11].ui_height==178,"native gradient control replaces numerical stop banks");
@@ -131,7 +131,7 @@ int main() {
     if constexpr(kind==Kind::emitter) {
         check(registered[1].u.pd.num_choices==4,"Emitting exposes timing choices");
         check(registered[14].u.pd.value==2,"Direction defaults Uniform");
-        check(std::strcmp(registered[30].name,"Auxiliary Source")==0,"Auxiliary source is a separate structural control");
+        check(std::strcmp(registered[33].name,"Auxiliary Source")==0,"Auxiliary source is a separate structural control");
     }
     if constexpr (kind == Kind::force) {
         check(registered[0].param_type==PF_Param_FLOAT_SLIDER && registered[0].uu.id==disk_ids::kForceGravityId,"Force uses scalar Gravity with a fresh bounded disk identity");
@@ -144,7 +144,7 @@ int main() {
     int colors = 0;
     bool controls_constant = true, controls_animated = true, interpolation_unrestricted = true, colors_supervised = true;
     A_long control_index = 0;
-    const A_long last_animated = kind == Kind::emitter ? 30 : kind == Kind::particle ? 14 : 10;
+    const A_long last_animated = kind == Kind::emitter ? 33 : kind == Kind::particle ? 14 : 10;
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;

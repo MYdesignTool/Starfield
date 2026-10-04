@@ -121,6 +121,11 @@ PF_Err add_angle(PF_InData* in_data,const char* name,A_long id) noexcept {
     def.u.ad.value=def.u.ad.dephault=0; // Native AE turns + degrees and dial.
     return add_checked_parameter(in_data,def);
 }
+PF_Err add_checkbox(PF_InData* data,const char* name,A_long id) noexcept {
+    PF_ParamDef def{};def.param_type=PF_Param_CHECKBOX;def.flags=kNodeEditableFlags;def.uu.id=id;
+    std::snprintf(def.name,sizeof(def.name),"%s",name);def.u.bd.u.nameptr=name;
+    def.u.bd.value=def.u.bd.dephault=FALSE;return add_checked_parameter(data,def);
+}
 
 PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
                    PF_FpLong x, PF_FpLong y, PF_FpLong z) noexcept {
@@ -291,19 +296,31 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
         error=add_curve_bank(in_data,"Size",'s');if(error)return error;
         error=add_curve_bank(in_data,"Opacity",'o');if(error)return error;
         error=particle_group(in_data,"",kParticleOverLifeEndId,true);if(error)return error;
-        error=particle_group(in_data,"Rotation",kParticleRotationId,false,true);if(error)return error;
-        error=add_popup(in_data,"Orient To",kOrientToId,3,1,"None|Motion(particle)|Emitter");if(error)return error;
+        error=particle_group(in_data,"Rotation Properties",kParticleRotationId,false,true);if(error)return error;
+        error=add_popup(in_data,"Orient To",kOrientToId,3,1,"Nothing|Motion(particle)|Emitter");if(error)return error;
         for(auto axis:{std::pair{"X",kParticleAngleXId},std::pair{"Y",kParticleAngleYId},std::pair{"Z",kParticleAngleZId}}) {
             char name[24]{};std::snprintf(name,sizeof(name),"Angle %s",axis.first);
             error=add_angle(in_data,name,axis.second);if(error)return error;
         }
         error=add_slider(in_data,"Angle Random",kParticleAngleRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
+        error=add_popup(in_data,"Random Limit",kRandomLimitId,5,1,"None|All Axis|X|Y|Z");if(error)return error;
+        error=add_angle(in_data,"Limit Angle",kLimitAngleId);if(error)return error;
         for(auto axis:{std::pair{"X",kRotationSpeedXId},std::pair{"Y",kRotationSpeedYId},std::pair{"Z",kRotationSpeedZId}}) {
             char name[24]{};std::snprintf(name,sizeof(name),"Speed %s",axis.first);
             error=add_angle(in_data,name,axis.second);if(error)return error;
         }
-        error=add_slider(in_data,"Speed Random",kRotationSpeedRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
-        error=add_popup(in_data,"Limit to 2D",kLimitTo2DId,2,2,"Off|On");if(error)return error;
+        error=add_slider(in_data,"Rotation Speed Random",kRotationSpeedRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
+        error=add_slider(in_data,"Rotation Over Life",kRotationCurveCountId,0,8,0,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_CONTROL,178);if(error)return error;
+        for(A_long point=0;point<8;++point) {
+            char name[48]{};const auto ui=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
+            std::snprintf(name,sizeof(name),"Rotation Curve %ld Life",static_cast<long>(point));
+            error=add_slider(in_data,name,kRotationCurveAgeFirstId+point,0,1,double(point)/7,PF_Precision_THOUSANDTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
+            std::snprintf(name,sizeof(name),"Rotation Curve %ld Value",static_cast<long>(point));
+            error=add_slider(in_data,name,kRotationCurveValueFirstId+point,-32768,32768,0,PF_Precision_TENTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
+        }
+        error=add_slider(in_data,"Anchor X (Percent)",kAnchorXId,0,100,50,PF_Precision_TENTHS);if(error)return error;
+        error=add_slider(in_data,"Anchor Y (Percent)",kAnchorYId,0,100,50,PF_Precision_TENTHS);if(error)return error;
+        error=add_checkbox(in_data,"Limit To 2D",kLimitTo2DId);if(error)return error;
         error=particle_group(in_data,"",kParticleRotationEndId,true);if(error)return error;
     }
     return PF_Err_NONE;
@@ -349,6 +366,10 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     error = add_popup(in_data, "Direction", kDirectionId, 2, 2,
                       "Directional|Uniform");
     if (error != PF_Err_NONE) return error;
+    for(const auto& axis:{std::pair{"X",kEmitterOrientXId},std::pair{"Y",kEmitterOrientYId},std::pair{"Z",kEmitterOrientZId}}) {
+        char name[24]{};std::snprintf(name,sizeof(name),"Orient %s",axis.first);
+        error=add_angle(in_data,name,axis.second);if(error)return error;
+    }
     error = add_slider(in_data, "Direction Span", kDirectionSpanId, 0.0, 180.0, 60.0,
                        PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
@@ -533,6 +554,9 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             return PF_Err_NONE;
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
+                const auto* event=static_cast<PF_EventExtra*>(extra);
+                if(event && event->effect_win.index==starfield::adapter::native_nodes::particle_layout::rotation_curve)
+                    return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
             } else return PF_Err_NONE;
         case PF_Cmd_RENDER:

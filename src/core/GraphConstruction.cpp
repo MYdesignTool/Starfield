@@ -9,7 +9,7 @@ namespace {
 using namespace graph_keys;
 
 GraphNode make_emitter_node(const Settings& settings, NodeId id) {
-    GraphNode node{id, kEmitterNode, 6, {
+    GraphNode node{id, kEmitterNode, 7, {
         {kBirthRate, settings.birth_rate},
         {kSeed, settings.seed},
         {kEmitterShape, static_cast<std::uint32_t>(settings.emitter_shape)},
@@ -18,9 +18,10 @@ GraphNode make_emitter_node(const Settings& settings, NodeId id) {
         {kEmitterSize, settings.emitter_size}, {kVelocitySpread, settings.velocity_spread},
         {kEmissionSpeed, settings.emission_speed},
         {kEmissionSpeedRandom, settings.emission_speed_random},
-        {kEmissionAngleX, settings.emission_angles_degrees.x},
-        {kEmissionAngleY, settings.emission_angles_degrees.y},
-        {kEmissionAngleZ, settings.emission_angles_degrees.z},
+        {kEmissionAngleX, settings.emitter_shape_angles_degrees.x},
+        {kEmissionAngleY, settings.emitter_shape_angles_degrees.y},
+        {kEmissionAngleZ, settings.emitter_shape_angles_degrees.z},
+        {kEmitterOrient,settings.emission_angles_degrees},
         {kDirectionMode, static_cast<std::uint32_t>(settings.direction_mode)},
         {kDirectionSpan, settings.direction_span_degrees},
         {kEmitterSizeX, settings.emitter_size_pixels.x},
@@ -56,7 +57,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         const double size_end = settings.appearance_enabled ? settings.particle_size_end : 100.0;
         const double opacity_end = settings.appearance_enabled ? settings.opacity_end : 100.0;
 
-        GraphNode particle_node{particle, kParticleNode, 5, {
+        GraphNode particle_node{particle, kParticleNode, 6, {
             {kColorStart, color_start}, {kColorEnd, color_end},
             {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
             {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};

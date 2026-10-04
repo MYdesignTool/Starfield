@@ -1,7 +1,7 @@
 {
-  "identityRevision": 4,
+  "identityRevision": 5,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Build32 development Particle schema 5/base 81 replaces schema 4/base 75 with organized control groups and a native Color Gradient editor. Recreate Particle effects/graphs; no legacy migration, as authorized by the owner. Existing disk IDs and match names stay paired; group disk IDs 2910..2915 are new. Emitter schema 6/base 31, Force schema 2/base 27, main manifest 24, transient snapshot version 2 and C ABI 3 stay unchanged. Appearance was removed in build31; graphs containing that node must also be recreated. ADRs 0026/0027.",
+  "migrationPolicy": "Development Particle schema6/base102 and Emitter schema7/base34: recreate test effects/graphs; no legacy migration per owner. Disk IDs remain explicit; new rotation and emitter Orient IDs are independent. Main binding layout24 and C ABI3 unchanged; transient evaluated-particle snapshot3/200 bytes requires paired native/Core deployment and rollback. ADR0028.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "fixed": {
     "emitter_type": 101,
@@ -84,7 +84,15 @@
     "particle_over_life_group": 2912,
     "particle_over_life_end": 2913,
     "particle_rotation_group": 2914,
-    "particle_rotation_end": 2915
+    "particle_rotation_end": 2915,
+    "random_limit": 228,
+    "limit_angle": 229,
+    "anchor_x": 230,
+    "anchor_y": 231,
+    "rotation_curve_count": 960,
+    "emitter_orient_x": 137,
+    "emitter_orient_y": 138,
+    "emitter_orient_z": 139
   },
   "outgoingConnections": {
     "first": 500,
@@ -282,12 +290,12 @@
     }
   },
   "graphAuthoring": {
-    "emitterSchemaVersion": 6,
+    "emitterSchemaVersion": 7,
     "speedRandomPercentKey": 22,
     "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
     "forceSchemaVersion": 2,
     "outputSchemaVersion": 4,
-    "particleSchemaVersion": 5
+    "particleSchemaVersion": 6
   },
   "nativeControlOrder": {
     "emitter": [
@@ -306,6 +314,9 @@
       "Angle Y",
       "Angle Z",
       "Direction",
+      "Orient X",
+      "Orient Y",
+      "Orient Z",
       "Direction Span",
       "Random Seed"
     ],
@@ -327,17 +338,22 @@
       "Over Life",
       "Size Over Life",
       "Opacity Over Life",
-      "Rotation",
+      "Rotation Properties",
       "Orient To",
       "Angle X",
       "Angle Y",
       "Angle Z",
       "Angle Random",
+      "Random Limit",
+      "Limit Angle",
       "Speed X",
       "Speed Y",
       "Speed Z",
-      "Speed Random",
-      "Limit to 2D"
+      "Rotation Speed Random",
+      "Rotation Over Life",
+      "Anchor X (Percent)",
+      "Anchor Y (Percent)",
+      "Limit To 2D"
     ],
     "force": [
       "Gravity",
@@ -368,5 +384,17 @@
     "nativeColorFirstIndex": 14,
     "nativeStride": 2,
     "nativePositionUnits": "0–100 percent"
+  },
+  "rotationCurve": {
+    "ageFirst": 970,
+    "valueFirst": 980,
+    "points": 8,
+    "graphKey": 27,
+    "nativeCountIndex": 82,
+    "nativeFirstIndex": 83,
+    "valueMin": -32768,
+    "valueMax": 32768,
+    "default": "flat zero",
+    "constant": true
   }
 }

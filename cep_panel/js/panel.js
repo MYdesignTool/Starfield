@@ -1193,6 +1193,7 @@
             elements.inspectorBody.appendChild(renderCurveEditor("opacity", "Opacity Over Life (%)", curves.opacity, 100));
             drawCurvePlot("size");
             drawCurvePlot("opacity");
+            elements.inspectorBody.appendChild(renderRotationCurveEditor(node));
         }
         if (shownInspectorNodeId !== node.id) positionInspector(node.id);
         shownInspectorNodeId = node.id;
@@ -1279,6 +1280,47 @@
             var widest=1;for(var i=2;i<stops.length;i++) if(stops[i].position-stops[i-1].position>stops[widest].position-stops[widest-1].position)widest=i;
             insert((stops[widest].position+stops[widest-1].position)/2);
         });
+        draw();return section;
+    }
+
+    function renderRotationCurveEditor(node) {
+        var section=document.createElement("section");section.className="age-curve-editor";
+        var title=document.createElement("strong");title.textContent="Rotation Over Life";section.appendChild(title);
+        var points=copyCurvePoints(node.curves.rotation.points),selected=0;
+        var plot=document.createElementNS("http://www.w3.org/2000/svg","svg");plot.setAttribute("viewBox","0 0 240 100");plot.style.width="100%";plot.style.height="110px";section.appendChild(plot);
+        var toolbar=document.createElement("div");toolbar.className="gradient-toolbar";section.appendChild(toolbar);
+        function button(label,fn){var b=document.createElement("button");b.textContent=label;b.addEventListener("click",function(){if(!state.pending)fn();});toolbar.appendChild(b);return b;}
+        var life=document.createElement("input");life.type="number";life.min=0;life.max=100;life.step=.1;life.setAttribute("aria-label","Rotation point life percent");
+        var value=document.createElement("input");value.type="number";value.min=-32768;value.max=32768;value.step=.1;value.setAttribute("aria-label","Rotation degrees");
+        var fields=document.createElement("div");fields.className="gradient-controls";fields.appendChild(life);fields.appendChild(value);section.appendChild(fields);
+        var rotationClipboard=window.StarfieldRotationClipboard;
+        button("Linear",function(){}).disabled=true;
+        button("Flip",function(){points.reverse().forEach(function(p){p.age=1-p.age;});selected=points.length-1-selected;commit();});
+        button("Copy",function(){window.StarfieldRotationClipboard=copyCurvePoints(points);paste.disabled=false;});
+        var paste=button("Paste",function(){if(window.StarfieldRotationClipboard){points=copyCurvePoints(window.StarfieldRotationClipboard);selected=0;commit();}});paste.disabled=!rotationClipboard;
+        var presets=document.createElement("select");presets.setAttribute("aria-label","Rotation curve presets");["Presets…","Zero","+360°","-360°"].forEach(function(label,i){var option=document.createElement("option");option.value=i;option.textContent=label;presets.appendChild(option);});toolbar.appendChild(presets);
+        presets.addEventListener("change",function(){if(state.pending || !Number(presets.value))return;points=[{age:0,value:0},{age:1,value:Number(presets.value)===2?360:Number(presets.value)===3?-360:0}];selected=0;commit();});
+        button("<",function(){selected=Math.max(0,selected-1);draw();});button(">",function(){selected=Math.min(points.length-1,selected+1);draw();});
+        var remove=button("Remove",function(){if(selected>0 && selected<points.length-1){points.splice(selected,1);selected=0;commit();}});
+        function commit(){applyCurveChanges("rotation",points,true,node.id);draw();}
+        function draw(){
+            while(plot.firstChild)plot.removeChild(plot.firstChild);
+            var span=Math.max.apply(null,[360].concat(points.map(function(p){return Math.abs(p.value);}))),ns=plot.namespaceURI;
+            var path=document.createElementNS(ns,"polyline");path.setAttribute("points",points.map(function(p){return (10+p.age*220)+","+(50-p.value/span*40);}).join(" "));path.setAttribute("fill","none");path.setAttribute("stroke","#9bc5eb");plot.appendChild(path);
+            points.forEach(function(p,index){var marker=document.createElementNS(ns,"circle");marker.setAttribute("cx",10+p.age*220);marker.setAttribute("cy",50-p.value/span*40);marker.setAttribute("r",4);marker.setAttribute("fill",index===selected?"#fff":"#70a8d3");
+                marker.addEventListener("pointerdown",function(event){if(state.pending)return;event.preventDefault();event.stopPropagation();selected=index;marker.setPointerCapture(event.pointerId);
+                    var original=copyCurvePoints(points),changed=false;
+                    function move(e){var rect=plot.getBoundingClientRect(),x=(e.clientX-rect.left)*240/rect.width,y=(e.clientY-rect.top)*100/rect.height;if(index>0 && index<points.length-1)points[index].age=Math.max(points[index-1].age+.001,Math.min(points[index+1].age-.001,(x-10)/220));points[index].value=Math.max(-32768,Math.min(32768,(50-y)*span/40));changed=true;path.setAttribute("points",points.map(function(q){return (10+q.age*220)+","+(50-q.value/span*40);}).join(" "));marker.setAttribute("cx",10+points[index].age*220);marker.setAttribute("cy",50-points[index].value/span*40);}
+                    function end(e){marker.removeEventListener("pointermove",move);marker.removeEventListener("pointerup",end);marker.removeEventListener("pointercancel",cancel);if(changed)commit();else draw();}
+                    function cancel(){points=original;changed=false;end();}
+                    marker.addEventListener("pointermove",move);marker.addEventListener("pointerup",end);marker.addEventListener("pointercancel",cancel);
+                });plot.appendChild(marker);
+            });
+            plot.onclick=function(event){if(event.target!==plot || state.pending || points.length>=8)return;var rect=plot.getBoundingClientRect(),age=Math.max(.001,Math.min(.999,((event.clientX-rect.left)*240/rect.width-10)/220)),i=1;while(i<points.length && points[i].age<age)i++;if(age-points[i-1].age<.001 || points[i].age-age<.001)return;points.splice(i,0,{age:age,value:Math.max(-32768,Math.min(32768,(50-(event.clientY-rect.top)*100/rect.height)*span/40))});selected=i;commit();};
+            life.value=(points[selected].age*100).toFixed(1);life.disabled=selected===0 || selected===points.length-1;value.value=points[selected].value.toFixed(1);remove.disabled=life.disabled;
+        }
+        life.addEventListener("change",function(){if(state.pending)return;var age=Number(life.value)/100;if(isFinite(age)){points[selected].age=Math.max(points[selected-1].age+.001,Math.min(points[selected+1].age-.001,age));commit();}});
+        value.addEventListener("change",function(){if(state.pending)return;var amount=Number(value.value);if(isFinite(amount)){points[selected].value=Math.max(-32768,Math.min(32768,amount));commit();}});
         draw();return section;
     }
 
@@ -1731,17 +1773,17 @@
                 Math.abs(curveState.points[0].value - points[0].value) < 1e-9 &&
                 Math.abs(curveState.points[curveState.points.length - 1].value - points[points.length - 1].value) < 1e-9) return;
             var graphChanges = [];
-            var endKey = kind === "size" ? keys.sizeEnd : keys.opacityEnd;
+            var endKey = kind === "rotation" ? null : kind === "size" ? keys.sizeEnd : keys.opacityEnd;
             var endParameter = endKey ? graphParameterRecord(node, endKey) : null;
             if (endParameter && Math.abs(Number(endParameter.value) - points[points.length - 1].value) > 1e-9) {
                 graphChanges.push({ nodeId: node.id, parameterKey: endKey,
                                     valueType: endParameter.type, value: points[points.length - 1].value });
             }
-            var curveKey = kind === "size" ? keys.size : keys.opacity;
+            var curveKey = keys[kind];
             if (custom) {
-                var maximum = 100;
+                var maximum = kind === "rotation" ? 32768 : 100;
                 var payload = window.StarfieldGraphView.encodeCurve(points);
-                window.StarfieldGraphView.decodeCurve(payload, 0, maximum, points[0].value,
+                window.StarfieldGraphView.decodeCurve(payload, kind === "rotation" ? -32768 : 0, maximum, points[0].value,
                                                        points[points.length - 1].value);
                 graphChanges.push({ nodeId: node.id, parameterKey: curveKey, valueType: 7, value: payload });
             } else {

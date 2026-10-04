@@ -155,17 +155,18 @@ Vec3 cross_direction(const Vec3& a, const Vec3& b) noexcept {
 // Rotate +Y (straight up) about X, then Y, then Z, so 0/0/0 points up, which is the
 // reference emitter's default look. The rotation order is part of our documented
 // convention (docs/reference-parameter-map.md), not an observation of the reference.
-Vec3 rotate_emission_axis(const Vec3& degrees) noexcept {
+Vec3 rotate_emission_vector(Vec3 axis,const Vec3& degrees) noexcept {
+    if(degrees.x==0 && degrees.y==0 && degrees.z==0)return axis;
     const double to_radians = kEmissionPi / 180.0;
     const double cx = std::cos(degrees.x * to_radians), sx = std::sin(degrees.x * to_radians);
     const double cy = std::cos(degrees.y * to_radians), sy = std::sin(degrees.y * to_radians);
     const double cz = std::cos(degrees.z * to_radians), sz = std::sin(degrees.z * to_radians);
-    Vec3 axis{0.0, 1.0, 0.0};
     axis = Vec3{axis.x, axis.y * cx - axis.z * sx, axis.y * sx + axis.z * cx};
     axis = Vec3{axis.x * cy + axis.z * sy, axis.y, -axis.x * sy + axis.z * cy};
     axis = Vec3{axis.x * cz - axis.y * sz, axis.x * sz + axis.y * cz, axis.z};
     return axis;
 }
+Vec3 rotate_emission_axis(const Vec3& degrees) noexcept {return rotate_emission_vector({0,1,0},degrees);}
 
 // Uniform over the cone's solid angle: cos(theta) is uniform between cos(half) and 1, so
 // the density is even across the cap instead of clustering at the axis. A span of 180
@@ -315,8 +316,8 @@ ParticleInstance evaluate_particle(const Settings& values, double age, std::uint
     // by (seed, id, purpose). This variation is what makes a steady emitter move:
     // with identical particles, births continuously replace the particles that
     // leave, so a correctly computed sequence still looks frozen on playback.
-    const Vec3 birth = birth_offset(values.emitter_shape, values.emitter_size,
-                                    values.emitter_size_pixels, dimension_context, values.seed, slot);
+    const Vec3 birth = rotate_emission_vector(birth_offset(values.emitter_shape, values.emitter_size,
+        values.emitter_size_pixels, dimension_context, values.seed, slot),values.emitter_shape_angles_degrees);
     Vec3 particle_velocity = values.velocity;
     // Emission direction model (M3-04): a per-particle direction on the cone (or the
     // sphere) times the emitted speed. Independent streams keep every frame identical

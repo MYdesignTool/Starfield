@@ -219,6 +219,11 @@ ValidatedSettings validate_settings(Settings settings) {
     value.emission_angles_degrees.z = clamp(value.emission_angles_degrees.z,
                                             -kMaxEmissionAngleDegrees, kMaxEmissionAngleDegrees,
                                             ValidationCode::emission_angle_clamped, "emission_angle_z", notices);
+    for(double* angle:{&value.emitter_shape_angles_degrees.x,&value.emitter_shape_angles_degrees.y,&value.emitter_shape_angles_degrees.z}) {
+        *angle=finite_or(*angle,0.0,"emitter_shape_angle",notices);
+        *angle=clamp(*angle,-kMaxEmissionAngleDegrees,kMaxEmissionAngleDegrees,
+            ValidationCode::emission_angle_clamped,"emitter_shape_angle",notices);
+    }
     value.direction_span_degrees = finite_or(value.direction_span_degrees, 60.0,
                                              "direction_span", notices);
     value.direction_span_degrees = clamp(value.direction_span_degrees, 0.0, kMaxDirectionSpanDegrees,

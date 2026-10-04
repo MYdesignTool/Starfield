@@ -104,8 +104,8 @@ PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef* params[]) noexc
     return PF_Err_NONE;
 }
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef* params[],const PF_UserChangedParamExtra* extra,bool bank) noexcept {
-    ++publications;check(bank && extra->param_index==layout::gradient,"entire gradient bank publishes atomically");
-    check(params[layout::gradient]->uu.change_flags==PF_ChangeFlag_CHANGED_VALUE,"count carries native undo/change flag");
+    ++publications;check(bank && (extra->param_index==layout::gradient || extra->param_index==layout::rotation_curve),"entire visual bank publishes atomically");
+    check(params[extra->param_index]->uu.change_flags==PF_ChangeFlag_CHANGED_VALUE,"count carries native undo/change flag");
     return reject?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
 }
 int main() {
@@ -228,5 +228,20 @@ int main() {
     preview<<"</svg>\n";check(bool(preview),"visual evidence saved only under artifacts");preview.close();
     event.e_type=PF_Event_CLOSE_CONTEXT;check(particle_gradient_event(&data,&out,params.data(),&event)==0,"UI context closes safely");
     starfield::adapter::clear_particle_gradient_ui();check(gets==releases,"SDK suites balanced across all events");
+    using starfield::adapter::particle_rotation_curve_event;
+    event.effect_win.index=layout::rotation_curve;
+    for(int i=0;i<17;++i)values[layout::rotation_curve+i].param_type=PF_Param_FLOAT_SLIDER;
+    event.e_type=PF_Event_DRAW;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"default zero rotation curve draws without any bitmap");
+    const auto curve_click=[&](int x,int y){event.e_type=PF_Event_DO_CLICK;event.u.do_click={};event.u.do_click.screen_point.h=x;event.u.do_click.screen_point.v=y;return particle_rotation_curve_event(&data,&out,params.data(),&event);};
+    auto edits=publications;check(curve_click(118,25)==0 && publications==edits+1 && values[layout::rotation_curve].u.fs_d.value==3,"native rotation adds a point through one bank transaction");
+    check(values[layout::rotation_curve+1].u.fs_d.value==0 && values[layout::rotation_curve+5].u.fs_d.value==1,"rotation curve retains normalized life endpoints");
+    auto rotation_bank=values;reject=true;check(curve_click(65,20)!=0,"failed rotation publication is reported");reject=false;
+    bool curve_restored=true;for(int i=0;i<17;++i)curve_restored &= values[layout::rotation_curve+i].u.fs_d.value==rotation_bank[layout::rotation_curve+i].u.fs_d.value;
+    check(curve_restored,"failed curve addition restores count and every old knot");
+    check(curve_click(243,35)==0,"rotation curve Flip publishes atomically");
+    check(curve_click(20,100)==0 && curve_click(80,100)==0,"rotation curve Copy and Paste remain usable");
+    check(curve_click(145,100)==0 && curve_click(80,125)==0 && values[layout::rotation_curve+4].u.fs_d.value==360,"rotation +360 preset is an authored degree curve");
+    event.e_type=PF_Event_CLOSE_CONTEXT;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"rotation close releases UI state");
+    starfield::adapter::clear_particle_gradient_ui();check(gets==releases,"SDK suites balanced across curve events");
     std::printf("Gradient editor: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

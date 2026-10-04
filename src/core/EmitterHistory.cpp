@@ -82,22 +82,23 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
     try {
         if(!time.scale || graph.particles.size()>kMaxParticleCount || graph.evaluated_nodes.size()>kMaxGraphNodes)
             return R::failure(ErrorCode::invalid_request,"invalid temporal particle snapshot");
-        OpaqueBytes bytes;bytes.reserve(32+16*graph.evaluated_nodes.size()+184*graph.particles.size());
+        OpaqueBytes bytes;bytes.reserve(32+16*graph.evaluated_nodes.size()+200*graph.particles.size());
         const auto append=[&](std::uint64_t value,unsigned count) {
             for(unsigned i=0;i<count;++i) bytes.push_back(static_cast<std::byte>((value>>(8*i))&255));
         };
-        append(0x8004,2);append(2,2);append(32+16*graph.evaluated_nodes.size()+184*graph.particles.size(),4);
+        append(0x8004,2);append(3,2);append(32+16*graph.evaluated_nodes.size()+200*graph.particles.size(),4);
         append(std::bit_cast<std::uint64_t>(time.value),8);append(time.scale,8);
         append(graph.evaluated_nodes.size(),4);append(graph.particles.size(),4);
         for(const auto& node:graph.evaluated_nodes) for(auto b:node.value.bytes) append(b,1);
         for(const auto& p:graph.particles) {
             append(p.id,8);for(auto b:p.emitter_id.value.bytes) append(b,1);
             for(double value:{p.age_seconds,p.lifetime_seconds,p.size_pixels,p.opacity,
-                p.color.x,p.color.y,p.color.z,p.position.x,p.position.y,p.position.z,p.velocity.x,p.velocity.y,p.velocity.z,p.size_y_pixels,p.rotation_degrees.x,p.rotation_degrees.y,p.rotation_degrees.z,p.feather_percent}) {
+                p.color.x,p.color.y,p.color.z,p.position.x,p.position.y,p.position.z,p.velocity.x,p.velocity.y,p.velocity.z,p.size_y_pixels,p.rotation_degrees.x,p.rotation_degrees.y,p.rotation_degrees.z,p.feather_percent,p.anchor_x_percent,p.anchor_y_percent}) {
                 if(!std::isfinite(value)) return R::failure(ErrorCode::invalid_request,"nonfinite temporal particle");
                 append(std::bit_cast<std::uint64_t>(value),8);
             }
-            if(p.shape>2 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100)
+            if(p.shape>2 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
+               p.anchor_x_percent<0 || p.anchor_x_percent>100 || p.anchor_y_percent<0 || p.anchor_y_percent>100)
                 return R::failure(ErrorCode::invalid_request,"invalid temporal sprite properties");
             append(p.shape,4);append(p.up_axis,4);append(p.limit_to_2d?1:0,4);append(0,4);
         }
@@ -114,9 +115,9 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
         const auto tag=read(2),version=read(2),length=read(4);
         const auto clock=std::bit_cast<std::int64_t>(read(8));const auto scale=read(8);
         const auto nodes=read(4),particles=read(4);
-        if(tag!=0x8004 || version!=2 || length!=bytes.size() || !scale || !time.scale ||
+        if(tag!=0x8004 || version!=3 || length!=bytes.size() || !scale || !time.scale ||
             static_cast<long double>(clock)*time.scale!=static_cast<long double>(time.value)*scale ||
-            nodes>kMaxGraphNodes || particles>kMaxParticleCount || bytes.size()!=32+16*nodes+184*particles)
+            nodes>kMaxGraphNodes || particles>kMaxParticleCount || bytes.size()!=32+16*nodes+200*particles)
             return R::failure(ErrorCode::invalid_request,"invalid temporal snapshot header/time");
         EvaluatedGraph result;result.evaluated_nodes.resize(static_cast<std::size_t>(nodes));
         for(auto& node:result.evaluated_nodes) for(auto& b:node.value.bytes) b=static_cast<std::uint8_t>(read(1));
@@ -124,12 +125,13 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
         for(auto& p:result.particles) {
             p.id=read(8);for(auto& b:p.emitter_id.value.bytes) b=static_cast<std::uint8_t>(read(1));
             for(double* value:{&p.age_seconds,&p.lifetime_seconds,&p.size_pixels,&p.opacity,&p.color.x,&p.color.y,&p.color.z,
-                &p.position.x,&p.position.y,&p.position.z,&p.velocity.x,&p.velocity.y,&p.velocity.z,&p.size_y_pixels,&p.rotation_degrees.x,&p.rotation_degrees.y,&p.rotation_degrees.z,&p.feather_percent}) {
+                &p.position.x,&p.position.y,&p.position.z,&p.velocity.x,&p.velocity.y,&p.velocity.z,&p.size_y_pixels,&p.rotation_degrees.x,&p.rotation_degrees.y,&p.rotation_degrees.z,&p.feather_percent,&p.anchor_x_percent,&p.anchor_y_percent}) {
                 *value=std::bit_cast<double>(read(8));if(!std::isfinite(*value)) return R::failure(ErrorCode::invalid_request,"nonfinite temporal particle");
             }
             p.shape=static_cast<std::uint32_t>(read(4));p.up_axis=static_cast<std::uint32_t>(read(4));
             const auto limit=read(4),reserved=read(4);p.limit_to_2d=limit!=0;
-            if(limit>1 || reserved || p.shape>2 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100)
+            if(limit>1 || reserved || p.shape>2 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
+               p.anchor_x_percent<0 || p.anchor_x_percent>100 || p.anchor_y_percent<0 || p.anchor_y_percent>100)
                 return R::failure(ErrorCode::invalid_request,"invalid temporal sprite properties");
             if(p.age_seconds<0 || p.lifetime_seconds<=0 || p.age_seconds>=p.lifetime_seconds ||
                 p.size_pixels<0 || p.opacity<0 || p.opacity>1 ||

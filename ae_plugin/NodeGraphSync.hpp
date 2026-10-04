@@ -67,12 +67,12 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
     if (edit.node_kind > 3 || edit.node_kind == 2 || edit.additional_count>17 ||
-        edit.parameter_index <= 0 || edit.parameter_index > 81 || !any ||
+        edit.parameter_index <= 0 || edit.parameter_index > native_nodes::particle_layout::last || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
     for(unsigned i=0;i<edit.additional_count;++i) {
         const auto& field=edit.additional_fields[i];
-        if(field.index<1 || field.index>81 || static_cast<unsigned>(field.kind)>3)return false;
+        if(field.index<1 || field.index>native_nodes::particle_layout::last || static_cast<unsigned>(field.kind)>3)return false;
         for(double value:field.value)if(!std::isfinite(value))return false;
         for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
     }
@@ -82,6 +82,22 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
 inline bool gradient_bank_parameter(std::uint32_t kind,A_long index) noexcept {
     namespace layout=native_nodes::particle_layout;
     return kind==1 && index>=layout::gradient && index<layout::gradient_first+16;
+}
+inline bool rotation_bank_parameter(std::uint32_t kind,A_long index) noexcept {
+    namespace layout=native_nodes::particle_layout;
+    return kind==1 && index>=layout::rotation_curve && index<layout::rotation_curve+17;
+}
+inline bool capture_rotation_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
+    namespace layout=native_nodes::particle_layout;
+    if(!params || !rotation_bank_parameter(edit.node_kind,edit.parameter_index))return false;
+    auto candidate=edit;candidate.additional_count=0;
+    for(A_long index=layout::rotation_curve;index<layout::rotation_curve+17;++index) {
+        const auto* param=params[index];if(!param || param->param_type!=PF_Param_FLOAT_SLIDER)return false;
+        NativeEdit::Field field;field.index=index;field.value[0]=param->u.fs_d.value;
+        candidate.additional_fields[candidate.additional_count++]=field;
+    }
+    if(!valid_edit(candidate))return false;
+    edit=candidate;return true;
 }
 // A supervised follow-up can arrive before AEGP exposes every newly changed
 // component. Capture the entire callback bank for both PF events and supervision.

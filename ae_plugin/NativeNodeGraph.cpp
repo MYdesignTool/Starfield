@@ -57,7 +57,7 @@ constexpr A_long component_count(node_sync::ValueKind type) noexcept {
 }
 constexpr bool animated_index(Kind kind,A_long index) noexcept {
     if(kind==Kind::particle) return native_nodes::particle_layout::animated(index);
-    return index>=1 && index<=(kind==Kind::emitter?30:10);
+    return index>=1 && index<=(kind==Kind::emitter?33:10);
 }
 
 struct SuiteSet {
@@ -279,7 +279,7 @@ bool read_uuid(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect
 
 bool read_curve(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
                 A_long count_index, A_long first_point_index, const A_Time& time,
-                core::OpaqueBytes& bytes, bool& has_curve) {
+                core::OpaqueBytes& bytes, bool& has_curve,double minimum=0.0,double maximum=100.0) {
     std::uint32_t count = 0;
     if (!read_uint(suites, plugin_id, effect, count_index, time, count) || count > core::kMaxAgeCurvePoints ||
         (count != 0 && count < 2)) return false;
@@ -294,7 +294,7 @@ bool read_curve(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
             !read_one_d(suites, plugin_id, effect, first_point_index + static_cast<A_long>(point * 2 + 1), time,
                         curve.points[point].value)) return false;
     }
-    if (!core::valid_age_curve(curve, 0.0, 100.0)) return false;
+    if (!core::valid_age_curve(curve, minimum, maximum)) return false;
     bytes = core::encode_age_curve(curve);
     return !bytes.empty();
 }
@@ -455,10 +455,10 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
 
 bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key, std::uint16_t& schema) noexcept {
     if (std::strcmp(match_name, kEmitterMatchName) == 0) {
-        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 6; return true;
+        kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 7; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
-        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 5; return true;
+        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 6; return true;
     }
     if (std::strcmp(match_name, kForceMatchName) == 0) {
         kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 2; return true;
@@ -475,24 +475,24 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     if (kind == Kind::emitter) {
         if (!read_one_d(suites, plugin_id, effect, 3, time, scalar)) return false;
         add_value(node, kBirthRate, scalar);
-        if (!read_uint(suites, plugin_id, effect, 24, time, integer)) return false;
+        if (!read_uint(suites, plugin_id, effect, 27, time, integer)) return false;
         add_value(node, kSeed, integer);
         if (!read_uint(suites, plugin_id, effect, 1, time, integer) || integer < 1 || integer > 4) return false;
         add_value(node, kEmitterShape, integer - 1u);
         if (!read_two_d(suites, plugin_id, effect, 4, time, vector) ||
             !read_one_d(suites, plugin_id, effect, 5, time, vector.z)) return false;
         add_value(node, kEmitterOrigin, core::layer_point_to_world(vector.x, vector.y, vector.z + units.layer_height / 2.0, units));
-        if (!read_one_d(suites, plugin_id, effect, 27, time, vector.x) ||
-            !read_one_d(suites, plugin_id, effect, 28, time, vector.y) ||
-            !read_one_d(suites, plugin_id, effect, 29, time, vector.z)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 30, time, vector.x) ||
+            !read_one_d(suites, plugin_id, effect, 31, time, vector.y) ||
+            !read_one_d(suites, plugin_id, effect, 32, time, vector.z)) return false;
         add_value(node, kVelocity, vector);
-        if (!read_one_d(suites, plugin_id, effect, 25, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 28, time, scalar)) return false;
         add_value(node, kParticleSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 26, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 29, time, scalar)) return false;
         add_value(node, kOpacity, scalar / 100.0);
         if (!read_one_d(suites, plugin_id, effect, 11, time, scalar)) return false;
         add_value(node, kEmitterSize, scalar);
-        if (!read_one_d(suites, plugin_id, effect, 30, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 33, time, scalar)) return false;
         add_value(node, kVelocitySpread, scalar);
         if (!read_one_d(suites, plugin_id, effect, 6, time, scalar)) return false;
         const double emission_speed = scalar / units.layer_height;
@@ -506,7 +506,11 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         }
         if (!read_uint(suites, plugin_id, effect, 15, time, integer) || integer < 1 || integer > 2) return false;
         add_value(node, kDirectionMode, integer - 1u);
-        if (!read_one_d(suites, plugin_id, effect, 16, time, scalar)) return false;
+        if (!read_one_d(suites, plugin_id, effect, 16, time, vector.x) ||
+            !read_one_d(suites, plugin_id, effect, 17, time, vector.y) ||
+            !read_one_d(suites, plugin_id, effect, 18, time, vector.z)) return false;
+        add_value(node,kEmitterOrient,vector);
+        if (!read_one_d(suites, plugin_id, effect, 19, time, scalar)) return false;
         add_value(node, kDirectionSpan, scalar);
         constexpr std::array<core::ParameterKey, 3> size_keys{kEmitterSizeX, kEmitterSizeY, kEmitterSizeZ};
         for (A_long axis = 0; axis < 3; ++axis) {
@@ -515,12 +519,12 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         }
         if (!read_uint(suites, plugin_id, effect, 2, time, integer) || integer < 1 || integer > 4) return false;
         add_value(node, kEmittingMode, integer - 1u);
-        if(!read_uint(suites,plugin_id,effect,31,time,integer) || integer>1) return false;
+        if(!read_uint(suites,plugin_id,effect,34,time,integer) || integer>1) return false;
         add_value(node,kAuxiliarySource,integer);
         constexpr std::array<core::ParameterKey, 7> auxiliary_keys{kEmitChance, kEmitLifeStart, kEmitLifeEnd,
             kInheritVelocity, kInheritSize, kInheritOpacity, kInheritColor};
         for (A_long field = 0; field < 7; ++field) {
-            if (!read_one_d(suites, plugin_id, effect, 17 + field, time, scalar)) return false;
+            if (!read_one_d(suites, plugin_id, effect, 20 + field, time, scalar)) return false;
             add_value(node, auxiliary_keys[field], scalar);
         }
         return true;
@@ -593,15 +597,18 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         if (!read_one_d(suites, plugin_id, effect, 2, time, scalar)) return false;
         add_value(node, kParticleLifetimeSeconds, scalar);
         for(auto [index,key]:{std::pair{particle_layout::life_random,kLifeRandom},std::pair{particle_layout::size_y,kSizeY},std::pair{particle_layout::feather,kParticleFeather},
-                            std::pair{particle_layout::angle_random,kAngleRandom},std::pair{particle_layout::speed_random,kRotationSpeedRandom}}) {
+                            std::pair{particle_layout::angle_random,kAngleRandom},std::pair{particle_layout::speed_random,kRotationSpeedRandom},
+                            std::pair{particle_layout::limit_angle,kLimitAngle},std::pair{particle_layout::anchor_x,kAnchorX},std::pair{particle_layout::anchor_y,kAnchorY}}) {
             if(!read_one_d(suites,plugin_id,effect,index,time,scalar)) return false;
             add_value(node,key,scalar);
         }
         for(auto [index,key]:{std::pair{particle_layout::shape,kParticleShape},std::pair{particle_layout::up_axis,kUpAxis},
-                            std::pair{particle_layout::orient,kOrientTo},std::pair{particle_layout::limit_2d,kLimitTo2D}}) {
+                            std::pair{particle_layout::orient,kOrientTo},std::pair{particle_layout::random_limit,kRandomLimit}}) {
             if(!read_uint(suites,plugin_id,effect,index,time,integer) || integer<1) return false;
             add_value(node,key,integer-1);
         }
+        if(!read_uint(suites,plugin_id,effect,particle_layout::limit_2d,time,integer) || integer>1)return false;
+        add_value(node,kLimitTo2D,integer);
         for(auto [first,key]:{std::pair{particle_layout::angle,kParticleAngles},std::pair{particle_layout::speed,kRotationSpeed}}) {
             if(!read_one_d(suites,plugin_id,effect,first,time,vector.x) ||
                !read_one_d(suites,plugin_id,effect,first+1,time,vector.y) ||
@@ -622,6 +629,9 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     if (!read_curve(suites, plugin_id, effect, opacity_curve_count_index, opacity_curve_first_index,
                     time, curve, has_curve)) return false;
     if (has_curve) add_value(node, kOpacityOverLifeCurve, std::move(curve));
+    if (!read_curve(suites,plugin_id,effect,particle_layout::rotation_curve,particle_layout::rotation_curve+1,
+                    time,curve,has_curve,-32768.0,32768.0)) return false;
+    if(has_curve)add_value(node,kRotationOverLife,std::move(curve));
     return true;
 }
 

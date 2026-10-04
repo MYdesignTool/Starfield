@@ -160,6 +160,7 @@ struct Settings {
     double emission_speed{0.0};
     double emission_speed_random{0.0};
     Vec3 emission_angles_degrees{};
+    Vec3 emitter_shape_angles_degrees{};
     DirectionMode direction_mode{DirectionMode::uniform};
     double direction_span_degrees{60.0};
 };

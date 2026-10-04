@@ -48,8 +48,11 @@ struct ParticleValues {
     ColorGradient gradient{white_gradient()};
     double life_random_percent{}, size_y{10}, feather_percent{}, angle_random_percent{}, speed_random_percent{};
     std::uint32_t shape{}, orient_to{}, up_axis{2};
-    bool limit_to_2d{true};
+    bool limit_to_2d{false};
     Vec3 angles{}, rotation_speed{};
+    std::uint32_t random_limit{};
+    double limit_angle{},anchor_x{50},anchor_y{50};
+    AgeCurve rotation_curve{};
 };
 
 constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
@@ -82,14 +85,15 @@ Result<ValidatedSettings> read_emitter(const GraphNode& node) {
                 settings.emission_speed_random = std::get<double>(parameter.value);
                 break;
             case kEmissionAngleX.value:
-                settings.emission_angles_degrees.x = std::get<double>(parameter.value);
+                settings.emitter_shape_angles_degrees.x = std::get<double>(parameter.value);
                 break;
             case kEmissionAngleY.value:
-                settings.emission_angles_degrees.y = std::get<double>(parameter.value);
+                settings.emitter_shape_angles_degrees.y = std::get<double>(parameter.value);
                 break;
             case kEmissionAngleZ.value:
-                settings.emission_angles_degrees.z = std::get<double>(parameter.value);
+                settings.emitter_shape_angles_degrees.z = std::get<double>(parameter.value);
                 break;
+            case kEmitterOrient.value: settings.emission_angles_degrees=std::get<Vec3>(parameter.value);break;
             case kDirectionMode.value: {
                 const auto mode = std::get<std::uint32_t>(parameter.value);
                 if (mode > static_cast<std::uint32_t>(DirectionMode::uniform)) {
@@ -234,13 +238,22 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
             if(const auto* v=find_value(node,key)) value=std::get<std::uint32_t>(*v);
             return value<=maximum;
         };
-        std::uint32_t limit=1;
+        std::uint32_t limit=0;
         if(!scalar(kLifeRandom,100,result.life_random_percent) || !scalar(kSizeY,100000,result.size_y) ||
            !scalar(kParticleFeather,100,result.feather_percent) || !scalar(kAngleRandom,100,result.angle_random_percent) ||
            !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,2,result.shape) ||
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
+        if(!scalar(kAnchorX,100,result.anchor_x) || !scalar(kAnchorY,100,result.anchor_y) ||
+           !enumeration(kRandomLimit,4,result.random_limit))
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle anchor/random limit outside bounds");
+        if(const auto* v=find_value(node,kLimitAngle))result.limit_angle=std::get<double>(*v);
+        if(!std::isfinite(result.limit_angle) || std::abs(result.limit_angle)>32768)
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Limit Angle outside native Angle range");
+        if(const auto* v=find_value(node,kRotationOverLife))
+            if(!decode_age_curve(std::get<OpaqueBytes>(*v),result.rotation_curve,-32768,32768))
+                return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Invalid Rotation Over Life curve");
         for(auto [key,value]:{std::pair{kParticleAngles,&result.angles},std::pair{kRotationSpeed,&result.rotation_speed}}) {
             if(const auto* v=find_value(node,key)) *value=std::get<Vec3>(*v);
             for(double axis:{value->x,value->y,value->z}) if(!std::isfinite(axis) || axis < -32768 || axis > 32768)
@@ -257,12 +270,21 @@ void apply_particle_properties(ParticleInstance& particle,const ParticleValues& 
     std::uint32_t seed,Vec3 birth_position) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
     particle.feather_percent=values.feather_percent;
+    particle.anchor_x_percent=values.anchor_x;particle.anchor_y_percent=values.anchor_y;
     particle.size_y_pixels=values.size_start>0?particle.size_pixels*values.size_y/values.size_start:0;
     const double spin_scale=1-values.speed_random_percent/100*unit_value(seed,particle.id,RandomPurpose::particle_spin);
-    const double angle_offset=(2*unit_value(seed,particle.id,RandomPurpose::particle_angle)-1)*180*values.angle_random_percent/100;
+    const auto angle_offset=[&](unsigned axis) {
+        const bool limited=values.random_limit==1 || values.random_limit==axis+2;
+        const double amplitude=limited?std::min(180*values.angle_random_percent/100,std::abs(values.limit_angle)):180*values.angle_random_percent/100;
+        const auto salt=axis==2?0U:(axis+1)*0x9e3779b9U;
+        return (2*unit_value(seed^salt,particle.id,RandomPurpose::particle_angle)-1)*amplitude;
+    };
+    const double age_fraction=particle.lifetime_seconds>0?particle.age_seconds/particle.lifetime_seconds:0;
     particle.rotation_degrees={values.angles.x+values.rotation_speed.x*particle.age_seconds*spin_scale,
         values.angles.y+values.rotation_speed.y*particle.age_seconds*spin_scale,
-        values.angles.z+values.rotation_speed.z*particle.age_seconds*spin_scale+angle_offset};
+        values.angles.z+values.rotation_speed.z*particle.age_seconds*spin_scale};
+    particle.rotation_degrees.x+=angle_offset(0);particle.rotation_degrees.y+=angle_offset(1);
+    particle.rotation_degrees.z+=angle_offset(2)+evaluate_age_curve(values.rotation_curve,age_fraction,0,0);
     if(values.orient_to) {
         const auto direction=values.orient_to==1?particle.velocity:Vec3{birth_position.x-particle.position.x,
             birth_position.y-particle.position.y,birth_position.z-particle.position.z};

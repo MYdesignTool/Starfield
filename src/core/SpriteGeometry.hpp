@@ -37,7 +37,7 @@ inline bool valid_camera(const RenderRequest::Camera& camera) noexcept {
 inline Vec3 rotate_axis(Vec3 value,Vec3 angles) noexcept {
     constexpr double radians=3.14159265358979323846/180;
     for(int axis=0;axis<3;++axis) {
-        const double angle=(axis==0?angles.x:axis==1?angles.y:angles.z)*radians;
+        const double angle=(axis==0?angles.x:axis==1?angles.y:-angles.z)*radians;
         const double c=std::cos(angle),s=std::sin(angle);
         if(axis==0) value={value.x,c*value.y-s*value.z,s*value.y+c*value.z};
         if(axis==1) value={c*value.x+s*value.z,value.y,-s*value.x+c*value.z};
@@ -75,9 +75,9 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         const double x=(m[0]*u+m[1]*v+m[2])/w,y=(m[3]*u+m[4]*v+m[5])/w;
         sprite.x=x*grid.scale_x;sprite.y=y*grid.scale_y;
         const auto project_axis=[&](Vec3 axis,double& dx,double& dy) {
-            double axis_view[3]{axis.x,axis.y,0};
+            double axis_view[3]{axis.x,-axis.y,0};
             if(!billboard) {
-                const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,axis.y,axis.z};
+                const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,-axis.y,axis.z};
                 for(int col=0;col<3;++col) {
                     axis_view[col]=0;
                     for(int row=0;row<3;++row) axis_view[col]+=local_axis[row]*camera.layer_to_view[row*4+col];
@@ -90,6 +90,9 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         };
         project_axis(a,sprite.ax,sprite.ay);project_axis(b,sprite.bx,sprite.by);
     }
+    const double anchor_x=1-particle.anchor_x_percent/50,anchor_y=particle.anchor_y_percent/50-1;
+    sprite.x+=sprite.ax*anchor_x+sprite.bx*anchor_y;
+    sprite.y+=sprite.ay*anchor_x+sprite.by*anchor_y;
     return std::isfinite(sprite.x) && std::isfinite(sprite.y) && std::isfinite(sprite.ax) &&
         std::isfinite(sprite.ay) && std::isfinite(sprite.bx) && std::isfinite(sprite.by);
 }

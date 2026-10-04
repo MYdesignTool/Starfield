@@ -498,4 +498,29 @@ void test_particle_geometry() {
         restored.value().particles[0].feather_percent==particle.feather_percent,"version 2 preserves sprite fields");
     auto malformed=bytes.take_value();malformed[2]=std::byte{1};check(!decode_evaluated_particles(malformed,{1,2}).has_value(),"unpaired old transient snapshot is rejected");
 }
-int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();test_particle_geometry();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_rotation_controls() {
+    Settings s;s.birth_rate=10;s.particle_lifetime_seconds=2;s.particle_count=100;s.emission_speed=1;s.direction_mode=DirectionMode::directional;
+    auto graph=make_emitter_particle_output_graph(s,NodeId{uuid(1)},NodeId{uuid(2)},NodeId{uuid(255)},EdgeId{uuid(11)},EdgeId{uuid(12)}).take_value();
+    auto base=evaluate_particle_graph(graph,{1,1},never);check(base.has_value() && !base.value().particles.empty(),"rotation baseline emits particles");
+    if(!base.has_value() || base.value().particles.empty())return;
+    check(!base.value().particles[0].limit_to_2d,"Limit To 2D defaults off");
+    set(graph.nodes[1],kAnchorX,25.0);set(graph.nodes[1],kAnchorY,75.0);
+    AgeCurve curve;curve.count=2;curve.points[0]={0,0};curve.points[1]={1,360};set(graph.nodes[1],kRotationOverLife,encode_age_curve(curve));
+    auto rotated=evaluate_particle_graph(graph,{1,1},never);check(rotated.has_value(),"degree Rotation Over Life evaluates");
+    if(rotated.has_value()) {
+        for(const auto& p:rotated.value().particles){check(std::abs(p.rotation_degrees.z-p.age_seconds/p.lifetime_seconds*360)<1e-9,"rotation curve uses normalized particle age");check(p.anchor_x_percent==25 && p.anchor_y_percent==75,"anchors reach evaluated particles");}
+        auto bytes=encode_evaluated_particles(rotated.value(),{1,1});auto decoded=decode_evaluated_particles(bytes.value(),{1,1});
+        check(decoded.has_value() && decoded.value().particles[0].anchor_x_percent==25 && decoded.value().particles[0].anchor_y_percent==75,"snapshot3 preserves both anchors");
+    }
+    curve.points[1].value=0;set(graph.nodes[1],kRotationOverLife,encode_age_curve(curve));
+    set(graph.nodes[1],kAngleRandom,100.0);set(graph.nodes[1],kRandomLimit,std::uint32_t{1});set(graph.nodes[1],kLimitAngle,10.0);
+    auto limited=evaluate_particle_graph(graph,{1,1},never);check(limited.has_value(),"All Axis random limit evaluates");
+    if(limited.has_value())for(const auto& p:limited.value().particles)check(std::abs(p.rotation_degrees.x)<=10 && std::abs(p.rotation_degrees.y)<=10 && std::abs(p.rotation_degrees.z)<=10,"All Axis bounds birth angle variation");
+    set(graph.nodes[1],kRandomLimit,std::uint32_t{5});check(!evaluate_particle_graph(graph,{1,1},never).has_value(),"invalid random limit rejected");
+    set(graph.nodes[1],kRandomLimit,std::uint32_t{0});set(graph.nodes[1],kAngleRandom,0.0);
+    set(graph.nodes[0],kEmissionAngleZ,90.0);auto shape_only=evaluate_particle_graph(graph,{1,1},never);
+    check(shape_only.has_value() && std::abs(shape_only.value().particles[0].velocity.x-base.value().particles[0].velocity.x)<1e-9,"Emitter Angle does not rotate directional cone");
+    set(graph.nodes[0],kEmitterOrient,Vec3{0,0,90});auto direction=evaluate_particle_graph(graph,{1,1},never);
+    check(direction.has_value() && std::abs(direction.value().particles[0].velocity.x-base.value().particles[0].velocity.x)>0.01,"Emitter Orient rotates directional cone");
+}
+int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();test_particle_geometry();test_rotation_controls();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

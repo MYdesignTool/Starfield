@@ -15,7 +15,7 @@
         force: "org.starfieldfx.nodes.force",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 6, particle: 5, force: 2, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 6, force: 2, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
@@ -38,7 +38,7 @@
             {key:"23",type:3,value:0},{key:"31",type:3,value:0}, {key:"24",type:4,value:100},
             {key:"25",type:4,value:0}, {key:"26",type:4,value:100},
             {key:"27",type:4,value:0}, {key:"28",type:4,value:0},
-            {key:"29",type:4,value:0}, {key:"30",type:4,value:0}
+            {key:"29",type:4,value:0}, {key:"30",type:4,value:0}, {key:"32",type:5,value:[0,0,0]}
         ],
         particle: [
             { key: "12", type: 3, value: 0 },
@@ -52,8 +52,9 @@
             { key: "16", type: 4, value: 10 }, { key: "17", type: 3, value: 0 },
             { key: "18", type: 5, value: [0,0,0] }, { key: "19", type: 4, value: 0 },
             { key: "20", type: 5, value: [0,0,0] }, { key: "21", type: 4, value: 0 },
-            { key: "22", type: 3, value: 1 }, { key: "23", type: 4, value: 0 },
-            { key: "24", type: 3, value: 2 }
+            { key: "22", type: 3, value: 0 }, { key: "23", type: 4, value: 0 },
+            { key: "24", type: 3, value: 2 }, {key:"25",type:3,value:0},
+            {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },

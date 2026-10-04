@@ -518,7 +518,7 @@
             for (var i = 0; i < bytes[1]; i++) {
                 var age = readGraphFloat64(bytes, 4 + i * 16);
                 var value = readGraphFloat64(bytes, 12 + i * 16);
-                if (age < 0 || age > 1 || value < 0 || value > 100 || (i && age <= points[i - 1].age)) {
+                if (!isFinite(age) || !isFinite(value) || age < 0 || age > 1 || value < (label==="Rotation"?-32768:0) || value > (label==="Rotation"?32768:100) || (i && age <= points[i - 1].age)) {
                     throw new Error(label + " curve point is outside its supported range.");
                 }
                 points.push({ age: age, value: value });
@@ -527,9 +527,9 @@
                 throw new Error(label + " curve endpoints must remain at 0 and 100 percent life.");
             }
         }
-        setNodeControl(effect, label + " Curve Count", points.length);
+        setNodeControl(effect, label === "Rotation" ? "Rotation Over Life" : label + " Curve Count", points.length);
         for (var p = 0; p < points.length; p++) {
-            setNodeControl(effect, label + " Curve " + p + " Age", points[p].age);
+            setNodeControl(effect, label + " Curve " + p + (label==="Rotation" ? " Life" : " Age"), points[p].age);
             setNodeControl(effect, label + " Curve " + p + " Value", points[p].value);
         }
     }
@@ -588,8 +588,8 @@
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
-            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 6 :
-                type === "org.starfieldfx.nodes.particle" ? 5 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
+            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 7 :
+                type === "org.starfieldfx.nodes.particle" ? 6 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -625,6 +625,7 @@
             scalar(17, "Direction", 3); node.parameters[node.parameters.length - 1].value--;
             scalar(23, "Emitting", 3); node.parameters[node.parameters.length - 1].value--;
             scalar(31,"Auxiliary Source",3);
+            node.parameters.push({key:"32",type:5,value:[Number(nodeControlValue(effect,"Orient X")),Number(nodeControlValue(effect,"Orient Y")),Number(nodeControlValue(effect,"Orient Z"))]});
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
@@ -669,8 +670,9 @@
             scalar(9, "Size Random"); scalar(10, "Opacity Random");
             if (type === "org.starfieldfx.nodes.particle") {
                 scalar(11,"Life (Seconds)");scalar(14,"Life Random");scalar(16,"Size Y (Pixels)");
-                scalar(19,"Angle Random");scalar(21,"Speed Random");scalar(23,"Particle Feather");
-                var enums=[[15,"Shape"],[17,"Orient To"],[22,"Limit to 2D"],[24,"Up Axis"]];
+                scalar(19,"Angle Random");scalar(21,"Rotation Speed Random");scalar(23,"Particle Feather");
+                scalar(26,"Limit Angle");scalar(28,"Anchor X (Percent)");scalar(29,"Anchor Y (Percent)");scalar(22,"Limit To 2D",3);
+                var enums=[[15,"Shape"],[17,"Orient To"],[25,"Random Limit"],[24,"Up Axis"]];
                 for(var ei=0;ei<enums.length;ei++) {
                     scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
                 }
@@ -680,14 +682,14 @@
                         Number(nodeControlValue(effect,label+" Y")),Number(nodeControlValue(effect,label+" Z"))]});
                 }
             }
-            var curves = [[7,"Size"],[8,"Opacity"]];
+            var curves = [[7,"Size"],[8,"Opacity"],[27,"Rotation"]];
             for (var c = 0; c < curves.length; c++) {
-                var label = curves[c][1], count = Number(nodeControlValue(effect, label + " Curve Count"));
+                var label = curves[c][1], count = Number(nodeControlValue(effect, label === "Rotation" ? "Rotation Over Life" : label + " Curve Count"));
                 if (count === 0) continue;
                 if (Math.floor(count) !== count || count < 2 || count > 8) throw new Error("A node curve count is invalid.");
                 var bytes = [1, count, 0, 0];
                 for (var point = 0; point < count; point++) {
-                    appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + " Age")));
+                    appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + (label==="Rotation" ? " Life" : " Age"))));
                     appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + " Value")));
                 }
                 node.parameters.push({ key: String(curves[c][0]), type: 7, value: bytes });
@@ -829,6 +831,7 @@
                     else if (key === "22") setNodeControl(effect, "Speed Random", value);
                     else if (key === "23") setNodeControl(effect, "Emitting", Number(value) + 1);
                     else if(key === "31") setNodeControl(effect,"Auxiliary Source",Number(value));
+                    else if(key === "32") {for(var oa=0;oa<3;oa++)setNodeControl(effect,"Orient "+["X","Y","Z"][oa],value[oa]);}
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
@@ -846,10 +849,11 @@
                     else if (key === "10") setNodeControl(effect, "Opacity Random", value);
                     else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Life (Seconds)", value);
                     else if(type==="org.starfieldfx.nodes.particle") {
-                        var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Speed Random","23":"Particle Feather"};
-                        var enums={"15":"Shape","17":"Orient To","22":"Limit to 2D","24":"Up Axis"};
+                        var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Rotation Speed Random","23":"Particle Feather","26":"Limit Angle","28":"Anchor X (Percent)","29":"Anchor Y (Percent)","22":"Limit To 2D"};
+                        var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis"};
                         if(scalars[key]) setNodeControl(effect,scalars[key],value);
                         else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
+                        else if(key==="27") writeNodeCurve(effect,"Rotation",value);
                         else if(key==="18" || key==="20") {
                             var group=key==="18"?"Angle":"Speed";
                             for(var axis=0;axis<3;axis++) setNodeControl(effect,group+" "+["X","Y","Z"][axis],value[axis]);
@@ -878,6 +882,7 @@
             if (type === "org.starfieldfx.nodes.particle") {
                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
+                if (!nodeParameter(node, "27")) writeNodeCurve(effect, "Rotation", null);
             }
         } finally {
             setNodeControl(effect, "Panel Sync Guard", 0);
@@ -1285,12 +1290,12 @@
                 }
                 var initial = [];
                 if (!emitter) {
-                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:6,
+                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:7,
                         parameters:[{key:"6",type:5,value:[0,0,0]}],position:{x:180,y:22},outgoing:[]};
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:5,
+                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:6,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }

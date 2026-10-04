@@ -267,6 +267,8 @@ inline constexpr ParameterKey kColorGradient{13};
 inline constexpr ParameterKey kLifeRandom{14}, kParticleShape{15}, kSizeY{16}, kOrientTo{17};
 inline constexpr ParameterKey kParticleAngles{18}, kAngleRandom{19}, kRotationSpeed{20}, kRotationSpeedRandom{21};
 inline constexpr ParameterKey kLimitTo2D{22}, kParticleFeather{23}, kUpAxis{24};
+inline constexpr ParameterKey kRandomLimit{25}, kLimitAngle{26}, kRotationOverLife{27}, kAnchorX{28}, kAnchorY{29};
+inline constexpr ParameterKey kEmitterOrient{32}; // Emitter direction, distinct from shape angles.
 inline constexpr ParameterKey kAcceleration{6}; // Output: 0 CPU / 1 GPU
 inline constexpr ParameterKey kTimeSamplingHz{7};
 

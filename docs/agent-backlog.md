@@ -1,5 +1,34 @@
 # Agent-ready implementation backlog
 
+## M3-08 - Reference procedural rotation controls
+
+Owner: primary agent. Depends on committed M3-07 movable gradients (381be4f).
+Current implementation card; develop on codex/m3-07-particle-gradient. ADR0028
+owns the Particle Random Limit/Limit Angle/Rotation Over Life/anchor semantics,
+Emitter Angle/Orient split, native AE dials and reference defaults/names/order.
+Owned files: Graph/Settings/ParticleInstance/GraphEvaluation/SpriteGeometry,
+EmitterHistory snapshot, node definition/layout/readers/sync/schema, CEP gradient
+and curve inspector/gateway, build/version and focused checks/docs. Render.hpp,
+GPU frameworks/kernel transport and main binding layout are unchanged. No inactive
+external Light/Null/source/model control placeholders. Fresh schema6 Particle and
+schema7 Emitter effects/graphs required; paired rollback retains prior bytes.
+Status: implementation complete. Native build succeeds; 435 current-node,
+6200 native-sync + 12 camera, 3688 visual-editor and 91 Particle registration
+checks pass. Integrate the candidate with subsequent P-03
+before the next deployment; main remains owner-accepted build31.
+
+## P-03 - Main picture launcher and preset manager
+
+Owner: primary agent, current card after M3-08. User explicitly requests one generated
+Starfield banner in the main ECW and a functional preset manager with categories,
+search, render-settings option and Add/Replace. The built-in imagegen banner is
+saved under artifacts/assets pending integration. Own main custom UI/resources/
+build/parameters/schema/capabilities, CEP manifest/assets/manager/preset model/
+gateway, and matching focused checks/docs. Keep authoring on the existing graph
+transaction and target identity/revision guards. Do not add registry, shared CEF
+flags, third-party presets or inactive unsupported-category downloads. Actual AE
+launcher and graph application require host qualification.
+
 ## M3-07 - Particle Color Over Life editor and control organization
 
 Owner reports build34 usable, then requests movable first/last markers. The

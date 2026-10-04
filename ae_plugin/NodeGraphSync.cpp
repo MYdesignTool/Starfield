@@ -256,8 +256,10 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         edit.uuid = node_id;
         if (!capture_edit(*in_data, *changed, edit)) return PF_Err_BAD_CALLBACK_PARAM;
         const bool gradient_bank=starfield::adapter::node_sync::gradient_bank_parameter(edit.node_kind,edit.parameter_index);
-        if(particle_gradient && !gradient_bank)return PF_Err_BAD_CALLBACK_PARAM;
+        const bool rotation_bank=starfield::adapter::node_sync::rotation_bank_parameter(edit.node_kind,edit.parameter_index);
+        if(particle_gradient && !gradient_bank && !rotation_bank)return PF_Err_BAD_CALLBACK_PARAM;
         if(gradient_bank && !starfield::adapter::node_sync::capture_gradient_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
+        if(rotation_bank && !starfield::adapter::node_sync::capture_rotation_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;

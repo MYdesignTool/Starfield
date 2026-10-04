@@ -34,7 +34,7 @@ global.testGradientWrite(effect,Array.from(insetBytes));
 assert.equal(values.get("Color Gradient 0 Position"),20);assert.equal(values.get("Color Gradient 1 Position"),80);
 const nodeId="00000000000000000000000000000001",copyId="00000000000000000000000000000002";
 let graph=edits.apply({nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:"particle"},()=>nodeId);
-assert.equal(graph.nodes[0].schemaVersion,5);
+assert.equal(graph.nodes[0].schemaVersion,6);
 assert.equal(graph.nodes[0].parameters.find(p=>p.key==="12").value,0);
 assert.equal(view.decodeGradient(graph.nodes[0].parameters.find(p=>p.key==="13").value).length,2);
 graph=edits.apply(graph,{type:"setParameters",changes:[{nodeId,parameterKey:"13",valueType:7,value:bytes}]});

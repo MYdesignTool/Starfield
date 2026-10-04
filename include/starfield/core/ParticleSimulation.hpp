@@ -25,7 +25,8 @@ struct ParticleInstance {
     double size_y_pixels{0.0}; // 0 means use diameter in standalone settings
     Vec3 rotation_degrees{};
     double feather_percent{0};
-    bool limit_to_2d{true};
+    bool limit_to_2d{false};
+    double anchor_x_percent{50},anchor_y_percent{50};
     std::uint32_t up_axis{2};
     Vec3 color{1.0, 1.0, 1.0};
     Vec3 position{};

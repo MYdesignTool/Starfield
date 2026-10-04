@@ -21,7 +21,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3 }; // 2 is not a node 
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
-        case Kind::emitter: return 31;
+        case Kind::emitter: return 34;
         case Kind::particle: return particle_layout::last;
         case Kind::force: return 27;
     }
@@ -59,6 +59,9 @@ enum : A_long {
     kParticleAngleXId = 219, kParticleAngleYId = 220, kParticleAngleZId = 221,
     kParticleAngleRandomId = 222, kRotationSpeedXId = 223, kRotationSpeedYId = 224,
     kRotationSpeedZId = 225, kRotationSpeedRandomId = 226, kLimitTo2DId = 227,
+    kRandomLimitId=228,kLimitAngleId=229,kAnchorXId=230,kAnchorYId=231,
+    kRotationCurveCountId=960,kRotationCurveAgeFirstId=970,kRotationCurveValueFirstId=980,
+    kEmitterOrientXId=137,kEmitterOrientYId=138,kEmitterOrientZId=139,
     kParticlePropertiesId=2910, kParticlePropertiesEndId=2911,
     kParticleOverLifeId=2912, kParticleOverLifeEndId=2913,
     kParticleRotationId=2914, kParticleRotationEndId=2915,
@@ -127,12 +130,13 @@ enum : A_long {
         kOriginXYId, kOriginZId, kVelocityXId, kVelocityYId, kVelocityZId, kDiscSizeId, kSpeedRandomId,
         kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId, kEmissionSpeedId,
         kEmissionSpeedRandomId, kEmissionAngleXId, kEmissionAngleYId, kEmissionAngleZId,
-        kDirectionId, kDirectionSpanId,
+        kDirectionId, kDirectionSpanId,kEmitterOrientXId,kEmitterOrientYId,kEmitterOrientZId,
         kLifetimeId, kSizeId, kSizeOverLifeId, kOpacityId, kOpacityOverLifeId,
         kColorStartId, kColorEndId, kSizeRandomId, kOpacityRandomId,
         kAuxiliarySourceId,kLifeRandomId,kParticleShapeId,kSizeYId,kFeatherId,kUpAxisId,kOrientToId,
         kParticleAngleXId,kParticleAngleYId,kParticleAngleZId,kParticleAngleRandomId,kRotationSpeedXId,kRotationSpeedYId,kRotationSpeedZId,kRotationSpeedRandomId,kLimitTo2DId,
         kParticleColorModeId, kColorGradientCountId,
+        kRandomLimitId,kLimitAngleId,kAnchorXId,kAnchorYId,kRotationCurveCountId,
         kParticlePropertiesId, kParticlePropertiesEndId, kParticleOverLifeId,
         kParticleOverLifeEndId, kParticleRotationId, kParticleRotationEndId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,
@@ -141,7 +145,7 @@ enum : A_long {
         kLayoutXId, kLayoutYId, kConnectionCountId, kSyncGuardId,
         kSizeCurveCountId, kOpacityCurveCountId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 64> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 8 + 80> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
@@ -151,6 +155,8 @@ enum : A_long {
         }
     }
     for (A_long point = 0; point < 8; ++point) {
+        ids[count++]=kRotationCurveAgeFirstId+point;
+        ids[count++]=kRotationCurveValueFirstId+point;
         ids[count++]=kColorGradientPositionFirstId+point;
         ids[count++]=kColorGradientColorFirstId+point;
         ids[count++] = uuid_id(point);
