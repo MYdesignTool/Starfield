@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-07 / build33 - correct failed native UI qualification
+
+Owner rejects build32 add-stop/UI/metadata qualification. Complete the ADR0027
+drawing, parameter-dimension and whole-bank event corrections, then requalify
+native edits/undo/reopen and fresh-node hidden fields in AE2023. Development stays
+on codex/m3-07-particle-gradient; accepted main remains at 8857303.
+
 ## M3-07 / build32 - Particle gradient editor
 
 Main/origin main contains the owner-accepted build31 at 8857303. Subsequent work

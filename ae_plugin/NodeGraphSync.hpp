@@ -1,4 +1,5 @@
 #pragma once
+#include "ParticleLayout.hpp"
 
 #include "AE_Effect.h"
 #include "AE_GeneralPlug.h"
@@ -76,6 +77,35 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
         for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
     }
     return true;
+}
+
+inline bool gradient_bank_parameter(std::uint32_t kind,A_long index) noexcept {
+    namespace layout=native_nodes::particle_layout;
+    return kind==1 && index>=layout::gradient && index<layout::gradient_first+16;
+}
+// A supervised follow-up can arrive before AEGP exposes every newly changed
+// component. Capture the entire callback bank for both PF events and supervision.
+inline bool capture_gradient_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
+    namespace layout=native_nodes::particle_layout;
+    if(!params || !gradient_bank_parameter(edit.node_kind,edit.parameter_index))return false;
+    auto candidate=edit;candidate.additional_count=0;
+    for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
+        const auto* param=params[index];if(!param)return false;
+        NativeEdit::Field field;field.index=index;
+        const bool color=index>=layout::gradient_first && (index-layout::gradient_first)%2==1;
+        if(color) {
+            if(param->param_type!=PF_Param_COLOR)return false;
+            field.kind=ValueKind::color;
+            field.value={param->u.cd.value.red/255.0,param->u.cd.value.green/255.0,
+                param->u.cd.value.blue/255.0,param->u.cd.value.alpha/255.0};
+        } else {
+            if(param->param_type!=PF_Param_FLOAT_SLIDER)return false;
+            field.kind=ValueKind::scalar;field.value[0]=param->u.fs_d.value;
+        }
+        candidate.additional_fields[candidate.additional_count++]=field;
+    }
+    if(!valid_edit(candidate))return false;
+    edit=candidate;return true;
 }
 
 } // namespace starfield::adapter::node_sync

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 32: native Particle gradient editor and reference control organization.
-#define STARFIELD_VERSION_BUILD 32
-#define STARFIELD_VERSION_PACKED 32800 /* 0x8020 */
+// Build 33: continuous gradient drawing, atomic events and hidden node metadata.
+#define STARFIELD_VERSION_BUILD 33
+#define STARFIELD_VERSION_PACKED 32801 /* 0x8021 */

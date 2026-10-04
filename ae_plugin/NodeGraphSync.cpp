@@ -16,6 +16,7 @@
 #include <cstring>
 #include <mutex>
 #include <new>
+#include <utility>
 
 namespace {
 
@@ -196,6 +197,42 @@ PF_Err register_node_graph_sync(PF_InData* in_data) noexcept {
     return static_cast<PF_Err>(error ? error : PF_Err_BAD_CALLBACK_PARAM);
 }
 
+PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) noexcept {
+    namespace layout=starfield::adapter::native_nodes::particle_layout;
+    const auto plugin=g_plugin_id.load(std::memory_order_acquire);
+    if(!data || !data->pica_basicP || !data->effect_ref || !plugin || !params ||
+       !params[layout::color_mode] || !params[layout::shape] ||
+       params[layout::color_mode]->param_type!=PF_Param_POPUP || params[layout::shape]->param_type!=PF_Param_POPUP)return PF_Err_NONE;
+    SuiteSet suites(data);if(suites.acquire())return PF_Err_NONE;
+    struct VisibilityScope {
+        SuiteSet& suites;
+        const AEGP_StreamSuite6* streams{};
+        const AEGP_DynamicStreamSuite4* dynamic{};
+        AEGP_EffectRefH effect{};
+        ~VisibilityScope() {
+            if(effect)suites.effect->AEGP_DisposeEffect(effect);
+            if(dynamic)suites.basic->ReleaseSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4);
+            if(streams)suites.basic->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);
+        }
+    } scope{suites};
+    if(suites.basic->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&scope.streams)) ||
+       suites.basic->AcquireSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4,reinterpret_cast<const void**>(&scope.dynamic)))return PF_Err_NONE;
+    if(!suites.pf_interface->AEGP_GetNewEffectForEffect ||
+       suites.pf_interface->AEGP_GetNewEffectForEffect(plugin,data->effect_ref,&scope.effect) || !scope.effect)return PF_Err_NONE;
+    // PF_PUI_INVISIBLE is not dynamically mutable through PF_UpdateParamUI in
+    // AE. Use the documented non-undoable HIDDEN stream flag for UI visibility.
+    for(auto [index,hidden]:{std::pair{layout::gradient,params[layout::color_mode]->u.pd.value==1},
+                             std::pair{layout::size_y,params[layout::shape]->u.pd.value==1}}) {
+        AEGP_StreamRefH ref{};
+        if(scope.streams->AEGP_GetNewEffectStreamByIndex(plugin,scope.effect,index,&ref) || !ref)continue;
+        AEGP_DynStreamFlags flags{};
+        if(!scope.dynamic->AEGP_GetDynamicStreamFlags(ref,&flags) && bool(flags&AEGP_DynStreamFlag_HIDDEN)!=hidden)
+            (void)scope.dynamic->AEGP_SetDynamicStreamFlag(ref,AEGP_DynStreamFlag_HIDDEN,FALSE,hidden?TRUE:FALSE);
+        scope.streams->AEGP_DisposeStream(ref);
+    }
+    return PF_Err_NONE;
+}
+
 PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
                                 const PF_UserChangedParamExtra* extra,bool particle_gradient) noexcept {
     if (!in_data || !params || !extra || extra->param_index <= 0 ||
@@ -218,16 +255,9 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         edit.parameter_index = extra->param_index;
         edit.uuid = node_id;
         if (!capture_edit(*in_data, *changed, edit)) return PF_Err_BAD_CALLBACK_PARAM;
-        if(particle_gradient) {
-            if(kind!=starfield::adapter::native_nodes::Kind::particle)return PF_Err_BAD_CALLBACK_PARAM;
-            namespace layout=starfield::adapter::native_nodes::particle_layout;
-            for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
-                if(!params[index])return PF_Err_BAD_CALLBACK_PARAM;
-                auto field_edit=edit;
-                if(!capture_edit(*in_data,*params[index],field_edit))return PF_Err_BAD_CALLBACK_PARAM;
-                edit.additional_fields[edit.additional_count++]={index,field_edit.value_kind,field_edit.value};
-            }
-        }
+        const bool gradient_bank=starfield::adapter::node_sync::gradient_bank_parameter(edit.node_kind,edit.parameter_index);
+        if(particle_gradient && !gradient_bank)return PF_Err_BAD_CALLBACK_PARAM;
+        if(gradient_bank && !starfield::adapter::node_sync::capture_gradient_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;

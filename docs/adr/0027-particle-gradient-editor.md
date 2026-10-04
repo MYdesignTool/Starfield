@@ -3,6 +3,31 @@
 Status: candidate implementation/build/scoped checks complete on development
 branch; AE 2023 qualification pending.
 
+## Build33 correction after owner feedback - 2026-10-04
+
+Owner AE2023 feedback rejects build32 UI qualification: adding a stop reports
+node compile / parameter12 / stream-1; the bar has vertical seams; fresh Emitter
+and Force effects expose internal metadata. No build32 host pass is recorded.
+The strip renderer used separate antialiased fractional rectangles. Build33 uses
+one opaque, aligned-row RGB bitmap per bar, with bounded buffers and image release
+in the same callback. Ordinary and hidden slider ui_width/ui_height return to
+zero; only the actual custom gradient sets those nonstandard fields. This corrects
+the SDK contract; the fresh-node visibility result still needs an AE host check.
+
+The fake host reproduces compile rejection when a new count is combined with the
+old stop positions. Gradient leaves no longer SUPERVISE intermediate host writes:
+the custom event publishes once with native change flags. A retained defensive
+supervision path captures the complete 17-field callback bank. Failures report
+the offending gradient stream index and preserve the previous graph. Other public
+controls retain supervision and keyframes; gradient banks remain constant.
+AE dynamic Size Y/gradient visibility uses non-undoable AEGP HIDDEN flags on just
+the current Particle effect, because PF_UpdateParamUI does not dynamically toggle
+PF_PUI_INVISIBLE in AE. No authored data, receipts or SDK objects are retained by
+the UI helper. Optional suite failure cannot reject loading.
+Schema5/base81, disk IDs, group IDs, match names, main manifest24 and CoreABI3 stay
+unchanged; build32 graphs need no additional layout migration for build33.
+SDK reference: https://ae-plugins.docsforadobe.dev/effect-basics/PF_ParamDef/.
+
 The owner accepted build31 for main on 2026-10-04, then requested the Particle
 Color Over Life UI shown in their reference screenshot. Task M3-07 implements
 an independent visible multi-stop gradient in AE Effect Controls, not a pair of

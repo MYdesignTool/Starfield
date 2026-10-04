@@ -12,12 +12,15 @@
 #include <cstdio>
 #include <limits>
 #include <fstream>
+#include <vector>
 
 namespace {
 namespace model=starfield::adapter::gradient_editor;
 namespace layout=starfield::adapter::native_nodes::particle_layout;
-int checks{},failures{},publications{},invalidations{},gets{},releases{},objects{},rectangles{},texts{},ui_updates{};
-bool reject{},cancel{},drawing_fail{};
+int checks{},failures{},publications{},invalidations{},gets{},releases{},objects{},rectangles{},texts{},ui_updates{},bitmap_draws{};
+bool reject{},cancel{},drawing_fail{},bitmap_fail{};
+std::vector<std::uint8_t> bitmap_pixels;
+int bitmap_width{},bitmap_height{};
 std::ofstream preview;
 DRAWBOT_ColorRGBA preview_color{};
 DRAWBOT_RectF32 preview_rect{};
@@ -48,6 +51,17 @@ void configure() {
     supplier.NewDefaultFont=[](DRAWBOT_SupplierRef,float,DRAWBOT_FontRef* output)->SPErr{++objects;*output=reference<DRAWBOT_FontRef>();return 0;};
     supplier.NewBrush=[](DRAWBOT_SupplierRef,const DRAWBOT_ColorRGBA* color,DRAWBOT_BrushRef* output)->SPErr{preview_color=*color;++objects;*output=reference<DRAWBOT_BrushRef>();return 0;};
     supplier.NewPath=[](DRAWBOT_SupplierRef,DRAWBOT_PathRef* output)->SPErr{if(drawing_fail)return 1;++objects;*output=reference<DRAWBOT_PathRef>();return 0;};
+    supplier.NewImageFromBuffer=[](DRAWBOT_SupplierRef,int width,int height,int stride,DRAWBOT_PixelLayout format,const void* data,DRAWBOT_ImageRef* output)->SPErr {
+        check(format==kDRAWBOT_PixelLayout_24RGB && stride>=width*3 && stride%4==0 && height==62,"gradient creates one opaque RGB bitmap with aligned rows");
+        const auto* pixels=static_cast<const std::uint8_t*>(data);bitmap_pixels.assign(pixels,pixels+stride*height);
+        bitmap_width=width;bitmap_height=height;++objects;*output=reference<DRAWBOT_ImageRef>();return bitmap_fail?1:0;
+    };
+    surface.DrawImage=[](DRAWBOT_SurfaceRef,DRAWBOT_ImageRef,const DRAWBOT_PointF32* origin,float alpha)->SPErr {
+        ++bitmap_draws;check(alpha==1,"bitmap draws opaquely without strip edge blending");
+        if(preview.is_open())for(int x=0;x<bitmap_width;++x)preview<<"<rect x='"<<origin->x+x<<"' y='"<<origin->y<<"' width='1' height='"<<bitmap_height
+            <<"' fill='rgb("<<int(bitmap_pixels[x*3])<<","<<int(bitmap_pixels[x*3+1])<<","<<int(bitmap_pixels[x*3+2])<<")'/>\n";
+        return 0;
+    };
     supplier.ReleaseObject=[](DRAWBOT_ObjectRef)->SPErr{--objects;return 0;};
     path.AddRect=[](DRAWBOT_PathRef,const DRAWBOT_RectF32* bounds)->SPErr{preview_rect=*bounds;++rectangles;check(bounds->width>0 && bounds->height>0,"positive drawing rectangles");return 0;};
     surface.FillPath=[](DRAWBOT_SurfaceRef,DRAWBOT_BrushRef,DRAWBOT_PathRef,DRAWBOT_FillType)->SPErr{
@@ -63,6 +77,11 @@ void configure() {
     utility.PF_UpdateParamUI=[](PF_ProgPtr,PF_ParamIndex,const PF_ParamDef*)->PF_Err{++ui_updates;return 0;};
 }
 }
+PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef* params[]) noexcept {
+    ++ui_updates;
+    check(params[layout::shape]->u.pd.value==1 && params[layout::color_mode]->u.pd.value==1,"UI forwards mode/shape visibility without authoring values");
+    return PF_Err_NONE;
+}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef* params[],const PF_UserChangedParamExtra* extra,bool bank) noexcept {
     ++publications;check(bank && extra->param_index==layout::gradient,"entire gradient bank publishes atomically");
     check(params[layout::gradient]->uu.change_flags==PF_ChangeFlag_CHANGED_VALUE,"count carries native undo/change flag");
@@ -72,6 +91,13 @@ int main() {
     using starfield::adapter::particle_gradient_event;
     auto gradient=model::preset(2);check(model::valid(gradient),"independent preset validates");
     const auto original=gradient;model::flip(gradient);model::flip(gradient);
+    std::array<std::uint8_t,220*62*3> pixels{};
+    check(model::rasterize_rgb8(gradient,220,62,pixels),"entire gradient rasterizes into a bounded bitmap");
+    bool equal_rows=true;for(unsigned y=1;y<62;++y)for(unsigned i=0;i<220*3;++i)equal_rows &= pixels[y*220*3+i]==pixels[i];
+    check(equal_rows && pixels[0]==255 && pixels[219*3]==std::lround(gradient.stops[4].color.x*255),"all rows have complete identical coverage and exact endpoints");
+    check(!model::rasterize_rgb8(gradient,221,62,pixels) && !model::rasterize_rgb8(gradient,220,0,pixels),"invalid bitmap dimensions rejected");
+    std::array<std::uint8_t,304*62> narrow{};
+    check(model::rasterize_rgb8(gradient,101,62,narrow,304) && narrow[303]==0 && narrow[304]==narrow[0],"narrow panel bitmap has aligned padding and continuous complete rows");
     check(starfield::core::encode_color_gradient(original)==starfield::core::encode_color_gradient(gradient),"double flip retains complete gradient");
     check(model::insert(gradient,std::numeric_limits<double>::quiet_NaN())<0,"nonfinite add rejected");
     check(!model::move(gradient,0,.3) && !model::erase(gradient,0),"endpoints cannot move/delete");
@@ -108,11 +134,13 @@ int main() {
     check(restored,"failed edit restores every count/position/color/change flag");
     check(click(248,45)==0,"flip authors complete bank");check(click(80,105)==0 && values[layout::gradient_first+1].u.cd.value.red==255,"paste restores copied first stop");
     const int prior=publications;event.e_type=PF_Event_DRAW;
-    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && rectangles>128 && texts>=7,"native editor draws gradient markers and actions");
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_draws==1 && rectangles<30 && texts>=7,"native editor draws gradient once with markers and actions");
     check(publications==prior && objects==0,"draw writes no authored values and releases Drawbot objects");
     drawing_fail=true;check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0,"drawing failure releases brushes and font");drawing_fail=false;
+    const int previous_bitmaps=bitmap_draws;bitmap_fail=true;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0 && bitmap_draws==previous_bitmaps,"failed bitmap creation releases its object without drawing");bitmap_fail=false;
     values[layout::color_mode].u.pd.value=1;values[layout::shape].u.pd.value=1;
-    check(starfield::adapter::particle_gradient_param_ui(&data,params.data())==0 && ui_updates==2,"irrelevant gradient and circle Size Y UI hidden");
+    check(starfield::adapter::particle_gradient_param_ui(&data,params.data())==0 && ui_updates==1,"particle UI forwards visibility through the native stream helper");
     check(publications==prior,"UPDATE_PARAMS_UI never changes authored values");
     preview.open("artifacts/gradient-editor-preview.svg");
     preview<<"<svg xmlns='http://www.w3.org/2000/svg' width='310' height='180'>\n<rect width='310' height='180' fill='#29292c'/>\n";

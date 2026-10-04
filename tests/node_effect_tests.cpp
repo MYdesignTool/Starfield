@@ -14,6 +14,7 @@
 
 // Actual node EffectMain; only the independent graph-sync callback is replaced.
 PF_Err register_node_graph_sync(PF_InData*) noexcept { return PF_Err_NONE; }
+PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef*[]) noexcept {return PF_Err_NONE;}
 PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
                                  const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
 
@@ -89,6 +90,14 @@ int main() {
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
+    bool dimensions_valid=true,hidden_valid=true;
+    for(const auto& def:registered) {
+        const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
+        dimensions_valid &= custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
+        if(def.ui_flags&PF_PUI_NO_ECW_UI)hidden_valid &= bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
+    }
+    check(dimensions_valid,"only the custom gradient has nonstandard control dimensions");
+    check(hidden_valid,"all internal node metadata retains hidden flags and zero dimensions");
     if(kind==Kind::emitter) for(A_long index:{12,13,14})
         check(registered[index-1].param_type==PF_Param_ANGLE &&
             (registered[index-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0 &&
@@ -106,6 +115,10 @@ int main() {
         check(std::strcmp(registered[23].name, "Random Seed") == 0, "seed ends source controls at runtime stream 24");
     }
     if constexpr(kind==Kind::particle) {
+        bool bank_unsupervised=true;
+        for(A_long i=particle_layout::gradient;i<particle_layout::gradient_first+16;++i)
+            bank_unsupervised &= (registered[i-1].flags&PF_ParamFlag_CANNOT_TIME_VARY) && !(registered[i-1].flags&PF_ParamFlag_SUPERVISE);
+        check(bank_unsupervised,"custom events author one bank without intermediate supervised leaf callbacks");
         check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
         check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
         check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");

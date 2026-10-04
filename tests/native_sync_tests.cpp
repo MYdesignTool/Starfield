@@ -70,6 +70,10 @@ AEGP_EffectRefH effect_ref(std::size_t i) { return reinterpret_cast<AEGP_EffectR
 AEGP_PFInterfaceSuite1 pf{};
 AEGP_EffectSuite4 effect{};
 AEGP_StreamSuite6 stream{};
+AEGP_DynamicStreamSuite4 dynamic{};
+bool dynamic_enabled{};
+std::array<AEGP_DynStreamFlags,82> visibility_flags{};
+int visibility_sets{};
 AEGP_UtilitySuite6 utility{};
 AEGP_MemorySuite1 memory{};
 PF_ParamUtilsSuite3 param_utils{};
@@ -92,6 +96,7 @@ A_Err acquire(const char* name, int32, const void** out) {
     if (!std::strcmp(name, kAEGPPFInterfaceSuite)) *out = &pf;
     else if (!std::strcmp(name, kAEGPEffectSuite)) *out = &effect;
     else if (!std::strcmp(name, kAEGPStreamSuite)) *out = &stream;
+    else if(dynamic_enabled && !std::strcmp(name,kAEGPDynamicStreamSuite))*out=&dynamic;
     else if (!std::strcmp(name, kAEGPUtilitySuite)) *out = &utility;
     else if (!std::strcmp(name, kAEGPLayerSuite)) *out = &layers;
     else if (!std::strcmp(name, kAEGPItemSuite)) *out = &items;
@@ -286,6 +291,38 @@ int main() {
         expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;return 0;
     };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
+    {
+        namespace layout=records::particle_layout;
+        dynamic_enabled=true;
+        dynamic.AEGP_GetDynamicStreamFlags=[](AEGP_StreamRefH ref,AEGP_DynStreamFlags* flags)->A_Err {
+            const auto& key=*reinterpret_cast<Ref*>(ref);check(key.effect==2,"visibility operates on the current Particle effect only");
+            *flags=visibility_flags[key.index];return 0;
+        };
+        dynamic.AEGP_SetDynamicStreamFlag=[](AEGP_StreamRefH ref,AEGP_DynStreamFlags flag,A_Boolean undoable,A_Boolean hidden)->A_Err {
+            check(flag==AEGP_DynStreamFlag_HIDDEN && !undoable,"UI visibility changes only non-undoable HIDDEN flags");
+            auto& flags=visibility_flags[reinterpret_cast<Ref*>(ref)->index];
+            flags=hidden?flags|flag:flags&~flag;++visibility_sets;return 0;
+        };
+        const auto original_pf=pf.AEGP_GetNewEffectForEffect;
+        pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH* ref)->A_Err{*ref=effect_ref(2);return 0;};
+        std::array<PF_ParamDef,82> ui_values{};std::array<PF_ParamDef*,82> ui_params{};
+        for(unsigned i=0;i<82;++i)ui_params[i]=&ui_values[i];
+        ui_values[layout::shape].param_type=ui_values[layout::color_mode].param_type=PF_Param_POPUP;
+        ui_values[layout::shape].u.pd.value=ui_values[layout::color_mode].u.pd.value=1;
+        const int before_writes=sets;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 &&
+              (visibility_flags[layout::size_y]&AEGP_DynStreamFlag_HIDDEN) &&
+              (visibility_flags[layout::gradient]&AEGP_DynStreamFlag_HIDDEN),"Circle and solid mode hide Size Y and gradient through actual stream flags");
+        const int previous_sets=visibility_sets;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 && visibility_sets==previous_sets,"unchanged visibility performs no setter calls");
+        ui_values[layout::shape].u.pd.value=2;ui_values[layout::color_mode].u.pd.value=4;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 &&
+              !(visibility_flags[layout::size_y]&AEGP_DynStreamFlag_HIDDEN) &&
+              !(visibility_flags[layout::gradient]&AEGP_DynStreamFlag_HIDDEN),"rectangle and gradient modes reveal controls through actual stream flags");
+        check(sets==before_writes && acquisitions==0 && live_refs==0,"UI visibility authors no parameter values and releases suites and stream references");
+        dynamic_enabled=false;pf.AEGP_GetNewEffectForEffect=original_pf;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 && acquisitions==0,"unavailable optional visibility suite cannot reject effect loading");
+    }
     check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
     PF_InData node_data = renderer_data; node_data.effect_ref = reinterpret_cast<PF_ProgPtr>(2);
     node_data.num_params = static_cast<A_long>(emitter.params.size()); node_data.downsample_x = {1, 4}; node_data.downsample_y = {1, 4};
@@ -374,6 +411,30 @@ int main() {
             decoded.stops[i].color.x==palette.stops[i].color.x &&
             decoded.stops[i].color.y==palette.stops[i].color.y &&
             decoded.stops[i].color.z==palette.stops[i].color.z,"published bank retains new position and RGB together");
+        std::array<PF_ParamDef,82> callback{};std::array<PF_ParamDef*,82> callback_params{};
+        for(unsigned i=0;i<82;++i)callback_params[i]=&callback[i];
+        for(const auto& field:bank.additional_fields) {
+            auto& def=callback[field.index];
+            if(field.kind==node_sync::ValueKind::color) {
+                def.param_type=PF_Param_COLOR;
+                def.u.cd.value={255,static_cast<A_u_char>(std::lround(field.value[0]*255)),
+                    static_cast<A_u_char>(std::lround(field.value[1]*255)),static_cast<A_u_char>(std::lround(field.value[2]*255))};
+            } else {def.param_type=PF_Param_FLOAT_SLIDER;def.u.fs_d.value=field.value[0];}
+        }
+        auto partial_count=edit(1,layout::gradient,5);
+        check(direct_edit(partial_count)!=0 && partial_count.stream_index==layout::gradient_first+4,
+              "single changed count reproduces mixed old-bank rejection with exact bad position index");
+        for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
+            auto followup=edit(1,index,index==layout::gradient?5:0);
+            check(node_sync::capture_gradient_bank(callback_params.data(),followup) && followup.additional_count==17,
+                  "every gradient callback captures all seventeen fields atomically");
+            check(direct_edit(followup)==0 && followup.accepted,"full callback bank publishes while AEGP still exposes the old two-stop bank");
+        }
+        auto incomplete=edit(1,layout::gradient,5);callback_params[layout::gradient_first+1]=nullptr;
+        check(!node_sync::capture_gradient_bank(callback_params.data(),incomplete) && incomplete.additional_count==0,
+              "incomplete callback bank cannot partially modify the edit request");
+        check(!node_sync::gradient_bank_parameter(0,layout::gradient) && !node_sync::gradient_bank_parameter(3,layout::gradient),
+              "Emitter and Force controls are never classified as Particle gradient fields");
         auto reset=edit(1,layout::gradient,2);
         check(direct_edit(reset)==0,"fixture restores previous bank without callback overrides");
     }

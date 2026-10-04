@@ -1,5 +1,14 @@
 # Starfield plug-in architecture
 
+## M3-07 / build33 - native UI correction
+
+Build32 fails owner UI qualification (add-stop compile error, seams and internal
+node parameters visible). ADR0027 now specifies one complete gradient bitmap and
+event publication, zero ordinary/hidden UI dimensions, and actual AE dynamic
+stream visibility. Gradient leaf supervision is removed to prevent intermediate
+host-bank recompilation; public animated controls retain their supervision.
+Schema5/base81/main manifest24/CoreABI3 and renderer boundaries are unchanged.
+
 ## M3-07 / build32 - native Particle gradient editor
 
 Accepted build31 is on main/origin main at 8857303. Build32 is developed on

@@ -1,4 +1,14 @@
-# Build32 current development surface
+# Build33 native UI correction
+
+Build32 owner testing found gradient seams, adding-stop compile failure and
+internal metadata visible on fresh Emitter/Force. Build33 restores zero standard/
+hidden control dimensions, draws one opaque gradient bitmap, submits one complete
+bank without intermediate leaf supervision, and uses actual AE HIDDEN stream
+flags for mode/shape visibility. No additional schema/layout change from build32.
+Host confirmation is pending; these corrections do not establish reference parity.
+See ADR0027 and build-matrix.md.
+
+## Build32 development surface
 
 The owner accepted build31 for main; main/origin main now contain 8857303.
 New work is on codex/m3-07-particle-gradient. Particle uses schema5/base81;

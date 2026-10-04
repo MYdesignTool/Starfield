@@ -1,5 +1,16 @@
 # Behavior inventory
 
+## M3-07 / build33 correction qualification
+
+Owner reports adding-stop compile failure (parameter12/stream-1), striped/cut
+gradient drawing and internal data visible on fresh Emitter/Force in build32.
+This is failed native UI qualification, superseding the build32 candidate-only
+checks below. Build33 corrects drawing, standard control dimensions, gradient
+event publication and AE dynamic visibility (ADR0027). No schema/layout migration
+from build32. Required host checks: add/drag/color/undo/reopen; continuous gradient
+at normal/narrow panel widths; all UUID/layout/connection/curve banks absent from
+fresh Emitter/Force; Circle/Rectangle Size Y visibility. Main stays at 8857303.
+
 ## M3-07 / build32 qualification
 
 Owner-accepted build31 is on main/origin main at 8857303; build32 remains on

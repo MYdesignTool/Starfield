@@ -110,6 +110,17 @@ struct Canvas {
         rect(x,y,width,21,{0.43f,0.43f,0.45f,1});rect(x+1,y+1,width-2,19,{0.22f,0.22f,0.23f,1});
         text(x+6,y+14,label,enabled);
     }
+    void gradient(float x,float y,unsigned width,const core::ColorGradient& value) const {
+        if(!supplier->NewImageFromBuffer || !surface->DrawImage)return;
+        std::array<std::uint8_t,220*62*3> pixels{};
+        const unsigned stride=(width*3+3)&~3U;
+        const auto size=std::size_t(stride)*62;
+        if(!model::rasterize_rgb8(value,width,62,std::span{pixels.data(),size},stride))return;
+        DRAWBOT_ImageRef bitmap{};const DRAWBOT_PointF32 origin{x,y};
+        if(!supplier->NewImageFromBuffer(source,width,62,stride,kDRAWBOT_PixelLayout_24RGB,pixels.data(),&bitmap) && bitmap)
+            (void)surface->DrawImage(target,bitmap,&origin,1);
+        if(bitmap)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(bitmap));
+    }
 };
 struct Bounds {
     float x,y,width;
@@ -125,11 +136,7 @@ void draw(PF_InData* data,PF_EventExtra* event,const core::ColorGradient& value,
     Canvas canvas(data,event->contextH);if(!canvas)return;
     const Bounds b(event->effect_win);
     canvas.rect(b.x,b.y,b.width+69,171,{0.18f,0.18f,0.19f,1});
-    for(int i=0;i<128;++i) {
-        const auto rgb=core::evaluate_color_gradient(value,double(i)/127);
-        canvas.rect(b.x+b.width*i/128,b.y,b.width/128+0.1f,62,
-            {static_cast<float>(rgb.x),static_cast<float>(rgb.y),static_cast<float>(rgb.z),1});
-    }
+    canvas.gradient(b.x,b.y,static_cast<unsigned>(b.width),value);
     for(unsigned i=0;i<value.count;++i) {
         const float x=b.x+static_cast<float>(value.stops[i].position)*b.width;
         const auto& c=value.stops[i].color;
@@ -161,20 +168,7 @@ bool pick(PF_InData* data,core::Vec3& rgb) {
 }
 void clear_particle_gradient_ui() noexcept {contexts.clear();clipboard.reset();}
 PF_Err particle_gradient_param_ui(PF_InData* data,PF_ParamDef* params[]) noexcept {
-    if(!data || !data->pica_basicP || !params || !params[layout::color_mode] || !params[layout::shape])return PF_Err_NONE;
-    Suite<PF_ParamUtilsSuite3> utility(data->pica_basicP,kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3);
-    if(!utility || !utility->PF_UpdateParamUI)return PF_Err_NONE;
-    const bool solid=params[layout::color_mode]->u.pd.value==1;
-    for(auto [index,hidden]:{std::pair{layout::gradient,solid},
-        std::pair{layout::size_y,params[layout::shape]->u.pd.value==1}}) {
-        if(!params[index])continue;
-        auto copy=*params[index];
-        copy.ui_flags=hidden?copy.ui_flags|PF_PUI_INVISIBLE:copy.ui_flags&~PF_PUI_INVISIBLE;
-        if(copy.ui_flags!=params[index]->ui_flags) {
-            const auto error=utility->PF_UpdateParamUI(data->effect_ref,index,&copy);if(error)return error;
-        }
-    }
-    return PF_Err_NONE;
+    return update_native_particle_visibility(data,params);
 }
 PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
     if(!event || !data || !out)return PF_Err_NONE;

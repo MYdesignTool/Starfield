@@ -1,5 +1,30 @@
 # Build and host matrix
 
+## M3-07 / build33 native UI correction candidate - 2026-10-04
+
+Owner rejected build32 native UI qualification: add-stop compile failure,
+gradient seams and internal metadata visible on fresh Emitter/Force. Build33
+(32801/0x8021) corrects standard/custom dimensions, single-bitmap drawing,
+whole-bank event publication and actual AE dynamic visibility. See ADR0027.
+Main remains at 8857303; development stays on codex/m3-07-particle-gradient.
+Schema5/base81/main manifest24/CoreABI3 and CEP sources are unchanged from build32.
+
+Full May2023 SDK /MT candidate build passes with NoDistPublish/NoRuntimePublish,
+without compiler warnings/errors: artifacts/build33-native-build.log.
+
+| Scope | Checks | Failures | Evidence under artifacts/ |
+|---|---:|---:|---|
+| Continuous bitmap, native events and resource cleanup | 122 | 0 | build33-gradient-editor.log |
+| Whole-bank compile/replay, dynamic stream visibility and camera | 5717 + 12 | 0 | build33-native-sync.log |
+| Emitter / Particle / Force native definitions and pass-through | 86 / 90 / 82 | 0 | build33-node-Emitter.log / build33-node-Particle.log / build33-node-Force.log |
+| GPU adapter driver | 433 | 0 | build33-gpu.log |
+
+Total: 6542 C++ checks, zero failures. Generated native-expression JS checks
+pass: build33-native-animation.log. Exported current drawing commands/layout
+were inspected in gradient-editor-preview.svg/.png; this remains fake-host
+drawing evidence. Actual AE add/drag/color/undo/reopen, continuous bar appearance
+and absence of fresh-node metadata remain host gates.
+
 ## M3-07 / build32 candidate - 2026-10-04
 
 Accepted build31 was fast-forwarded and pushed to main/origin main at 8857303.

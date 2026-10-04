@@ -59,7 +59,8 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_FLOAT_SLIDER;
     def.flags = flags;
-    def.ui_flags = ui_flags;def.ui_height=height;def.ui_width=300;
+    def.ui_flags = ui_flags;
+    if(ui_flags & (PF_PUI_CONTROL|PF_PUI_TOPIC)) {def.ui_height=height;def.ui_width=300;}
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.fs_d.valid_min = static_cast<PF_FpShort>(minimum);
@@ -268,11 +269,13 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
         error=add_slider(in_data,"Opacity Random",kOpacityRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=add_popup(in_data,"Particle Color",kParticleColorModeId,4,1,"Solid color|Color over life|Random from gradient|Loop from grad");if(error)return error;
         error=add_color(in_data,"Color",kColorStartId);if(error)return error;
-        error=add_slider(in_data,"Color Gradient",kColorGradientCountId,2,8,2,PF_Precision_INTEGER,kNodeConstantFlags|PF_ParamFlag_SUPERVISE,PF_PUI_CONTROL,178);if(error)return error;
+        // The custom event publishes all components once. Supervising each
+        // changed leaf would recompile a partially committed host bank.
+        error=add_slider(in_data,"Color Gradient",kColorGradientCountId,2,8,2,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_CONTROL,178);if(error)return error;
         for(A_long i=0;i<8;++i) {
             char name[48]{};
             const auto ui=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
-            const auto flags=PF_ParamFlag_CANNOT_TIME_VARY|PF_ParamFlag_SUPERVISE;
+            const auto flags=PF_ParamFlag_CANNOT_TIME_VARY;
             std::snprintf(name,sizeof(name),"Color Gradient %ld Position",static_cast<long>(i));
             error=add_slider(in_data,name,kColorGradientPositionFirstId+i,0,100,i==1?100:double(i)*100/7,
                 PF_Precision_TENTHS,flags,ui);if(error)return error;
