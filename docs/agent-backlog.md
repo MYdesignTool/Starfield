@@ -19,6 +19,14 @@ before the next deployment; main remains owner-accepted build31.
 
 ## P-03 - Main picture launcher and preset manager
 
+Build36 follow-up: owner reports a blank preset window, requires the image without
+its folding Presets title, and requests half-size packaging. Read-only installed
+path inspection finds the files present; correct Modeless AutoVisible=false to
+true and advance bundle version. Register untitled NO_DATA/disk1631 at main index1
+(manifest26, fresh main effect), halve artwork to1086x362 and retain paired35
+bytes. No cache, registry, host process or shared CEF switches change. The actual
+AE window/content correction and no-title UI are pending owner confirmation.
+
 Owner: primary agent, current card after M3-08. User explicitly requests one generated
 Starfield banner in the main ECW and a functional preset manager with categories,
 search, render-settings option and Add/Replace. The built-in imagegen banner is

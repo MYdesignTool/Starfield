@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-03 / build36 - preset window and picture placement
+
+Correct the owner's failed build35 preset UI qualification: visible Modeless
+lifecycle, untitled picture-only main control and half-resolution packaged art.
+Requalify the actual AE window/catalog and Add/Replace, keeping main at accepted
+build31 and work on the existing development branch. No host-wide changes.
+
 ## M3-07 / build34 - unblock native gradient testing
 
 Build33 expansion is blocked by repeated Unsupported Pixel Format warnings.

@@ -1,10 +1,14 @@
 # Starfield preset banner
 
-Asset: `cep_panel/assets/starfield-presets-banner.png`, 2172x724 PNG.
-SHA-256: `945F1EB22BB10C561DA303B5B643B2C62DFAE5C0CD86D0AF820752F6BAAD84EF`.
+Asset: `cep_panel/assets/starfield-presets-banner.png`, 1086x362 PNG, 819524 bytes.
+SHA-256: `313999EC1D0C67CD28B73FB0C13530BDBA4F5A3A2B22F6298FF6CAB2725ECD3A`.
 Created2026-10-04 with the imagegen skill and built-in image_gen tool. Original
-generation is retained outside the checkout by the tool; the unchanged production
-PNG is tracked here. Native WIC scales it for display; artwork bytes are unedited.
+generation is retained outside the checkout by the tool. Original2172x724 PNG
+was2064083 bytes, hash945F1EB22BB10C561DA303B5B643B2C62DFAE5C0CD86D0AF820752F6BAAD84EF.
+For build36 the owner explicitly requests half-size packaging. Windows GDI+
+HighQualityBicubic resampling halves each dimension, keeps alpha/composition, and
+reduces file size60.3%. The original is also retained in the paired build35 backup.
+No generative artwork revision was made. Native WIC still scales for display.
 
 ## Prompt
 

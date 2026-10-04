@@ -404,9 +404,9 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // Hidden group starts with visible group ends leave a malformed ECW tree.
     // Bootstrap data needs no hierarchy: use ordinary hidden scalar slots here.
     AEFX_CLR_STRUCT(def);
-    def.param_type=PF_Param_FLOAT_SLIDER;def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
-    def.ui_flags=PF_PUI_CONTROL;def.ui_width=304;def.ui_height=104;def.uu.id=1630;
-    std::snprintf(def.name,sizeof(def.name),"Presets");def.u.fs_d.valid_max=def.u.fs_d.slider_max=1;
+    // A picture-only control has no scalar value or collapsible Presets title.
+    def.param_type=PF_Param_NO_DATA;def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
+    def.ui_flags=PF_PUI_CONTROL;def.ui_width=304;def.ui_height=104;def.uu.id=1631;
     err=PF_ADD_PARAM(in_data,-1,&def);if(err)return err;
     // Type and Origin are registered by hand instead of through PF_ADD_POPUP or
     // PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and never set

@@ -1,5 +1,17 @@
 # Starfield plug-in architecture
 
+## P-03 / build36 - visible manager and picture-only entry
+
+The owner exercises the build35 image and menu launcher, but sees an empty window.
+Installed CEP path inspection finds the HTML/CSS present. ADR0029 corrects the
+visible Modeless extension's AutoVisible flag, advances bundle/extension version,
+and adds a visible dependency failure message. The lifecycle defect is identified
+in code; AE content qualification is pending. No host cache or shared flags change.
+The owner requests no folding title: main index1 is now untitled PF_Param_NO_DATA
+with fresh disk1631/main manifest26. All authored indices and native schemas stay
+unchanged. The packaged original illustration is resampled to1086x362; native
+WIC/Drawbot callback ownership and image-failure guards remain unchanged.
+
 ## P-03 / M3-08 / build35 - presets and reference rotation
 
 ADR0028 adds independent Emitter Orient, native AE angle dials, Particle Random

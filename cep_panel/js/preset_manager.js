@@ -3,6 +3,9 @@
     var presets=window.StarfieldPresets,codec=window.StarfieldGraphCodec,snapshots=window.StarfieldNativeGraphSnapshot;
     var entries=presets.catalog.slice(),category=null,selected=null,targetToken=null,revision=null,graph=null,busy=false,serial=0;
     var el={};["grid","preview","search","target","breadcrumb","selected-title","description","structure","status","refresh","import","save","home","render-settings","cancel","replace","add"].forEach(function(id){el[id]=document.getElementById(id);});
+    // Keep the page and the reason visible when a dependency did not load.
+    var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
+    if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
     var cep=window.__adobe_cep__,ready=false,readyToken="org.starfieldfx.panel/1/native-presets-35";
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}

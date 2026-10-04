@@ -1,4 +1,9 @@
-# Presets manager (build35)
+# Presets manager (build36)
+
+Build36 corrects the visible Modeless lifecycle and uses an untitled picture-only
+entry. Restart AE to read the manifest version, then create a fresh main effect
+(manifest26/disk1631). Emitter/Particle layouts are unchanged from build35.
+The banner is packaged at1086x362. Actual content/no-title UI needs owner retest.
 
 Click the original Presets picture in a fresh main effect, or Presets in the node
 panel, to open Starfield Presets. Select a layer with Starfield before opening;

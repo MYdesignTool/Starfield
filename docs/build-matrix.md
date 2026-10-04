@@ -1,5 +1,26 @@
 # Build and host matrix
 
+## P-03 / build36 owner feedback candidate - 2026-10-04
+
+Build35 owner screenshot confirms native image rendering and menu invocation,
+but the preset window is empty. Read-only inspection of the existing system CEP
+Junction confirms this checkout's presets.html/css are accessible. Correct the
+visible Modeless lifecycle AutoVisible=false to true and advance bundle version
+to0.1.0.36. This is an identified configuration defect; actual window correction
+still needs owner confirmation. No host cache, registry or shared CEF change.
+
+Build36 (32804/0x8024) also replaces the folding scalar launcher at index1 with
+an untitled PF_Param_NO_DATA control, fresh disk1631/main manifest26. All authored
+indices/node schemas/CoreABI/render contracts stay unchanged. Create a fresh main
+effect. Original2172x724/2064083-byte banner is resampled to1086x362/819524 bytes,
+a60.3% reduction. Main AEX decreases2775040 ->1530368 bytes (1244672 bytes smaller).
+The nineteen original CEP files are retained with verified build35 hashes.
+
+May2023 SDK /MT candidate compiles without compiler warnings/errors using
+NoDistPublish/NoRuntimePublish: artifacts/build36-native.log. Registration fixture
+tracks the new NO_DATA/disk1631 contract. No regression suites were run in this
+iteration; build35 check counts do not qualify this update. Host UI remains open.
+
 ## P-03 / M3-08 / build35 candidate - 2026-10-04
 
 Build35 (32803/0x8023) integrates movable gradient endpoints (381be4f), reference

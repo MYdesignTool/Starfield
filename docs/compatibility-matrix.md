@@ -1,5 +1,17 @@
 # Behavior inventory
 
+## P-03 / build36 qualification
+
+Owner build35 evidence confirms the main illustration draws and its click opens
+an AE extension window. The content remains blank, so catalog/application is
+failed host qualification. The owner also rejects the folding Presets title and
+requests a half-size asset. Build36 corrects AutoVisible=false, uses an untitled
+NO_DATA launcher and1086x362 art. May2023 SDK compilation passes; no regression
+suites were run in this iteration. These changes require AE confirmation.
+After restarting AE, use a fresh main effect (manifest26/disk1631) and confirm
+the picture is directly visible, the manager displays categories/search/cards,
+and Add/Replace succeeds. Emitter7/Particle6 are unchanged from build35.
+
 ## P-03 / M3-08 / build35 qualification
 
 Owner reports build34 gradient expansion/editing usable; that feedback precedes

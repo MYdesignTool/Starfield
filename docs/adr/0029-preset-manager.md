@@ -4,6 +4,31 @@ Status: implemented in build35; AE qualification pending. P-03 (preset-manager c
 historical overlay-gizmo backlog row). Owner explicitly requests an original
 generated picture in the main Effect Controls and a clickable preset manager.
 
+## Build36 owner feedback
+
+The main image renders and its click opens an AE window, but the owner reports
+empty content. Read-only inspection confirms the installed system CEP Junction
+points to this checkout and both presets.html and its stylesheet exist. The
+manifest incorrectly sets AutoVisible=false for this visible Modeless extension;
+set true and advance the extension/bundle version to36. The Adobe manifest schema
+defines this flag as making the UI visible when started, and its Modeless sample
+uses true. This is the identified configuration defect; actual AE correction
+still requires owner confirmation. No caches, registry or shared CEF flags change.
+
+The owner also requires no Presets folding title and exactly half-sized artwork.
+Replace the scalar launcher with an untitled PF_Param_NO_DATA custom control at
+the same PF registration index1, fresh disk1631/main manifest26. Retain all actual
+authored parameter IDs and native node schemas. No legacy migration per owner;
+create a fresh main development effect. Native events still target its control
+area. Resample the original2172x724 PNG to1086x362, preserve composition/alpha,
+retain original bytes in the paired backup and record the new hash/provenance.
+The manager reports missing dependencies visibly if an import fails.
+
+Primary reference: [Adobe CEP manifest schema](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_7.x/ExtensionManifest_v_7_0.xsd)
+and [Adobe Modeless sample](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_12.x/Samples/CEP_HTML_Test_Extension-12.0/CSXS/manifest.xml).
+
+## Original build35 contract
+
 Main stream1 was an unused hidden bootstrap placeholder. Replace that placeholder
 with constant UI-only Presets (fresh disk ID1630) at the same stream index. Public
 renderer globals, hidden animation aliases98..609, graph persistence, and C ABI3

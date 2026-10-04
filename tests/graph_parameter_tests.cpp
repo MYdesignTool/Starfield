@@ -259,7 +259,7 @@ void test_parameters(PF_InData& host) {
     }
     CHECK(group_depth == 0 && group_count == 1);
     const auto& launcher=registered[0];
-    CHECK(std::strcmp(launcher.name,"Presets")==0 && launcher.uu.id==1630 && launcher.param_type==PF_Param_FLOAT_SLIDER);
+    CHECK(launcher.name[0]=='\0' && launcher.uu.id==1631 && launcher.param_type==PF_Param_NO_DATA);
     CHECK(launcher.ui_flags==PF_PUI_CONTROL && launcher.ui_width==304 && launcher.ui_height==104);
     CHECK((launcher.flags&PF_ParamFlag_CANNOT_TIME_VARY)!=0);
     for (const std::size_t index : {10u, 11u, 19u, 20u, 25u, 80u, 84u, 85u, 88u}) {

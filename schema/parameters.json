@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 25,
-  "schemaVersion": 25,
-  "revisionNote": "Build35 replaces unused bootstrap stream1 with a constant Presets image control, fresh disk ID1630. Renderer globals/animation aliases and all public disk IDs remain unchanged. Fresh development effects; no legacy migration per owner. ADR0029.",
+  "manifestVersion": 26,
+  "schemaVersion": 26,
+  "revisionNote": "Build36 replaces the development launcher at index1 with an untitled PF_Param_NO_DATA picture, fresh disk ID1631. Renderer globals/animation aliases and public authored disk IDs remain unchanged. Fresh main development effects; no legacy migration per owner. ADR0029.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -1328,16 +1328,16 @@
   },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Unreleased manifest 24 keeps indices 1..609, appends Simulation Settings 610..612 and GPU Rendering 613..615. Emitter schema 6/base 31, Particle schema 4/base 75 and Output schema 4 require fresh development effects; no old-project migration. GPU scene C ABI 3 requires paired AEX/Core; private SFU1 main sequence data is a separate lifecycle marker. ADR 0026.",
+    "migrationPolicy": "Unreleased manifest26 keeps registration indices1..615 and replaces UI-only index1 with untitled NO_DATA/disk1631; create a fresh main effect. Emitter schema7/base34, Particle schema6/base102 and Output schema4 are unchanged from build35. No old-project migration per owner. GPU scene C ABI3 and private SFU1 sequence marker remain unchanged. ADR0028/0029.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
   },
   "presetLauncher": {
     "index": 1,
-    "diskId": 1630,
-    "label": "Presets",
-    "type": "custom_ui_float",
+    "diskId": 1631,
+    "label": "",
+    "type": "custom_ui_no_data",
     "constant": true,
     "uiWidth": 304,
     "uiHeight": 104,

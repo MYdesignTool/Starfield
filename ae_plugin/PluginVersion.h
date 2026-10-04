@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 35: movable gradient ends, reference rotation controls and preset manager.
-#define STARFIELD_VERSION_BUILD 35
-#define STARFIELD_VERSION_PACKED 32803 /* 0x8023 */
+// Build 36: visible preset window, untitled picture-only launcher, half-size asset.
+#define STARFIELD_VERSION_BUILD 36
+#define STARFIELD_VERSION_PACKED 32804 /* 0x8024 */
