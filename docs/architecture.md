@@ -1,5 +1,16 @@
 # Starfield plug-in architecture
 
+## P-03 / build37 - preset version source and title ownership
+
+Owner build36 evidence qualifies catalog loading, but rejects preset application
+and removal of the remaining twirly. The planner now exposes its schemaVersion
+accessor; preset validation uses the same table as node creation. Resource URLs
+and gateway/bundle generations advance together. No versions are silently changed
+in imported/project graphs. Errors preserve the graph phase and actual/expected
+version evidence. Up/Folders/All presets navigation and Example removal stay in
+CEP. ADR0029 extends the existing NO_DATA picture to own its title paint/click;
+all persistent IDs, schemas, Core/Render contracts remain unchanged.
+
 ## P-03 / build36 - visible manager and picture-only entry
 
 The owner exercises the build35 image and menu launcher, but sees an empty window.

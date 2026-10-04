@@ -64,15 +64,20 @@
         var positions={};graph.nodes.forEach(function(n,i){positions[n.id]={x:80+(i%4)*180,y:70+Math.floor(i/4)*180};});
         return layout.set(graph,positions);
     }
-    function authoring(graph){
+    function authoring(graph,context){
         var clean=clone(graph),positions=layout.resolve(clean);clean.optionalRecords=[];
-        clean=layout.set(clean,positions);validate(clean);return clean;
+        clean=layout.set(clean,positions);validate(clean,context);return clean;
     }
-    function validate(graph){
+    function validate(graph,context){
         if(codec.toHex(graph).length/2>MAX_BYTES)fail("Preset exceeds the 24 KiB project limit.");
         if(graph.nodes.length>64 || graph.edges.length>256)fail("Preset has too many nodes or connections.");
         var outputs=graph.nodes.filter(function(n){return n.type===edits.types.output;});if(outputs.length!==1 || outputs[0].id!==OUTPUT)fail("Preset needs one renderer Output.");
-        graph.nodes.forEach(function(n){var kind=Object.keys(edits.types).filter(function(k){return edits.types[k]===n.type;})[0];if(!kind || n.schemaVersion!==({emitter:7,particle:6,force:2,output:4})[kind])fail("Preset uses an unsupported node schema; recreate it with this version.");
+        if(typeof edits.schemaVersion!=="function")fail("The node library did not update. Close and reopen Starfield Presets.");
+        graph.nodes.forEach(function(n){
+            var kind=Object.keys(edits.types).filter(function(k){return edits.types[k]===n.type;})[0];
+            if(!kind)fail((context||"Preset")+": unsupported node type "+n.type+".");
+            var expected=edits.schemaVersion(kind);
+            if(n.schemaVersion!==expected)fail((context||"Preset")+": "+kind+" has unsupported node schema "+n.schemaVersion+"; expected "+expected+".");
             if(graph.edges.filter(function(e){return e.sourceNode===n.id;}).length>4)fail("A node can have at most four outgoing connections.");
         });
         // Check every edge and cycle using the same authoring planner as the canvas.
@@ -81,7 +86,7 @@
     }
     function apply(base,edit,idFactory){
         if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
-        var preset=authoring(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels)),current=clone(base);
+        var preset=authoring(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels),"Selected preset"),current=clone(base);
         var oldOutput=current.nodes.filter(function(n){return n.type===edits.types.output;})[0];if(!oldOutput)fail("The current graph has no Output.");
         var positions=layout.resolve(current),sourcePositions=layout.resolve(preset),occupied={};
         current.nodes.concat(preset.nodes).forEach(function(n){occupied[n.id]=true;});current.edges.concat(preset.edges).forEach(function(e){occupied[e.id]=true;});
@@ -93,7 +98,7 @@
         var offset=edit.mode==="add"?Math.max.apply(null,[0].concat(Object.keys(positions).map(function(id){return positions[id].y;})))+180:0;
         preset.nodes.forEach(function(n){if(n.id===incomingOutput.id)return;var id=next();map[n.id]=id;current.nodes.push({id:id,type:n.type,schemaVersion:n.schemaVersion,parameters:n.parameters});positions[id]={x:sourcePositions[n.id].x,y:sourcePositions[n.id].y+offset};});
         preset.edges.forEach(function(e){current.edges.push({id:next(),sourceNode:map[e.sourceNode],sourcePort:e.sourcePort,destinationNode:map[e.destinationNode],destinationPort:e.destinationPort});});
-        current=layout.set(current,positions);validate(current);return current;
+        current=layout.set(current,positions);validate(current,"Updated project");return current;
     }
     function encode(graph,name,category){if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");return JSON.stringify({format:"org.starfieldfx.preset",version:1,name:name.trim(),category:category||"My Presets",graphHex:codec.toHex(authoring(graph))},null,2);}
     function decode(text){if(typeof text!=="string" || text.length>MAX_BYTES*2+2048)fail("Preset file is too large.");var data=JSON.parse(text);if(!data || data.format!=="org.starfieldfx.preset" || data.version!==1 || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");var graph=authoring(codec.fromHex(data.graphHex));return {id:"imported-"+edits.randomId(),name:data.name,category:"My Presets",description:"Imported Starfield preset",color:"#91bde0",graph:graph};}

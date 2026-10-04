@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-03 / build37 - qualify application and navigation
+
+Catalog loading passes owner testing, but application/title removal fail. Unify
+the preset version source, prevent mixed resource generations, expose precise
+mismatch evidence, add parent navigation and remove old Example controls. Own
+the native title draw/click area and requalify actual AE Add/Replace/icon behavior.
+
 ## P-03 / build36 - preset window and picture placement
 
 Correct the owner's failed build35 preset UI qualification: visible Modeless

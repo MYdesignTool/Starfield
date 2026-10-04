@@ -456,6 +456,7 @@
         } catch (invalidConnection) { return false; }
     }
 
-    return { types: TYPES, ports: PORTS, apply: apply, createInsertEdit: createInsertEdit,
+    return { types: TYPES, ports: PORTS, schemaVersion: function(kind) { return SCHEMA_VERSIONS[kind]; },
+             apply: apply, createInsertEdit: createInsertEdit,
              randomId: randomId, canConnect: canConnect };
 }));

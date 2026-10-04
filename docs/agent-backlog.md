@@ -19,6 +19,15 @@ before the next deployment; main remains owner-accepted build31.
 
 ## P-03 - Main picture launcher and preset manager
 
+Build37 follow-up: owner confirms build36 catalog loading, but preset application
+fails schema validation; parent navigation is missing and native blank title still
+has a twirly. Owner also removes the CEP Example feature. Unify schema validation
+with graph_edits, version page resources/gateway, report exact mismatched versions,
+add Up/Folders navigation and remove Example data/UI/listener. Own title paint and
+click through PF_PUI_TOPIC/DONT_ERASE_TOPIC. Keep main26/index1/disk1631 and native
+schemas unchanged. Cached-generation mixing is a hypothesis pending host evidence.
+May2023 compilation and JS syntax checks pass; no regression suites are run here.
+
 Build36 follow-up: owner reports a blank preset window, requires the image without
 its folding Presets title, and requests half-size packaging. Read-only installed
 path inspection finds the files present; correct Modeless AutoVisible=false to

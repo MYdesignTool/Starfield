@@ -1,7 +1,7 @@
 {
   "manifestVersion": 26,
   "schemaVersion": 26,
-  "revisionNote": "Build36 replaces the development launcher at index1 with an untitled PF_Param_NO_DATA picture, fresh disk ID1631. Renderer globals/animation aliases and public authored disk IDs remain unchanged. Fresh main development effects; no legacy migration per owner. ADR0029.",
+  "revisionNote": "Build37 owns the title drawing/click area of the build36 NO_DATA picture to remove the residual twirly. Registration index1/disk1631/main manifest26 and all authored IDs/node schemas remain unchanged. ADR0029.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -1338,6 +1338,7 @@
     "diskId": 1631,
     "label": "",
     "type": "custom_ui_no_data",
+    "uiFlags": ["PF_PUI_TOPIC", "PF_PUI_CONTROL", "PF_PUI_DONT_ERASE_TOPIC"],
     "constant": true,
     "uiWidth": 304,
     "uiHeight": 104,

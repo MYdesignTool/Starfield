@@ -58,6 +58,25 @@ void draw(PF_InData* data,PF_EventExtra* event) {
     if(!ui || !bot || !supplier || !surface)return;
     DRAWBOT_DrawRef ref{};DRAWBOT_SupplierRef source{};DRAWBOT_SurfaceRef target{};
     if(ui->PF_GetDrawingReference(event->contextH,&ref) || !ref || bot->GetSupplier(ref,&source) || bot->GetSurface(ref,&target) || !source || !target)return;
+    if(event->effect_win.area==PF_EA_PARAM_TITLE) {
+        // The complete title belongs to this custom UI, including AE's twirly.
+        Suite<DRAWBOT_PathSuite1> paths(data->pica_basicP,kDRAWBOT_PathSuite,kDRAWBOT_PathSuite_Version1);
+        Suite<PFAppSuite6> app(data->pica_basicP,kPFAppSuite,kPFAppSuiteVersion6);
+        if(!paths)return;
+        DRAWBOT_ColorRGBA color{.2f,.2f,.2f,1};PF_App_Color background{};
+        if(app && !app->PF_AppGetBgColor(&background)) {
+            color.red=background.red/65535.0f;color.green=background.green/65535.0f;color.blue=background.blue/65535.0f;
+        }
+        const auto& title=event->effect_win.param_title_frame;
+        const DRAWBOT_RectF32 bounds{float(title.left),float(title.top),float(title.right-title.left),float(title.bottom-title.top)};
+        if(bounds.width<=0 || bounds.height<=0)return;
+        DRAWBOT_BrushRef brush{};DRAWBOT_PathRef path{};
+        if(!supplier->NewBrush(source,&color,&brush) && brush && !supplier->NewPath(source,&path) && path &&
+            !paths->AddRect(path,&bounds))(void)surface->FillPath(target,brush,path,kDRAWBOT_FillType_EvenOdd);
+        if(path)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(path));
+        if(brush)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(brush));
+        return;
+    }
     const auto& frame=event->effect_win.current_frame;
     const int width=std::clamp(int(frame.right-frame.left)-4,30,300),height=width/3;
     const DRAWBOT_PointF32 origin{float(frame.left+2),float(frame.top+2)};
@@ -91,12 +110,12 @@ void clear_main_presets_ui() noexcept {disabled.clear();}
 PF_Err main_presets_event(PF_InData* data,PF_OutData*,PF_EventExtra* event) noexcept try {
     if(!data || !event)return PF_Err_NONE;
     if(event->e_type==PF_Event_CLOSE_CONTEXT){disabled.erase(event->contextH);return PF_Err_NONE;}
+    if(event->e_type!=PF_Event_DRAW && event->e_type!=PF_Event_DO_CLICK)return PF_Err_NONE;
     // PF_Context's public window type is borrowed only during this callback.
     if(!event->contextH || !*event->contextH || (**event->contextH).w_type!=PF_Window_EFFECT ||
-        event->effect_win.index!=1 || event->effect_win.area!=PF_EA_CONTROL)return PF_Err_NONE;
+        event->effect_win.index!=1 || (event->effect_win.area!=PF_EA_CONTROL && event->effect_win.area!=PF_EA_PARAM_TITLE))return PF_Err_NONE;
     if(event->e_type==PF_Event_DRAW)draw(data,event);
-    else if(event->e_type==PF_Event_DO_CLICK)launch(data);
-    else return PF_Err_NONE;
+    else if(event->effect_win.area==PF_EA_CONTROL)launch(data);
     event->evt_out_flags|=PF_EO_HANDLED_EVENT;return PF_Err_NONE;
 } catch(...) {return PF_Err_NONE;}
 }

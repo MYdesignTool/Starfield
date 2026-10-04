@@ -1,4 +1,11 @@
-# Presets manager (build36)
+# Presets manager (build37)
+
+Up or Folders returns to the category grid; All presets shows every card. Example
+selection is removed from the node editor. Both pages use build37 resource URLs
+and gateway identity to avoid mixing script generations. Preset validation uses
+the node planner's schema table; mismatch messages name the node and versions.
+Restart AE and reopen both panels for the update. No authored schemas changed
+from build36. Preset application and native title-icon removal need owner retest.
 
 Build36 corrects the visible Modeless lifecycle and uses an untitled picture-only
 entry. Restart AE to read the manifest version, then create a fresh main effect

@@ -2,14 +2,14 @@
     "use strict";
     var presets=window.StarfieldPresets,codec=window.StarfieldGraphCodec,snapshots=window.StarfieldNativeGraphSnapshot;
     var entries=presets.catalog.slice(),category=null,selected=null,targetToken=null,revision=null,graph=null,busy=false,serial=0;
-    var el={};["grid","preview","search","target","breadcrumb","selected-title","description","structure","status","refresh","import","save","home","render-settings","cancel","replace","add"].forEach(function(id){el[id]=document.getElementById(id);});
+    var el={};["grid","preview","search","target","breadcrumb","selected-title","description","structure","status","refresh","import","save","home","up","all","render-settings","cancel","replace","add"].forEach(function(id){el[id]=document.getElementById(id);});
     // Keep the page and the reason visible when a dependency did not load.
     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
-    var cep=window.__adobe_cep__,ready=false,readyToken="org.starfieldfx.panel/1/native-presets-35";
+    var cep=window.__adobe_cep__,ready=false,readyToken="org.starfieldfx.panel/1/native-presets-37";
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
-    function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;}
+    function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
     function host(script,callback){if(!cep || !cep.evalScript){callback(null);return;}cep.evalScript(script,callback);}
     function gateway(callback){
         if(ready){callback(true);return;}
@@ -72,7 +72,7 @@
         var previewGraph=entry.graph || presets.build(entry.id,1080);el.structure.textContent=previewGraph.nodes.length+" nodes · "+previewGraph.edges.length+" connections · illustration preview";illustration(el.preview,entry);pending(busy);
     }
     function render(){
-        el.grid.textContent="";el.breadcrumb.textContent=category || "Categories";var query=el.search.value.trim().toLowerCase();
+        el.grid.textContent="";el.breadcrumb.textContent=category || "Categories";var query=el.search.value.trim().toLowerCase();el.up.disabled=busy || (!category && !query);
         if(!category && !query){presets.categories.slice(1).forEach(function(name){var folder=document.createElement("button");folder.className="card";folder.setAttribute("role","listitem");
             var art=document.createElement("div");art.className="folder-art";art.innerHTML='<svg viewBox="0 0 100 80" aria-hidden="true"><path d="M5 18h32l8 9h48v49H5zM8 10h28l8 8H8z"/></svg>';
             var text=document.createElement("span");text.textContent=name;folder.appendChild(art);folder.appendChild(text);folder.addEventListener("click",function(){category=name;render();});el.grid.appendChild(folder);});return;}
@@ -80,7 +80,8 @@
         found.forEach(function(entry){var card=document.createElement("button");card.className="card"+(selected===entry?" selected":"");card.setAttribute("role","listitem");card.setAttribute("aria-pressed",selected===entry?"true":"false");var canvas=document.createElement("canvas");canvas.width=320;canvas.height=180;illustration(canvas,entry);var label=document.createElement("span");label.textContent=entry.name;card.appendChild(canvas);card.appendChild(label);card.addEventListener("click",function(){select(entry);});el.grid.appendChild(card);});
         if(!found.length){var empty=document.createElement("div");empty.className="empty";empty.textContent=category==="My Presets"?"Import a Starfield preset, or save the current graph.":"No presets match this search.";el.grid.appendChild(empty);}
     }
-    el.search.addEventListener("input",render);el.home.addEventListener("click",function(){category="All presets";el.search.value="";render();});
+    function browse(destination){category=destination;selected=null;el.search.value="";el["selected-title"].textContent="Choose a preset";el.description.textContent="Browse a category or search the library.";el.structure.textContent="";el.preview.getContext("2d").clearRect(0,0,el.preview.width,el.preview.height);render();pending(busy);}
+    el.search.addEventListener("input",render);el.home.addEventListener("click",function(){browse(null);});el.up.addEventListener("click",function(){browse(null);});el.all.addEventListener("click",function(){browse("All presets");});
     el.refresh.addEventListener("click",refresh);el.add.addEventListener("click",function(){apply("add");});el.replace.addEventListener("click",function(){apply("replace");});
     el.cancel.addEventListener("click",function(){if(busy)return;if(cep && cep.closeExtension)cep.closeExtension();else window.close();});
     el.import.addEventListener("click",function(){if(busy)return;pending(true);call("readPresetFile",{},function(response){if(!response.ok){failure(response);return;}if(response.cancelled){pending(false);return;}try{var entry=presets.decode(response.text);entries.push(entry);category="My Presets";el.search.value="";select(entry);status("Imported "+entry.name+". Choose Add or Replace to apply.");pending(false);}catch(error){failure({error:{code:error.code||"invalid_preset",message:error.message}});}});});

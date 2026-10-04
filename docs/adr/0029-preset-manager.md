@@ -6,6 +6,33 @@ generated picture in the main Effect Controls and a clickable preset manager.
 
 ## Build36 owner feedback
 
+### Build37 follow-up
+
+The owner confirms the manager now shows its catalog and pinned target, but Add
+reports invalid_preset/unsupported node schema. Current source tables agree at
+Emitter7/Particle6/Force2/Output4, and prior source-only catalog checks passed;
+the exact failing runtime node/version is absent from the old generic message.
+Mixed cached script generations are a hypothesis, not a confirmed host diagnosis.
+Expose the edit planner's schemaVersion accessor and use it for preset validation,
+removing the duplicate version table. Both HTML pages load their scripts/styles
+with the same build37 resource suffix; gateway/bundle identities advance together.
+Validation remains strict and Core remains authoritative. Errors now identify
+Selected preset versus Updated project, node kind and actual/expected versions.
+No silent imported-preset migration or manual CEP cache manipulation is added.
+
+Add Up, Folders and All presets navigation. Up returns to the root category grid,
+clears selection, and disables while a transaction is pending. Remove the old
+Example dropdown, its unused table and listener from the node editor by owner
+request. Palette/curve presets remain separate supported editor features.
+
+Owner evidence disproves the assumption that an untitled NO_DATA control removes
+AE's title twirly. Keep index1/disk1631/main26 and own PF_PUI_TOPIC plus CONTROL
+and DONT_ERASE_TOPIC. Draw the complete parameter title frame in the host's
+background color; consume title clicks instead of letting AE collapse the picture.
+Only the image control area launches the manager. Path/brush objects remain local
+and balanced; Draw/Click-only handling avoids reading the wrong event union.
+Native removal of the residual title icon still needs actual AE confirmation.
+
 The main image renders and its click opens an AE window, but the owner reports
 empty content. Read-only inspection confirms the installed system CEP Junction
 points to this checkout and both presets.html and its stylesheet exist. The

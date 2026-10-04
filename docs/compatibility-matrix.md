@@ -1,5 +1,18 @@
 # Behavior inventory
 
+## P-03 / build37 qualification
+
+Owner build36 screenshots confirm catalog/folder rendering, selection preview and
+pinned target; the AutoVisible correction has passed that display gate. Add fails
+with the old generic unsupported-schema message; application remains failed.
+The untitled NO_DATA row still exposes a twirly, so its no-title claim is rejected.
+Build37 unifies version lookup, versions page resources and adds exact diagnostics;
+cached scripts are a hypothesis, not a proven cause. Up/Folders returns to the
+category grid; Example is removed. Native title painting/clicks are owned now.
+Compilation/syntax checks pass; no regression suites were run. Restart AE and
+reopen both panels, then verify Add and Replace, return navigation and the title
+icon. Main26/Emitter7/Particle6/Force2/Output4 and half-size artwork are unchanged.
+
 ## P-03 / build36 qualification
 
 Owner build35 evidence confirms the main illustration draws and its click opens

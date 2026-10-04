@@ -1,5 +1,21 @@
 # Build and host matrix
 
+## P-03 / build37 candidate - 2026-10-04
+
+Owner build36 evidence confirms the catalog loads, but Add reports unsupported
+node schema and the NO_DATA row retains a twirly. Build37 (32805/0x8025) centralizes
+preset version lookup in graph_edits, versions both pages' script/style URLs and
+gateway/bundle identities, and reports graph phase/node/version on a mismatch.
+Current source versions already agree; stale generation mixing is a hypothesis.
+Add Up/Folders navigation, remove Example UI/data/listener, and own native title
+painting/clicks with PF_PUI_TOPIC/DONT_ERASE_TOPIC. IDs/indexes/main26/node schemas/
+CoreABI3/render contracts and1086x362 artwork stay unchanged. See ADR0029.
+
+Final May2023 SDK /MT build passes without compiler errors using candidate-only
+flags: artifacts/build37-final-native.log. Node --check validates graph_edits,
+presets, preset_manager and panel syntax. No regression suites were run. AE
+Add/Replace and actual title icon remain owner gates; main stays at accepted31.
+
 ## P-03 / build36 owner feedback candidate - 2026-10-04
 
 Build35 owner screenshot confirms native image rendering and menu invocation,

@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-35";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-37";
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
         var bridge=window.__adobe_cep__;
@@ -66,44 +66,6 @@
         window.__adobe_cep__.evalScript(script, callback);
     }
 
-    // Example presets. Only values with agreed units are included: the emitter origin
-    // stays untouched because its host unit (pixels vs percent) is still an open
-    // question (backlog D-05) and a wrong guess would silently move the emitter.
-    var PRESETS = {
-        defaults: {
-            particle_count: 1000000, birth_rate: 100, seed: 1000, particle_lifetime: 2, emitter_shape: 1,
-            velocity_x: 0, velocity_y: 0.3, velocity_z: 0, emitter_size: 0.05,
-            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.15,
-            gravity_x: 0, gravity_y: 0, gravity_z: 0, linear_drag: 0,
-            particle_size: 8, particle_size_end: 100, opacity: 1, opacity_end: 100,
-            color_start: [255, 255, 255], color_end: [255, 255, 255]
-        },
-        spark: {
-            particle_count: 1000000, birth_rate: 220, seed: 7, particle_lifetime: 1.1, emitter_shape: 1,
-            velocity_x: 0, velocity_y: 1.6, velocity_z: 0, emitter_size: 0,
-            emitter_size_x: 16, emitter_size_y: 16, emitter_size_z: 16, velocity_spread: 1.1,
-            gravity_x: 0, gravity_y: -2.6, gravity_z: 0, linear_drag: 0.9,
-            particle_size: 3.2, particle_size_end: 18.8, opacity: 1, opacity_end: 0,
-            color_start: [255, 240, 180], color_end: [255, 90, 20]
-        },
-        snow: {
-            particle_count: 1000000, birth_rate: 90, seed: 21, particle_lifetime: 6.5, emitter_shape: 2,
-            velocity_x: 0.06, velocity_y: -0.14, velocity_z: 0, emitter_size: 1.1,
-            emitter_size_x: 2160, emitter_size_y: 1080, emitter_size_z: 2160, velocity_spread: 0.35,
-            gravity_x: 0, gravity_y: -0.05, gravity_z: 0, linear_drag: 0.15,
-            particle_size: 4.5, particle_size_end: 100, opacity: 0.9, opacity_end: 83.3,
-            color_start: [235, 245, 255], color_end: [200, 215, 235]
-        },
-        floating_light: {
-            particle_count: 1000000, birth_rate: 14, seed: 3, particle_lifetime: 9, emitter_shape: 3,
-            velocity_x: 0, velocity_y: 0.16, velocity_z: 0, emitter_size: 0.9,
-            emitter_size_x: 100, emitter_size_y: 100, emitter_size_z: 100, velocity_spread: 0.4,
-            gravity_x: 0, gravity_y: 0.06, gravity_z: 0, linear_drag: 0.35,
-            particle_size: 14, particle_size_end: 21.4, opacity: 0.85, opacity_end: 0,
-            color_start: [255, 232, 150], color_end: [255, 140, 60]
-        }
-    };
-
     // Surface load-time failures instead of showing a blank panel: a syntax error or an
     // exception during startup is exactly what "the panel is recognised but will not open"
     // looks like from the outside.
@@ -151,7 +113,6 @@
         modeLine: document.getElementById("modeLine"),
         revisionLine: document.getElementById("revisionLine"),
         resolutionLine: document.getElementById("resolutionLine"),
-        preset: document.getElementById("preset"),
         refresh: document.getElementById("refresh"),
         autoRefresh: document.getElementById("autoRefresh"),
         targetLock: document.getElementById("targetLock")
@@ -2826,17 +2787,6 @@
     }
     if (elements.autoRefresh) elements.autoRefresh.addEventListener("change", function () {
         if (elements.autoRefresh.checked) refresh(false, false);
-    });
-
-    elements.preset.addEventListener("change", function () {
-        var preset = PRESETS[elements.preset.value];
-        elements.preset.value = "";
-        if (!preset) return;
-        var changes = [];
-        for (var key in preset) {
-            if (Object.prototype.hasOwnProperty.call(preset, key)) changes.push({ key: key, value: preset[key] });
-        }
-        applyChanges(changes);
     });
 
     refresh(true, true);
