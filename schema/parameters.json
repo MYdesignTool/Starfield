@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 24,
-  "schemaVersion": 24,
-  "revisionNote": "Build 24 adds main Acceleration GPU/CPU, default GPU, with native AE CUDA/OpenCL negotiation; C ABI 3 requires paired AEX/Core. Existing IDs are unchanged; fresh development effects.",
+  "manifestVersion": 25,
+  "schemaVersion": 25,
+  "revisionNote": "Build35 replaces unused bootstrap stream1 with a constant Presets image control, fresh disk ID1630. Renderer globals/animation aliases and all public disk IDs remain unchanged. Fresh development effects; no legacy migration per owner. ADR0029.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -1332,5 +1332,16 @@
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
+  },
+  "presetLauncher": {
+    "index": 1,
+    "diskId": 1630,
+    "label": "Presets",
+    "type": "custom_ui_float",
+    "constant": true,
+    "uiWidth": 304,
+    "uiHeight": 104,
+    "asset": "cep_panel/assets/starfield-presets-banner.png",
+    "extensionId": "org.starfieldfx.panel.presets"
   }
 }

@@ -16,6 +16,7 @@
 #include "SmartRender.hpp"
 #include "GpuRender.hpp"
 #include "NativeTemporalUI.hpp"
+#include "PresetsUI.hpp"
 
 static_assert(STARFIELD_VERSION_STAGE == PF_Stage_DEVELOP);
 static_assert(PF_VERSION(STARFIELD_VERSION_MAJOR,
@@ -104,6 +105,7 @@ PF_Err dispatch(PF_Cmd cmd,
             out_data->sequence_data=nullptr;
             return PF_Err_NONE;
         case PF_Cmd_GLOBAL_SETDOWN:
+            starfield::adapter::clear_main_presets_ui();
             return PF_Err_NONE;
         case PF_Cmd_SMART_PRE_RENDER:
             return starfield::adapter::pre_render(in_data, out_data, static_cast<PF_PreRenderExtra*>(extra));
@@ -131,6 +133,7 @@ PF_Err dispatch(PF_Cmd cmd,
                 *static_cast<starfield::adapter::NativeBootstrapRequest*>(extra));
             return PF_Err_NONE;
         case PF_Cmd_EVENT:
+            if(const auto error=starfield::adapter::main_presets_event(in_data,out_data,static_cast<PF_EventExtra*>(extra));error)return error;
             starfield::adapter::refresh_native_temporal_ui(in_data,params,static_cast<PF_EventExtra*>(extra),
                 starfield::adapter::graph_carrier_plugin_id());
             return PF_Err_NONE;

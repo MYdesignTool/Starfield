@@ -10,6 +10,7 @@ param(
     [switch]$HostBootstrap,
     [switch]$GradientEditor,
     [switch]$TraceIncludes,
+    [ValidatePattern('^([A-Za-z0-9_./-]+)?$')][string]$PresetCatalog = '',
     [ValidateSet('Emitter', 'Particle', 'Force')][string]$NodeKind = 'Particle',
     [string]$MSVCVarsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 )
@@ -104,12 +105,14 @@ try {
     [System.IO.File]::WriteAllLines($responsePath, $responseLines, [System.Text.Encoding]::ASCII)
 
     $batchPath = Join-Path $buildDirectory 'build-core-tests.cmd'
+    if($PresetCatalog -and -not $CurrentNodes){throw 'PresetCatalog belongs to CurrentNodes checks.'}
+    $taskTestArgs = if($PresetCatalog){' "'+$PresetCatalog+'"'}else{''}
     $batch = @"
 @echo off
 call "$MSVCVarsPath" >nul
 cl @$responsePath
 if errorlevel 1 exit /b %errorlevel%
-"$buildDirectory\core_tests.exe"
+"$buildDirectory\core_tests.exe"$taskTestArgs
 exit /b %errorlevel%
 "@
     [System.IO.File]::WriteAllText($batchPath, $batch, [System.Text.Encoding]::ASCII)

@@ -22,12 +22,18 @@ before the next deployment; main remains owner-accepted build31.
 Owner: primary agent, current card after M3-08. User explicitly requests one generated
 Starfield banner in the main ECW and a functional preset manager with categories,
 search, render-settings option and Add/Replace. The built-in imagegen banner is
-saved under artifacts/assets pending integration. Own main custom UI/resources/
+integrated under cep_panel/assets and embedded in the main AEX. Own main custom UI/resources/
 build/parameters/schema/capabilities, CEP manifest/assets/manager/preset model/
 gateway, and matching focused checks/docs. Keep authoring on the existing graph
 transaction and target identity/revision guards. Do not add registry, shared CEF
 flags, third-party presets or inactive unsupported-category downloads. Actual AE
 launcher and graph application require host qualification.
+Status: implementation complete in build35, integrated with M3-07 movable stops
+and M3-08 rotation. Six authored catalogs pass real Core parsing/evaluation;
+Add/Replace, portable file dialogs, stale targets and native readback checks pass.
+Final native candidate builds without compiler warnings/errors. Actual AE picture
+click, modeless manager, undo/reopen and rotation visuals remain host gates.
+Local browser policy rejects file URLs; no actual manager screenshot is claimed.
 
 ## M3-07 - Particle Color Over Life editor and control organization
 

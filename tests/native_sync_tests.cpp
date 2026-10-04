@@ -833,7 +833,7 @@ int main() {
     remember_native_control_proofs(&renderer_data,{});
     auto ui_data=renderer_data;ui_data.num_params=kGraphParameterId+1;
     ui_data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* info)->PF_Err {
-        check(info && info->events==PF_CustomEFlag_COMP && !info->comp_ui_width && !info->comp_ui_height,
+        check(info && info->events==(PF_CustomEFlag_COMP|PF_CustomEFlag_EFFECT) && !info->comp_ui_width && !info->comp_ui_height,
             "metadata UI registers only zero-sized composition events");return 0;
     };
     check(register_native_temporal_ui(&ui_data)==0,"UI metadata callback registration succeeds");

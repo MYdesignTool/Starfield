@@ -44,7 +44,7 @@ assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
     return parameter.key === "9" || parameter.key === "10";
 }).map(function (parameter) { return parameter.value; }), [0, 0],
 "new Particle nodes include zero-default random variation controls");
-assert.strictEqual(newParticle.schemaVersion, 2, "new Particle nodes use the current node schema");
+assert.strictEqual(newParticle.schemaVersion, 6, "new Particle nodes use the current node schema");
 assert.strictEqual(newParticle.parameters.filter(function (parameter) {
     return parameter.key === "11";
 })[0].value, 2, "new Particle nodes own their lifetime");
@@ -196,17 +196,9 @@ assert.strictEqual(duplicatedEmitter.edges.some(function (edge) {
     return edge.sourceNode === copiedEmitterId || edge.destinationNode === copiedEmitterId;
 }), true, "an Emitter copy contributes an independent active source");
 
-var appearanceGraph = edits.apply(original, { type: "addNode", nodeType: "appearance" }, idFactory);
-var appearanceId = appearanceGraph.nodes[4].id;
-appearanceGraph = edits.apply(appearanceGraph, { type: "connect", from: forceId, to: appearanceId }, idFactory);
-appearanceGraph = edits.apply(appearanceGraph, { type: "connect", from: appearanceId, to: outputId }, idFactory);
-var duplicatedAppearance = edits.apply(appearanceGraph, {
-    type: "duplicateNodes", nodeIds: [appearanceId]
-}, idFactory);
-var copiedAppearanceId = duplicatedAppearance.nodes[5].id;
-assert.strictEqual(duplicatedAppearance.edges.some(function (edge) {
-    return edge.sourceNode === copiedAppearanceId || edge.destinationNode === copiedAppearanceId;
-}), false, "an Appearance copy is disconnected until its override precedence is chosen");
+assert.throws(function () {
+    edits.apply(original, { type: "addNode", nodeType: "appearance" }, idFactory);
+}, /unsupported built-in node type/i, "the retired Appearance type cannot be created");
 
 var moved = edits.apply(original, {
     type: "moveNodes", positions: { [forceId]: { x: -260, y: 610 } }

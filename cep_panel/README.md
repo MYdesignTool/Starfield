@@ -1,4 +1,18 @@
-# Build32 Particle Color Gradient
+# Presets manager (build35)
+
+Click the original Presets picture in a fresh main effect, or Presets in the node
+panel, to open Starfield Presets. Select a layer with Starfield before opening;
+Refresh Target deliberately changes the pinned target. Browse categories, search,
+select a preset, then Add or Replace. Add keeps existing nodes. Uncheck Apply
+Render Settings to keep the current Output settings. AE undo restores graph edits.
+
+Save Current and Import use explicit file dialogs for .sfldpreset files. My Presets
+shows saves/imports in this manager session; reopen a saved file through Import.
+The six built-in graphs use available features only. Card art is an illustration
+preview, not an AE render. Fresh main/Emitter/Particle effects are required after
+the development schema changes. Actual AE menu/Modeless qualification is pending.
+
+## Historical build32 Particle Color Gradient
 
 Accepted build31 is on main; development continues on
 codex/m3-07-particle-gradient. Reopen CEP for native-gradient-32. Create a fresh

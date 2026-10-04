@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-gradient-32";
+    var GATEWAY_BUILD = "native-presets-35";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1978,6 +1978,36 @@
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
+    host.SFLD_readPresetFile=function(requestJson) {
+        var request=parseRequest(requestJson);if(!request || request.operation!=="readPresetFile")return fail("invalid_request","Invalid preset import request.");
+        var file=null,opened=false;
+        try {
+            file=File.openDialog("Import Starfield preset","Starfield presets:*.sfldpreset;*.json");
+            if(!file)return reply({ok:true,cancelled:true});
+            if(file.length>51200)return fail("size_limit_exceeded","The preset file exceeds the supported size.");
+            file.encoding="UTF-8";if(!file.open("r"))return fail("preset_file_error",file.error || "Unable to read this preset.");opened=true;
+            var text=file.read();if(file.error)return fail("preset_file_error",file.error);
+            return reply({ok:true,text:text,path:file.fsName});
+        } catch(error){return fail("preset_file_error",error.toString());}
+        finally{if(opened)file.close();}
+    };
+    host.SFLD_writePresetFile=function(requestJson) {
+        var request=parseRequest(requestJson);if(!request || request.operation!=="writePresetFile" || typeof request.text!=="string" || request.text.length>51200)return fail("invalid_request","Invalid preset save request.");
+        var file=null,opened=false;
+        try {
+            var data=JSON.parse(request.text);
+            if(!data || data.format!=="org.starfieldfx.preset" || data.version!==1 || typeof data.name!=="string" || !data.name || data.name.length>120 ||
+                typeof data.graphHex!=="string" || !data.graphHex || data.graphHex.length>MAX_GRAPH_BYTES*2 || data.graphHex.length%2 || !/^[0-9a-f]+$/i.test(data.graphHex))return fail("invalid_preset","Unsupported preset data.");
+            file=File.saveDialog("Save Starfield preset","Starfield presets:*.sfldpreset");if(!file)return reply({ok:true,cancelled:true});
+            if(!/\.sfldpreset$/i.test(file.name))file=new File(file.fsName+".sfldpreset");
+            if(file.exists && !confirm("Replace the existing preset?\n"+file.fsName))return reply({ok:true,cancelled:true});
+            file.encoding="UTF-8";if(!file.open("w"))return fail("preset_file_error",file.error || "Unable to write this preset.");opened=true;
+            if(!file.write(request.text))return fail("preset_file_error",file.error || "The preset could not be written.");
+            if(!file.close())return fail("preset_file_error",file.error || "The preset file could not be closed.");opened=false;
+            return reply({ok:true,path:file.fsName});
+        } catch(error){return fail("preset_file_error",error.toString());}
+        finally{if(opened)file.close();}
+    };
     host.SFLD_getState = SFLD_getState;
     host.SFLD_selectNodeEffect = SFLD_selectNodeEffect;
     host.SFLD_getFrameStatus = SFLD_getFrameStatus;

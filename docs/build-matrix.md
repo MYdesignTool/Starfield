@@ -1,5 +1,42 @@
 # Build and host matrix
 
+## P-03 / M3-08 / build35 candidate - 2026-10-04
+
+Build35 (32803/0x8023) integrates movable gradient endpoints (381be4f), reference
+rotation controls (12dbd32) and the original picture/preset manager (ADR0029).
+Development remains codex/m3-07-particle-gradient; main retains accepted build31
+at 8857303. Main manifest25/disk1630, Particle schema6/base102, Emitter schema7/
+base34 and snapshot3/200 bytes require fresh development effects. Core ABI3 and
+Render.hpp are unchanged. Banner provenance and prompt are recorded separately.
+
+Final May2023 SDK /MT candidate build passes without compiler warnings/errors:
+artifacts/build35-final-native.log, NoDistPublish/NoRuntimePublish. Those flags
+preserve the installed bundle while preparing the candidate.
+
+| Scope | Checks | Failures | Evidence under artifacts/ |
+|---|---:|---:|---|
+| Current nodes and six real preset graphs | 449 | 0 | build35-preset-core.log |
+| Native synchronization and camera capture | 6200 + 12 | 0 | build35-preset-sync.log |
+| Gradient/rotation custom editor and atomic banks | 3688 | 0 | build35-rotation-editor.log |
+| Particle native definitions | 91 | 0 | build35-rotation-particle.log |
+| Emitter native definitions | 86 | 0 | build35-rotation-emitter.log |
+| GPU adapter regression | 433 | 0 | build35-rotation-gpu.log |
+| Main parameter registration | 51 | 0 | build35-renderer-controls.log |
+
+Total 11010 focused C++ checks, zero failures. Seven JavaScript suites pass:
+preset_tests, panel_graph_transaction_tests, panel_startup_tests,
+particle_gradient_tests, panel_graph_view_tests, panel_gateway_tests,
+panel_graph_edit_tests (build35-final-<suite>.log). Manager/model syntax checks
+pass. Fixtures now use the current Particle schema and reject retired Appearance;
+gateway fixtures supply existing public renderer globals with current names.
+
+Standalone OpenCL test at512x512/20001 sprites: prepare3.722ms, kernel path1.293ms,
+combined5.015ms versus CPU67.243ms, maximum component error1.16229e-6. These are
+driver harness timings, not AE preview measurements. Native menu launching,
+Modeless interaction, undo/reopen, rotation visuals and startup speed remain
+owner host gates. Browser local-file access was blocked by its security policy;
+no actual manager screenshot is claimed.
+
 ## M3-07 / build34 Drawbot pixel-format correction - 2026-10-04
 
 Owner build33 testing is blocked by repeated Unsupported Pixel Format warnings

@@ -10,6 +10,7 @@
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="org.starfieldfx.panel.main" Version="0.1.0" />
+    <Extension Id="org.starfieldfx.panel.presets" Version="0.1.0" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -25,6 +26,15 @@
     </RequiredRuntimeList>
   </ExecutionEnvironment>
   <DispatchInfoList>
+    <Extension Id="org.starfieldfx.panel.presets">
+      <DispatchInfo>
+        <Resources><MainPath>./presets.html</MainPath><ScriptPath>./jsx/starfield_gateway.jsx</ScriptPath></Resources>
+        <Lifecycle><AutoVisible>false</AutoVisible></Lifecycle>
+        <UI><Type>Modeless</Type><Menu>Starfield Presets</Menu>
+          <Geometry><Size><Height>700</Height><Width>1040</Width></Size><MinSize><Height>450</Height><Width>480</Width></MinSize></Geometry>
+        </UI>
+      </DispatchInfo>
+    </Extension>
     <Extension Id="org.starfieldfx.panel.main">
       <DispatchInfo>
         <Resources>

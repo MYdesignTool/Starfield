@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits>
 #include <functional>
+#include <fstream>
 
 using namespace starfield::core;
 using namespace starfield::core::graph_keys;
@@ -523,4 +524,17 @@ void test_rotation_controls() {
     set(graph.nodes[0],kEmitterOrient,Vec3{0,0,90});auto direction=evaluate_particle_graph(graph,{1,1},never);
     check(direction.has_value() && std::abs(direction.value().particles[0].velocity.x-base.value().particles[0].velocity.x)>0.01,"Emitter Orient rotates directional cone");
 }
-int main() {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();test_particle_geometry();test_rotation_controls();std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}
+void test_preset_catalog(const char* path) {
+    std::ifstream catalog(path);check(bool(catalog),"paired JavaScript catalog exists");
+    std::string line;unsigned count=0;
+    while(std::getline(catalog,line)) {
+        if(line.empty())continue;++count;OpaqueBytes bytes;
+        for(std::size_t i=0;i+1<line.size();i+=2)bytes.push_back(static_cast<std::byte>(std::stoul(line.substr(i,2),nullptr,16)));
+        auto decoded=deserialize_graph(bytes,particle_node_registry());check(decoded.has_value(),"actual manager preset passes authoritative Core codec/registry");
+        if(!decoded.has_value())continue;
+        auto evaluated=evaluate_particle_graph(decoded.value(),{1,1},never,{1080,1});
+        check(evaluated.has_value() && !evaluated.value().particles.empty(),"manager preset emits particles through actual Core evaluation");
+    }
+    check(count==6,"all six manager presets evaluated");
+}
+int main(int argc,char* argv[]) {test_auxiliary();test_camera();test_reference_force_and_globals();test_birth_origins();test_temporal_controls();test_particle_gradient();test_birth_parameter_matrix();test_particle_geometry();test_rotation_controls();if(argc>1)test_preset_catalog(argv[1]);std::printf("%d checks, %d failures\n",checks,failures);return failures?1:0;}

@@ -37,14 +37,15 @@
       <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
-    <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
-    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><ImportLibrary>$(IntDir)StarfieldParticle.lib</ImportLibrary><TargetMachine>MachineX64</TargetMachine></Link>
+    <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalIncludeDirectories>$(ProjectDir)..\cep_panel\assets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ResourceCompile>
+    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><ImportLibrary>$(IntDir)StarfieldParticle.lib</ImportLibrary><TargetMachine>MachineX64</TargetMachine><AdditionalDependencies>windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="CoreLoader.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="EffectMain.cpp" />
+    <ClCompile Include="PresetsUI.cpp" />
       <ClCompile Include="GraphCarrier.cpp" />
     <ClCompile Include="NativeGraphCommit.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />
@@ -79,6 +80,7 @@
       <AdditionalInputs>$(MSBuildProjectDirectory)\PluginFlags.h;$(MSBuildProjectDirectory)\PluginVersion.h</AdditionalInputs>
     </CustomBuild>
     <ResourceCompile Include="$(IntDir)StarfieldPiPL.rc" />
+    <ResourceCompile Include="PresetsResources.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

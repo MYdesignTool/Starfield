@@ -1,5 +1,27 @@
 # Behavior inventory
 
+## P-03 / M3-08 / build35 qualification
+
+Owner reports build34 gradient expansion/editing usable; that feedback precedes
+the current rotation and preset changes. Build35 compiles with the May2023 SDK
+and passes the scoped Core/adapter/JavaScript checks recorded in build-matrix.md.
+These are implementation evidence, not a new AE support claim.
+
+Use fresh main, Emitter and Particle test effects (main manifest25, Emitter7,
+Particle6). In AE2023.5.0 Build52, verify the main Presets image opens Starfield
+Presets, categories/search and Add/Replace work on the pinned effect, unchecked
+Apply Render Settings retains its settings, and undo/reopen preserve the result.
+Save/import uses user-selected files; My Presets has a session list. Native click
+and Modeless behavior have not yet been exercised. Local browser policy rejected
+file URLs, so no manager UI screenshot is qualification evidence.
+
+Verify first/last gradient markers move, Emitter Angle/Orient have distinct
+effects, all rotation fields use AE angle dials, Random Limit None/All Axis/X/Y/Z,
+Rotation Over Life point editing and Anchor X/Y affect rendering. Compare these
+independent semantics with the owner's reference; no exact Stardust random-angle
+distribution claim is made. External Light/Null/source orientation remains open.
+Retest no-Options startup speed and native keyframes after reopening.
+
 ## M3-07 / build34 pixel-format qualification
 
 Owner build33 feedback reports repeated Unsupported Pixel Format modals when

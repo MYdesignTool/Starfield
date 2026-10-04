@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 34: query supported Drawbot formats and prevent repeating image failures.
-#define STARFIELD_VERSION_BUILD 34
-#define STARFIELD_VERSION_PACKED 32802 /* 0x8022 */
+// Build 35: movable gradient ends, reference rotation controls and preset manager.
+#define STARFIELD_VERSION_BUILD 35
+#define STARFIELD_VERSION_PACKED 32803 /* 0x8023 */

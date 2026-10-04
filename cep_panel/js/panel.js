@@ -7,7 +7,12 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-gradient-32";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-35";
+    var openPresetsButton=document.getElementById("openPresets");
+    if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
+        var bridge=window.__adobe_cep__;
+        if(bridge && bridge.requestOpenExtension)bridge.requestOpenExtension("org.starfieldfx.panel.presets","");
+    });
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
     var TARGET_POLL_INTERVAL_MS = 1200;
     var FRAME_STATUS_POLL_INTERVAL_MS = 200;

@@ -64,7 +64,7 @@ NativeUITiming last_native_ui_timing() noexcept {
 }
 PF_Err register_native_temporal_ui(PF_InData* data) noexcept {
     if(!data || !data->inter.register_ui)return PF_Err_BAD_CALLBACK_PARAM;
-    PF_CustomUIInfo info{};info.events=PF_CustomEFlag_COMP;
+    PF_CustomUIInfo info{};info.events=PF_CustomEFlag_COMP|PF_CustomEFlag_EFFECT;
     // No ECW custom area, overlays, input handlers or additional parameters.
     return PF_REGISTER_UI(data,&info);
 }

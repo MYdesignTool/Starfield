@@ -123,12 +123,13 @@
                         node.type === "org.starfieldfx.nodes.force" ? ({"3":0,"5":0,"6":0,"7":0,"8":0})[key] :
                         node.type === "org.starfieldfx.nodes.output" ? ({"2":0,"3":0,"4":0,"5":100})[key] : undefined;
                     if (fallback === undefined || value.type !== (key === "17" || key === "23" || (node.type === "org.starfieldfx.nodes.output" && (key === "2" || key === "4")) ? 3 : 4) || value.value !== fallback) return false;
-                } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.force" && key === "9"))) {
+                } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.particle" && (key === "27" || key === "13")) || (node.type === "org.starfieldfx.nodes.force" && key === "9"))) {
                     var av = a.value, bv = b.value;
                     if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1]) return false;
                     var ad = new DataView(new Uint8Array(av).buffer), bd = new DataView(new Uint8Array(bv).buffer);
                     for (var offset = 4; offset < av.length; offset += 8) {
-                        if (!near(ad.getFloat64(offset, true), bd.getFloat64(offset, true))) return false;
+                        var gradient=node.type === "org.starfieldfx.nodes.particle" && key==="13";
+                        if (!near(ad.getFloat64(offset, true), bd.getFloat64(offset, true), gradient && (offset-4)%32!==0)) return false;
                     }
                 } else if (a.type !== b.type || !near(a.value, b.value,
                     (node.type === "org.starfieldfx.nodes.particle") && (key === "1" || key === "2"))) return false;

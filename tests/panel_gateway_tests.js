@@ -16,7 +16,7 @@ const initialValues = {
     "Max Particles": 1000,
     "Particles Per Second": 100,
     "Random Seed": 1,
-    "Lifetime": 2,
+    "Life (Seconds)": 2,
     "Type": 1,
     "Origin": [50, 50, 50],
     "Velocity X": 0,
@@ -39,7 +39,13 @@ const initialValues = {
     "Color End": [1, 1, 1, 1],
     "Size Over Life": 100,
     "Opacity Over Life": 100,
-    "Control Source": 2
+    "Control Source": 2,
+    "Time Remapping On / Off": 0,
+    "Time (Seconds)": 0,
+    "Preview": 0,
+    "Particle chance": 100,
+    "Acceleration": 1,
+    "Time Sampling": 1
 };
 
 // Revision 9 added a bounded project curve bank and supervised commit nonce.

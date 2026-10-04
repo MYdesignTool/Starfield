@@ -1,5 +1,24 @@
 # Starfield plug-in architecture
 
+## P-03 / M3-08 / build35 - presets and reference rotation
+
+ADR0028 adds independent Emitter Orient, native AE angle dials, Particle Random
+Limit/Limit Angle, Rotation Over Life and Anchor X/Y, alongside movable gradient
+endpoints. Fresh Emitter schema7/base34 and Particle schema6/base102 effects are
+required. Birth sampling remains intact; rotating particles use shared CPU/GPU
+sprite geometry and snapshot3/200-byte transport. Core ABI3 and Render.hpp stay
+unchanged. External Light/Null/source orientation contracts remain deferred.
+
+ADR0029 replaces unused main stream1 with a constant Presets custom picture
+(new disk1630, main manifest25). The original PNG is embedded in the AEX; WIC
+retains only owned CPU pixels, and Drawbot objects stay within each callback.
+The explicit click opens a separate CEP Modeless manager through the AE menu.
+The manager's six procedural catalog entries and imported presets use the existing
+bounded graph transactions, target/revision guards, native sync and readback.
+No bindings/history are stored in portable files. Add remaps identities and keeps
+one existing Output; Replace is explicit. Paired rollback covers both native
+binaries and all CEP sources. AE launcher/manager qualification remains pending.
+
 ## M3-07 / build34 - negotiate Drawbot image layouts
 
 Owner build33 gradient expansion triggers repeating Unsupported Pixel Format
