@@ -437,3 +437,13 @@ Appearance throughout core/adapter/CEP/manifests, and the necessary scoped tests
 No-Options first preview/save/reopen and Particle -> Force need actual host
 qualification before the authorized main merge. Fake-host results alone cannot
 close this task. Build/tests/deployment evidence is recorded separately below.
+
+## Owner acceptance / main integration - 2026-10-04
+
+The owner reports the build31 issues are basically resolved and explicitly
+authorizes merging this installed version into main. This is an accepted
+development checkpoint for AE 2023, superseding the previous merge hold.
+No new exact timing numbers or exhaustive host matrix results were supplied;
+unreported render-queue/MFR/new-host gates remain open. Development continues
+on a separate branch for the Particle gradient editor and reference controls.
+The installed build31 and its paired rollback remain unchanged by integration.

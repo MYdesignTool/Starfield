@@ -1,5 +1,15 @@
 # Agent-ready implementation backlog
 
+## Owner acceptance / main integration - 2026-10-04
+
+The owner reports the build31 issues are basically resolved and explicitly
+authorizes merging this installed version into main. This is an accepted
+development checkpoint for AE 2023, superseding the previous merge hold.
+No new exact timing numbers or exhaustive host matrix results were supplied;
+unreported render-queue/MFR/new-host gates remain open. Development continues
+on a separate branch for the Particle gradient editor and reference controls.
+The installed build31 and its paired rollback remain unchanged by integration.
+
 ## M3-06 / build 31 - post-load bootstrap and Appearance removal
 
 Build30 failed owner no-Options startup qualification: W57/57 P57 E0 but
