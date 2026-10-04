@@ -6,6 +6,8 @@ Build33 follow-up: owner rejects build32 native UI (adding-stop compile failure,
 strip seams and internal controls visible even on fresh Emitter/Force). Correct
 custom dimensions, continuous bitmap drawing, whole-bank events and actual AE
 dynamic visibility. Continue M3-07 qualification; main remains at 8857303.
+Candidate 549b1b9 / build33 is built, checked and deployed with verified binary
+hashes and unchanged CEP/Core. Host retest is pending; rollback is in build-matrix.md.
 
 Owner: primary agent. Depends on owner-accepted build31 / ADR0026. Development
 branch: codex/m3-07-particle-gradient; main retains the accepted checkpoint.

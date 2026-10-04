@@ -10,6 +10,9 @@ event publication and AE dynamic visibility (ADR0027). No schema/layout migratio
 from build32. Required host checks: add/drag/color/undo/reopen; continuous gradient
 at normal/narrow panel widths; all UUID/layout/connection/curve banks absent from
 fresh Emitter/Force; Circle/Rectangle Size Y visibility. Main stays at 8857303.
+Build33 candidate 549b1b9 is now deployed under standing authorization with AE
+absent, six installed/retained hashes and unchanged CEP/Core verified. No actual
+host retest result is recorded yet; see build-matrix.md for the backup and rollback.
 
 ## M3-07 / build32 qualification
 

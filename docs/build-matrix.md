@@ -25,6 +25,38 @@ were inspected in gradient-editor-preview.svg/.png; this remains fake-host
 drawing evidence. Actual AE add/drag/color/undo/reopen, continuous bar appearance
 and absence of fresh-node metadata remain host gates.
 
+### Build33 deployment - 2026-10-04
+
+Candidate 549b1b9 deployed under standing authorization after a read-only check
+found no AfterFX/AfterFX_64. Six installed and six retained build32 binary hashes
+verified; all 14 CEP hashes are unchanged from the build32 paired manifest.
+Core remains 9C6CABFCD28D6CD5C984A91AE54834682C0AD4B143953A30ABF40EB5895F285A.
+Existing single `Plug-ins/Starfield -> newStardust/dist` Junction retained;
+Appearance remains absent. No process, registry, cache or other host changes.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 98271E77F4A328A1610F28D2A377C5B296ADB61479DAAE37B27B0C02D6E8E80D |
+| StarfieldEmitter.aex | CD19D362B235BC074896AFFB00FA6A6808ADACF9CDBE736CD323C237C6A49C6B |
+| StarfieldParticleNode.aex | A9AE791C7A2E87E768EEEBDD5269553D039EFA31040491B2FF2C0C39E82CB90B |
+| StarfieldForce.aex | C7082AFDC7895A4E4ED6528C4CA2402F94C7333391B21BC918BEF926E83482CC |
+| StarfieldHost.aex | 012C9D19D37DD194ADB9585E882C69CF3A3938B4FEFFB9912977C657B90E35D9 |
+
+Selector remains StarfieldCore-9C6CABFCD28D6CD5.dll with matching selected bytes.
+Before/after: artifacts/build33-deploy-before.json / build33-deploy-after.json;
+installation log: build33-deploy.log. Backup:
+artifacts/disabled/m307-build33-gradient-ui-fix-20261004.
+Actual native UI qualification remains pending. No additional schema migration
+from build32; reuse its nodes for edit tests, plus fresh Emitter/Force for visibility.
+
+One-step undo to build32 after closing AE (CEP already has matching hashes):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Deploy-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm307-build33-gradient-ui-fix-20261004' -Rollback
+```
+
+After that rollback, the build32 paired rollback below can restore accepted build31.
+
 ## M3-07 / build32 candidate - 2026-10-04
 
 Accepted build31 was fast-forwarded and pushed to main/origin main at 8857303.
