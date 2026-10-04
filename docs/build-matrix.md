@@ -16,6 +16,37 @@ flags: artifacts/build37-final-native.log. Node --check validates graph_edits,
 presets, preset_manager and panel syntax. No regression suites were run. AE
 Add/Replace and actual title icon remain owner gates; main stays at accepted31.
 
+### Build37 deployment - 2026-10-04
+
+Candidate4e85ec3 deployed with neither AfterFX nor AfterFX_64 running, using the
+standing authorization and existing Deploy-TestBuild.ps1. Six installed hashes
+match candidate artifacts, six saved hashes match the build36 receipt, and all19
+old/new CEP hashes pass paired rollback validation. The half-size PNG is verified
+inside the AEX. One Junction remains, retired Appearance is absent, and Core
+retains14A0D14A22A79650 with its matching selector. No host process, registry,
+cache or shared CEF settings were modified. Native compilation has no warnings
+or errors; JS syntax was checked, and regression suites were not run.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | 758F0A9231199FDACDD611B63413663E59B4E8A6DA870C479CE12AA827473247 |
+| StarfieldEmitter.aex | EE1516D824B367F6083FEA84D2AF409C40090A270D03CE861271B649910B9A49 |
+| StarfieldParticleNode.aex | 932A8B447975DF92BB0AD3B47804E2C030AE5D2F29412E5A84F7333B7F1A9DF4 |
+| StarfieldForce.aex | E19E5D69686E913C2AEF9936776ECB6C993D6CAD5A1BEC89529607BE02A4C75E |
+| StarfieldHost.aex | F8B8D1F153C0660959C86BC94DBDA93D9C038461AE70D40EFF2450C0D680DE2B |
+| StarfieldCore.dll | 14A0D14A22A7965046DD85B2F2E6AF2A8DB59BC2972DB9A8CD4B4AB47BD29C97 |
+
+Receipts: artifacts/build37-deploy-before.json / build37-deploy-after.json;
+logs: build37-deploy.log / build37-rollback-report.log. Backup:
+artifacts/disabled/p03-build37-preset-apply-20261004. With AE closed, one-step
+paired undo to build36:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p03-build37-preset-apply-20261004' -Restore
+```
+
+Actual AE application, parent navigation and title icon qualification are pending.
+
 ## P-03 / build36 owner feedback candidate - 2026-10-04
 
 Build35 owner screenshot confirms native image rendering and menu invocation,

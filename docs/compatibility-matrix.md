@@ -12,6 +12,8 @@ category grid; Example is removed. Native title painting/clicks are owned now.
 Compilation/syntax checks pass; no regression suites were run. Restart AE and
 reopen both panels, then verify Add and Replace, return navigation and the title
 icon. Main26/Emitter7/Particle6/Force2/Output4 and half-size artwork are unchanged.
+Candidate4e85ec3 is installed as37 with verified paired undo to36. No successful
+host application/icon-retention result has been received for this candidate.
 
 ## P-03 / build36 qualification
 

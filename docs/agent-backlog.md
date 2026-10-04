@@ -27,6 +27,8 @@ add Up/Folders navigation and remove Example data/UI/listener. Own title paint a
 click through PF_PUI_TOPIC/DONT_ERASE_TOPIC. Keep main26/index1/disk1631 and native
 schemas unchanged. Cached-generation mixing is a hypothesis pending host evidence.
 May2023 compilation and JS syntax checks pass; no regression suites are run here.
+Candidate4e85ec3 is deployed as37, with verified binary/CEP hashes and paired36
+rollback. Actual Add/Replace, Up and native title drawing remain owner gates.
 
 Build36 follow-up: owner reports a blank preset window, requires the image without
 its folding Presets title, and requests half-size packaging. Read-only installed
