@@ -28,6 +28,8 @@ default-collapse native angle dials, without altering M3-08 values/IDs/contracts
 Remaining banner disclosure arrow has no located public May2023 hide flag and
 is unresolved; preserve the owned drawing rectangle. No tests requested or run.
 Actual AE Add/Replace and initial dial appearance remain qualification gates.
+Candidate4bf5d26 builds and is deployed as38 with all six binary/all19 CEP hash
+checks and paired37 rollback verification. Main remains owner-accepted31.
 
 Build37 follow-up: owner confirms build36 catalog loading, but preset application
 fails schema validation; parent navigation is missing and native blank title still

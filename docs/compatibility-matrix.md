@@ -10,6 +10,9 @@ collapsed; existing user expansion is preserved. Actual Add/Replace and initial
 dial appearance need owner AE2023 evidence. The main image's remaining disclosure
 arrow is unresolved, with no located supported May2023 hide flag. No tests are
 requested or run in this follow-up; compilation alone is not host qualification.
+Candidate4bf5d26 is deployed as38 with verified paired37 rollback. Native build
+and changed script syntax checks pass; no successful AE application result has
+been received for38.
 
 ## P-03 / build37 qualification
 

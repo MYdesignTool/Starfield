@@ -16,6 +16,35 @@ the gateway via stdin (no host execution). No tests were requested or run. Actua
 AE Add/Replace and default dial appearance are still owner qualification gates.
 Continue on codex/m3-07-particle-gradient; accepted main31 is not advanced.
 
+### Build38 deployment - 2026-10-04
+
+Candidate4bf5d26 deployed with neither AfterFX nor AfterFX_64 running via the
+standing authorization and existing Deploy-TestBuild.ps1. Six installed hashes
+match candidate artifacts, six retained binary hashes match the build37 receipt,
+and all19 prior/current CEP source hashes pass paired rollback validation. The
+single existing plug-in Junction and existing system CEP Junction are retained.
+Core selection remains StarfieldCore-14A0D14A22A79650.dll. No host process is
+started/stopped, no registry/cache/shared flags are changed, and main stays31.
+
+| Installed artifact | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | CD4CE181A4246674EAF82A376796BDE8698C069DAA5FB9FFC5597A3E74355FF1 |
+| StarfieldEmitter.aex | 3EFFE5B400547AD499C7FC62E0AB1217EFEFC776D02E4B10D518D8A90F525BE5 |
+| StarfieldParticleNode.aex | 950551431F6148C3CF60B6A53213A8134FC8B797F0D9D8BCDF35401967E4832D |
+| StarfieldForce.aex | B9D8981AD509B8717537569A6E490D0E4A5FD0B19B58DC555CE3CEB2D81A0205 |
+| StarfieldHost.aex | 8DC83157AFA9F56E5CEDBA8DFAEF3D78D6C35D0071E1F4EDC4AB7B4D745F906A |
+| StarfieldCore.dll | 14A0D14A22A7965046DD85B2F2E6AF2A8DB59BC2972DB9A8CD4B4AB47BD29C97 |
+
+Before/after receipts: artifacts/build38-deploy-before.json and
+artifacts/build38-deploy-after.json; rollback validation:
+artifacts/build38-rollback-report.log. Retained build37 binary/CEP bytes are under
+artifacts/disabled/p03-build38-preset-dispatch-20261004.
+One-step paired rollback to37, with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p03-build38-preset-dispatch-20261004' -Restore
+```
+
 ## P-03 / build37 candidate - 2026-10-04
 
 Owner build36 evidence confirms the catalog loads, but Add reports unsupported
