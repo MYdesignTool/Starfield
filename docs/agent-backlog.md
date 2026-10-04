@@ -34,6 +34,9 @@ Add/Replace, portable file dialogs, stale targets and native readback checks pas
 Final native candidate builds without compiler warnings/errors. Actual AE picture
 click, modeless manager, undo/reopen and rotation visuals remain host gates.
 Local browser policy rejects file URLs; no actual manager screenshot is claimed.
+Build35 candidate381404b is deployed with verified binary/CEP receipts and paired
+build34 rollback (build-matrix.md). Main remains at accepted build31; host feedback
+is the next gate before further integration.
 
 ## M3-07 - Particle Color Over Life editor and control organization
 

@@ -37,6 +37,41 @@ Modeless interaction, undo/reopen, rotation visuals and startup speed remain
 owner host gates. Browser local-file access was blocked by its security policy;
 no actual manager screenshot is claimed.
 
+### Build35 deployment - 2026-10-04
+
+Candidate381404b deployed through Deploy-TestBuild.ps1 under the standing owner
+authorization after fresh read-only checks found neither AfterFX nor AfterFX_64.
+Six installed hashes match the candidate artifacts; six saved binary hashes match
+the build34 installation receipt. All14 prior CEP sources were reconstructed from
+cac5db6 and verified against their original installed hashes; the paired manifest
+also records the five new files as previously absent. All19 candidate CEP hashes
+and the guarded paired rollback report pass. The existing single Starfield
+Junction is retained; retired Appearance is absent. Selector and selected DLL
+match StarfieldCore-14A0D14A22A79650.dll. No host process was started or stopped.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | E94B82B3923CD6852EBE1C6171905050B2DE8FAFCECB444F4926A27FE294BCBB |
+| StarfieldEmitter.aex | E02D7F31B5AF026F310690E916161C24FDE503E3FC6A5F34FEF48C67236C594A |
+| StarfieldParticleNode.aex | 05BCC34BC835503239F8439000A8B4049B419684F0600CD1755F5CB664A74F1A |
+| StarfieldForce.aex | B4216660A14B16C26AE4080B840D2F5C7D919FAD8C3B4E1316D95882F9290455 |
+| StarfieldHost.aex | 5437CD491E9D11E1E8ECF553B5FBECF364EAE6B36B4901CAB155BDA55CDEB14A |
+| StarfieldCore.dll | 14A0D14A22A7965046DD85B2F2E6AF2A8DB59BC2972DB9A8CD4B4AB47BD29C97 |
+
+Backup: artifacts/disabled/p03-build35-presets-bundle-20261004. Before/after
+receipts: artifacts/build35-deploy-before.json and build35-deploy-after.json;
+logs: build35-deploy.log / build35-rollback-report.log. Resource-byte inspection
+confirms the AEX embeds the exact original PNG. Actual AE qualification is pending.
+With AE closed, one-step paired undo to build34:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p03-build35-presets-bundle-20261004' -Restore
+```
+
+The restore retains candidate CEP sources, restores the previous14 and removes
+only the five validated new files. It reports by default and refuses to overwrite
+sources whose installed hashes changed. This source rollback is visible in Git.
+
 ## M3-07 / build34 Drawbot pixel-format correction - 2026-10-04
 
 Owner build33 testing is blocked by repeated Unsupported Pixel Format warnings

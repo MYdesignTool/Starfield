@@ -6,6 +6,8 @@ Owner reports build34 gradient expansion/editing usable; that feedback precedes
 the current rotation and preset changes. Build35 compiles with the May2023 SDK
 and passes the scoped Core/adapter/JavaScript checks recorded in build-matrix.md.
 These are implementation evidence, not a new AE support claim.
+Candidate381404b is now installed as build35 with verified paired rollback to
+build34. Before/after hashes are recorded in build-matrix.md.
 
 Use fresh main, Emitter and Particle test effects (main manifest25, Emitter7,
 Particle6). In AE2023.5.0 Build52, verify the main Presets image opens Starfield
