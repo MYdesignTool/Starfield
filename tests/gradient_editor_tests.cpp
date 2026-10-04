@@ -12,15 +12,19 @@
 #include <cstdio>
 #include <limits>
 #include <fstream>
+#include <functional>
 #include <vector>
 
 namespace {
 namespace model=starfield::adapter::gradient_editor;
 namespace layout=starfield::adapter::native_nodes::particle_layout;
-int checks{},failures{},publications{},invalidations{},gets{},releases{},objects{},rectangles{},texts{},ui_updates{},bitmap_draws{};
-bool reject{},cancel{},drawing_fail{},bitmap_fail{};
+int checks{},failures{},publications{},invalidations{},gets{},releases{},objects{},rectangles{},texts{},ui_updates{},bitmap_draws{},bitmap_creates{},unsupported_formats{};
+bool reject{},cancel{},drawing_fail{},bitmap_fail{},bitmap_null{},draw_image_fail{};
+bool supports_bgra{true},supports_argb{},prefers_bgra{true},prefers_argb{},query_fail{},preference_fail{};
 std::vector<std::uint8_t> bitmap_pixels;
 int bitmap_width{},bitmap_height{};
+DRAWBOT_PixelLayout bitmap_format{};
+std::function<void()> image_hook;
 std::ofstream preview;
 DRAWBOT_ColorRGBA preview_color{};
 DRAWBOT_RectF32 preview_rect{};
@@ -51,16 +55,33 @@ void configure() {
     supplier.NewDefaultFont=[](DRAWBOT_SupplierRef,float,DRAWBOT_FontRef* output)->SPErr{++objects;*output=reference<DRAWBOT_FontRef>();return 0;};
     supplier.NewBrush=[](DRAWBOT_SupplierRef,const DRAWBOT_ColorRGBA* color,DRAWBOT_BrushRef* output)->SPErr{preview_color=*color;++objects;*output=reference<DRAWBOT_BrushRef>();return 0;};
     supplier.NewPath=[](DRAWBOT_SupplierRef,DRAWBOT_PathRef* output)->SPErr{if(drawing_fail)return 1;++objects;*output=reference<DRAWBOT_PathRef>();return 0;};
+    supplier.SupportsPixelLayoutBGRA=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=supports_bgra;return query_fail?1:0;};
+    supplier.SupportsPixelLayoutARGB=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=supports_argb;return query_fail?1:0;};
+    supplier.PrefersPixelLayoutBGRA=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=prefers_bgra;return preference_fail?1:0;};
+    supplier.PrefersPixelLayoutARGB=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=prefers_argb;return preference_fail?1:0;};
     supplier.NewImageFromBuffer=[](DRAWBOT_SupplierRef,int width,int height,int stride,DRAWBOT_PixelLayout format,const void* data,DRAWBOT_ImageRef* output)->SPErr {
-        check(format==kDRAWBOT_PixelLayout_24RGB && stride>=width*3 && stride%4==0 && height==62,"gradient creates one opaque RGB bitmap with aligned rows");
+        ++bitmap_creates;
+        if(image_hook){auto callback=std::move(image_hook);callback();}
+        const bool supported=!query_fail && ((format==kDRAWBOT_PixelLayout_32BGRA_Premul && supports_bgra) ||
+            (format==kDRAWBOT_PixelLayout_32ARGB_Premul && supports_argb));
+        if(!supported){++unsupported_formats;*output=nullptr;return 1;}
+        check(stride==width*4 && stride%4==0 && height==62,"gradient creates one supported 32-bit bitmap with aligned rows");
         const auto* pixels=static_cast<const std::uint8_t*>(data);bitmap_pixels.assign(pixels,pixels+stride*height);
-        bitmap_width=width;bitmap_height=height;++objects;*output=reference<DRAWBOT_ImageRef>();return bitmap_fail?1:0;
+        const auto alpha=format==kDRAWBOT_PixelLayout_32BGRA_Premul?3:0;
+        bool opaque=true;for(int y=0;y<height;++y)for(int x=0;x<width;++x)opaque &= pixels[y*stride+x*4+alpha]==255;
+        check(opaque,"every bitmap pixel is fully opaque in the negotiated channel order");
+        bitmap_width=width;bitmap_height=height;bitmap_format=format;
+        if(bitmap_null){*output=nullptr;return 0;}
+        ++objects;*output=reference<DRAWBOT_ImageRef>();return bitmap_fail?1:0;
     };
     surface.DrawImage=[](DRAWBOT_SurfaceRef,DRAWBOT_ImageRef,const DRAWBOT_PointF32* origin,float alpha)->SPErr {
         ++bitmap_draws;check(alpha==1,"bitmap draws opaquely without strip edge blending");
-        if(preview.is_open())for(int x=0;x<bitmap_width;++x)preview<<"<rect x='"<<origin->x+x<<"' y='"<<origin->y<<"' width='1' height='"<<bitmap_height
-            <<"' fill='rgb("<<int(bitmap_pixels[x*3])<<","<<int(bitmap_pixels[x*3+1])<<","<<int(bitmap_pixels[x*3+2])<<")'/>\n";
-        return 0;
+        if(preview.is_open())for(int x=0;x<bitmap_width;++x) {
+            const bool bgra=bitmap_format==kDRAWBOT_PixelLayout_32BGRA_Premul;
+            preview<<"<rect x='"<<origin->x+x<<"' y='"<<origin->y<<"' width='1' height='"<<bitmap_height
+                <<"' fill='rgb("<<int(bitmap_pixels[x*4+(bgra?2:1)])<<","<<int(bitmap_pixels[x*4+(bgra?1:2)])<<","<<int(bitmap_pixels[x*4+(bgra?0:3)])<<")'/>\n";
+        }
+        return draw_image_fail?1:0;
     };
     supplier.ReleaseObject=[](DRAWBOT_ObjectRef)->SPErr{--objects;return 0;};
     path.AddRect=[](DRAWBOT_PathRef,const DRAWBOT_RectF32* bounds)->SPErr{preview_rect=*bounds;++rectangles;check(bounds->width>0 && bounds->height>0,"positive drawing rectangles");return 0;};
@@ -91,13 +112,16 @@ int main() {
     using starfield::adapter::particle_gradient_event;
     auto gradient=model::preset(2);check(model::valid(gradient),"independent preset validates");
     const auto original=gradient;model::flip(gradient);model::flip(gradient);
-    std::array<std::uint8_t,220*62*3> pixels{};
-    check(model::rasterize_rgb8(gradient,220,62,pixels),"entire gradient rasterizes into a bounded bitmap");
-    bool equal_rows=true;for(unsigned y=1;y<62;++y)for(unsigned i=0;i<220*3;++i)equal_rows &= pixels[y*220*3+i]==pixels[i];
-    check(equal_rows && pixels[0]==255 && pixels[219*3]==std::lround(gradient.stops[4].color.x*255),"all rows have complete identical coverage and exact endpoints");
-    check(!model::rasterize_rgb8(gradient,221,62,pixels) && !model::rasterize_rgb8(gradient,220,0,pixels),"invalid bitmap dimensions rejected");
-    std::array<std::uint8_t,304*62> narrow{};
-    check(model::rasterize_rgb8(gradient,101,62,narrow,304) && narrow[303]==0 && narrow[304]==narrow[0],"narrow panel bitmap has aligned padding and continuous complete rows");
+    std::array<std::uint8_t,220*62*4> pixels{};
+    check(model::rasterize_opaque32(gradient,220,62,model::PixelOrder::bgra,pixels),"entire gradient rasterizes into a bounded BGRA bitmap");
+    bool equal_rows=true;for(unsigned y=1;y<62;++y)for(unsigned i=0;i<220*4;++i)equal_rows &= pixels[y*220*4+i]==pixels[i];
+    check(equal_rows && pixels[2]==255 && pixels[3]==255 && pixels[219*4+2]==std::lround(gradient.stops[4].color.x*255),"all BGRA rows have identical coverage and exact endpoints");
+    check(model::rasterize_opaque32(gradient,220,62,model::PixelOrder::argb,pixels) && pixels[0]==255 && pixels[1]==255 && pixels[219*4+1]==std::lround(gradient.stops[4].color.x*255),"ARGB pixels have correct alpha and color byte order");
+    check(!model::rasterize_opaque32(gradient,221,62,model::PixelOrder::bgra,pixels) && !model::rasterize_opaque32(gradient,220,0,model::PixelOrder::bgra,pixels),"invalid bitmap dimensions rejected");
+    std::array<std::uint8_t,408*62> narrow{};
+    check(model::rasterize_opaque32(gradient,101,62,model::PixelOrder::bgra,narrow,408) && narrow[407]==0 && narrow[408]==narrow[0],"narrow bitmap has zero padding and continuous complete rows");
+    check(!model::rasterize_opaque32(gradient,101,62,model::PixelOrder::bgra,narrow,400) && !model::rasterize_opaque32(gradient,101,62,model::PixelOrder::bgra,std::span{narrow.data(),narrow.size()-1},408),"short strides and buffers rejected");
+    check(!model::rasterize_opaque32(gradient,std::numeric_limits<unsigned>::max(),62,model::PixelOrder::bgra,pixels),"dimension overflow rejected before stride arithmetic");
     check(starfield::core::encode_color_gradient(original)==starfield::core::encode_color_gradient(gradient),"double flip retains complete gradient");
     check(model::insert(gradient,std::numeric_limits<double>::quiet_NaN())<0,"nonfinite add rejected");
     check(!model::move(gradient,0,.3) && !model::erase(gradient,0),"endpoints cannot move/delete");
@@ -137,11 +161,54 @@ int main() {
     check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_draws==1 && rectangles<30 && texts>=7,"native editor draws gradient once with markers and actions");
     check(publications==prior && objects==0,"draw writes no authored values and releases Drawbot objects");
     drawing_fail=true;check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0,"drawing failure releases brushes and font");drawing_fail=false;
-    const int previous_bitmaps=bitmap_draws;bitmap_fail=true;
-    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0 && bitmap_draws==previous_bitmaps,"failed bitmap creation releases its object without drawing");bitmap_fail=false;
+    auto close_context=[&](){event.e_type=PF_Event_CLOSE_CONTEXT;check(particle_gradient_event(&data,&out,params.data(),&event)==0,"UI context resets without SDK object retention");event.e_type=PF_Event_DRAW;};
+    // The prior fake supplier accepted 24RGB unconditionally. Model the host's
+    // support queries and reject unadvertised formats without allowing a probe.
+    for(unsigned mask=0;mask<16;++mask) {
+        close_context();supports_bgra=(mask&1)!=0;supports_argb=(mask&2)!=0;
+        prefers_bgra=(mask&4)!=0;prefers_argb=(mask&8)!=0;
+        const auto creates=bitmap_creates;const auto shapes=rectangles;
+        check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0,"support/preference matrix draws and releases resources");
+        if(!supports_bgra && !supports_argb)check(bitmap_creates==creates && rectangles>shapes+100,"no supported layout uses path fallback without image probes");
+        else check(bitmap_creates==creates+1 && bitmap_format==((supports_bgra && (prefers_bgra || !supports_argb || !prefers_argb))?kDRAWBOT_PixelLayout_32BGRA_Premul:kDRAWBOT_PixelLayout_32ARGB_Premul),"image layout follows advertised support and preference");
+    }
+    supports_bgra=supports_argb=true;prefers_bgra=false;prefers_argb=true;
+    close_context();query_fail=true;auto creates=bitmap_creates;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates,"failed support queries cannot authorize image creation");query_fail=false;
+    close_context();preference_fail=true;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_format==kDRAWBOT_PixelLayout_32BGRA_Premul,"failed preferences still use successfully queried support");preference_fail=false;
+    const auto saved_bgra=supplier.SupportsPixelLayoutBGRA,saved_argb=supplier.SupportsPixelLayoutARGB;
+    supplier.SupportsPixelLayoutBGRA=supplier.SupportsPixelLayoutARGB=nullptr;close_context();creates=bitmap_creates;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates,"missing capability APIs use fallback without guessing");
+    const auto authored=publications;check(click(70,30)==0 && publications==authored+1,"path fallback retains authored gradient interactions");event.e_type=PF_Event_DRAW;
+    supplier.SupportsPixelLayoutBGRA=saved_bgra;supplier.SupportsPixelLayoutARGB=saved_argb;
+    supports_bgra=true;supports_argb=false;prefers_bgra=true;prefers_argb=false;
+    close_context();creates=bitmap_creates;
+    image_hook=[&](){check(particle_gradient_event(&data,&out,params.data(),&event)==0,"reentrant image-creation repaint draws a safe fallback");};
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates+1 && objects==0,"image guard is set before a host call can repaint recursively");
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates+2,"successful image creation restores subsequent normal bitmap draws");
+    const auto saved_prefer_bgra=supplier.PrefersPixelLayoutBGRA,saved_prefer_argb=supplier.PrefersPixelLayoutARGB;
+    supplier.PrefersPixelLayoutBGRA=supplier.PrefersPixelLayoutARGB=nullptr;close_context();
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_format==kDRAWBOT_PixelLayout_32BGRA_Premul,"missing preferences use advertised supported layout");
+    supplier.PrefersPixelLayoutBGRA=saved_prefer_bgra;supplier.PrefersPixelLayoutARGB=saved_prefer_argb;
+    for(unsigned failure=0;failure<3;++failure) {
+        close_context();bitmap_fail=failure==0;bitmap_null=failure==1;draw_image_fail=failure==2;
+        creates=bitmap_creates;
+        for(unsigned repeat=0;repeat<4;++repeat)check(particle_gradient_event(&data,&out,params.data(),&event)==0 && objects==0,"image failure repaint retains usable editor and releases any image");
+        check(bitmap_creates==creates+1,"image creation/null/draw failure is not retried by subsequent repaints");
+        bitmap_fail=bitmap_null=draw_image_fail=false;
+        close_context();check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates+2,"a new UI context may attempt a supported image again");
+    }
+    const auto saved_create=supplier.NewImageFromBuffer;const auto saved_draw=surface.DrawImage;
+    supplier.NewImageFromBuffer=nullptr;close_context();creates=bitmap_creates;
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates,"missing image creation API uses safe fallback");supplier.NewImageFromBuffer=saved_create;
+    surface.DrawImage=nullptr;close_context();
+    check(particle_gradient_event(&data,&out,params.data(),&event)==0 && bitmap_creates==creates,"missing image draw API uses safe fallback");surface.DrawImage=saved_draw;
+    check(unsupported_formats==0,"no unsupported image format was ever submitted to Drawbot");
     values[layout::color_mode].u.pd.value=1;values[layout::shape].u.pd.value=1;
     check(starfield::adapter::particle_gradient_param_ui(&data,params.data())==0 && ui_updates==1,"particle UI forwards visibility through the native stream helper");
-    check(publications==prior,"UPDATE_PARAMS_UI never changes authored values");
+    check(publications==authored+1,"draw and UPDATE_PARAMS_UI never change authored values");
+    close_context();
     preview.open("artifacts/gradient-editor-preview.svg");
     preview<<"<svg xmlns='http://www.w3.org/2000/svg' width='310' height='180'>\n<rect width='310' height='180' fill='#29292c'/>\n";
     event.e_type=PF_Event_DRAW;

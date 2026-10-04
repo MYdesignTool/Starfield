@@ -3,6 +3,28 @@
 Status: candidate implementation/build/scoped checks complete on development
 branch; AE 2023 qualification pending.
 
+## Build34 correction after owner feedback - 2026-10-04
+
+Owner build33 testing is blocked by repeated "Unsupported Pixel Format" warnings
+when expanding Color Gradient; markers/buttons draw but the bar stays blank.
+The build33 image path requested 24RGB without negotiating supplier capabilities.
+The previous fake supplier accepted that layout unconditionally and missed this
+host restriction. No native bitmap qualification pass is recorded for build33.
+
+Build34 queries Drawbot Supports/PrefersPixelLayoutBGRA/ARGB and creates only an
+advertised 32-bit premultiplied layout, with matching byte order and alpha255.
+Failed or absent support queries cannot authorize image creation. Missing image
+APIs/capabilities use bounded overlapping path bands on an opaque base. Unexpected
+image creation/null-image/draw failure disables bitmap attempts for that bounded
+UI context until CLOSE_CONTEXT, avoiding repeated calls during dialog repaints.
+All image/font/path objects remain callback-local and are released on failure;
+fallback drawing retains editing and never changes authored values.
+The capability matrix, byte order/opacity, optional APIs, failure repaint guard
+and context reset are exercised in the fake host. Actual AE warning-free drawing
+and editor interaction remain mandatory host gates. Schema/IDs/flags/CEP/Core
+and the renderer remain unchanged from build33; only native UI and build version
+change. Development remains on M3-07 with main at accepted build31.
+
 ## Build33 correction after owner feedback - 2026-10-04
 
 Owner AE2023 feedback rejects build32 UI qualification: adding a stop reports

@@ -1,5 +1,18 @@
 # Behavior inventory
 
+## M3-07 / build34 pixel-format qualification
+
+Owner build33 feedback reports repeated Unsupported Pixel Format modals when
+expanding Color Gradient, preventing testing. This rejects native bitmap
+qualification; prior candidate mock checks did not simulate supplier restrictions.
+Build34 negotiates advertised BGRA/ARGB layouts, opaque 32-bit byte order and safe
+fallback drawing. Per-context failure guards also block reentrant image retries.
+May2023 compilation and 3943 focused checks pass; AE2023 remains unqualified for
+this change. Required: expand/repaint without warnings, continuous gradient at
+normal/narrow widths, add/drag/color/undo/reopen, and fresh Emitter/Force hidden
+metadata. Reuse build32/33 nodes; schema5/base81 and all data contracts are unchanged.
+Main remains at accepted build31 (8857303); no automatic candidate integration.
+
 ## M3-07 / build33 correction qualification
 
 Owner reports adding-stop compile failure (parameter12/stream-1), striped/cut

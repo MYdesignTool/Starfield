@@ -18,17 +18,22 @@ inline bool valid(const ColorGradient& value) noexcept {
     }
     return true;
 }
-inline bool rasterize_rgb8(const ColorGradient& value,unsigned width,unsigned height,
-                          std::span<std::uint8_t> pixels,unsigned row_stride=0) noexcept {
-    if(!row_stride)row_stride=width*3;
-    if(!valid(value) || width<2 || width>220 || !height || height>62 ||
-       row_stride<width*3 || row_stride>660 || pixels.size()!=std::size_t(row_stride)*height)return false;
+enum class PixelOrder {bgra,argb};
+inline bool rasterize_opaque32(const ColorGradient& value,unsigned width,unsigned height,
+                              PixelOrder order,std::span<std::uint8_t> pixels,unsigned row_stride=0) noexcept {
+    if(!valid(value) || width<2 || width>220 || !height || height>62)return false;
+    if(!row_stride)row_stride=width*4;
+    if(row_stride<width*4 || row_stride>880 || pixels.size()!=std::size_t(row_stride)*height)return false;
     std::fill_n(pixels.data(),row_stride,std::uint8_t{0});
     for(unsigned x=0;x<width;++x) {
         const auto rgb=core::evaluate_color_gradient(value,double(x)/(width-1));
         const std::array<std::uint8_t,3> color{static_cast<std::uint8_t>(std::lround(rgb.x*255)),
             static_cast<std::uint8_t>(std::lround(rgb.y*255)),static_cast<std::uint8_t>(std::lround(rgb.z*255))};
-        for(unsigned c=0;c<3;++c)pixels[x*3+c]=color[c];
+        if(order==PixelOrder::bgra) {
+            pixels[x*4]=color[2];pixels[x*4+1]=color[1];pixels[x*4+2]=color[0];pixels[x*4+3]=255;
+        } else {
+            pixels[x*4]=255;pixels[x*4+1]=color[0];pixels[x*4+2]=color[1];pixels[x*4+3]=color[2];
+        }
     }
     for(unsigned y=1;y<height;++y)std::copy_n(pixels.data(),row_stride,pixels.data()+y*row_stride);
     return true;

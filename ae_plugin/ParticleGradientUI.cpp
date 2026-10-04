@@ -15,7 +15,7 @@ namespace starfield::adapter {
 namespace {
 namespace model=gradient_editor;
 namespace layout=native_nodes::particle_layout;
-struct UIState {int selected{};bool presets{};};
+struct UIState {int selected{};bool presets{};bool bitmap_disabled{};};
 // Opaque context keys are never dereferenced or passed to a later SDK callback.
 // CLOSE_CONTEXT erases them; selection has no effect on authored values.
 std::map<PF_ContextH,UIState> contexts;
@@ -110,16 +110,58 @@ struct Canvas {
         rect(x,y,width,21,{0.43f,0.43f,0.45f,1});rect(x+1,y+1,width-2,19,{0.22f,0.22f,0.23f,1});
         text(x+6,y+14,label,enabled);
     }
-    void gradient(float x,float y,unsigned width,const core::ColorGradient& value) const {
-        if(!supplier->NewImageFromBuffer || !surface->DrawImage)return;
-        std::array<std::uint8_t,220*62*3> pixels{};
-        const unsigned stride=(width*3+3)&~3U;
+    std::optional<model::PixelOrder> pixel_order() const {
+        DRAWBOT_Boolean bgra{},argb{},prefer_bgra{},prefer_argb{};
+        // A successful support query is required before creating an image. Do
+        // not probe layouts with NewImageFromBuffer: AE can show a modal warning.
+        const bool has_bgra=supplier->SupportsPixelLayoutBGRA &&
+            !supplier->SupportsPixelLayoutBGRA(source,&bgra) && bgra;
+        const bool has_argb=supplier->SupportsPixelLayoutARGB &&
+            !supplier->SupportsPixelLayoutARGB(source,&argb) && argb;
+        if(has_bgra && supplier->PrefersPixelLayoutBGRA &&
+           supplier->PrefersPixelLayoutBGRA(source,&prefer_bgra))prefer_bgra=false;
+        if(has_argb && supplier->PrefersPixelLayoutARGB &&
+           supplier->PrefersPixelLayoutARGB(source,&prefer_argb))prefer_argb=false;
+        if(has_bgra && (prefer_bgra || !has_argb || !prefer_argb))return model::PixelOrder::bgra;
+        if(has_argb)return model::PixelOrder::argb;
+        return std::nullopt;
+    }
+    bool bitmap(float x,float y,unsigned width,const core::ColorGradient& value,UIState& state) const {
+        if(state.bitmap_disabled)return false;
+        const auto order=pixel_order();
+        if(!order || !supplier->NewImageFromBuffer || !surface->DrawImage) {
+            state.bitmap_disabled=true;return false;
+        }
+        std::array<std::uint8_t,220*62*4> pixels{};
+        const unsigned stride=width*4;
         const auto size=std::size_t(stride)*62;
-        if(!model::rasterize_rgb8(value,width,62,std::span{pixels.data(),size},stride))return;
-        DRAWBOT_ImageRef bitmap{};const DRAWBOT_PointF32 origin{x,y};
-        if(!supplier->NewImageFromBuffer(source,width,62,stride,kDRAWBOT_PixelLayout_24RGB,pixels.data(),&bitmap) && bitmap)
-            (void)surface->DrawImage(target,bitmap,&origin,1);
-        if(bitmap)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(bitmap));
+        if(!model::rasterize_opaque32(value,width,62,*order,std::span{pixels.data(),size},stride))return false;
+        const auto format=*order==model::PixelOrder::bgra?kDRAWBOT_PixelLayout_32BGRA_Premul:kDRAWBOT_PixelLayout_32ARGB_Premul;
+        DRAWBOT_ImageRef image{};const DRAWBOT_PointF32 origin{x,y};
+        // Set the guard before calling the host: even a reentrant repaint while
+        // an unexpected modal warning is open must not attempt another image.
+        state.bitmap_disabled=true;
+        const auto created=supplier->NewImageFromBuffer(source,width,62,stride,format,pixels.data(),&image);
+        const bool drawn=!created && image && !surface->DrawImage(target,image,&origin,1);
+        if(image)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(image));
+        // An unexpected driver failure is attempted once per UI context, so a
+        // warning cannot become an unbounded loop of repaint/dialog/repaint.
+        state.bitmap_disabled=!drawn;
+        return drawn;
+    }
+    void gradient(float x,float y,unsigned width,const core::ColorGradient& value,UIState& state) const {
+        if(bitmap(x,y,width,value,state))return;
+        // Optional bitmap support must not remove the editor. Overlap integer
+        // bands on an opaque base to avoid uncovered antialiased strip edges.
+        const auto first=value.stops[0].color;
+        rect(x,y,static_cast<float>(width),62,{static_cast<float>(first.x),static_cast<float>(first.y),static_cast<float>(first.z),1});
+        for(unsigned column=0;column<width;column+=2) {
+            const auto rgb=core::evaluate_color_gradient(value,double(column)/(width-1));
+            rect(x+column,y,static_cast<float>(std::min(3U,width-column)),62,
+                {static_cast<float>(rgb.x),static_cast<float>(rgb.y),static_cast<float>(rgb.z),1});
+        }
+        const auto last=value.stops[value.count-1].color;
+        rect(x+width-1,y,1,62,{static_cast<float>(last.x),static_cast<float>(last.y),static_cast<float>(last.z),1});
     }
 };
 struct Bounds {
@@ -132,11 +174,11 @@ struct Bounds {
         return h>=x+dx && h<x+dx+w && v>=y+dy && v<y+dy+height;
     }
 };
-void draw(PF_InData* data,PF_EventExtra* event,const core::ColorGradient& value,const UIState& state) {
+void draw(PF_InData* data,PF_EventExtra* event,const core::ColorGradient& value,UIState& state) {
     Canvas canvas(data,event->contextH);if(!canvas)return;
     const Bounds b(event->effect_win);
     canvas.rect(b.x,b.y,b.width+69,171,{0.18f,0.18f,0.19f,1});
-    canvas.gradient(b.x,b.y,static_cast<unsigned>(b.width),value);
+    canvas.gradient(b.x,b.y,static_cast<unsigned>(b.width),value,state);
     for(unsigned i=0;i<value.count;++i) {
         const float x=b.x+static_cast<float>(value.stops[i].position)*b.width;
         const auto& c=value.stops[i].color;

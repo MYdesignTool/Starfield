@@ -1,5 +1,32 @@
 # Build and host matrix
 
+## M3-07 / build34 Drawbot pixel-format correction - 2026-10-04
+
+Owner build33 testing is blocked by repeated Unsupported Pixel Format warnings
+on expanding Color Gradient. The prior fake supplier accepted unnegotiated 24RGB;
+build34 (32802/0x8022) queries BGRA/ARGB support/preferences and writes matching
+opaque 32-bit pixels. Unsupported/failed capability queries never create images.
+Missing capabilities/APIs retain path drawing; creation/null-image/draw failures
+disable bitmap retries in that UI context. The guard precedes host image calls,
+including reentrant repaints while a warning is open. See ADR0027.
+Schemas/IDs/flags/CEP/Core/render contracts stay unchanged. Main remains 8857303;
+development stays on codex/m3-07-particle-gradient.
+
+Full May2023 SDK /MT candidate build passes using NoDistPublish/NoRuntimePublish,
+without compiler warnings/errors: artifacts/build34-native-build.log.
+
+| Scope | Checks | Failures | Evidence under artifacts/ |
+|---|---:|---:|---|
+| Supported layouts, byte order/opacity, missing APIs, failure/reentrant repaints, native edits/resources | 3420 | 0 | build34-gradient-editor.log |
+| Particle native definitions and pass-through | 90 | 0 | build34-node-Particle.log |
+| GPU adapter driver regression | 433 | 0 | build34-gpu.log |
+
+Total: 3943 focused C++ checks, zero failures. Many checks validate path rectangle
+dimensions during fallback draws. Exported Drawbot commands were inspected in
+gradient-editor-preview.svg/.png; these are fake-host, not AE bitmap evidence.
+Actual AE warning-free expansion/drawing, stop edits/undo/reopen and fresh-node
+metadata remain host gates. Build33 has failed bitmap qualification.
+
 ## M3-07 / build33 native UI correction candidate - 2026-10-04
 
 Owner rejected build32 native UI qualification: add-stop compile failure,

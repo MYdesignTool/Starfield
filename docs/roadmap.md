@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-07 / build34 - unblock native gradient testing
+
+Build33 expansion is blocked by repeated Unsupported Pixel Format warnings.
+Negotiate Drawbot capabilities and prevent failure/reentrant repaint loops, then
+requalify the actual AE editor. Candidate compilation and focused checks pass;
+main stays at accepted build31 and development remains on the M3-07 branch.
+
 ## M3-07 / build33 - correct failed native UI qualification
 
 Owner rejects build32 add-stop/UI/metadata qualification. Complete the ADR0027

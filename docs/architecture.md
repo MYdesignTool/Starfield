@@ -1,5 +1,13 @@
 # Starfield plug-in architecture
 
+## M3-07 / build34 - negotiate Drawbot image layouts
+
+Owner build33 gradient expansion triggers repeating Unsupported Pixel Format
+warnings. ADR0027 replaces unnegotiated 24RGB with supplier-supported BGRA/ARGB
+opaque bitmaps. A context-local guard precedes image creation, suppresses failure
+retries, and retains path drawing when image support is absent. No schema,
+authored-value, CEP, Core, render or GPU contract changes are involved.
+
 ## M3-07 / build33 - native UI correction
 
 Build32 fails owner UI qualification (add-stop compile error, seams and internal

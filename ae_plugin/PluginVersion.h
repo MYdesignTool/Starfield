@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 33: continuous gradient drawing, atomic events and hidden node metadata.
-#define STARFIELD_VERSION_BUILD 33
-#define STARFIELD_VERSION_PACKED 32801 /* 0x8021 */
+// Build 34: query supported Drawbot formats and prevent repeating image failures.
+#define STARFIELD_VERSION_BUILD 34
+#define STARFIELD_VERSION_PACKED 32802 /* 0x8022 */

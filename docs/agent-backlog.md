@@ -2,6 +2,15 @@
 
 ## M3-07 - Particle Color Over Life editor and control organization
 
+Build34 follow-up: owner build33 testing is blocked by a repeating Unsupported
+Pixel Format warning on gradient expansion. Correct unnegotiated 24RGB image
+creation using supplier BGRA/ARGB capabilities, opaque 32-bit bytes, safe path
+fallback and a per-context image failure guard (ADR0027). Continue the same task;
+native AE qualification and fresh-node hidden metadata remain open.
+Build34 implementation/full May2023 compilation and 3943 focused checks pass;
+see build-matrix.md for scopes/logs. Native AE warning-free drawing and editing
+are pending. No schema or renderer changes; main remains at accepted build31.
+
 Build33 follow-up: owner rejects build32 native UI (adding-stop compile failure,
 strip seams and internal controls visible even on fresh Emitter/Force). Correct
 custom dimensions, continuous bitmap drawing, whole-bank events and actual AE
