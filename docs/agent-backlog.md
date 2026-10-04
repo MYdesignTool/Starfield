@@ -26,6 +26,9 @@ true and advance bundle version. Register untitled NO_DATA/disk1631 at main inde
 (manifest26, fresh main effect), halve artwork to1086x362 and retain paired35
 bytes. No cache, registry, host process or shared CEF switches change. The actual
 AE window/content correction and no-title UI are pending owner confirmation.
+Candidate41c07c5 is built and deployed as36; before/after binaries, all19 CEP
+sources and one-step build35 rollback are verified (build-matrix.md). Main remains
+at owner-accepted31 and the development branch remains unchanged.
 
 Owner: primary agent, current card after M3-08. User explicitly requests one generated
 Starfield banner in the main ECW and a functional preset manager with categories,

@@ -21,6 +21,37 @@ NoDistPublish/NoRuntimePublish: artifacts/build36-native.log. Registration fixtu
 tracks the new NO_DATA/disk1631 contract. No regression suites were run in this
 iteration; build35 check counts do not qualify this update. Host UI remains open.
 
+### Build36 deployment - 2026-10-04
+
+Candidate41c07c5 deployed under standing authorization through the existing
+Deploy-TestBuild.ps1 after fresh read-only checks found neither AE process.
+Resource-byte inspection confirms the new half-size PNG is embedded in the main
+AEX. Six installed candidate hashes and six retained build35 hashes match;
+all19 original CEP sources and their candidate hashes pass paired verification.
+The single native Junction remains, retired Appearance is absent, Core/selector
+remain14A0D14A22A79650. The system CEP Junction is read only and unchanged.
+No process, registry, cache or shared CEF setting was changed.
+
+| Installed file | SHA-256 |
+|---|---|
+| StarfieldParticle.aex | E9B4563A223CAE33CE732651DB5426DAFD38C8AD86CC5B1FCD6527C4A1D702C0 |
+| StarfieldEmitter.aex | 5CB5DDADA7FF3D8CD6426E4CF8CED193454D2A8310EEBE9CBFAC76C21DF3EDC5 |
+| StarfieldParticleNode.aex | E8312FFD45D2AB35383302B51F3424C2D48CA98AAA1A426A6AA70290BB4689FB |
+| StarfieldForce.aex | F5CFC1CC37F22EBD9862D64E7CAD81CB24FA89FE8628281DF56BCEE24DC7D0B8 |
+| StarfieldHost.aex | 62CD6B1714B8B7FA90107E3D807C42AA73B6DB2C4E9E2145055CF97D23C597E7 |
+| StarfieldCore.dll | 14A0D14A22A7965046DD85B2F2E6AF2A8DB59BC2972DB9A8CD4B4AB47BD29C97 |
+
+Receipts: artifacts/build36-deploy-before.json / build36-deploy-after.json.
+Logs: build36-deploy.log / build36-rollback-report.log. Backup:
+artifacts/disabled/p03-build36-presets-ui-20261004. With AE closed, one-step
+paired undo to build35:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'p03-build36-presets-ui-20261004' -Restore
+```
+
+Actual AE content display/no-title picture/Add/Replace remain owner gates.
+
 ## P-03 / M3-08 / build35 candidate - 2026-10-04
 
 Build35 (32803/0x8023) integrates movable gradient endpoints (381be4f), reference

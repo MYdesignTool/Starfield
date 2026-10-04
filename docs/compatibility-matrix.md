@@ -11,6 +11,8 @@ suites were run in this iteration. These changes require AE confirmation.
 After restarting AE, use a fresh main effect (manifest26/disk1631) and confirm
 the picture is directly visible, the manager displays categories/search/cards,
 and Add/Replace succeeds. Emitter7/Particle6 are unchanged from build35.
+Candidate41c07c5 is now deployed as36, with verified paired undo to35. This records
+installation integrity only; no host content-success result has been received.
 
 ## P-03 / M3-08 / build35 qualification
 
