@@ -1,5 +1,23 @@
 # Agent-ready implementation backlog
 
+## P-02K - CEP idle and preset-operation performance
+
+Owner qualitatively accepts panel47 functionality. Multiple emitters cause frequent
+busy cursors; owner subsequently confirms they stop when CEP closes, and asks to
+improve general responsiveness including preset application. Own panel.js,
+preset_manager, graph_transactions, gateway, paired CEP version declarations/
+README and ADR0009/0029/architecture/roadmap/build/qualification docs. Retain
+native46, motion blur and native temporal bootstrap. Combine read-only panel
+inspection, adaptively poll lightweight target/time/receipt markers, refresh full
+node data on changes/focus and bounded periodic audit, reuse fresh preset planning
+snapshots, and cache native property lookups only inside one host request. Numeric
+identity indices may survive own append/remove operations; reacquire effect
+references and clear property caches after every Effect Parade structural edit.
+Preserve native guards, exact disk IDs, strict schema/value validation, transaction
+revision/record-stamp checks, semantic acknowledgement and paired rollback. No
+tests requested/run; observed host latency and cursor improvement remain owner
+qualification. Source operation counts are not measured timing attribution.
+
 ## M3-10 - Main-effect motion blur
 
 Owner accepts native45/panel45 curve behavior and requests the supplied Motion

@@ -179,11 +179,14 @@
         var edits = options.edits;
         var maxBytes = options.maxBytes || DEFAULT_MAX_BYTES;
         var idFactory = options.idFactory;
-        function apply(edit, callback, targetToken, expectedRevision) {
+        function apply(edit, callback, targetToken, expectedRevision, preparedResponse) {
             if (typeof callback !== "function") throw new Error("graph transaction callback is required");
             var pinnedTarget = targetToken ? { target: { token: targetToken } } : null;
-            call("getGraphSnapshot", pinnedTarget, function (response) {
+            function plan(response) {
                 if (!response || response.ok !== true) { callback(response || failure("bad_response", "No snapshot response.")); return; }
+                if (targetToken && (!response.target || response.target.token !== targetToken)) {
+                    callback(failure("stale_target", "The planning snapshot belongs to a different effect.")); return;
+                }
                 var base = response.snapshot;
                 if (typeof expectedRevision === "number" && base.revision !== expectedRevision) {
                     callback(failure("stale_graph", "The project graph changed after node-effect inspection; refresh before reconciling."));
@@ -239,7 +242,11 @@
                     callback({ ok: true, operation: "submitGraph", target: committed.target,
                                snapshot: saved, graphHex: saved.graphHex });
                 });
-            });
+            }
+            // Reuse only the immediate planning receipt. The host independently
+            // rereads native records and checks revision/stamp before mutation.
+            if (preparedResponse) plan(snapshots.normalize(preparedResponse));
+            else call("getGraphSnapshot", pinnedTarget, plan);
         }
 
         function ensureNativeEffects(snapshot, targetToken, callback) {

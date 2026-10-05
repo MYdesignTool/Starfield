@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-47";
+    var GATEWAY_BUILD = "native-presets-48";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -26,6 +26,8 @@
     var MAX_GRAPH_REVISION = 16777215;
     var MAX_GRAPH_NONCE = 1000000;
     var graphNonceCounter = 0;
+    // Property references live only inside one synchronous gateway request.
+    var nativePropertyIndexes = [];
     var GRAPH_CARRIERS = {
         revision: { index: 39, name: "Graph Revision" },
         guard: { index: 40, name: "Panel Graph Sync Guard" },
@@ -138,6 +140,7 @@
     }
 
     function reply(payload) {
+        nativePropertyIndexes = [];
         payload.protocol = PROTOCOL;
         payload.version = VERSION;
         payload.gatewayBuild = GATEWAY_BUILD;
@@ -151,6 +154,7 @@
     }
 
     function parseRequest(text) {
+        nativePropertyIndexes = [];
         if (typeof text !== "string" || text.length === 0 || text.length > MAX_REQUEST_BYTES) return null;
         var request = null;
         try { request = JSON.parse(text); } catch (error) { return null; }
@@ -450,15 +454,66 @@
         return typeof control === "string" ? control : control.name + " [disk " + control.diskId + "]";
     }
 
+    function nativePropertyIndex(effect) {
+        for (var n = 0; n < nativePropertyIndexes.length; n++) {
+            if (nativePropertyIndexes[n].effect === effect) return nativePropertyIndexes[n];
+        }
+        var index = {effect:effect,names:{},matches:{},complete:false};
+        if (nativePropertyIndexes.length >= 64) nativePropertyIndexes.shift();
+        nativePropertyIndexes.push(index);
+        return index;
+    }
+
+    function completeNativePropertyIndex(index) {
+        var visited = 0;
+        function childCount(group) {
+            try { return Number(group.numProperties) || 0; } catch (ignored) { return 0; }
+        }
+        function visit(group, depth) {
+            var count = childCount(group);
+            if (depth > 16 || count > 8192 || visited + count > 8192) throw new Error("Native control layout exceeds its lookup bound.");
+            for (var i = 1; i <= count; i++) {
+                var child = group.property(i);
+                if (!child) continue;
+                visited++;
+                var name = "$" + child.name, match = "$" + child.matchName;
+                if (!Object.prototype.hasOwnProperty.call(index.names,name)) index.names[name] = child;
+                if (!Object.prototype.hasOwnProperty.call(index.matches,match)) index.matches[match] = child;
+                if (childCount(child) > 0) visit(child,depth+1);
+            }
+        }
+        visit(index.effect,0);
+        index.complete = true;
+    }
+
+    function indexedNativeProperty(effect, names, byMatchName) {
+        var index = nativePropertyIndex(effect), identity = byMatchName ? "matchName" : "name";
+        var bucket = byMatchName ? index.matches : index.names;
+        for (var i = 0; i < names.length; i++) if (bucket["$"+names[i]]) return bucket["$"+names[i]];
+        if (!index.complete) {
+            // Preserve AE's direct lookup and try both exact disk-ID spellings
+            // before traversing anything. Flat native controls usually hit here.
+            for (var d = 0; d < names.length; d++) {
+                var direct = null;
+                try { direct = effect.property(names[d]); } catch (ignored) { /* bounded fallback below */ }
+                if (direct && direct[identity] === names[d]) {
+                    bucket["$"+names[d]] = direct; return direct;
+                }
+            }
+            completeNativePropertyIndex(index);
+        }
+        for (var n = 0; n < names.length; n++) if (bucket["$"+names[n]]) return bucket["$"+names[n]];
+        return null;
+    }
+
     function findNodeDiskControl(effect, diskId) {
         if (!effect || !nativeNodeTypeByMatch(effect.matchName) || diskId < 1 || diskId > 9999 ||
             Math.floor(diskId) !== diskId) return null;
         var suffix = String(diskId);
         while (suffix.length < 4) suffix = "0" + suffix;
-        var property = findEffectProperty(effect, effect.matchName + "-" + suffix, true);
         // Both spellings still identify exactly the same native disk ID; never
         // fall back to a display name, topic path, or mutable parameter index.
-        return property || findEffectProperty(effect, effect.matchName + "-" + diskId, true);
+        return indexedNativeProperty(effect,[effect.matchName+"-"+suffix,effect.matchName+"-"+diskId],true);
     }
 
     function findNodeControl(effect, control) {
@@ -466,6 +521,7 @@
         if (effect && effect.matchName === "org.starfieldfx.node.particle" && control === "Opacity") {
             return findNodeDiskControl(effect, 204);
         }
+        if (effect && nativeNodeTypeByMatch(effect.matchName)) return indexedNativeProperty(effect,[control],false);
         return findEffectProperty(effect, control);
     }
 
@@ -1021,7 +1077,9 @@
         var previousCount = parade.numProperties;
         var effect = null, stage = "create effect";
         try {
+            nativePropertyIndexes = [];
             effect = parade.addProperty(spec.matchName);
+            nativePropertyIndexes = [];
             if (!effect) throw new Error("AE did not return the effect instance.");
             stage = "name effect";
             effect.name = spec.label + " " + node.id.substr(0, 6);
@@ -1041,7 +1099,9 @@
                 throw new Error(detail + " AE could not remove the partially initialized node effect.");
             }
             try {
+                nativePropertyIndexes = [];
                 effect.remove();
+                nativePropertyIndexes = [];
                 var currentParade = layer.property("ADBE Effect Parade");
                 if (!currentParade || currentParade.numProperties !== previousCount) {
                     throw new Error("AE did not remove the partially initialized node effect.");
@@ -1078,10 +1138,23 @@
         validateNodeManifest(nodes);
         var previous={};
         if (previousNodes) for(var p=0;p<previousNodes.length;p++) previous["$"+previousNodes[p].id]=previousNodes[p];
+        var indices = nodeEffectIndices(layer);
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
-            var effect = nodeEffectById(layer, node.id);
-            if (!effect) addNativeNode(layer, node);
+            var matches = indices["$"+node.id] || [], effect = null;
+            if (matches.length > 1) throw new Error("Multiple AE node effects share node identity " + node.id + ".");
+            if (matches.length) {
+                effect = layer.property("ADBE Effect Parade").property(matches[0]);
+                if (!effect || nodeIdentity(effect) !== node.id) throw new Error("The node identity changed while applying the graph.");
+            }
+            if (!effect) {
+                addNativeNode(layer, node);
+                // addProperty appends. Indexed-group references are invalidated,
+                // but earlier numeric slots remain valid and are reacquired.
+                var parade = layer.property("ADBE Effect Parade"), last = parade.numProperties;
+                if (nodeIdentity(parade.property(last)) !== node.id) throw new Error("The new node effect was not appended at its expected slot.");
+                indices["$"+node.id] = [last];
+            }
             else {
                 var existingType = nativeNodeTypeByMatch(effect.matchName);
                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
@@ -1095,25 +1168,38 @@
         }
     }
 
+    function nodeEffectIndices(layer) {
+        var parade = layer.property("ADBE Effect Parade"), indices = {};
+        if (!parade) return indices;
+        for (var i = 1; i <= parade.numProperties; i++) {
+            var effect = parade.property(i);
+            if (!effect || !nativeNodeTypeByMatch(effect.matchName)) continue;
+            var id = nodeIdentity(effect);
+            if (id) (indices["$"+id] || (indices["$"+id]=[])).push(i);
+        }
+        return indices;
+    }
+
     function removeNativeNodeEffects(layer, ids) {
+        var indices = nodeEffectIndices(layer), removal = [];
         for (var i = 0; i < ids.length; i++) {
-            // Effect Parade is an indexed group. Removing an instance invalidates
-            // the remaining references, so re-enumerate after each removal. This
-            // also clears accidental AE-level duplicates carrying the same UUID.
-            while (true) {
-                var matches = nodeEffectsById(layer, ids[i]);
-                if (matches.length === 0) break;
-                var parade = layer.property("ADBE Effect Parade");
-                var before = parade ? parade.numProperties : 0;
-                if (typeof matches[matches.length - 1].remove !== "function") {
-                    throw new Error("AE cannot remove the node effect with identity " + ids[i] + ".");
-                }
-                matches[matches.length - 1].remove();
-                parade = layer.property("ADBE Effect Parade");
-                if (!parade || parade.numProperties >= before) {
-                    throw new Error("AE did not remove the node effect with identity " + ids[i] + ".");
-                }
+            var matches = indices["$"+ids[i]] || [];
+            for (var j = 0; j < matches.length; j++) removal.push({index:matches[j],id:ids[i]});
+        }
+        removal.sort(function(a,b){return b.index-a.index;});
+        // Descending numeric slots remain stable; never reuse Property references
+        // after remove(). All duplicate instances of a removed UUID are included.
+        for (var r = 0; r < removal.length; r++) {
+            var parade = layer.property("ADBE Effect Parade"), before = parade.numProperties;
+            var effect = parade.property(removal[r].index);
+            if (!effect || nodeIdentity(effect) !== removal[r].id || typeof effect.remove !== "function") {
+                throw new Error("AE cannot remove the expected node effect " + removal[r].id + ".");
             }
+            nativePropertyIndexes = [];
+            effect.remove();
+            nativePropertyIndexes = [];
+            parade = layer.property("ADBE Effect Parade");
+            if (!parade || parade.numProperties !== before-1) throw new Error("AE did not remove the expected node effect " + removal[r].id + ".");
         }
     }
 
@@ -1252,7 +1338,7 @@
     function motionProperty(effect,i){
         // Disk IDs avoid the duplicate Motion Blur topic/popup display name.
         var property=findEffectProperty(effect,MATCH_NAME+"-"+(1641+i),true);
-        if(!property)throw new Error("Main Motion Blur control is missing (disk "+(1641+i)+"). Close AE and install native46/panel46 together.");
+        if(!property)throw new Error("Main Motion Blur control is missing (disk "+(1641+i)+"). Close AE and install native46 with the current Starfield CEP bundle.");
         return property;
     }
     function validateRendererManifest(record) {
@@ -1699,6 +1785,41 @@
         return null;
     }
 
+    function getPanelState(request) {
+        var state = JSON.parse(getState(request));
+        if (!state.ok) return reply(state);
+        var resolved = graphCarrierTarget({target:{token:state.target.token},pinTarget:true});
+        if (resolved.error) return fail(resolved.error.code,resolved.error.message);
+        state.operation = "getPanelState";
+        state.snapshot = nativeSnapshot(resolved);
+        return reply(state);
+    }
+
+    function getPanelPulse(request) {
+        var target = findRequestTarget(request);
+        if (target.error) return fail(target.error.code,target.error.message);
+        var token = targetToken(target);
+        if (token === null) return fail("host_error","The panel target identity is unavailable.");
+        var source = controlSource(target.effect), markers = [];
+        var keys = ["revision","nodeEffectsReady","checksumHigh","checksumLow"];
+        for (var i = 0; i < keys.length; i++) {
+            var property = resolveCarrier(target.effect,keys[i]);
+            if (!property) return fail("missing_parameter","The panel graph receipt is unavailable.");
+            markers.push(Number(property.value));
+        }
+        var renderer = readRendererRecord({target:target});
+        var frame = JSON.parse(getFrameStatus({target:{token:token},pinTarget:true}));
+        if (!frame.ok) return reply(frame);
+        var parade = target.layer.property("ADBE Effect Parade");
+        var legacyRevision = source === "AE Controls" ? currentRevision(target,{}) : null;
+        // No sibling control reads, curve decoding, simulation or writes here.
+        var stamp = JSON.stringify([token,source,Number(target.comp.time),markers,
+            parade ? parade.numProperties : 0,Number(target.layer.width),Number(target.layer.height),
+            target.layer.source ? Number(target.layer.source.pixelAspect) : 1,renderer,legacyRevision]);
+        return reply({ok:true,operation:"getPanelPulse",requestId:request.requestId || "",
+            target:{token:token},stamp:stamp,frameStatus:frame});
+    }
+
     function getFrameStatus(request) {
         var target = findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
@@ -1974,6 +2095,18 @@
         }
     }
 
+    function SFLD_getPanelState(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request || request.operation !== "getPanelState") return fail("invalid_request","Invalid panel state request.");
+        try { return getPanelState(request); } catch (error) { return fail("host_error",error.toString()); }
+    }
+
+    function SFLD_getPanelPulse(requestJson) {
+        var request = parseRequest(requestJson);
+        if (!request || request.operation !== "getPanelPulse") return fail("invalid_request","Invalid panel pulse request.");
+        try { return getPanelPulse(request); } catch (error) { return fail("host_error",error.toString()); }
+    }
+
     function SFLD_selectNodeEffect(requestJson) {
         var request = parseRequest(requestJson);
         if (!request || request.operation !== "selectNodeEffect") return fail("invalid_request", "Invalid selection request.");
@@ -2104,6 +2237,8 @@
         finally{if(opened)file.close();}
     };
     host.SFLD_getState = SFLD_getState;
+    host.SFLD_getPanelState = SFLD_getPanelState;
+    host.SFLD_getPanelPulse = SFLD_getPanelPulse;
     host.SFLD_selectNodeEffect = SFLD_selectNodeEffect;
     host.SFLD_getFrameStatus = SFLD_getFrameStatus;
     host.SFLD_setParameters = SFLD_setParameters;

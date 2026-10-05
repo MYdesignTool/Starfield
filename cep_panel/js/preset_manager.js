@@ -6,7 +6,7 @@
     // Keep the page and the reason visible when a dependency did not load.
     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-47",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+    var cep=window.__adobe_cep__,gatewayBuild="native-presets-48",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
@@ -19,10 +19,11 @@
             request.gatewayBuild=gatewayBuild;
             // Native file dialogs are user controlled; render/graph calls time out.
             var settled=false,timer=operation.indexOf("PresetFile")>=0?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
-            // Loading and invocation share one evalScript turn. Another CEP page
-            // cannot replace the global SFLD functions between these two steps.
-            var script="(function(){try{$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));"+
-                "if(SFLD_ready()!=="+literal(readyToken)+")throw new Error('Gateway generation mismatch.');"+
+            // Reads check readiness in this host turn; writes always reload and
+            // invoke atomically, preserving the cross-page generation guard.
+            var readOnly=operation==="getState" || operation==="getGraphSnapshot";
+            var script="(function(){try{if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+"){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));}"+
+                "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+")throw new Error('Gateway generation mismatch.');"+
                 "return SFLD_"+operation+"("+literal(JSON.stringify(request))+");}catch(e){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+literal(gatewayBuild)+",ok:false,error:{code:'gateway_load_failed',message:e.toString()}});}}())";
             host(script,function(raw){if(settled)return;settled=true;if(timer)clearTimeout(timer);try{var response=JSON.parse(raw);if(!response || response.protocol!=="org.starfieldfx.panel" || response.version!==1 || response.gatewayBuild!==gatewayBuild)throw new Error("Unsupported host response or gateway generation.");callback(response);}catch(error){callback({ok:false,error:{code:"bad_response",message:"Invalid reply from After Effects: "+error.message}});}});
     }
@@ -40,7 +41,7 @@
     }
     function initialize(callback){
         call("getGraphSnapshot",{},function(record){if(!record.ok){callback(record);return;}
-            var finish=function(response){if(!response.ok){callback(response);return;}client.ensureNativeEffects(response.snapshot,targetToken,function(ensured){if(!ensured.ok){callback(ensured);return;}var normalized=snapshots.normalize(ensured);if(normalized.ok){revision=normalized.snapshot.revision;graph=codec.fromHex(normalized.snapshot.graphHex);}callback(normalized);});};
+            var finish=function(response){if(!response.ok){callback(response);return;}var normalized=snapshots.normalize(response);if(normalized.ok){revision=normalized.snapshot.revision;graph=codec.fromHex(normalized.snapshot.graphHex);}callback(normalized);};
             if(record.snapshot.initialized)finish(record);else call("syncGraphSnapshot",{},finish);
         });
     }
@@ -50,7 +51,7 @@
         initialize(function(response){if(!response.ok){failure(response);return;}
             client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,mode:mode,applyRenderSettings:settings},function(committed){
                 if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+" Undo in After Effects restores the previous graph.");pending(false);
-            },targetToken,revision);
+            },targetToken,revision,response);
         });
     }
     function illustration(canvas,entry){

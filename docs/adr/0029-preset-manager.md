@@ -171,3 +171,21 @@ Panel47 also scopes dark 8px WebKit scrollbars to the extension documents; inspe
 rows wrap and the body scrolls vertically. No shared CEF switches, registry/cache,
 other extensions or host processes change. Syntax/hash evidence is distinct from
 actual owner AE Add/Replace and narrow-window qualification. No tests requested.
+## Panel48 follow-up: preset operation cost (2026-10-05)
+
+The owner requests faster preset behavior after accepting panel47 qualitatively.
+An initialized Add/Replace previously read getGraphSnapshot, ensureNodeEffects,
+and the transaction's getGraphSnapshot before submit. It now reads one immediate
+native snapshot for planning and passes that receipt into the transaction client.
+Target identity is checked before planning; submit independently rereads native
+records and validates revision/record stamp before any write. The current-state
+semantic acknowledgement, native guards, diff writes and rollback remain strict.
+Uninitialized graphs still explicitly run syncGraphSnapshot and validate its
+receipt. No old project/preset schema migration or missing-control defaults added.
+
+Manager reads check the exact gateway generation and reuse it in the same host
+turn. Writes always reload/invoke atomically. No cached ready boolean. The lookup
+and numeric identity-index optimizations are scoped in ADR0009/P-02K. Graph wire,
+native IDs/layouts, Core ABI and rendering remain at native46. Actual Add/Replace,
+animated existing values, rollback/undo and operation timings remain AE gates.
+No test suites requested/run and no measured latency reduction is claimed.

@@ -1,5 +1,21 @@
 # Starfield plug-in architecture
 
+## P-02K / native46 + panel48 - background and preset cost
+
+The owner confirms idle busy cursors stop when CEP closes. Replace200ms status/
+1200ms full-refresh intervals with one500ms-to2s completion-scheduled pulse that
+reads only current target/time/receipt/main-global markers. Full read-only state
+and native graph share one host turn on changes/focus and nominal15s safety audits.
+Reuse unchanged graph/geometry views. Native values and renderer sampling stay
+authoritative; external same-frame changes absent from markers may wait for audit.
+Initialized presets reuse one immediate planning snapshot; the host still rereads
+and checks revision/stamp, validates and acknowledges before accepting the edit.
+Native properties use request-only direct lookup memoization with one bounded
+fallback index; clear on structural mutation and reply. Checked numeric UUID slots
+replace repeated whole-parade lookup, with descending removal. Native46/Core ABI3,
+temporal bootstrap and motion blur are unchanged. No speedup inferred from syntax
+checks; actual multi-emitter idle/seek/native-edit/undo/Add/Replace remain AE gates.
+
 ## P-03 / native46 + panel47 - native snapshot versions and inspector scrollbars
 
 The snapshot adapter resolves portable schemas through graph_edits only after

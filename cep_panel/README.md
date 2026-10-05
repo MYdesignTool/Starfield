@@ -1,5 +1,18 @@
 # Starfield CEP panels
 
+Native46/panel48 reduces background inspection and preset application overhead.
+One non-overlapping poll reads only target/time/receipt/main-renderer markers:
+500ms while changing, backing off to2s after three unchanged replies. Full native
+inspection runs on change/focus/manual refresh and a nominal15s safety audit for
+dependencies not represented by the cheap markers. It combines state and graph
+in one host turn and reuses an unchanged graph view. Live-count updates therefore
+may lag by2s while idle, or500ms while active, plus host processing time.
+Fresh initialized presets plan from one native read; submit independently checks
+the current host before writing. Property lookup caches last only one request,
+preserve exact disk IDs and clear after structural edits. Node reconciliation
+uses checked numeric identity slots and descending removal. Actual AE cursor and
+operation latency remain owner qualification; no test suites requested/run.
+
 Native46/panel47 repairs Add's retained-node version projection. Only complete
 current ordinary native-control records resolve to the current graph schema;
 missing controls, unknown fields and future versions fail before any host write.

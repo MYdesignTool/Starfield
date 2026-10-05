@@ -243,3 +243,41 @@ control, and its summary reports `Live N · Max M`. `Live N` is derived from the
 same time/rate/lifetime/cap slot-range rules used by the portable simulator. This
 is only a presentation grouping: it does not reassign an AE parameter ID or change
 the renderer's global cap contract.
+## P-02K / panel48: bounded background inspection (2026-10-05)
+
+The owner confirms frequent busy cursors stop when CEP closes. Inspection finds
+independent200ms status calls and1200ms full refreshes, with repeated native reads
+and an ensureNodeEffects gateway reload even for initialized graphs. These are
+confirmed source operations; their contribution to wall-clock host latency is
+not measured. Native46 render and temporal bootstrap remain unchanged.
+
+Protocol v1 adds read-only getPanelPulse and getPanelState. Pulse reads target,
+composition time, graph revision/ready/checksum, Effect Parade count, geometry and
+main renderer globals; legacy AE Controls also retain their value revision. It
+does not inspect sibling node fields, decode curves, simulate or write. The reply
+includes the existing frame-status data. getPanelState combines legacy public
+state and the current native snapshot in one synchronous host turn, pinning the
+second read to the first resolved identity. Full schema/codec validation remains.
+
+A single completion-scheduled poll replaces both old intervals. Changing replies
+use500ms; three unchanged replies back off to2s. Hidden/disabled/interactive or
+pending refresh/edit/selection states pause requests. Full inspection occurs on
+marker change, focus/manual refresh, and a nominal15s audit when available to
+catch same-frame expression dependencies or other changes absent from markers.
+There is at most one background request; long callbacks do not enqueue a backlog.
+Discarded interaction-time reads invalidate the marker so the next poll retries.
+Byte-identical graphs with identical geometry reuse the existing projected view.
+Live status may lag2s while idle/500ms while active plus host work; the historical
+200ms statement below is superseded for the current panel. This is display
+latency, not a change to animation sampling or render-time controls.
+
+Native lookup caching contains Property locators only for the current request.
+It tries direct exact names/disk-ID spellings first; one bounded fallback traversal
+indexes unresolved fields. Caches clear at request start/reply and before/after
+every own Effect Parade add/remove. Values are always read from AE. Identity
+enumeration stores numeric slots, detects duplicates and reacquires/checks the
+effect before mutation. Appends preserve old numeric slots; removal is descending.
+No property references survive structural changes or request completion. Existing
+guard, rollback, exact disk ID, schema, conflict and acknowledgement rules remain.
+AE idle/seek/native-edit/undo and preset latency qualification remains an owner
+gate. No test suites requested/run; source checks do not establish a speedup.

@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-47";
+    var GATEWAY_BUILD = "native-presets-48";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -15,8 +15,9 @@
         if(bridge && bridge.requestOpenExtension)bridge.requestOpenExtension("org.starfieldfx.panel.presets","");
     });
     var STARTUP_RETRY_DELAYS_MS = [250, 750, 1500, 3000, 5000];
-    var TARGET_POLL_INTERVAL_MS = 1200;
-    var FRAME_STATUS_POLL_INTERVAL_MS = 200;
+    var ACTIVE_POLL_INTERVAL_MS = 500;
+    var IDLE_POLL_INTERVAL_MS = 2000;
+    var FULL_AUDIT_INTERVAL_MS = 15000;
     var NODE_WIDTH = 110;
     var NODE_HEIGHT = 54;
     var CANVAS_MIN_WIDTH = 580;
@@ -51,6 +52,9 @@
     var minimapPanState = null;
     var minimapTransform = null;
     var frameStatusInFlight = false;
+    var latestFrameStatusResponse = null;
+    var panelPulseInFlight = false, panelPollTimer = null, lastPulseStamp = null;
+    var unchangedPulseCount = 0, lastFullRefreshAt = 0;
     var retainedError = null;
     var failedGraphInitializations = {};
     var resizeUpdatePending = false;
@@ -160,7 +164,8 @@
             if (Object.prototype.hasOwnProperty.call(extra,key)) envelope[key]=extra[key];
         }
         envelope.gatewayBuild=GATEWAY_BUILD;
-        var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot";
+        var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot" ||
+            operation==="getPanelState" || operation==="getPanelPulse";
         var script="(function(){try{"+
             "if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+
             "){$.evalFile(new File("+quote(root+"/jsx/starfield_gateway.jsx")+"));}"+
@@ -584,12 +589,18 @@
     }
 
     function updateFrameStatus() {
-        if (frameStatusInFlight || !resolvedTarget || !state.targetToken || state.pending ||
+        if (frameStatusInFlight || panelPulseInFlight || !resolvedTarget || !state.targetToken || state.pending ||
             refreshInFlight || !state.nodes.length) return;
         frameStatusInFlight = true;
         call("getFrameStatus", null, function (response) {
             frameStatusInFlight = false;
+            adoptFrameStatus(response);
+        });
+    }
+
+    function adoptFrameStatus(response) {
             if (!response || !response.ok || response.targetToken !== state.targetToken) return;
+            latestFrameStatusResponse = response;
             var status = response;
             if (state.graphMode) {
                 var emission = window.StarfieldGraphView.activeEmitterParameters(state.graph);
@@ -613,7 +624,6 @@
                 if (nodeKind(state.nodes[i]) === "output") { output = graphNodeElements[state.nodes[i].id]; break; }
             }
             if (output && output.summary && output.node) output.summary.textContent = nodeSummary(output.node);
-        });
     }
 
     var effectSelectionInFlight = false;
@@ -792,26 +802,15 @@
                  to: path.getAttribute("data-to"), edgeId: path.getAttribute("data-edge-id") || undefined };
     }
 
-    function loadGraphSnapshot(targetToken, callback) {
+    function loadGraphSnapshot(targetToken, callback, currentResponse) {
         if (!window.StarfieldGraphCodec || !window.StarfieldGraphView ||
             !window.StarfieldGraphTransactions || !window.StarfieldGraphEdits) {
             callback({ ok: false, error: { code: "graph_modules_missing", message: "The graph editor modules did not load." } });
             return;
         }
-        call("getGraphSnapshot", { target: { token: targetToken } }, function (response) {
+        function received(response) {
             if (!response || !response.ok || !response.snapshot) { callback(response); return; }
-            function ensureNodeEffects(snapshotResponse) {
-                var client = getGraphTransactionClient();
-                if (!client || !client.ensureNativeEffects) { callback(snapshotResponse); return; }
-                client.ensureNativeEffects(snapshotResponse.snapshot, targetToken, function (ensured) {
-                    if (!ensured || !ensured.ok) { callback(ensured || snapshotResponse); return; }
-                    if (ensured.snapshot) {
-                        snapshotResponse = Object.assign({}, snapshotResponse, { snapshot: ensured.snapshot });
-                    }
-                    callback(snapshotResponse);
-                });
-            }
-            if (response.snapshot.initialized) { ensureNodeEffects(response); return; }
+            if (response.snapshot.initialized) { callback(response); return; }
             var failed = failedGraphInitializations[targetToken];
             if (failed) { callback(failed); return; }
             call("syncGraphSnapshot", { target: { token: targetToken } }, function (initialized) {
@@ -822,9 +821,11 @@
                     callback(failed);
                     return;
                 }
-                ensureNodeEffects(initialized);
+                callback(initialized);
             });
-        });
+        }
+        if (currentResponse) received(currentResponse);
+        else call("getGraphSnapshot", { target: { token: targetToken } }, received);
     }
 
     function getGraphTransactionClient() {
@@ -2484,6 +2485,7 @@
     }
 
     function adoptState(response, graphSnapshot) {
+        lastFullRefreshAt = Date.now();
         var targetChanged = state.targetToken !== response.target.token;
         var graphChanged = window.StarfieldGraphView.graphSnapshotChanged(state.graphSnapshot, graphSnapshot);
         var graphLayoutChanged = false;
@@ -2496,13 +2498,18 @@
         state.topologyReady = !!(graphSnapshot && graphSnapshot.initialized);
         if (state.graphMode && state.topologyReady) {
             try {
-                var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
-                var view = window.StarfieldGraphView.project(graph, null, graphSnapshot.geometry);
-                graphLayoutChanged = !window.StarfieldGraphView.samePositions(nodePositions, view.positions);
-                state.graph = graph;
-                state.nodes = view.nodes;
-                state.edges = view.edges;
-                nodePositions = view.positions;
+                var reusable = !targetChanged && state.graph && state.graphSnapshot &&
+                    state.graphSnapshot.graphHex === graphSnapshot.graphHex &&
+                    JSON.stringify(state.graphSnapshot.geometry) === JSON.stringify(graphSnapshot.geometry);
+                if (!reusable) {
+                    var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
+                    var view = window.StarfieldGraphView.project(graph, null, graphSnapshot.geometry);
+                    graphLayoutChanged = !window.StarfieldGraphView.samePositions(nodePositions, view.positions);
+                    state.graph = graph;
+                    state.nodes = view.nodes;
+                    state.edges = view.edges;
+                    nodePositions = view.positions;
+                }
                 state.graphSnapshot = graphSnapshot;
                 state.layoutPersistence = true;
             } catch (graphError) {
@@ -2550,7 +2557,8 @@
         }
         syncTargetLock();
         if (changed || layoutChanged || graphLayoutChanged) render(state);
-        updateFrameStatus();
+        if (latestFrameStatusResponse && latestFrameStatusResponse.targetToken === state.targetToken) adoptFrameStatus(latestFrameStatusResponse);
+        else updateFrameStatus();
     }
 
     function isStartupRetryable(code) {
@@ -2567,9 +2575,9 @@
         if (resetRetryBudget) startupRetryAttempt = 0;
         var epoch = ++refreshEpoch;
         refreshInFlight = true;
-        call("getState", null, function (response) {
-            if (epoch !== refreshEpoch) { refreshInFlight = false; return; }
-            if (canvasInteractionActive() || state.pending) { refreshInFlight = false; return; }
+        call("getPanelState", null, function (response) {
+            if (epoch !== refreshEpoch) { refreshInFlight = false; lastPulseStamp = null; return; }
+            if (canvasInteractionActive() || state.pending) { refreshInFlight = false; lastPulseStamp = null; return; }
             if (!response.ok) {
                 refreshInFlight = false;
                 var error = response.error || { code: "unknown", message: "Unknown failure." };
@@ -2613,7 +2621,7 @@
             startupRetryAttempt = 0;
             loadGraphSnapshot(response.target.token, function (snapshotResponse) {
                 refreshInFlight = false;
-                if (epoch !== refreshEpoch || canvasInteractionActive() || state.pending) return;
+                if (epoch !== refreshEpoch || canvasInteractionActive() || state.pending) { lastPulseStamp = null; return; }
                 if (!snapshotResponse || !snapshotResponse.ok || !snapshotResponse.snapshot ||
                     snapshotResponse.snapshot.initialized !== true) {
                     var graphError = snapshotResponse && snapshotResponse.error ||
@@ -2628,7 +2636,40 @@
                 // the first automatic Emitter + Particle initialization.
                 clearBanner();
                 adoptState(response, snapshotResponse.snapshot);
-            });
+            }, response);
+        });
+    }
+
+    function schedulePanelPoll(delay) {
+        if (panelPollTimer !== null) window.clearTimeout(panelPollTimer);
+        panelPollTimer = window.setTimeout(pollPanelState,delay);
+    }
+
+    function pollPanelState() {
+        panelPollTimer = null;
+        if (panelPulseInFlight || refreshInFlight || frameStatusInFlight || state.pending ||
+            effectSelectionInFlight || canvasInteractionActive() || document.hidden ||
+            (elements.autoRefresh && !elements.autoRefresh.checked)) {
+            schedulePanelPoll(IDLE_POLL_INTERVAL_MS); return;
+        }
+        panelPulseInFlight = true;
+        call("getPanelPulse",null,function(response) {
+            panelPulseInFlight = false;
+            if (state.pending || canvasInteractionActive() || document.hidden) {
+                schedulePanelPoll(IDLE_POLL_INTERVAL_MS); return;
+            }
+            if (response && response.ok) {
+                var changed = response.stamp !== lastPulseStamp;
+                lastPulseStamp = response.stamp;
+                unchangedPulseCount = changed ? 0 : unchangedPulseCount+1;
+                adoptFrameStatus(response.frameStatus);
+                if (changed || !resolvedTarget || Date.now()-lastFullRefreshAt >= FULL_AUDIT_INTERVAL_MS) refresh(false,false);
+            } else {
+                unchangedPulseCount++;
+                lastPulseStamp = null;
+                if (state.targetToken) refresh(false,false);
+            }
+            schedulePanelPoll(unchangedPulseCount >= 3 ? IDLE_POLL_INTERVAL_MS : ACTIVE_POLL_INTERVAL_MS);
         });
     }
 
@@ -2720,18 +2761,7 @@
         elements.inspector.hidden = true;
         shownInspectorNodeId = null;
     });
-    if (window.setInterval) {
-        window.setInterval(function () {
-            if (state.pending || document.hidden ||
-                (elements.autoRefresh && !elements.autoRefresh.checked)) return;
-            refresh(false, false);
-        }, TARGET_POLL_INTERVAL_MS);
-        window.setInterval(function () {
-            if (!resolvedTarget || state.pending || document.hidden ||
-                (elements.autoRefresh && !elements.autoRefresh.checked)) return;
-            updateFrameStatus();
-        }, FRAME_STATUS_POLL_INTERVAL_MS);
-    }
+    schedulePanelPoll(IDLE_POLL_INTERVAL_MS);
     if (document.addEventListener) {
         document.addEventListener("visibilitychange", function () {
             if (!document.hidden &&

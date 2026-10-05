@@ -1,5 +1,15 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-02K / native46 + panel48 - CEP performance
+
+Owner confirms multiple-emitter busy cursors stop with CEP closed, then requests
+overall responsiveness including preset application. Reduce background requests
+through one adaptive lightweight pulse, combined full inspections, view reuse and
+periodic safety audit. Reduce preset planning from three native reads to one, keep
+host conflict/semantic checks, and avoid repeated native-control/parade searches.
+Native46/renderer contracts remain. Syntax/hash checks are separate from actual
+AE cursor and wall-clock latency evidence; no test suites requested/run.
+
 ## P-03 / native46 + panel47 - Add and inspector scrolling
 
 Owner reports Add's retained Emitter3/expected7 failure and white inspector bars.

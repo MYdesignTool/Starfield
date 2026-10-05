@@ -1,5 +1,26 @@
 # Behavior inventory
 
+## P-02K / native46 + panel48 qualification
+
+Owner qualitatively accepts panel47 functionality; frequent busy cursors with
+multiple emitters cease when CEP closes. No exact host timing is provided.
+Source inspection finds independent200ms status calls,1200ms full inspections,
+duplicate native reads and whole-parade lookup per reconciled node. Panel48
+combines reads and uses an adaptive500ms-to2s lightweight poll, nominal15s safety
+audits, request-scoped exact property lookup, checked numeric identity slots and
+one immediate preset planning read. This is source evidence, not measured host
+attribution or a speedup. Native46/rendering/temporal bootstrap remain unchanged.
+No test suites requested/run. Owner AE2023 gates:
+
+- Multiple emitters stay idle without frequent busy cursors while CEP is visible.
+- Seek/native control edit/Add/Replace/undo refresh the correct values and target.
+- Same-frame external expression dependencies refresh by focus/audit; live count
+  accepts up to2s idle/500ms active lag plus host work.
+- Add retains existing animated values; Replace removes the intended identities,
+  and failure/undo/reopen preserve the prior project correctly.
+- Record actual preset-click latency and idle responsiveness; rendering timing
+  is a separate measurement and is not established by the CEP source changes.
+
 ## P-03 / native46 + panel47 qualification
 
 Owner reports Replace succeeds and Add fails Updated project Emitter3/expected7.

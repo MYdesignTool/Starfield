@@ -1,5 +1,16 @@
 # Build and host matrix
 
+## P-02K / native46 + panel48 candidate - 2026-10-05
+
+CEP0.1.0.48/extensions0.1.48 and gateway/resource markers48. Panel polling,
+combined native inspection, property/identity lookup and preset planning change.
+Native46 binaries/Core selector/IDs/ABI and motion blur are retained. All panel JS
+and gateway JSX syntax, manifest XML parse and patch whitespace are source gates;
+no native build needed or test suites requested/run. The21-file panel47 baseline
+is saved and hash verified under artifacts/prepared/p-02k-build48-cep-performance.
+Paired native46/panel47 backup name: p-02k-build48-cep-performance-20261005.
+Actual AE cursor, live-count lag and preset latency remain owner qualification.
+
 ## P-03 / native46 + panel47 candidate - 2026-10-05
 
 CEP0.1.0.47/extensions0.1.47 and gateway/resource markers47. Only the CEP snapshot
