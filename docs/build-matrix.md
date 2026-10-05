@@ -2,6 +2,38 @@
 
 ## M3-09 / build40 candidate - 2026-10-05
 
+Deployed at2026-10-05T16:50:20+08:00 from local candidate
+8d6fb33b182b64b12a04b6dfd9dc905ed7b7e0f4. Fresh read-only checks found neither
+AfterFX nor AfterFX_64; tools/Deploy-TestBuild.ps1 installed through the existing
+Starfield Junction. All6 installed candidate hashes,6 saved build38 hashes and
+21 CEP source entries (19 retained,2 newly added) were verified. Runtime selects
+StarfieldCore-15DEAD2027EDB6B4.dll, matching the pinned Core hash. Existing CEP
+Junction still points to this checkout's cep_panel. No process start/stop,
+registry/cache, host settings or installation-link changes. Main remains
+8857303d2b114a40ac3cbf2a5fc38ca78c3c7191; development stays on
+codex/m3-07-particle-gradient with local commits only.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | 5FAB419D5709E70FBE40130EB86EE91527AD4527748CD6B5EEFD23B588A1D2F7 |
+| StarfieldEmitter.aex | 9A629FF5D0284F6DE7CB55DD06CA3ED1EC396DEFD50461BF393F12427EB844C5 |
+| StarfieldParticleNode.aex | EE9F36398718D4F02C46E3ADFD7CA8FCD4AB718132C3435D0CBA6BB6A0735FD3 |
+| StarfieldForce.aex | F90D90D0FD4C1B0FD39E63A43AA8D9EF5D32D2F8955E313AD5DD147D60872717 |
+| StarfieldHost.aex | 40122AB1A3358E9B5B84413BBFF125B6058840D9B11BA473D857150E47D6F3CE |
+| StarfieldCore.dll | 15DEAD2027EDB6B466E187157D2FF24585CA60D99BD6F6A5BE82A5C6A98D18FF |
+
+Receipts: artifacts/build40-deploy-before.json, build40-deploy-after.json,
+build40-deploy.log and build40-rollback-report.log. The rollback report verified
+the saved pair without performing rollback. One-step undo with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-build40-editor-presets-20261005' -Restore
+```
+
+Rollback restores paired build38 binaries/panel, retains the40 candidate sources
+under candidate-panel and requires recreating development Particle/Force nodes
+authored with schema7/3. It does not roll back Git source commits.
+
 Packed version32808/0x8028. May2023 SDK /MT full candidate compilation succeeds
 without compiler warnings/errors (artifacts/build40-native-final.log). CEP
 JavaScript and gateway JSX pass Node --check; git diff --check passes. No tests

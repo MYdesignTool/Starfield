@@ -6,6 +6,9 @@ Owner: primary agent, current card after P-03 fix a624455/build39 compilation.
 Implementation candidate: build40 compiled cleanly with May2023 SDK /MT;
 JS/JSX syntax and patch whitespace pass. No tests requested/run. Actual AE
 Add/Replace, native modal picker and persisted four-mode behavior are owner gates.
+Local source8d6fb33 is deployed as40; six native/Core candidates and21 CEP source
+entries are verified with paired38 rollback. Implementation/deployment complete;
+actual AE qualification remains open. See docs/build-matrix.md for receipts/undo.
 Owner supplies Over Life/color screenshots, excludes directory recreation, and
 requires editor-specific Presets entries plus exactly Linear/Hold gradients.
 ADR0030 owns numeric independent catalogs, native modal picker, Size/Opacity

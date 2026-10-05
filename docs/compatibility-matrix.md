@@ -10,7 +10,8 @@ Bezier tangents and64-point Draw. Main transport remains8 knots. Particle7 and
 Force3 need fresh development effects/graphs; no legacy migration per owner.
 
 May2023 compilation without diagnostics and JS/JSX syntax pass. No tests requested
-or run. Pending AE2023 owner gates: all six complete-system presets Add/Replace
+or run. Candidate8d6fb33 is deployed as40 with hash-verified paired38 rollback.
+Pending AE2023 owner gates: all six complete-system presets Add/Replace
 (especially Warm Sparks/Orbital Drift), guard visibility restoration, native
 modal picker Apply/Cancel and undo, four-mode click cycling/freehand Draw,
 color Hold preview/output, save/reopen mode/64-knot retention. Existing main
