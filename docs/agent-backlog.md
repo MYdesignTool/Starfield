@@ -15,7 +15,9 @@ No tests requested/run. Full build, paired native43/panel42 rollback and actual
 owner Draw timing remain required; other owner qualification gates stay open.
 Full May2023 /MT candidate compilation and patch whitespace pass. The final log
 is artifacts/build44-native.log; no tests requested/run. The 21-file panel42
-baseline is prepared and hash verified. Deployment and actual AE timing pending.
+baseline is prepared and hash verified. Source6774b2f is deployed as native44/
+panel42; six installed/saved binaries and 21 paired CEP sources are verified.
+Paired native43/panel42 rollback is retained. Actual AE Draw timing remains open.
 
 Current owner follow-up: panel42 most functions and preset application pass;
 native mode click still fails animation binding, parameter36/stream-1/error516.

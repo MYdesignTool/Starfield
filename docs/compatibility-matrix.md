@@ -15,6 +15,9 @@ keyboard cancellation, undo/reopen and independently targeted Size/Opacity/Rotat
 Build/deployment evidence will be recorded separately from actual host timing.
 Full May2023 /MT candidate build passes without compiler diagnostics. Patch
 whitespace and deployment-wrapper syntax pass. No actual AE latency measured.
+Source6774b2f is deployed as native44/panel42 through the existing Junction;
+six native/Core and 21 CEP entries are verified with paired native43/panel42
+rollback. The read-only restore report passes. Deployment is not AE timing proof.
 
 ## M3-09 / native43 qualification
 

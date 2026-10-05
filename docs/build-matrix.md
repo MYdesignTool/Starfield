@@ -2,6 +2,26 @@
 
 ## M3-09 / native44 candidate - 2026-10-05
 
+Source6774b2fa6704f4238c897bde796601db2d2850c8 is deployed as native44/panel42
+at 2026-10-05 18:06:36 +08:00. Fresh read-only process checks found neither
+AfterFX nor AfterFX_64. The existing single Starfield -> dist Junction is verified.
+The Core selector remains StarfieldCore-15DEAD2027EDB6B4.dll. All six installed
+and saved native/Core hashes and all 21 paired CEP files are verified. Saved pair:
+artifacts/disabled/m3-09-build44-draw-edit-20261005 (native43/panel42).
+Receipts: artifacts/build44-deploy-before.json, build44-deploy-after.json,
+build44-deploy.log and build44-rollback-report.log. Restore's read-only report
+passes; no rollback was performed. No registry, cache, shared CEP/CEF settings,
+installation link or process start/stop changes. Actual AE latency remains open.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | 97615C386986405F67E91CF33B8074CD904AE57DE32C11490CE6159775634704 |
+| StarfieldEmitter.aex | 4629116704435B9CDCE9CB061492AD258BE790C7D7038CB5E1FD9BF0D2ED6244 |
+| StarfieldParticleNode.aex | DD3697C1E39BD2DE4868099C655E75B1CAB3A24D0F540867E772935635D92A03 |
+| StarfieldForce.aex | A705DA890F0F62AE3C80E80B56651C483D3F2D7EEF2ED91D5ADA9E878203B29E |
+| StarfieldHost.aex | 9AEBAC7BD5EF35B1A59CE25C58F1A9EDDD372F5490CD854B2763E65555BFF62E |
+| StarfieldCore.dll | 15DEAD2027EDB6B466E187157D2FF24585CA60D99BD6F6A5BE82A5C6A98D18FF |
+
 Draw uses a local 64-sample draft until mouse release; the curve is stroked once.
 Only changed leaves are flagged. Binding snapshots/evaluation apply only to
 installed/repaired aliases after type, exact expression and enabled-state checks.
@@ -11,7 +31,7 @@ Full May2023 /MT compilation passes without C++ or MSBuild warnings/errors;
 final log is artifacts/build44-native.log. The initial context-cleanup compile
 error is corrected; its log is retained as build44-native-attempt1.log. Patch
 whitespace and deployment-wrapper syntax pass. No tests requested/run, and no
-claimed AE speedup without the owner's timing feedback. Deployment is pending.
+claimed AE speedup without the owner's timing feedback. Deployment is complete.
 All 21 panel42 sources are saved and hash verified under
 artifacts/prepared/m3-09-build44-draw-edit. Save native43 with that panel for
 paired rollback through the existing single Junction and standing authorization.
