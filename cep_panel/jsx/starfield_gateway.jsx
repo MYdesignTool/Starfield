@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-40";
+    var GATEWAY_BUILD = "native-presets-41";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -408,6 +408,34 @@
         return result === "00000000000000000000000000000000" ? null : result;
     }
 
+    // Count labels are public editor names, not names synthesized from a bank.
+    // Opacity also exists under Particle Properties, so bind the whole curve
+    // bank inside its registered native group for both reading and writing.
+    var NATIVE_CURVE_CONTROLS = {
+        Size: { group: "Over Life", count: "Size", mode: "Size Curve Interpolation", prefix: "Size Curve ", age: " Age" },
+        Opacity: { group: "Over Life", count: "Opacity", mode: "Opacity Curve Interpolation", prefix: "Opacity Curve ", age: " Age" },
+        Rotation: { group: "Rotation Properties", count: "Rotation Over Life", mode: "Rotation Curve Interpolation", prefix: "Rotation Curve ", age: " Life" },
+        "Wind and Spin": { group: null, count: "Wind and Spin Curve Count", mode: "Wind and Spin Curve Interpolation", prefix: "Wind and Spin Curve ", age: " Age" }
+    };
+
+    function nativeCurveBank(effect, label) {
+        if (!Object.prototype.hasOwnProperty.call(NATIVE_CURVE_CONTROLS, label)) {
+            throw new Error("Unsupported native curve bank: " + label);
+        }
+        var controls = NATIVE_CURVE_CONTROLS[label];
+        var scope = controls.group ? findEffectProperty(effect, controls.group) : effect;
+        if (!scope) throw new Error("Node curve group is missing: " + controls.group + " (" + GATEWAY_BUILD + ")");
+        return { controls: controls, scope: scope };
+    }
+
+    function findNodeControl(effect, name) {
+        if (effect && effect.matchName === "org.starfieldfx.node.particle" && name === "Opacity") {
+            var properties = findEffectProperty(effect, "Particle Properties");
+            return properties ? findEffectProperty(properties, name) : null;
+        }
+        return findEffectProperty(effect, name);
+    }
+
     function setNodeIdentity(effect, id) {
         for (var i = 0; i < 8; i++) {
             var property = findEffectProperty(effect, "Node UUID " + i);
@@ -457,9 +485,9 @@
     }
 
     function setNodeControl(effect, name, value) {
-        var property = findEffectProperty(effect, name);
+        var property = findNodeControl(effect, name);
         if (!property || typeof property.setValue !== "function") {
-            throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ")");
+            throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ", " + GATEWAY_BUILD + ")");
         }
         try {
             if (!sameValue(property.value, value)) {
@@ -514,6 +542,7 @@
     }
 
     function writeNodeCurve(effect, label, bytes) {
+        var bank = nativeCurveBank(effect, label), controls = bank.controls;
         var points = [];
         // Author the absent rotation curve as its canonical flat-zero default
         // so readback and repeated application agree explicitly.
@@ -535,11 +564,11 @@
                 throw new Error(label + " curve endpoints must remain at 0 and 100 percent life.");
             }
         }
-        setNodeControl(effect, label === "Rotation" ? "Rotation Over Life" : label === "Wind and Spin" ? label + " Curve Count" : label, points.length);
-        setNodeControl(effect,label+" Curve Interpolation",bytes?bytes[2]:0);
+        setNodeControl(bank.scope, controls.count, points.length);
+        setNodeControl(bank.scope, controls.mode, bytes ? bytes[2] : 0);
         for (var p = 0; p < points.length; p++) {
-            setNodeControl(effect, label + " Curve " + p + (label==="Rotation" ? " Life" : " Age"), points[p].age);
-            setNodeControl(effect, label + " Curve " + p + " Value", points[p].value);
+            setNodeControl(bank.scope, controls.prefix + p + controls.age, points[p].age);
+            setNodeControl(bank.scope, controls.prefix + p + " Value", points[p].value);
         }
     }
 
@@ -575,7 +604,7 @@
     }
 
     function nodeControlValue(effect, name) {
-        var property = findEffectProperty(effect, name);
+        var property = findNodeControl(effect, name);
         if (!property) throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ")");
         return property.value;
     }
@@ -649,13 +678,14 @@
                 -Number(nodeControlValue(effect,"Wind Y"))/forceHeight,Number(nodeControlValue(effect,"Wind Z"))/forceHeight]});
             scalar(5,"Spin"); node.parameters[node.parameters.length-1].value /= forceHeight;
             scalar(6,"Spin Frequency"); scalar(7,"Spin resist"); scalar(8,"Spin Delay (Seconds)");
-            var forceCount = Number(nodeControlValue(effect,"Wind and Spin Curve Count"));
+            var forceBank = nativeCurveBank(effect, "Wind and Spin");
+            var forceCount = Number(nodeControlValue(forceBank.scope, forceBank.controls.count));
             if (forceCount) {
                 if (Math.floor(forceCount)!==forceCount || forceCount<2 || forceCount>64) throw new Error("Invalid Force curve count.");
-                var forceBytes=[1,forceCount,Number(nodeControlValue(effect,"Wind and Spin Curve Interpolation")),0];
+                var forceBytes=[1,forceCount,Number(nodeControlValue(forceBank.scope, forceBank.controls.mode)),0];
                 for (var fp=0;fp<forceCount;fp++) {
-                    appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Age")));
-                    appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Value")));
+                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, forceBank.controls.prefix+fp+forceBank.controls.age)));
+                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, forceBank.controls.prefix+fp+" Value")));
                 }
                 node.parameters.push({key:"9",type:7,value:forceBytes});
             }
@@ -693,13 +723,14 @@
             }
             var curves = [[7,"Size"],[8,"Opacity"],[27,"Rotation"]];
             for (var c = 0; c < curves.length; c++) {
-                var label = curves[c][1], count = Number(nodeControlValue(effect, label === "Rotation" ? "Rotation Over Life" : label === "Wind and Spin" ? label + " Curve Count" : label));
+                var label = curves[c][1], bank = nativeCurveBank(effect, label);
+                var count = Number(nodeControlValue(bank.scope, bank.controls.count));
                 if (count === 0) continue;
                 if (Math.floor(count) !== count || count < 2 || count > 64) throw new Error("A node curve count is invalid.");
-                var bytes = [1, count, Number(nodeControlValue(effect,label+" Curve Interpolation")), 0];
+                var bytes = [1, count, Number(nodeControlValue(bank.scope, bank.controls.mode)), 0];
                 for (var point = 0; point < count; point++) {
-                    appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + (label==="Rotation" ? " Life" : " Age"))));
-                    appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + " Value")));
+                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, bank.controls.prefix+point+bank.controls.age)));
+                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, bank.controls.prefix+point+" Value")));
                 }
                 node.parameters.push({ key: String(curves[c][0]), type: 7, value: bytes });
             }

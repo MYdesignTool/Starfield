@@ -2,6 +2,10 @@
 
 ## M3-09 - Restore editor palettes from supplied references
 
+Current follow-up: panel41 fixes scoped curve bindings and node gateway dispatch
+after owner build40 addition failure. Qualify effect/Particle creation before
+claiming the editor palette workflow works in AE. Native build40 stays paired.
+
 After the P-03 application fix, implement native editor Presets thumbnails,
 independent Over Life/color profiles, Linear/Hold/Bezier/Draw curves,
 and persisted Linear/Hold gradients. No preset directory replica. ADR0030 owns

@@ -53,3 +53,22 @@ control handles. The independently computed Force motion integrates each
 constant/linear/cubic segment under constant drag; this task also owns
 src/core/ParticleSimulation.cpp to keep the expanded Force bank coherent.
 Parameters.cpp explicitly retains the main effect eight-knot transport.
+
+## Panel generation41: scoped native bank names
+
+Owner build40 reports node_effect_sync_failed looking for Rotation Curve Count.
+This literal is absent from current source; its runtime producer is unconfirmed.
+The node client had cached readiness and separately invoked global host functions,
+leaving a gap when another CEP page reloads those functions. Generation41 reloads
+every mutation and calls its operation within one evalScript turn; read-only calls
+reuse only a matching generation. Requests/replies carry and check the generation.
+Both extension versions and HTML URLs advance together. No cache/registry changes.
+
+Static inspection also identifies a definite duplicate name: Particle Properties
+Opacity and Over Life Opacity. Curve controls now use an explicit count/mode/point
+name table with Over Life or Rotation Properties scopes, including the actual
+Rotation Over Life count name. Scalar Opacity resolves in Particle Properties.
+Readers and writers share these scopes; no fallback to an ambiguous root label.
+Native binaries remain build40 (Particle7/Force3, main26, ABI3); only the21-file
+CEP bundle advances. Save paired40 panel and unchanged native files for rollback.
+JS/JSX syntax compilation is the implemented check; actual AE add remains open.

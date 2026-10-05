@@ -1,5 +1,23 @@
 # Build and host matrix
 
+## M3-09 / panel41 candidate - 2026-10-05
+
+Owner build40 addition reports missing Rotation Curve Count. Current source has
+no producer for that name; runtime origin remains unconfirmed. A confirmed source
+defect is the duplicated Opacity label across Particle Properties and Over Life.
+Explicit native curve descriptors scope count/mode/knots to the owning group;
+scalar opacity is scoped to Particle Properties. Main node client now reloads and
+invokes writes atomically and validates gateway generation in requests/replies.
+Read-only polls reuse only a matching generation; manifest extension versions
+and HTML URLs advance together to41 without cache/host-setting modifications.
+
+This is a21-file CEP update. All native binaries/Core remain build40, so Options
+continues to show40; Particle7/Force3/main26/ABI3 and runtime selector remain intact.
+Changed JS/JSX syntax compilation and git diff --check pass. No tests requested
+or run. Backup/deploy receipts are under artifacts/prepared/m3-09-panel41-curve-
+names, artifacts/disabled/m3-09-panel41-curve-names-20261005 and artifacts/panel41-
+deploy-*.json/log. Actual AE effect addition/readback remains an owner gate.
+
 ## M3-09 / build40 candidate - 2026-10-05
 
 Deployed at2026-10-05T16:50:20+08:00 from local candidate

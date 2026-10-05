@@ -1,5 +1,16 @@
 # Behavior inventory
 
+## M3-09 / panel41 qualification
+
+Owner build40 fails addition with node_effect_sync_failed / missing Rotation
+Curve Count. The reported label is absent from current source; stale runtime
+origin is unconfirmed. The overlapping scalar/curve Opacity name is an inspected
+binding defect.41 uses explicit scoped curve names and atomic node writes with
+generation checks; native40 is retained. JS/JSX syntax and patch whitespace pass;
+no tests requested/run. AE2023 addition, correct scalar opacity vs curve count,
+all three native Particle curves and cross-panel gateway generation are pending
+owner-visible checks. This is a repair candidate, not a confirmed host pass.
+
 ## M3-09 / build40 qualification
 
 Includes the owner-reported application failure fixes from build39 plus native

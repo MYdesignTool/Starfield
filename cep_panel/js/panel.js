@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-40";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-41";
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
         var bridge=window.__adobe_cep__;
@@ -140,119 +140,55 @@
         return null;
     }
 
-    // The manifest registers the gateway as this extension's ScriptPath, so CEP normally
-    // evaluates it into the host engine when the extension loads. Depending on that alone
-    // means a panel opened in a session where the script was not evaluated - or an
-    // installed copy that lags the panel - can only report an unreadable reply. Loading
-    // the gateway by path on the first call removes both cases, and it is why a panel
-    // edit needs no After Effects restart, only a panel reload.
-    var gatewayReady = false;
-    var gatewayLoadDiagnostic = "";
-
-    function isGatewayReady(value) {
-        var result = String(value);
-        // Some CEP/ExtendScript combinations return a quoted string value while
-        // others return its contents. Accept both forms for this fixed token.
-        if (result.length >= 2 && result.charAt(0) === "\"" && result.charAt(result.length - 1) === "\"") {
-            result = result.slice(1, -1);
-        }
-        return result === GATEWAY_READY_TOKEN;
-    }
-
-    function ensureGateway(callback) {
-        if (gatewayReady) { callback(true); return; }
-        evalScript("(typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing'", function (probe) {
-            if (isGatewayReady(probe)) { gatewayReady = true; gatewayLoadDiagnostic = ""; callback(true); return; }
-            var root = extensionRoot();
-            if (!root) {
-                gatewayLoadDiagnostic = "CEP did not return an extension folder path.";
-                callback(false);
-                return;
-            }
-            var gatewayPath = root + "/jsx/starfield_gateway.jsx";
-            var loader = "(function(){try{" +
-                "var gatewayFile = new File(" + quote(gatewayPath) + ");" +
-                "if (!gatewayFile.exists) return 'missing_file:' + gatewayFile.fsName;" +
-                "$.evalFile(gatewayFile);" +
-                "return (typeof SFLD_ready === 'function') ? SFLD_ready() : 'missing_after_eval';" +
-                "} catch (error) { return 'load_error:' + error.toString(); }}())";
-            evalScript(loader, function (loadResult) {
-                gatewayReady = isGatewayReady(loadResult);
-                gatewayLoadDiagnostic = gatewayReady ? "" : snippet(loadResult || "empty ExtendScript reply");
-                callback(gatewayReady);
-            });
-        });
-    }
-
+    // Read operations can reuse the current generation. Every write reloads and
+    // invokes the gateway in one host turn, so a different CEP page cannot replace
+    // global entry points between a cached readiness probe and a mutation.
+    var GATEWAY_BUILD = "native-presets-41";
     function call(operation, extra, callback) {
-        ensureGateway(function (ready) {
-            if (!ready) {
-                callback({ ok: false, error: {
-                    code: "gateway_missing",
-                    message: "The ExtendScript gateway did not load. " +
-                        (gatewayLoadDiagnostic || "Check the CEP extension path and reload the panel.")
-                } });
+        var root = extensionRoot();
+        if (!root) {
+            callback({ ok:false, error:{code:"gateway_missing",message:"CEP did not return an extension folder path."} });
+            return;
+        }
+        var envelope = {
+            protocol:"org.starfieldfx.panel",version:1,requestId:requestId(),
+            operation:operation,
+            target:(state.pinnedTargetToken || state.targetToken)?{token:state.pinnedTargetToken || state.targetToken}:{},
+            pinTarget:!!state.pinnedTargetToken,baseRevision:state.revision,changes:[]
+        };
+        if (extra) for (var key in extra) {
+            if (Object.prototype.hasOwnProperty.call(extra,key)) envelope[key]=extra[key];
+        }
+        envelope.gatewayBuild=GATEWAY_BUILD;
+        var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot";
+        var script="(function(){try{"+
+            "if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+
+            "){$.evalFile(new File("+quote(root+"/jsx/starfield_gateway.jsx")+"));}"+
+            "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+")throw new Error('Gateway generation mismatch.');"+
+            "return SFLD_"+operation+"("+quote(JSON.stringify(envelope))+");"+
+            "}catch(error){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+quote(GATEWAY_BUILD)+
+            ",ok:false,error:{code:'gateway_load_failed',message:error.toString()}});}}())";
+        var settled=false;
+        var timer=window.setTimeout(function(){
+            if(settled)return;settled=true;
+            callback({ok:false,error:{code:"host_timeout",message:"The host did not answer within "+(REQUEST_TIMEOUT_MS/1000)+"s."}});
+        },REQUEST_TIMEOUT_MS);
+        evalScript(script,function(raw){
+            if(settled)return;settled=true;window.clearTimeout(timer);
+            var response;
+            try {response=JSON.parse(raw);} catch(error){
+                var text=raw===null || typeof raw==="undefined"?"":String(raw).trim();
+                if(!text || text==="undefined" || /^EvalScript error\.?$/i.test(text)){
+                    callback({ok:false,error:{code:"host_not_ready",message:"After Effects has not returned a panel response yet."}});
+                } else callback({ok:false,error:{code:"bad_response",message:"The gateway returned unreadable data: "+snippet(raw)}});
                 return;
             }
-            var envelope = {
-                protocol: "org.starfieldfx.panel",
-                version: 1,
-                requestId: requestId(),
-                operation: operation,
-                target: (state.pinnedTargetToken || state.targetToken) ?
-                        { token: state.pinnedTargetToken || state.targetToken } : {},
-                pinTarget: !!state.pinnedTargetToken,
-                baseRevision: state.revision,
-                changes: []
-            };
-            if (extra) {
-                for (var key in extra) {
-                    if (Object.prototype.hasOwnProperty.call(extra, key)) envelope[key] = extra[key];
-                }
+            if(response && response.ok===false && response.error && response.error.code==="no_host"){callback(response);return;}
+            if(!response || response.protocol!=="org.starfieldfx.panel" || response.version!==1 || response.gatewayBuild!==GATEWAY_BUILD){
+                callback({ok:false,error:{code:"gateway_generation_mismatch",message:"The node panel and host gateway versions do not match. Reopen the panel."}});
+                return;
             }
-            var script = "SFLD_" + operation + "(" + quote(JSON.stringify(envelope)) + ")";
-            var settled = false;
-            var timer = window.setTimeout(function () {
-                if (settled) return;
-                settled = true;
-                callback({ ok: false, error: {
-                    code: "host_timeout",
-                    message: "The host did not answer within " + (REQUEST_TIMEOUT_MS / 1000) + "s."
-                } });
-            }, REQUEST_TIMEOUT_MS);
-            evalScript(script, function (raw) {
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timer);
-                var response = null;
-                try {
-                    response = JSON.parse(raw);
-                } catch (error) {
-                    var replyText = raw === null || typeof raw === "undefined" ? "" : String(raw).trim();
-                    if (!replyText || replyText === "undefined" || /^EvalScript error\.?$/i.test(replyText)) {
-                        // During AE startup CEP can complete evalScript with no usable
-                        // result before the project/ExtendScript context is ready.
-                        gatewayReady = false;
-                        callback({ ok: false, error: {
-                            code: "host_not_ready", message: "After Effects has not returned a panel response yet."
-                        } });
-                        return;
-                    }
-                    // Non-empty malformed replies are useful diagnostics and should not be
-                    // collapsed into the transient startup state handled above.
-                    callback({ ok: false, error: {
-                        code: "bad_response", message: "The gateway returned unreadable data: " + snippet(raw)
-                    } });
-                    return;
-                }
-                if (!response || response.protocol !== "org.starfieldfx.panel") {
-                    callback({ ok: false, error: {
-                        code: "bad_response", message: "Unexpected response envelope: " + snippet(raw)
-                    } });
-                    return;
-                }
-                callback(window.StarfieldNativeGraphSnapshot ? window.StarfieldNativeGraphSnapshot.normalize(response) : response);
-            });
+            callback(window.StarfieldNativeGraphSnapshot?window.StarfieldNativeGraphSnapshot.normalize(response):response);
         });
     }
 

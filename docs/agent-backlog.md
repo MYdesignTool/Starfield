@@ -2,6 +2,13 @@
 
 ## M3-09 - Editor curve/color presets and interpolation
 
+Owner follow-up: build40 fails effect/node addition with missing Rotation Curve
+Count. Panel generation41 owns explicit scoped curve bindings and atomic node
+gateway mutations with request/reply generation checks. The reported old label's
+producer remains unconfirmed; the duplicate scalar/curve Opacity name is found
+in source and corrected on both read/write paths. Native40 is unchanged; retain
+paired40 rollback and qualify actual AE addition. No tests requested/run.
+
 Owner: primary agent, current card after P-03 fix a624455/build39 compilation.
 Implementation candidate: build40 compiled cleanly with May2023 SDK /MT;
 JS/JSX syntax and patch whitespace pass. No tests requested/run. Actual AE

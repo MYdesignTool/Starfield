@@ -1,5 +1,17 @@
 # Starfield plug-in architecture
 
+## M3-09 / panel41 - curve scopes and atomic node calls
+
+Native curve names are explicit entries bound to Over Life or Rotation Properties;
+scalar Particle Opacity resolves in Particle Properties. This separates duplicate
+public names while keeping native40 IDs/layout intact. Node panel mutations load
+and call the gateway in one evalScript turn and validate generation in requests/
+replies. Frequent read operations reuse a matching generation. Existing timeout,
+pinned identity, revision and graph confirmation/rollback guards remain in place.
+The owner-reported Rotation Curve Count is not in current source; stale runtime
+origin is a hypothesis, pending owner-visible evidence. No native rebuild, host
+cache/settings or protocol-version change accompanies this panel-only update.
+
 ## M3-09 / build40 - editor catalogs and four curve modes
 
 Independent numeric data in schema/editor-presets.json generates native and CEP
