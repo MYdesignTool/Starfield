@@ -1,5 +1,20 @@
 # Behavior inventory
 
+## M3-09 / native43 qualification
+
+Owner panel42/native40 reports most functionality working and presets applying,
+but Size interpolation button fails at animation binding (parameter36,
+stream-1,error516). No individual preset list or exhaustive gate results supplied.
+Inspection identifies Draw's64-knot bank exceeding read_binding_record's old81
+field cap; the stage/stream report agrees with rejection before alias installation.
+Native43 ties record writer/count/index read limits to each current node layout.
+Particle7/base442, Force3/base140, Emitter7/base34 and panel42 stay intact.
+Candidate compilation/patch review are separate from actual AE qualification.
+May2023 SDK /MT full build and patch whitespace pass, with no compiler diagnostics.
+No tests requested/run. Pending owner checks: Linear/Hold/Bezier/Draw cycle on
+Size/Opacity/Rotation,64-sample freehand, Flip, native presets with dense curves,
+undo and reopen. Preset application has a reported pass; native43 clicks pending.
+
 ## M3-09 / panel42 qualification
 
 Owner panel41 rejects effect addition: missing Size under Over Life, with marker

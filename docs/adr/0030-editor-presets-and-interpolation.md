@@ -88,3 +88,17 @@ atomic request/reply generation guards stay intact; ready token derives from
 the gateway version. Advance only the21-file CEP bundle to42, keep native40 and
 retain paired41 rollback. No persistence/schema/ABI or native UI changes.
 Actual effect addition and preset/editor readback remain owner gates.
+
+## Native43: dense constant bank binding records
+
+Owner reports panel42/native40 presets working but Size mode clicks failing at
+animation binding, parameter36/stream-1/error516. Draw produces64 knots while
+read_binding_record still caps all node records at81 fields. The inspected
+writer already emits expanded banks; rejection occurs before alias installation.
+Use the existing per-kind base_parameter_count for both writer and reader
+count/index bounds (34/442/140). Preserve duplicate, type, alias-capacity,
+finite-value and byte/version guards. Constant dense knots remain unbound.
+No wire, schema, disk ID, main26, Core ABI3, snapshot3 or Render.hpp change;
+no migration needed. Retain panel42. Packed native version advances to32811/43;
+full AEX installation must wait for AE closed and save paired native40/panel42
+rollback. Actual four-mode/Draw/undo/reopen remains an owner qualification gate.

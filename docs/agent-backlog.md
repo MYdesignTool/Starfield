@@ -2,6 +2,17 @@
 
 ## M3-09 - Editor curve/color presets and interpolation
 
+Current owner follow-up: panel42 most functions and preset application pass;
+native mode click still fails animation binding, parameter36/stream-1/error516.
+Native43 owns NativeNodeGraph binding writer/reader bounds, PluginVersion and
+ADR0030/build/qualification docs. Draw expands to64 knots; old81-field decode
+limit rejects this valid record. Use per-kind base counts34/442/140 for count
+and index validation, preserve alias/type/version and transaction guards. Panel42
+and native schemas/IDs stay unchanged. Full candidate build, paired40+42 rollback
+and owner AE native-click qualification required. No tests requested/run.
+Candidate May2023 /MT full build and patch whitespace pass without compiler
+diagnostics; artifacts/build43-native.log records compilation. AE clicks pending.
+
 Current owner follow-up: panel41 fails addition at Size under Over Life; the error
 identifies the PF topic2912 as the attempted scope.42 owns root disk-ID matchName
 binding for count/mode/all64 knot slots and Particle scalar Opacity on both read

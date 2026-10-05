@@ -1,5 +1,21 @@
 # Build and host matrix
 
+## M3-09 / native43 candidate - 2026-10-05
+
+Packed version32811/0x802B. Native binding record0x8002/version1 now uses the
+registered per-kind control count instead of retired81: Emitter34, Particle442,
+Force140. Serialization rejects fields outside that node; decoding checks both
+count and indices, retaining duplicate/type/alias/finite/length guards.64-knot
+constant banks keep their existing wire form and do not consume animation slots.
+Native schemas/IDs/main26/CoreABI3/snapshot3 are unchanged; retain panel42.
+
+Candidate build uses May2023 SDK /MT with -NoDistPublish -NoRuntimePublish so the
+running AE installation is retained. Compilation succeeded without compiler
+warnings/errors. Compilation log: artifacts/build43-native.log; patch whitespace
+review passes. The generated editor catalog retains its panel42 bytes.
+No tests requested/run. Prepared paired baseline is under
+artifacts/prepared/m3-09-build43-dense-bindings; actual deployment/AE gates pending.
+
 ## M3-09 / panel42 candidate - 2026-10-05
 
 Deployed at2026-10-05T17:24:38+08:00 from local source

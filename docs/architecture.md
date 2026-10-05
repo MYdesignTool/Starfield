@@ -1,5 +1,18 @@
 # Starfield plug-in architecture
 
+## M3-09 / native43 - dense binding-record limits
+
+Owner panel42/native40 reports working preset application but native Size mode
+switch fails at animation binding, parameter36/stream-1/error516. Draw expands
+the bank to64 knots; binding decode still rejected any node with more than81
+recorded fields. Native43 derives both serialization and readback limits from
+the existing per-kind base_parameter_count: Emitter34/Particle442/Force140.
+Fields stay unique and within their node's authored indices; type, slot capacity,
+finite-value, record length and version checks remain. Dense constant knots use
+no animation aliases. Optional record0x8002/version1, all IDs/native schemas,
+main26, CoreABI3, snapshot3 and renderer contracts remain unchanged. Panel42 is
+retained. Full AEX deployment and actual owner click/Draw qualification required.
+
 ## M3-09 / panel42 - native disk-ID bindings
 
 Owner panel41 evidence reports Size missing from Over Life, whose matchName is

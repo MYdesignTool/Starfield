@@ -359,12 +359,19 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
+        const auto field_limit = native_nodes::base_parameter_count(node.kind);
+        if (field_limit < 1 || static_cast<std::size_t>(field_limit) >= node.fields.size() ||
+            node.fields[0].present) return {};
         for (auto b : node.id.value.bytes) bytes.push_back(static_cast<std::byte>(b));
         append_u16(bytes, static_cast<std::uint16_t>(node.kind));
         std::uint16_t count = 0;
-        for (const auto& field : node.fields) if (field.present) ++count;
-        append_u16(bytes, count);
         for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
+            if (!node.fields[index].present) continue;
+            if (index > field_limit) return {};
+            ++count;
+        }
+        append_u16(bytes, count);
+        for (A_long index = 1; index <= field_limit; ++index) {
             auto& field = node.fields[index]; if (!field.present) continue;
             if (animated_index(node.kind,index)) {
                 field.slot = slot; slot += component_count(field.type);
@@ -402,12 +409,19 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || (kind > 3 || kind == 2) || !read(2, fields) || fields > 81) return false;
+            if (!read(2, kind) || (kind > 3 || kind == 2) || !read(2, fields)) return false;
             node.kind = static_cast<Kind>(kind);
+            // Dense Draw banks have 64 age/value pairs. Their constant fields
+            // belong in the record but do not consume animation alias slots.
+            // Keep writer/reader bounds tied to the current per-kind layout,
+            // rather than the retired Particle81 control count.
+            const auto field_limit = native_nodes::base_parameter_count(node.kind);
+            if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
                 std::uint64_t index{}, type{}, slot{}, reserved{};
-                if (!read(2, index) || index < 1 || index >= node.fields.size() || node.fields[index].present ||
+                if (!read(2, index) || index < 1 || index > static_cast<std::uint64_t>(field_limit) ||
+                    index >= node.fields.size() || node.fields[index].present ||
                     !read(2, type) || type > 3 || !read(2, slot) || !read(2, reserved) || reserved != 0) return false;
                 auto& field = node.fields[index]; field.present = true;
                 field.type = static_cast<node_sync::ValueKind>(type);

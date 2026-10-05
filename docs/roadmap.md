@@ -1,5 +1,13 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-09 / native43 - finish four-mode native clicks
+
+Owner reports most panel42 functions and preset application working; native
+Size mode cycling remains blocked at animation binding. Replace the obsolete81
+field limit with current per-kind layout bounds on record writer and reader.
+Retain panel42 and value/schema contracts. Qualify mode cycle through Draw,
+freehand/Flip and all Particle banks before accepting this repair on main31.
+
 ## M3-09 / panel42 - correct failed topic scoping
 
 Owner panel41 addition fails at Size under PF topic Over Life. Bind all native
