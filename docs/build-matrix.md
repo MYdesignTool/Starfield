@@ -10,7 +10,32 @@ artifacts/build46-native.log. Changed JS/JSX and paired deployment-wrapper synta
 pass. No tests requested/run; no AE Motion Blur execution is claimed from compilation.
 The21-file panel45 baseline is saved and hash verified under
 artifacts/prepared/m3-10-build46-motion-blur. Paired native45/panel45 backup name:
-m3-10-build46-motion-blur-20261005. Deployment receipt follows after installation.
+m3-10-build46-motion-blur-20261005.
+
+Source63224b063a1acbcffd31e2b818d0fe1ded40ce60 is installed at 2026-10-05T20:20:13.9485984+08:00
+after fresh read-only checks confirmed neither AfterFX nor AfterFX_64 running.
+Six installed/saved binary hashes and all21 paired CEP files are verified. The
+single existing Starfield -> dist Junction is retained. Current Core selector:
+StarfieldCore-67728453FAE5A1C7.dll. No rollback performed; the paired restore report
+passes. Receipts: artifacts/build46-deploy-before.json, build46-deploy-after.json,
+build46-deploy.log and build46-rollback-report.log. The source implementation is
+locally committed; no remote upload performed. AE execution remains unverified.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | 1B41FF6751DEE6AB4624AF639E9C17A709D7FBCAB261E88B8BDFC023AFB35AD0 |
+| StarfieldEmitter.aex | 5B24474CFA67727911B0FA38A109896ABB013BC66E9594924D6FF2EBDA315138 |
+| StarfieldParticleNode.aex | 1FDBEA32DED680640DC2D6DC3E2DFA68FE81939C68334A99D39F99BBC94011E8 |
+| StarfieldForce.aex | 437977F10D961ADC46D01AF412237FFBDAE0F05FE7AEBF7F2AF048AB7061623E |
+| StarfieldHost.aex | 2DD79D484C2553429E43CDE45A07E550EB78A83C9763E9C22236526A3BC12217 |
+| StarfieldCore.dll | 67728453FAE5A1C76EA7F7D7A63C2A337B3014DF054767D75E9AAADBB75D7C12 |
+
+With AE closed, restore the paired native45/panel45 bundle in one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-10-build46-motion-blur-20261005' -Restore
+```
+
 No process, registry, cache, host-wide switch or Junction change.
 
 ## M3-09 / native45 + panel45 candidate - 2026-10-05

@@ -14,6 +14,8 @@ rational scale (up to microseconds, reduced for large absolute clocks).
 
 May2023 /MT build, generated CUDA PTX, changed JS/JSX and deployment-wrapper syntax
 and patch whitespace are recorded in build-matrix. No tests requested/run.
+Source63224b0 is deployed as native46/panel46. Native/Core and all21 paired CEP
+hashes are verified; native45/panel45 rollback passes the read-only restore report.
 Actual owner AE2023 qualification remains open:
 
 - Off preserves the prior frame; On gives visible trails with moving particles.

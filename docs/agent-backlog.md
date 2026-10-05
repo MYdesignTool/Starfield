@@ -23,6 +23,9 @@ and qualify actual AE visuals/performance with the owner. No process/registry ch
 Implementation includes CPU/GPU exposure averaging, one temporal plan per shutter,
 pre-render camera sampling, mode UI and all native/CEP render-setting roundtrips.
 Main27/build46/CEP46 compile and syntax evidence are recorded in build-matrix.
+Source63224b0 is installed as native46/panel46; six native/Core and21 paired CEP
+hashes and read-only rollback verification pass. Backup:
+artifacts/disabled/m3-10-build46-motion-blur-20261005.
 Actual AE qualification remains open. Native45 behavior is accepted qualitatively.
 
 ## M3-09 - Editor curve/color presets and interpolation
