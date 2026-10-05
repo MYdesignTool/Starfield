@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-38";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-39";
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
         var bridge=window.__adobe_cep__;

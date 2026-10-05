@@ -19,6 +19,17 @@ before the next deployment; main remains owner-accepted build31.
 
 ## P-03 - Main picture launcher and preset manager
 
+Build39 follow-up (2026-10-05): owner build38 reports Warm Sparks failing to write
+the dynamically hidden Color Gradient and Orbital Drift failing graph readback.
+Own NodeEffects guard flags/NodeGraphSync visibility plus gateway/graph_edits/
+graph_transactions and paired version/docs. Supervise Panel Sync Guard, unhide
+conditional gradient/Size Y synchronously during guarded writes and restore in
+finally. Canonicalize absent Rotation Over Life to two zero points and expose
+specific readback differences without weakening schema/topology/value checks.
+No tests requested or run. Native AE verification remains an owner gate.
+Subsequent owner request is a separate editor preset card: no directory replica;
+entry points belong to Color Gradient and Over Life's Presets buttons.
+
 Build38 follow-up: owner supplies precise Updated project Particle2/expected6
 failure and rejects build37 title painting. Own the preset bridge lifecycle:
 atomic gateway load/invocation, request/reply generation checks and paired38

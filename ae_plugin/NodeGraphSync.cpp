@@ -221,8 +221,14 @@ PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) 
        suites.pf_interface->AEGP_GetNewEffectForEffect(plugin,data->effect_ref,&scope.effect) || !scope.effect)return PF_Err_NONE;
     // PF_PUI_INVISIBLE is not dynamically mutable through PF_UpdateParamUI in
     // AE. Use the documented non-undoable HIDDEN stream flag for UI visibility.
-    for(auto [index,hidden]:{std::pair{layout::gradient,params[layout::color_mode]->u.pd.value==1},
-                             std::pair{layout::size_y,params[layout::shape]->u.pd.value==1}}) {
+    const auto* guard=params[starfield::adapter::native_nodes::sync_guard_index(
+        starfield::adapter::native_nodes::Kind::particle)];
+    const bool syncing=guard && guard->param_type==PF_Param_FLOAT_SLIDER && guard->u.fs_d.value!=0;
+    // ExtendScript cannot set a dynamically hidden property. The supervised
+    // guard opens the conditional controls synchronously for the complete batch;
+    // resetting it in the gateway's finally block restores mode-based visibility.
+    for(auto [index,hidden]:{std::pair{layout::gradient,!syncing && params[layout::color_mode]->u.pd.value==1},
+                             std::pair{layout::size_y,!syncing && params[layout::shape]->u.pd.value==1}}) {
         AEGP_StreamRefH ref{};
         if(scope.streams->AEGP_GetNewEffectStreamByIndex(plugin,scope.effect,index,&ref) || !ref)continue;
         AEGP_DynStreamFlags flags{};
@@ -237,6 +243,13 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
                                 const PF_UserChangedParamExtra* extra,bool particle_gradient) noexcept {
     if (!in_data || !params || !extra || extra->param_index <= 0 ||
         extra->param_index > kLastParameterIndex) return PF_Err_NONE;
+    if constexpr(kNodeKind==static_cast<std::uint32_t>(starfield::adapter::native_nodes::Kind::particle)) {
+        if(extra->param_index==kSyncGuardIndex) {
+            const auto error=update_native_particle_visibility(in_data,params);
+            if(out_data)out_data->out_flags|=PF_OutFlag_REFRESH_UI;
+            return error;
+        }
+    }
     const PF_ParamDef* guard = params[kSyncGuardIndex];
     if (guard && guard->param_type == PF_Param_FLOAT_SLIDER && guard->u.fs_d.value != 0.0) return PF_Err_NONE;
     const PF_ParamDef* changed = params[extra->param_index];

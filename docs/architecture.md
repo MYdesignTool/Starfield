@@ -1,5 +1,14 @@
 # Starfield plug-in architecture
 
+## P-03 / build39 - guarded writes and semantic readback
+
+The supervised native Panel Sync Guard opens conditional Color Gradient/Size Y
+streams before script writes and restores their mode visibility on reset. It
+does not publish partial authored banks. Missing Rotation Over Life is explicitly
+reset/authored as the native two-point zero curve; confirmation recognizes only
+that canonical default and reports other differences. Native IDs/schema/render
+contracts are retained. Actual AE application remains an owner gate.
+
 ## P-03 / build38 - atomic preset bridge and dial defaults
 
 Owner build37 evidence isolates a retained Particle2 target record; current named

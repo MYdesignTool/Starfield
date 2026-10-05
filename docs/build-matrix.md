@@ -1,5 +1,18 @@
 # Build and host matrix
 
+## P-03 / build39 candidate - 2026-10-05
+
+Warm Sparks' hidden Color Gradient write is owner-confirmed. Supervise Panel Sync
+Guard and synchronously expose the two dynamically conditional Particle streams
+while the gateway writes, restoring visibility on guard reset. Native flat-zero
+Rotation Over Life is now authored/reset canonically and is recognized as the
+only equivalent absent rotation curve. Other confirmation differences identify
+their field/value instead of a generic message. Main26/native schemas/IDs/CoreABI3
+remain unchanged. May2023 SDK /MT candidate-only compilation succeeds without
+compiler warnings/errors; changed scripts pass Node --check. No tests requested
+or run. AE PID33976 was running: candidate is not installed. The owner queues
+reference editor-only curve/color catalogs and Linear/Hold gradient modes next.
+
 ## P-03 / build38 candidate - 2026-10-04
 
 Owner build37 rejects Add (Updated project Particle2/expected6) and the remaining

@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-38";
+    var GATEWAY_BUILD = "native-presets-39";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -514,6 +514,11 @@
 
     function writeNodeCurve(effect, label, bytes) {
         var points = [];
+        // Rotation Over Life's native count has a minimum of two. Never send
+        // zero and rely on AE clamping: the absent graph curve means flat zero.
+        if(label==="Rotation" && (bytes===null || bytes===undefined)) {
+            points=[{age:0,value:0},{age:1,value:0}];
+        }
         if (bytes !== null && bytes !== undefined) {
             if (!(bytes instanceof Array) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 8 ||
                 bytes.length !== 4 + bytes[1] * 16) throw new Error(label + " curve payload is malformed.");

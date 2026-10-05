@@ -184,7 +184,7 @@ PF_Err add_node_identity(PF_InData* in_data) noexcept {
     }
     return add_slider(in_data, "Panel Sync Guard", kSyncGuardId,
                       0.0, 2147483647.0, 0.0, PF_Precision_INTEGER,
-                      kNodeConstantFlags,
+                      kNodeConstantFlags | PF_ParamFlag_SUPERVISE,
                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
 }
 

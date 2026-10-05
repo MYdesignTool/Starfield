@@ -52,6 +52,7 @@
             { key: "16", type: 4, value: 10 }, { key: "17", type: 3, value: 0 },
             { key: "18", type: 5, value: [0,0,0] }, { key: "19", type: 4, value: 0 },
             { key: "20", type: 5, value: [0,0,0] }, { key: "21", type: 4, value: 0 },
+            { key: "27", type: 7, value: defaultRotationCurve() },
             { key: "22", type: 3, value: 0 }, { key: "23", type: 4, value: 0 },
             { key: "24", type: 3, value: 2 }, {key:"25",type:3,value:0},
             {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}
@@ -73,6 +74,12 @@
             view.setFloat64(4+32*i,i,true);
             for(var channel=0;channel<3;channel++) view.setFloat64(12+32*i+8*channel,1,true);
         }
+        return bytes;
+    }
+
+    function defaultRotationCurve() {
+        var bytes=new Uint8Array(36),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;view.setFloat64(20,1,true);
         return bytes;
     }
 

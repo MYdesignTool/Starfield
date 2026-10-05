@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 38: atomic preset gateway dispatch and collapsed native rotation dials.
-#define STARFIELD_VERSION_BUILD 38
-#define STARFIELD_VERSION_PACKED 32806 /* 0x8026 */
+// Build 39: writable guarded gradient banks and canonical rotation readback.
+#define STARFIELD_VERSION_BUILD 39
+#define STARFIELD_VERSION_PACKED 32807 /* 0x8027 */

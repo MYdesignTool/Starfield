@@ -6,6 +6,29 @@ generated picture in the main Effect Controls and a clickable preset manager.
 
 ## Build36 owner feedback
 
+### Build39 follow-up: hidden writes and canonical rotation defaults
+
+Owner build38 shows Warm Sparks blocked by AE's hidden Color Gradient property,
+and Orbital Drift reporting an unconfirmed graph after application. The gateway
+sets Panel Sync Guard but the stream was not supervised; its native callback
+could not synchronously open mode-hidden controls before script setValue calls.
+Register the guard with SUPERVISE, handle its change before the early guarded
+return, and make native conditional visibility honor the guard. Open only the
+Color Gradient and Size Y conditional streams, retaining their registration.
+The gateway's finally reset restores mode/shape visibility even after a failure;
+ordinary UPDATE_PARAMS_UI passes also honor an active guard. No force event
+loops, arbitrary-data scripting writes or persistent host flags are introduced.
+
+Native Rotation Over Life always has at least two knots. The preset planner
+omitted key27, while named native readback includes its default flat-zero bank;
+the old equivalence check rejected that additional field. Author the canonical
+two-point bank in new graph nodes and use the same reset for absent curves rather
+than setting count0 below the native minimum. Only this exact flat-zero default
+is equivalent to absence; nonzero/custom rotation curves are still compared.
+Preserve count/schema/identity/layout/connection and value checking, and report
+the first differing field when readback fails. Other host differences remain
+qualification gates, not silently accepted states.
+
 ### Build38 follow-up: rejected title fix and retained schema evidence
 
 Owner build37 reports `Updated project: particle has unsupported node schema 2;

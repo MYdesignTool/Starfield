@@ -88,8 +88,10 @@
     // AE may round float controls and colors. Missing optional numeric parameters
     // compile to registry defaults. Validate the saved structure and values rather
     // than rejecting an otherwise identical graph solely for its byte encoding.
-    function sameCompiledGraph(expected, actual) {
-        if (expected.nodes.length !== actual.nodes.length || expected.edges.length !== actual.edges.length) return false;
+    function sameCompiledGraph(expected, actual, mismatch) {
+        function reject(message) { if(mismatch)mismatch.message=message;return false; }
+        if (expected.nodes.length !== actual.nodes.length || expected.edges.length !== actual.edges.length)
+            return reject("The saved node or connection count differs.");
         var defaults = { "9": 0, "10": 0 };
         function near(a, b, color) {
             if (typeof a === "number" && typeof b === "number") {
@@ -107,32 +109,49 @@
         var ep = layout.resolve(expected), ap = layout.resolve(actual);
         for (var n = 0; n < expected.nodes.length; n++) {
             var node = expected.nodes[n], saved = actualNodes[node.id];
+            var kind=node.type.substr(node.type.lastIndexOf(".")+1);
             if (!saved || saved.type !== node.type || saved.schemaVersion !== node.schemaVersion ||
-                !near(ep[node.id].x, ap[node.id].x) || !near(ep[node.id].y, ap[node.id].y)) return false;
+                !near(ep[node.id].x, ap[node.id].x) || !near(ep[node.id].y, ap[node.id].y))
+                return reject(kind+": node identity, schema or layout differs.");
             var params = {}, savedParams = {};
             node.parameters.forEach(function (p) { params[p.key] = p; });
             saved.parameters.forEach(function (p) { savedParams[p.key] = p; });
             var keys = Object.keys(params).concat(Object.keys(savedParams));
             for (var p = 0; p < keys.length; p++) {
                 var key = keys[p], a = params[key], b = savedParams[key];
+                var label=kind+" "+((kind==="particle" ? {"7":"Size Over Life","8":"Opacity Over Life","13":"Color Gradient","27":"Rotation Over Life"} :
+                    kind==="force" ? {"9":"Wind and Spin Over Life"} : {})[key] || "parameter "+key);
                 if (!a || !b) {
                     var value = a || b;
+                    // An omitted rotation curve has the same Core meaning as
+                    // the native editor's canonical two-point flat-zero bank.
+                    if(kind==="particle" && key==="27" && value.type===7 && value.value.length===36 &&
+                        value.value[0]===1 && value.value[1]===2 && value.value[2]===0 && value.value[3]===0) {
+                        var flat=new DataView(new Uint8Array(value.value).buffer);
+                        if(flat.getFloat64(4,true)===0 && flat.getFloat64(12,true)===0 &&
+                            flat.getFloat64(20,true)===1 && flat.getFloat64(28,true)===0)continue;
+                    }
                     var fallback = (node.type === "org.starfieldfx.nodes.particle") ?
                         defaults[key] : node.type === "org.starfieldfx.nodes.emitter" ?
                         ({"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":60,"22":0,"23":0,"24":100,"25":0,"26":100,"27":0,"28":0,"29":0,"30":0})[key] :
                         node.type === "org.starfieldfx.nodes.force" ? ({"3":0,"5":0,"6":0,"7":0,"8":0})[key] :
                         node.type === "org.starfieldfx.nodes.output" ? ({"2":0,"3":0,"4":0,"5":100})[key] : undefined;
-                    if (fallback === undefined || value.type !== (key === "17" || key === "23" || (node.type === "org.starfieldfx.nodes.output" && (key === "2" || key === "4")) ? 3 : 4) || value.value !== fallback) return false;
+                    if (fallback === undefined || value.type !== (key === "17" || key === "23" || (node.type === "org.starfieldfx.nodes.output" && (key === "2" || key === "4")) ? 3 : 4) || value.value !== fallback)
+                        return reject(label+": "+(a?"missing from saved controls":"unexpected saved value"));
                 } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.particle" && (key === "27" || key === "13")) || (node.type === "org.starfieldfx.nodes.force" && key === "9"))) {
                     var av = a.value, bv = b.value;
-                    if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1]) return false;
+                    if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1] || av[2]!==bv[2] || av[3]!==bv[3])
+                        return reject(label+": knot count or encoding differs.");
                     var ad = new DataView(new Uint8Array(av).buffer), bd = new DataView(new Uint8Array(bv).buffer);
                     for (var offset = 4; offset < av.length; offset += 8) {
                         var gradient=node.type === "org.starfieldfx.nodes.particle" && key==="13";
-                        if (!near(ad.getFloat64(offset, true), bd.getFloat64(offset, true), gradient && (offset-4)%32!==0)) return false;
+                        var before=ad.getFloat64(offset,true),after=bd.getFloat64(offset,true);
+                        if (!near(before,after,gradient && (offset-4)%32!==0))
+                            return reject(label+": knot field "+((offset-4)/8+1)+" differs ("+before+" → "+after+").");
                     }
                 } else if (a.type !== b.type || !near(a.value, b.value,
-                    (node.type === "org.starfieldfx.nodes.particle") && (key === "1" || key === "2"))) return false;
+                    (node.type === "org.starfieldfx.nodes.particle") && (key === "1" || key === "2")))
+                    return reject(label+": value differs ("+JSON.stringify(a.value)+" → "+JSON.stringify(b.value)+").");
             }
         }
         var edges = {};
@@ -140,7 +159,8 @@
         for (var e = 0; e < expected.edges.length; e++) {
             var edge = expected.edges[e], other = edges[edge.id];
             if (!other || edge.sourceNode !== other.sourceNode || edge.destinationNode !== other.destinationNode ||
-                edge.sourcePort !== other.sourcePort || edge.destinationPort !== other.destinationPort) return false;
+                edge.sourcePort !== other.sourcePort || edge.destinationPort !== other.destinationPort)
+                return reject("The saved connection endpoints differ.");
         }
         return true;
     }
@@ -203,9 +223,11 @@
                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
                     var saved = committed.snapshot;
                     try {
+                        var mismatch={};
                         if (!saved || saved.initialized !== true || saved.revision <= base.revision ||
-                            !sameCompiledGraph(updated, validateSnapshot(saved, codec, maxBytes))) {
-                            callback(failure("graph_snapshot_unconfirmed", "The host acknowledgement did not match the submitted graph."));
+                            !sameCompiledGraph(updated, validateSnapshot(saved, codec, maxBytes),mismatch)) {
+                            callback(failure("graph_snapshot_unconfirmed", "The host acknowledgement did not match the submitted graph. "+
+                                (mismatch.message || "The native graph receipt is not current.")));
                             return;
                         }
                         validateSnapshot(saved, codec, maxBytes);

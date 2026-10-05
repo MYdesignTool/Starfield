@@ -1,5 +1,15 @@
 # Behavior inventory
 
+## P-03 / build39 qualification
+
+Owner build38 confirms schema gating is no longer the reported failure: Warm
+Sparks cannot write a dynamically hidden Color Gradient; Orbital Drift applies
+but fails generic readback confirmation. Build39 adds synchronous guarded native
+visibility, canonical zero rotation defaults and field-specific mismatch evidence.
+May2023 compilation/script syntax pass. No tests are requested/run and this
+candidate is not deployed while AE is running. Actual all-six Add/Replace and
+visibility restoration after failures remain owner gates.
+
 ## P-03 / build38 qualification
 
 Owner build37 reports retained Updated project Particle2/expected6; preset

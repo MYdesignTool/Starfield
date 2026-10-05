@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-03 / build39 - unblock native bank writes
+
+Correct owner-confirmed hidden Color Gradient writes and the inspected missing
+flat rotation default in confirmation. Qualify Warm Sparks/Orbital Drift and
+all six authored presets before moving accepted main. Then implement reference
+Over Life/color palettes at their editor buttons, without recreating folders.
+
 ## P-03 / build38 - qualify atomic preset operations
 
 Close the inspected cached-ready/global-function lifecycle gap with atomic
