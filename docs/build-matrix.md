@@ -2,6 +2,25 @@
 
 ## M3-09 / native45 + panel45 candidate - 2026-10-05
 
+Source9755fc08bb9e3ab6d84afeda2916265d18249cb0 is deployed as native45/panel45
+at 2026-10-05T18:23:15.1239407+08:00 after fresh read-only checks found neither
+AfterFX nor AfterFX_64. Six installed/saved native/Core binaries and all 21
+paired CEP sources are hash verified. Existing single Starfield -> dist Junction
+and Core selector StarfieldCore-15DEAD2027EDB6B4.dll are retained.
+Saved native44/panel42 pair: artifacts/disabled/m3-09-build45-draw-exit-20261005.
+Receipts: artifacts/build45-deploy-before.json, build45-deploy-after.json,
+build45-deploy.log and build45-rollback-report.log. The restore read-only report
+passes; no rollback performed. Actual AE simplification/undo/reopen remains open.
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | 3BBE4B5BF82310CDA59E91D7ECC019B03D3A8223B80582411D1ACD2C7A2A1C96 |
+| StarfieldEmitter.aex | 27A1F936717B29CE556B126BB0885AE628F4CFA8DB8B6122B06AA322D06DA8B2 |
+| StarfieldParticleNode.aex | 20C2E541C82135782DF568496DEF41CE221B976FE7F59DAF6D7AA0184F1636C2 |
+| StarfieldForce.aex | B4FA44205685B74A0AB5B83AE1F3FDCD1435428DE732B6FB1EC824819C3A5732 |
+| StarfieldHost.aex | EEBC7423893B431E293CF071E1A1F6121F9F5E3034E65412669135F10FFFF267 |
+| StarfieldCore.dll | 15DEAD2027EDB6B466E187157D2FF24585CA60D99BD6F6A5BE82A5C6A98D18FF |
+
 Mode-button Draw -> Linear simplifies to at most 12 handles, keeping endpoints
 and the overall shape. Split the largest vertical error until below 4% of the
 source range or the budget is reached; complex strokes can exceed this target.
@@ -10,7 +29,7 @@ Native packed version32813/0x802D, CEP bundle0.1.0.45/extensions0.1.45 and gatew
 resource markers45. Main26, Particle7, Force3, ABI3 and snapshot3 are unchanged.
 Full May2023 /MT native compilation passes without C++ or MSBuild diagnostics;
 log: artifacts/build45-native.log. Changed JS/JSX and deployment-wrapper syntax
-and patch whitespace pass. No tests requested/run. Deployment pending; all 21 panel42 baseline
+and patch whitespace pass. No tests requested/run. Deployment complete; all 21 panel42 baseline
 files are saved and hash verified under artifacts/prepared/m3-09-build45-draw-exit.
 Save native44/panel42 for paired rollback before installation. Owner accepts
 native44 performance qualitatively; mode-switch/undo/reopen qualification open.

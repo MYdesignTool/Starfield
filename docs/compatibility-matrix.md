@@ -10,7 +10,10 @@ the samples to at most 12 significant handles, preserving endpoints and targetin
 Native Size/Opacity/Rotation and both CEP
 mode-handler paths share these semantics. Preset/paste paths remain explicit.
 No tests requested/run. Full May2023 /MT candidate compilation, changed JS/JSX,
-deployment-wrapper syntax and patch whitespace pass. Deployment pending. Actual AE checks remain:
+deployment-wrapper syntax and patch whitespace pass. Source9755fc0 is deployed
+as native45/panel45; six native/Core and 21 paired CEP entries are hash verified.
+Retained native44/panel42 rollback passes the read-only restore report.
+Actual AE checks remain:
 Draw -> Linear retains the main peaks/valleys with few handles, ordinary transitions preserve manually authored
 knots, undo restores the Draw curve, and save/reopen preserves the chosen mode.
 

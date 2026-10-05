@@ -15,6 +15,9 @@ with AE closed. No tests requested/run; compilation and AE behavior are separate
 Full May2023 /MT candidate and changed JS/JSX/deployment-wrapper syntax pass.
 Log: artifacts/build45-native.log; no compiler diagnostics. Patch whitespace
 passes. The 21-file panel42 rollback baseline is prepared and hash verified.
+Source9755fc0 is deployed as native45/panel45; six installed/saved binary hashes
+and all 21 CEP sources verified with retained native44/panel42 rollback. Owner
+AE Draw -> Linear shape/handle count and undo/reopen qualification remains open.
 
 Current owner follow-up: native43 is usable, but a Draw edit waits nearly ten
 seconds before composition rendering. Native44 owns ParticleGradientUI,
