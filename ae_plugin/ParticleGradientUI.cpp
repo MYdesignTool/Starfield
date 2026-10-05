@@ -1,5 +1,6 @@
 #include "ParticleGradientUI.hpp"
 #include "GradientEditorModel.hpp"
+#include "CurveEditorModel.hpp"
 #include "ParticleLayout.hpp"
 #include "EditorPresetPicker.hpp"
 #include "starfield/core/AgeCurve.hpp"
@@ -393,6 +394,8 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
             if(value.interpolation==core::CurveInterpolation::draw) {
                 value.count=static_cast<std::uint8_t>(core::kMaxAgeCurvePoints);
                 for(unsigned i=0;i<value.count;++i){const auto age=double(i)/(value.count-1);value.points[i]={age,core::evaluate_age_curve(source,age,100,100)};}
+            } else if(source.interpolation==core::CurveInterpolation::draw) {
+                value=curve_editor::simplify_draw(source);
             }
             state.selected=0;changed=true;
         } else if(b.inside(h,v,b.width+8,23,59,21)) {

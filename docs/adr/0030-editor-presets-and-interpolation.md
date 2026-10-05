@@ -130,3 +130,22 @@ new value proof at edit time; render-time validation remains unchanged. No globa
 readiness cache is added. Advance only packed native version to 32812/build44,
 retain panel42 and save paired native43/panel42 rollback. Full AEX compilation
 and deployment do not establish an AE latency target; owner timing is required.
+
+## Native45/panel45: simplify Draw on return to Linear
+
+Owner reports native44 performance basically normal and rejects the dense Linear
+handles produced by leaving Draw. The owner then clarifies that the overall
+shape must remain, without retaining every sample. The mode button cycles Draw
+-> Linear by preserving endpoints and repeatedly splitting the segment with the
+largest vertical deviation from the source. Stop when all deviations are within
+4% of the source value range (minimum tolerance 1e-6) or at 12 handles. This is
+a bounded editing approximation, not a wire limit or exact shape guarantee;
+noisy/complex curves can exceed the error target when the budget is reached.
+Native CurveEditorModel and CEP implement the same deterministic policy.
+Native Particle Size/Opacity/Rotation and CEP curve mode
+handlers apply the same rule. Keep explicit preset/paste point data and other
+mode transitions; the existing atomic publication/undo can restore the Draw bank.
+Keep build44 stroke drafting and binding optimizations. No schema, parameter ID,
+wire or ABI change. Advance native packed version to32813/build45 and CEP bundle/
+gateway/cache markers to45; retain paired native44/panel42 rollback. Compilation
+does not qualify actual mode switching, undo or reopen. No tests requested/run.

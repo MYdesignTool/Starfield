@@ -1,5 +1,20 @@
 # Starfield plug-in architecture
 
+## M3-09 / native45 + panel45 - simplify Draw for Linear editing
+
+Owner reports native44 Draw performance basically normal, but its samples become
+an unwanted dense set of Linear handles. A mode-button transition from Draw to
+Linear simplifies samples to at most 12 handles, preserving endpoints and the
+overall shape. The owner's clarification requires approximate shape preservation.
+CurveEditorModel and the CEP helper split the segment with the largest vertical
+deviation until below 4% of the source value range or the handle budget is reached.
+The budget can leave larger errors on complex/noisy strokes; exact parity is not
+claimed. Native Particle Size/Opacity/Rotation and CEP editors use this rule. Other mode transitions
+and explicit preset/paste operations retain their authored points. Atomic bank
+publication, rollback and build44 stroke performance behavior are retained.
+No disk ID, schema, wire, Render.hpp or Core ABI change. Advance AEX to45 and the
+21-file CEP bundle/cache/gateway markers to45; save native44/panel42 for rollback.
+
 ## M3-09 / native44 - Draw stroke publication
 
 Draw owns a CPU-only 64-sample draft keyed by UI context, native node UUID and

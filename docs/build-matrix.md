@@ -1,5 +1,27 @@
 # Build and host matrix
 
+## M3-09 / native45 + panel45 candidate - 2026-10-05
+
+Mode-button Draw -> Linear simplifies to at most 12 handles, keeping endpoints
+and the overall shape. Split the largest vertical error until below 4% of the
+source range or the budget is reached; complex strokes can exceed this target.
+Native and CEP implementations use the same deterministic rule.
+Native packed version32813/0x802D, CEP bundle0.1.0.45/extensions0.1.45 and gateway/
+resource markers45. Main26, Particle7, Force3, ABI3 and snapshot3 are unchanged.
+Full May2023 /MT native compilation passes without C++ or MSBuild diagnostics;
+log: artifacts/build45-native.log. Changed JS/JSX and deployment-wrapper syntax
+and patch whitespace pass. No tests requested/run. Deployment pending; all 21 panel42 baseline
+files are saved and hash verified under artifacts/prepared/m3-09-build45-draw-exit.
+Save native44/panel42 for paired rollback before installation. Owner accepts
+native44 performance qualitatively; mode-switch/undo/reopen qualification open.
+
+After installation, with AE closed, the paired native44/panel42 rollback is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-build45-draw-exit-20261005' -Restore
+```
+
+
 ## M3-09 / native44 candidate - 2026-10-05
 
 Source6774b2fa6704f4238c897bde796601db2d2850c8 is deployed as native44/panel42

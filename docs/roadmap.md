@@ -1,5 +1,15 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-09 / native45 + panel45 - sparse Linear after Draw
+
+Owner accepts build44 performance qualitatively; no measured timing is supplied.
+Draw -> Linear should simplify the curve while keeping its overall shape, as
+clarified by the owner. Keep endpoints and the most significant deviations,
+using a 4% relative error target and at most 12 handles. Apply this to native and CEP
+mode buttons, preserving explicit presets/paste and other mode transitions.
+Compile and deploy with paired native44/panel42 rollback; owner mode-switch,
+undo/reopen and the remaining prior qualification gates are still required.
+
 ## M3-09 / native44 - reduce Draw edit latency
 
 Owner reports native43 usable, with nearly ten seconds spent on a Draw edit

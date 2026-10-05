@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-42";
+    var GATEWAY_BUILD = "native-presets-45";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -1198,7 +1198,7 @@
         var value=document.createElement("input");value.type="number";value.min=-32768;value.max=32768;value.step=.1;value.setAttribute("aria-label","Rotation degrees");
         var fields=document.createElement("div");fields.className="gradient-controls";fields.appendChild(life);fields.appendChild(value);section.appendChild(fields);
         var rotationClipboard=window.StarfieldRotationClipboard;
-        var mode=button(window.StarfieldCurveTools.modes[points.interpolation||0],function(){var next=((points.interpolation||0)+1)%4;if(next===3)points=window.StarfieldCurveTools.dense(points);else points.interpolation=next;selected=0;commit();});
+        var mode=button(window.StarfieldCurveTools.modes[points.interpolation||0],function(){points=window.StarfieldCurveTools.cycle(points);selected=0;commit();});
         button("Flip",function(){points.reverse().forEach(function(p){p.age=1-p.age;});selected=points.length-1-selected;commit();});
         button("Copy",function(){window.StarfieldRotationClipboard=copyCurvePoints(points);paste.disabled=false;});
         var paste=button("Paste",function(){if(window.StarfieldRotationClipboard){points=copyCurvePoints(window.StarfieldRotationClipboard);selected=0;commit();}});paste.disabled=!rotationClipboard;
@@ -1254,8 +1254,8 @@
         var tools=window.StarfieldCurveTools;
         function editButton(label,fn){var button=document.createElement("button");button.textContent=label;button.addEventListener("click",function(){if(!state.pending)fn();});actions.appendChild(button);return button;}
         var interpolation=editButton(tools.modes[curve.points.interpolation||0],function(){
-            var current=currentCurveState(kind)[kind],points=copyCurvePoints(current.points),next=((points.interpolation||0)+1)%4;
-            if(next===3)points=tools.dense(points);else points.interpolation=next;applyCurveChanges(kind,points,true);
+            var current=currentCurveState(kind)[kind],points=tools.cycle(current.points);
+            applyCurveChanges(kind,points,true);
         });interpolation.disabled=!state.graphMode;
         if(state.graphMode){
             editButton("Flip",function(){var points=copyCurvePoints(currentCurveState(kind)[kind].points);points.reverse().forEach(function(p){p.age=1-p.age;});applyCurveChanges(kind,points,true);});

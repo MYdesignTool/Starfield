@@ -2,6 +2,20 @@
 
 ## M3-09 - Editor curve/color presets and interpolation
 
+Current owner follow-up: build44 Draw performance is basically normal, but
+Draw -> Linear exposes all 64 samples as unwanted handles. Build45 owns
+ParticleGradientUI, new CurveEditorModel, PluginVersion, CEP curve_editor/panel mode handlers, shared
+bundle/cache/gateway version markers and ADR0030/build/qualification docs.
+The owner clarifies that the overall shape must remain. Simplify by the largest
+vertical deviation, preserving endpoints with a 4% relative error target and
+at most 12 handles; the cap can leave larger errors on complex strokes. Preserve
+other mode transitions, presets/paste, build44 latency changes and atomic undo.
+No schema/ID/ABI change. Save native44/panel42 and deploy native45/panel45 only
+with AE closed. No tests requested/run; compilation and AE behavior are separate.
+Full May2023 /MT candidate and changed JS/JSX/deployment-wrapper syntax pass.
+Log: artifacts/build45-native.log; no compiler diagnostics. Patch whitespace
+passes. The 21-file panel42 rollback baseline is prepared and hash verified.
+
 Current owner follow-up: native43 is usable, but a Draw edit waits nearly ten
 seconds before composition rendering. Native44 owns ParticleGradientUI,
 NativeNodeGraph, PluginVersion and ADR0030/build/qualification docs. Keep the

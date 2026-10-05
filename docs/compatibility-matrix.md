@@ -1,5 +1,19 @@
 # Behavior inventory
 
+## M3-09 / native45 + panel45 qualification
+
+Owner reports native44 performance basically normal, without measured timings.
+The supplied screenshot confirms dense visible handles after Draw -> Linear.
+The owner clarifies that the overall shape should remain. Native45/panel45 reduces
+the samples to at most 12 significant handles, preserving endpoints and targeting
+4% relative vertical error (the cap can exceed that target on noisy curves).
+Native Size/Opacity/Rotation and both CEP
+mode-handler paths share these semantics. Preset/paste paths remain explicit.
+No tests requested/run. Full May2023 /MT candidate compilation, changed JS/JSX,
+deployment-wrapper syntax and patch whitespace pass. Deployment pending. Actual AE checks remain:
+Draw -> Linear retains the main peaks/valleys with few handles, ordinary transitions preserve manually authored
+knots, undo restores the Draw curve, and save/reopen preserves the chosen mode.
+
 ## M3-09 / native44 qualification
 
 Owner reports native43 functionality usable; Draw edits wait nearly ten seconds

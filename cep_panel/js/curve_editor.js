@@ -18,11 +18,39 @@
         return Math.max(Math.min(a.value,b.value),Math.min(Math.max(a.value,b.value),value));
     }
     function dense(points){var result=[];for(var i=0;i<64;i++)result.push({age:i/63,value:sample(points,i/63)});result.interpolation=3;return result;}
+    function simplify(points){
+        var minimum=points[0].value,maximum=minimum,retained=[],i;
+        for(i=0;i<points.length;i++){minimum=Math.min(minimum,points[i].value);maximum=Math.max(maximum,points[i].value);retained.push(false);}
+        var tolerance=Math.max(1e-6,(maximum-minimum)*0.04),count=2;
+        retained[0]=retained[points.length-1]=true;
+        while(count<12){
+            var candidate=points.length,left=0,error=tolerance;
+            for(var right=1;right<points.length;right++){
+                if(!retained[right])continue;
+                var a=points[left],b=points[right];
+                for(i=left+1;i<right;i++){
+                    var point=points[i],amount=(point.age-a.age)/(b.age-a.age),deviation=Math.abs(point.value-(a.value+(b.value-a.value)*amount));
+                    if(deviation>error){candidate=i;error=deviation;}
+                }
+                left=right;
+            }
+            if(candidate===points.length)break;
+            retained[candidate]=true;count++;
+        }
+        var result=[];for(i=0;i<points.length;i++)if(retained[i])result.push({age:points[i].age,value:points[i].value});
+        result.interpolation=0;return result;
+    }
+    function cycle(points){
+        var mode=points.interpolation||0,result;
+        if(mode===3)return simplify(points);
+        var next=(mode+1)%4;if(next===3)return dense(points);
+        result=copy(points);result.interpolation=next;return result;
+    }
     function stroke(points,last,age,value){
         var next=Math.max(0,Math.min(points.length-1,Math.round(age*(points.length-1)))),previous=points[last].value;
         for(var i=Math.min(last,next);i<=Math.max(last,next);i++)points[i].value=last===next?value:previous+(value-previous)*(i-last)/(next-last);
         return next;
     }
     function presets(){return root.StarfieldEditorPresets.curves.map(function(p){var points=p.points.map(function(v){return {age:v[0],value:v[1]};});points.interpolation=p.interpolation;return {name:p.name,points:points};});}
-    root.StarfieldCurveTools={copy:copy,sample:sample,dense:dense,stroke:stroke,presets:presets,modes:["Linear","Hold","Bezier","Draw"]};
+    root.StarfieldCurveTools={copy:copy,sample:sample,dense:dense,cycle:cycle,stroke:stroke,presets:presets,modes:["Linear","Hold","Bezier","Draw"]};
 }(window));
