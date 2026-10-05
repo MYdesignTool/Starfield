@@ -11,6 +11,19 @@ is saved and hash verified under artifacts/prepared/p-02k-build48-cep-performanc
 Paired native46/panel47 backup name: p-02k-build48-cep-performance-20261005.
 Actual AE cursor, live-count lag and preset latency remain owner qualification.
 
+Sourcebb0df2e260ec24d67012d7057d624b1556785370 is installed at
+2026-10-05T21:46:16.5537359+08:00 after fresh checks confirmed neither AfterFX nor
+AfterFX_64 running. All panel JS/gateway JSX syntax, manifest XML parsing, both
+PowerShell wrapper parses and patch whitespace pass (artifacts/build48-source-checks.log).
+Six installed/saved binary hashes match native46; all21 paired CEP files are
+verified. Existing Junction and StarfieldCore-67728453FAE5A1C7.dll selector remain.
+Read-only paired native46/panel47 restore verification passes; no restore or AE
+start/stop performed. Receipts: artifacts/build48-deploy-before.json,
+build48-deploy-after.json, build48-deploy.log and build48-rollback-report.log.
+No registry/cache/shared CEF changes or remote upload. With AE closed, one-step
+restore: `powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/build48-rollback.ps1`.
+Actual wall-clock/cursor measurements remain open; no test suites requested/run.
+
 ## P-03 / native46 + panel47 candidate - 2026-10-05
 
 CEP0.1.0.47/extensions0.1.47 and gateway/resource markers47. Only the CEP snapshot

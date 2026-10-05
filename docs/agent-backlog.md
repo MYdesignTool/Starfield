@@ -18,6 +18,11 @@ revision/record-stamp checks, semantic acknowledgement and paired rollback. No
 tests requested/run; observed host latency and cursor improvement remain owner
 qualification. Source operation counts are not measured timing attribution.
 
+Sourcebb0df2e installed as native46/panel48 with AE absent; six binary/all21 CEP
+hashes and paired native46/panel47 read-only rollback verification pass. Source
+syntax/manifest/wrapper/whitespace gates pass. Implementation and deployment are
+complete; owner idle-cursor, preset latency and refresh/undo qualification remain.
+
 ## M3-10 - Main-effect motion blur
 
 Owner accepts native45/panel45 curve behavior and requests the supplied Motion
