@@ -11,6 +11,8 @@ JS/JSX syntax and patch review are recorded separately from owner AE qualificati
 No tests requested/run. Pending: addition, bootstrap/native readback, scalar
 Opacity vs over-life curve count, all three Particle curves, Force curve, and
 full-system preset Add/Replace.41 is a failed repair, not a supported checkpoint.
+Source8f38c37 is deployed as panel42/native40 with verified paired41 rollback.
+Installation/hash verification is complete; actual AE addition remains open.
 
 ## M3-09 / panel41 qualification
 

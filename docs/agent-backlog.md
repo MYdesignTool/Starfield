@@ -9,6 +9,8 @@ and write paths. Reject the41 topic-as-PropertyGroup assumption. Native40 and
 schemas remain unchanged. Preserve paired41 rollback and qualify actual AE
 effect addition/readback. No tests requested/run. Owned files: gateway, both
 client version markers, manifest/HTML URLs, schema binding policy and docs.
+Source8f38c37 is deployed as panel42/native40; all21 CEP entries and6 native
+files are verified with paired41 rollback. Actual AE repair gate remains open.
 
 Owner follow-up: build40 fails effect/node addition with missing Rotation Curve
 Count. Panel generation41 owns explicit scoped curve bindings and atomic node

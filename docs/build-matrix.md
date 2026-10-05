@@ -2,6 +2,20 @@
 
 ## M3-09 / panel42 candidate - 2026-10-05
 
+Deployed at2026-10-05T17:24:38+08:00 from local source
+8f38c37fe3451e61663d987144e7c0c3760b2b78 after fresh read-only checks found
+neither AfterFX nor AfterFX_64.21 installed/saved CEP sources and6 unchanged
+native40 files are hash-verified. Core selector remains
+StarfieldCore-15DEAD2027EDB6B4.dll; both existing Junctions retain their targets.
+No AE start/stop, cache, registry or host-wide setting changes. Receipt files:
+artifacts/panel42-deploy-before.json, panel42-deploy-after.json, panel42-deploy.log
+and panel42-rollback-report.log. Paired41 restore report passes without rollback.
+One-step undo with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-panel42-flat-curve-ids-20261005' -Restore
+```
+
 Panel-only correction for owner41 missing Size/Over Life report. Native40 files,
 Core selector, Particle7/Force3/main26 and existing Junctions remain unchanged.
 Curve count/mode/all64 knot slots and scalar Opacity resolve by
@@ -11,7 +25,8 @@ the main ready token is derived from the single gateway version constant.
 All bundle versions, bridge generations and HTML resource URLs advance to42.
 
 Prepared baseline: artifacts/prepared/m3-09-panel42-flat-curve-ids contains all21
-hash-verified prior41 CEP sources. Deployment/rollback receipts follow below.
+hash-verified prior41 CEP sources; paired deployed backup is retained under
+artifacts/disabled/m3-09-panel42-flat-curve-ids-20261005.
 JS/JSX syntax, schema JSON/manifest XML parsing and git diff --check pass.
 No native recompilation or tests requested/run; actual AE addition is pending.
 
