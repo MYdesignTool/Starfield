@@ -28,7 +28,7 @@
  */
 /* Birth-position sampling checks out historical parameters. SmartFX tracks
  * those dependencies automatically; optional prefixes require matching all-time states. */
-#define STARFIELD_OUT_FLAGS 0x02008466L  /* WIDE_TIME_INPUT plus implemented COMP DRAW callback */
+#define STARFIELD_OUT_FLAGS 0x06088466L  /* shutter dependencies and implemented UPDATE_PARAMS_UI */
 #define STARFIELD_OUT_FLAGS2 0x0222148AL /* includes native GPU F32 capability; accepted per-device/per-frame */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

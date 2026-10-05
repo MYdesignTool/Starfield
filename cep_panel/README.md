@@ -1,5 +1,12 @@
 # Presets manager (build37)
 
+Native46/panel46 adds main Motion Blur controls and preset render-setting roundtrip.
+Comp Settings is the default; On uses custom Shutter Angle/Phase. Linear and
+Subframe Sample render exposures on CPU/GPU. Nothing/Camera Motion are available;
+PTF is deferred by the owner. Main27 appends616..625/disk1640..1649; native layouts
+and ABI3 remain unchanged. Existing main effects acquire appended AE defaults.
+Actual host qualification is recorded separately in docs/compatibility-matrix.
+
 Up or Folders returns to the category grid; All presets shows every card. Example
 selection is removed from the node editor. Both pages use build37 resource URLs
 and gateway identity to avoid mixing script generations. Preset validation uses

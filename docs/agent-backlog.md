@@ -1,5 +1,30 @@
 # Agent-ready implementation backlog
 
+## M3-10 - Main-effect motion blur
+
+Owner accepts native45/panel45 curve behavior and requests the supplied Motion
+Blur inventory. Owner explicitly defers both PTF disregard choices until Physics
+Time Factor exists. Implement Off / Comp Settings / On; custom Shutter Angle /
+Phase, Linear / Subframe Sample, Levels8, Linear Accuracy70, Opacity Boost0 and
+Disregard Nothing / Camera Motion. Actual exposure rendering on CPU and native
+GPU is required. Read comp/layer switches and comp shutter without modifying them.
+Linear uses stable particle identity and interpolates two endpoint states;
+Subframe evaluates each midpoint. Share historical native captures across samples.
+Accumulate premultiplied floating exposures, normalize once and boost alpha while
+preserving color. Keep cancellation, pixel/ROI guards and bounded memory/work.
+Owned: new MotionBlur source/headers, Graph optional metadata/registry/defaults,
+EmitterHistoryCapture,
+SmartRender, Camera, GpuRender/kernel, Parameters/EffectMain/flags/version, main
+schema, CEP render-settings/preset roundtrip and version markers, build project/
+fingerprint inputs, ADR0031 and architecture/roadmap/qualification docs. Main
+parameter indices append only; native layouts, graph wire, Core ABI3 and snapshot3
+stay unchanged. No tests requested/run. Compile May2023 /MT, save paired45 rollback
+and qualify actual AE visuals/performance with the owner. No process/registry changes.
+Implementation includes CPU/GPU exposure averaging, one temporal plan per shutter,
+pre-render camera sampling, mode UI and all native/CEP render-setting roundtrips.
+Main27/build46/CEP46 compile and syntax evidence are recorded in build-matrix.
+Actual AE qualification remains open. Native45 behavior is accepted qualitatively.
+
 ## M3-09 - Editor curve/color presets and interpolation
 
 Current owner follow-up: build44 Draw performance is basically normal, but

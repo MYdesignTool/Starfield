@@ -1,5 +1,18 @@
 # Build and host matrix
 
+## M3-10 / native46 + panel46 candidate - 2026-10-05
+
+Main manifest27 appends616..625/disk1640..1649. Native packed32814/0x802E,
+CEP0.1.0.46/extensions0.1.46 and gateway/resource markers46. Native layouts,
+Core ABI3, sequence lifecycle and temporal snapshot3/200bytes are retained.
+Full May2023 /MT candidate compilation and generated CUDA PTX pass; log
+artifacts/build46-native.log. Changed JS/JSX and paired deployment-wrapper syntax
+pass. No tests requested/run; no AE Motion Blur execution is claimed from compilation.
+The21-file panel45 baseline is saved and hash verified under
+artifacts/prepared/m3-10-build46-motion-blur. Paired native45/panel45 backup name:
+m3-10-build46-motion-blur-20261005. Deployment receipt follows after installation.
+No process, registry, cache, host-wide switch or Junction change.
+
 ## M3-09 / native45 + panel45 candidate - 2026-10-05
 
 Source9755fc08bb9e3ab6d84afeda2916265d18249cb0 is deployed as native45/panel45

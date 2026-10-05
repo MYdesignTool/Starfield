@@ -41,23 +41,33 @@ SF_KERNEL void starfield_sprite_render(SF_GLOBAL float* output,
     SF_GLOBAL const SfSprite* sprites,SF_GLOBAL const sf_uint* offsets,
     SF_GLOBAL const sf_uint* indices,sf_uint width,sf_uint height,
     sf_uint row_floats,sf_uint tiles_x,sf_uint first_y,sf_uint roi_x,sf_uint roi_y,
-    sf_uint roi_width,sf_uint roi_height,sf_uint straight) {
+    sf_uint roi_width,sf_uint roi_height,sf_uint straight,sf_uint samples,float gain) {
     sf_uint px=SF_X,py=SF_Y+first_y;
     if(px>=width || py>=height) return;
     float r=0.f,g=0.f,b=0.f,a=0.f;
     if(px>=roi_x && py>=roi_y && px-roi_x<roi_width && py-roi_y<roi_height) {
         sf_uint x=px-roi_x,y=py-roi_y;
         sf_uint tile=(y/16)*tiles_x+x/16;
-        for(sf_uint k=offsets[tile];k<offsets[tile+1];k++) {
-            SfSprite s=sprites[indices[k]];
-            if(x<(sf_uint)s.left || y<(sf_uint)s.top || x>=(sf_uint)s.right || y>=(sf_uint)s.bottom) continue;
-            float dx=(float)x+.5f-s.x,dy=(float)y+.5f-s.y;
-            float alpha=sf_coverage(s.shape,dx*s.ia+dy*s.ib,dx*s.ic+dy*s.id,s.edge,s.feather)*s.opacity;
-            if(alpha<=0.f) continue;
-            float rem=1.f-alpha;
-            r=s.r*alpha+r*rem;g=s.g*alpha+g*rem;b=s.b*alpha+b*rem;a=alpha+a*rem;
+        sf_uint stride=tiles_x*((roi_height+15)/16)+1;
+        for(sf_uint sample=0;sample<samples;++sample) {
+            float sr=0.f,sg=0.f,sb=0.f,sa=0.f;
+            sf_uint base=sample*stride;
+            for(sf_uint k=offsets[base+tile];k<offsets[base+tile+1];k++) {
+                SfSprite s=sprites[indices[k]];
+                if(x<(sf_uint)s.left || y<(sf_uint)s.top || x>=(sf_uint)s.right || y>=(sf_uint)s.bottom) continue;
+                float dx=(float)x+.5f-s.x,dy=(float)y+.5f-s.y;
+                float alpha=sf_coverage(s.shape,dx*s.ia+dy*s.ib,dx*s.ic+dy*s.id,s.edge,s.feather)*s.opacity;
+                if(alpha<=0.f) continue;
+                float rem=1.f-alpha;
+                sr=s.r*alpha+sr*rem;sg=s.g*alpha+sg*rem;sb=s.b*alpha+sb*rem;sa=alpha+sa*rem;
+            }
+            r+=sr;g+=sg;b+=sb;a+=sa;
         }
     }
+    r/=samples;g/=samples;b/=samples;a/=samples;
+    float adjusted=sf_clamp(a*gain);
+    if(a>0.f) {float scale=adjusted/a;r*=scale;g*=scale;b*=scale;}
+    a=adjusted;
     if(straight && a>0.f) {r/=a;g/=a;b/=a;}
     // AE's GPU format is BGRA128, unlike CPU PF_PixelFloat's ARGB layout.
     unsigned long long address=(unsigned long long)py*row_floats+(unsigned long long)px*4;

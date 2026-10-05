@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 45: simplify Draw into a few Linear handles, keeping the overall shape.
-#define STARFIELD_VERSION_BUILD 45
-#define STARFIELD_VERSION_PACKED 32813 /* 0x802D */
+// Build 46: main-effect CPU/GPU shutter exposure and camera sampling.
+#define STARFIELD_VERSION_BUILD 46
+#define STARFIELD_VERSION_PACKED 32814 /* 0x802E */

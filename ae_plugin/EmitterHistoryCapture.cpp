@@ -17,6 +17,17 @@ namespace starfield::adapter {
 namespace {
 std::mutex history_trace_mutex;
 NativeHistoryTrace history_trace;
+bool static_history_eligible(const core::Graph& graph) {
+    for(const auto& node:graph.nodes) {
+        if(node.type_key==core::graph_keys::kEmitterNode) {
+            for(const auto& p:node.parameters)
+                if((p.key==core::graph_keys::kEmittingMode || p.key==core::graph_keys::kAuxiliarySource) && std::get<std::uint32_t>(p.value)!=0)return false;
+        } else if(node.type_key==core::graph_keys::kParticleNode) {
+            for(const auto& p:node.parameters)if(p.key==core::graph_keys::kLifeRandom && std::get<double>(p.value)!=0)return false;
+        } else if(node.type_key!=core::graph_keys::kOutputNode)return false;
+    }
+    return true;
+}
 struct TraceScope {
     NativeHistoryTrace trace;
     std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
@@ -135,6 +146,64 @@ public:
 NativeHistoryTrace last_native_history_trace() noexcept {
     std::lock_guard lock(history_trace_mutex);return history_trace;
 }
+PF_Err capture_motion_particles(PF_InData* data,PF_OutData* output,const core::Graph& source,
+    A_long width,A_long height,std::span<const core::RationalTime> times,
+    const core::Cancellation& cancellation,std::vector<CapturedParticleFrame>& frames) noexcept try {
+    TraceScope trace(data);
+    if(!data || !data->time_scale || !data->inter.checkout_param || !data->inter.checkin_param || times.size()>64)return PF_Err_BAD_CALLBACK_PARAM;
+    TemporalCapture capture(data,source,cancellation,width,height,trace.trace);
+    auto error=read_native_origin_bindings(source,capture.bindings);if(error)return error;
+    error=read_native_lifetime_bindings(source,capture.lifetimes);if(error)return error;
+    const bool simple=static_history_eligible(source);
+    capture.prepare(simple);
+    const bool ordinary=capture.bindings.empty() || (simple && capture.fully_constant());
+    std::size_t particle_bytes=0;
+    for(const auto time:times) {
+        if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
+        if(time.scale<=0 || time.scale>std::numeric_limits<A_u_long>::max() ||
+            time.value<std::numeric_limits<A_long>::min() || time.value>std::numeric_limits<A_long>::max())return PF_Err_BAD_CALLBACK_PARAM;
+        PF_InData sampled=*data;sampled.current_time=static_cast<A_long>(time.value);sampled.time_scale=static_cast<A_u_long>(time.scale);
+        sampled.time_step=static_cast<A_long>(std::clamp(std::round(double(data->time_step)/data->time_scale*time.scale),1.0,double(std::numeric_limits<A_long>::max())));
+        auto graph=source;
+        double clock=double(time.value)/time.scale;
+        PF_ParamDef enabled{},seconds{};
+        error=PF_CHECKOUT_PARAM(&sampled,kTimeRemapEnabledId,sampled.current_time,sampled.time_step,sampled.time_scale,&enabled);
+        if(error)return error;
+        const bool valid_enabled=enabled.param_type==PF_Param_CHECKBOX;
+        const bool remap=valid_enabled && enabled.u.bd.value;
+        error=PF_CHECKIN_PARAM(&sampled,&enabled);if(error)return error;
+        if(!valid_enabled)return PF_Err_BAD_CALLBACK_PARAM;
+        if(remap) {
+            error=PF_CHECKOUT_PARAM(&sampled,kTimeRemapSecondsId,sampled.current_time,sampled.time_step,sampled.time_scale,&seconds);
+            if(error)return error;
+            const bool valid=seconds.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(seconds.u.fs_d.value);
+            const double value=seconds.u.fs_d.value;
+            error=PF_CHECKIN_PARAM(&sampled,&seconds);if(error)return error;
+            if(!valid)return PF_Err_BAD_CALLBACK_PARAM;clock=value;
+        }
+        for(auto& node:graph.nodes)if(node.type_key==core::graph_keys::kOutputNode)
+            for(auto& p:node.parameters) {
+                if(p.key==core::graph_keys::kTimeRemapEnabled)p.value=std::uint32_t(remap);
+                if(p.key==core::graph_keys::kTimeRemapSeconds)p.value=clock;
+            }
+        const core::EmitterDimensionContext dimensions{double(std::max<A_long>(height,1)),
+            data->pixel_aspect_ratio.den?double(data->pixel_aspect_ratio.num)/data->pixel_aspect_ratio.den:1};
+        auto evaluated=ordinary?core::evaluate_particle_graph(graph,time,cancellation,dimensions):
+            core::evaluate_temporal_particle_graph(graph,time,cancellation,dimensions,capture);
+        if(!evaluated.has_value()) {
+            if(evaluated.error().code==core::ErrorCode::cancelled)return PF_Interrupt_CANCEL;
+            if(output)std::snprintf(output->return_msg,sizeof(output->return_msg),"Starfield shutter sampling: %s (stream %ld).",evaluated.error().detail,long(capture.stream));
+            return capture.error?capture.error:PF_Err_BAD_CALLBACK_PARAM;
+        }
+        particle_bytes+=evaluated.value().particles.size()*sizeof(core::ParticleInstance);
+        if(particle_bytes>256u*1024u*1024u)return PF_Err_OUT_OF_MEMORY;
+        trace.trace.particles+=evaluated.value().particles.size();
+        frames.push_back({time,clock,evaluated.take_value()});
+    }
+    trace.trace.path=ordinary?NativeHistoryPath::static_graph:NativeHistoryPath::temporal;
+    return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::Graph& graph,
     A_long width,A_long height,const core::Cancellation& cancellation) noexcept {
     TraceScope trace(data);
@@ -146,15 +215,7 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
         error=read_native_lifetime_bindings(graph,capture.lifetimes);if(error) return error;
         // The ordinary evaluator selects only the alive slot interval and uses
         // closed-form motion. Never select it from merely equal sample values.
-        bool simple=true;
-        for(const auto& node:graph.nodes) {
-            if(node.type_key==core::graph_keys::kEmitterNode) {
-                for(const auto& p:node.parameters)
-                    if((p.key==core::graph_keys::kEmittingMode || p.key==core::graph_keys::kAuxiliarySource) && std::get<std::uint32_t>(p.value)!=0)simple=false;
-            } else if(node.type_key==core::graph_keys::kParticleNode) {
-                for(const auto& p:node.parameters)if(p.key==core::graph_keys::kLifeRandom && std::get<double>(p.value)!=0)simple=false;
-            } else if(node.type_key!=core::graph_keys::kOutputNode)simple=false;
-        }
+        const bool simple=static_history_eligible(graph);
         capture.prepare(simple);
         if(simple && capture.fully_constant()) {trace.trace.path=NativeHistoryPath::static_graph;return PF_Err_NONE;}
         // Core CPU/GPU path evaluates a certified static graph only once.

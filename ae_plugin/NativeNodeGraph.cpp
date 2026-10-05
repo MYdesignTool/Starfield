@@ -8,6 +8,7 @@
 #include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
 #include "Parameters.hpp"
+#include "MotionBlur.hpp"
 #include "SPBasic.h"
 
 #include "starfield/core/AgeCurve.hpp"
@@ -945,6 +946,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         if(!params[kAccelerationId] || params[kAccelerationId]->param_type!=PF_Param_POPUP ||
             params[kAccelerationId]->u.pd.value<1 || params[kAccelerationId]->u.pd.value>2) return PF_Err_BAD_CALLBACK_PARAM;
         add_value(output,core::graph_keys::kAcceleration,std::uint32_t(params[kAccelerationId]->u.pd.value-1));
+        if(const auto motion_error=append_motion_values(params,output);motion_error)return motion_error;
         for (const auto& binding : {std::pair{kTimeRemapEnabledId, core::graph_keys::kTimeRemapEnabled},
                                    std::pair{kPreviewEnabledId, core::graph_keys::kPreviewEnabled}}) {
             if (!params[binding.first] || params[binding.first]->param_type != PF_Param_CHECKBOX) return PF_Err_BAD_CALLBACK_PARAM;

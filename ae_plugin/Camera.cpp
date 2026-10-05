@@ -40,7 +40,7 @@ struct Suites {
     }
 };
 }
-PF_Err capture_camera(PF_InData* data, SfCoreRenderRequest& request) noexcept {
+PF_Err capture_camera(PF_InData* data, SfCoreRenderRequest& request,const PF_InData* camera_time) noexcept {
     request.camera_enabled = 0;
     if (!data || !data->pica_basicP || !data->pica_basicP->AcquireSuite ||
         !data->pica_basicP->ReleaseSuite) return PF_Err_BAD_CALLBACK_PARAM;
@@ -51,15 +51,18 @@ PF_Err capture_camera(PF_InData* data, SfCoreRenderRequest& request) noexcept {
                                                   reinterpret_cast<const void**>(&suites.layer));
     if (error) return static_cast<PF_Err>(error);
     A_Time time{};
+    A_Time camera_at{};
     A_Matrix4 camera{}, layer{}, view{};
     A_FpLong zoom{};
     A_short width{}, height{};
     AEGP_LayerH effect_layer{}, active_camera{};
     AEGP_LayerFlags flags{};
     error = suites.pf->AEGP_ConvertEffectToCompTime(data->effect_ref, data->current_time, data->time_scale, &time);
-    if (!error) error = suites.pf->AEGP_GetEffectCamera(data->effect_ref, &time, &active_camera);
+    const auto* camera_data=camera_time?camera_time:data;
+    if(!error)error=suites.pf->AEGP_ConvertEffectToCompTime(data->effect_ref,camera_data->current_time,camera_data->time_scale,&camera_at);
+    if (!error) error = suites.pf->AEGP_GetEffectCamera(data->effect_ref, &camera_at, &active_camera);
     if (error) return static_cast<PF_Err>(error);
-    if (!error) error = suites.pf->AEGP_GetEffectCameraMatrix(data->effect_ref, &time, &camera, &zoom, &width, &height);
+    if (!error) error = suites.pf->AEGP_GetEffectCameraMatrix(data->effect_ref, &camera_at, &camera, &zoom, &width, &height);
     // Some host views supply no default camera geometry. Preserve the ordinary
     // layer-space output in that case; an invalid explicit camera remains an error.
     if (!active_camera && (error || !(zoom > 0) || width <= 0 || height <= 0)) return PF_Err_NONE;

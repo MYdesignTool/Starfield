@@ -123,18 +123,20 @@ struct Device {
             runtime.cuMemcpyHtoDAsync(reinterpret_cast<DevicePtr>(buffer),source,bytes,info.command_queuePV) :
             runtime.clEnqueueWriteBuffer(info.command_queuePV,buffer,0,0,bytes,source,0,nullptr,nullptr);
     }
-    int dispatch(void* output,const std::array<void*,3>& buffers,std::array<unsigned,10>& values,unsigned rows) {
+    int dispatch(void* output,const std::array<void*,3>& buffers,std::array<unsigned,11>& values,float gain,unsigned rows) {
         if(info.device_framework==PF_GPU_Framework_CUDA) {
             std::array<DevicePtr,4> ptrs{reinterpret_cast<DevicePtr>(output),reinterpret_cast<DevicePtr>(buffers[0]),
                 reinterpret_cast<DevicePtr>(buffers[1]),reinterpret_cast<DevicePtr>(buffers[2])};
-            std::array<void*,14> args{};
+            std::array<void*,16> args{};
             for(unsigned i=0;i<4;++i) args[i]=&ptrs[i];
-            for(unsigned i=0;i<10;++i) args[i+4]=&values[i];
+            for(unsigned i=0;i<11;++i) args[i+4]=&values[i];
+            args[15]=&gain;
             return runtime.cuLaunchKernel(kernel,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,info.command_queuePV,args.data(),nullptr);
         }
         std::array<void*,4> ptrs{output,buffers[0],buffers[1],buffers[2]};
         for(unsigned i=0;i<4;++i) {const auto err=runtime.clSetKernelArg(kernel,i,sizeof(void*),&ptrs[i]);if(err) return err;}
-        for(unsigned i=0;i<10;++i) {const auto err=runtime.clSetKernelArg(kernel,i+4,sizeof(unsigned),&values[i]);if(err) return err;}
+        for(unsigned i=0;i<11;++i) {const auto err=runtime.clSetKernelArg(kernel,i+4,sizeof(unsigned),&values[i]);if(err) return err;}
+        if(const auto err=runtime.clSetKernelArg(kernel,15,sizeof(float),&gain);err)return err;
         const std::size_t global[2]{values[0],rows};
         // Let each driver choose legal local sizes, including narrow ROI worlds.
         return runtime.clEnqueueNDRangeKernel(info.command_queuePV,kernel,2,nullptr,global,nullptr,0,nullptr,nullptr);
@@ -207,10 +209,10 @@ PF_Err gpu_device_setdown(PF_InData* in,PF_GPUDeviceSetdownExtra* extra) noexcep
     return PF_Err_NONE;
 }
 PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Framework framework,A_u_long index,
-    const SfCoreGpuSceneResult& scene,PF_EffectWorld* output,std::int32_t world_left,std::int32_t world_top,bool straight) noexcept try {
+    const SfCoreGpuSceneResult& scene,PF_EffectWorld* output,std::int32_t world_left,std::int32_t world_top,bool straight,unsigned samples,float gain) noexcept try {
     auto* d=device(data);
     if(!in || !out || !output || !gpu_device_matches(d,framework,index) || scene.status!=SF_CORE_OK ||
-        scene.struct_size!=sizeof(scene) || scene.tile_size!=16) return PF_Err_BAD_CALLBACK_PARAM;
+        scene.struct_size!=sizeof(scene) || scene.tile_size!=16 || samples<1 || samples>64 || !(gain>=1 && gain<=11)) return PF_Err_BAD_CALLBACK_PARAM;
     std::lock_guard lock(d->mutex);
     ContextScope context(d->runtime,framework,d->info.contextPV);
     if(!context.valid) return PF_Err_BAD_CALLBACK_PARAM;
@@ -230,7 +232,7 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     const auto roi_width=std::int64_t(scene.region.right)-scene.region.left,roi_height=std::int64_t(scene.region.bottom)-scene.region.top;
     // Core scene ROI is contained in this world's pixel rectangle. The adapter
     // normalizes host origins/downsampling before dispatching; it passes offsets below.
-    if(scene.sprite_count>2000000 || scene.index_count>32u*1024u*1024u || roi_width<0 || roi_height<0 || roi_width>output->width || roi_height>output->height ||
+    if(scene.sprite_count>8000000 || scene.index_count>32u*1024u*1024u || roi_width<0 || roi_height<0 || roi_width>output->width || roi_height>output->height ||
         scene.tiles_x!=(unsigned(roi_width)+15)/16 || scene.tiles_y!=(unsigned(roi_height)+15)/16 ||
         (scene.sprite_count && !scene.sprites) || (scene.index_count && !scene.tile_indices) ||
         (roi_width && roi_height && !scene.tile_offsets)) return PF_Err_BAD_CALLBACK_PARAM;
@@ -239,15 +241,16 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     if(roi_x<0 || roi_y<0 || roi_x+roi_width>output->width || roi_y+roi_height>output->height) return PF_Err_BAD_CALLBACK_PARAM;
     FrameMemory memory{gpu,in->effect_ref,*d};
     std::array<std::size_t,3> bytes{std::max<std::size_t>(16,std::size_t(scene.sprite_count)*sizeof(SfGpuSprite)),
-        std::max<std::size_t>(16,(std::size_t(scene.tiles_x)*scene.tiles_y+1)*sizeof(std::uint32_t)),
+        std::max<std::size_t>(16,(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*sizeof(std::uint32_t)),
         std::max<std::size_t>(16,std::size_t(scene.index_count)*sizeof(std::uint32_t))};
     const auto total=bytes[0]+bytes[1]+bytes[2];
+    if(total>512u*1024u*1024u)return PF_Err_OUT_OF_MEMORY;
     const auto host_error=gpu.AllocateHostMemory(in->effect_ref,index,total,&memory.pinned);
     if(host_error || !memory.pinned) return host_error?host_error:PF_Err_OUT_OF_MEMORY;
     std::memset(memory.pinned,0,total);
     const void* sources[3]{scene.sprites,scene.tile_offsets,scene.tile_indices};
     const std::size_t sizes[3]{std::size_t(scene.sprite_count)*sizeof(SfGpuSprite),
-        roi_width && roi_height?(std::size_t(scene.tiles_x)*scene.tiles_y+1)*4:0,std::size_t(scene.index_count)*4};
+        roi_width && roi_height?(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*4:0,std::size_t(scene.index_count)*4};
     auto* staging=static_cast<std::byte*>(memory.pinned);
     for(unsigned i=0;i<3;++i) {
         if(sizes[i]) std::memcpy(staging,sources[i],sizes[i]);
@@ -258,12 +261,12 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
         staging+=bytes[i];
     }
     if(d->sync()!=0) return PF_Err_INTERNAL_STRUCT_DAMAGED; // explicit upload dependency, including out-of-order OpenCL queues
-    std::array<unsigned,10> values{unsigned(output->width),unsigned(output->height),unsigned(output->rowbytes/4),
-        scene.tiles_x,0,unsigned(roi_x),unsigned(roi_y),unsigned(roi_width),unsigned(roi_height),straight?1u:0u};
+    std::array<unsigned,11> values{unsigned(output->width),unsigned(output->height),unsigned(output->rowbytes/4),
+        scene.tiles_x,0,unsigned(roi_x),unsigned(roi_y),unsigned(roi_width),unsigned(roi_height),straight?1u:0u,samples};
     for(unsigned y=0;y<values[1];y+=128) {
         const auto interrupted=PF_ABORT(in); if(interrupted) {out->return_msg[0]='\0';return interrupted;}
         values[4]=y;
-        if(d->dispatch(output_buffer,memory.buffers,values,std::min(128u,values[1]-y))!=0 || d->sync()!=0) {
+        if(d->dispatch(output_buffer,memory.buffers,values,gain,std::min(128u,values[1]-y))!=0 || d->sync()!=0) {
             std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield native GPU dispatch failed (%s, device %lu).",
                 framework==PF_GPU_Framework_CUDA?"CUDA":"OpenCL",static_cast<unsigned long>(index));
             return PF_Err_INTERNAL_STRUCT_DAMAGED;

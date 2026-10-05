@@ -36,7 +36,7 @@
             graph.nodes.push({id:output.id,type:"org.starfieldfx.nodes.output",schemaVersion:4,
                 parameters:[{key:"1",type:3,value:output.maxParticles},
                     {key:"2",type:3,value:output.timeRemapEnabled || 0},{key:"3",type:4,value:output.timeRemapSeconds || 0},
-                    {key:"4",type:3,value:output.previewEnabled || 0},{key:"5",type:4,value:typeof output.previewChance === "number" ? output.previewChance : 100},{key:"6",type:3,value:output.acceleration || 0},{key:"7",type:3,value:output.timeSamplingHz || 30}]});
+                    {key:"4",type:3,value:output.previewEnabled || 0},{key:"5",type:4,value:typeof output.previewChance === "number" ? output.previewChance : 100},{key:"6",type:3,value:output.acceleration || 0},{key:"7",type:3,value:output.timeSamplingHz || 30},{key:"8",type:3,value:typeof output.motionBlur === "number" ? output.motionBlur : 1},{key:"9",type:4,value:typeof output.shutterAngle === "number" ? output.shutterAngle : 360},{key:"10",type:4,value:typeof output.shutterPhase === "number" ? output.shutterPhase : 0},{key:"11",type:3,value:typeof output.motionBlurType === "number" ? output.motionBlurType : 0},{key:"12",type:4,value:typeof output.motionBlurLevels === "number" ? output.motionBlurLevels : 8},{key:"13",type:4,value:typeof output.linearAccuracy === "number" ? output.linearAccuracy : 70},{key:"14",type:4,value:typeof output.opacityBoost === "number" ? output.opacityBoost : 0},{key:"15",type:3,value:typeof output.motionBlurDisregard === "number" ? output.motionBlurDisregard : 0}]});
             positions[output.id] = output.position;
             graph = layout.set(graph,positions);
             var bytes = codec.serialize(graph);

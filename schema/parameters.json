@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 26,
-  "schemaVersion": 26,
-  "revisionNote": "Build38 retains the main26/index1/disk1631 NO_DATA picture. Owner evidence rejects build37 title painting as a way to hide AE's disclosure gutter; no public SDK hide flag has been found. Atomic preset gateway dispatch and collapsed angle defaults do not change authored IDs or node schemas. ADR0029/0028.",
+  "manifestVersion": 27,
+  "schemaVersion": 27,
+  "revisionNote": "M3-10 build46 appends Motion Blur controls 616..625/disk1640..1649. Existing native layouts and Core ABI3 remain unchanged. ADR0031.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -35,6 +35,14 @@
       "label": "GPU Rendering",
       "endIndex": 615,
       "endDiskId": 1612
+    },
+    {
+      "index": 616,
+      "diskId": 1640,
+      "label": "Motion Blur",
+      "endIndex": 625,
+      "endDiskId": 1649,
+      "collapsed": true
     }
   ],
   "parameters": [
@@ -1313,6 +1321,119 @@
         1
       ],
       "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
+    },
+    {
+      "id": 617,
+      "diskId": 1641,
+      "key": "motionBlur",
+      "label": "Motion Blur",
+      "type": "popup",
+      "default": 2,
+      "animated": false,
+      "choices": [
+        "Off",
+        "Comp Settings",
+        "On"
+      ],
+      "values": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": 618,
+      "diskId": 1642,
+      "key": "shutterAngle",
+      "label": "Shutter Angle",
+      "type": "float_slider",
+      "default": 360,
+      "animated": true,
+      "min": 0,
+      "max": 720,
+      "collapsed": true
+    },
+    {
+      "id": 619,
+      "diskId": 1643,
+      "key": "shutterPhase",
+      "label": "Shutter Phase",
+      "type": "float_slider",
+      "default": 0,
+      "animated": true,
+      "min": -720,
+      "max": 720,
+      "collapsed": true
+    },
+    {
+      "id": 620,
+      "diskId": 1644,
+      "key": "motionBlurType",
+      "label": "Type",
+      "type": "popup",
+      "default": 1,
+      "animated": false,
+      "choices": [
+        "Linear",
+        "Subframe Sample"
+      ],
+      "values": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": 621,
+      "diskId": 1645,
+      "key": "motionBlurLevels",
+      "label": "Levels",
+      "type": "float_slider",
+      "default": 8,
+      "animated": true,
+      "min": 2,
+      "max": 64,
+      "collapsed": true
+    },
+    {
+      "id": 622,
+      "diskId": 1646,
+      "key": "linearAccuracy",
+      "label": "Linear Accuracy",
+      "type": "float_slider",
+      "default": 70,
+      "animated": true,
+      "min": 1,
+      "max": 100,
+      "collapsed": true
+    },
+    {
+      "id": 623,
+      "diskId": 1647,
+      "key": "opacityBoost",
+      "label": "Opacity Boost",
+      "type": "float_slider",
+      "default": 0,
+      "animated": true,
+      "min": 0,
+      "max": 1000,
+      "collapsed": true
+    },
+    {
+      "id": 624,
+      "diskId": 1648,
+      "key": "motionBlurDisregard",
+      "label": "Disregard",
+      "type": "popup",
+      "default": 1,
+      "animated": false,
+      "choices": [
+        "Nothing",
+        "Camera Motion"
+      ],
+      "values": [
+        0,
+        1
+      ]
     }
   ],
   "nativeRenderBindings": {
@@ -1328,7 +1449,7 @@
   },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Unreleased manifest26 keeps registration indices1..615 and replaces UI-only index1 with untitled NO_DATA/disk1631; create a fresh main effect. Emitter schema7/base34, Particle schema6/base102 and Output schema4 are unchanged from build35. No old-project migration per owner. GPU scene C ABI3 and private SFU1 sequence marker remain unchanged. ADR0028/0029.",
+    "migrationPolicy": "Manifest27 appends main indices616..625/disk1640..1649. Existing streams and IDs remain unchanged; prior main effects acquire appended defaults through AE. Native Emitter7/Particle7/Force3/Output4, Core ABI3 and sequence lifecycle are unchanged. ADR0031.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
@@ -1338,7 +1459,11 @@
     "diskId": 1631,
     "label": "",
     "type": "custom_ui_no_data",
-    "uiFlags": ["PF_PUI_TOPIC", "PF_PUI_CONTROL", "PF_PUI_DONT_ERASE_TOPIC"],
+    "uiFlags": [
+      "PF_PUI_TOPIC",
+      "PF_PUI_CONTROL",
+      "PF_PUI_DONT_ERASE_TOPIC"
+    ],
     "constant": true,
     "uiWidth": 304,
     "uiHeight": 104,

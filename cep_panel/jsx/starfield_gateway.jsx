@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-45";
+    var GATEWAY_BUILD = "native-presets-46";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1245,6 +1245,16 @@
         return { ok: true, nonce: nonce, requestId: requestId || "" };
     }
 
+    var MOTION_FIELDS=["motionBlur","shutterAngle","shutterPhase","motionBlurType","motionBlurLevels","linearAccuracy","opacityBoost","motionBlurDisregard"],
+        MOTION_DEFAULTS=[1,360,0,0,8,70,0,0],MOTION_MIN=[0,0,-720,0,2,1,0,0],MOTION_MAX=[2,720,720,1,64,100,1000,1];
+    function motionPopup(i){return i===0 || i===3 || i===7;}
+    function motionValue(record,i){return typeof record[MOTION_FIELDS[i]]==="undefined"?MOTION_DEFAULTS[i]:record[MOTION_FIELDS[i]];}
+    function motionProperty(effect,i){
+        // Disk IDs avoid the duplicate Motion Blur topic/popup display name.
+        var property=findEffectProperty(effect,MATCH_NAME+"-"+(1641+i),true);
+        if(!property)throw new Error("Main Motion Blur control is missing (disk "+(1641+i)+"). Close AE and install native46/panel46 together.");
+        return property;
+    }
     function validateRendererManifest(record) {
         if (!record || record.id !== "000000000000000000000000000000ff" || !record.position ||
             !isFinite(record.position.x) || !isFinite(record.position.y) ||
@@ -1262,6 +1272,9 @@
         if (typeof record.previewChance!=="undefined" && (typeof record.previewChance!=="number" ||
             !isFinite(record.previewChance) || record.previewChance<0 || record.previewChance>100)) throw new Error("Invalid Output preview percentage.");
         if(typeof record.acceleration!=="undefined" && record.acceleration!==0 && record.acceleration!==1) throw new Error("Invalid Acceleration preference.");
+        for(var m=0;m<8;m++){var number=motionValue(record,m);
+            if(typeof number!=="number" || !isFinite(number) || number<MOTION_MIN[m] || number>MOTION_MAX[m] || (motionPopup(m)&&Math.floor(number)!==number))throw new Error("Invalid Motion Blur control: "+MOTION_FIELDS[m]);
+        }
         return record;
     }
 
@@ -1278,10 +1291,17 @@
                 else property.setValue(values[i]);
             }
         }
+        for(var m=0;m<8;m++){
+            var motion=motionProperty(resolved.target.effect,m),number=motionValue(record,m)+(motionPopup(m)?1:0);
+            if(!sameValue(motion.value,number)){
+                if(motion.numKeys>0 && typeof motion.setValueAtTime==="function")motion.setValueAtTime(resolved.target.comp.time,number);
+                else motion.setValue(number);
+            }
+        }
     }
 
     function readRendererRecord(resolved) {
-        return { id: "000000000000000000000000000000ff",
+        var record = { id: "000000000000000000000000000000ff",
             maxParticles: Number(findEffectProperty(resolved.target.effect, "Max Particles").value),
             timeRemapEnabled:Number(findEffectProperty(resolved.target.effect,"Time Remapping On / Off").value),
             timeRemapSeconds:Number(findEffectProperty(resolved.target.effect,"Time (Seconds)").value),
@@ -1290,6 +1310,8 @@
             acceleration:Number(findEffectProperty(resolved.target.effect,"Acceleration").value)-1,
             timeSamplingHz:[30,60,120][Number(findEffectProperty(resolved.target.effect,"Time Sampling").value)-1],
             position: { x: Number(findEffectProperty(resolved.target.effect, "Layout Output X").value), y: Number(findEffectProperty(resolved.target.effect, "Layout Output Y").value) } };
+        for(var m=0;m<8;m++)record[MOTION_FIELDS[m]]=Number(motionProperty(resolved.target.effect,m).value)-(motionPopup(m)?1:0);
+        return record;
     }
 
     function reconcileNativeRecords(layer) {

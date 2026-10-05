@@ -82,7 +82,7 @@
             return fallback;
         }
         return { id: node.id, position: positions[node.id], maxParticles: value(1,1000000),
-            timeRemapEnabled:value(2,0),timeRemapSeconds:value(3,0),previewEnabled:value(4,0),previewChance:value(5,100),acceleration:value(6,0),timeSamplingHz:value(7,30) };
+            timeRemapEnabled:value(2,0),timeRemapSeconds:value(3,0),previewEnabled:value(4,0),previewChance:value(5,100),acceleration:value(6,0),timeSamplingHz:value(7,30),motionBlur:value(8,1),shutterAngle:value(9,360),shutterPhase:value(10,0),motionBlurType:value(11,0),motionBlurLevels:value(12,8),linearAccuracy:value(13,70),opacityBoost:value(14,0),motionBlurDisregard:value(15,0) };
     }
 
     // AE may round float controls and colors. Missing optional numeric parameters

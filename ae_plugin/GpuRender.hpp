@@ -15,7 +15,7 @@ void record_cpu_execution() noexcept;
 [[nodiscard]] bool gpu_device_matches(const void*,PF_GPU_Framework,A_u_long) noexcept;
 // Never reads or writes PF_LayerDef::data. GPU worlds are borrowed from AE.
 [[nodiscard]] PF_Err render_gpu_scene(PF_InData*,PF_OutData*,const void*,PF_GPU_Framework,
-    A_u_long,const SfCoreGpuSceneResult&,PF_EffectWorld*,std::int32_t world_left,std::int32_t world_top,bool straight) noexcept;
+    A_u_long,const SfCoreGpuSceneResult&,PF_EffectWorld*,std::int32_t world_left,std::int32_t world_top,bool straight,unsigned samples=1,float gain=1) noexcept;
 [[nodiscard]] PF_Err copy_gpu_pixels(PF_InData*,const void*,PF_GPU_Framework,A_u_long,
     PF_EffectWorld* input,PF_EffectWorld* output) noexcept;
 }

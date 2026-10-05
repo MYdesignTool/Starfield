@@ -5,12 +5,12 @@
      arbitrary-data graph parameter directly. -->
 <ExtensionManifest Version="11.0"
                    ExtensionBundleId="org.starfieldfx.panel"
-                   ExtensionBundleVersion="0.1.0.45"
+                   ExtensionBundleVersion="0.1.0.46"
                    ExtensionBundleName="Starfield Particle Controls"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="org.starfieldfx.panel.main" Version="0.1.45" />
-    <Extension Id="org.starfieldfx.panel.presets" Version="0.1.45" />
+    <Extension Id="org.starfieldfx.panel.main" Version="0.1.46" />
+    <Extension Id="org.starfieldfx.panel.presets" Version="0.1.46" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

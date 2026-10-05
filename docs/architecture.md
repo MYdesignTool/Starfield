@@ -1,5 +1,32 @@
 # Starfield plug-in architecture
 
+## M3-10 / native46 + panel46 - main-effect motion blur
+
+Append the main Motion Blur topic and eight controls (indices616..625, disk1640..1649).
+Comp Settings reads the host shutter interval and comp/layer flags. On uses custom
+angle/phase; Off preserves the prior single-frame path. Type selects endpoint
+particle interpolation or actual subframes. Capture one historical native plan
+per exposure and immutable per-sample camera/graph data in pre-render. Core ABI3,
+Render.hpp, snapshot3/200 bytes and native node layouts remain unchanged.
+Output4 gains optional renderer metadata8..15; older authored presets acquire
+defaults before snapshot matching. Native publishing, main checkout and CEP
+roundtrip all include the controls. Disk lookup distinguishes the Motion Blur
+topic from its popup. Main27/build46/CEP46 replace main26/build45/CEP45.
+
+CPU averages complete float premultiplied samples before depth conversion. CUDA
+and OpenCL composite each ordered tile list independently, then average; opacity
+boost changes alpha while preserving color. Camera disregard freezes camera time
+and retains sampled layer transforms. Nominal image-to-layer mapping applies to
+every shutter sample. Camera geometry, resolved exposure and Core generation mix
+into SmartFX cache identity. No additional host objects or DLL generations escape
+their existing leases. Capture, graph, accumulation and GPU memory have explicit
+limits; cancellation checks span sampling, interpolation, scene packing and copy.
+Linear Accuracy maps to2..16 midpoint samples (70 gives12); Levels maps to2..64
+exact subframes. Known short lifetimes use exact sampling at the Linear count.
+Endpoint extrapolation for births/deaths and bounded samples are approximations;
+numeric parity with Stardust is not claimed. See ADR0031.
+Owner qualitatively accepts native45 curve behavior; undo/reopen gates stay open.
+
 ## M3-09 / native45 + panel45 - simplify Draw for Linear editing
 
 Owner reports native44 Draw performance basically normal, but its samples become

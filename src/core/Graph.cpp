@@ -596,6 +596,14 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kPreviewChance, ParameterKind::float64, false},
         ParameterDescriptor{kAcceleration, ParameterKind::uint32, false},
         ParameterDescriptor{kTimeSamplingHz, ParameterKind::uint32, false},
+        ParameterDescriptor{kMotionBlur, ParameterKind::uint32, false},
+        ParameterDescriptor{kShutterAngle, ParameterKind::float64, false},
+        ParameterDescriptor{kShutterPhase, ParameterKind::float64, false},
+        ParameterDescriptor{kMotionBlurType, ParameterKind::uint32, false},
+        ParameterDescriptor{kMotionBlurLevels, ParameterKind::float64, false},
+        ParameterDescriptor{kLinearAccuracy, ParameterKind::float64, false},
+        ParameterDescriptor{kOpacityBoost, ParameterKind::float64, false},
+        ParameterDescriptor{kMotionBlurDisregard, ParameterKind::uint32, false},
     };
 
     NodeTypeDescriptor force;

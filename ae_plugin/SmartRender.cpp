@@ -7,6 +7,7 @@
 #include "Diagnostics.hpp"
 #include "Parameters.hpp"
 #include "EmitterHistory.hpp"
+#include "MotionBlur.hpp"
 #include "WorldBridge.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
@@ -176,6 +177,7 @@ struct PreRenderState {
     A_long time{},step{};A_u_long scale{};
     core::OpaqueBytes graph_bytes;
     SfCoreGpuSceneResult gpu_scene{};
+    MotionExposure motion;MotionGpuStorage motion_gpu;
     A_long gpu_world_width{},gpu_world_height{};
     ~PreRenderState() { if(generation && gpu_scene.struct_size==sizeof(gpu_scene)) generation->api().release_gpu_scene(&gpu_scene); }
     std::shared_ptr<const CoreGeneration> generation;
@@ -313,6 +315,7 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
         SfCoreRenderRequest request{};
         const auto request_error=make_request(in_data,out_data,depth,state,output_layout,cancellation,request);
         if(request_error) return request_error;
+        if(state.motion.enabled)return render_motion_cpu(in_data,out_data,state.generation->api(),request,state.motion,output_layout,output_world,depth,cancellation);
         SfCoreRenderResult rendered{};
         rendered.struct_size = sizeof(rendered);
         const auto& api = state.generation->api();
@@ -404,7 +407,9 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     core::Graph frame_graph=*graph;
     HostCancellation history_cancel(in_data);
     const auto history_start=PreparationTimer::Clock::now();
-    const auto history_error=capture_emitter_origin_history(in_data,out_data,frame_graph,
+    MotionExposure motion;
+    auto history_error=prepare_motion_exposure(in_data,out_data,frame_graph,input_result.ref_width,input_result.ref_height,history_cancel,motion);
+    if(!history_error && !motion.enabled)history_error=capture_emitter_origin_history(in_data,out_data,frame_graph,
         input_result.ref_width,input_result.ref_height,history_cancel);
     timer.value.history_ms=PreparationTimer::elapsed(history_start);
     if(history_error) return history_error;
@@ -438,6 +443,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     if (!state) {
         return PF_Err_OUT_OF_MEMORY;
     }
+    state->motion=std::move(motion);
     state->graph_bytes = encoded.take_value();
     state->time=in_data->current_time;state->step=in_data->time_step;state->scale=in_data->time_scale;
     state->generation = loaded.generation;
@@ -465,6 +471,15 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
                                                      static_cast<A_u_long>(sizeof(generation_identity)),
                                                      &generation_identity);
     if (cache_err != PF_Err_NONE) return cache_err;
+    const double exposure_key[2]{state->motion.enabled?1.0:0.0,state->motion.gain};
+    if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(exposure_key),exposure_key);error)return error;
+    for(const auto& sample:state->motion.samples) {
+        double key[34]{};key[0]=double(sample.time.value);key[1]=double(sample.time.scale);key[2]=sample.camera.camera_enabled;
+        std::copy(std::begin(sample.camera.layer_to_view),std::end(sample.camera.layer_to_view),key+3);
+        std::copy(std::begin(sample.camera.image_to_layer),std::end(sample.camera.image_to_layer),key+19);
+        key[28]=sample.camera.focal_x;key[29]=sample.camera.focal_y;key[30]=sample.camera.center_x;key[31]=sample.camera.center_y;key[32]=sample.camera.near_clip;key[33]=double(state->motion.samples.size());
+        if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(key),key);error)return error;
+    }
 
     bool prefer_gpu=true;
     for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode)
@@ -482,7 +497,11 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         const auto request_error=make_request(in_data,out_data,HostBitDepth::bpc32,*state,predicted,cancellation,scene_request);
         if(request_error) return request_error;
         state->gpu_scene.struct_size=sizeof(state->gpu_scene);
-        const auto status=state->generation->api().prepare_gpu_scene(&scene_request,&state->gpu_scene);
+        SfCoreStatus status=SF_CORE_OK;
+        if(state->motion.enabled) {
+            const auto error=prepare_motion_gpu(in_data,out_data,state->generation->api(),scene_request,state->motion,state->gpu_scene,state->motion_gpu,cancellation);
+            if(error)return error;
+        } else status=state->generation->api().prepare_gpu_scene(&scene_request,&state->gpu_scene);
         timer.value.scene_ms=PreparationTimer::elapsed(scene_start);
         if(status==SF_CORE_OK && state->gpu_scene.status==SF_CORE_OK) {
             state->gpu_world_width=static_cast<A_long>(predicted.width);state->gpu_world_height=static_cast<A_long>(predicted.height);
@@ -571,7 +590,8 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         // Ratio is 1 here, as checked against the pre-render world's dimensions.
         // The actual GPU buffer is validated by GPU suites, never world.data.
         err=render_gpu_scene(in_data,out_data,extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index,
-            state->gpu_scene,output_world,output_world->origin_x,output_world->origin_y,true);
+            state->gpu_scene,output_world,output_world->origin_x,output_world->origin_y,true,
+            state->motion.enabled?static_cast<unsigned>(state->motion.samples.size()):1u,static_cast<float>(state->motion.gain));
     } else {err=render_frame(in_data,out_data,depth,*state,output_world);if(!err) record_cpu_execution();}
 
     timer.value.complete=err==PF_Err_NONE;

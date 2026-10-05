@@ -64,7 +64,7 @@
             { key: "7", type: 4, value: 0 }, { key: "8", type: 4, value: 0 }
         ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
-            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30}]
+            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30},{key:"8",type:3,value:1},{key:"9",type:4,value:360},{key:"10",type:4,value:0},{key:"11",type:3,value:0},{key:"12",type:4,value:8},{key:"13",type:4,value:70},{key:"14",type:4,value:0},{key:"15",type:3,value:0}]
     };
 
     function defaultGradient() {

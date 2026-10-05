@@ -1,5 +1,36 @@
 # Behavior inventory
 
+## M3-10 / native46 + panel46 qualification
+
+Owner accepts native45 curve behavior qualitatively, without new quantitative
+timings or specific undo/reopen evidence. Motion Blur screenshots establish the
+control names/defaults; owner explicitly defers both PTF choices. Implementation
+includes CPU/CUDA/OpenCL shutter samples, comp/layer gating, custom shutter,
+camera disregard, control enabling and preset roundtrip. Linear uses endpoint
+particles and2..16 interpolated midpoint exposures; Subframe uses2..64 actual
+evaluations. Known short lives use exact samples. No numerical reference parity
+or new AE support is inferred. Signed shutter times are rounded to a bounded AE
+rational scale (up to microseconds, reduced for large absolute clocks).
+
+May2023 /MT build, generated CUDA PTX, changed JS/JSX and deployment-wrapper syntax
+and patch whitespace are recorded in build-matrix. No tests requested/run.
+Actual owner AE2023 qualification remains open:
+
+- Off preserves the prior frame; On gives visible trails with moving particles.
+- Angle/phase change exposure placement;0 angle gives the ordinary frame.
+- Comp Settings follows both comp/layer switches and actual comp shutter.
+- Subframe handles curved paths; Linear Accuracy/Levels affect their own modes.
+- Camera animation contributes, and Camera Motion disregard removes that part.
+- Opacity Boost changes transparency without tinting; CPU/GPU and8/16/32-bpc output.
+- Native edits, preset save/Add/Replace with Apply Render Settings on/off, undo and reopen.
+- Actual preparation/render timings on representative particle counts, static and animated.
+
+Work limits are explicit failures, not partial frames: captured particle frames
+256MiB, frozen exposure graphs512MiB, CPU pixel buffers bounded by32bytes/pixel
+within512MiB, merged GPU scenes512MiB/8M sprites/32M tile indices. These are
+separate phase limits, not a total process-memory promise. Linear birth/death
+extrapolation and very long trails at the sample cap are approximate.
+
 ## M3-09 / native45 + panel45 qualification
 
 Owner reports native44 performance basically normal, without measured timings.

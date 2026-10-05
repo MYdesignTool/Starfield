@@ -1,5 +1,17 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-10 / native46 + panel46 - Motion Blur
+
+Owner requests the supplied main Motion Blur inventory and explicitly defers PTF.
+Implemented Off / Comp Settings / On, custom shutter angle/phase, Linear / Subframe
+Sample, Levels, Linear Accuracy, Opacity Boost and Nothing / Camera Motion disregard.
+CPU and native GPU exposures average premultiplied frames; native history and
+camera/layer transforms are sampled during pre-render. Controls enable by mode.
+Preset save/apply and snapshot acknowledgement carry all settings. Main IDs append;
+Core ABI3, sequence and native layouts are retained. PTF choices remain deferred
+until Physics Time Factor exists. Build/source evidence is separate from actual
+AE2023 shutter, switch, camera, format, performance and persistence qualification.
+
 ## M3-09 / native45 + panel45 - sparse Linear after Draw
 
 Owner accepts build44 performance qualitatively; no measured timing is supplied.

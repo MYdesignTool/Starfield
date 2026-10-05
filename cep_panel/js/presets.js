@@ -64,8 +64,16 @@
         var positions={};graph.nodes.forEach(function(n,i){positions[n.id]={x:80+(i%4)*180,y:70+Math.floor(i/4)*180};});
         return layout.set(graph,positions);
     }
+    function motionDefaults(graph) {
+        var values=[1,360,0,0,8,70,0,0];
+        graph.nodes.forEach(function(node){if(node.type!==edits.types.output)return;
+            values.forEach(function(value,i){var key=String(8+i);
+                if(!node.parameters.some(function(p){return p.key===key;}))node.parameters.push({key:key,type:i===0||i===3||i===7?3:4,value:value});
+            });
+        });return graph;
+    }
     function authoring(graph,context){
-        var clean=clone(graph),positions=layout.resolve(clean);clean.optionalRecords=[];
+        var clean=motionDefaults(clone(graph)),positions=layout.resolve(clean);clean.optionalRecords=[];
         clean=layout.set(clean,positions);validate(clean,context);return clean;
     }
     function validate(graph,context){
@@ -86,7 +94,7 @@
     }
     function apply(base,edit,idFactory){
         if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
-        var preset=authoring(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels),"Selected preset"),current=clone(base);
+        var preset=authoring(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels),"Selected preset"),current=motionDefaults(clone(base));
         var oldOutput=current.nodes.filter(function(n){return n.type===edits.types.output;})[0];if(!oldOutput)fail("The current graph has no Output.");
         var positions=layout.resolve(current),sourcePositions=layout.resolve(preset),occupied={};
         current.nodes.concat(preset.nodes).forEach(function(n){occupied[n.id]=true;});current.edges.concat(preset.edges).forEach(function(e){occupied[e.id]=true;});

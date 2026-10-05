@@ -1,4 +1,5 @@
 #include "Parameters.hpp"
+#include "MotionBlur.hpp"
 
 #include "AE_EffectCB.h"
 #include "AE_Macros.h"
@@ -780,6 +781,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_POPUP("Acceleration", 2, 1, "GPU|CPU", 1611);
     AEFX_CLR_STRUCT(def);
     PF_END_TOPIC(1612);
+    if(const auto motion_error=append_motion_parameters(in_data,out_data);motion_error)return motion_error;
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }
@@ -924,9 +926,9 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             // These registered controls are read through callbacks in SmartFX,
             // independently of the count of parameters delivered in params[].
             core::Graph snapshot = *graph;
-            constexpr std::array<A_long, 6> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId};
-            constexpr std::array<core::ParameterKey, 6> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
-                core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance,core::graph_keys::kTimeSamplingHz,core::graph_keys::kAcceleration};
+            constexpr std::array<A_long, 14> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,617,618,619,620,621,622,623,624};
+            constexpr std::array<core::ParameterKey, 14> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
+                core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance,core::graph_keys::kTimeSamplingHz,core::graph_keys::kAcceleration,core::ParameterKey{8},core::ParameterKey{9},core::ParameterKey{10},core::ParameterKey{11},core::ParameterKey{12},core::ParameterKey{13},core::ParameterKey{14},core::ParameterKey{15}};
             for (std::size_t i = 0; i < indices.size(); ++i) {
                 CheckedParameter global(in_data);
                 err = global.checkout(indices[i]);
@@ -940,8 +942,8 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                         graph.reset();return PF_Err_BAD_CALLBACK_PARAM;
                     }
                     value=std::uint32_t(30u<<(global.value.u.pd.value-1));
-                } else if(i==5) {
-                    if(global.value.param_type!=PF_Param_POPUP || global.value.u.pd.value<1 || global.value.u.pd.value>2) {
+                } else if(i==5 || (i>=6 && motion_popup(i-6))) {
+                    if(global.value.param_type!=PF_Param_POPUP || global.value.u.pd.value<1 || global.value.u.pd.value>(i==6?3:2)) {
                         graph.reset();return PF_Err_BAD_CALLBACK_PARAM;
                     }
                     value=std::uint32_t(global.value.u.pd.value-1);
@@ -1107,7 +1109,8 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
             return sync_graph_from_controls(in_data, out_data, params);
         }
         const bool renderer_global = extra->param_index == kTimeRemapEnabledId || extra->param_index == kTimeRemapSecondsId ||
-            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId || extra->param_index==kTimeSamplingHzId || extra->param_index==kAccelerationId;
+            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId || extra->param_index==kTimeSamplingHzId || extra->param_index==kAccelerationId || (extra->param_index>=617 && extra->param_index<=624);
+        if(extra->param_index==617 || extra->param_index==620) {if(const auto ui_error=update_motion_ui(in_data,params);ui_error)return ui_error;}
         if (!is_bound_control(extra->param_index) && !renderer_global) return PF_Err_NONE;
         if ((extra->param_index == kMaxParticlesId || renderer_global) && params[kNodeEffectsReadyId] &&
             params[kNodeEffectsReadyId]->param_type == PF_Param_FLOAT_SLIDER &&

@@ -269,8 +269,13 @@ inline constexpr ParameterKey kParticleAngles{18}, kAngleRandom{19}, kRotationSp
 inline constexpr ParameterKey kLimitTo2D{22}, kParticleFeather{23}, kUpAxis{24};
 inline constexpr ParameterKey kRandomLimit{25}, kLimitAngle{26}, kRotationOverLife{27}, kAnchorX{28}, kAnchorY{29};
 inline constexpr ParameterKey kEmitterOrient{32}; // Emitter direction, distinct from shape angles.
-inline constexpr ParameterKey kAcceleration{6}; // Output: 0 CPU / 1 GPU
+inline constexpr ParameterKey kAcceleration{6}; // Output: 0 GPU / 1 CPU
 inline constexpr ParameterKey kTimeSamplingHz{7};
+// Optional Output metadata; the adapter renders the shutter exposure while
+// Core ABI3 receives one immutable frame at a time. Popup values are zero based.
+inline constexpr ParameterKey kMotionBlur{8}, kShutterAngle{9}, kShutterPhase{10};
+inline constexpr ParameterKey kMotionBlurType{11}, kMotionBlurLevels{12}, kLinearAccuracy{13};
+inline constexpr ParameterKey kOpacityBoost{14}, kMotionBlurDisregard{15};
 
 } // namespace graph_keys
 
