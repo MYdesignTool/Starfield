@@ -8,6 +8,8 @@ gateway mutations with request/reply generation checks. The reported old label's
 producer remains unconfirmed; the duplicate scalar/curve Opacity name is found
 in source and corrected on both read/write paths. Native40 is unchanged; retain
 paired40 rollback and qualify actual AE addition. No tests requested/run.
+Source49720c4 is deployed as panel41/native40; paired21 CEP entries and6 native
+files verified. Scope/bridge implementation complete; actual AE repair gate open.
 
 Owner: primary agent, current card after P-03 fix a624455/build39 compilation.
 Implementation candidate: build40 compiled cleanly with May2023 SDK /MT;

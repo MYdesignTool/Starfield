@@ -2,6 +2,19 @@
 
 ## M3-09 / panel41 candidate - 2026-10-05
 
+Deployed at2026-10-05T17:09:19+08:00 from local source
+49720c446c13f0f4223ac606fd9ddcbef3d95066. Fresh read-only checks found neither
+AfterFX nor AfterFX_64 running.21 current/saved CEP sources and6 current/saved
+native files are verified; native40 hashes match the40 receipt below exactly.
+Core selector stays StarfieldCore-15DEAD2027EDB6B4.dll. The existing Junctions
+remain in place. No AE start/stop, registry/cache or host-wide settings changes.
+The saved pair restores the prior panel40 with the same native40. Undo with AE
+closed (read-only rollback report passed; rollback was not performed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-panel41-curve-names-20261005' -Restore
+```
+
 Owner build40 addition reports missing Rotation Curve Count. Current source has
 no producer for that name; runtime origin remains unconfirmed. A confirmed source
 defect is the duplicated Opacity label across Particle Properties and Over Life.

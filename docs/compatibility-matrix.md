@@ -10,6 +10,9 @@ generation checks; native40 is retained. JS/JSX syntax and patch whitespace pass
 no tests requested/run. AE2023 addition, correct scalar opacity vs curve count,
 all three native Particle curves and cross-panel gateway generation are pending
 owner-visible checks. This is a repair candidate, not a confirmed host pass.
+Local source49720c4 is deployed as panel41 with unchanged native40. The saved21
+panel entries and6 binary files pass paired rollback verification; actual AE
+addition still needs owner confirmation. See docs/build-matrix.md for one-step undo.
 
 ## M3-09 / build40 qualification
 
