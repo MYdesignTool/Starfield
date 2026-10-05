@@ -1,5 +1,25 @@
 # Build and host matrix
 
+## M3-09 / build40 candidate - 2026-10-05
+
+Packed version32808/0x8028. May2023 SDK /MT full candidate compilation succeeds
+without compiler warnings/errors (artifacts/build40-native-final.log). CEP
+JavaScript and gateway JSX pass Node --check; git diff --check passes. No tests
+were requested or run. Build39 was not separately deployed; its guarded-bank
+and semantic-readback fixes are included in40. Main26, Core ABI3/snapshot3 and
+the existing single installation Junction are retained.
+
+The independent catalog has20 curve profiles and19 gradient palettes. Native
+modal picker entries are at the editors' Presets buttons; Size/Opacity have
+native curve editors. Curve buttons cycle Linear/Hold/Bezier/Draw; gradient
+buttons cycle only Linear/Hold. All modes persist and affect evaluated output.
+Bezier tangents are automatic; vendor tangent-handle identity/color parity are
+not claimed. Particle7/Force3 require fresh test effects/graphs. Candidate
+deployment uses artifacts/build40-deploy.ps1, saves paired build38 files under
+artifacts/disabled/m3-09-build40-editor-presets-20261005, and records native/Core/
+CEP hashes plus before/after and rollback reports. Actual AE qualification is
+pending owner execution; compilation is not a host pass.
+
 ## P-03 / build39 candidate - 2026-10-05
 
 Warm Sparks' hidden Color Gradient write is owner-confirmed. Supervise Panel Sync

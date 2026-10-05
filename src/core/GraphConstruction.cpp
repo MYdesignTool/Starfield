@@ -57,7 +57,7 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         const double size_end = settings.appearance_enabled ? settings.particle_size_end : 100.0;
         const double opacity_end = settings.appearance_enabled ? settings.opacity_end : 100.0;
 
-        GraphNode particle_node{particle, kParticleNode, 6, {
+        GraphNode particle_node{particle, kParticleNode, 7, {
             {kColorStart, color_start}, {kColorEnd, color_end},
             {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
             {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};
@@ -104,7 +104,7 @@ Result<Graph> make_emitter_particle_force_output_graph(
                                                        emitter_to_particle, particle_to_force);
         if (!base.has_value()) return base;
         Graph graph = base.take_value();
-        graph.nodes.push_back(GraphNode{force, kForceNode, 2, {
+        graph.nodes.push_back(GraphNode{force, kForceNode, 3, {
             {kGravity, settings.gravity}, {kLinearDrag, settings.linear_drag}}});
 
         // The base constructor provides the stable Emitter -> Particle edge and a

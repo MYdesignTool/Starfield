@@ -95,8 +95,8 @@ DragIntegrals drag_integrals(double drag, double age) noexcept {
 // --- Emission direction model (M3-04) ---------------------------------------
 constexpr double kEmissionPi = 3.14159265358979323846;
 
-// Exact integration of piecewise linear acceleration under constant drag.
-// Work depends on the curve's at most eight knots, not particle age/frame rate.
+// Integrate constant/linear/cubic acceleration under constant drag. Curve work
+// is bounded by its knots and does not depend on particle age/frame rate.
 void apply_force_motion(ParticleInstance& particle, const ForceMotion& force, double drag) noexcept {
     const double age = particle.age_seconds, life = particle.lifetime_seconds;
     if (!(age > 0) || !(life > 0)) return;
@@ -109,7 +109,21 @@ void apply_force_motion(ParticleInstance& particle, const ForceMotion& force, do
         const double end = curve.count ? curve.points[i + 1].age * life : life;
         if (age < start) break;
         const double a = curve.count ? curve.points[i].value / 100.0 : 1;
-        const double b = curve.count ? (curve.points[i + 1].value / 100.0 - a) / (end - start) : 0;
+        double b = curve.count ? (curve.points[i + 1].value / 100.0 - a) / (end - start) : 0;
+        double c=0,d=0;
+        if(curve.count && curve.interpolation==CurveInterpolation::hold)b=0;
+        if(curve.count && curve.interpolation==CurveInterpolation::bezier) {
+            const auto begin=curve.points[i].age,width=curve.points[i+1].age-begin,duration=end-start;
+            // Each shape-preserving Bezier segment is a cubic polynomial. Four
+            // exact samples recover its coefficients in local seconds.
+            const double y1=evaluate_age_curve(curve,begin+width/3,100,100)/100;
+            const double y2=evaluate_age_curve(curve,begin+2*width/3,100,100)/100;
+            const double y3=curve.points[i+1].value/100;
+            const double d_unit=4.5*(y3-3*y2+3*y1-a);
+            const double c_unit=4.5*(y2-2*y1+a)-d_unit;
+            const double b_unit=3*(y1-a)-c_unit/3-d_unit/9;
+            b=b_unit/duration;c=c_unit/(duration*duration);d=d_unit/(duration*duration*duration);
+        }
         const double dt = std::min(age, end) - start;
         const auto f = drag_integrals(drag, dt);
         double linear_factor;
@@ -119,7 +133,28 @@ void apply_force_motion(ParticleInstance& particle, const ForceMotion& force, do
         } else linear_factor = (0.5 * dt * dt - f.acceleration_displacement) / drag;
         x += v * f.velocity_displacement + a * f.acceleration_displacement + b * linear_factor;
         v = v * std::exp(-z) + a * f.velocity_displacement + b * f.acceleration_displacement;
-        curve_value = a + b * dt; curve_slope = b;
+        if(c!=0 || d!=0) {
+            double integral=f.velocity_displacement;
+            for(unsigned degree=1;degree<=3;++degree) {
+                double velocity_weight{},position_weight{};
+                if(std::abs(z)<0.5) {
+                    double vt=1.0/(degree+1),pt=1.0/((degree+1)*(degree+2));
+                    double vs=vt,ps=pt;
+                    for(unsigned n=1;n<=20;++n){vt*=-z/(degree+n+1);pt*=-z/(degree+n+2);vs+=vt;ps+=pt;}
+                    velocity_weight=std::pow(dt,int(degree)+1)*vs;
+                    position_weight=std::pow(dt,int(degree)+2)*ps;
+                } else {
+                    integral=(std::pow(dt,int(degree))-degree*integral)/drag;
+                    velocity_weight=integral;
+                    position_weight=(std::pow(dt,int(degree)+1)/(degree+1)-integral)/drag;
+                }
+                const double coefficient=degree==2?c:degree==3?d:0;
+                x+=coefficient*position_weight;v+=coefficient*velocity_weight;
+            }
+        }
+        curve_value = a + b * dt+c*dt*dt+d*dt*dt*dt; curve_slope = b+2*c*dt+3*d*dt*dt;
+        if(curve.count && curve.interpolation==CurveInterpolation::hold && age>=end)
+            curve_value=curve.points[i+1].value/100;
         if (age <= end) break;
     }
     particle.position.x += force.wind.x * x;

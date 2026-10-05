@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-39";
+    var GATEWAY_BUILD = "native-presets-40";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -490,7 +490,7 @@
     }
 
     function writeNodeColorGradient(effect, bytes) {
-        if(!bytes || bytes[0]!==1 || bytes[2]!==0 || bytes[3]!==0 ||
+        if(!bytes || bytes[0]!==1 || bytes[2]>1 || bytes[3]!==0 ||
             bytes[1]<2 || bytes[1]>8 || bytes.length!==4+32*bytes[1]) throw new Error("Invalid Color Gradient payload.");
         var count=bytes[1],previous=-1,stops=[];
         for(var i=0;i<count;i++) {
@@ -506,6 +506,7 @@
         }
         // Validate the whole payload before mutating any native property.
         setNodeControl(effect,"Color Gradient",count);
+        setNodeControl(effect,"Color Gradient Interpolation",bytes[2]);
         for(var point=0;point<count;point++) {
             setNodeControl(effect,"Color Gradient "+point+" Position",stops[point].position*100);
             setNodeControl(effect,"Color Gradient "+point+" Color",stops[point].color.concat([1]));
@@ -514,14 +515,14 @@
 
     function writeNodeCurve(effect, label, bytes) {
         var points = [];
-        // Rotation Over Life's native count has a minimum of two. Never send
-        // zero and rely on AE clamping: the absent graph curve means flat zero.
+        // Author the absent rotation curve as its canonical flat-zero default
+        // so readback and repeated application agree explicitly.
         if(label==="Rotation" && (bytes===null || bytes===undefined)) {
             points=[{age:0,value:0},{age:1,value:0}];
         }
         if (bytes !== null && bytes !== undefined) {
-            if (!(bytes instanceof Array) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 8 ||
-                bytes.length !== 4 + bytes[1] * 16) throw new Error(label + " curve payload is malformed.");
+            if (!(bytes instanceof Array) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 64 ||
+                bytes.length !== 4 + bytes[1] * 16 || bytes[2]>3 || bytes[3]!==0) throw new Error(label + " curve payload is malformed.");
             for (var i = 0; i < bytes[1]; i++) {
                 var age = readGraphFloat64(bytes, 4 + i * 16);
                 var value = readGraphFloat64(bytes, 12 + i * 16);
@@ -534,7 +535,8 @@
                 throw new Error(label + " curve endpoints must remain at 0 and 100 percent life.");
             }
         }
-        setNodeControl(effect, label === "Rotation" ? "Rotation Over Life" : label + " Curve Count", points.length);
+        setNodeControl(effect, label === "Rotation" ? "Rotation Over Life" : label === "Wind and Spin" ? label + " Curve Count" : label, points.length);
+        setNodeControl(effect,label+" Curve Interpolation",bytes?bytes[2]:0);
         for (var p = 0; p < points.length; p++) {
             setNodeControl(effect, label + " Curve " + p + (label==="Rotation" ? " Life" : " Age"), points[p].age);
             setNodeControl(effect, label + " Curve " + p + " Value", points[p].value);
@@ -596,7 +598,7 @@
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
             schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 7 :
-                type === "org.starfieldfx.nodes.particle" ? 6 : type === "org.starfieldfx.nodes.force" ? 2 : 1,
+                type === "org.starfieldfx.nodes.particle" ? 7 : type === "org.starfieldfx.nodes.force" ? 3 : 1,
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -649,8 +651,8 @@
             scalar(6,"Spin Frequency"); scalar(7,"Spin resist"); scalar(8,"Spin Delay (Seconds)");
             var forceCount = Number(nodeControlValue(effect,"Wind and Spin Curve Count"));
             if (forceCount) {
-                if (Math.floor(forceCount)!==forceCount || forceCount<2 || forceCount>8) throw new Error("Invalid Force curve count.");
-                var forceBytes=[1,forceCount,0,0];
+                if (Math.floor(forceCount)!==forceCount || forceCount<2 || forceCount>64) throw new Error("Invalid Force curve count.");
+                var forceBytes=[1,forceCount,Number(nodeControlValue(effect,"Wind and Spin Curve Interpolation")),0];
                 for (var fp=0;fp<forceCount;fp++) {
                     appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Age")));
                     appendFloat64(forceBytes,Number(nodeControlValue(effect,"Wind and Spin Curve "+fp+" Value")));
@@ -663,7 +665,7 @@
                 scalar(12,"Particle Color",3);node.parameters[node.parameters.length-1].value-=1;
                 var colorCount=Number(nodeControlValue(effect,"Color Gradient"));
                 if(Math.floor(colorCount)!==colorCount || colorCount<2 || colorCount>8) throw new Error("Invalid Color Gradient count.");
-                var colorBytes=[1,colorCount,0,0];
+                var colorBytes=[1,colorCount,Number(nodeControlValue(effect,"Color Gradient Interpolation")),0];
                 for(var stop=0;stop<colorCount;stop++) {
                     appendFloat64(colorBytes,Number(nodeControlValue(effect,"Color Gradient "+stop+" Position"))/100);
                     var stopColor=nodeControlValue(effect,"Color Gradient "+stop+" Color");
@@ -691,10 +693,10 @@
             }
             var curves = [[7,"Size"],[8,"Opacity"],[27,"Rotation"]];
             for (var c = 0; c < curves.length; c++) {
-                var label = curves[c][1], count = Number(nodeControlValue(effect, label === "Rotation" ? "Rotation Over Life" : label + " Curve Count"));
+                var label = curves[c][1], count = Number(nodeControlValue(effect, label === "Rotation" ? "Rotation Over Life" : label === "Wind and Spin" ? label + " Curve Count" : label));
                 if (count === 0) continue;
-                if (Math.floor(count) !== count || count < 2 || count > 8) throw new Error("A node curve count is invalid.");
-                var bytes = [1, count, 0, 0];
+                if (Math.floor(count) !== count || count < 2 || count > 64) throw new Error("A node curve count is invalid.");
+                var bytes = [1, count, Number(nodeControlValue(effect,label+" Curve Interpolation")), 0];
                 for (var point = 0; point < count; point++) {
                     appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + (label==="Rotation" ? " Life" : " Age"))));
                     appendFloat64(bytes, Number(nodeControlValue(effect, label + " Curve " + point + " Value")));
@@ -1302,7 +1304,7 @@
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:6,
+                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:7,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }

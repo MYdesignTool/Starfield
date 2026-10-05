@@ -75,6 +75,7 @@ constexpr A_long kLayoutOutputXDiskId = 'lOx0';
 constexpr A_long kLayoutOutputYDiskId = 'lOy0';
 constexpr A_long kSizeCurveCountDiskId = 'szct';
 constexpr A_long kOpacityCurveCountDiskId = 'opct';
+constexpr std::size_t kLegacyAgeCurvePoints=8; // Main26 keeps its published stream layout.
 constexpr A_long kCurveEditCommitDiskId = 'cvcm';
 constexpr A_long kEmitterSizeTopicDiskId = 'topX';
 constexpr A_long kEmitterSizeXDiskId = 'eszx';
@@ -201,8 +202,8 @@ std::uint32_t to_seed(const PF_ParamDef& def) noexcept {
 std::uint32_t to_curve_point_count(const PF_ParamDef& def) noexcept {
     const double value = static_cast<double>(def.u.fs_d.value);
     if (!std::isfinite(value) || value <= 0.0) return 0;
-    if (value >= static_cast<double>(core::kMaxAgeCurvePoints)) {
-        return static_cast<std::uint32_t>(core::kMaxAgeCurvePoints);
+    if (value >= static_cast<double>(kLegacyAgeCurvePoints)) {
+        return static_cast<std::uint32_t>(kLegacyAgeCurvePoints);
     }
     return static_cast<std::uint32_t>(value + 0.5);
 }
@@ -304,14 +305,14 @@ core::Settings settings_from_controls(const PF_ParamDef* const* defs, PF_InData&
     settings.appearance_enabled = true;
     const std::uint32_t size_count = to_curve_point_count(*defs[21]);
     settings.size_over_life.count = static_cast<std::uint8_t>(size_count);
-    for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+    for (std::size_t point = 0; point < kLegacyAgeCurvePoints; ++point) {
         settings.size_over_life.points[point].age = to_double(*defs[22 + point * 2]);
         settings.size_over_life.points[point].value = to_double(*defs[23 + point * 2]);
     }
     const std::size_t opacity_count_slot = 38;
     const std::uint32_t opacity_count = to_curve_point_count(*defs[opacity_count_slot]);
     settings.opacity_over_life.count = static_cast<std::uint8_t>(opacity_count);
-    for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+    for (std::size_t point = 0; point < kLegacyAgeCurvePoints; ++point) {
         settings.opacity_over_life.points[point].age = to_double(*defs[opacity_count_slot + 1 + point * 2]);
         settings.opacity_over_life.points[point].value = to_double(*defs[opacity_count_slot + 2 + point * 2]);
     }
@@ -658,10 +659,10 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         char name[sizeof(def.name)]{};
         std::snprintf(name, sizeof(name), "%s Curve Count", bank.label);
         err = add_hidden_curve_slider(in_data, def, name, bank.count_disk_id, 0.0,
-                                      static_cast<PF_FpLong>(core::kMaxAgeCurvePoints), 0.0,
+                                      static_cast<PF_FpLong>(kLegacyAgeCurvePoints), 0.0,
                                       PF_Precision_INTEGER);
         if (err != PF_Err_NONE) return err;
-        for (std::size_t point = 0; point < core::kMaxAgeCurvePoints; ++point) {
+        for (std::size_t point = 0; point < kLegacyAgeCurvePoints; ++point) {
             std::snprintf(name, sizeof(name), "%s Curve Point %u Age", bank.short_name,
                           static_cast<unsigned int>(point));
             err = add_hidden_curve_slider(in_data, def, name,
@@ -1083,7 +1084,7 @@ void sync_curve_endpoint(PF_ParamDef* params[], A_long count_id, A_long first_po
                          bool end, PF_FpLong value) noexcept {
     if (!params || !params[count_id] || params[count_id]->param_type != PF_Param_FLOAT_SLIDER) return;
     const std::uint32_t count = to_curve_point_count(*params[count_id]);
-    if (count < 2 || count > core::kMaxAgeCurvePoints) return;
+    if (count < 2 || count > kLegacyAgeCurvePoints) return;
     const A_long value_index = first_point_id + static_cast<A_long>((end ? count - 1 : 0) * 2 + 1);
     PF_ParamDef* point_value = params[value_index];
     if (!point_value || point_value->param_type != PF_Param_FLOAT_SLIDER) return;

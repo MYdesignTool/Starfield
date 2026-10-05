@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-09 - Restore editor palettes from supplied references
+
+After the P-03 application fix, implement native editor Presets thumbnails,
+independent Over Life/color profiles, Linear/Hold/Bezier/Draw curves,
+and persisted Linear/Hold gradients. No preset directory replica. ADR0030 owns
+fresh Particle7/Force3, source generation and paired deployment/rollback.
+
 ## P-03 / build39 - unblock native bank writes
 
 Correct owner-confirmed hidden Color Gradient writes and the inspected missing

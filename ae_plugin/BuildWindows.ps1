@@ -21,6 +21,7 @@ if (-not $CoreOnly -and -not $NoDistPublish -and
 if (-not (Test-Path -LiteralPath $MSBuildPath)) { throw "MSBuild not found: $MSBuildPath" }
 
 if (-not $CoreOnly) {
+    & (Join-Path $repositoryRoot 'tools\Generate-EditorPresets.ps1') -Generate
     $resolvedNvrtc = Join-Path $repositoryRoot $NvrtcPath
     if (-not (Test-Path -LiteralPath $resolvedNvrtc)) { throw 'Missing workspace NVRTC build input. Run tools/Prepare-GpuBuildInputs.ps1 -Download first; no system installation is needed.' }
     & $PythonPath (Join-Path $repositoryRoot 'tools\Build-GpuKernels.py') --nvrtc $resolvedNvrtc --output (Join-Path $repositoryRoot 'artifacts\gpu-build\generated\GpuKernels.hpp')
@@ -53,6 +54,8 @@ $adapterInputs = @(
     'ae_plugin\StarfieldPiPL.r', 'ae_plugin\Starfield.vcxproj',
     'ae_plugin\NodeEffectFlags.h', 'ae_plugin\NodeEffectMain.cpp',
     'ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\ParticleGradientUI.hpp', 'ae_plugin\ParticleLayout.hpp', 'ae_plugin\GradientEditorModel.hpp',
+    'ae_plugin\EditorPresetPicker.cpp', 'ae_plugin\EditorPresetPicker.hpp',
+    'schema\editor-presets.json', 'tools\Generate-EditorPresets.ps1',
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',

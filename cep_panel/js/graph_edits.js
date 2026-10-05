@@ -15,7 +15,7 @@
         force: "org.starfieldfx.nodes.force",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 6, force: 2, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },

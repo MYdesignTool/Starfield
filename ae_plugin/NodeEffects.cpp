@@ -232,15 +232,16 @@ PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kin
 PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexcept {
     char name[48]{};
     PF_Err error = PF_Err_NONE;
-    std::snprintf(name, sizeof(name), "%s Curve Count", label);
-    error = add_slider(in_data, name, curve_count_id(prefix), 0.0, 8.0, 0.0,
+    const bool visible=prefix=='s' || prefix=='o';
+    std::snprintf(name, sizeof(name), visible?"%s":"%s Curve Count", label);
+    error = add_slider(in_data, name, curve_count_id(prefix), 0.0, particle_layout::curve_points, 0.0,
                        PF_Precision_INTEGER, kNodeConstantFlags,
-                       PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
+                       visible?PF_PUI_CONTROL:(PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE),visible?178:0);
     if (error != PF_Err_NONE) return error;
-    for (A_long point = 0; point < 8; ++point) {
+    for (A_long point = 0; point < particle_layout::curve_points; ++point) {
         std::snprintf(name, sizeof(name), "%s Curve %ld Age", label, static_cast<long>(point));
         error = add_slider(in_data, name, curve_age_id(prefix, point),
-                           0.0, 1.0, static_cast<PF_FpLong>(point) / 7.0, PF_Precision_THOUSANDTHS,
+                           0.0, 1.0, static_cast<PF_FpLong>(point) / (particle_layout::curve_points-1), PF_Precision_THOUSANDTHS,
                            kNodeConstantFlags,
                            PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
@@ -251,7 +252,9 @@ PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexce
                            PF_PUI_NO_ECW_UI | PF_PUI_INVISIBLE);
         if (error != PF_Err_NONE) return error;
     }
-    return PF_Err_NONE;
+    std::snprintf(name,sizeof(name),"%s Curve Interpolation",label);
+    return add_slider(in_data,name,curve_interpolation_id(prefix),0,3,0,PF_Precision_INTEGER,
+        kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);
 }
 
 PF_Err particle_group(PF_InData* data,const char* name,A_long id,bool end=false,bool collapsed=false) noexcept {
@@ -287,12 +290,13 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
             std::snprintf(name,sizeof(name),"Color Gradient %ld Color",static_cast<long>(i));
             error=add_color(in_data,name,kColorGradientColorFirstId+i,flags,ui);if(error)return error;
         }
+        error=add_slider(in_data,"Color Gradient Interpolation",kColorGradientInterpolationId,0,1,0,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
         error=add_slider(in_data,"Particle Feather",kFeatherId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=add_popup(in_data,"Up Axis",kUpAxisId,3,3,"X|Y|Z");if(error)return error;
         error=particle_group(in_data,"",kParticlePropertiesEndId,true);if(error)return error;
         error=particle_group(in_data,"Over Life",kParticleOverLifeId,false,true);if(error)return error;
-        error=add_slider(in_data,"Size Over Life",kSizeOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Opacity Over Life",kOpacityOverLifeId,0,100,100,PF_Precision_TENTHS);if(error)return error;
+        error=add_slider(in_data,"Size Over Life",kSizeOverLifeId,0,100,100,PF_Precision_TENTHS,kNodeEditableFlags,PF_PUI_NO_ECW_UI);if(error)return error;
+        error=add_slider(in_data,"Opacity Over Life",kOpacityOverLifeId,0,100,100,PF_Precision_TENTHS,kNodeEditableFlags,PF_PUI_NO_ECW_UI);if(error)return error;
         error=add_curve_bank(in_data,"Size",'s');if(error)return error;
         error=add_curve_bank(in_data,"Opacity",'o');if(error)return error;
         error=particle_group(in_data,"",kParticleOverLifeEndId,true);if(error)return error;
@@ -310,14 +314,15 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
             error=add_angle(in_data,name,axis.second);if(error)return error;
         }
         error=add_slider(in_data,"Rotation Speed Random",kRotationSpeedRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
-        error=add_slider(in_data,"Rotation Over Life",kRotationCurveCountId,0,8,0,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_CONTROL,178);if(error)return error;
-        for(A_long point=0;point<8;++point) {
+        error=add_slider(in_data,"Rotation Over Life",kRotationCurveCountId,0,particle_layout::curve_points,0,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_CONTROL,178);if(error)return error;
+        for(A_long point=0;point<particle_layout::curve_points;++point) {
             char name[48]{};const auto ui=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
             std::snprintf(name,sizeof(name),"Rotation Curve %ld Life",static_cast<long>(point));
-            error=add_slider(in_data,name,kRotationCurveAgeFirstId+point,0,1,double(point)/7,PF_Precision_THOUSANDTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
+            error=add_slider(in_data,name,curve_age_id('r',point),0,1,double(point)/(particle_layout::curve_points-1),PF_Precision_THOUSANDTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
             std::snprintf(name,sizeof(name),"Rotation Curve %ld Value",static_cast<long>(point));
-            error=add_slider(in_data,name,kRotationCurveValueFirstId+point,-32768,32768,0,PF_Precision_TENTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
+            error=add_slider(in_data,name,curve_value_id('r',point),-32768,32768,0,PF_Precision_TENTHS,PF_ParamFlag_CANNOT_TIME_VARY,ui);if(error)return error;
         }
+        error=add_slider(in_data,"Rotation Curve Interpolation",kRotationCurveInterpolationId,0,3,0,PF_Precision_INTEGER,kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
         error=add_slider(in_data,"Anchor X (Percent)",kAnchorXId,0,100,50,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Anchor Y (Percent)",kAnchorYId,0,100,50,PF_Precision_TENTHS);if(error)return error;
         error=add_checkbox(in_data,"Limit To 2D",kLimitTo2DId);if(error)return error;
@@ -555,7 +560,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 const auto* event=static_cast<PF_EventExtra*>(extra);
-                if(event && event->effect_win.index==starfield::adapter::native_nodes::particle_layout::rotation_curve)
+                if(event && starfield::adapter::native_nodes::particle_layout::curve_base(event->effect_win.index))
                     return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
             } else return PF_Err_NONE;

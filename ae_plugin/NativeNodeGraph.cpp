@@ -288,6 +288,9 @@ bool read_curve(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     if (count == 0) return true;
     core::AgeCurve curve{};
     curve.count = static_cast<std::uint8_t>(count);
+    std::uint32_t interpolation{};
+    if(!read_uint(suites,plugin_id,effect,particle_layout::curve_interpolation(count_index),time,interpolation) || interpolation>3)return false;
+    curve.interpolation=static_cast<core::CurveInterpolation>(interpolation);
     for (std::uint32_t point = 0; point < count; ++point) {
         if (!read_one_d(suites, plugin_id, effect, first_point_index + static_cast<A_long>(point * 2), time,
                         curve.points[point].age) ||
@@ -458,10 +461,10 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
         kind = Kind::emitter; type_key = core::graph_keys::kEmitterNode; schema = 7; return true;
     }
     if (std::strcmp(match_name, kParticleMatchName) == 0) {
-        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 6; return true;
+        kind = Kind::particle; type_key = core::graph_keys::kParticleNode; schema = 7; return true;
     }
     if (std::strcmp(match_name, kForceMatchName) == 0) {
-        kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 2; return true;
+        kind = Kind::force; type_key = core::graph_keys::kForceNode; schema = 3; return true;
     }
     return false;
 }
@@ -569,6 +572,9 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         if(count<2 || count>8)return suites.fail(particle_layout::gradient);
         add_value(node,kParticleColorMode,mode-1);
         core::ColorGradient gradient;gradient.count=static_cast<std::uint8_t>(count);
+        std::uint32_t interpolation{};
+        if(!read_uint(suites,plugin_id,effect,particle_layout::gradient_interpolation,time,interpolation) || interpolation>1)return false;
+        gradient.interpolation=static_cast<core::ColorInterpolation>(interpolation);
         for(std::uint32_t i=0;i<count;++i) {
             if(!read_one_d(suites,plugin_id,effect,particle_layout::gradient_first+2*i,time,gradient.stops[i].position) ||
                 !read_color(suites,plugin_id,effect,particle_layout::gradient_first+2*i+1,time,gradient.stops[i].color)) return false;

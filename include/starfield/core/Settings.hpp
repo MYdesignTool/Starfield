@@ -76,7 +76,8 @@ struct EmitterDimensionContext {
     double pixel_aspect_ratio{1.0};
 };
 
-inline constexpr std::size_t kMaxAgeCurvePoints = 8;
+inline constexpr std::size_t kMaxAgeCurvePoints = 64;
+enum class CurveInterpolation : std::uint8_t { linear, hold, bezier, draw };
 
 struct AgeCurvePoint {
     double age{};
@@ -88,6 +89,7 @@ struct AgeCurvePoint {
 struct AgeCurve {
     std::array<AgeCurvePoint, kMaxAgeCurvePoints> points{};
     std::uint8_t count{};
+    CurveInterpolation interpolation{CurveInterpolation::linear};
 };
 
 // How the emission direction is sampled. `directional` uses the Euler angles and the

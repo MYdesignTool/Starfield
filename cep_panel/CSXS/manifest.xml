@@ -5,7 +5,7 @@
      arbitrary-data graph parameter directly. -->
 <ExtensionManifest Version="11.0"
                    ExtensionBundleId="org.starfieldfx.panel"
-                   ExtensionBundleVersion="0.1.0.39"
+                   ExtensionBundleVersion="0.1.0.40"
                    ExtensionBundleName="Starfield Particle Controls"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>

@@ -1,6 +1,7 @@
 #include "ParticleGradientUI.hpp"
 #include "GradientEditorModel.hpp"
 #include "ParticleLayout.hpp"
+#include "EditorPresetPicker.hpp"
 #include "starfield/core/AgeCurve.hpp"
 #include "NodeEffects.hpp"
 #include "AE_EffectSuites.h"
@@ -16,7 +17,7 @@ namespace starfield::adapter {
 namespace {
 namespace model=gradient_editor;
 namespace layout=native_nodes::particle_layout;
-struct UIState {int selected{};bool presets{};bool bitmap_disabled{};};
+struct UIState {int selected{};bool bitmap_disabled{};};
 // Opaque context keys are never dereferenced or passed to a later SDK callback.
 // CLOSE_CONTEXT erases them; selection has no effect on authored values.
 std::map<PF_ContextH,UIState> contexts;
@@ -37,6 +38,10 @@ bool read(PF_ParamDef* params[],core::ColorGradient& value) noexcept {
     const auto count=params[layout::gradient]->u.fs_d.value;
     if(!std::isfinite(count) || count<2 || count>8 || std::floor(count)!=count)return false;
     value.count=static_cast<std::uint8_t>(count);
+    if(!params[layout::gradient_interpolation])return false;
+    const auto mode=params[layout::gradient_interpolation]->u.fs_d.value;
+    if(mode!=0 && mode!=1)return false;
+    value.interpolation=static_cast<core::ColorInterpolation>(static_cast<unsigned>(mode));
     for(unsigned i=0;i<value.count;++i) {
         const auto* position=params[layout::gradient_first+2*i];const auto* color=params[layout::gradient_first+2*i+1];
         if(!position || !color || position->param_type!=PF_Param_FLOAT_SLIDER || color->param_type!=PF_Param_COLOR)return false;
@@ -47,13 +52,15 @@ bool read(PF_ParamDef* params[],core::ColorGradient& value) noexcept {
 }
 PF_Err publish(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],const core::ColorGradient& value) noexcept {
     if(!model::valid(value))return PF_Err_BAD_CALLBACK_PARAM;
-    std::array<PF_ParamDef,17> previous{};
-    for(A_long i=0;i<17;++i) {
+    std::array<PF_ParamDef,18> previous{};
+    for(A_long i=0;i<18;++i) {
         if(!params[layout::gradient+i])return PF_Err_BAD_CALLBACK_PARAM;
         previous[i]=*params[layout::gradient+i];
     }
     params[layout::gradient]->u.fs_d.value=value.count;
     params[layout::gradient]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
+    params[layout::gradient_interpolation]->u.fs_d.value=static_cast<unsigned>(value.interpolation);
+    params[layout::gradient_interpolation]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
     for(unsigned i=0;i<value.count;++i) {
         auto* position=params[layout::gradient_first+2*i];auto* color=params[layout::gradient_first+2*i+1];
         position->u.fs_d.value=value.stops[i].position*100;
@@ -66,7 +73,7 @@ PF_Err publish(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],const core:
     // All bank components belong to one direct publication. The renderer must
     // not read a new count with old AEGP colors before this PF event returns.
     const auto error=sync_node_graph_parameter(data,out,params,&changed,true);
-    if(error) {for(A_long i=0;i<17;++i)*params[layout::gradient+i]=previous[i];return error;}
+    if(error) {for(A_long i=0;i<18;++i)*params[layout::gradient+i]=previous[i];return error;}
     out->out_flags|=PF_OutFlag_REFRESH_UI|PF_OutFlag_FORCE_RERENDER;return PF_Err_NONE;
 }
 struct Canvas {
@@ -188,11 +195,10 @@ void draw(PF_InData* data,PF_EventExtra* event,const core::ColorGradient& value,
         canvas.rect(x-5,b.y+61,10,21,state.selected==static_cast<int>(i)?DRAWBOT_ColorRGBA{0.9f,0.92f,1,1}:DRAWBOT_ColorRGBA{0.6f,0.6f,0.6f,1});
         canvas.rect(x-3,b.y+63,6,17,{static_cast<float>(c.x),static_cast<float>(c.y),static_cast<float>(c.z),1});
     }
-    canvas.text(b.x+b.width+10,b.y+14,"Linear");
+    canvas.button(b.x+b.width+8,b.y,59,value.interpolation==core::ColorInterpolation::hold?"Hold":"Linear");
     canvas.button(b.x+b.width+8,b.y+29,59,"Flip");
     canvas.button(b.x,b.y+92,58,"Copy");canvas.button(b.x+65,b.y+92,58,"Paste",clipboard.has_value());
     canvas.button(b.x+130,b.y+92,70,"Presets");
-    if(state.presets) {canvas.button(b.x,b.y+119,58,"White");canvas.button(b.x+65,b.y+119,58,"Fire");canvas.button(b.x+130,b.y+119,70,"Spectrum");}
     char label[80]{};std::snprintf(label,sizeof(label),"Stop %d: %.1f%%",state.selected+1,value.stops[state.selected].position*100);
     canvas.text(b.x,b.y+154,label);canvas.text(b.x,b.y+169,"Double-click: color; Alt-click: delete");
 }
@@ -226,13 +232,12 @@ PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* para
     bool changed=false;const Bounds b(event->effect_win);
     if(event->e_type==PF_Event_DO_CLICK) {
         auto& click=event->u.do_click;const auto h=click.screen_point.h,v=click.screen_point.v;
-        if(b.inside(h,v,b.width+8,29,59,21)){model::flip(value);state.selected=int(value.count)-1-state.selected;changed=true;}
+        if(b.inside(h,v,b.width+8,0,59,21)){value.interpolation=value.interpolation==core::ColorInterpolation::linear?core::ColorInterpolation::hold:core::ColorInterpolation::linear;changed=true;}
+        else if(b.inside(h,v,b.width+8,29,59,21)){model::flip(value);state.selected=int(value.count)-1-state.selected;changed=true;}
         else if(b.inside(h,v,0,92,58,21))clipboard=value;
         else if(b.inside(h,v,65,92,58,21) && clipboard){value=*clipboard;state.selected=0;changed=true;}
-        else if(b.inside(h,v,130,92,70,21))state.presets=!state.presets;
-        else if(state.presets && b.inside(h,v,0,119,200,21)) {
-            value=model::preset(h<b.x+65?0:h<b.x+130?1:2);state.selected=0;state.presets=false;changed=true;
-        } else if(b.inside(h,v,-6,0,b.width+12,84)) {
+        else if(b.inside(h,v,130,92,70,21)){changed=choose_gradient_preset(data,value);if(changed)state.selected=0;}
+        else if(b.inside(h,v,-6,0,b.width+12,84)) {
             int nearest=-1;double distance=9;
             for(unsigned i=0;i<value.count;++i) {
                 const double delta=std::abs(h-(b.x+b.width*value.stops[i].position));
@@ -262,60 +267,88 @@ PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* para
 PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
     if(!data || !out || !event)return PF_Err_NONE;
     if(event->e_type==PF_Event_CLOSE_CONTEXT){curve_contexts.erase(event->contextH);return PF_Err_NONE;}
-    if(!event->contextH || event->effect_win.index!=layout::rotation_curve || event->effect_win.area!=PF_EA_CONTROL ||
-       !params || !params[layout::rotation_curve])return PF_Err_NONE;
+    if(!event->contextH || !layout::curve_base(event->effect_win.index) || event->effect_win.area!=PF_EA_CONTROL ||
+       !params || !params[event->effect_win.index])return PF_Err_NONE;
+    const auto base=event->effect_win.index;
+    const bool rotation=base==layout::rotation_curve;
+    const double minimum=rotation?-32768.0:0.0,maximum=rotation?32768.0:100.0;
+    const auto mode_index=layout::curve_interpolation(base);
+    if(!params[mode_index])return PF_Err_NONE;
     core::AgeCurve value{};
-    const double count=params[layout::rotation_curve]->u.fs_d.value;
-    if(count==0) {value.count=2;value.points[0]={0,0};value.points[1]={1,0};}
+    const auto mode=params[mode_index]->u.fs_d.value;
+    if(!std::isfinite(mode) || std::floor(mode)!=mode || mode<0 || mode>3)return PF_Err_NONE;
+    value.interpolation=static_cast<core::CurveInterpolation>(static_cast<unsigned>(mode));
+    const double count=params[base]->u.fs_d.value;
+    if(count==0) {
+        const auto endpoint=base==layout::size_curve?layout::size_over_life:layout::opacity_over_life;
+        if(!rotation && !params[endpoint])return PF_Err_NONE;
+        value.count=2;value.points[0]={0,rotation?0.0:100.0};value.points[1]={1,rotation?0.0:params[endpoint]->u.fs_d.value};
+    }
     else {
-        if(!std::isfinite(count) || count<2 || count>8 || std::floor(count)!=count)return PF_Err_NONE;
+        if(!std::isfinite(count) || count<2 || count>core::kMaxAgeCurvePoints || std::floor(count)!=count)return PF_Err_NONE;
         value.count=static_cast<std::uint8_t>(count);
         for(unsigned i=0;i<value.count;++i) {
-            const auto* age=params[layout::rotation_curve+1+2*i];const auto* amount=params[layout::rotation_curve+2+2*i];
+            const auto* age=params[base+1+2*i];const auto* amount=params[base+2+2*i];
             if(!age || !amount || age->param_type!=PF_Param_FLOAT_SLIDER || amount->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;
             value.points[i]={age->u.fs_d.value,amount->u.fs_d.value};
         }
     }
-    if(!core::valid_age_curve(value,-32768,32768))return PF_Err_NONE;
+    if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
     if(curve_contexts.size()>=64 && !curve_contexts.contains(event->contextH))curve_contexts.erase(curve_contexts.begin());
     auto& state=curve_contexts[event->contextH];state.selected=std::clamp(state.selected,0,int(value.count)-1);
     const Bounds b(event->effect_win);
     double span=360;for(unsigned i=0;i<value.count;++i)span=std::max(span,std::abs(value.points[i].value));
     const auto px=[&](double age){return b.x+float(age)*b.width;};
-    const auto py=[&](double amount){return b.y+40-float(amount/span)*40;};
-    const auto amount=[&](A_long v){return std::clamp((b.y+40-v)*span/40,-32768.0,32768.0);};
+    const auto py=[&](double amount){return rotation?b.y+40-float(amount/span)*40:b.y+80-float(amount)*.8f;};
+    const auto amount=[&](A_long v){return rotation?std::clamp((b.y+40-v)*span/40,minimum,maximum):std::clamp((b.y+80-v)/.8,minimum,maximum);};
     if(event->e_type==PF_Event_DRAW) {
         Canvas c(data,event->contextH);if(!c)return PF_Err_NONE;
         c.rect(b.x,b.y,b.width,81,{0.18f,0.18f,0.19f,1});c.rect(b.x,b.y+40,b.width,1,{0.35f,0.35f,0.36f,1});
-        for(unsigned i=1;i<value.count;++i) {
-            const float x0=px(value.points[i-1].age),y0=py(value.points[i-1].value);
-            const float dx=px(value.points[i].age)-x0,dy=py(value.points[i].value)-y0;
-            const int steps=std::max(1,int(std::ceil(std::max(std::abs(dx),std::abs(dy)))));
-            for(int n=0;n<=steps;++n)c.rect(x0+dx*n/steps,y0+dy*n/steps,1.5f,1.5f,{0.85f,0.85f,0.86f,1});
+        for(int x=0;x<=int(b.width);++x) {
+            const auto sampled=core::evaluate_age_curve(value,double(x)/b.width,100,100);
+            c.rect(b.x+x,py(sampled),1.5f,1.5f,{0.85f,0.85f,0.86f,1});
+            if(x) {
+                const auto last=core::evaluate_age_curve(value,double(x-1)/b.width,100,100);
+                const auto y0=py(last),y1=py(sampled);
+                for(float y=std::min(y0,y1);y<std::max(y0,y1);y+=1)c.rect(b.x+x,y,1,1,{0.85f,0.85f,0.86f,1});
+            }
         }
-        for(unsigned i=0;i<value.count;++i)c.rect(px(value.points[i].age)-3,py(value.points[i].value)-3,6,6,
+        if(value.interpolation!=core::CurveInterpolation::draw)for(unsigned i=0;i<value.count;++i)c.rect(px(value.points[i].age)-3,py(value.points[i].value)-3,6,6,
             int(i)==state.selected?DRAWBOT_ColorRGBA{0.45f,0.8f,1,1}:DRAWBOT_ColorRGBA{0.8f,0.8f,0.8f,1});
-        c.text(b.x+b.width+8,b.y+13,"Linear");c.button(b.x+b.width+8,b.y+23,59,"Flip");
-        c.button(b.x,b.y+88,58,"Copy");c.button(b.x+65,b.y+88,58,"Paste",curve_clipboard.has_value());c.button(b.x+130,b.y+88,70,"Presets");
-        if(state.presets){c.button(b.x,b.y+113,58,"Zero");c.button(b.x+65,b.y+113,58,"+360");c.button(b.x+130,b.y+113,70,"-360");}
-        char label[80]{};std::snprintf(label,sizeof(label),"Life: %.1f%%   Value: %.1f deg",value.points[state.selected].age*100,value.points[state.selected].value);
+        const char* modes[]={"Linear","Hold","Bezier","Draw"};c.button(b.x+b.width+8,b.y,59,modes[static_cast<unsigned>(value.interpolation)]);c.button(b.x+b.width+8,b.y+23,59,"Flip");
+        c.button(b.x,b.y+88,58,"Copy");c.button(b.x+65,b.y+88,58,"Paste",curve_clipboard && core::valid_age_curve(*curve_clipboard,minimum,maximum));c.button(b.x+130,b.y+88,70,"Presets");
+        char label[80]{};std::snprintf(label,sizeof(label),"Life: %.1f%%   Value: %.1f %s",value.points[state.selected].age*100,value.points[state.selected].value,rotation?"deg":"%");
         c.text(b.x,b.y+153,label);c.button(b.x+b.width+8,b.y+58,26,"<");c.button(b.x+b.width+38,b.y+58,26,">");
         event->evt_out_flags|=PF_EO_HANDLED_EVENT;return PF_Err_NONE;
     }
     bool changed=false;
     if(event->e_type==PF_Event_DO_CLICK) {
         auto& click=event->u.do_click;const auto h=click.screen_point.h,v=click.screen_point.v;
-        if(b.inside(h,v,b.width+8,23,59,21)) {
+        if(b.inside(h,v,b.width+8,0,59,21)) {
+            const auto source=value;
+            value.interpolation=static_cast<core::CurveInterpolation>((static_cast<unsigned>(value.interpolation)+1)%4);
+            if(value.interpolation==core::CurveInterpolation::draw) {
+                value.count=static_cast<std::uint8_t>(core::kMaxAgeCurvePoints);
+                for(unsigned i=0;i<value.count;++i){const auto age=double(i)/(value.count-1);value.points[i]={age,core::evaluate_age_curve(source,age,100,100)};}
+            }
+            state.selected=0;changed=true;
+        } else if(b.inside(h,v,b.width+8,23,59,21)) {
             for(unsigned i=0;i<value.count;++i)value.points[i].age=1-value.points[i].age;
             std::reverse(value.points.begin(),value.points.begin()+value.count);state.selected=int(value.count)-1-state.selected;changed=true;
         } else if(b.inside(h,v,0,88,58,21))curve_clipboard=value;
-        else if(b.inside(h,v,65,88,58,21)){if(curve_clipboard){value=*curve_clipboard;state.selected=0;changed=true;}}
-        else if(b.inside(h,v,130,88,70,21))state.presets=!state.presets;
-        else if(state.presets && b.inside(h,v,0,113,200,21)) {
-            value={};value.count=2;value.points[0]={0,0};value.points[1]={1,h<b.x+65?0.0:h<b.x+130?360.0:-360.0};state.selected=0;changed=true;
-        } else if(b.inside(h,v,b.width+8,58,26,21))state.selected=std::max(0,state.selected-1);
+        else if(b.inside(h,v,65,88,58,21)){if(curve_clipboard && core::valid_age_curve(*curve_clipboard,minimum,maximum)){value=*curve_clipboard;state.selected=0;changed=true;}}
+        else if(b.inside(h,v,130,88,70,21)){changed=choose_curve_preset(data,value);if(changed)state.selected=0;}
+        else if(b.inside(h,v,b.width+8,58,26,21))state.selected=std::max(0,state.selected-1);
         else if(b.inside(h,v,b.width+38,58,26,21))state.selected=std::min(int(value.count)-1,state.selected+1);
         else if(b.inside(h,v,-5,-5,b.width+10,91)) {
+            if(value.interpolation==core::CurveInterpolation::draw) {
+                const auto source=value;
+                value.count=static_cast<std::uint8_t>(core::kMaxAgeCurvePoints);
+                for(unsigned i=0;i<value.count;++i){const auto age=double(i)/(value.count-1);value.points[i]={age,core::evaluate_age_curve(source,age,100,100)};}
+                const int index=std::clamp(int(std::lround(std::clamp(b.position(h),0.0,1.0)*(value.count-1))),0,int(value.count)-1);
+                value.points[index].value=amount(v);state.selected=index;
+                click.send_drag=TRUE;click.continue_refcon[0]=index+1;changed=true;
+            } else {
             int nearest=-1;double distance=9;
             for(unsigned i=0;i<value.count;++i){const double d=std::hypot(h-px(value.points[i].age),v-py(value.points[i].value));if(d<distance){distance=d;nearest=int(i);}}
             if(nearest>=0) {
@@ -323,30 +356,41 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
                 if(click.modifiers&PF_Mod_OPT_ALT_KEY) {
                     if(nearest>0 && nearest<int(value.count)-1 && value.count>2){for(unsigned i=nearest+1;i<value.count;++i)value.points[i-1]=value.points[i];--value.count;state.selected=0;changed=true;}
                 } else {click.send_drag=TRUE;click.continue_refcon[0]=nearest+1;}
-            } else if(value.count<8) {
+            } else if(value.count<core::kMaxAgeCurvePoints) {
                 const double age=std::clamp(b.position(h),0.001,0.999);unsigned index=1;
                 while(index<value.count && value.points[index].age<age)++index;
                 if(age-value.points[index-1].age>=0.001 && value.points[index].age-age>=0.001){for(unsigned i=value.count;i>index;--i)value.points[i]=value.points[i-1];value.points[index]={age,amount(v)};++value.count;state.selected=int(index);changed=true;}
             }
+            }
         } else return PF_Err_NONE;
     } else if(event->e_type==PF_Event_DRAG) {
         const int index=int(event->u.do_click.continue_refcon[0])-1;if(index<0 || index>=value.count)return PF_Err_NONE;
-        auto& point=value.points[index];if(index>0 && index<int(value.count)-1)point.age=std::clamp(b.position(event->u.do_click.screen_point.h),value.points[index-1].age+0.001,value.points[index+1].age-0.001);
-        point.value=amount(event->u.do_click.screen_point.v);state.selected=index;changed=true;
+        if(value.interpolation==core::CurveInterpolation::draw) {
+            const int next=std::clamp(int(std::lround(std::clamp(b.position(event->u.do_click.screen_point.h),0.0,1.0)*(value.count-1))),0,int(value.count)-1);
+            const auto target=amount(event->u.do_click.screen_point.v),previous=value.points[index].value;
+            for(int i=std::min(index,next);i<=std::max(index,next);++i)value.points[i].value=index==next?target:previous+(target-previous)*double(i-index)/(next-index);
+            state.selected=next;event->u.do_click.continue_refcon[0]=next+1;
+        } else {
+            auto& point=value.points[index];if(index>0 && index<int(value.count)-1)point.age=std::clamp(b.position(event->u.do_click.screen_point.h),value.points[index-1].age+0.001,value.points[index+1].age-0.001);
+            point.value=amount(event->u.do_click.screen_point.v);state.selected=index;
+        }
+        changed=true;
     } else if(event->e_type==PF_Event_KEYDOWN) {
         const auto code=PF_KEYCODE_GET_CONTROL_CODE(event->u.key_down.keycode);
         if(code!=PF_ControlCode_Delete && code!=PF_ControlCode_Backspace)return PF_Err_NONE;
         const int index=state.selected;if(index>0 && index<int(value.count)-1 && value.count>2){for(unsigned i=index+1;i<value.count;++i)value.points[i-1]=value.points[i];--value.count;state.selected=0;changed=true;}
     } else return PF_Err_NONE;
     if(changed) {
-        if(!core::valid_age_curve(value,-32768,32768))return PF_Err_NONE;
-        std::array<PF_ParamDef,17> previous{};for(A_long i=0;i<17;++i){if(!params[layout::rotation_curve+i])return PF_Err_NONE;previous[i]=*params[layout::rotation_curve+i];}
-        params[layout::rotation_curve]->u.fs_d.value=value.count;
-        for(unsigned i=0;i<value.count;++i){params[layout::rotation_curve+1+2*i]->u.fs_d.value=value.points[i].age;params[layout::rotation_curve+2+2*i]->u.fs_d.value=value.points[i].value;}
-        for(A_long i=0;i<17;++i)params[layout::rotation_curve+i]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
-        PF_UserChangedParamExtra edited{};edited.param_index=layout::rotation_curve;
+        if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
+        std::array<PF_ParamDef,layout::curve_span> previous{};for(A_long i=0;i<layout::curve_span;++i){if(!params[base+i])return PF_Err_NONE;previous[i]=*params[base+i];}
+        params[base]->u.fs_d.value=value.count;
+        for(unsigned i=0;i<value.count;++i){params[base+1+2*i]->u.fs_d.value=value.points[i].age;params[base+2+2*i]->u.fs_d.value=value.points[i].value;}
+        params[mode_index]->u.fs_d.value=static_cast<unsigned>(value.interpolation);
+        for(A_long i=0;i<=2*value.count;++i)params[base+i]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
+        params[mode_index]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
+        PF_UserChangedParamExtra edited{};edited.param_index=base;
         const auto error=sync_node_graph_parameter(data,out,params,&edited,true);
-        if(error){for(A_long i=0;i<17;++i)*params[layout::rotation_curve+i]=previous[i];return error;}
+        if(error){for(A_long i=0;i<layout::curve_span;++i)*params[base+i]=previous[i];return error;}
         out->out_flags|=PF_OutFlag_REFRESH_UI|PF_OutFlag_FORCE_RERENDER;
     }
     invalidate(data,event);return PF_Err_NONE;

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 39: writable guarded gradient banks and canonical rotation readback.
-#define STARFIELD_VERSION_BUILD 39
-#define STARFIELD_VERSION_PACKED 32807 /* 0x8027 */
+// Build 40: native editor palettes, four curve modes and Linear/Hold color.
+#define STARFIELD_VERSION_BUILD 40
+#define STARFIELD_VERSION_PACKED 32808 /* 0x8028 */

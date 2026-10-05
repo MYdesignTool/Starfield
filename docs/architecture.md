@@ -1,5 +1,23 @@
 # Starfield plug-in architecture
 
+## M3-09 / build40 - editor catalogs and four curve modes
+
+Independent numeric data in schema/editor-presets.json generates native and CEP
+catalogs. Native Particle Color Gradient and Size/Opacity/Rotation Presets open
+an AE-owned modal thumbnail picker (20 curves,19 gradients, no folder replica).
+Curve payload byte2 carries Linear/Hold/Bezier/Draw; Draw stores64 sampled knots,
+Bezier uses automatic shape-preserving cubic tangents. Gradient byte2 carries
+Linear/Hold. Editors, graph codecs, native bank writers/readers and evaluated
+scene appearance share these modes. Force integrates constant/linear/cubic
+segments under drag. Active native banks are captured/published together.
+
+Particle7/base442 and Force3/base140 require fresh development effects/graphs.
+First8 knot disk IDs are retained, additional knots/interpolation use explicit
+3000-series IDs. Main26/index1/disk1631 retains its legacy8-knot transport;
+Emitter7/base34, Output4, Render.hpp, numeric Core ABI3 and snapshot3/200 bytes
+remain unchanged. Full paired deployment/rollback is required (ADR0030).
+Build39's guarded visibility and canonical rotation confirmation are included.
+
 ## P-03 / build39 - guarded writes and semantic readback
 
 The supervised native Panel Sync Guard opens conditional Color Gradient/Size Y

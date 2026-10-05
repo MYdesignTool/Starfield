@@ -42,7 +42,7 @@ inline const char* stage_name(Stage stage) noexcept {
 // No cross-effect transport, persistent schema or render-thread state.
 struct NativeEdit {
     struct Field { A_long index{}; ValueKind kind{}; std::array<double,4> value{}; };
-    std::array<Field,17> additional_fields{};
+    std::array<Field,native_nodes::particle_layout::curve_span> additional_fields{};
     std::uint32_t additional_count{};
     std::uint32_t node_kind{};
     A_long parameter_index{};
@@ -66,7 +66,7 @@ static_assert(std::is_trivially_copyable_v<NativeEdit>);
 inline bool valid_edit(const NativeEdit& edit) noexcept {
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
-    if (edit.node_kind > 3 || edit.node_kind == 2 || edit.additional_count>17 ||
+    if (edit.node_kind > 3 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
         edit.parameter_index <= 0 || edit.parameter_index > native_nodes::particle_layout::last || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
@@ -81,21 +81,28 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
 
 inline bool gradient_bank_parameter(std::uint32_t kind,A_long index) noexcept {
     namespace layout=native_nodes::particle_layout;
-    return kind==1 && index>=layout::gradient && index<layout::gradient_first+16;
+    return kind==1 && index>=layout::gradient && index<=layout::gradient_interpolation;
 }
-inline bool rotation_bank_parameter(std::uint32_t kind,A_long index) noexcept {
+inline bool age_bank_parameter(std::uint32_t kind,A_long index) noexcept {
     namespace layout=native_nodes::particle_layout;
-    return kind==1 && index>=layout::rotation_curve && index<layout::rotation_curve+17;
+    return kind==1 && layout::curve_base(index)!=0;
 }
-inline bool capture_rotation_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
+inline bool capture_age_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
     namespace layout=native_nodes::particle_layout;
-    if(!params || !rotation_bank_parameter(edit.node_kind,edit.parameter_index))return false;
+    if(!params || !age_bank_parameter(edit.node_kind,edit.parameter_index))return false;
     auto candidate=edit;candidate.additional_count=0;
-    for(A_long index=layout::rotation_curve;index<layout::rotation_curve+17;++index) {
+    const auto base=layout::curve_base(edit.parameter_index);
+    if(!params[base] || params[base]->param_type!=PF_Param_FLOAT_SLIDER)return false;
+    const auto count=params[base]->u.fs_d.value;
+    if(!std::isfinite(count) || std::floor(count)!=count || count<0 || count>layout::curve_points || count==1)return false;
+    const auto capture=[&](A_long index) {
         const auto* param=params[index];if(!param || param->param_type!=PF_Param_FLOAT_SLIDER)return false;
         NativeEdit::Field field;field.index=index;field.value[0]=param->u.fs_d.value;
         candidate.additional_fields[candidate.additional_count++]=field;
-    }
+        return true;
+    };
+    for(A_long index=base;index<=base+2*static_cast<A_long>(count);++index)if(!capture(index))return false;
+    if(!capture(layout::curve_interpolation(base)))return false;
     if(!valid_edit(candidate))return false;
     edit=candidate;return true;
 }
@@ -105,7 +112,7 @@ inline bool capture_gradient_bank(PF_ParamDef* params[],NativeEdit& edit) noexce
     namespace layout=native_nodes::particle_layout;
     if(!params || !gradient_bank_parameter(edit.node_kind,edit.parameter_index))return false;
     auto candidate=edit;candidate.additional_count=0;
-    for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
+    for(A_long index=layout::gradient;index<=layout::gradient_interpolation;++index) {
         const auto* param=params[index];if(!param)return false;
         NativeEdit::Field field;field.index=index;
         const bool color=index>=layout::gradient_first && (index-layout::gradient_first)%2==1;

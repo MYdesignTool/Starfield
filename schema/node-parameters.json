@@ -1,7 +1,7 @@
 {
-  "identityRevision": 5,
+  "identityRevision": 6,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
-  "migrationPolicy": "Development Particle schema6/base102 and Emitter schema7/base34: recreate test effects/graphs; no legacy migration per owner. Disk IDs remain explicit; new rotation and emitter Orient IDs are independent. Main binding layout24 and C ABI3 unchanged; transient evaluated-particle snapshot3/200 bytes requires paired native/Core deployment and rollback. ADR0028.",
+  "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main26/index1/disk1631 and numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "angleUiDefaults": "All native PF_Param_ANGLE controls start collapsed (PF_ParamFlag_START_COLLAPSED), including Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This changes the initial UI state only, preserves user expansion, and keeps keyframes/IDs/schemas unchanged. Build38 / ADR0028.",
   "fixed": {
@@ -93,7 +93,12 @@
     "rotation_curve_count": 960,
     "emitter_orient_x": 137,
     "emitter_orient_y": 138,
-    "emitter_orient_z": 139
+    "emitter_orient_z": 139,
+    "size_curve_interpolation": 3610,
+    "opacity_curve_interpolation": 3611,
+    "rotation_curve_interpolation": 3612,
+    "color_gradient_interpolation": 3613,
+    "wind_spin_curve_interpolation": 3614
   },
   "outgoingConnections": {
     "first": 500,
@@ -109,15 +114,35 @@
   "sizeCurve": {
     "ageFirst": 710,
     "valueFirst": 720,
-    "points": 8
+    "points": 64,
+    "extraAgeBase": 3000,
+    "extraValueBase": 3100,
+    "extraPointFirst": 8,
+    "interpolationId": 3610,
+    "interpolationModes": [
+      "Linear",
+      "Hold",
+      "Bezier",
+      "Draw"
+    ]
   },
   "opacityCurve": {
     "ageFirst": 810,
     "valueFirst": 820,
-    "points": 8
+    "points": 64,
+    "extraAgeBase": 3200,
+    "extraValueBase": 3300,
+    "extraPointFirst": 8,
+    "interpolationId": 3611,
+    "interpolationModes": [
+      "Linear",
+      "Hold",
+      "Bezier",
+      "Draw"
+    ]
   },
   "sharedOpacity": "Emitter and Particle reuse semantic disk ID 204 within separate effects. Each effect registers it once.",
-  "layoutRevision": 9,
+  "layoutRevision": 10,
   "reservedRemovedGroupIds": [
     100,
     122,
@@ -294,9 +319,9 @@
     "emitterSchemaVersion": 7,
     "speedRandomPercentKey": 22,
     "canonicalUnits": "Speed (key 12) remains layer-heights/second; authored Speed Random (key 22) is independent 0..100 percent. Key 13 remains the direct Settings world-unit amplitude input; authored key 22 takes precedence. Percent is retained at zero Speed.",
-    "forceSchemaVersion": 2,
+    "forceSchemaVersion": 3,
     "outputSchemaVersion": 4,
-    "particleSchemaVersion": 6
+    "particleSchemaVersion": 7
   },
   "nativeControlOrder": {
     "emitter": [
@@ -337,8 +362,8 @@
       "Particle Feather",
       "Up Axis",
       "Over Life",
-      "Size Over Life",
-      "Opacity Over Life",
+      "Size",
+      "Opacity",
       "Rotation Properties",
       "Orient To",
       "Angle X",
@@ -372,7 +397,17 @@
   "windSpinCurve": {
     "ageFirst": 910,
     "valueFirst": 920,
-    "points": 8
+    "points": 64,
+    "extraAgeBase": 3700,
+    "extraValueBase": 3800,
+    "extraPointFirst": 8,
+    "interpolationId": 3614,
+    "interpolationModes": [
+      "Linear",
+      "Hold",
+      "Bezier",
+      "Draw"
+    ]
   },
   "colorGradient": {
     "positionFirst": 940,
@@ -384,18 +419,35 @@
     "nativePositionFirstIndex": 13,
     "nativeColorFirstIndex": 14,
     "nativeStride": 2,
-    "nativePositionUnits": "0–100 percent"
+    "nativePositionUnits": "0–100 percent",
+    "interpolationId": 3613,
+    "interpolationIndex": 29,
+    "interpolationModes": [
+      "Linear",
+      "Hold"
+    ]
   },
   "rotationCurve": {
     "ageFirst": 970,
     "valueFirst": 980,
-    "points": 8,
+    "points": 64,
     "graphKey": 27,
     "nativeCountIndex": 82,
     "nativeFirstIndex": 83,
     "valueMin": -32768,
     "valueMax": 32768,
     "default": "flat zero",
-    "constant": true
-  }
+    "constant": true,
+    "extraAgeBase": 3400,
+    "extraValueBase": 3500,
+    "extraPointFirst": 8,
+    "interpolationId": 3612,
+    "interpolationModes": [
+      "Linear",
+      "Hold",
+      "Bezier",
+      "Draw"
+    ]
+  },
+  "editorCatalog": "schema/editor-presets.json: 20 independently authored curve profiles, 19 gradient palettes; native modal chooser at each editor Presets button, no vendor folder structure."
 }

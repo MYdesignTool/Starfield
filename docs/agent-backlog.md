@@ -1,5 +1,24 @@
 # Agent-ready implementation backlog
 
+## M3-09 - Editor curve/color presets and interpolation
+
+Owner: primary agent, current card after P-03 fix a624455/build39 compilation.
+Implementation candidate: build40 compiled cleanly with May2023 SDK /MT;
+JS/JSX syntax and patch whitespace pass. No tests requested/run. Actual AE
+Add/Replace, native modal picker and persisted four-mode behavior are owner gates.
+Owner supplies Over Life/color screenshots, excludes directory recreation, and
+requires editor-specific Presets entries plus exactly Linear/Hold gradients.
+ADR0030 owns numeric independent catalogs, native modal picker, Size/Opacity
+curve UI,64-knot curve/four-mode contract, Linear/Hold gradient persistence, native
+schemas/layout/readers/publishers, CEP editor roundtrips, generator/build/version
+and qualification docs. Owned: Settings/AgeCurve/ColorGradient, graph registry and Force curve integration,
+native NodeEffects/ParticleLayout/NodeRecord/NodeGraphSync/NativeNodeGraph/
+ParticleGradientUI/models, new catalog/picker/generator, schema/node-parameters,
+CEP graph/editor/default/bridge and build/docs. Render.hpp, C ABI3, GPU kernels
+and main parameter indices are outside this task; immutable evaluated scenes
+already carry resulting appearance. Fresh Particle7/Force3 are required, paired
+rollback to38 is retained, and actual AE behavior remains an owner gate.
+
 ## M3-08 - Reference procedural rotation controls
 
 Owner: primary agent. Depends on committed M3-07 movable gradients (381be4f).

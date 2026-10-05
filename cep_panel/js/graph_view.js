@@ -265,7 +265,7 @@
         }
         var view = new DataView(value.buffer, value.byteOffset, value.byteLength);
         var count = value[1];
-        if (value[0] !== 1 || count < 2 || count > 8 || value[2] !== 0 || value[3] !== 0 ||
+        if (value[0] !== 1 || count < 2 || count > 64 || value[2] > 3 || value[3] !== 0 ||
             value.length !== 4 + count * 16) fail("invalid_curve", "the graph contains a malformed over-life curve");
         points = [];
         for (var i = 0; i < count; i++) {
@@ -280,15 +280,18 @@
         if (points[0].age !== 0 || points[points.length - 1].age !== 1) {
             fail("invalid_curve", "over-life curves must have endpoints at 0 and 100 percent life");
         }
-        return { custom: true, points: points };
+        points.interpolation=value[2];return { custom: true, points: points, interpolation:value[2] };
     }
 
     function encodeCurve(points) {
-        if (!points || points.length < 2 || points.length > 8 || points[0].age !== 0 ||
+        var mode=points && points.interpolation===undefined?0:points && points.interpolation;
+        if(typeof mode!=="number" || Math.floor(mode)!==mode || mode<0 || mode>3)fail("invalid_curve","Unknown curve mode.");
+        if (!points || points.length < 2 || points.length > 64 || points[0].age !== 0 ||
             points[points.length - 1].age !== 1) fail("invalid_curve", "a curve needs fixed 0 and 100 percent endpoints");
         var bytes = new Uint8Array(4 + points.length * 16);
         bytes[0] = 1;
-        bytes[1] = points.length;
+        bytes[1] = points.length;bytes[2]=points.interpolation||0;
+        if(bytes[2]>3)fail("invalid_curve","Unknown curve mode.");
         var view = new DataView(bytes.buffer);
         for (var i = 0; i < points.length; i++) {
             if (!isFinite(points[i].age) || !isFinite(points[i].value) ||
@@ -303,7 +306,7 @@
 
     function decodeGradient(value) {
         if(value===undefined || value===null) return [{position:0,color:[1,1,1]},{position:1,color:[1,1,1]}];
-        if(!(value instanceof Uint8Array) || value.length<68 || value[0]!==1 || value[2]!==0 || value[3]!==0 ||
+        if(!(value instanceof Uint8Array) || value.length<68 || value[0]!==1 || value[2]>1 || value[3]!==0 ||
             value[1]<2 || value[1]>8 || value.length!==4+32*value[1]) fail("invalid_gradient","Malformed Color Gradient.");
         var view=new DataView(value.buffer,value.byteOffset,value.byteLength),stops=[];
         for(var i=0;i<value[1];i++) {
@@ -316,12 +319,13 @@
             }
             stops.push({position:position,color:color});
         }
-        return stops;
+        stops.interpolation=value[2];return stops;
     }
     function encodeGradient(stops) {
+        if(stops && stops.interpolation!==undefined && stops.interpolation!==0 && stops.interpolation!==1)fail("invalid_gradient","Unknown gradient mode.");
         if(!stops || stops.length<2 || stops.length>8) fail("invalid_gradient","A gradient requires 2–8 stops.");
         var bytes=new Uint8Array(4+32*stops.length),view=new DataView(bytes.buffer);
-        bytes[0]=1;bytes[1]=stops.length;
+        bytes[0]=1;bytes[1]=stops.length;bytes[2]=stops.interpolation||0;
         for(var i=0;i<stops.length;i++) {
             view.setFloat64(4+32*i,stops[i].position,true);
             for(var c=0;c<3;c++) view.setFloat64(12+32*i+8*c,stops[i].color[c],true);

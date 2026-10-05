@@ -1,5 +1,21 @@
 # Behavior inventory
 
+## M3-09 / build40 qualification
+
+Includes the owner-reported application failure fixes from build39 plus native
+editor-specific thumbnail presets and persisted interpolation. Curve modes are
+Linear/Hold/Bezier/Draw; colors are Linear/Hold.20 curve profiles and19 gradient
+palettes are independently authored from the supplied images, with automatic
+Bezier tangents and64-point Draw. Main transport remains8 knots. Particle7 and
+Force3 need fresh development effects/graphs; no legacy migration per owner.
+
+May2023 compilation without diagnostics and JS/JSX syntax pass. No tests requested
+or run. Pending AE2023 owner gates: all six complete-system presets Add/Replace
+(especially Warm Sparks/Orbital Drift), guard visibility restoration, native
+modal picker Apply/Cancel and undo, four-mode click cycling/freehand Draw,
+color Hold preview/output, save/reopen mode/64-knot retention. Existing main
+banner disclosure arrow remains unresolved; this card does not claim its removal.
+
 ## P-03 / build39 qualification
 
 Owner build38 confirms schema gating is no longer the reported failure: Warm

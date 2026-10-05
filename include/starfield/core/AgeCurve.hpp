@@ -10,7 +10,7 @@
 
 namespace starfield::core {
 
-// Nested opaque graph payload: version:u8, point_count:u8, reserved:u16,
+// Nested opaque graph payload: version:u8, point_count:u8, interpolation:u8, reserved:u8,
 // followed by point_count little-endian IEEE-754 binary64 age/value pairs.
 // The outer sequence codec supplies graph-level bounds and checksums.
 inline constexpr std::uint8_t kAgeCurvePayloadVersion = 1;
@@ -19,7 +19,8 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
 
 [[nodiscard]] inline bool valid_age_curve(const AgeCurve& curve, double value_min,
                                           double value_max) noexcept {
-    if (curve.count < 2 || curve.count > kMaxAgeCurvePoints) return false;
+    if (curve.count < 2 || curve.count > kMaxAgeCurvePoints ||
+        static_cast<unsigned>(curve.interpolation)>3) return false;
     if (curve.points[0].age != 0.0 || curve.points[curve.count - 1].age != 1.0) return false;
     double previous_age = -1.0;
     for (std::size_t i = 0; i < curve.count; ++i) {
@@ -39,14 +40,32 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
         return linear_start + (linear_end - linear_start) * age;
     }
     if (age <= curve.points[0].age) return curve.points[0].value;
-    for (std::size_t i = 1; i < curve.count; ++i) {
-        const auto& right = curve.points[i];
+    std::size_t low=1,high=curve.count-1;
+    while(low<high) {const auto middle=(low+high)/2;if(age>curve.points[middle].age)low=middle+1;else high=middle;}
+    const auto i=low;
+    const auto& right=curve.points[i];const auto& left=curve.points[i-1];
         if (age <= right.age) {
-            const auto& left = curve.points[i - 1];
             const double amount = (age - left.age) / (right.age - left.age);
-            return left.value + (right.value - left.value) * amount;
+            if(curve.interpolation==CurveInterpolation::hold)return age<right.age?left.value:right.value;
+            if(curve.interpolation!=CurveInterpolation::bezier)
+                return left.value + (right.value - left.value) * amount;
+            // Shape-preserving cubic Hermite slopes give cubic Bezier segments
+            // without overshoot, including plateaus and local extrema.
+            const auto slope=[&](std::size_t index) {
+                const auto secant=[&](std::size_t a,std::size_t b){return (curve.points[b].value-curve.points[a].value)/(curve.points[b].age-curve.points[a].age);};
+                if(index==0)return secant(0,1);
+                if(index+1==curve.count)return secant(index-1,index);
+                const auto a=secant(index-1,index),b=secant(index,index+1);
+                if(a*b<=0)return 0.0;
+                const auto h0=curve.points[index].age-curve.points[index-1].age,h1=curve.points[index+1].age-curve.points[index].age;
+                const auto w0=2*h1+h0,w1=h1+2*h0;
+                return (w0+w1)/(w0/a+w1/b);
+            };
+            const auto t=amount,t2=t*t,t3=t2*t,h=right.age-left.age;
+            const auto value=(2*t3-3*t2+1)*left.value+(t3-2*t2+t)*h*slope(i-1)+
+                (-2*t3+3*t2)*right.value+(t3-t2)*h*slope(i);
+            return std::clamp(value,std::min(left.value,right.value),std::max(left.value,right.value));
         }
-    }
     return curve.points[curve.count - 1].value;
 }
 
@@ -56,7 +75,7 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
     bytes.reserve(kAgeCurveHeaderBytes + curve.count * kAgeCurvePointBytes);
     bytes.push_back(static_cast<std::byte>(kAgeCurvePayloadVersion));
     bytes.push_back(static_cast<std::byte>(curve.count));
-    bytes.push_back(std::byte{0});
+    bytes.push_back(static_cast<std::byte>(curve.interpolation));
     bytes.push_back(std::byte{0});
     const auto append_u64 = [&bytes](std::uint64_t value) {
         for (unsigned int shift = 0; shift < 64; shift += 8) {
@@ -76,9 +95,10 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
     if (bytes.size() < kAgeCurveHeaderBytes || bytes.size() >
         kAgeCurveHeaderBytes + kMaxAgeCurvePoints * kAgeCurvePointBytes) return false;
     if (std::to_integer<std::uint8_t>(bytes[0]) != kAgeCurvePayloadVersion ||
-        std::to_integer<std::uint8_t>(bytes[2]) != 0 ||
+        std::to_integer<std::uint8_t>(bytes[2]) > 3 ||
         std::to_integer<std::uint8_t>(bytes[3]) != 0) return false;
     const auto count = std::to_integer<std::uint8_t>(bytes[1]);
+    curve.interpolation=static_cast<CurveInterpolation>(std::to_integer<std::uint8_t>(bytes[2]));
     if (count < 2 || count > kMaxAgeCurvePoints ||
         bytes.size() != kAgeCurveHeaderBytes + count * kAgeCurvePointBytes) return false;
     const auto read_u64 = [&bytes](std::size_t offset) {

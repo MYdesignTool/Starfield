@@ -8,7 +8,7 @@ namespace starfield::adapter::gradient_editor {
 using core::ColorGradient;
 constexpr double gap=0.001;
 inline bool valid(const ColorGradient& value) noexcept {
-    if(value.count<2 || value.count>8)return false;
+    if(value.count<2 || value.count>8 || static_cast<unsigned>(value.interpolation)>1)return false;
     for(unsigned i=0;i<value.count;++i) {
         const auto& stop=value.stops[i];
         if(!std::isfinite(stop.position) || stop.position<0 || stop.position>1 ||
