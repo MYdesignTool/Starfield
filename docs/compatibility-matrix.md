@@ -14,6 +14,8 @@ May2023 SDK /MT full build and patch whitespace pass, with no compiler diagnosti
 No tests requested/run. Pending owner checks: Linear/Hold/Bezier/Draw cycle on
 Size/Opacity/Rotation,64-sample freehand, Flip, native presets with dense curves,
 undo and reopen. Preset application has a reported pass; native43 clicks pending.
+Source73f478d is deployed as native43/panel42. Six binary and21 CEP hashes are
+verified with native40/panel42 paired rollback; actual native mode clicks pending.
 
 ## M3-09 / panel42 qualification
 

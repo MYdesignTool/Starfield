@@ -2,6 +2,31 @@
 
 ## M3-09 / native43 candidate - 2026-10-05
 
+Deployed at2026-10-05T17:40:44+08:00 from local source
+73f478d624bcd2d2ac80ddeda2f5dd37e5c8f5e0 after fresh read-only checks found
+neither AfterFX nor AfterFX_64. Native40 -> native43; panel42's21 sources and
+Core selector StarfieldCore-15DEAD2027EDB6B4.dll stay unchanged. All6 installed
+candidate hashes,6 saved native40 hashes and21 paired CEP hashes are verified.
+Existing plug-in/CEP Junction targets are retained. No process start/stop,
+cache/registry or host-wide settings changes. Actual AE mode clicks pending.
+Receipts: artifacts/build43-deploy-before.json, build43-deploy-after.json,
+build43-deploy.log and build43-rollback-report.log. Saved native40/panel42 pair:
+artifacts/disabled/m3-09-build43-dense-bindings-20261005. Read-only restore report
+passed; rollback was not performed. Undo with AE closed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-build43-dense-bindings-20261005' -Restore
+```
+
+| Installed file | SHA-256 |
+| --- | --- |
+| StarfieldParticle.aex | 7F3F744D4AEE0FC7D17142BF4815B859B7605CB202E4DA2A0B35672B082013CC |
+| StarfieldEmitter.aex | 8EFEEEEBDABB881E91BDF4482ED3BFDF4A0865C9F4C51E6D56ABC924DAB51D39 |
+| StarfieldParticleNode.aex | BD56D4FE7DE69EEBDF0BA7A5B3B10831CC302C63D0D4D79A7C65E2D79264DB36 |
+| StarfieldForce.aex | 91D80BC97E6D444671DF7297E0163B1899DCC4F2D3617919D9B9C07F82A66877 |
+| StarfieldHost.aex | 34701EA60EDAFBDE83921EA5D99632FD74BA04ABE4889FD57330888F9F5F698E |
+| StarfieldCore.dll | 15DEAD2027EDB6B466E187157D2FF24585CA60D99BD6F6A5BE82A5C6A98D18FF |
+
 Packed version32811/0x802B. Native binding record0x8002/version1 now uses the
 registered per-kind control count instead of retired81: Emitter34, Particle442,
 Force140. Serialization rejects fields outside that node; decoding checks both
@@ -14,7 +39,8 @@ running AE installation is retained. Compilation succeeded without compiler
 warnings/errors. Compilation log: artifacts/build43-native.log; patch whitespace
 review passes. The generated editor catalog retains its panel42 bytes.
 No tests requested/run. Prepared paired baseline is under
-artifacts/prepared/m3-09-build43-dense-bindings; actual deployment/AE gates pending.
+artifacts/prepared/m3-09-build43-dense-bindings. Deployment is complete as
+recorded above; actual AE qualification stays open.
 
 ## M3-09 / panel42 candidate - 2026-10-05
 
