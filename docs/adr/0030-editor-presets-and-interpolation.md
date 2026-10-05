@@ -72,3 +72,19 @@ Readers and writers share these scopes; no fallback to an ambiguous root label.
 Native binaries remain build40 (Particle7/Force3, main26, ABI3); only the21-file
 CEP bundle advances. Save paired40 panel and unchanged native files for rollback.
 JS/JSX syntax compilation is the implemented check; actual AE add remains open.
+
+## Panel generation42: PF topics are not scripting containers
+
+Owner41 reports missing Size from Over Life, identifying matchName
+org.starfieldfx.node.particle-2912.2912 is the registered PF_Param_GROUP_START;
+the41 nested PropertyGroup assumption fails on AE2023. Resolve these controls
+from the effect root by exact generated matchName and existing disk IDs instead.
+Match four-digit or equivalent unpadded decimal identity only; never fall back
+to a display label/topic path/stream index. Count, mode, first8 and extra knot
+IDs mirror schema/node-parameters.json and Native NodeRecord allocation. Scalar
+Particle Opacity204 and curve Opacity800 remain independent. All four banks
+share this resolver for writing and native readback. Existing sync/rollback and
+atomic request/reply generation guards stay intact; ready token derives from
+the gateway version. Advance only the21-file CEP bundle to42, keep native40 and
+retain paired41 rollback. No persistence/schema/ABI or native UI changes.
+Actual effect addition and preset/editor readback remain owner gates.

@@ -2,6 +2,14 @@
 
 ## M3-09 - Editor curve/color presets and interpolation
 
+Current owner follow-up: panel41 fails addition at Size under Over Life; the error
+identifies the PF topic2912 as the attempted scope.42 owns root disk-ID matchName
+binding for count/mode/all64 knot slots and Particle scalar Opacity on both read
+and write paths. Reject the41 topic-as-PropertyGroup assumption. Native40 and
+schemas remain unchanged. Preserve paired41 rollback and qualify actual AE
+effect addition/readback. No tests requested/run. Owned files: gateway, both
+client version markers, manifest/HTML URLs, schema binding policy and docs.
+
 Owner follow-up: build40 fails effect/node addition with missing Rotation Curve
 Count. Panel generation41 owns explicit scoped curve bindings and atomic node
 gateway mutations with request/reply generation checks. The reported old label's

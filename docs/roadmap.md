@@ -1,5 +1,12 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-09 / panel42 - correct failed topic scoping
+
+Owner panel41 addition fails at Size under PF topic Over Life. Bind all native
+curve fields and duplicate scalar Opacity by unique disk-ID matchName at the
+effect root. Qualify actual AE addition/readback before accepting41/42 or moving
+main31. Native40 and its schemas remain paired; no migration or host changes.
+
 ## M3-09 - Restore editor palettes from supplied references
 
 Current follow-up: panel41 fixes scoped curve bindings and node gateway dispatch

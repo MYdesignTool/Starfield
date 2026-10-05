@@ -1,5 +1,20 @@
 # Build and host matrix
 
+## M3-09 / panel42 candidate - 2026-10-05
+
+Panel-only correction for owner41 missing Size/Over Life report. Native40 files,
+Core selector, Particle7/Force3/main26 and existing Junctions remain unchanged.
+Curve count/mode/all64 knot slots and scalar Opacity resolve by
+exact native disk-ID matchName at the effect root. No PF topic child traversal
+or ambiguous display-name fallback for these controls. Atomic dispatch is retained;
+the main ready token is derived from the single gateway version constant.
+All bundle versions, bridge generations and HTML resource URLs advance to42.
+
+Prepared baseline: artifacts/prepared/m3-09-panel42-flat-curve-ids contains all21
+hash-verified prior41 CEP sources. Deployment/rollback receipts follow below.
+JS/JSX syntax, schema JSON/manifest XML parsing and git diff --check pass.
+No native recompilation or tests requested/run; actual AE addition is pending.
+
 ## M3-09 / panel41 candidate - 2026-10-05
 
 Deployed at2026-10-05T17:09:19+08:00 from local source

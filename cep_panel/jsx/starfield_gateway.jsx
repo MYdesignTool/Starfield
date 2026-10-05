@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-41";
+    var GATEWAY_BUILD = "native-presets-42";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -375,11 +375,12 @@
         return Object.prototype.hasOwnProperty.call(NATIVE_NODE_TYPES, type) ? NATIVE_NODE_TYPES[type] : null;
     }
 
-    function findEffectProperty(effect, name) {
+    function findEffectProperty(effect, name, byMatchName) {
         if (!effect) return null;
+        var identity = byMatchName ? "matchName" : "name";
         try {
             var direct = effect.property(name);
-            if (direct && direct.name === name) return direct;
+            if (direct && direct[identity] === name) return direct;
         } catch (ignored) { /* recurse through parameter groups */ }
         var count = 0;
         try { count = Number(effect.numProperties) || 0; } catch (ignoredCount) { count = 0; }
@@ -387,8 +388,8 @@
             var child = null;
             try { child = effect.property(i); } catch (ignoredChild) { child = null; }
             if (!child) continue;
-            if (child.name === name) return child;
-            var nested = findEffectProperty(child, name);
+            if (child[identity] === name) return child;
+            var nested = findEffectProperty(child, name, byMatchName);
             if (nested) return nested;
         }
         return null;
@@ -408,14 +409,22 @@
         return result === "00000000000000000000000000000000" ? null : result;
     }
 
-    // Count labels are public editor names, not names synthesized from a bank.
-    // Opacity also exists under Particle Properties, so bind the whole curve
-    // bank inside its registered native group for both reading and writing.
+    // PF topics are presentation markers, not scripting PropertyGroups. Resolve
+    // the root effect's unique disk-ID match names, never children of a topic or
+    // duplicate display labels. IDs mirror schema/node-parameters.json/NodeRecord.
     var NATIVE_CURVE_CONTROLS = {
-        Size: { group: "Over Life", count: "Size", mode: "Size Curve Interpolation", prefix: "Size Curve ", age: " Age" },
-        Opacity: { group: "Over Life", count: "Opacity", mode: "Opacity Curve Interpolation", prefix: "Opacity Curve ", age: " Age" },
-        Rotation: { group: "Rotation Properties", count: "Rotation Over Life", mode: "Rotation Curve Interpolation", prefix: "Rotation Curve ", age: " Life" },
-        "Wind and Spin": { group: null, count: "Wind and Spin Curve Count", mode: "Wind and Spin Curve Interpolation", prefix: "Wind and Spin Curve ", age: " Age" }
+        Size: { effect: "org.starfieldfx.node.particle", count: { name: "Size", diskId: 700 },
+            mode: { name: "Size Curve Interpolation", diskId: 3610 }, prefix: "Size Curve ", age: " Age",
+            ageFirst: 710, valueFirst: 720, extraAgeBase: 3000, extraValueBase: 3100 },
+        Opacity: { effect: "org.starfieldfx.node.particle", count: { name: "Opacity", diskId: 800 },
+            mode: { name: "Opacity Curve Interpolation", diskId: 3611 }, prefix: "Opacity Curve ", age: " Age",
+            ageFirst: 810, valueFirst: 820, extraAgeBase: 3200, extraValueBase: 3300 },
+        Rotation: { effect: "org.starfieldfx.node.particle", count: { name: "Rotation Over Life", diskId: 960 },
+            mode: { name: "Rotation Curve Interpolation", diskId: 3612 }, prefix: "Rotation Curve ", age: " Life",
+            ageFirst: 970, valueFirst: 980, extraAgeBase: 3400, extraValueBase: 3500 },
+        "Wind and Spin": { effect: "org.starfieldfx.node.force", count: { name: "Wind and Spin Curve Count", diskId: 900 },
+            mode: { name: "Wind and Spin Curve Interpolation", diskId: 3614 }, prefix: "Wind and Spin Curve ", age: " Age",
+            ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 }
     };
 
     function nativeCurveBank(effect, label) {
@@ -423,17 +432,41 @@
             throw new Error("Unsupported native curve bank: " + label);
         }
         var controls = NATIVE_CURVE_CONTROLS[label];
-        var scope = controls.group ? findEffectProperty(effect, controls.group) : effect;
-        if (!scope) throw new Error("Node curve group is missing: " + controls.group + " (" + GATEWAY_BUILD + ")");
-        return { controls: controls, scope: scope };
+        if (!effect || effect.matchName !== controls.effect) {
+            throw new Error("Native curve effect mismatch: " + label + " (" + GATEWAY_BUILD + ")");
+        }
+        return { controls: controls, scope: effect };
     }
 
-    function findNodeControl(effect, name) {
-        if (effect && effect.matchName === "org.starfieldfx.node.particle" && name === "Opacity") {
-            var properties = findEffectProperty(effect, "Particle Properties");
-            return properties ? findEffectProperty(properties, name) : null;
+    function nativeCurvePointControl(bank, point, value) {
+        if (point < 0 || point >= 64 || Math.floor(point) !== point) throw new Error("Invalid native curve point.");
+        var controls = bank.controls;
+        return { name: controls.prefix + point + (value ? " Value" : controls.age),
+            diskId: (point < 8 ? (value ? controls.valueFirst : controls.ageFirst) :
+                (value ? controls.extraValueBase : controls.extraAgeBase)) + point };
+    }
+
+    function nodeControlName(control) {
+        return typeof control === "string" ? control : control.name + " [disk " + control.diskId + "]";
+    }
+
+    function findNodeDiskControl(effect, diskId) {
+        if (!effect || !nativeNodeTypeByMatch(effect.matchName) || diskId < 1 || diskId > 9999 ||
+            Math.floor(diskId) !== diskId) return null;
+        var suffix = String(diskId);
+        while (suffix.length < 4) suffix = "0" + suffix;
+        var property = findEffectProperty(effect, effect.matchName + "-" + suffix, true);
+        // Both spellings still identify exactly the same native disk ID; never
+        // fall back to a display name, topic path, or mutable parameter index.
+        return property || findEffectProperty(effect, effect.matchName + "-" + diskId, true);
+    }
+
+    function findNodeControl(effect, control) {
+        if (control && typeof control === "object") return findNodeDiskControl(effect, control.diskId);
+        if (effect && effect.matchName === "org.starfieldfx.node.particle" && control === "Opacity") {
+            return findNodeDiskControl(effect, 204);
         }
-        return findEffectProperty(effect, name);
+        return findEffectProperty(effect, control);
     }
 
     function setNodeIdentity(effect, id) {
@@ -484,8 +517,8 @@
         return left === right;
     }
 
-    function setNodeControl(effect, name, value) {
-        var property = findNodeControl(effect, name);
+    function setNodeControl(effect, control, value) {
+        var property = findNodeControl(effect, control), name = nodeControlName(control);
         if (!property || typeof property.setValue !== "function") {
             throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ", " + GATEWAY_BUILD + ")");
         }
@@ -567,8 +600,8 @@
         setNodeControl(bank.scope, controls.count, points.length);
         setNodeControl(bank.scope, controls.mode, bytes ? bytes[2] : 0);
         for (var p = 0; p < points.length; p++) {
-            setNodeControl(bank.scope, controls.prefix + p + controls.age, points[p].age);
-            setNodeControl(bank.scope, controls.prefix + p + " Value", points[p].value);
+            setNodeControl(bank.scope, nativeCurvePointControl(bank, p, false), points[p].age);
+            setNodeControl(bank.scope, nativeCurvePointControl(bank, p, true), points[p].value);
         }
     }
 
@@ -603,9 +636,9 @@
         bytes.push((exponent >> 4) | sign);
     }
 
-    function nodeControlValue(effect, name) {
-        var property = findNodeControl(effect, name);
-        if (!property) throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ")");
+    function nodeControlValue(effect, control) {
+        var property = findNodeControl(effect, control);
+        if (!property) throw new Error("Node effect parameter is missing: " + nodeControlName(control) + " (" + effect.matchName + ", " + effect.name + ", " + GATEWAY_BUILD + ")");
         return property.value;
     }
 
@@ -684,8 +717,8 @@
                 if (Math.floor(forceCount)!==forceCount || forceCount<2 || forceCount>64) throw new Error("Invalid Force curve count.");
                 var forceBytes=[1,forceCount,Number(nodeControlValue(forceBank.scope, forceBank.controls.mode)),0];
                 for (var fp=0;fp<forceCount;fp++) {
-                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, forceBank.controls.prefix+fp+forceBank.controls.age)));
-                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, forceBank.controls.prefix+fp+" Value")));
+                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, nativeCurvePointControl(forceBank,fp,false))));
+                    appendFloat64(forceBytes,Number(nodeControlValue(forceBank.scope, nativeCurvePointControl(forceBank,fp,true))));
                 }
                 node.parameters.push({key:"9",type:7,value:forceBytes});
             }
@@ -729,8 +762,8 @@
                 if (Math.floor(count) !== count || count < 2 || count > 64) throw new Error("A node curve count is invalid.");
                 var bytes = [1, count, Number(nodeControlValue(bank.scope, bank.controls.mode)), 0];
                 for (var point = 0; point < count; point++) {
-                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, bank.controls.prefix+point+bank.controls.age)));
-                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, bank.controls.prefix+point+" Value")));
+                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, nativeCurvePointControl(bank,point,false))));
+                    appendFloat64(bytes, Number(nodeControlValue(bank.scope, nativeCurvePointControl(bank,point,true))));
                 }
                 node.parameters.push({ key: String(curves[c][0]), type: 7, value: bytes });
             }

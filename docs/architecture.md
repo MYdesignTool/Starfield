@@ -1,5 +1,17 @@
 # Starfield plug-in architecture
 
+## M3-09 / panel42 - native disk-ID bindings
+
+Owner panel41 evidence reports Size missing from Over Life, whose matchName is
+org.starfieldfx.node.particle-2912. Registration defines2912 as a PF topic marker;
+the41 assumption that it is a scripting PropertyGroup is rejected by this host
+result.42 resolves curve count, interpolation and all64 knot slots from the root
+effect by exact disk-ID matchName. Particle scalar Opacity uses204; curve count
+uses800. IDs mirror schema/node-parameters.json and NodeRecord.hpp, including the
+first8 and extra knot ranges. No name/topic/index fallback is used for these
+controls. Reader and writer share the resolver; existing guard, revision,
+rollback, timeout and atomic gateway-generation checks remain. Native40 unchanged.
+
 ## M3-09 / panel41 - curve scopes and atomic node calls
 
 Native curve names are explicit entries bound to Over Life or Rotation Properties;

@@ -7,7 +7,8 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/native-presets-41";
+    var GATEWAY_BUILD = "native-presets-42";
+    var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
         var bridge=window.__adobe_cep__;
@@ -143,7 +144,6 @@
     // Read operations can reuse the current generation. Every write reloads and
     // invokes the gateway in one host turn, so a different CEP page cannot replace
     // global entry points between a cached readiness probe and a mutation.
-    var GATEWAY_BUILD = "native-presets-41";
     function call(operation, extra, callback) {
         var root = extensionRoot();
         if (!root) {

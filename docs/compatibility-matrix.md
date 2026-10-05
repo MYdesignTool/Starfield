@@ -1,5 +1,17 @@
 # Behavior inventory
 
+## M3-09 / panel42 qualification
+
+Owner panel41 rejects effect addition: missing Size under Over Life, with marker
+matchName org.starfieldfx.node.particle-2912 and gateway native-presets-41. This
+confirms the new gateway ran; the failing scope is a PF topic, not a child
+PropertyGroup.42 binds native curve fields and scalar Opacity by disk-ID matchName
+on the effect root. Native40/Particle7/Force3 and value contracts stay unchanged.
+JS/JSX syntax and patch review are recorded separately from owner AE qualification.
+No tests requested/run. Pending: addition, bootstrap/native readback, scalar
+Opacity vs over-life curve count, all three Particle curves, Force curve, and
+full-system preset Add/Replace.41 is a failed repair, not a supported checkpoint.
+
 ## M3-09 / panel41 qualification
 
 Owner build40 fails addition with node_effect_sync_failed / missing Rotation
