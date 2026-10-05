@@ -1,5 +1,21 @@
 # Behavior inventory
 
+## M3-09 / native44 qualification
+
+Owner reports native43 functionality usable; Draw edits wait nearly ten seconds
+before composition rendering. This is host feedback, not an instrumented profile.
+Inspection finds full publication per mouse event, repeated alias evaluation and
+many tiny rectangle draws. Their individual time contributions are hypotheses.
+Native44 defers a Draw stroke to release, paints one curve path and verifies
+evaluated values only for installed/repaired aliases after exact per-alias checks.
+Keep 64 samples, panel42, existing schema/disk IDs and render-time validation.
+No tests requested/run. Pending owner AE2023 checks: responsive local stroke,
+release wait excluding composition render, simple click, mode/preset switching,
+keyboard cancellation, undo/reopen and independently targeted Size/Opacity/Rotation.
+Build/deployment evidence will be recorded separately from actual host timing.
+Full May2023 /MT candidate build passes without compiler diagnostics. Patch
+whitespace and deployment-wrapper syntax pass. No actual AE latency measured.
+
 ## M3-09 / native43 qualification
 
 Owner panel42/native40 reports most functionality working and presets applying,

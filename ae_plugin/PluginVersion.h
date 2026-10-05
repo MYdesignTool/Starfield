@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 43: native binding record bounds follow the current 64-knot node layouts.
-#define STARFIELD_VERSION_BUILD 43
-#define STARFIELD_VERSION_PACKED 32811 /* 0x802B */
+// Build 44: defer Draw strokes, stroke curves once, and verify only changed aliases.
+#define STARFIELD_VERSION_BUILD 44
+#define STARFIELD_VERSION_PACKED 32812 /* 0x802C */

@@ -1,5 +1,24 @@
 # Starfield plug-in architecture
 
+## M3-09 / native44 - Draw stroke publication
+
+Draw owns a CPU-only 64-sample draft keyed by UI context, native node UUID and
+curve bank. Mouse events update this draft and invalidate only the control;
+the last drag event publishes the whole bank once and requests composition
+rendering. Keyboard cancellation, a newer host curve or context closure discards
+the draft. No AE stream/world/suite objects escape a callback. UI state is bounded.
+No-op strokes skip publication; only changed bank leaves receive AE change flags.
+Curve previews use one Drawbot stroked path with at most 221 sampled vertices,
+replacing the previous per-pixel rectangle sequence without changing evaluation.
+
+Binding installation still resolves every alias and checks its stream type,
+enabled state and exact expression against the freshly compiled identity and
+parameter. Matching aliases need no value snapshot/evaluation. Installed or
+repaired aliases retain sentinel setup, rollback and evaluated-value checks.
+Render-time availability/identity checks remain intact. There is no readiness
+cache. Main26, Particle7, Force3, Core ABI3, snapshot3 and panel42 are retained.
+Build44 requires full AEX deployment; AE timing is not established by compilation.
+
 ## M3-09 / native43 - dense binding-record limits
 
 Owner panel42/native40 reports working preset application but native Size mode

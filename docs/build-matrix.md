@@ -1,5 +1,28 @@
 # Build and host matrix
 
+## M3-09 / native44 candidate - 2026-10-05
+
+Draw uses a local 64-sample draft until mouse release; the curve is stroked once.
+Only changed leaves are flagged. Binding snapshots/evaluation apply only to
+installed/repaired aliases after type, exact expression and enabled-state checks.
+Packed AEX version is 32812/0x802C (build44). Main26, Particle7/base442,
+Force3/base140, Core ABI3, snapshot3/200 bytes and panel42 remain unchanged.
+Full May2023 /MT compilation passes without C++ or MSBuild warnings/errors;
+final log is artifacts/build44-native.log. The initial context-cleanup compile
+error is corrected; its log is retained as build44-native-attempt1.log. Patch
+whitespace and deployment-wrapper syntax pass. No tests requested/run, and no
+claimed AE speedup without the owner's timing feedback. Deployment is pending.
+All 21 panel42 sources are saved and hash verified under
+artifacts/prepared/m3-09-build44-draw-edit. Save native43 with that panel for
+paired rollback through the existing single Junction and standing authorization.
+
+The rollback, after this installation and with AE closed, is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-09-build44-draw-edit-20261005' -Restore
+```
+
+
 ## M3-09 / native43 candidate - 2026-10-05
 
 Deployed at2026-10-05T17:40:44+08:00 from local source

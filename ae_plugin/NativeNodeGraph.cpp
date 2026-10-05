@@ -1059,12 +1059,6 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 AEGP_StreamType type = AEGP_StreamType_NO_DATA;
                 ae = tx.suites.stream->AEGP_GetStreamType(change.ref, &type);
                 if (ae || type != AEGP_StreamType_OneD) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
-                const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
-                AEGP_StreamValue2 previous{};
-                ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, TRUE, &previous);
-                if (ae) return static_cast<PF_Err>(ae);
-                change.previous_value = previous.val.one_d;
-                tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &change.enabled);
                 if (ae) return static_cast<PF_Err>(ae);
                 AEGP_MemHandle handle{};
@@ -1086,6 +1080,15 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 }
                 const auto desired = binding_expression(node, index, component);
                 if (change.previous == desired && change.enabled) continue;
+                // Snapshot values only for aliases we will actually mutate.
+                // An unchanged, enabled expression was checked against the exact
+                // freshly compiled node identity and source parameter above.
+                const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
+                AEGP_StreamValue2 previous{};
+                ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, TRUE, &previous);
+                if (ae) return static_cast<PF_Err>(ae);
+                change.previous_value = previous.val.one_d;
+                tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 change.changed = true;
                 AEGP_StreamValue2 sentinel{}; sentinel.streamH = change.ref; sentinel.val.one_d = kNativeBindingUnavailable;
                 ae = tx.suites.stream->AEGP_SetStreamValue(tx.id, change.ref, &sentinel);
@@ -1095,9 +1098,12 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 if (ae) return static_cast<PF_Err>(ae);
             }
         }
-        // Suite success alone does not prove an expression evaluated in AE.
+        // Newly installed/repaired expressions must evaluate before acceptance.
+        // Matching enabled aliases were not modified: repeatedly evaluating all
+        // of them on a constant curve edit adds host work without a new binding.
         const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
         for (const auto& change : tx.changes) {
+            if (!change.changed) continue;
             if (failed_stream) *failed_stream = change.index;
             AEGP_StreamValue2 evaluated{};
             ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, FALSE, &evaluated);

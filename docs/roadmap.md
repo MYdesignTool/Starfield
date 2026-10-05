@@ -1,5 +1,16 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-09 / native44 - reduce Draw edit latency
+
+Owner reports native43 usable, with nearly ten seconds spent on a Draw edit
+before rendering. Defer the 64-sample stroke publication until mouse release,
+use one stroked preview path and update only changed native leaves. Resolve
+and check every animation alias, evaluating only newly installed/repaired ones.
+Preserve atomic graph publication, rollback and render checks. No schema changes.
+Build and deploy with paired native43/panel42 rollback, then obtain actual owner
+stroke/release latency and undo/reopen evidence. The inspected source overheads
+are not a measured breakdown of the ten-second host wait. No tests requested/run.
+
 ## M3-09 / native43 - finish four-mode native clicks
 
 Owner reports most panel42 functions and preset application working; native

@@ -102,3 +102,31 @@ No wire, schema, disk ID, main26, Core ABI3, snapshot3 or Render.hpp change;
 no migration needed. Retain panel42. Packed native version advances to32811/43;
 full AEX installation must wait for AE closed and save paired native40/panel42
 rollback. Actual four-mode/Draw/undo/reopen remains an owner qualification gate.
+
+## Native44: Draw editing cost and release semantics
+
+The owner reports native43 usable but a Draw edit takes nearly ten seconds before
+rendering. Source inspection identifies publication for every mouse event,
+unconditional alias value snapshots/evaluation and per-pixel preview rectangles.
+These are overhead candidates; no measured host time breakdown is available.
+
+Keep 64 samples and the current wire/disk/schema contracts. During a Draw stroke,
+store an owned CPU draft keyed by UI context, node UUID and curve bank (bounded
+to 64 UI states). Redraw only the control. Publish the entire bank atomically
+on the last drag event, then request composition rendering. Keyboard input,
+context closure or changed host curve cancels the draft; a later drag cannot
+publish it. A new click starts from authored host values. No SDK object is kept
+for later use. No-op strokes skip publication; only changed leaves are flagged.
+Draw is now a stroke preview until release; composition previews do not update
+for intermediate mouse samples. Other interpolation modes retain immediate edits.
+All curve previews use one Drawbot StrokePath with at most 221 sampled vertices.
+
+Installation still resolves every binding alias and checks its type, enabled
+state and exact expression generated from the fresh compiled node identity and
+source parameter. Snapshot previous values and evaluate only aliases that need
+installation/repair. These keep sentinel setup, evaluated finite/availability
+checks and transaction rollback. Matching aliases are not modified and need no
+new value proof at edit time; render-time validation remains unchanged. No global
+readiness cache is added. Advance only packed native version to 32812/build44,
+retain panel42 and save paired native43/panel42 rollback. Full AEX compilation
+and deployment do not establish an AE latency target; owner timing is required.

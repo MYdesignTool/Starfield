@@ -2,6 +2,21 @@
 
 ## M3-09 - Editor curve/color presets and interpolation
 
+Current owner follow-up: native43 is usable, but a Draw edit waits nearly ten
+seconds before composition rendering. Native44 owns ParticleGradientUI,
+NativeNodeGraph, PluginVersion and ADR0030/build/qualification docs. Keep the
+64 samples and existing IDs/schemas. Draw uses an owned UI draft during a stroke
+and one atomic publication on release; cancel on keyboard, external changes or
+context closure. Stroke the preview once and mark only changed native leaves.
+Check every alias's exact expression/type/enabled state, but snapshot and evaluate
+only installed/repaired aliases. Preserve rollback and render-time validation.
+Source overheads are inspection findings; their share of AE latency is unmeasured.
+No tests requested/run. Full build, paired native43/panel42 rollback and actual
+owner Draw timing remain required; other owner qualification gates stay open.
+Full May2023 /MT candidate compilation and patch whitespace pass. The final log
+is artifacts/build44-native.log; no tests requested/run. The 21-file panel42
+baseline is prepared and hash verified. Deployment and actual AE timing pending.
+
 Current owner follow-up: panel42 most functions and preset application pass;
 native mode click still fails animation binding, parameter36/stream-1/error516.
 Native43 owns NativeNodeGraph binding writer/reader bounds, PluginVersion and

@@ -4,13 +4,18 @@
 #include "EditorPresetPicker.hpp"
 #include "starfield/core/AgeCurve.hpp"
 #include "NodeEffects.hpp"
+#include "NodeRecord.hpp"
 #include "AE_EffectSuites.h"
 #include "AE_EffectCBSuites.h"
 #include "SPBasic.h"
 #include <adobesdk/DrawbotSuite.h>
 #include <array>
+#include <algorithm>
 #include <map>
 #include <optional>
+#include <span>
+#include <tuple>
+#include <cstdint>
 #include <cstdio>
 
 namespace starfield::adapter {
@@ -22,8 +27,25 @@ struct UIState {int selected{};bool bitmap_disabled{};};
 // CLOSE_CONTEXT erases them; selection has no effect on authored values.
 std::map<PF_ContextH,UIState> contexts;
 std::optional<core::ColorGradient> clipboard;
-std::map<PF_ContextH,UIState> curve_contexts;
+struct CurveUIState {
+    int selected{};
+    core::AgeCurve original{};
+    double original_count{};
+    std::optional<core::AgeCurve> draft;
+};
+using CurveContextKey=std::tuple<std::uintptr_t,std::array<std::uint16_t,8>,A_long>;
+std::map<CurveContextKey,CurveUIState> curve_contexts;
+void erase_curve_context(PF_ContextH context) noexcept {
+    const auto token=reinterpret_cast<std::uintptr_t>(context);
+    std::erase_if(curve_contexts,[&](const auto& entry){return std::get<0>(entry.first)==token;});
+}
 std::optional<core::AgeCurve> curve_clipboard;
+bool same_curve(const core::AgeCurve& a,const core::AgeCurve& b) noexcept {
+    if(a.count!=b.count || a.interpolation!=b.interpolation)return false;
+    for(unsigned i=0;i<a.count;++i)
+        if(a.points[i].age!=b.points[i].age || a.points[i].value!=b.points[i].value)return false;
+    return true;
+}
 template<class T> struct Suite {
     SPBasicSuite* basic;const char* name;A_long version;const T* value{};
     Suite(SPBasicSuite* b,const char* n,A_long v):basic(b),name(n),version(v) {
@@ -104,6 +126,20 @@ struct Canvas {
         }
         if(path)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(path));
         if(brush)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(brush));
+    }
+    void polyline(std::span<const DRAWBOT_PointF32> points) const {
+        if(points.size()<2)return;
+        const DRAWBOT_ColorRGBA color{0.85f,0.85f,0.86f,1};
+        DRAWBOT_PenRef pen{};DRAWBOT_PathRef path{};
+        if(!supplier->NewPen(source,&color,1.5f,&pen) && pen &&
+           !supplier->NewPath(source,&path) && path) {
+            auto error=paths->MoveTo(path,points[0].x,points[0].y);
+            for(std::size_t i=1;i<points.size() && !error;++i)
+                error=paths->LineTo(path,points[i].x,points[i].y);
+            if(!error)(void)surface->StrokePath(target,pen,path);
+        }
+        if(path)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(path));
+        if(pen)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(pen));
     }
     void text(float x,float y,const char* label,bool enabled=true) const {
         std::array<DRAWBOT_UTF16Char,96> string{};
@@ -223,7 +259,7 @@ PF_Err particle_gradient_param_ui(PF_InData* data,PF_ParamDef* params[]) noexcep
 }
 PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
     if(!event || !data || !out)return PF_Err_NONE;
-    if(event->e_type==PF_Event_CLOSE_CONTEXT){contexts.erase(event->contextH);curve_contexts.erase(event->contextH);return PF_Err_NONE;}
+    if(event->e_type==PF_Event_CLOSE_CONTEXT){contexts.erase(event->contextH);erase_curve_context(event->contextH);return PF_Err_NONE;}
     if(!event->contextH || event->effect_win.index!=layout::gradient || event->effect_win.area!=PF_EA_CONTROL)return PF_Err_NONE;
     core::ColorGradient value;if(!read(params,value))return PF_Err_NONE;
     if(contexts.size()>=64 && !contexts.contains(event->contextH))contexts.erase(contexts.begin());
@@ -266,7 +302,10 @@ PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* para
 
 PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
     if(!data || !out || !event)return PF_Err_NONE;
-    if(event->e_type==PF_Event_CLOSE_CONTEXT){curve_contexts.erase(event->contextH);return PF_Err_NONE;}
+    if(event->e_type==PF_Event_CLOSE_CONTEXT){
+        erase_curve_context(event->contextH);
+        return PF_Err_NONE;
+    }
     if(!event->contextH || !layout::curve_base(event->effect_win.index) || event->effect_win.area!=PF_EA_CONTROL ||
        !params || !params[event->effect_win.index])return PF_Err_NONE;
     const auto base=event->effect_win.index;
@@ -294,8 +333,34 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         }
     }
     if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
-    if(curve_contexts.size()>=64 && !curve_contexts.contains(event->contextH))curve_contexts.erase(curve_contexts.begin());
-    auto& state=curve_contexts[event->contextH];state.selected=std::clamp(state.selected,0,int(value.count)-1);
+    std::array<std::uint16_t,8> identity{};
+    const auto identity_first=native_nodes::uuid_first_index(native_nodes::Kind::particle);
+    for(A_long i=0;i<8;++i) {
+        const auto* field=params[identity_first+i];
+        if(!field || field->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;
+        const auto word=field->u.fs_d.value;
+        if(!std::isfinite(word) || word<0 || word>65535 || std::floor(word)!=word)return PF_Err_NONE;
+        identity[i]=static_cast<std::uint16_t>(word);
+    }
+    const CurveContextKey key{reinterpret_cast<std::uintptr_t>(event->contextH),identity,base};
+    if(curve_contexts.size()>=64 && !curve_contexts.contains(key))curve_contexts.erase(curve_contexts.begin());
+    auto& state=curve_contexts[key];
+    const auto authored=value;
+    // Drafts contain only owned CPU values. Undo/external edits, keyboard
+    // cancellation or a new click cannot overwrite newer host parameters.
+    if(state.draft) {
+        if(event->e_type==PF_Event_KEYDOWN) {
+            state.draft.reset();invalidate(data,event);return PF_Err_NONE;
+        }
+        if(event->e_type==PF_Event_DO_CLICK || state.original_count!=count || !same_curve(state.original,authored)) {
+            state.draft.reset();
+            if(event->e_type==PF_Event_DRAG){invalidate(data,event);return PF_Err_NONE;}
+        } else value=*state.draft;
+    } else if(event->e_type==PF_Event_DRAG && value.interpolation==core::CurveInterpolation::draw) {
+        // A cancelled/evicted draft has no authored host changes to finish.
+        invalidate(data,event);return PF_Err_NONE;
+    }
+    state.selected=std::clamp(state.selected,0,int(value.count)-1);
     const Bounds b(event->effect_win);
     double span=360;for(unsigned i=0;i<value.count;++i)span=std::max(span,std::abs(value.points[i].value));
     const auto px=[&](double age){return b.x+float(age)*b.width;};
@@ -304,15 +369,13 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
     if(event->e_type==PF_Event_DRAW) {
         Canvas c(data,event->contextH);if(!c)return PF_Err_NONE;
         c.rect(b.x,b.y,b.width,81,{0.18f,0.18f,0.19f,1});c.rect(b.x,b.y+40,b.width,1,{0.35f,0.35f,0.36f,1});
-        for(int x=0;x<=int(b.width);++x) {
-            const auto sampled=core::evaluate_age_curve(value,double(x)/b.width,100,100);
-            c.rect(b.x+x,py(sampled),1.5f,1.5f,{0.85f,0.85f,0.86f,1});
-            if(x) {
-                const auto last=core::evaluate_age_curve(value,double(x-1)/b.width,100,100);
-                const auto y0=py(last),y1=py(sampled);
-                for(float y=std::min(y0,y1);y<std::max(y0,y1);y+=1)c.rect(b.x+x,y,1,1,{0.85f,0.85f,0.86f,1});
-            }
+        std::array<DRAWBOT_PointF32,221> samples{};
+        const auto columns=static_cast<unsigned>(std::ceil(b.width));
+        for(unsigned x=0;x<=columns;++x) {
+            const auto horizontal=std::min(float(x),b.width);
+            samples[x]={b.x+horizontal,py(core::evaluate_age_curve(value,double(horizontal)/b.width,100,100))};
         }
+        c.polyline(std::span{samples.data(),std::size_t(columns)+1});
         if(value.interpolation!=core::CurveInterpolation::draw)for(unsigned i=0;i<value.count;++i)c.rect(px(value.points[i].age)-3,py(value.points[i].value)-3,6,6,
             int(i)==state.selected?DRAWBOT_ColorRGBA{0.45f,0.8f,1,1}:DRAWBOT_ColorRGBA{0.8f,0.8f,0.8f,1});
         const char* modes[]={"Linear","Hold","Bezier","Draw"};c.button(b.x+b.width+8,b.y,59,modes[static_cast<unsigned>(value.interpolation)]);c.button(b.x+b.width+8,b.y+23,59,"Flip");
@@ -321,7 +384,7 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         c.text(b.x,b.y+153,label);c.button(b.x+b.width+8,b.y+58,26,"<");c.button(b.x+b.width+38,b.y+58,26,">");
         event->evt_out_flags|=PF_EO_HANDLED_EVENT;return PF_Err_NONE;
     }
-    bool changed=false;
+    bool changed=false,begin_stroke=false;
     if(event->e_type==PF_Event_DO_CLICK) {
         auto& click=event->u.do_click;const auto h=click.screen_point.h,v=click.screen_point.v;
         if(b.inside(h,v,b.width+8,0,59,21)) {
@@ -347,7 +410,7 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
                 for(unsigned i=0;i<value.count;++i){const auto age=double(i)/(value.count-1);value.points[i]={age,core::evaluate_age_curve(source,age,100,100)};}
                 const int index=std::clamp(int(std::lround(std::clamp(b.position(h),0.0,1.0)*(value.count-1))),0,int(value.count)-1);
                 value.points[index].value=amount(v);state.selected=index;
-                click.send_drag=TRUE;click.continue_refcon[0]=index+1;changed=true;
+                click.send_drag=TRUE;click.continue_refcon[0]=index+1;changed=true;begin_stroke=true;
             } else {
             int nearest=-1;double distance=9;
             for(unsigned i=0;i<value.count;++i){const double d=std::hypot(h-px(value.points[i].age),v-py(value.points[i].value));if(d<distance){distance=d;nearest=int(i);}}
@@ -380,14 +443,24 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         if(code!=PF_ControlCode_Delete && code!=PF_ControlCode_Backspace)return PF_Err_NONE;
         const int index=state.selected;if(index>0 && index<int(value.count)-1 && value.count>2){for(unsigned i=index+1;i<value.count;++i)value.points[i-1]=value.points[i];--value.count;state.selected=0;changed=true;}
     } else return PF_Err_NONE;
+    if(begin_stroke || (event->e_type==PF_Event_DRAG && state.draft && !event->u.do_click.last_time)) {
+        if(begin_stroke){state.original=authored;state.original_count=count;}
+        state.draft=value;
+        invalidate(data,event);return PF_Err_NONE;
+    }
+    if(event->e_type==PF_Event_DRAG && state.draft)state.draft.reset();
     if(changed) {
         if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
+        if(count==value.count && same_curve(authored,value)){invalidate(data,event);return PF_Err_NONE;}
         std::array<PF_ParamDef,layout::curve_span> previous{};for(A_long i=0;i<layout::curve_span;++i){if(!params[base+i])return PF_Err_NONE;previous[i]=*params[base+i];}
         params[base]->u.fs_d.value=value.count;
         for(unsigned i=0;i<value.count;++i){params[base+1+2*i]->u.fs_d.value=value.points[i].age;params[base+2+2*i]->u.fs_d.value=value.points[i].value;}
         params[mode_index]->u.fs_d.value=static_cast<unsigned>(value.interpolation);
-        for(A_long i=0;i<=2*value.count;++i)params[base+i]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
-        params[mode_index]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
+        // Publish the whole bank to the compiler, but ask AE to update only
+        // actual changed leaves. A one-sample stroke is not 130 host changes.
+        for(A_long i=0;i<layout::curve_span;++i)
+            if(params[base+i]->u.fs_d.value!=previous[i].u.fs_d.value)
+                params[base+i]->uu.change_flags|=PF_ChangeFlag_CHANGED_VALUE;
         PF_UserChangedParamExtra edited{};edited.param_index=base;
         const auto error=sync_node_graph_parameter(data,out,params,&edited,true);
         if(error){for(A_long i=0;i<layout::curve_span;++i)*params[base+i]=previous[i];return error;}
