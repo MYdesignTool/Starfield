@@ -10,6 +10,20 @@ no new native compilation needed, no AE execution inferred. The21-file panel46
 baseline is saved/hash verified under artifacts/prepared/p-03-build47-add-scrollbars.
 Paired native46/panel46 backup name: p-03-build47-add-scrollbars-20261005.
 
+Source798757db94bb7fc100d555a6ddbd772dc9413d4d is installed at
+2026-10-05T21:07:39.4980897+08:00 after fresh checks confirmed neither AfterFX nor
+AfterFX_64 running. All six installed/saved binary hashes match native46's table
+below, and all21 paired CEP sources are verified. The existing single Junction
+and StarfieldCore-67728453FAE5A1C7.dll selector are retained. Read-only paired
+restore verification and rollback-script parsing pass; no restore performed.
+Receipts: artifacts/build47-deploy-before.json, build47-deploy-after.json,
+build47-deploy.log and build47-rollback-report.log. No AE process was started or
+stopped; no registry/cache/shared CEF changes or remote upload performed.
+
+With AE closed, restore native46/panel46 in one command:
+`powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/build47-rollback.ps1`.
+AE Add/Replace and narrow-inspector appearance remain owner qualification.
+
 ## M3-10 / native46 + panel46 candidate - 2026-10-05
 
 Main manifest27 appends616..625/disk1640..1649. Native packed32814/0x802E,

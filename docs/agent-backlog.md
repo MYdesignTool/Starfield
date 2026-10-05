@@ -148,6 +148,10 @@ Use local dark scrollbar styling and wrapping inspector rows. Native46 and
 motion blur remain in place; no test suites are requested or run. Actual AE Add
 and narrow inspector appearance require owner qualification.
 
+Panel47 source798757d is installed with AE absent, six native46 hashes/all21 CEP
+files verified and native46/panel46 paired rollback checked without restoring.
+Implementation/deployment complete; actual owner AE qualification remains open.
+
 Build39 follow-up (2026-10-05): owner build38 reports Warm Sparks failing to write
 the dynamically hidden Color Gradient and Orbital Drift failing graph readback.
 Own NodeEffects guard flags/NodeGraphSync visibility plus gateway/graph_edits/

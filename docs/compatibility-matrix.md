@@ -10,6 +10,8 @@ or future layouts reject, with no defaults or serialized graph migration. Import
 preset versions remain strict. Owner's screenshot also shows bright native scroll
 tracks. Local dark scrollbar CSS and wrapping editor rows address that appearance.
 All panel JS/JSX syntax and manifest parsing pass; no tests requested/run.
+Source798757d is deployed as native46/panel47 with six binary/all21 CEP hashes
+verified and a read-only native46/panel46 restore report. No AE execution claimed.
 AE2023 owner gates: Add retains existing nodes/values/connections/keyframes, repeated
 Add and subsequent Replace acknowledge correctly, unchecked Apply Render Settings
 preserves motion blur, and narrow inspector scrolling exposes every control without
