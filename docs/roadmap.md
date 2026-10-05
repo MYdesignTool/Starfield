@@ -1,5 +1,14 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-03 / native46 + panel47 - Add and inspector scrolling
+
+Owner reports Add's retained Emitter3/expected7 failure and white inspector bars.
+Resolve complete ordinary native control records through the shared current schema
+registry, retaining data and strict imported graph validation. Reject missing or
+incompatible native records before writes. Add local dark scrollbar styling and
+wrapping editor rows. No test suites requested; AE Add/Replace and narrow inspector
+appearance remain owner qualification gates. Native46 motion blur remains active.
+
 ## M3-10 / native46 + panel46 - Motion Blur
 
 Owner requests the supplied main Motion Blur inventory and explicitly defers PTF.

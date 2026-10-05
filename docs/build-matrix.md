@@ -1,5 +1,15 @@
 # Build and host matrix
 
+## P-03 / native46 + panel47 candidate - 2026-10-05
+
+CEP0.1.0.47/extensions0.1.47 and gateway/resource markers47. Only the CEP snapshot
+projection, inspector/preset styling and declarations change; native46 binaries,
+Core selector, parameter IDs and motion blur are retained. All panel JS and gateway
+JSX syntax checks, XML parsing and patch whitespace pass. No tests requested/run,
+no new native compilation needed, no AE execution inferred. The21-file panel46
+baseline is saved/hash verified under artifacts/prepared/p-03-build47-add-scrollbars.
+Paired native46/panel46 backup name: p-03-build47-add-scrollbars-20261005.
+
 ## M3-10 / native46 + panel46 candidate - 2026-10-05
 
 Main manifest27 appends616..625/disk1640..1649. Native packed32814/0x802E,

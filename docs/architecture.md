@@ -1,5 +1,16 @@
 # Starfield plug-in architecture
 
+## P-03 / native46 + panel47 - native snapshot versions and inspector scrollbars
+
+The snapshot adapter resolves portable schemas through graph_edits only after
+the full current ordinary-control key/type layout validates. It preserves existing
+node data and does not upgrade imported graph hex or fill missing controls. Missing
+native snapshots reject before authoring. Add keeps the existing native diff,
+revision/stamp guards and semantic readback. Observed Emitter3 metadata producer
+remains unconfirmed; current JSX emits7. Native46/motion blur contracts stay intact.
+Local dark scrollbars and wrapping editor rows remove the bright inspector track
+and unnecessary horizontal scrolling. Actual AE behavior remains owner evidence.
+
 ## M3-10 / native46 + panel46 - main-effect motion blur
 
 Append the main Motion Blur topic and eight controls (indices616..625, disk1640..1649).

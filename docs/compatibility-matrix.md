@@ -1,5 +1,20 @@
 # Behavior inventory
 
+## P-03 / native46 + panel47 qualification
+
+Owner reports Replace succeeds and Add fails Updated project Emitter3/expected7.
+The current JSX emits7, so the producer of the observed3 tag is not confirmed by
+static inspection. The snapshot adapter now resolves graph versions from complete
+current ordinary-control layouts using the shared schema registry; missing/unknown
+or future layouts reject, with no defaults or serialized graph migration. Imported
+preset versions remain strict. Owner's screenshot also shows bright native scroll
+tracks. Local dark scrollbar CSS and wrapping editor rows address that appearance.
+All panel JS/JSX syntax and manifest parsing pass; no tests requested/run.
+AE2023 owner gates: Add retains existing nodes/values/connections/keyframes, repeated
+Add and subsequent Replace acknowledge correctly, unchecked Apply Render Settings
+preserves motion blur, and narrow inspector scrolling exposes every control without
+bright tracks or horizontal clipping. Native46 motion blur gates below remain open.
+
 ## M3-10 / native46 + panel46 qualification
 
 Owner accepts native45 curve behavior qualitatively, without new quantitative

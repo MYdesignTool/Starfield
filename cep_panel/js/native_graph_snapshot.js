@@ -3,24 +3,27 @@
 (function (root, factory) {
     var common = typeof module === "object" && module.exports;
     var api = factory(common ? require("./graph_codec.js") : root.StarfieldGraphCodec,
-        common ? require("./graph_layout.js") : root.StarfieldGraphLayout);
+        common ? require("./graph_layout.js") : root.StarfieldGraphLayout,
+        common ? require("./graph_edits.js") : root.StarfieldGraphEdits);
     if (common) module.exports = api;
     else root.StarfieldNativeGraphSnapshot = api;
-}(typeof window !== "undefined" ? window : this, function (codec, layout) {
+}(typeof window !== "undefined" ? window : this, function (codec, layout, edits) {
     "use strict";
     function normalize(response) {
-        if (!response || !response.ok || !response.snapshot ||
-            !Array.isArray(response.snapshot.nativeNodes)) return response;
+        if (!response || !response.ok || !response.snapshot) return response;
         var snapshot = response.snapshot;
         if (!snapshot.initialized) return response;
         try {
+            if (!Array.isArray(snapshot.nativeNodes) || !snapshot.renderer) {
+                throw {code:"invalid_native_node_record",message:"The current native control snapshot is missing. Close and reopen the Starfield panels."};
+            }
             var graph = {version:1,nodes:[],edges:[],optionalRecords:[]}, positions = {};
             var emitterTargets = {};
             snapshot.nativeNodes.forEach(function (record) {
                 if (record.type === "org.starfieldfx.nodes.emitter") emitterTargets[record.id] = true;
             });
             snapshot.nativeNodes.forEach(function (record) {
-                graph.nodes.push({id:record.id,type:record.type,schemaVersion:record.schemaVersion,
+                graph.nodes.push({id:record.id,type:record.type,schemaVersion:edits.nativeRecordSchema(record),
                     parameters:record.parameters.map(function (parameter) {
                         return {key:String(parameter.key),type:parameter.type,
                             value:parameter.type === 7 ? new Uint8Array(parameter.value) : parameter.value};
@@ -33,7 +36,7 @@
                 });
             });
             var output = snapshot.renderer;
-            graph.nodes.push({id:output.id,type:"org.starfieldfx.nodes.output",schemaVersion:4,
+            graph.nodes.push({id:output.id,type:"org.starfieldfx.nodes.output",schemaVersion:edits.schemaVersion("output"),
                 parameters:[{key:"1",type:3,value:output.maxParticles},
                     {key:"2",type:3,value:output.timeRemapEnabled || 0},{key:"3",type:4,value:output.timeRemapSeconds || 0},
                     {key:"4",type:3,value:output.previewEnabled || 0},{key:"5",type:4,value:typeof output.previewChance === "number" ? output.previewChance : 100},{key:"6",type:3,value:output.acceleration || 0},{key:"7",type:3,value:output.timeSamplingHz || 30},{key:"8",type:3,value:typeof output.motionBlur === "number" ? output.motionBlur : 1},{key:"9",type:4,value:typeof output.shutterAngle === "number" ? output.shutterAngle : 360},{key:"10",type:4,value:typeof output.shutterPhase === "number" ? output.shutterPhase : 0},{key:"11",type:3,value:typeof output.motionBlurType === "number" ? output.motionBlurType : 0},{key:"12",type:4,value:typeof output.motionBlurLevels === "number" ? output.motionBlurLevels : 8},{key:"13",type:4,value:typeof output.linearAccuracy === "number" ? output.linearAccuracy : 70},{key:"14",type:4,value:typeof output.opacityBoost === "number" ? output.opacityBoost : 0},{key:"15",type:3,value:typeof output.motionBlurDisregard === "number" ? output.motionBlurDisregard : 0}]});

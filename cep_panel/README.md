@@ -1,4 +1,11 @@
-# Presets manager (build37)
+# Starfield CEP panels
+
+Native46/panel47 repairs Add's retained-node version projection. Only complete
+current ordinary native-control records resolve to the current graph schema;
+missing controls, unknown fields and future versions fail before any host write.
+Imported graph presets retain strict schema validation. The inspector uses dark
+8px scrollbars, vertical scrolling and wrapping curve/gradient controls.
+Actual Add and narrow inspector appearance remain AE owner qualification gates.
 
 Native46/panel46 adds main Motion Blur controls and preset render-setting roundtrip.
 Comp Settings is the default; On uses custom Shutter Angle/Phase. Linear and

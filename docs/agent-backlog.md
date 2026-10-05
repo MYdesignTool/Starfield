@@ -135,6 +135,19 @@ before the next deployment; main remains owner-accepted build31.
 
 ## P-03 - Main picture launcher and preset manager
 
+Panel47 follow-up (2026-10-05): owner reports Replace succeeds but Add rejects a
+retained Emitter schema3/expected7, and the CEP inspector shows white vertical
+and horizontal scrollbars. Own graph_edits/native_graph_snapshot, local panel
+and preset CSS, paired CEP generation declarations and ADR0029/architecture/
+roadmap/build/compatibility records. Derive portable versions only from complete
+current ordinary-control records; reject incomplete/unknown/future layouts and
+missing native snapshots. Keep imported preset validation strict and preserve
+existing identities, values, connections, layout and native animation. The source
+of the observed schema3 label remains a hypothesis: current JSX emits7 already.
+Use local dark scrollbar styling and wrapping inspector rows. Native46 and
+motion blur remain in place; no test suites are requested or run. Actual AE Add
+and narrow inspector appearance require owner qualification.
+
 Build39 follow-up (2026-10-05): owner build38 reports Warm Sparks failing to write
 the dynamically hidden Color Gradient and Orbital Drift failing graph readback.
 Own NodeEffects guard flags/NodeGraphSync visibility plus gateway/graph_edits/

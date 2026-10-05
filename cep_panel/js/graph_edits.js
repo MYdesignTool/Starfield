@@ -89,6 +89,38 @@
         throw result;
     }
 
+    // Ordinary AE controls are read by name in the current gateway. Their
+    // portable graph schema is determined by that complete field layout, not
+    // by a potentially stale projection label. This never upgrades graph hex
+    // or adds defaults to an older project's missing controls.
+    function nativeRecordSchema(record) {
+        var kind = Object.keys(TYPES).filter(function (key) { return TYPES[key] === record.type; })[0];
+        if (!kind || kind === "output" || !Array.isArray(record.parameters)) {
+            fail("invalid_native_node_record", "The host returned an unsupported native node record.");
+        }
+        var expected = SCHEMA_VERSIONS[kind], fields = {}, optional = {}, found = {};
+        if (!Number.isInteger(record.schemaVersion) || record.schemaVersion < 1 || record.schemaVersion > expected) {
+            fail("invalid_native_node_record", "The host returned an unsupported " + kind + " record version.");
+        }
+        DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
+        if (kind === "particle") optional = {"7":7,"8":7,"27":7};
+        if (kind === "force") optional = {"9":7};
+        Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
+        record.parameters.forEach(function (p) {
+            var key = String(p.key);
+            if (!Object.prototype.hasOwnProperty.call(fields,key) || p.type !== fields[key] || found[key]) {
+                fail("invalid_native_node_record", "The " + kind + " native control layout differs at parameter " + key + ".");
+            }
+            found[key] = true;
+        });
+        Object.keys(fields).forEach(function (key) {
+            if (!found[key] && !Object.prototype.hasOwnProperty.call(optional,key)) {
+                fail("invalid_native_node_record", "The " + kind + " native control record is incomplete at parameter " + key + ". Close and reopen the Starfield panels.");
+            }
+        });
+        return expected;
+    }
+
     function copyValue(value) {
         if (Object.prototype.toString.call(value) === "[object Array]") {
             return value.map(copyValue);
@@ -464,6 +496,7 @@
     }
 
     return { types: TYPES, ports: PORTS, schemaVersion: function(kind) { return SCHEMA_VERSIONS[kind]; },
+             nativeRecordSchema: nativeRecordSchema,
              apply: apply, createInsertEdit: createInsertEdit,
              randomId: randomId, canConnect: canConnect };
 }));
