@@ -4,36 +4,21 @@ var assert = require("assert");
 var codec = require("../cep_panel/js/graph_codec.js");
 var edits = require("../cep_panel/js/graph_edits.js");
 var transactions = require("../cep_panel/js/graph_transactions.js");
+var fixture = require("./native_snapshot_fixture.js");
 
 function uuid(n) { return ("00000000000000000000000000000000" + n.toString(16)).slice(-32); }
 function graph() {
-    return {
-        version: 1,
-        nodes: [
-            { id: uuid(1), type: edits.types.emitter, schemaVersion: 3, parameters: [
-                { key: "2", type: 4, value: 30 },
-                { key: "3", type: 3, value: 1 },
-                { key: "5", type: 3, value: 1 }, { key: "6", type: 5, value: [0, 0, 0] },
-                { key: "7", type: 5, value: [0, 0.3, 0] }, { key: "8", type: 4, value: 10 },
-                { key: "9", type: 4, value: 1 }, { key: "10", type: 4, value: 0.05 },
-                { key: "11", type: 4, value: 0.15 }, { key: "19", type: 4, value: 100 },
-                { key: "20", type: 4, value: 120 }, { key: "21", type: 4, value: 140 }
-            ] },
-            { id: uuid(2), type: edits.types.particle, schemaVersion: 2, parameters: [
-                { key: "1", type: 5, value: [1, 1, 1] }, { key: "2", type: 5, value: [1, 1, 1] },
-                { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 10 },
-                { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 1 },
-                { key: "11", type: 4, value: 2 }
-            ] },
-            { id: uuid(3), type: edits.types.output, schemaVersion: 2, parameters: [
-                { key: "1", type: 3, value: 1000 }
-            ] }
-        ],
-        edges: [
-            { id: uuid(11), sourceNode: uuid(1), sourcePort: "1", destinationNode: uuid(2), destinationPort: "1" },
-            { id: uuid(12), sourceNode: uuid(2), sourcePort: "2", destinationNode: uuid(3), destinationPort: "1" }
-        ], optionalRecords: []
-    };
+    var result = {version:1,nodes:[],edges:[
+        {id:uuid(11),sourceNode:uuid(1),sourcePort:"1",destinationNode:uuid(2),destinationPort:"1"},
+        {id:uuid(12),sourceNode:uuid(2),sourcePort:"2",destinationNode:uuid(3),destinationPort:"1"}
+    ],optionalRecords:[]};
+    result.nodes = [fixture.node("emitter", uuid(1)), fixture.node("particle", uuid(2)), fixture.node("output", uuid(3))];
+    [100, 120, 140].forEach(function (value, i) {
+        result.nodes[0].parameters.find(function (p) { return p.key === String(19 + i); }).value = value;
+    });
+    return require("../cep_panel/js/graph_layout.js").set(result, {
+        [uuid(1)]:{x:0,y:0},[uuid(2)]:{x:0,y:0},[uuid(3)]:{x:0,y:0}
+    });
 }
 
 function createHarness(initialGraph, options) {
@@ -48,14 +33,14 @@ function createHarness(initialGraph, options) {
         call: function (operation, extra, callback) {
             calls.push({ operation: operation, extra: extra });
             if (operation === "getGraphSnapshot") {
-                callback(options.getSnapshot ? options.getSnapshot(snapshot) :
-                         { ok: true, snapshot: snapshot, target: { token: "target-1" } });
+                callback(fixture.receipt(options.getSnapshot ? options.getSnapshot(snapshot) :
+                         { ok: true, snapshot: snapshot, target: { token: "target-1" } }));
                 return;
             }
             if (operation === "submitGraph") {
-                if (options.submit) { callback(options.submit(extra, snapshot)); return; }
+                if (options.submit) { callback(fixture.receipt(options.submit(extra, snapshot))); return; }
                 snapshot = { initialized: true, revision: snapshot.revision + 1, graphHex: extra.graphHex };
-                callback({ ok: true, snapshot: snapshot, target: { token: "target-1" } });
+                callback(fixture.receipt({ ok: true, snapshot: snapshot, target: { token: "target-1" } }));
                 return;
             }
             if (operation === "ensureNodeEffects") {
@@ -69,12 +54,26 @@ function createHarness(initialGraph, options) {
             callback({ ok: false, error: { code: "unexpected_operation", message: operation } });
         }
     });
-    return { client: client, calls: calls, snapshot: function () { return snapshot; },
+    return { client: client, calls: calls, snapshot: function () { return fixture.receipt({ok:true,snapshot:snapshot}).snapshot; },
              replaceSnapshot: function (value) { snapshot = value; },
              setMissingNodeIds: function (value) { options.missingNodeIds = value; } };
 }
 
 var source = graph();
+var preparedHarness = createHarness(source);
+var prepared = fixture.receipt({ok:true,target:{token:"target-1"},snapshot:preparedHarness.snapshot()});
+var preparedReply;
+preparedHarness.client.apply({type:"addNode",nodeType:"force"},function(r){preparedReply=r;},"target-1",8,prepared);
+assert.strictEqual(preparedReply.ok,true);
+assert.deepStrictEqual(preparedHarness.calls.map(function(c){return c.operation;}),["submitGraph"],
+    "an immediate planning receipt removes the redundant client snapshot call");
+var wrongTargetHarness=createHarness(source);
+wrongTargetHarness.client.apply({type:"addNode",nodeType:"force"},function(r){preparedReply=r;},"different",8,prepared);
+assert.strictEqual(preparedReply.error.code,"stale_target");
+assert.strictEqual(wrongTargetHarness.calls.length,0,"a wrong-target prepared receipt never reaches the host");
+wrongTargetHarness.client.apply({type:"addNode",nodeType:"force"},function(r){preparedReply=r;},"target-1",9,prepared);
+assert.strictEqual(preparedReply.error.code,"stale_graph");
+assert.strictEqual(wrongTargetHarness.calls.length,0,"an obsolete planning revision never reaches the host");
 var harness = createHarness(source);
 var reply;
 harness.client.apply({ type: "addNode", nodeType: "force" }, function (response) { reply = response; });

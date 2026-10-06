@@ -10,7 +10,11 @@ combines reads and uses an adaptive500ms-to2s lightweight poll, nominal15s safet
 audits, request-scoped exact property lookup, checked numeric identity slots and
 one immediate preset planning read. This is source evidence, not measured host
 attribution or a speedup. Native46/rendering/temporal bootstrap remain unchanged.
-No test suites requested/run. Owner AE2023 gates:
+Initial panel48 deployment used source checks only. On2026-10-06, the owner's
+minimal-test authorization covers five passing focused suites (build-matrix).
+Adaptive polls, pause/audit, exact property fallback, prepared receipts, Add/Replace
+call counts, stale-record rejection, copy and rollback pass in a fake host.
+No actual AE cursor or latency result is inferred. Owner AE2023 gates:
 
 - Sourcebb0df2e is installed as native46/panel48; all JS/JSX syntax, manifest XML,
   wrapper parsing and whitespace checks pass. Six native46 binary/all21 CEP

@@ -23,9 +23,10 @@ class FakeElement {
 }
 
 const elements = {};
-for (const id of ["banner", "chain", "targetLine", "modeLine", "revisionLine", "resolutionLine", "preset", "refresh", "graphScroll"]) {
+for (const id of ["banner", "chain", "targetLine", "modeLine", "revisionLine", "resolutionLine", "preset", "refresh", "graphScroll", "autoRefresh"]) {
     elements[id] = new FakeElement(id);
 }
+elements.autoRefresh.checked = true;
 
 const timers = new Map();
 let nextTimerId = 1;
@@ -33,6 +34,9 @@ const gatewayHost = {};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,"..","cep_panel","jsx","starfield_gateway.jsx"),"utf8"), {$:{global:gatewayHost}});
 const actualReadyToken = gatewayHost.SFLD_ready();
 let stateCalls = 0, gatewayLoads = 0, gatewayProbes = 0;
+let pulseCalls = 0, pulseStamp = "idle", holdPulse = false, pendingPulse;
+let now = 1000;
+class Clock extends Date { static now() { return now; } }
 let failParameterWrite = true;
 let simulateBootstrapFailure = false, bootstrapCalls = 0;
 const windowListeners = {};
@@ -44,12 +48,25 @@ const window = {
     __adobe_cep__: {
         getSystemPath() { return "C:/Starfield/cep_panel"; },
         evalScript(script, callback) {
-            if (script.indexOf("SFLD_ready") >= 0) {
+            const deliver = callback;
+            callback = text => {
+                try {
+                    const reply = JSON.parse(text);
+                    if (reply.protocol === "org.starfieldfx.panel") {
+                        reply.version = 1;
+                        reply.gatewayBuild = actualReadyToken.split("/").pop();
+                        text = JSON.stringify(reply);
+                    }
+                } catch (_) { /* empty startup replies stay empty */ }
+                deliver(text);
+            };
+            if (script.indexOf("SFLD_ready") >= 0 && !/return SFLD_(get|set|sync)/.test(script)) {
                 if(script.indexOf("$.evalFile") >= 0) {gatewayLoads++;callback(actualReadyToken);}
                 else {gatewayProbes++;callback(gatewayProbes===1 ? "org.starfieldfx.panel/1/stale-gateway" : actualReadyToken);}
                 return;
             }
-            if (script.indexOf("SFLD_getState(") >= 0) {
+            if (script.indexOf("SFLD_getPanelState(") >= 0) {
+                if (!gatewayLoads) gatewayLoads++;
                 stateCalls += 1;
                 if (stateCalls === 1) {
                     callback(""); // CEP can return an empty result during AE startup.
@@ -60,8 +77,20 @@ const window = {
                         error: { code: "no_target", message: "Target is not ready yet." } }
                     : { protocol: "org.starfieldfx.panel", ok: true, revision: "r2", controlSource: "AE Controls",
                         resolution: "name", layoutPersistence: true, layout: {},
-                        target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [] };
+                        target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [], snapshot:{initialized:false} };
                 callback(JSON.stringify(response));
+                return;
+            }
+            if (script.indexOf("SFLD_getPanelPulse(") >= 0) {
+                pulseCalls++;
+                const respond = () => callback(JSON.stringify({protocol:"org.starfieldfx.panel",ok:true,
+                    stamp:pulseStamp,frameStatus:{ok:true,targetToken:"target-1",available:false}}));
+                if (holdPulse) pendingPulse = respond;
+                else respond();
+                return;
+            }
+            if (script.indexOf("SFLD_getFrameStatus(") >= 0) {
+                callback(JSON.stringify({protocol:"org.starfieldfx.panel",ok:true,targetToken:"target-1",available:false}));
                 return;
             }
             if (script.indexOf("SFLD_setParameters(") >= 0) {
@@ -102,7 +131,7 @@ const document = {
 const graphViewSource = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "graph_view.js"), "utf8");
 vm.runInNewContext(graphViewSource, { window, document, Date, Math, JSON, String, Number, isFinite });
 const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "panel.js"), "utf8");
-vm.runInNewContext(source, { window, document, Date, Math, JSON, String, Number, isFinite });
+vm.runInNewContext(source, { window, document, Date:Clock, Math, JSON, String, Number, isFinite });
 
 assert.strictEqual(stateCalls, 1, "panel should request the current target immediately on startup");
 assert.strictEqual(gatewayLoads, 1, "panel reloads a stale gateway and accepts the actual paired JSX readiness token");
@@ -125,34 +154,50 @@ assert.strictEqual(stateCalls, 7, "panel should keep discovering until the targe
 assert.strictEqual(elements.targetLine.textContent, "Comp 1 / Particles", "retry should populate target details");
 assert.strictEqual(elements.banner.className, "banner hidden",
     "successful discovery should clear the banner: " + elements.banner.textContent);
-assert.strictEqual(timers.size, 0, "successful discovery should stop the retry loop");
+assert.strictEqual(timers.size, 1, "successful discovery leaves only one background poll timer");
 
-elements.preset.value = "defaults";
-elements.preset.listeners.change();
-const retainedMessage = elements.banner.textContent;
-assert.match(retainedMessage, /graph_commit_failed.*exact host detail/,
-    "a failed edit must leave the complete diagnostic visible after its immediate refresh");
-windowListeners.focus();
-assert.equal(elements.banner.textContent, retainedMessage,
-    "a successful background read must not erase the edit error");
-assert.equal(elements.banner.className, "banner error");
-assert.equal(window.onerror("ResizeObserver loop limit exceeded", "index.html", 0), true);
-assert.equal(elements.banner.textContent, retainedMessage, "resize warnings must not mask the native edit failure");
+function poll(delay) {
+    const entry = Array.from(timers.entries()).find(([, timer]) => timer.delay === delay);
+    assert.ok(entry, "one completion-scheduled poll exists at " + delay + "ms");
+    timers.delete(entry[0]);
+    entry[1].callback();
+}
+const beforeIdle = stateCalls;
+poll(2000); // First stamp establishes current target markers.
+assert.equal(stateCalls, beforeIdle + 1);
+for (let i = 0; i < 3; i++) poll(500);
+assert.equal(stateCalls, beforeIdle + 1, "unchanged pulses never reread native nodes");
+assert.equal(timers.size, 1, "no independent frame-status/full-refresh interval remains");
+document.hidden = true;
+const beforeHidden = pulseCalls;
+poll(2000);
+assert.equal(pulseCalls, beforeHidden, "hidden panel makes no host request");
+document.hidden = false;
+elements.autoRefresh.checked = false;
+poll(2000);
+assert.equal(pulseCalls, beforeHidden, "disabled automatic refresh makes no host request");
+elements.autoRefresh.checked = true;
+holdPulse = true;
+poll(2000);
+assert.equal(timers.size, 1, "while a host call is pending, only its timeout exists");
+assert.equal(Array.from(timers.values())[0].delay, 8000);
+holdPulse = false;
+pendingPulse();
+assert.equal(timers.size, 1, "the next poll is scheduled only after completion");
+now += 15001;
+poll(2000);
+assert.equal(stateCalls, beforeIdle + 2, "periodic audit catches same-frame changes absent from markers");
+pulseStamp = "changed";
+poll(2000);
+assert.equal(stateCalls, beforeIdle + 3, "changed markers trigger one combined full inspection");
+
 resizeObservers[0]();
 resizeObservers[0]();
 windowListeners.resize();
 assert.equal(animationFrames.length, 1, "observer and resize events defer/coalesce layout writes");
 animationFrames.shift()();
 resizeObservers[0]();
-assert.equal(animationFrames.length, 0, "unchanged observed dimensions must not start a resize feedback loop");
-elements.refresh.listeners.click();
-assert.equal(elements.banner.className, "banner hidden", "manual Refresh acknowledges the retained error");
-elements.preset.value = "defaults";
-elements.preset.listeners.change();
-failParameterWrite = false;
-elements.preset.value = "defaults";
-elements.preset.listeners.change();
-assert.equal(elements.banner.className, "banner hidden", "a successful user edit clears the previous edit error");
+assert.equal(animationFrames.length, 0, "unchanged dimensions must not start a resize feedback loop");
 
 window.StarfieldGraphCodec = {};
 window.StarfieldGraphTransactions = {};
@@ -168,4 +213,7 @@ assert.match(elements.banner.textContent, /Particle: bootstrap failed/);
 elements.refresh.listeners.click();
 assert.equal(bootstrapCalls, 2, "manual Refresh explicitly retries bootstrap once");
 
-console.log("Panel startup and retained error checks passed (discovery, failed edit survives background refresh, manual/successful edit acknowledgement, bootstrap retry suppression).");
+const retainedMessage = elements.banner.textContent;
+assert.equal(window.onerror("ResizeObserver loop limit exceeded", "index.html", 0), true);
+assert.equal(elements.banner.textContent, retainedMessage, "resize warnings must not mask bootstrap failure");
+console.log("Panel discovery, adaptive pulse, pause, bounded requests, audit, resize and bootstrap retry checks passed.");

@@ -23,6 +23,18 @@ hashes and paired native46/panel47 read-only rollback verification pass. Source
 syntax/manifest/wrapper/whitespace gates pass. Implementation and deployment are
 complete; owner idle-cursor, preset latency and refresh/undo qualification remain.
 
+2026-10-06 follow-up under the owner's minimal-test authorization: this card also
+owns the focused startup/transaction/native gateway/preset suites, the two current
+ordinary-control fixture helpers and preset_manager_performance_tests. All five
+suites pass against panel48. Coverage includes adaptive/pause/audit scheduling,
+one fallback traversal per effect/request, no sibling values or graph mutations
+from pulses, prepared-receipt target/revision rejection, host record-stamp conflict
+checks, actual manager Add/Replace call counts, explicit bootstrap, copy/deletion
+and rollback. The fake host models ordinary properties and indexed invalidation;
+it is not AE or the C++ compiler. Signed zero/decimal transport CRC remains
+diagnostic; semantic field checks remain strict. Installed runtime sources are
+unchanged. Actual cursor and wall-clock measurements remain owner gates.
+
 ## M3-10 - Main-effect motion blur
 
 Owner accepts native45/panel45 curve behavior and requests the supplied Motion

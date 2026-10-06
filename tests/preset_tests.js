@@ -2,6 +2,7 @@
 const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm");
 const presets=require("../cep_panel/js/presets.js"),codec=require("../cep_panel/js/graph_codec.js"),layout=require("../cep_panel/js/graph_layout.js"),edits=require("../cep_panel/js/graph_edits.js"),view=require("../cep_panel/js/graph_view.js"),transactions=require("../cep_panel/js/graph_transactions.js");
 const output="000000000000000000000000000000ff";
+const fixture=require("./native_snapshot_fixture.js");
 const built=presets.catalog.map(p=>presets.build(p.id,1080));
 assert.equal(built.length,6);
 for(const graph of built){assert.equal(presets.validate(graph),true);assert.ok(codec.toHex(graph).length/2<24*1024);assert.equal(graph.nodes.filter(n=>n.type===edits.types.output).length,1);assert.equal(graph.nodes.find(n=>n.type===edits.types.output).id,output);assert.ok(view.project(graph,{height:1080,width:1920,pixelAspect:1}));}
@@ -24,7 +25,7 @@ const dirty=codec.fromHex(before);dirty.optionalRecords.push("0280010008000000")
 assert.equal(presets.validate(presets.apply(base,{type:"applyPreset",presetGraph:imported.graph,mode:"add",applyRenderSettings:false},factory)),true);
 // Exercise the exact existing transaction and its float/color readback validation.
 let hostGraph=codec.fromHex(before),revision=1,calls=[];
-function snapshot(){return {ok:true,target:{token:"target"},snapshot:{initialized:true,revision:revision,recordStamp:"record-"+revision,graphHex:codec.toHex(hostGraph),geometry:{height:1080,width:1920,pixelAspect:1}}};}
+function snapshot(){return fixture.receipt({ok:true,target:{token:"target"},snapshot:{initialized:true,revision:revision,recordStamp:"record-"+revision,graphHex:codec.toHex(hostGraph),geometry:{height:1080,width:1920,pixelAspect:1}}});}
 const client=transactions.create({codec,edits:{apply:presets.apply},idFactory:factory,call:(operation,fields,callback)=>{
     calls.push(operation);if(operation==="getGraphSnapshot")return callback(snapshot());assert.equal(operation,"submitGraph");assert.equal(fields.baseGraphRevision,revision);assert.equal(fields.baseRecordStamp,"record-"+revision);assert.equal(fields.target.token,"target");hostGraph=codec.fromHex(fields.graphHex);
     for(const node of hostGraph.nodes)for(const p of node.parameters){if(node.type===edits.types.particle && p.key==="13"){p.value=view.encodeGradient(view.decodeGradient(p.value).map(s=>({position:Math.fround(s.position*100)/100,color:s.color.map(c=>Math.round(c*255)/255)})));}}

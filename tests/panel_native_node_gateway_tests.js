@@ -11,47 +11,33 @@ const source = fs.readFileSync(path.join(__dirname, "../cep_panel/jsx/starfield_
 const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
 let epoch = 0, rejectNext = false, revision = 0, commits = 0, roundWireNumbers = false, beforeSubmit = null;
 let rejectNextAdd = null;
+let nodePropertyReads = 0;
+let numericNodeVisits = 0, hideDirectCurveIds = false;
 const undo = { begins: 0, ends: 0 }, clone = value => Array.isArray(value) ? value.slice() : value;
 const renderer = { matchName: "org.starfieldfx.particle", name: "Starfield Particle", properties: {} };
-const control = (name, value) => ({ name, value: clone(value) });
-function nodeControls() {
-    const values = { "Type":1, "Particles Per Second":100, "Random Seed":1, "Particle Size":10,
-        "Opacity":1, "Origin":[1920,1080,1080], "Velocity X":0, "Velocity Y":0.3, "Velocity Z":0,
-        "Disc Size":0.05, "Speed Random":0.15, "Size X":100, "Size Y":100, "Size Z":100,
-        "Emission Speed":0, "Emission Speed Random":0, "Emission Angle X":0, "Emission Angle Y":0,
-        "Emission Angle Z":0, "Direction":1, "Direction Span":60, "Color Start":[1,1,1,1],
-        "Color End":[1,1,1,1], "Size":10, "Size Over Life":100, "Opacity Over Life":100,
-        "Size Random":0, "Opacity Random":0, "Lifetime":2, "Size Curve Count":0, "Opacity Curve Count":0,
-        "Gravity":[0,0,0], "Linear Drag":0, "Panel Sync Guard":0,
-        "Node Layout X":0, "Node Layout Y":0, "Outgoing Connection Count":0 };
-    for(let i=0;i<8;i++) values["Node UUID "+i]=0;
-    for(let s=0;s<4;s++) for(let i=0;i<8;i++) {
-        values["Connection "+s+" Target UUID "+i]=0; values["Connection "+s+" Edge UUID "+i]=0;
-    }
-    for(const label of ["Size","Opacity"]) for(let i=0;i<8;i++) {
-        values[label+" Curve "+i+" Age"]=0; values[label+" Curve "+i+" Value"]=100;
-    }
-    return Object.fromEntries(Object.entries(values).map(([name,value])=>[name,control(name,value)]));
-}
-for(const [index,name,value] of [[27,"Max Particles",1000],[39,"Layout Output X",180],
-    [40,"Layout Output Y",526],[41,"Graph Revision",0],[42,"Panel Graph Sync Guard",0],
-    [43,"Commit Graph Edit",0],[44,"Graph Edit Receipt",0],[89,"Node Effects Ready",0],[90,"Graph Checksum High",0],[91,"Graph Checksum Low",0]]) {
-    const p=control(name,value); p.propertyIndex=index; renderer.properties[index]=renderer.properties[name]=p;
-}
+const {mainControls,nodeControls}=require("./node_property_fixture.js");
+renderer.properties=mainControls();
+renderer.properties["Max Particles"].value=1000;
 const items=[renderer];
 function assertFresh(captured) { if(captured!==epoch) throw new Error("Invalid indexed-group reference"); }
-function wrapProperty(p,captured) {
-    return {name:p.name,propertyIndex:p.propertyIndex,canSetExpression:false,
-        get value(){assertFresh(captured);return clone(p.value);},
+function wrapProperty(p,captured,isNode) {
+    return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,canSetExpression:false,
+        get value(){assertFresh(captured);if(isNode)nodePropertyReads++;return clone(p.value);},
         get expression(){throw new Error("AEGP_CanVaryOverTime: expressions are forbidden on node records");},
         set expression(_){throw new Error("Expression requests are unsupported");},
-        setValue(v){assertFresh(captured);p.value=clone(v);if(p===renderer.properties[43]) compile(v);} };
+        setValue(v){assertFresh(captured);p.value=clone(v);if(p===renderer.properties["Commit Graph Edit"]) compile(v);} };
 }
 function wrapEffect(raw) {
     const captured=epoch;
-    return {matchName:raw.matchName,get name(){assertFresh(captured);return raw.name;},
+    const ordered=Array.from(new Set(Object.values(raw.properties)));
+    return {matchName:raw.matchName,get numProperties(){assertFresh(captured);return ordered.length;},get name(){assertFresh(captured);return raw.name;},
         set name(v){assertFresh(captured);raw.name=v;},
-        property(key){assertFresh(captured);const p=raw.properties[key];return p?wrapProperty(p,captured):null;},
+        property(key){assertFresh(captured);
+            if(hideDirectCurveIds && raw.matchName==="org.starfieldfx.node.particle" &&
+                typeof key==="string" && /-(0?(700|800|960)|361[012])$/.test(key))return null;
+            if(raw!==renderer && typeof key==="number")numericNodeVisits++;
+            const p=raw.properties[key] || (typeof key==="number"?ordered[key-1]:null);
+            return p?wrapProperty(p,captured,raw!==renderer):null;},
         remove(){assertFresh(captured);items.splice(items.indexOf(raw),1);epoch++;} };
 }
 function parade() {
@@ -63,57 +49,70 @@ function parade() {
 const layer={id:29,name:"Particle Layer",selected:true,width:3840,height:2160,source:{pixelAspect:1},
     property(name){return name==="ADBE Effect Parade"?parade():null;} };
 function CompItem() {}
-const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",numLayers:1,layer:()=>layer});
+const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",time:0,numLayers:1,layer:()=>layer});
 const exported={};
 vm.runInNewContext("JSON.stringify = wireStringify;\n"+source,{CompItem,wireStringify:value=>JSON.stringify(value,
     (_,item)=>roundWireNumbers&&typeof item==="number"?Number(item.toPrecision(12)):item),
-    $:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5}},
+    $:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5},numItems:1,item:()=>comp},
     beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;}}});
 const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toString(16).padStart(4,"0")).join("");
 function graphFromEffects() {
-    const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={},p=(key,type,value)=>({key:String(key),type,value});
+    const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={};
+    const fixture=require("./native_snapshot_fixture.js");
     for(const effect of items.filter(effect=>effect!==renderer)) {
         const c=effect.properties,v=name=>clone(c[name].value),id=readUuid(c,"Node UUID ");
-        const type="org.starfieldfx.nodes."+effect.matchName.split(".").pop();
-        let parameters;
-        if(type===edits.types.emitter) {
-            const origin=v("Origin");
-            parameters=[p(2,4,v("Particles Per Second")),p(3,3,v("Random Seed")),p(5,3,v("Type")-1),
-                p(6,5,[(origin[0]-1920)/2160,(1080-origin[1])/2160,(origin[2]-1080)/2160]),
-                p(7,5,[v("Velocity X"),v("Velocity Y"),v("Velocity Z")]),p(8,4,v("Particle Size")),
-                p(9,4,v("Opacity")),p(10,4,v("Disc Size")),p(11,4,v("Speed Random")),
-                p(12,4,v("Emission Speed")),p(13,4,v("Emission Speed Random")),p(14,4,v("Emission Angle X")),
-                p(15,4,v("Emission Angle Y")),p(16,4,v("Emission Angle Z")),p(17,3,v("Direction")-1),
-                p(18,4,v("Direction Span")),p(19,4,v("Size X")),p(20,4,v("Size Y")),p(21,4,v("Size Z"))];
-        } else if(type===edits.types.force) parameters=[p(1,5,v("Gravity")),p(2,4,v("Linear Drag"))];
-        else {
-            parameters=[p(1,5,v("Color Start").slice(0,3)),p(2,5,v("Color End").slice(0,3)),p(3,4,v("Size")),
-                p(4,4,v("Size Over Life")),p(5,4,v("Opacity")),p(6,4,v("Opacity Over Life")),
-                p(9,4,v("Size Random")),p(10,4,v("Opacity Random"))];
-            if(type===edits.types.particle) parameters.push(p(11,4,v("Lifetime")));
-            for(const [key,label] of [[7,"Size"],[8,"Opacity"]]) if(v(label+" Curve Count")) {
+        const kind=effect.matchName.split(".").pop(),node=fixture.node(kind,id);
+        const set=(key,value)=>node.parameters.find(p=>p.key===String(key)).value=value;
+        const scalar=entries=>entries.forEach(([key,name,scale=1,offset=0])=>set(key,v(name)*scale+offset));
+        if(kind==="emitter") {
+            scalar([[2,"Particles Per Second"],[3,"Random Seed"],[5,"Type",1,-1],[8,"Particle Size"],
+                [9,"Opacity",.01],[10,"Disc Size"],[11,"Velocity Random"],
+                [14,"Angle X"],[15,"Angle Y"],[16,"Angle Z"],[17,"Direction",1,-1],[18,"Direction Span"],
+                [19,"Size X"],[20,"Size Y"],[21,"Size Z"],[22,"Speed Random"],[23,"Emitting",1,-1],
+                [24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],[27,"Inherit Velocity"],
+                [28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"],[31,"Auxiliary Source"]]);
+            set(12,v("Speed")/2160);
+            const xy=v("Origin XY");set(6,[(xy[0]-1920)/2160,(1080-xy[1])/2160,v("Origin Z")/2160]);
+            set(7,[v("Velocity X"),v("Velocity Y"),v("Velocity Z")]);set(32,[v("Orient X"),v("Orient Y"),v("Orient Z")]);
+        } else if(kind==="force") {
+            set(1,[0,-v("Gravity")/2160,0]);set(4,[v("Wind X")/2160,-v("Wind Y")/2160,v("Wind Z")/2160]);
+            set(5,v("Spin")/2160);
+            scalar([[2,"Air Density"],[3,"Gravity random"],[6,"Spin Frequency"],[7,"Spin resist"],[8,"Spin Delay (Seconds)"]]);
+        } else {
+            set(1,v("Color").slice(0,3));set(18,[v("Angle X"),v("Angle Y"),v("Angle Z")]);set(20,[v("Speed X"),v("Speed Y"),v("Speed Z")]);
+            scalar([[3,"Size (Pixels)"],[4,"Size Over Life"],[5,"Opacity",.01],[6,"Opacity Over Life"],
+                [9,"Size Random"],[10,"Opacity Random"],[11,"Life (Seconds)"],[12,"Particle Color",1,-1],
+                [14,"Life Random"],[15,"Shape",1,-1],[16,"Size Y (Pixels)"],[17,"Orient To",1,-1],
+                [19,"Angle Random"],[21,"Rotation Speed Random"],[22,"Limit To 2D"],[23,"Particle Feather"],
+                [24,"Up Axis",1,-1],[25,"Random Limit",1,-1],[26,"Limit Angle"],[28,"Anchor X (Percent)"],[29,"Anchor Y (Percent)"]]);
+            const stops=Array.from({length:v("Color Gradient")},(_,i)=>({position:v("Color Gradient "+i+" Position")/100,color:v("Color Gradient "+i+" Color").slice(0,3)}));
+            stops.interpolation=v("Color Gradient Interpolation");set(13,view.encodeGradient(stops));
+        }
+        for(const [key,label] of kind==="particle"?[[7,"Size"],[8,"Opacity"],[27,"Rotation"]]:kind==="force"?[[9,"Wind and Spin"]]:[]) {
+            node.parameters=node.parameters.filter(p=>p.key!==String(key));
+            if(v(label+" Curve Count")) {
                 const points=Array.from({length:v(label+" Curve Count")},(_,i)=>({age:v(label+" Curve "+i+" Age"),value:v(label+" Curve "+i+" Value")}));
-                parameters.push(p(key,7,view.encodeCurve(points)));
+                points.interpolation=v(label+" Curve Interpolation");node.parameters.push({key:String(key),type:7,value:view.encodeCurve(points)});
             }
         }
-        graph.nodes.push({id,type,schemaVersion:type===edits.types.emitter?3:type===edits.types.particle?2:1,parameters});
-        positions[id]={x:v("Node Layout X"),y:v("Node Layout Y")};
-        for(let s=0;s<v("Outgoing Connection Count");s++) graph.edges.push({id:readUuid(c,"Connection "+s+" Edge UUID "),
-            sourceNode:id,sourcePort:type===edits.types.emitter?"1":"2",
-            destinationNode:readUuid(c,"Connection "+s+" Target UUID "),destinationPort:"1"});
+        graph.nodes.push(node);positions[id]={x:v("Node Layout X"),y:v("Node Layout Y")};
+        for(let slot=0;slot<v("Outgoing Connection Count");slot++) graph.edges.push({id:readUuid(c,"Connection "+slot+" Edge UUID "),
+            sourceNode:id,sourcePort:kind==="emitter"?"1":"2",destinationNode:readUuid(c,"Connection "+slot+" Target UUID "),destinationPort:"1"});
     }
-    graph.nodes.push({id:outputId,type:edits.types.output,schemaVersion:2,parameters:[p(1,3,renderer.properties[27].value)]});
-    positions[outputId]={x:renderer.properties[39].value,y:renderer.properties[40].value};
-    return layout.set(graph,positions);
+    const output=fixture.node("output",outputId),v=name=>renderer.properties[name].value;
+    const values=[v("Max Particles"),v("Time Remapping On / Off"),v("Time (Seconds)"),v("Preview"),v("Particle chance"),
+        v("Acceleration")-1,[30,60,120][v("Time Sampling")-1],...Array.from({length:8},(_,i)=>v("org.starfieldfx.particle-"+(1641+i)) - ([0,3,7].includes(i)?1:0))];
+    output.parameters.forEach((p,i)=>p.value=values[i]);graph.nodes.push(output);
+    positions[outputId]={x:v("Layout Output X"),y:v("Layout Output Y")};return layout.set(graph,positions);
 }
 function publish(graph) {
     const bytes=codec.serialize(graph),crc=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(24,true);
-    renderer.properties[41].value=revision;
-    renderer.properties[90].value=crc>>>16;renderer.properties[91].value=crc&65535;
+    renderer.properties["Graph Revision"].value=revision;
+    renderer.properties["Graph Checksum High"].value=crc>>>16;renderer.properties["Graph Checksum Low"].value=crc&65535;
 }
 function compile(nonce) {
-    commits++;if(rejectNext){rejectNext=false;renderer.properties[44].value=-nonce;return;}
-    revision++;publish(graphFromEffects());renderer.properties[44].value=nonce;
+    commits++;if(rejectNext){rejectNext=false;renderer.properties["Graph Edit Receipt"].value=-nonce;return;}
+    revision++;publish(graphFromEffects());renderer.properties["Graph Edit Receipt"].value=nonce;
 }
 function invoke(operation,fields={}) {
     return JSON.parse(exported["SFLD_"+operation](JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,
@@ -126,17 +125,44 @@ const boot=snapshots.normalize(invoke("syncGraphSnapshot"));
 assert.equal(boot.ok,true,JSON.stringify(boot));assert.equal(boot.snapshot.initialized,true);
 assert.equal(boot.snapshot.checksumMatches,true,"ordinary record codec must match the compiled payload CRC");
 const initial=codec.fromHex(boot.snapshot.graphHex);
+renderer.properties["Control Source"].value=2;
+const readsBeforePulse=nodePropertyReads,commitsBeforePulse=commits;
+const pulse=invoke("getPanelPulse");
+assert.equal(pulse.ok,true,JSON.stringify(pulse));
+assert.equal(nodePropertyReads,readsBeforePulse,"lightweight pulse does not read sibling node values");
+assert.equal(commits,commitsBeforePulse,"background pulse never compiles or mutates a graph");
+const combined=invoke("getPanelState");
+assert.equal(combined.ok,true,JSON.stringify(combined));
+assert.equal(combined.snapshot.nativeNodes.length,2,"one combined request returns the current native graph");
+assert.equal(commits,commitsBeforePulse,"combined full inspection is read-only");
+hideDirectCurveIds=true;
+numericNodeVisits=0;
+const fallback=invoke("getGraphSnapshot");
+assert.equal(fallback.ok,true,JSON.stringify(fallback));
+const particleRaw=items.find(e=>e.matchName==="org.starfieldfx.node.particle");
+assert.equal(numericNodeVisits,new Set(Object.values(particleRaw.properties)).size,
+    "all unresolved curve fields share one bounded property traversal per effect/request");
+hideDirectCurveIds=false;
 const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleId=initial.nodes.find(n=>n.type===edits.types.particle).id;
 const client=transactions.create({codec,edits,idFactory:()=>uuid(next++),call:(op,fields,cb)=>{
     if(op==="submitGraph"&&beforeSubmit){const change=beforeSubmit;beforeSubmit=null;change();}
     cb(invoke(op,fields));
 }});
 const snapshot=()=>snapshots.normalize(invoke("getGraphSnapshot")).snapshot;
+function wireGraphHex(graph) {
+    // JSON transports -0 as 0; CRC remains diagnostic, while all graph fields
+    // must still match exactly after this one transport normalization.
+    for(const node of graph.nodes)for(const p of node.parameters) {
+        if(typeof p.value==="number" && p.value===0)p.value=0;
+        if(Array.isArray(p.value))p.value=p.value.map(v=>v===0?0:v);
+    }
+    return codec.toHex(graph);
+}
 function apply(edit){let result;client.apply(edit,r=>result=r,"p5-c17-l29");return result;}
 let ensured;client.ensureNativeEffects(snapshot(),"p5-c17-l29",r=>ensured=r);
 assert.equal(ensured.ok,true,JSON.stringify(ensured));assert.equal(items.length,3);
-assert.equal(renderer.properties[89].value,1);assert.deepEqual(Array.from(items[1].properties.Origin.value),[1920,1080,1080]);
-assert.equal(renderer.properties[42].value,0);
+assert.equal(renderer.properties["Node Effects Ready"].value,1);assert.deepEqual(Array.from(items[1].properties["Origin XY"].value),[1920,1080]);
+assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
 // Exercise a host's decimal JSON rounding across the JSX/CEP boundary.
 const emitterEffect=items.find(e=>e.matchName==="org.starfieldfx.node.emitter");
 emitterEffect.properties["Velocity Y"].value=0.30000001192092896;
@@ -150,22 +176,26 @@ assert.equal(commits,unchangedCommits,"refresh must not recompile an approximate
 assert.equal(apply({type:"moveNodes",positions:{[emitterId]:{x:-161.125,y:-80}}}).ok,true);
 beforeSubmit=()=>{emitterEffect.properties["Particles Per Second"].value=123;};
 const staleCount=items.length;
-assert.equal(apply({type:"addNode",nodeType:"force",position:{x:0,y:0}}).error.code,"stale_graph");
+const preparedNative=invoke("getGraphSnapshot");
+let stalePrepared;
+client.apply({type:"addNode",nodeType:"force",position:{x:0,y:0}},r=>stalePrepared=r,
+    "p5-c17-l29",preparedNative.snapshot.revision,preparedNative);
+assert.equal(stalePrepared.error.code,"stale_graph","host rechecks records even when planning reused a receipt");
 assert.equal(items.length,staleCount,"a real intervening edit rejects before effect creation");
 roundWireNumbers=false;publish(graphFromEffects());
 const duplicate=apply({type:"duplicateNodes",nodeIds:[particleId],offset:{x:160,y:0}});
 assert.equal(duplicate.ok,true,JSON.stringify(duplicate));assert.equal(items.length,4);
 const copiedId=codec.fromHex(snapshot().graphHex).nodes.find(n=>n.type===edits.types.particle&&n.id!==particleId).id;
 assert.equal(apply({type:"setParameters",changes:[{nodeId:copiedId,parameterKey:"3",valueType:4,value:64}]}).ok,true);
-assert.equal(items[2].properties.Size.value,10);assert.equal(items[3].properties.Size.value,64);
+assert.equal(items[2].properties["Size (Pixels)"].value,10);assert.equal(items[3].properties["Size (Pixels)"].value,64);
 assert.equal(apply({type:"moveNodes",positions:{[outputId]:{x:-300,y:-200}}}).ok,true);
-assert.equal(renderer.properties[39].value,-300);assert.equal(renderer.properties[40].value,-200);
+assert.equal(renderer.properties["Layout Output X"].value,-300);assert.equal(renderer.properties["Layout Output Y"].value,-200);
 assert.equal(apply({type:"setParameters",changes:[{nodeId:outputId,parameterKey:"1",valueType:3,value:8000}]}).ok,true);
-assert.equal(renderer.properties[27].value,8000);
+assert.equal(renderer.properties["Max Particles"].value,8000);
 rejectNext=true;assert.equal(apply({type:"deleteNodes",nodeIds:[copiedId]}).ok,false);
 assert.equal(items.length,4,"rejected edit restores the removed effect");
 assert.equal(codec.fromHex(snapshot().graphHex).nodes.length,4,"rollback also recompiles the render snapshot");
-assert.equal(renderer.properties[42].value,0);
+assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
 assert.equal(apply({type:"deleteNodes",nodeIds:[copiedId]}).ok,true);assert.equal(items.length,3);
 const opacity=view.encodeCurve([{age:0,value:100},{age:0.2,value:37.5},{age:1,value:0}]);
 assert.equal(apply({type:"setParameters",changes:[{nodeId:particleId,parameterKey:"8",valueType:7,value:opacity}]}).ok,true);
@@ -185,15 +215,31 @@ assert.ok(currentGraph.edges.some(e=>e.sourceNode===forceId&&e.destinationNode==
 let forceOutput=currentGraph.edges.find(e=>e.sourceNode===forceId&&e.destinationNode===outputId);
 assert.equal(apply({type:"disconnect",edgeId:forceOutput.id}).ok,true);
 assert.equal(apply({type:"connect",from:forceId,to:outputId}).ok,true);
+const extraEmitters=[];
+for(let i=0;i<2;i++) {
+    const previousIds=codec.fromHex(snapshot().graphHex).nodes.map(n=>n.id);
+    assert.equal(apply({type:"addNode",nodeType:"emitter",position:{x:600,y:i*100}}).ok,true);
+    extraEmitters.push(codec.fromHex(snapshot().graphHex).nodes.find(n=>!previousIds.includes(n.id)).id);
+}
+const multiEmitterReads=nodePropertyReads,multiEmitterCommits=commits;
+assert.equal(invoke("getPanelPulse").ok,true);
+assert.equal(nodePropertyReads,multiEmitterReads,"multiple emitters add no sibling value reads to the pulse");
+assert.equal(commits,multiEmitterCommits,"multiple-emitter idle inspection does not recompile");
+assert.equal(apply({type:"deleteNodes",nodeIds:extraEmitters}).ok,true);
 // AE reordering must not change graph identity, topology or independently saved values.
 const beforeReorder=snapshot().graphHex;
 items.reverse();epoch++;
 assert.equal(snapshot().graphHex,beforeReorder);
-const nativeCopy=JSON.parse(JSON.stringify(items.find(e=>e.matchName==="org.starfieldfx.node.particle")));
+const original=items.find(e=>e.matchName==="org.starfieldfx.node.particle"), copiedProperties=new Map();
+const nativeCopy={matchName:original.matchName,name:original.name,properties:{}};
+for(const [key,p] of Object.entries(original.properties)) {
+    if(!copiedProperties.has(p))copiedProperties.set(p,{...p,value:clone(p.value)});
+    nativeCopy.properties[key]=copiedProperties.get(p);
+}
 items.push(nativeCopy);epoch++;
 assert.equal(snapshot().initialized,false,"AE-level Ctrl+D needs new node and edge identities");
 assert.equal(invoke("syncGraphSnapshot").ok,true);
-assert.equal(snapshot().checksumMatches,true);
+assert.equal(snapshot().graphHex,wireGraphHex(graphFromEffects()));
 currentGraph=codec.fromHex(snapshot().graphHex);
 assert.equal(currentGraph.nodes.filter(n=>n.type===edits.types.particle).length,2);
 assert.equal(new Set(currentGraph.nodes.map(n=>n.id)).size,currentGraph.nodes.length);
@@ -211,7 +257,7 @@ assert.equal(invoke("syncGraphSnapshot").ok,true);
 assert.equal(items.length,1,"an intentionally empty graph must not recreate initial nodes");
 // A partial fresh initialization with only an unassigned emitter still creates
 // Particle and the initial wiring. It is distinct from intentional ready=1 deletion.
-renderer.properties[89].value=0;renderer.properties[41].value=0;revision=0;
+renderer.properties["Node Effects Ready"].value=0;renderer.properties["Graph Revision"].value=0;revision=0;
 items.push({matchName:"org.starfieldfx.node.emitter",name:"Starfield Emitter",properties:nodeControls()});epoch++;
 const recovered=snapshots.normalize(invoke("syncGraphSnapshot"));
 assert.equal(recovered.ok,true,JSON.stringify(recovered));
@@ -228,7 +274,7 @@ assert.match(refusedParticle.error.message,/Particle \(org\.starfieldfx\.node\.p
 assert.match(refusedParticle.error.message,/canAddProperty=false/);
 assert.equal(items.length,beforeFailedAddCount,"failed Particle creation must not change the Effect Parade");
 assert.equal(snapshot().graphHex,beforeFailedAdd,"failed creation preserves existing nodes and connections");
-assert.equal(renderer.properties[42].value,0);
+assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
 rejectNextAdd=null;
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

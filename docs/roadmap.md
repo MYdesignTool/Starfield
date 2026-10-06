@@ -10,6 +10,12 @@ host conflict/semantic checks, and avoid repeated native-control/parade searches
 Native46/renderer contracts remain. Syntax/hash checks are separate from actual
 AE cursor and wall-clock latency evidence; no test suites requested/run.
 
+2026-10-06: five focused CEP suites now pass under the owner's resumed minimal-test
+authorization. They verify background request bounds, unchanged-marker behavior,
+request-only property lookup, prepared-receipt guards and actual preset manager
+Add/Replace planning calls. Runtime sources remain panel48; AE latency and cursor
+qualification is still open.
+
 ## P-03 / native46 + panel47 - Add and inspector scrolling
 
 Owner reports Add's retained Emitter3/expected7 failure and white inspector bars.

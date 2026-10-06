@@ -1,5 +1,20 @@
 # Build and host matrix
 
+## Panel48 focused regression gate - 2026-10-06
+
+The owner's resumed goal authorizes necessary minimal tests. Node24.19.0 passes
+panel_graph_transaction_tests, panel_native_node_gateway_tests, panel_startup_tests,
+preset_tests and preset_manager_performance_tests. Logs are
+artifacts/cep48-<suite>.log. Update old fixtures to current Emitter7/Particle7/
+Force3/Output4, exact native disk IDs and atomic gateway/combined-state protocol.
+The real preset manager's button handlers use one getGraphSnapshot plus submitGraph
+for initialized Add and Replace. Uninitialized targets retain an explicit sync.
+The host still independently checks revision/record stamp before writes. Pulse
+tests prove no sibling value reads/compilation; fallback fields share one traversal
+per effect/request. These are source/fake-host gates, not AE timing measurements.
+No runtime source or native binary changes in this follow-up; the installed
+native46/panel48 pairing and paired46/47 rollback remain the existing deployment.
+
 ## P-02K / native46 + panel48 candidate - 2026-10-05
 
 CEP0.1.0.48/extensions0.1.48 and gateway/resource markers48. Panel polling,
