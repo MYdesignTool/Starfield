@@ -1,5 +1,15 @@
 # Starfield plug-in architecture
 
+## M3-11 - Transform affine foundation
+
+ParticleTransformSettings is a separate value type with no existing Settings/ABI
+layout change. Compile an immutable affine transform once per sampled node, with
+separate centre, velocity and sprite-axis maps. Local system scale affects spacing;
+particle scale/opacity are independent multipliers. Full inherited linear motion
+retains reflection/shear. 268 focused MSVC checks pass. No graph/native/CEP node
+is exposed yet; ordered Force/auxiliary semantics, Null capture and CPU/GPU basis
+transport remain open under ADR0032. Installed native46/panel48 is unchanged.
+
 ## P-02K / native46 + panel48 - background and preset cost
 
 The owner confirms idle busy cursors stop when CEP closes. Replace200ms status/

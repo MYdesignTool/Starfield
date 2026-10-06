@@ -1,5 +1,17 @@
 # Build and host matrix
 
+## M3-11 affine foundation - 2026-10-06
+
+tests/RunCoreTests.ps1 -ParticleTransform passes 268 focused checks with MSVC
+C++20 /W4 /O2 /DNDEBUG. The two-source scope needs no AE SDK and writes only to
+artifacts/particle-transform-tests/ (summary: artifacts/m3-11-transform-math.log).
+BuildWindows.ps1 -NoDistPublish -NoRuntimePublish succeeds with the default May2023
+SDK, 2023 label, Release x64 and /MT; both Core DLL and main AEX compile the new
+primitive. Log: artifacts/m3-11-transform-build.log; no build errors/warnings.
+CMake/MSBuild and adapter fingerprints include the new source/header. The helper
+has no render caller or public node yet. Native46/panel48 installed files and
+Core selector are unchanged; this is a source foundation, not an AE host pass.
+
 ## Panel48 focused regression gate - 2026-10-06
 
 The owner's resumed goal authorizes necessary minimal tests. Node24.19.0 passes

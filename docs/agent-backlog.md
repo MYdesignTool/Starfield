@@ -1,5 +1,31 @@
 # Agent-ready implementation backlog
 
+## M3-11 - Transform node
+
+Owner requests the Stardust Transform inventory on AE2023. The supplied parameter
+report and 2026-10-06 screenshot establish this order: Inherit Motion (Null Layer),
+Anchor XY/Z, Position X/Y/Z, Rotation X/Y/Z, Scale X/Y/Z, Particles Scale and
+Particles Opacity. Use independent Starfield identities and implementation.
+Own Settings.hpp, new ParticleTransform.hpp/.cpp, graph construction/evaluation,
+native Transform effect/parameter and sampled layer adapter, native temporal
+capture, sprite basis/render transport, CEP graph/inspector/gateway/preset paths,
+schema declarations, build inputs and scoped tests, ADR0032 and related docs.
+Render.hpp and Core ABI changes require explicit versioning in ADR0032 before
+implementation. Existing released IDs and kinds retain their values.
+
+Work starts with a host-independent affine primitive and focused tests, compiled
+once per sampled node. System Scale changes particle positions; Particles Scale
+changes sprite size. Preserve inherited affine reflection/shear and distinguish
+position, velocity and sprite axes. This foundation alone does not implement a
+graph node. Subsequent gates are ordered graph semantics (including Force and
+auxiliary emission), native/preset roundtrip, sampled Null capture in the effect's
+coordinate frame, CPU/GPU sprite transforms, cancellation and bounded work.
+Do not advertise inert controls or deploy the primitive as a finished node.
+Status: affine foundation implemented; 268 focused MSVC checks pass (2026-10-06).
+Graph/native/CEP/render integration and AE qualification remain open. Reference
+menus are recorded in reference-texture-transfer-transform.md. This first source
+milestone changes no installed bundle, graph kind, parameter ID, wire or Core ABI.
+
 ## P-02K - CEP idle and preset-operation performance
 
 Owner qualitatively accepts panel47 functionality. Multiple emitters cause frequent

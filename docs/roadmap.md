@@ -1,5 +1,14 @@
 # Development plan: AE 2023 particle Alpha
 
+## M3-11 - Transform
+
+The owner supplied the full Transform UI and Texture/Transfer menu screenshots.
+Record the visible inventory in reference-texture-transfer-transform.md. The
+Transform affine primitive and 268 release-active focused math checks are in place.
+Continue with the graph/native node, sampled Null motion and actual CPU/GPU sprite
+transforms before deployment. Foundation math is not a finished Transform node;
+AE behavior and all four broader owner feature requests remain open.
+
 ## P-02K / native46 + panel48 - CEP performance
 
 Owner confirms multiple-emitter busy cursors stop with CEP closed, then requests

@@ -10,6 +10,7 @@ add_library(starfield_core STATIC
     src/core/GraphEvaluation.cpp
     src/core/EmitterHistory.cpp
     src/core/ParticleSimulation.cpp
+    src/core/ParticleTransform.cpp
     src/core/Random.cpp
     src/core/Render.cpp
     src/core/SequenceCodec.cpp
@@ -46,4 +47,7 @@ if(BUILD_TESTING)
     target_sources(starfield_core_tests PRIVATE src/core/PluginApi.cpp)
     target_link_libraries(starfield_core_tests PRIVATE starfield_core)
     add_test(NAME starfield_core_tests COMMAND starfield_core_tests)
+    add_executable(starfield_particle_transform_tests tests/particle_transform_tests.cpp)
+    target_link_libraries(starfield_particle_transform_tests PRIVATE starfield_core)
+    add_test(NAME starfield_particle_transform_tests COMMAND starfield_particle_transform_tests)
 endif()

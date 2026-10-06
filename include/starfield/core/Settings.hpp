@@ -69,6 +69,20 @@ struct Vec3 {
     double z{};
 };
 
+// Transform node values use the same canonical world frame as particles.
+// The adapter converts AE pixels/signs and captures any inherited motion before
+// entering the core. Matrices are row-major, applied to column vectors.
+struct ParticleTransformSettings {
+    Vec3 anchor{};
+    Vec3 position{};
+    Vec3 rotation_degrees{};
+    Vec3 scale_percent{100.0, 100.0, 100.0};
+    double particles_scale_percent{100.0};
+    double particles_opacity_percent{100.0};
+    std::array<double, 16> inherited_motion{
+        1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+};
+
 // Converts full-resolution layer-pixel emitter dimensions to canonical world
 // coordinates (one world unit equals one layer height). X accounts for pixel aspect.
 struct EmitterDimensionContext {
