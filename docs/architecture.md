@@ -1,5 +1,27 @@
 # Starfield plug-in architecture
 
+## M3-11 - ordered Transform graph evaluation (source milestone)
+
+The independent Transform kind has particle input1/output2, schema1, required
+Anchor/Position/Rotation/System Scale/Particles Scale/Particles Opacity values,
+and an optional bounded sampled affine matrix. ADR0032 and sequence-format.md
+define its keys; existing kinds, IDs and graph envelope remain stable.
+
+Compile one complete centre/sprite map per Particle branch and map each Force
+through only its downstream Transform suffix. Static integration stays closed
+form; temporal integration uses the current pose with the existing Force history
+lattice. Parallel forces in one frame merge once. Different Transform paths of
+the same stream reject ambiguous merges; independent Particle streams keep their
+own frames at Output. Auxiliary prefixes sample parent geometry at child birth,
+and child transforms map inherited position, velocity, size and opacity.
+Orient To unmaps directions through a precompiled pseudoinverse of the sprite
+basis, preventing a second application of the Transform rotation.
+
+Four focused scopes pass5050 checks, including live CPU rectangular pixels.
+Native/CEP controls and sampled Null capture remain in progress. Installed
+native46/CEP49 remains selected; actual AE geometry, persistence, presets and
+shutter behavior still need qualification. Core ABI4 requires paired deployment.
+
 ## M3-11 - shared sprite basis transport (source milestone)
 
 ParticleInstance carries a uint32 basis index; EvaluatedGraph owns up to4096 shared
@@ -15,9 +37,9 @@ paired native deployment is required; runtime-only publication checks installed
 AEX hashes against all five paired build artifacts before changing the selector.
 This candidate is built with NoDistPublish/NoRuntimePublish. Installed native46/
 CEP49 remains selected. Scoped math466/transport3544/current-node437/publication11
-checks pass; actual AE and hardware GPU execution are not inferred. Graph kind,
-ordered Force/auxiliary stages, native controls and sampled Null capture remain
-the next M3-11 integration gates under ADR0032.
+checks pass; actual AE and hardware GPU execution are not inferred. The later
+ordered graph milestone above adds the core kind and Force/auxiliary stages;
+native controls and sampled Null capture remain the next integration gates.
 
 ## P-02L / native46 + panel49 - left node palette
 

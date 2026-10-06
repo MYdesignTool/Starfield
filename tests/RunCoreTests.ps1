@@ -11,6 +11,7 @@ param(
     [switch]$GradientEditor,
     [switch]$ParticleTransform,
     [switch]$TransformTransport,
+    [switch]$TransformGraph,
     [switch]$TraceIncludes,
     [ValidatePattern('^([A-Za-z0-9_./-]+)?$')][string]$PresetCatalog = '',
     [ValidateSet('Emitter', 'Particle', 'Force')][string]$NodeKind = 'Particle',
@@ -18,7 +19,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent + [int]$HostBootstrap.IsPresent + [int]$GradientEditor.IsPresent + [int]$ParticleTransform.IsPresent + [int]$TransformTransport.IsPresent) -gt 1) { throw 'Select only one test scope.' }
+if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent + [int]$HostBootstrap.IsPresent + [int]$GradientEditor.IsPresent + [int]$ParticleTransform.IsPresent + [int]$TransformTransport.IsPresent + [int]$TransformGraph.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -36,7 +37,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($TransformTransport) { 'transform-transport-tests' } elseif ($ParticleTransform) { 'particle-transform-tests' } elseif ($GradientEditor) { 'gradient-editor-tests' } elseif ($HostBootstrap) { 'host-bootstrap-tests' } elseif ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($TransformGraph) { 'transform-graph-tests' } elseif ($TransformTransport) { 'transform-transport-tests' } elseif ($ParticleTransform) { 'particle-transform-tests' } elseif ($GradientEditor) { 'gradient-editor-tests' } elseif ($HostBootstrap) { 'host-bootstrap-tests' } elseif ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -79,6 +80,7 @@ try {
     if ($HostBootstrap) { $sources = @('tests\host_bootstrap_tests.cpp') }
     if ($ParticleTransform) { $sources = @('tests\particle_transform_tests.cpp','src\core\ParticleTransform.cpp') }
     if ($TransformTransport) { $sources[0] = 'tests\transform_transport_tests.cpp' }
+    if ($TransformGraph) { $sources[0] = 'tests\transform_graph_tests.cpp' }
 
     $responseLines = @(
         '/nologo',

@@ -62,8 +62,18 @@ switch. Extend focused CurrentNodes ownership to its stale gradient fixture:
 the existing byte2 Hold mode is valid; corrupt reserved byte3 or mode2 instead.
 Production gradient code is unchanged. Math466/transport3544/current-node437/
 publication11 checks pass and the final native candidate builds without publishing.
-No Transform graph/native/CEP kind is exposed yet. Ordered Force/auxiliary graph
-evaluation, sampled Null capture and AE qualification remain open.
+At that transport milestone no Transform graph/native/CEP kind was exposed.
+
+2026-10-06 ordered graph milestone: core Transform schema1/keys1..7 and typed
+ports are implemented under ADR0032. Static and temporal evaluators share bounded
+Transform planning; each Force uses its downstream suffix, independent Particle
+streams retain separate frames, and divergent chains of one stream reject an
+ambiguous merge. Auxiliary birth prefixes, inherited velocity/style, historical
+origin offsets and sprite orientation use the appropriate frame. Pseudoinverse
+compilation handles reflected, sheared and singular inherited bases once per pose.
+TransformGraph586/math483/transport3544/current-node437 checks pass. Native effect,
+CEP authoring, sampled Null capture and actual AE qualification remain open.
+Continue M3-11; this source milestone does not finish the owner's broader goal.
 
 ## P-02K - CEP idle and preset-operation performance
 

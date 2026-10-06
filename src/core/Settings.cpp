@@ -156,6 +156,9 @@ ValidatedSettings validate_settings(Settings settings) {
                                   std::pair{force.spin_delay, 10000.0}})
             forces_valid = forces_valid && std::isfinite(scalar.first) && scalar.first >= 0 && scalar.first <= scalar.second;
         forces_valid = forces_valid && (force.wind_spin_curve.count == 0 || valid_age_curve(force.wind_spin_curve, 0, 100));
+        for(double channel:{force.spin_axis_x.x,force.spin_axis_x.y,force.spin_axis_x.z,
+            force.spin_axis_y.x,force.spin_axis_y.y,force.spin_axis_y.z})
+            forces_valid=forces_valid && std::isfinite(channel) && std::abs(channel)<=1e18;
     }
     if (!forces_valid) {
         notices.push_back({ValidationCode::force_motion_invalid, "forces"});

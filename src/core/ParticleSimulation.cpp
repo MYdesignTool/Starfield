@@ -1,4 +1,5 @@
 #include "starfield/core/ParticleSimulation.hpp"
+#include "starfield/core/ParticleTransform.hpp"
 #include "starfield/core/AgeCurve.hpp"
 
 #include "starfield/core/Random.hpp"
@@ -171,10 +172,19 @@ void apply_force_motion(ParticleInstance& particle, const ForceMotion& force, do
     const double radius = envelope * curve_value;
     const double radius_slope = envelope * (curve_slope - resistance * curve_value);
     const double c = std::cos(omega * spin_age), s = std::sin(omega * spin_age);
-    particle.position.x += radius * (c - 1);
-    particle.position.y += radius * s;
-    particle.velocity.x += radius_slope * (c - 1) - radius * omega * s;
-    particle.velocity.y += radius_slope * s + radius * omega * c;
+    const double dx=radius*(c-1),dy=radius*s;
+    const double vx=radius_slope*(c-1)-radius*omega*s,vy=radius_slope*s+radius*omega*c;
+    if(force.spin_axis_x.x==1 && force.spin_axis_x.y==0 && force.spin_axis_x.z==0 &&
+       force.spin_axis_y.x==0 && force.spin_axis_y.y==1 && force.spin_axis_y.z==0) {
+        particle.position.x+=dx;particle.position.y+=dy;particle.velocity.x+=vx;particle.velocity.y+=vy;
+    } else {
+        particle.position.x+=force.spin_axis_x.x*dx+force.spin_axis_y.x*dy;
+        particle.position.y+=force.spin_axis_x.y*dx+force.spin_axis_y.y*dy;
+        particle.position.z+=force.spin_axis_x.z*dx+force.spin_axis_y.z*dy;
+        particle.velocity.x+=force.spin_axis_x.x*vx+force.spin_axis_y.x*vy;
+        particle.velocity.y+=force.spin_axis_x.y*vx+force.spin_axis_y.y*vy;
+        particle.velocity.z+=force.spin_axis_x.z*vx+force.spin_axis_y.z*vy;
+    }
 }
 
 Vec3 normalize_direction(Vec3 value) noexcept {
@@ -308,7 +318,8 @@ PartitionRange partition_range(ParticleSlotRange range, std::uint32_t partition_
 }
 
 ParticleInstance evaluate_particle(const Settings& values, double age, std::uint64_t slot,
-                                   const EmitterDimensionContext& dimension_context) noexcept {
+                                   const EmitterDimensionContext& dimension_context,
+                                   const CompiledParticleTransform* birth_transform = nullptr) noexcept {
     ParticleInstance particle;
     // Age is derived from the slot distance instead of `t - k / rate`, which
     // keeps full relative precision for long comps and high birth rates.
@@ -384,11 +395,13 @@ ParticleInstance evaluate_particle(const Settings& values, double age, std::uint
         gravity.z -= force.gravity.z * attenuation;
     }
     const DragIntegrals factors = drag_integrals(values.linear_drag, age);
-    particle.position.x = values.emitter_origin.x + birth.x + particle_velocity.x * factors.velocity_displacement +
+    Vec3 initial{values.emitter_origin.x+birth.x,values.emitter_origin.y+birth.y,values.emitter_origin.z+birth.z};
+    if(birth_transform){initial=birth_transform->position(initial);particle_velocity=birth_transform->velocity(particle_velocity);}
+    particle.position.x = initial.x + particle_velocity.x * factors.velocity_displacement +
                           gravity.x * factors.acceleration_displacement;
-    particle.position.y = values.emitter_origin.y + birth.y + particle_velocity.y * factors.velocity_displacement +
+    particle.position.y = initial.y + particle_velocity.y * factors.velocity_displacement +
                           gravity.y * factors.acceleration_displacement;
-    particle.position.z = values.emitter_origin.z + birth.z + particle_velocity.z * factors.velocity_displacement +
+    particle.position.z = initial.z + particle_velocity.z * factors.velocity_displacement +
                           gravity.z * factors.acceleration_displacement;
     const double decay = std::exp(-values.linear_drag * age);
     particle.velocity = {particle_velocity.x * decay + gravity.x * factors.velocity_displacement,
@@ -424,8 +437,8 @@ Result<std::size_t> simulate_partition(const ValidatedSettings& settings, double
 } // namespace
 
 ParticleInstance simulate_particle_at_age(const Settings& settings, double age,
-    std::uint64_t identity, EmitterDimensionContext dimensions) noexcept {
-    return evaluate_particle(settings, age, identity, dimensions);
+    std::uint64_t identity, EmitterDimensionContext dimensions,const CompiledParticleTransform* birth_transform) noexcept {
+    return evaluate_particle(settings, age, identity, dimensions,birth_transform);
 }
 
 Result<std::vector<ParticleInstance>> simulate_particles(const ValidatedSettings& settings, double time_seconds,
@@ -514,7 +527,7 @@ Result<std::size_t> simulate_selected_particles_into(const ValidatedSettings& se
                                                      std::span<const ParticleSlotTarget> targets,
                                                      std::span<ParticleInstance> destination,
                                                      const Cancellation& cancellation,
-                                                     EmitterDimensionContext dimension_context) {
+                                                     EmitterDimensionContext dimension_context,const CompiledParticleTransform* birth_transform) {
     using R = Result<std::size_t>;
     if (!std::isfinite(dimension_context.layer_height_pixels) ||
         !(dimension_context.layer_height_pixels > 0.0) ||
@@ -537,7 +550,7 @@ Result<std::size_t> simulate_selected_particles_into(const ValidatedSettings& se
             return R::failure(ErrorCode::invalid_request, "selected particle slot is outside the live range");
         }
         destination[target.destination] = evaluate_particle(settings.value, (slots_elapsed-double(target.slot))/settings.value.birth_rate,
-                                                            target.slot, dimension_context);
+                                                            target.slot, dimension_context,birth_transform);
     }
     return R::success(targets.size());
 }

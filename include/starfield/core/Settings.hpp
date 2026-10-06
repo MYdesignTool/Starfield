@@ -122,6 +122,7 @@ struct ForceMotion {
     double spin_delay{};
     AgeCurve wind_spin_curve{};
     std::uint32_t random_salt{};
+    Vec3 spin_axis_x{1,0,0},spin_axis_y{0,1,0};
 };
 
 struct Settings {

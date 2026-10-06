@@ -625,10 +625,23 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kWindSpinCurve, ParameterKind::opaque_bytes, false},
     };
 
+    NodeTypeDescriptor transform;
+    transform.type_key=kTransformNode;transform.schema_version=1;
+    transform.ports={PortDescriptor{kTransformParticlesIn,PortDirection::input,kParticleStream,true,0},
+        PortDescriptor{kTransformParticlesOut,PortDirection::output,kParticleStream,false,0}};
+    transform.parameters={
+        ParameterDescriptor{kTransformAnchor,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kTransformPosition,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kTransformRotation,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kTransformSystemScale,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kTransformParticleScale,ParameterKind::float64,true},
+        ParameterDescriptor{kTransformParticleOpacity,ParameterKind::float64,true},
+        ParameterDescriptor{kTransformInheritedMatrix,ParameterKind::opaque_bytes,false}};
     registry.types.push_back(std::move(emitter));
     registry.types.push_back(std::move(particle));
     registry.types.push_back(std::move(force));
     registry.types.push_back(std::move(output));
+    registry.types.push_back(std::move(transform));
     return registry;
 }
 

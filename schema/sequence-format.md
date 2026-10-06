@@ -35,6 +35,30 @@ Fields after the 8-byte record prefix:
 
 Value type IDs are fixed: `1=bool` (one byte, only 0/1), `2=i32`, `3=u32`, `4=f64` (IEEE-754 little-endian, finite only), `5=vec3_f64` (three finite f64 values), `6=utf8` (no NUL terminator), `7=opaque_bytes` (only for a node type that explicitly owns this payload). Unknown required value types fail migration; opaque bytes remain subject to the 64 MiB total limit.
 
+### Transform node (`org.starfieldfx.nodes.transform`, node schema 1)
+
+ADR0032 owns this independent kind. Particle input port1 accepts multiple sources;
+particle output port2 has bounded graph fan-out. The existing Node record and
+graph envelope remain version1. Existing node kinds/keys/IDs are unchanged.
+
+| Key | Value type | Required | Meaning |
+| ---: | --- | --- | --- |
+| 1 | vec3_f64 | yes | Anchor, canonical world coordinates |
+| 2 | vec3_f64 | yes | Position offset, canonical world coordinates |
+| 3 | vec3_f64 | yes | Rotation X/Y/Z in degrees |
+| 4 | vec3_f64 | yes | System Scale X/Y/Z in percent |
+| 5 | f64 | yes | Particles Scale in percent |
+| 6 | f64 | yes | Particles Opacity in percent |
+| 7 | opaque_bytes | no | Sampled inherited affine matrix; missing means identity |
+
+Key7 is exactly132 bytes: `[1,0,0,0]`, then sixteen little-endian finite IEEE-754
+doubles in row-major order acting on column vectors. The final row must be
+`[0,0,0,1]`; authored entries are bounded to +/-1e6. Core evaluation validates
+all authored values, including parked nodes. Native Null authoring will append
+a separate resource key rather than replacing the sampled matrix contract.
+Older registries reject this new kind as unsupported; publish the ABI4 native
+pair before exposing it in CEP. Keep prior paired builds for rollback.
+
 ### Edge record (`kind = 2`, `record_version = 1`)
 
 Fields after the 8-byte record prefix:

@@ -1,6 +1,6 @@
 # ADR 0032: independent Transform node
 
-- Status: staged implementation; affine and render transport selected, host/node contract open.
+- Status: core graph, affine and render transport implemented; native/Null authoring and AE qualification open.
 - Task: M3-11, AE2023 baseline.
 
 ## Reference and scope
@@ -84,11 +84,54 @@ collapse halfway through a large rotation); it does not claim rigid rotation
 interpolation. Invalid indices, allocation failure, work limits and cancellation
 return typed errors rather than silently dropping transforms or particles.
 
-## Remaining node and host contracts
+## Ordered graph evaluation contract
 
-These stages do not add a graph kind, native effect or controls.
-Ordered Force/Transform and branching/auxiliary semantics must be specified
-before integration. The adapter must capture Null motion at each shutter sample
+Add the independent org.starfieldfx.nodes.transform kind, schema1, with particle
+input1/output2. Required keys1..6 are canonical Anchor:Vec3, Position:Vec3,
+Rotation degrees:Vec3, system Scale percent:Vec3, Particles Scale:double and
+Particles Opacity:double. Optional key7 carries the sampled inherited affine
+matrix:132 bytes, version byte1 and three zero reserved bytes, followed by16
+little-endian doubles. Missing matrix means identity. The native Null reference
+will append its own authoring/resource key; no released kind/key is renumbered.
+
+A Particle branch may traverse Force and Transform stages in graph order before
+Output or an Auxiliary input. Different Particle streams retain independent
+frames. Reconverging paths of the same stream must carry the same Transform
+chain: parallel forces in one frame merge once, but bypassing or diverging
+Transform chains is an ambiguous merge and returns invalid_request. Auxiliary
+inputs terminate a parent prefix; unrelated child frames do not merge into it.
+Plan only descendants that reach that branch's terminal without crossing another
+Emitter. Existing graphs without Transform retain their current fast path.
+
+Compile the complete centre map once per branch. Map its initial birth position
+and velocity before integration. Each Force's gravity, wind and spin-plane axes
+map through only the Transform suffix downstream of that Force. Scalar drag
+commutes with affine linear maps, so the ordinary evaluator retains closed-form
+integration, including singular/negative system scales, without an inverse or
+frame stepping. Validate authored Force bounds before mapping; derived vectors
+are finite products of already bounded transforms and are not slider-clamped.
+Bound cached derived transforms to65536 per evaluation, in addition to existing
+node/edge/work/cancellation limits. Sprite axes, size and opacity use the complete
+branch map, independently of centre/system scale.
+
+Temporal evaluation samples each Transform's pose at the requested render time;
+Force history remains midpoint sampled on the existing simulation lattice and
+maps through that current suffix. This is a geometric stage, not additional
+physics integration. Velocity is the spatial linear map of simulation velocity;
+it does not add a derivative of animated translation/rotation. Exact shutter
+samples still capture the moving geometry. An Auxiliary parent's prefix evaluates
+at child birth, retaining that transformed birth position after its parent dies;
+the child's own Transform acts on inherited position/velocity and its own stream.
+Orient To directions are mapped back into the sprite basis before applying the
+existing Particle angle convention, using a precompiled bounded pseudoinverse
+for reflection/shear and rank-deficient inherited matrices. Numerical reference
+parity and animated Null velocity semantics remain observable AE gates.
+
+## Remaining native and host contracts
+
+The core graph kind and ordered Force/Transform/Auxiliary stages are implemented.
+Native effect and CEP authoring are the next integration gate. The adapter must
+capture Null motion at each shutter sample
 and convert to the particle world frame; no host object may cross into core.
 Null reference-pose and anchor semantics require host evidence. Existing
 wire/kind/disk IDs remain. Do not expose an inert node while these gates are open.
@@ -109,3 +152,12 @@ and publication11 focused checks pass. May2023 /MT native build succeeds with
 -NoDistPublish -NoRuntimePublish. Exported C CPU/GPU-scene transport and software
 packed-scene parity are covered; actual AE and GPU execution are not. Native46/
 CEP49 remains installed. See build-matrix.md for logs and remaining gates.
+
+2026-10-06 graph evidence: TransformGraph586, ParticleTransform483,
+TransformTransport3544 and CurrentNodes437 focused release-active checks pass.
+Coverage includes Force suffix order between two transforms, parallel forces,
+independent Particle frames, static/temporal evaluation, Auxiliary parent-at-birth
+and inherited velocity/style, origin history, pseudoinverse orientation, graph
+codec/frozen replay, derived bounds/cancellation and live rectangular CPU pixels.
+Native/CEP controls and actual AE/Null sampling remain unqualified. The installed
+native46/CEP49 bundle is retained while the source candidate uses Core ABI4.

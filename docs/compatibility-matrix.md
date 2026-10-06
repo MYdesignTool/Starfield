@@ -1,5 +1,17 @@
 # Behavior inventory
 
+## M3-11 ordered core graph qualification
+
+TransformGraph586, ParticleTransform483, TransformTransport3544 and CurrentNodes437
+checks pass5050 total. New graph schema1 persists through the existing codec.
+Tests cover two transforms around a Force, parallel Force merging, independent
+Particle streams, sampled poses, Auxiliary parent-at-birth and inherited velocity,
+historical origins, orientation, malformed data, bounds/cancellation and live
+32-bpc rectangular CPU pixel position/direction. These are core/source checks.
+Native/CEP authoring and Null sampling remain open, together with actual AE2023
+preset, undo, save/reopen, camera/Null and shutter qualification. The installed
+native46/CEP49 bundle remains unchanged. Core ABI4 requires a full native pair.
+
 ## M3-11 source transport qualification
 
 Four focused scopes pass4458 checks; the May2023 /MT native candidate compiles
@@ -8,7 +20,7 @@ bytes and new version4 matrices survive C render/GPU scene and Linear blur
 transport. Bounds/cancellation, affine projection and8/16/32-bpc ROI checks pass.
 The GPU comparison consumes packed scene data in software; actual CUDA/OpenCL
 and AE2023 frames remain open. Installed native46/CEP49 hashes stay unchanged.
-Graph/native/CEP Transform controls, Force order, auxiliary birth transforms,
+Native/CEP Transform controls and observed AE Force order/auxiliary birth transforms,
 animated Null inheritance, shutter geometry, undo and save/reopen require the
 remaining M3-11 integration and observed host checks. Do not infer Stardust
 numerical parity from its control inventory or these independently specified
@@ -22,7 +34,8 @@ pan/zoom/negative layout, pointer cancellation, overlays, pending/rejected write
 drag polling suppression and stale in-flight read guards. Owner closes AE for
 publication, but no actual CEP49 UI exercise is recorded. Existing native46
 render and broader host gates remain unchanged; M3-11 has unpublished affine and
-sprite-transport foundations, with graph/native/CEP Transform integration open.
+sprite transport and ordered core graph evaluation, with native/CEP Transform
+integration open.
 
 AE2023 owner checks still open: reopen the panel; inspect the left icons and bottom
 arrow at narrow sizes; drag each of Emitter/Auxiliary/Particle/Force onto empty

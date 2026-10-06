@@ -86,12 +86,20 @@ void inherited_affine_and_composition() {
     near(transform.velocity({1,2,3}),Vec3{-4,3,-12},"inherited affine velocity");
     near(transform.particle_axis({1,0,0}),Vec3{0,3,0},"inherited scale lost on sprite");
     near(transform.particle_axis({0,0,1}),Vec3{0,0,-4},"inherited reflection lost");
+    near(transform.unmap_particle_axis(transform.particle_axis({1,2,3})),Vec3{1,2,3},"reflected inverse sprite direction");
     settings={}; settings.inherited_motion={1,2,0,0, 0,1,.5,0, 0,0,1,0, 0,0,0,1};
     transform=compile(settings);
     near(transform.particle_axis({0,1,0}),Vec3{2,1,0},"inherited shear lost");
+    near(transform.unmap_particle_axis(transform.particle_axis({1,2,3})),Vec3{1,2,3},"sheared inverse sprite direction");
+    settings.inherited_motion={1,0,0,0,0,-2,0,0,0,0,0,0,0,0,0,1};transform=compile(settings);
+    near(transform.unmap_particle_axis({3,4,5}),Vec3{3,-2,0},"rank-two inverse direction");
+    settings.inherited_motion={1,2,3,0,2,4,6,0,0,0,0,0,0,0,0,1};transform=compile(settings);
+    const Vec3 projected=transform.particle_axis({2,3,4});
+    near(transform.particle_axis(transform.unmap_particle_axis(projected)),projected,"rank-one inverse projection");
     settings.inherited_motion={0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1};
     transform=compile(settings);
     near(transform.particle_axis({1,2,3}),Vec3{},"singular inherited basis");
+    near(transform.unmap_particle_axis({1,2,3}),Vec3{},"zero-rank inverse direction");
 
     // Check full affine composition against two separately compiled transforms.
     // Sprite bases are intentionally tested separately: local system scale must

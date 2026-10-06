@@ -15,17 +15,20 @@ Continue M3-11 and the other owner feature goals after this source milestone.
 
 The owner supplied the full Transform UI and Texture/Transfer menu screenshots.
 Record the visible inventory in reference-texture-transfer-transform.md. The
-Transform affine primitive and 268 release-active focused math checks are in place.
-Continue with the graph/native node, sampled Null motion and actual CPU/GPU sprite
-transforms before deployment. Foundation math is not a finished Transform node;
-AE behavior and all four broader owner feature requests remain open.
+Transform affine primitive, shared render transport and ordered graph kind are
+implemented. Continue with the native/CEP node and sampled Null motion before
+paired deployment. AE behavior and all four broader owner feature requests
+remain open.
 
 The next source milestone now carries shared affine sprite bases through CPU,
 portable GPU scene data, transient snapshot4 and Linear motion blur, with legacy
 snapshot3 bytes retained for the identity path. Core ABI4 requires a native pair;
 the runtime publisher rejects unpaired AEX hashes. Four focused scopes pass4458
 checks in total and the May2023 SDK candidate compiles without publication.
-Continue with ordered graph evaluation and sampled Null/native/CEP authoring.
+The later ordered graph milestone passes5050 focused checks across four scopes.
+Force suffix order, independent frames, Auxiliary birth/velocity inheritance,
+orientation, graph persistence and live CPU pixels are covered. Continue with
+sampled Null/native/CEP authoring and host qualification.
 
 ## P-02K / native46 + panel48 - CEP performance
 

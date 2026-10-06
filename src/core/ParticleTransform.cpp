@@ -1,6 +1,7 @@
 #include "starfield/core/ParticleTransform.hpp"
 
 #include <cmath>
+#include <algorithm>
 #include <numbers>
 
 namespace starfield::core {
@@ -15,6 +16,33 @@ Vec3 vector(const std::array<double,16>& matrix, Vec3 value) noexcept {
     return {matrix[0]*value.x+matrix[1]*value.y+matrix[2]*value.z,
             matrix[4]*value.x+matrix[5]*value.y+matrix[6]*value.z,
             matrix[8]*value.x+matrix[9]*value.y+matrix[10]*value.z};
+}
+ParticleSpriteBasis pseudo_inverse(ParticleSpriteBasis b) noexcept {
+    ParticleSpriteBasis v{1,0,0,0,1,0,0,0,1},inverse{};
+    // One-sided Jacobi SVD. B=M*V; orthogonalize its three columns. Fixed work
+    // and a relative rank cutoff avoid inverses of a nearly collapsed Null axis.
+    for(unsigned sweep=0;sweep<18;++sweep) {
+        bool changed=false;
+        for(unsigned p=0;p<2;++p)for(unsigned q=p+1;q<3;++q) {
+            double aa=0,bb=0,gamma=0;
+            for(unsigned r=0;r<3;++r){aa+=b[r*3+p]*b[r*3+p];bb+=b[r*3+q]*b[r*3+q];gamma+=b[r*3+p]*b[r*3+q];}
+            if(aa==0 || bb==0 || std::abs(gamma)<=1e-15*std::sqrt(aa)*std::sqrt(bb))continue;
+            const double tau=(bb-aa)/(2*gamma);
+            const double t=std::copysign(1.,tau)/(std::abs(tau)+std::hypot(1.,tau));
+            const double c=1/std::sqrt(1+t*t),s=c*t;
+            for(auto* matrix:{&b,&v})for(unsigned r=0;r<3;++r) {
+                const auto x=(*matrix)[r*3+p],y=(*matrix)[r*3+q];
+                (*matrix)[r*3+p]=c*x-s*y;(*matrix)[r*3+q]=s*x+c*y;
+            }
+            changed=true;
+        }
+        if(!changed)break;
+    }
+    double norms[3]{},maximum=0;
+    for(unsigned c=0;c<3;++c){for(unsigned r=0;r<3;++r)norms[c]+=b[r*3+c]*b[r*3+c];maximum=std::max(maximum,norms[c]);}
+    for(unsigned k=0;k<3;++k)if(norms[k]>maximum*1e-20 && norms[k]>1e-300)
+        for(unsigned r=0;r<3;++r)for(unsigned c=0;c<3;++c)inverse[r*3+c]+=v[r*3+k]*b[c*3+k]/norms[k];
+    return inverse;
 }
 } // namespace
 
@@ -34,6 +62,11 @@ Vec3 CompiledParticleTransform::particle_axis(Vec3 value) const noexcept {
     return {particle_basis_[0]*value.x+particle_basis_[1]*value.y+particle_basis_[2]*value.z,
             particle_basis_[3]*value.x+particle_basis_[4]*value.y+particle_basis_[5]*value.z,
             particle_basis_[6]*value.x+particle_basis_[7]*value.y+particle_basis_[8]*value.z};
+}
+Vec3 CompiledParticleTransform::unmap_particle_axis(Vec3 value) const noexcept {
+    const auto& m=inverse_particle_basis_;
+    return {m[0]*value.x+m[1]*value.y+m[2]*value.z,
+        m[3]*value.x+m[4]*value.y+m[5]*value.z,m[6]*value.x+m[7]*value.y+m[8]*value.z};
 }
 
 Result<CompiledParticleTransform> compile_particle_transform(const ParticleTransformSettings& settings) noexcept {
@@ -75,6 +108,7 @@ Result<CompiledParticleTransform> compile_particle_transform(const ParticleTrans
         for (std::size_t k=0;k<3;++k) compiled.particle_basis_[row*3+column]+=parent[row*4+k]*rotation[k*3+column];
     compiled.particle_scale_=settings.particles_scale_percent/100.0;
     compiled.particle_opacity_=settings.particles_opacity_percent/100.0;
+    compiled.inverse_particle_basis_=pseudo_inverse(compiled.particle_basis_);
     return R::success(std::move(compiled));
 }
 
@@ -92,6 +126,7 @@ Result<CompiledParticleTransform> compose_particle_transforms(
         return R::failure(ErrorCode::work_limit_exceeded,"composed Transform centre matrix exceeds bounds");
     if(!valid_particle_sprite_basis(result.particle_basis_) || !bounded(result.particle_scale_,1e6))
         return R::failure(ErrorCode::work_limit_exceeded,"composed Transform sprite exceeds bounds");
+    result.inverse_particle_basis_=pseudo_inverse(result.particle_basis_);
     return R::success(std::move(result));
 }
 

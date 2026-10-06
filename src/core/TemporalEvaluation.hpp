@@ -47,18 +47,22 @@ class TemporalEvaluator {
     std::uint64_t work{};
     double hz{kDefaultTemporalHz};
     std::map<std::pair<NodeId,double>,ForceValues> force_samples;
+    std::map<std::pair<NodeId,double>,CompiledParticleTransform> transform_samples;
+    TransformPlanningBudget transform_budget;
     using R=Result<EvaluatedGraph>;
     struct Branch {
         const GraphNode* emitter{};
         const GraphNode* particle{};
         std::vector<const GraphNode*> forces;
         std::uint64_t partition{}, stride{};
+        std::shared_ptr<const TransformBranchPlan> transform;
+        std::vector<const CompiledParticleTransform*> force_spaces;
     };
     Result<GraphNode> at(const GraphNode& node,double time) {
         if(cancel.is_cancelled()) return Result<GraphNode>::failure(ErrorCode::cancelled,"temporal sampling cancelled");
         if(++work>kTemporalWorkLimit) return Result<GraphNode>::failure(ErrorCode::work_limit_exceeded,"temporal sampling work limit");
         auto result=sampler.node(node.id,time);
-        if(result.has_value() && (result.value().id!=node.id || result.value().type_key!=node.type_key))
+        if(result.has_value() && (result.value().id!=node.id || result.value().type_key!=node.type_key || result.value().schema_version!=node.schema_version))
             return Result<GraphNode>::failure(ErrorCode::invalid_request,"historical node identity changed");
         return result;
     }
@@ -72,6 +76,18 @@ class TemporalEvaluator {
         if(values.has_value()) {
             if(force_samples.size()>=65536) force_samples.clear();
             force_samples.emplace(key,values.value());
+        }
+        return values;
+    }
+    Result<CompiledParticleTransform> transform_at(const GraphNode& node,double time) {
+        const auto key=std::make_pair(node.id,time);
+        if(const auto found=transform_samples.find(key);found!=transform_samples.end())
+            return Result<CompiledParticleTransform>::success(found->second);
+        auto sampled=at(node,time);if(!sampled.has_value())return Result<CompiledParticleTransform>::failure(sampled.error());
+        auto values=read_transform(sampled.value());
+        if(values.has_value()) {
+            if(transform_samples.size()>=65536)transform_samples.clear();
+            transform_samples.emplace(key,values.value());
         }
         return values;
     }
@@ -90,20 +106,25 @@ class TemporalEvaluator {
             const double dt=end-t, midpoint=(t+end)/2, age=midpoint-birth;
             Vec3 acceleration{}, spin_velocity{};
             double drag=0;
-            for(const auto* force_node:branch.forces) {
+            for(std::size_t force_index=0;force_index<branch.forces.size();++force_index) {
+                const auto* force_node=branch.forces[force_index];
                 auto force=force_at(*force_node,midpoint);if(!force.has_value()) return M::failure(force.error());
                 const auto values=motion_for_emitter(force.value().motion,branch.emitter->id);
                 const double attenuation=unit_value(seed^values.random_salt,particle.id,RandomPurpose::force_gravity)*values.gravity_random_percent/100;
                 const double envelope=evaluate_age_curve(values.wind_spin_curve,
                     age/particle.lifetime_seconds,100,100)/100;
-                acceleration.x+=force.value().gravity.x*(1-attenuation)+values.wind.x*envelope;
-                acceleration.y+=force.value().gravity.y*(1-attenuation)+values.wind.y*envelope;
-                acceleration.z+=force.value().gravity.z*(1-attenuation)+values.wind.z*envelope;
+                Vec3 contribution{force.value().gravity.x*(1-attenuation)+values.wind.x*envelope,
+                    force.value().gravity.y*(1-attenuation)+values.wind.y*envelope,
+                    force.value().gravity.z*(1-attenuation)+values.wind.z*envelope};
                 drag+=force.value().linear_drag;
                 // Spin is a displacement field. Integrate its local velocity,
                 // so animated radius/frequency does not teleport old particles.
-                const auto spin=temporal_spin_velocity(values,age,particle.lifetime_seconds);
-                spin_velocity.x+=spin.x;spin_velocity.y+=spin.y;
+                auto spin=temporal_spin_velocity(values,age,particle.lifetime_seconds);
+                if(!branch.force_spaces.empty())if(const auto* space=branch.force_spaces[force_index]) {
+                    contribution=space->velocity(contribution);spin=space->velocity(spin);
+                }
+                acceleration.x+=contribution.x;acceleration.y+=contribution.y;acceleration.z+=contribution.z;
+                spin_velocity.x+=spin.x;spin_velocity.y+=spin.y;spin_velocity.z+=spin.z;
             }
             if(drag>kMaxLinearDrag) return M::failure(ErrorCode::invalid_request,"combined animated drag outside bounds");
             const double decay=std::exp(-drag*dt);
@@ -113,6 +134,7 @@ class TemporalEvaluator {
             particle.position.x+=particle.velocity.x*a+acceleration.x*b+spin_velocity.x*dt;
             particle.position.y+=particle.velocity.y*a+acceleration.y*b+spin_velocity.y*dt;
             particle.position.z+=particle.velocity.z*a+acceleration.z*b;
+            if(spin_velocity.z!=0)particle.position.z+=spin_velocity.z*dt;
             particle.velocity={particle.velocity.x*decay+acceleration.x*a,
                                particle.velocity.y*decay+acceleration.y*a,
                                particle.velocity.z*decay+acceleration.z*a};
@@ -126,10 +148,13 @@ class TemporalEvaluator {
         } else {
             // Report the instantaneous field velocity for Auxiliary inheritance;
             // do not feed it back into physical velocity during integration.
-            for(const auto* force_node:branch.forces) {
+            for(std::size_t force_index=0;force_index<branch.forces.size();++force_index) {
+                const auto* force_node=branch.forces[force_index];
                 auto force=force_at(*force_node,now);if(!force.has_value()) return M::failure(force.error());
-                const auto spin=temporal_spin_velocity(force.value().motion,now-birth,particle.lifetime_seconds);
+                auto spin=temporal_spin_velocity(force.value().motion,now-birth,particle.lifetime_seconds);
+                if(!branch.force_spaces.empty())if(const auto* space=branch.force_spaces[force_index])spin=space->velocity(spin);
                 particle.velocity.x+=spin.x;particle.velocity.y+=spin.y;
+                if(spin.z!=0)particle.velocity.z+=spin.z;
             }
         }
         return M::success(true);
@@ -171,6 +196,37 @@ public:
             return R::failure(ErrorCode::invalid_request,"Particle chance outside 0..100");
         EvaluatedGraph result;
         for(const auto& [id,node]:nodes) if(active[id]) result.evaluated_nodes.push_back(id);
+        const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
+        std::vector<const GraphNode*> plan_nodes;
+        std::map<NodeId,std::size_t> plan_indices;
+        std::vector<std::vector<std::size_t>> plan_incoming,plan_outgoing;
+        std::vector<bool> plan_active;
+        std::vector<std::size_t> plan_order;
+        std::vector<std::optional<CompiledParticleTransform>> plan_transforms;
+        if(has_transforms) {
+            for(const auto& [id,n]:nodes){plan_indices.emplace(id,plan_nodes.size());plan_nodes.push_back(n);}
+            const auto count=plan_nodes.size();plan_incoming.resize(count);plan_outgoing.resize(count);
+            plan_active.resize(count);plan_transforms.resize(count);std::vector<std::size_t> degrees(count);
+            std::priority_queue<std::size_t,std::vector<std::size_t>,std::greater<>> ready;
+            for(std::size_t i=0;i<count;++i) {
+                plan_active[i]=active[plan_nodes[i]->id];
+                for(auto source:incoming[plan_nodes[i]->id])plan_incoming[i].push_back(plan_indices.at(source));
+                for(auto dest:outgoing[plan_nodes[i]->id])plan_outgoing[i].push_back(plan_indices.at(dest));
+                if(plan_nodes[i]->type_key==kTransformNode) {
+                    auto authored=read_transform(*plan_nodes[i]);if(!authored.has_value())return R::failure(authored.error());
+                    if(plan_active[i]) {
+                        auto sampled=transform_at(*plan_nodes[i],now);if(!sampled.has_value())return R::failure(sampled.error());
+                        plan_transforms[i]=sampled.take_value();
+                    }
+                }
+                if(plan_active[i]){degrees[i]=plan_incoming[i].size();if(!degrees[i])ready.push(i);}
+            }
+            while(!ready.empty()) {
+                if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Transform temporal topology cancelled");
+                auto index=ready.top();ready.pop();plan_order.push_back(index);
+                for(auto dest:plan_outgoing[index])if(plan_active[dest] && --degrees[dest]==0)ready.push(dest);
+            }
+        }
         if(now<0 || !cap) return R::success(std::move(result));
         std::vector<Branch> branches;
         std::map<NodeId,std::uint64_t> partitions;
@@ -187,6 +243,20 @@ public:
             }
             if(!terminal) continue;
             std::sort(base.forces.begin(),base.forces.end(),[](auto a,auto b){return a->id<b->id;});
+            if(has_transforms) {
+                auto planned=plan_transform_branch(plan_nodes,plan_incoming,plan_outgoing,plan_active,plan_order,
+                    plan_indices.at(id),plan_indices.at(output->id),plan_transforms,cancel,transform_budget);
+                if(!planned.has_value())return R::failure(planned.error());auto value=planned.take_value();
+                auto basis=retain_transform_basis(result,value);if(!basis.has_value())return R::failure(basis.error());
+                value.sprite_basis_index=basis.value();base.transform=std::make_shared<const TransformBranchPlan>(std::move(value));
+                base.forces.erase(std::remove_if(base.forces.begin(),base.forces.end(),[&](const auto* force) {
+                    return std::find(base.transform->force_nodes.begin(),base.transform->force_nodes.end(),force->id)==base.transform->force_nodes.end();
+                }),base.forces.end());
+                for(const auto* force:base.forces) {
+                    const auto found=base.transform->force_spaces.find(force->id);
+                    base.force_spaces.push_back(found==base.transform->force_spaces.end()?nullptr:&found->second);
+                }
+            }
             auto sources=incoming[id];std::sort(sources.begin(),sources.end());
             for(auto source:sources) {
                 const auto* emitter=nodes.at(source);
@@ -319,10 +389,13 @@ public:
                             const double inherit=percent(kInheritVelocity,0);
                             instance.velocity.x+=parent.velocity.x*inherit;instance.velocity.y+=parent.velocity.y*inherit;instance.velocity.z+=parent.velocity.z*inherit;
                         }
+                        const auto* tf=branch.transform && branch.transform->combined?&*branch.transform->combined:nullptr;
+                        if(tf){instance.position=tf->position(instance.position);instance.velocity=tf->velocity(instance.velocity);}
                         const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
                         apply_particle_style(instance,looks,own.seed);
-                        apply_particle_properties(instance,particle_values.value(),own.seed,birth_position);
+                        apply_particle_properties(instance,particle_values.value(),own.seed,birth_position,tf);
+                        if(branch.transform)apply_transform_style(instance,*branch.transform);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));
                         else if(older(candidate,kept.top())) {kept.pop();kept.push(std::move(candidate));}

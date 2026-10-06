@@ -1,5 +1,29 @@
 # Build and host matrix
 
+## M3-11 ordered Transform graph - 2026-10-06 (unpublished)
+
+MSVC C++20 /W4 /O2 /DNDEBUG focused scopes pass5050 checks:
+
+- RunCoreTests.ps1 -TransformGraph:586; m3-11-transform-graph.log.
+- RunCoreTests.ps1 -ParticleTransform:483; m3-11-transform-graph-math.log.
+- RunCoreTests.ps1 -TransformTransport:3544; m3-11-transform-graph-transport.log.
+- RunCoreTests.ps1 -CurrentNodes:437; m3-11-transform-graph-current.log.
+
+Logs are under artifacts/. The new scope covers static and temporal Force suffix
+order between two transforms, parallel forces, independent Particle streams,
+Auxiliary parent-at-birth and inherited velocity/size/opacity, historical origins,
+orientation, graph codec/frozen replay, malformed matrices/schema, derived bounds,
+cancellation and live32-bpc rectangular CPU pixels. Math adds reflection/shear
+and singular-rank pseudoinverse checks. Existing transport and nodes still pass.
+This is source/core evidence; actual AE/Null and hardware GPU behavior is open.
+
+BuildWindows.ps1 -NoDistPublish -NoRuntimePublish succeeds with the default May2023
+SDK, 2023 label, Release x64 /MT and Core ABI4. No compiler errors/warnings are
+reported. Log: artifacts/m3-11-transform-graph-build.log. Native controls, Null
+sampling and CEP authoring are the next M3-11 gates. Installed native46/CEP49 and
+its selected Core remain unchanged; verification receipt:
+artifacts/m3-11-transform-graph-installed-state.json. The owner goal remains open.
+
 ## M3-11 shared sprite transport - 2026-10-06 (unpublished)
 
 MSVC C++20 /W4 /O2 /DNDEBUG focused scopes pass:
@@ -30,8 +54,9 @@ any selector/runtime mutation; eleven scratch-fixture checks pass. Candidate
 files remain in artifacts/plugin and artifacts/core-dll. Installed native46/
 CEP49 hashes and selector remain as in cep49-deploy-after.json; verification
 receipt: artifacts/m3-11-transform-transport-installed-state.json.
-Transform graph kind, ordered Force/auxiliary integration, native/CEP controls and
-Null sampling are still open. No native deployment or AE host pass is claimed.
+At that transport milestone the Transform graph kind and ordered Force/auxiliary
+integration were still open; the later graph milestone above implements them.
+Native/CEP controls and Null sampling remain open. No AE host pass is claimed.
 
 ## P-02L / native46 + panel49 - 2026-10-06
 

@@ -191,6 +191,7 @@ inline constexpr const char* kParticleStream = "org.starfieldfx.types.particle-s
 inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
 inline constexpr const char* kParticleNode = "org.starfieldfx.nodes.particle";
 inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
+inline constexpr const char* kTransformNode = "org.starfieldfx.nodes.transform";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
 inline constexpr PortKey kEmitterParticles{1};
 inline constexpr PortKey kEmitterParents{2};
@@ -198,6 +199,7 @@ inline constexpr PortKey kParticleParticlesIn{1};
 inline constexpr PortKey kParticleParticlesOut{2};
 inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
+inline constexpr PortKey kTransformParticlesIn{1},kTransformParticlesOut{2};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};
@@ -245,6 +247,9 @@ inline constexpr ParameterKey kSpinFrequency{6};
 inline constexpr ParameterKey kSpinResist{7};
 inline constexpr ParameterKey kSpinDelay{8};
 inline constexpr ParameterKey kWindSpinCurve{9};
+inline constexpr ParameterKey kTransformAnchor{1},kTransformPosition{2},kTransformRotation{3};
+inline constexpr ParameterKey kTransformSystemScale{4},kTransformParticleScale{5},kTransformParticleOpacity{6};
+inline constexpr ParameterKey kTransformInheritedMatrix{7};
 // Output-scoped globals; optional values default to disabled / 100%.
 inline constexpr ParameterKey kTimeRemapEnabled{2};
 inline constexpr ParameterKey kTimeRemapSeconds{3};

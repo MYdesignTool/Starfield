@@ -79,7 +79,7 @@ $adapterInputs = @(
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\EmitterHistory.hpp',
     'include\starfield\core\EmissionTimeline.hpp',
-    'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp',
+    'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp', 'src\core\TransformEvaluation.hpp',
     'include\starfield\core\ParticleSimulation.hpp',
     'include\starfield\core\ParticleTransform.hpp',
     'include\starfield\core\Random.hpp',

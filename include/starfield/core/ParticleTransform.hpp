@@ -20,6 +20,7 @@ public:
     // Inherited affine motion also carries its full linear basis, retaining
     // reflection/shear instead of attempting a lossy Euler decomposition.
     [[nodiscard]] Vec3 particle_axis(Vec3 value) const noexcept;
+    [[nodiscard]] Vec3 unmap_particle_axis(Vec3 value) const noexcept;
     [[nodiscard]] double particle_scale() const noexcept { return particle_scale_; }
     [[nodiscard]] double particle_opacity() const noexcept { return particle_opacity_; }
     [[nodiscard]] const std::array<double,16>& world_matrix() const noexcept { return world_; }
@@ -33,6 +34,7 @@ private:
     CompiledParticleTransform() = default;
     std::array<double,16> world_{};
     ParticleSpriteBasis particle_basis_{};
+    ParticleSpriteBasis inverse_particle_basis_{};
     double particle_scale_{1.0}, particle_opacity_{1.0};
     friend Result<CompiledParticleTransform> compile_particle_transform(const ParticleTransformSettings&) noexcept;
     friend Result<CompiledParticleTransform> compose_particle_transforms(

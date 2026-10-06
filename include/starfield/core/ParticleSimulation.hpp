@@ -9,6 +9,7 @@
 #include <vector>
 
 namespace starfield::core {
+class CompiledParticleTransform;
 
 // One evaluated particle for the requested absolute time. Positions are world
 // space (ADR 0003): origin at the layer center, unit = one layer height.
@@ -59,7 +60,7 @@ struct ParticleSlotTarget {
 // Stable random identity and age are independent of the emission clock.
 [[nodiscard]] ParticleInstance simulate_particle_at_age(
     const Settings&, double age_seconds, std::uint64_t identity,
-    EmitterDimensionContext = {}) noexcept;
+    EmitterDimensionContext = {},const CompiledParticleTransform* birth_transform = nullptr) noexcept;
 
 // Use the branch's own half-open lifetime before applying its candidate cap.
 // The graph merges these sequences and applies Output's single population cap.
@@ -72,7 +73,8 @@ struct ParticleSlotTarget {
 [[nodiscard]] Result<std::size_t> simulate_selected_particles_into(
     const ValidatedSettings& settings, double time_seconds,
     std::span<const ParticleSlotTarget> targets, std::span<ParticleInstance> destination,
-    const Cancellation& cancellation, EmitterDimensionContext dimension_context = {});
+    const Cancellation& cancellation, EmitterDimensionContext dimension_context = {},
+    const CompiledParticleTransform* birth_transform = nullptr);
 
 // Deterministic particle evaluation for one absolute time.
 //
