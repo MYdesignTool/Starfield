@@ -52,6 +52,19 @@ Graph/native/CEP/render integration and AE qualification remain open. Reference
 menus are recorded in reference-texture-transfer-transform.md. This first source
 milestone changes no installed bundle, graph kind, parameter ID, wire or Core ABI.
 
+2026-10-06 render-transport milestone: independently compose centre/sprite maps;
+add a shared basis index/table, bounded snapshot4 with snapshot3 compatibility,
+CPU/GPU scene projection and typed Linear motion interpolation. Core ABI4 is
+declared in ADR0032 before implementation. Own the BuildWindows runtime-only
+native-pair hash guard and focused build_publication_tests; its old artifact-only
+fingerprint could allow an unpublished AEX to authorize an incompatible Core
+switch. Extend focused CurrentNodes ownership to its stale gradient fixture:
+the existing byte2 Hold mode is valid; corrupt reserved byte3 or mode2 instead.
+Production gradient code is unchanged. Math466/transport3544/current-node437/
+publication11 checks pass and the final native candidate builds without publishing.
+No Transform graph/native/CEP kind is exposed yet. Ordered Force/auxiliary graph
+evaluation, sampled Null capture and AE qualification remain open.
+
 ## P-02K - CEP idle and preset-operation performance
 
 Owner qualitatively accepts panel47 functionality. Multiple emitters cause frequent

@@ -1,5 +1,24 @@
 # Starfield plug-in architecture
 
+## M3-11 - shared sprite basis transport (source milestone)
+
+ParticleInstance carries a uint32 basis index; EvaluatedGraph owns up to4096 shared
+3x3 bases. CPU and portable GPU scene projection retain the table and apply the
+same world/display/camera map. Identity index0 preserves the prior path. The
+transient snapshot4 adds a table without expanding the200-byte particle record;
+snapshot3 remains readable and is still emitted for graphs with no basis table.
+Linear motion blur remaps/interpolates each endpoint pair once and reports typed
+cancellation/bounds errors. Centre and sprite maps compose independently.
+
+Core ABI4 guards the new capability with unchanged exported C/GPU layouts. Full
+paired native deployment is required; runtime-only publication checks installed
+AEX hashes against all five paired build artifacts before changing the selector.
+This candidate is built with NoDistPublish/NoRuntimePublish. Installed native46/
+CEP49 remains selected. Scoped math466/transport3544/current-node437/publication11
+checks pass; actual AE and hardware GPU execution are not inferred. Graph kind,
+ordered Force/auxiliary stages, native controls and sampled Null capture remain
+the next M3-11 integration gates under ADR0032.
+
 ## P-02L / native46 + panel49 - left node palette
 
 The expanded icon strip lists Emitter/Auxiliary/Particle/Force with a bottom

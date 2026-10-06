@@ -25,15 +25,17 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
     constexpr std::size_t max_indices = 32u * 1024u * 1024u;
     constexpr std::uint64_t max_pixel_visits = 512ull * 1024ull * 1024ull;
     const EmitterDimensionContext dimension{double(frame.layer_height), frame.pixel_aspect_ratio};
-    auto particles = [&]() -> Result<std::vector<ParticleInstance>> {
+    auto evaluated = [&]() -> Result<EvaluatedGraph> {
         if (request.graph) {
-            auto evaluated = evaluate_particle_graph(*request.graph, frame.time, cancel, dimension);
-            if (!evaluated.has_value()) return Result<std::vector<ParticleInstance>>::failure(evaluated.error());
-            return Result<std::vector<ParticleInstance>>::success(std::move(evaluated.take_value().particles));
+            return evaluate_particle_graph(*request.graph, frame.time, cancel, dimension);
         }
-        return simulate_particles(request.settings, to_seconds(frame.time), cancel, dimension);
+        auto simulated=simulate_particles(request.settings, to_seconds(frame.time), cancel, dimension);
+        if(!simulated.has_value())return Result<EvaluatedGraph>::failure(simulated.error());
+        EvaluatedGraph result;result.particles=simulated.take_value();
+        return Result<EvaluatedGraph>::success(std::move(result));
     }();
-    if (!particles.has_value()) return R::failure(particles.error());
+    if (!evaluated.has_value()) return R::failure(evaluated.error());
+    const auto& particles=evaluated.value().particles;
     const auto grid = sprite_geometry::make_grid(frame);
     double preview = 100;
     if (request.graph) for (const auto& node : request.graph->nodes) if (node.type_key == graph_keys::kOutputNode) {
@@ -45,17 +47,17 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
         if (enabled) preview = chance;
     }
     std::vector<sprite_geometry::Sprite> projected;
-    projected.reserve(particles.value().size());
-    for (std::size_t i = 0; i < particles.value().size(); ++i) {
+    projected.reserve(particles.size());
+    for (std::size_t i = 0; i < particles.size(); ++i) {
         if ((i & 63) == 0 && cancel.is_cancelled()) return R::failure(ErrorCode::cancelled, "scene projection cancelled");
-        const auto& p = particles.value()[i];
+        const auto& p = particles[i];
         if (preview < 100) {
             auto identity = p.id;
             for (auto byte : p.emitter_id.value.bytes) identity = mix64(identity ^ byte);
             if (unit_value(0, identity, RandomPurpose::preview_chance) * 100 >= preview) continue;
         }
         sprite_geometry::Sprite sprite;
-        if (sprite_geometry::project_sprite(p, request, grid, sprite)) projected.push_back(sprite);
+        if (sprite_geometry::project_sprite(p, request, grid, sprite,evaluated.value().sprite_bases)) projected.push_back(sprite);
     }
     if (request.camera.enabled) std::stable_sort(projected.begin(), projected.end(),
         [](const auto& a, const auto& b) { return a.depth > b.depth; });

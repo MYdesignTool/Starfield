@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 3u
+#define SF_CORE_ABI_VERSION 4u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)

@@ -102,13 +102,32 @@ void inherited_affine_and_composition() {
     second_settings.anchor={-4,2,1}; second_settings.position={-1,3,6};
     second_settings.rotation_degrees={-15,40,100}; second_settings.scale_percent={60,-110,200};
     const auto first=compile(first_settings),second=compile(second_settings);
+    const auto chained=compose_particle_transforms(first,second);
+    check(chained.has_value(),"valid chain rejected");
     first_settings.inherited_motion=second.world_matrix();
     const auto combined=compile(first_settings);
     for (int i=-10;i<=10;++i) {
         const Vec3 point{static_cast<double>(i)*.3,static_cast<double>(i*i)*.02,static_cast<double>(i-4)*-.11};
         near(combined.position(point),second.position(first.position(point)),"affine composition centre");
         near(combined.velocity(point),second.velocity(first.velocity(point)),"affine composition velocity");
+        near(chained.value().position(point),second.position(first.position(point)),"compiled chain centre");
+        near(chained.value().velocity(point),second.velocity(first.velocity(point)),"compiled chain velocity");
+        near(chained.value().particle_axis(point),second.particle_axis(first.particle_axis(point)),"compiled chain sprite basis");
     }
+    first_settings={};second_settings={};
+    first_settings.particles_scale_percent=250;first_settings.particles_opacity_percent=20;
+    second_settings.particles_scale_percent=30;second_settings.particles_opacity_percent=70;
+    const auto factors=compose_particle_transforms(compile(first_settings),compile(second_settings));
+    check(factors.has_value(),"valid factor chain rejected");
+    near(factors.value().particle_scale(),.75,"chained sprite scale");
+    near(factors.value().particle_opacity(),.14,"chained opacity");
+    first_settings.particles_scale_percent=10000;
+    const auto maximum=compile(first_settings);
+    const auto twice=compose_particle_transforms(maximum,maximum);
+    const auto thrice=compose_particle_transforms(twice.value(),maximum);
+    check(twice.has_value() && thrice.has_value(),"scale product boundary rejected");
+    const auto excessive=compose_particle_transforms(thrice.value(),maximum);
+    check(!excessive.has_value() && excessive.error().code==ErrorCode::work_limit_exceeded,"scale product overflow not bounded");
 }
 
 void bounds_and_invalid_inputs() {

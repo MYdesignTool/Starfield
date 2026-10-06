@@ -18,6 +18,11 @@ Vec3 vector(const std::array<double,16>& matrix, Vec3 value) noexcept {
 }
 } // namespace
 
+bool valid_particle_sprite_basis(const ParticleSpriteBasis& basis) noexcept {
+    for(double value:basis) if(!bounded(value,kMaxParticleSpriteBasisCoefficient)) return false;
+    return true;
+}
+
 Vec3 CompiledParticleTransform::position(Vec3 value) const noexcept {
     const auto rotated=vector(world_,value);
     return {rotated.x+world_[3],rotated.y+world_[7],rotated.z+world_[11]};
@@ -71,6 +76,23 @@ Result<CompiledParticleTransform> compile_particle_transform(const ParticleTrans
     compiled.particle_scale_=settings.particles_scale_percent/100.0;
     compiled.particle_opacity_=settings.particles_opacity_percent/100.0;
     return R::success(std::move(compiled));
+}
+
+Result<CompiledParticleTransform> compose_particle_transforms(
+    const CompiledParticleTransform& before,const CompiledParticleTransform& after) noexcept {
+    using R=Result<CompiledParticleTransform>;
+    CompiledParticleTransform result;
+    for(std::size_t row=0;row<4;++row) for(std::size_t col=0;col<4;++col)
+        for(std::size_t k=0;k<4;++k) result.world_[row*4+col]+=after.world_[row*4+k]*before.world_[k*4+col];
+    for(std::size_t row=0;row<3;++row) for(std::size_t col=0;col<3;++col)
+        for(std::size_t k=0;k<3;++k) result.particle_basis_[row*3+col]+=after.particle_basis_[row*3+k]*before.particle_basis_[k*3+col];
+    result.particle_scale_=before.particle_scale_*after.particle_scale_;
+    result.particle_opacity_=before.particle_opacity_*after.particle_opacity_;
+    for(double value:result.world_) if(!bounded(value,1e18))
+        return R::failure(ErrorCode::work_limit_exceeded,"composed Transform centre matrix exceeds bounds");
+    if(!valid_particle_sprite_basis(result.particle_basis_) || !bounded(result.particle_scale_,1e6))
+        return R::failure(ErrorCode::work_limit_exceeded,"composed Transform sprite exceeds bounds");
+    return R::success(std::move(result));
 }
 
 } // namespace starfield::core

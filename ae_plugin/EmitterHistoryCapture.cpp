@@ -230,8 +230,9 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
                 evaluated.error().detail,static_cast<long>(capture.stream),capture.birth,static_cast<long>(capture.error));
             return capture.error?capture.error:evaluated.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM;
         }
-        auto encoded=core::encode_evaluated_particles(evaluated.value(),time);
-        if(!encoded.has_value()) return PF_Err_BAD_CALLBACK_PARAM;
+        auto encoded=core::encode_evaluated_particles(evaluated.value(),time,&cancellation);
+        if(!encoded.has_value())return encoded.error().code==core::ErrorCode::cancelled?PF_Interrupt_CANCEL:
+            encoded.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM;
         trace.trace.particles=evaluated.value().particles.size();
         trace.trace.path=NativeHistoryPath::temporal;
         graph.optional_records.push_back(encoded.take_value());return PF_Err_NONE;

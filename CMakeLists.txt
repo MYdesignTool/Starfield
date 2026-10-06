@@ -15,6 +15,7 @@ add_library(starfield_core STATIC
     src/core/Render.cpp
     src/core/SequenceCodec.cpp
     src/core/Settings.cpp
+    src/core/SpriteScene.cpp
     src/core/Time.cpp
 )
 
@@ -50,4 +51,7 @@ if(BUILD_TESTING)
     add_executable(starfield_particle_transform_tests tests/particle_transform_tests.cpp)
     target_link_libraries(starfield_particle_transform_tests PRIVATE starfield_core)
     add_test(NAME starfield_particle_transform_tests COMMAND starfield_particle_transform_tests)
+    add_executable(starfield_transform_transport_tests tests/transform_transport_tests.cpp src/core/PluginApi.cpp)
+    target_link_libraries(starfield_transform_transport_tests PRIVATE starfield_core)
+    add_test(NAME starfield_transform_transport_tests COMMAND starfield_transform_transport_tests)
 endif()

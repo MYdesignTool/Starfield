@@ -148,21 +148,21 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         return OutputResult::failure(ErrorCode::allocation_failed, "accumulation buffer allocation failed");
     }
 
-    const auto particles = [&]() -> Result<std::vector<ParticleInstance>> {
+    const auto evaluated = [&]() -> Result<EvaluatedGraph> {
         const EmitterDimensionContext dimension_context{
             static_cast<double>(frame.layer_height), frame.pixel_aspect_ratio};
         if (request.graph) {
-            auto evaluated = evaluate_particle_graph(*request.graph, frame.time, cancellation,
-                                                     dimension_context);
-            if (!evaluated.has_value()) return Result<std::vector<ParticleInstance>>::failure(evaluated.error());
-            return Result<std::vector<ParticleInstance>>::success(std::move(evaluated.take_value().particles));
+            return evaluate_particle_graph(*request.graph, frame.time, cancellation, dimension_context);
         }
-        return simulate_particles(request.settings, to_seconds(frame.time), cancellation,
-                                  dimension_context);
+        auto simulated=simulate_particles(request.settings, to_seconds(frame.time), cancellation,dimension_context);
+        if(!simulated.has_value())return Result<EvaluatedGraph>::failure(simulated.error());
+        EvaluatedGraph result;result.particles=simulated.take_value();
+        return Result<EvaluatedGraph>::success(std::move(result));
     }();
-    if (!particles.has_value()) {
-        return OutputResult::failure(particles.error());
+    if (!evaluated.has_value()) {
+        return OutputResult::failure(evaluated.error());
     }
+    const auto& particles=evaluated.value().particles;
 
     const PixelGrid grid = make_grid(frame);
     std::uint64_t sprite_pixels = 0;
@@ -179,18 +179,18 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     }
     std::vector<Sprite> sprites;
     try {
-        sprites.reserve(particles.value().size());
-        for (std::size_t i = 0; i < particles.value().size(); ++i) {
+        sprites.reserve(particles.size());
+        for (std::size_t i = 0; i < particles.size(); ++i) {
             if (i % kCancellationParticleInterval == 0 && cancellation.is_cancelled())
                 return OutputResult::failure(ErrorCode::cancelled, "cancelled during camera projection");
             if (preview_chance < 100) {
-                const auto& particle = particles.value()[i];
+                const auto& particle = particles[i];
                 std::uint64_t identity = particle.id;
                 for (auto byte : particle.emitter_id.value.bytes) identity = mix64(identity ^ byte);
                 if (unit_value(0, identity, RandomPurpose::preview_chance) * 100 >= preview_chance) continue;
             }
             Sprite sprite{};
-            if (project_sprite(particles.value()[i], request, grid, sprite)) sprites.push_back(sprite);
+            if (project_sprite(particles[i], request, grid, sprite,evaluated.value().sprite_bases)) sprites.push_back(sprite);
         }
         if (request.camera.enabled) std::stable_sort(sprites.begin(), sprites.end(), [](const Sprite& a, const Sprite& b) {
             return a.depth > b.depth;

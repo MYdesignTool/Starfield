@@ -1,6 +1,7 @@
 #pragma once
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Render.hpp"
+#include "starfield/core/ParticleTransform.hpp"
 #include <algorithm>
 #include <cmath>
 namespace starfield::core::sprite_geometry {
@@ -45,7 +46,8 @@ inline Vec3 rotate_axis(Vec3 value,Vec3 angles) noexcept {
     }
     return value;
 }
-inline bool project_sprite(const ParticleInstance& particle, const RenderRequest& request, const PixelGrid& grid, Sprite& sprite) noexcept {
+inline bool project_sprite(const ParticleInstance& particle, const RenderRequest& request, const PixelGrid& grid, Sprite& sprite,
+    std::span<const ParticleSpriteBasis> bases = {}) noexcept {
     sprite.particle=&particle;
     const double rx=particle.size_pixels*.5;
     const double ry=particle.shape==0?rx:particle.size_y_pixels*.5;
@@ -57,6 +59,20 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
     else if(particle.up_axis==0) {a={0,0,rx};b={0,ry,0};}
     else if(particle.up_axis==1) {a={rx,0,0};b={0,0,ry};}
     a=rotate_axis(a,angles);b=rotate_axis(b,angles);
+    const bool transformed=particle.sprite_basis_index!=0;
+    if(transformed) {
+        if(particle.sprite_basis_index>bases.size())return false;
+        const auto& basis=bases[particle.sprite_basis_index-1];
+        // Base axes are in the historic display convention. The Transform basis
+        // acts in canonical world coordinates, where positive Y points upward.
+        const auto transform_axis=[&](Vec3 axis) {
+            const Vec3 world{axis.x,-axis.y,axis.z};
+            return Vec3{basis[0]*world.x+basis[1]*world.y+basis[2]*world.z,
+                -(basis[3]*world.x+basis[4]*world.y+basis[5]*world.z),
+                basis[6]*world.x+basis[7]*world.y+basis[8]*world.z};
+        };
+        a=transform_axis(a);b=transform_axis(b);
+    }
     if(!request.camera.enabled) {
         sprite.x=(.5+particle.position.x/grid.aspect)*grid.frame_width;
         sprite.y=(.5-particle.position.y)*grid.frame_height;
@@ -76,7 +92,7 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         sprite.x=x*grid.scale_x;sprite.y=y*grid.scale_y;
         const auto project_axis=[&](Vec3 axis,double& dx,double& dy) {
             double axis_view[3]{axis.x,-axis.y,0};
-            if(!billboard) {
+            if(!billboard || transformed) {
                 const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,-axis.y,axis.z};
                 for(int col=0;col<3;++col) {
                     axis_view[col]=0;

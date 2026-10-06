@@ -20,6 +20,13 @@ Continue with the graph/native node, sampled Null motion and actual CPU/GPU spri
 transforms before deployment. Foundation math is not a finished Transform node;
 AE behavior and all four broader owner feature requests remain open.
 
+The next source milestone now carries shared affine sprite bases through CPU,
+portable GPU scene data, transient snapshot4 and Linear motion blur, with legacy
+snapshot3 bytes retained for the identity path. Core ABI4 requires a native pair;
+the runtime publisher rejects unpaired AEX hashes. Four focused scopes pass4458
+checks in total and the May2023 SDK candidate compiles without publication.
+Continue with ordered graph evaluation and sampled Null/native/CEP authoring.
+
 ## P-02K / native46 + panel48 - CEP performance
 
 Owner confirms multiple-emitter busy cursors stop with CEP closed, then requests

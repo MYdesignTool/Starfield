@@ -911,7 +911,7 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
     }
     if(frozen) {
         if(cancellation.is_cancelled()) return Result<EvaluatedGraph>::failure(ErrorCode::cancelled,"temporal render cancelled");
-        return decode_evaluated_particles(*frozen,time);
+        return decode_evaluated_particles(*frozen,time,&cancellation);
     }
     // Static graph entry points share Once timing and variable survivor selection
     // with the historical evaluator.

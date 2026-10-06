@@ -114,7 +114,7 @@ void test_camera() {
     check(behind.has_value() && centroid(behind.value())<0,"behind-camera sprites clipped");
     request.camera.focal_x=std::numeric_limits<double>::quiet_NaN();
     check(!CpuParticleRenderer{}.render(request,never).has_value(),"non-finite camera rejects");
-    SfCoreApi api{};check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"paired ABI 3 loads");
+    SfCoreApi api{};check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"paired current ABI loads");
     check(StarfieldCore_GetApi(1,sizeof(api),&api)==0,"ABI 1 cannot load new camera contract");
 }
 }
@@ -360,7 +360,9 @@ void test_particle_gradient() {
     check(decode_color_gradient(bytes,decoded) && decoded.count==3,"multi-stop Color Gradient round trips");
     auto sampled=evaluate_color_gradient(decoded,.15);
     check(sampled.x==.5 && sampled.y==.5 && sampled.z==0,"gradient honors nonuniform stop positions");
-    auto invalid=bytes;invalid[2]=std::byte{1};check(!decode_color_gradient(invalid,decoded),"gradient reserved bytes checked");
+    auto invalid=bytes;invalid[3]=std::byte{1};check(!decode_color_gradient(invalid,decoded),"gradient reserved byte checked");
+    invalid=bytes;invalid[2]=std::byte{2};check(!decode_color_gradient(invalid,decoded),"unsupported gradient interpolation checked");
+    auto hold=bytes;hold[2]=std::byte{1};check(decode_color_gradient(hold,decoded) && decoded.interpolation==ColorInterpolation::hold,"gradient Hold mode remains valid");
     auto inset=gradient;inset.stops[0].position=.2;inset.stops[2].position=.8;
     const auto inset_bytes=encode_color_gradient(inset);
     check(!inset_bytes.empty() && decode_color_gradient(inset_bytes,decoded),"inset first/last positions round trip in the gradient codec");

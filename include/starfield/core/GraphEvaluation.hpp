@@ -4,6 +4,7 @@
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/EmitterHistory.hpp"
 #include "starfield/core/EmissionTimeline.hpp"
+#include "starfield/core/ParticleTransform.hpp"
 #include <memory>
 
 namespace starfield::core {
@@ -13,6 +14,7 @@ struct EvaluatedGraph {
     // Dependency order, with UUID ordering for independent nodes. Only ancestors
     // of the single output execute. The snapshot and its identities stay intact.
     std::vector<NodeId> evaluated_nodes;
+    std::vector<ParticleSpriteBasis> sprite_bases;
 };
 
 // Pre-render supplies actual authored values at historical times. No host
@@ -44,9 +46,9 @@ public:
     const Graph&, RationalTime, const Cancellation&, EmitterDimensionContext,
     TemporalGraphSampler&);
 [[nodiscard]] Result<OpaqueBytes> encode_evaluated_particles(
-    const EvaluatedGraph&, RationalTime);
+    const EvaluatedGraph&, RationalTime, const Cancellation* cancellation = nullptr);
 [[nodiscard]] Result<EvaluatedGraph> decode_evaluated_particles(
-    const OpaqueBytes&, RationalTime);
+    const OpaqueBytes&, RationalTime, const Cancellation* cancellation = nullptr);
 
 // Evaluate an immutable schema-1 snapshot at absolute rational time. Node values
 // are sampled frame values; an optional origin sampler/history supplies emitter

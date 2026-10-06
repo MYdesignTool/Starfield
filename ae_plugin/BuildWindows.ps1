@@ -12,6 +12,20 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string]$Architecture,[string]$BuildConfiguration) {
+    # The artifact fingerprint proves which AEX was BUILT, not which AEX is
+    # installed. An unpublished full build must not enable an incompatible hot
+    # Core update. Verify the complete native pair before touching the selector.
+    foreach ($taskModule in @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldHost')) {
+        $taskBuiltNative = Join-Path $RepositoryRoot "artifacts\plugin\$Label\$Architecture\$BuildConfiguration\$taskModule.aex"
+        $taskInstalledNative = Join-Path $RepositoryRoot "dist\$taskModule.aex"
+        if (-not (Test-Path -LiteralPath $taskBuiltNative) -or -not (Test-Path -LiteralPath $taskInstalledNative) -or
+            (Get-FileHash -LiteralPath $taskBuiltNative -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $taskInstalledNative -Algorithm SHA256).Hash) {
+            throw "Runtime publication requires the matching installed native bundle ($taskModule). Use a paired deployment, or -NoRuntimePublish for a candidate."
+        }
+    }
+}
 Import-Module Microsoft.PowerShell.Utility
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $CoreOnly -and -not $NoDistPublish -and
@@ -153,6 +167,9 @@ try {
     # selected DLL unchanged. Use NoRuntimePublish for an uninstalled candidate
     # so the single linked bundle keeps selecting its current generation.
     if (-not $NoRuntimePublish) {
+    if ($CoreOnly -or $NoDistPublish -or -not $ArtifactLabel) {
+        Assert-RuntimeNativePair $repositoryRoot $ArtifactLabel $Platform $Configuration
+    }
     $runtimeDir = Join-Path $repositoryRoot 'dist\StarfieldRuntime'
     New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
     $builtCoreHash = (Get-FileHash -LiteralPath $builtCore -Algorithm SHA256).Hash

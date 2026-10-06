@@ -155,9 +155,16 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
     for(unsigned i=0;i<count;++i) {
         if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
         auto particles=linear?core::interpolate_motion_particles(frames[0].particles,frames[1].particles,
-            frames[0].simulation_seconds,frames[1].simulation_seconds,(i+.5)/count,limit,cancel):std::move(frames[i].particles);
+            frames[0].simulation_seconds,frames[1].simulation_seconds,(i+.5)/count,limit,cancel):core::Result<core::EvaluatedGraph>::success(std::move(frames[i].particles));
+        if(!particles.has_value()) {
+            if(particles.error().code==core::ErrorCode::cancelled)return PF_Interrupt_CANCEL;
+            return failure(out,particles.error().detail,particles.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM);
+        }
         if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
-        auto record=core::encode_evaluated_particles(particles,times[i]);if(!record.has_value())return failure(out,record.error().detail);
+        auto record=core::encode_evaluated_particles(particles.value(),times[i],&cancel);if(!record.has_value()) {
+            if(record.error().code==core::ErrorCode::cancelled)return PF_Interrupt_CANCEL;
+            return failure(out,record.error().detail,record.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM);
+        }
         auto frozen=graph;frozen.optional_records.push_back(record.take_value());
         auto bytes=core::serialize_graph(frozen,core::particle_node_registry());if(!bytes.has_value())return failure(out,bytes.error().detail);
         byte_count+=bytes.value().size();if(byte_count>kMotionByteBudget)return failure(out,"exposure exceeds memory budget",PF_Err_OUT_OF_MEMORY);

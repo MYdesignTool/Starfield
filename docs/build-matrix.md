@@ -1,5 +1,38 @@
 # Build and host matrix
 
+## M3-11 shared sprite transport - 2026-10-06 (unpublished)
+
+MSVC C++20 /W4 /O2 /DNDEBUG focused scopes pass:
+
+- RunCoreTests.ps1 -ParticleTransform:466 checks; m3-11-transform-math.log.
+- RunCoreTests.ps1 -TransformTransport:3544 checks; m3-11-transform-transport.log.
+- RunCoreTests.ps1 -CurrentNodes:437 checks; m3-11-transform-current-nodes.log.
+- tests/build_publication_tests.ps1:11 checks; m3-11-transform-publication.log.
+
+All logs are under artifacts/. Transport checks cover independently constructed
+legacy snapshot3 bytes, snapshot4 shared tables and malformed/truncated data,
+matrix sharing, cancellation, world/display/camera/PAR/downsample projection,
+all procedural shapes, tilted planes, singular matrices, HDR/alpha and8/16/32-bpc
+ROI parity. Packed GPU tile/affine coverage is compared to CPU with0.0002 tolerance;
+this uses a software consumer of the prepared scene, not a CUDA/OpenCL device.
+Exported C render and GPU scene entry points carry snapshot4, reject ABI3 and
+release their owned outputs. Linear blur checks endpoint-table remapping, one-
+endpoint births/deaths, backwards time-remapped shutter clocks and the4096-basis
+limit. CurrentNodes initially reported
+one stale fixture failure: byte2 now holds the existing Hold gradient mode.
+Update that fixture to corrupt reserved byte3 and check Hold/mode2 separately;
+all437 checks pass afterward with no production gradient changes.
+
+Final BuildWindows.ps1 -NoDistPublish -NoRuntimePublish succeeds with May2023 SDK,
+Release x64 /MT and Core ABI4. Log: artifacts/m3-11-transform-transport-build.log.
+The runtime-only native-pair guard checks all five installed AEX hashes before
+any selector/runtime mutation; eleven scratch-fixture checks pass. Candidate
+files remain in artifacts/plugin and artifacts/core-dll. Installed native46/
+CEP49 hashes and selector remain as in cep49-deploy-after.json; verification
+receipt: artifacts/m3-11-transform-transport-installed-state.json.
+Transform graph kind, ordered Force/auxiliary integration, native/CEP controls and
+Null sampling are still open. No native deployment or AE host pass is claimed.
+
 ## P-02L / native46 + panel49 - 2026-10-06
 
 CEP bundle0.1.0.49/extensions0.1.49, resource/gateway markers49 and one new

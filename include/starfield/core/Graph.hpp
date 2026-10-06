@@ -272,7 +272,7 @@ inline constexpr ParameterKey kEmitterOrient{32}; // Emitter direction, distinct
 inline constexpr ParameterKey kAcceleration{6}; // Output: 0 GPU / 1 CPU
 inline constexpr ParameterKey kTimeSamplingHz{7};
 // Optional Output metadata; the adapter renders the shutter exposure while
-// Core ABI3 receives one immutable frame at a time. Popup values are zero based.
+// Core ABI4 receives one immutable frame at a time. Popup values are zero based.
 inline constexpr ParameterKey kMotionBlur{8}, kShutterAngle{9}, kShutterPhase{10};
 inline constexpr ParameterKey kMotionBlurType{11}, kMotionBlurLevels{12}, kLinearAccuracy{13};
 inline constexpr ParameterKey kOpacityBoost{14}, kMotionBlurDisregard{15};

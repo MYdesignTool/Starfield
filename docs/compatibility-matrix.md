@@ -1,5 +1,19 @@
 # Behavior inventory
 
+## M3-11 source transport qualification
+
+Four focused scopes pass4458 checks; the May2023 /MT native candidate compiles
+with Core ABI4 without publishing. Identity snapshots retain exact version3
+bytes and new version4 matrices survive C render/GPU scene and Linear blur
+transport. Bounds/cancellation, affine projection and8/16/32-bpc ROI checks pass.
+The GPU comparison consumes packed scene data in software; actual CUDA/OpenCL
+and AE2023 frames remain open. Installed native46/CEP49 hashes stay unchanged.
+Graph/native/CEP Transform controls, Force order, auxiliary birth transforms,
+animated Null inheritance, shutter geometry, undo and save/reopen require the
+remaining M3-11 integration and observed host checks. Do not infer Stardust
+numerical parity from its control inventory or these independently specified
+projection conventions. Full paired deployment is required across ABI3->4.
+
 ## P-02L / native46 + panel49 qualification
 
 Source and installed hash gates pass; seven focused fake-host/client suites verify
@@ -7,7 +21,8 @@ default expansion/collapse, supported entries, one Output, drop coordinates at
 pan/zoom/negative layout, pointer cancellation, overlays, pending/rejected writes,
 drag polling suppression and stale in-flight read guards. Owner closes AE for
 publication, but no actual CEP49 UI exercise is recorded. Existing native46
-render and broader host gates remain unchanged; M3-11 is a math foundation only.
+render and broader host gates remain unchanged; M3-11 has unpublished affine and
+sprite-transport foundations, with graph/native/CEP Transform integration open.
 
 AE2023 owner checks still open: reopen the panel; inspect the left icons and bottom
 arrow at narrow sizes; drag each of Emitter/Auxiliary/Particle/Force onto empty
