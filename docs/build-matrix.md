@@ -1,5 +1,29 @@
 # Build and host matrix
 
+## P-02L / native46 + panel49 - 2026-10-06
+
+CEP bundle0.1.0.49/extensions0.1.49, resource/gateway markers49 and one new
+node_palette.js make22 files. The left strip defaults expanded and supports
+drag-to-create for four implemented kinds, with the single Output excluded.
+Node24.19.0 passes node_palette_tests, panel_palette_tests, panel_startup_tests,
+panel_graph_transaction_tests, panel_native_node_gateway_tests, preset_tests and
+preset_manager_performance_tests against the final installed sources. Logs:
+artifacts/cep49-<suite>.log. Actual panel integration tests cover pan/zoom/negative
+layout offsets, one Output, movement without writes, drag polling suppression,
+pending/rejected commits and stale in-flight inspections. HTML balancing/resource
+references, XML versions, JS and deployment PowerShell syntax checks pass.
+These are fake-host/source checks, not an actual AE UI or render timing pass.
+
+Owner closed AE; read-only checks found neither AfterFX nor AfterFX_64 immediately
+before publication. tools/Deploy-TestBuild.ps1 -Install -KeepNative saves/verifies
+the current native bundle and preserves all six native46 files, the Core selector,
+versioned Core and existing junction. The M3-11 math build remains unpublished.
+CEP source publication verifies22 hashes through the existing system CEP Junction.
+Before/after receipts: artifacts/cep49-deploy-before.json and cep49-deploy-after.json.
+Paired native46/CEP48 backup: artifacts/disabled/p-02l-panel49-node-palette-20261006.
+Restore-TestBuild report passes; artifacts/build49-rollback.ps1 is the one-step
+paired undo with AE closed. No registry, process, cache or host-wide changes.
+
 ## M3-11 affine foundation - 2026-10-06
 
 tests/RunCoreTests.ps1 -ParticleTransform passes 268 focused checks with MSVC

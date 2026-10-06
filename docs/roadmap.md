@@ -1,5 +1,16 @@
 # Development plan: AE 2023 particle Alpha
 
+## P-02L - Drag-to-create node palette
+
+Owner requests the reference left icon strip, default expansion and bottom arrow.
+Implement supported node entries and local drag previews, excluding fixed Output.
+Reuse the native graph transaction once on valid drop. Preserve pan/zoom/negative
+coordinates, pending-write guards and cancellation; pause polling during drag.
+Seven focused suites and source checks pass. Native46/CEP49 is published with
+verified22-file hashes and unchanged native/Core generation; paired46/48 rollback
+is saved. Actual AE2023 appearance, drag and undo qualification remains open.
+Continue M3-11 and the other owner feature goals after this source milestone.
+
 ## M3-11 - Transform
 
 The owner supplied the full Transform UI and Texture/Transfer menu screenshots.

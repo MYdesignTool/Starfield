@@ -1,5 +1,16 @@
 # Starfield CEP panels
 
+Native46/panel49 adds an expanded left node palette. Drag Emitter, Auxiliary,
+Particle or Force onto the canvas to add one node at the drop location. The arrow
+at the bottom collapses/expands the strip; it starts expanded whenever the panel
+opens. Output is fixed and excluded. Transform will appear after its node and
+render integration is functional. Icon previews and pointer movement make no host
+requests. Escape, outside drops, blur, lost capture and target/revision changes
+cancel. Drop coordinates account for canvas pan/zoom and negative layout offsets.
+Creation reuses the guarded native graph transaction and its undo group. Auto
+refresh pauses during drag. Native46 render/ABI and panel48 performance behavior
+are retained. AE2023 visual/drag/undo qualification remains owner evidence.
+
 Native46/panel48 reduces background inspection and preset application overhead.
 One non-overlapping poll reads only target/time/receipt/main-renderer markers:
 500ms while changing, backing off to2s after three unchanged replies. Full native

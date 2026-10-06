@@ -3,10 +3,12 @@ param(
     [Parameter(Mandatory=$true)][string]$PluginDir,
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName = 'p02d-build4-single-folder-20261001',
     [switch]$Install,
-    [switch]$Rollback
+    [switch]$Rollback,
+    [switch]$KeepNative
 )
 $ErrorActionPreference = 'Stop'
 if ($Install -and $Rollback) { throw 'Choose one action.' }
+if ($KeepNative -and $Rollback) { throw 'KeepNative belongs to a panel-only installation, not rollback.' }
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $destination = (Resolve-Path -LiteralPath $PluginDir).Path
 $bundle = Join-Path $repo 'dist'
@@ -25,7 +27,7 @@ $rootNames = @($allowedNames) + @($allowedNames | ForEach-Object { [IO.Path]::Ch
 $sources = @{}
 foreach ($name in $names) {
     $kind = if ($name -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
-    $sources[$name] = Join-Path $repo "artifacts\$kind\2023\x64\Release\$name"
+    $sources[$name] = if ($KeepNative) { Join-Path $bundle $name } else { Join-Path $repo "artifacts\$kind\2023\x64\Release\$name" }
     Write-Host "$($sources[$name]) -> $(Join-Path $bundle $name)"
 }
 Write-Host "Single AE junction: $link -> $bundle"
@@ -102,6 +104,20 @@ if ($unknown) { throw "Unexpected Starfield entries: $($unknown.Name -join ', ')
 if (Test-Path -LiteralPath $runtime) {
     if ((Get-Item -LiteralPath $runtime -Force).LinkType) { throw 'Bundle runtime must be a real subdirectory, not a second junction.' }
 }
+if ($KeepNative) {
+    # A CEP-only milestone must not publish a newer, unrelated native candidate.
+    # Require the qualified installation to exist; retain it byte for byte.
+    if (-not (Test-Path -LiteralPath $link)) { throw 'KeepNative requires the existing Starfield junction.' }
+    if ((Test-Path -LiteralPath $oldLink) -or @($rootNames | Where-Object { Test-Path -LiteralPath (Join-Path $destination $_) }).Count) {
+        throw 'KeepNative requires the single-junction installation without loose Starfield files.'
+    }
+    $taskInstalledCoreHash = (Get-FileHash -LiteralPath $sources['StarfieldCore.dll'] -Algorithm SHA256).Hash
+    $taskInstalledRuntimeName = "StarfieldCore-$($taskInstalledCoreHash.Substring(0,16)).dll"
+    if (-not (Test-Path -LiteralPath $selector) -or [IO.File]::ReadAllText($selector).Trim() -ne $taskInstalledRuntimeName -or
+        (Get-FileHash -LiteralPath (Join-Path $runtime $taskInstalledRuntimeName) -Algorithm SHA256).Hash -ne $taskInstalledCoreHash) {
+        throw 'KeepNative requires the existing matching Core selector and runtime.'
+    }
+}
 New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
     selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName=''}
@@ -110,12 +126,23 @@ foreach ($name in $allowedNames) {
     $target = Join-Path $bundle $name
     $exists = Test-Path -LiteralPath $target
     if ($exists) { Copy-Item -LiteralPath $target -Destination (Join-Path $backup "bundle\$name") }
-    $hash = if ($names -contains $name) { (Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash } else { $null }
+    $hash = if ($KeepNative) { if ($exists) { (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash } else { $null } }
+            elseif ($names -contains $name) { (Get-FileHash -LiteralPath $sources[$name] -Algorithm SHA256).Hash } else { $null }
     $record.files += [ordered]@{name=$name; existed=$exists; installedHash=$hash}
 }
 $coreHash = (Get-FileHash -LiteralPath $sources['StarfieldCore.dll'] -Algorithm SHA256).Hash
 $record.runtimeName = "StarfieldCore-$($coreHash.Substring(0,16)).dll"
 $record | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $recordPath -Encoding UTF8
+if ($KeepNative) {
+    foreach ($entry in $record.files) {
+        if ($entry.installedHash -and (Get-FileHash -LiteralPath (Join-Path $backup "bundle\$($entry.name)") -Algorithm SHA256).Hash -ne $entry.installedHash) {
+            throw 'Native baseline backup hash mismatch.'
+        }
+        Write-Host "$($entry.name) retained SHA256 $($entry.installedHash)"
+    }
+    Write-Host 'Native binaries, runtime selector and host junction retained unchanged; baseline saved for paired CEP rollback.'
+    exit 0
+}
 try {
     foreach ($name in $rootNames) {
         $target = Join-Path $destination $name

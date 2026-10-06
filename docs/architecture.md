@@ -1,5 +1,17 @@
 # Starfield plug-in architecture
 
+## P-02L / native46 + panel49 - left node palette
+
+The expanded icon strip lists Emitter/Auxiliary/Particle/Force with a bottom
+collapse/expand arrow. node_palette.js owns pointer capture, local ghost and
+drop/cancel handling; panel.js owns coordinate conversion and the existing
+guarded graph transaction. Output stays fixed; Transform is deferred until
+functional. Movement makes no graph writes; polling pauses during drag. Existing
+read requests cannot overwrite a committed graph due to interaction/epoch guards.
+No render/native/wire change. Seven focused source/fake-host suites pass; actual
+AE interaction remains open. CEP49 is installed with all22 hashes verified and
+native46/selector retained; paired46/48 rollback is verified in report mode.
+
 ## M3-11 - Transform affine foundation
 
 ParticleTransformSettings is a separate value type with no existing Settings/ABI

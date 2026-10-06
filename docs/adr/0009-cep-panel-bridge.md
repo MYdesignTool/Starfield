@@ -1,5 +1,30 @@
 # ADR 0009: CEP panel bridge through supervised AE parameters
 
+## P-02L / panel49 - left node palette, 2026-10-06
+
+The owner's screenshot requests a default-expanded icon strip, bottom collapse
+arrow and drag-to-create. Offer implemented Emitter/Auxiliary/Particle/Force;
+exclude the single fixed Output and defer Transform until M3-11 integration.
+Use pointer capture and a local preview, then one existing requestTopologyEdit
+on a valid canvas drop. Convert through the current pan/zoom/negative layout
+offset and centre the new card on the pointer. Do not write during movement or
+add transport/schema/renderer changes. Preserve the native transaction, host
+revision/stamp guards, acknowledgement and undo group. A ready palette remains
+usable during an in-flight read: existing interaction/epoch guards reject old
+responses. Pending mutations disable creation. Cancel on Escape, outside drop,
+blur, visibility loss, pointer cancellation/capture loss or changed target/revision.
+Inspector/minimap overlays are not drop surfaces. Polling pauses during drag.
+
+Seven focused fake-host/client suites pass; actual AE2023 display/drag/undo remains
+an owner qualification gate. CEP49 resource/manifest/gateway markers are paired.
+Publication follows a fresh no-AE check through the existing CEP Junction, retaining
+native46 bytes/selector. Deploy-TestBuild -Install -KeepNative verifies and backs
+up the current native generation instead of publishing unrelated new binaries.
+It retains the normal process/path/backup guards, requires the matching existing
+Core selector/runtime and creates no host changes. The paired Restore-TestBuild
+action restores native46/CEP48; a read-only report validates all22 current and21
+saved CEP files before any action. No registry/process/cache changes.
+
 - Status: protocol v1 accepted and implemented; graph topology editing is blocked on a qualified undoable graph transaction carrier.
 - Date: 2026-09-27.
 - Depends on ADRs 0006–0008 and the stable parameter identity rules in ADR 0001.

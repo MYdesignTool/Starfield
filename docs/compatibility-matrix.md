@@ -1,5 +1,20 @@
 # Behavior inventory
 
+## P-02L / native46 + panel49 qualification
+
+Source and installed hash gates pass; seven focused fake-host/client suites verify
+default expansion/collapse, supported entries, one Output, drop coordinates at
+pan/zoom/negative layout, pointer cancellation, overlays, pending/rejected writes,
+drag polling suppression and stale in-flight read guards. Owner closes AE for
+publication, but no actual CEP49 UI exercise is recorded. Existing native46
+render and broader host gates remain unchanged; M3-11 is a math foundation only.
+
+AE2023 owner checks still open: reopen the panel; inspect the left icons and bottom
+arrow at narrow sizes; drag each of Emitter/Auxiliary/Particle/Force onto empty
+canvas at several pan/zoom positions; cancel outside/with Escape; connect the new
+node; undo/redo creation, save/reopen and confirm exactly one Output. Preset Add/
+Replace and the panel48 idle-cursor/timing qualifications remain open.
+
 ## P-02K / native46 + panel48 qualification
 
 Owner qualitatively accepts panel47 functionality; frequent busy cursors with

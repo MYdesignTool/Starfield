@@ -126,6 +126,19 @@ button:hover, button:focus-visible { border-color: var(--accent); }
 #zoomReadout { min-width: 34px; color: var(--muted); font-weight: 400; text-align: right; }
 
 .graph-pane { display: flex; flex: 1 1 auto; flex-direction: column; }
+.graph-body { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; }
+.node-palette { display: flex; flex-direction: column; flex: 0 0 36px; min-height: 0; background: #292c31; border-right: 1px solid var(--line); }
+.node-palette.collapsed { flex-basis: 16px; }
+.node-palette-items { display: flex; flex-direction: column; gap: 3px; padding: 5px 3px; overflow-y: auto; min-height: 0; }
+.node-palette-items[hidden] { display: none; }
+.node-palette-items button { display: flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; padding: 3px; touch-action: none; cursor: grab; }
+.node-palette-items button:disabled { opacity: .4; cursor: default; }
+.node-palette-items button svg { width: 22px; height: 22px; pointer-events: none; }
+.node-palette-toggle { margin-top: auto; flex: 0 0 24px; border-width: 1px 0 0; border-radius: 0; padding: 0; font-size: 18px; line-height: 22px; color: var(--muted); }
+.palette-node-preview { position: fixed; z-index: 1000; pointer-events: none; transform-origin: top left; width: 110px; height: 54px; display: flex; align-items: center; justify-content: center; font-weight: 600; background: #30343d; border: 1px dashed var(--muted); border-radius: 7px; box-shadow: 0 4px 14px #0008; opacity: .7; }
+.palette-node-preview.valid-drop { border-style: solid; border-color: var(--accent); opacity: .95; }
+.graph-scroll.palette-drop-target { box-shadow: inset 0 0 0 1px #73aaff66; }
+.dragging-palette-node, .dragging-palette-node * { cursor: grabbing !important; user-select: none; }
 .graph-scroll {
   flex: 1 1 auto;
   min-height: 0;

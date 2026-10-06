@@ -1,5 +1,31 @@
 # Agent-ready implementation backlog
 
+## P-02L - Collapsible CEP node palette
+
+Owner's 2026-10-06 screenshot requests a left icon palette, expanded by default,
+a bottom collapse/expand arrow, and dragging an entry onto the canvas to create
+a node. Exclude Output: one canvas has one fixed Output. Offer only implemented
+Emitter/Auxiliary/Particle/Force kinds; add Transform when M3-11 is functional.
+Own cep_panel/index.html, panel.css, new node_palette.js, panel.js, paired resource/
+gateway/manifest versions and README, focused palette/startup tests, Deploy-TestBuild
+KeepNative mode, deployment/
+rollback staging and ADR0009/architecture/roadmap/build/qualification docs.
+Reuse requestTopologyEdit and existing coordinates/atomic native transaction;
+no new host transport, writes during pointer movement or render contract changes.
+Suspend polling during palette drag; release outside canvas, Escape, pointer
+cancel, lost capture, blur or target changes cancel without host writes.
+AE is currently running. Prepare/test under artifacts/prepared/ before changing
+the live CEP source Junction. Save panel48/native46 for paired rollback and publish
+only after a fresh no-AE check under the existing deployment authorization.
+Status: implementation and native46/CEP49 publication complete. Seven focused
+Node24.19.0 suites pass against installed sources, plus markup/resource/XML/JS and
+PowerShell syntax checks. Preserve all six native hashes and the Core selector;
+22 CEP files are hash verified. Native46/CEP48 backup:
+artifacts/disabled/p-02l-panel49-node-palette-20261006. Paired rollback report
+passes; one-step action is artifacts/build49-rollback.ps1 with AE closed. No
+process or registry changes. Actual AE drag/appearance/undo qualification remains
+open. M3-11 graph/native/render integration resumes after this source milestone.
+
 ## M3-11 - Transform node
 
 Owner requests the Stardust Transform inventory on AE2023. The supplied parameter

@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-48";
+    var GATEWAY_BUILD = "native-presets-49";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -58,6 +58,7 @@
     var retainedError = null;
     var failedGraphInitializations = {};
     var resizeUpdatePending = false;
+    var nodePalette = null;
     var observedPanelSize = null;
 
     // Minimal CEP bridge. CEP injects window.__adobe_cep__ into extension panels;
@@ -304,9 +305,9 @@
         viewPan.y = (elements.graphScroll.clientHeight - (bottom - top) * zoom) / 2 - top * zoom;
     }
 
-    function canvasInteractionActive() {
+    function canvasInteractionActive(ignorePalette) {
         return !!(dragState || panState || marqueeState || connectionState || edgePressState || minimapPanState || inspectorDragState || curveDragState ||
-                  numericScrubState || (elements.contextMenu && !elements.contextMenu.hidden));
+                  numericScrubState || (!ignorePalette && nodePalette && nodePalette.isDragging()) || (elements.contextMenu && !elements.contextMenu.hidden));
     }
 
     function commitNodeLayout() {
@@ -853,6 +854,7 @@
         function commitMappedEdit(snapshotResponse) {
             if (!snapshotResponse || !snapshotResponse.ok || !snapshotResponse.snapshot) {
                 state.pending = false;
+                if (nodePalette) nodePalette.refresh();
                 var loadError = snapshotResponse && snapshotResponse.error ||
                     { code: "graph_snapshot_unavailable", message: "The project graph snapshot could not be read." };
                 showError(loadError.code, loadError.message, true);
@@ -866,11 +868,13 @@
                 }
             } catch (error) {
                 state.pending = false;
+                if (nodePalette) nodePalette.refresh();
                 showError(error && error.code || "invalid_graph", error && error.message || String(error), true);
                 return;
             }
             client.apply(preparedEdit, function (result) {
                 state.pending = false;
+                if (nodePalette) nodePalette.refresh();
                 if (!result || !result.ok) {
                     var error = result && result.error || { code: "graph_edit_failed", message: "The graph transaction failed." };
                     showError(error.code, error.message, true);
@@ -1784,6 +1788,7 @@
     }
 
     function render(state) {
+        if (nodePalette) nodePalette.refresh();
         elements.chain.innerHTML = "";
         graphNodeElements = {};
         state.values = {};
@@ -2557,6 +2562,7 @@
         }
         syncTargetLock();
         if (changed || layoutChanged || graphLayoutChanged) render(state);
+        if (nodePalette) nodePalette.refresh();
         if (latestFrameStatusResponse && latestFrameStatusResponse.targetToken === state.targetToken) adoptFrameStatus(latestFrameStatusResponse);
         else updateFrameStatus();
     }
@@ -2630,6 +2636,7 @@
                         !!failedGraphInitializations[response.target.token]);
                     // Keep the last valid canvas during a host read failure.
                     if (!state.nodes.length || state.targetToken !== response.target.token) adoptState(response, null);
+                    if (nodePalette) nodePalette.refresh();
                     return;
                 }
                 // The actual sibling effects own topology and values, including
@@ -2684,6 +2691,24 @@
         refresh(true, true);
     });
     if (elements.graphCanvas) elements.graphCanvas.addEventListener("contextmenu", showGraphContextMenu);
+    if (window.StarfieldNodePalette) nodePalette = window.StarfieldNodePalette.create({
+        root: document.getElementById("nodePalette"),
+        items: document.getElementById("nodePaletteItems"),
+        toggle: document.getElementById("nodePaletteToggle"), viewport: elements.graphScroll,
+        prepare: hideGraphContextMenu,
+        guard: function () {
+            if (!state.targetToken || !state.revision || state.pending || canvasInteractionActive(true)) return null;
+            return JSON.stringify([state.targetToken,state.revision]);
+        },
+        isBlocked: function (element) { return !!closestElement(element,".graph-minimap"); },
+        zoom: function () { return zoom; }, resize: schedulePanelResize,
+        add: function (type,clientX,clientY) {
+            var point=canvasPoint(clientX,clientY);
+            requestTopologyEdit({type:"addNode",nodeType:type,
+                position:{x:point.x-canvasOffset.x-NODE_WIDTH/2,y:point.y-canvasOffset.y-NODE_HEIGHT/2}});
+            if (nodePalette) nodePalette.refresh();
+        }
+    });
     if (elements.contextMenu) elements.contextMenu.addEventListener("click", handleContextMenuAction);
     if (elements.graphScroll) {
         elements.graphScroll.addEventListener("pointerdown", beginCanvasPan);
@@ -2712,7 +2737,7 @@
         }
     });
     document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") { hideGraphContextMenu(); return; }
+        if (event.key === "Escape") { hideGraphContextMenu(); if(nodePalette)nodePalette.cancel(); return; }
         var target = event.target;
         if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
                        target.tagName === "SELECT" || target.isContentEditable)) return;
