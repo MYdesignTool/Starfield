@@ -1,6 +1,6 @@
 # ADR 0032: independent Transform node
 
-- Status: core graph, affine and render transport implemented; native/Null authoring and AE qualification open.
+- Status: core graph, affine/render transport and native/Null candidate implemented; CEP authoring and AE qualification open.
 - Task: M3-11, AE2023 baseline.
 
 ## Reference and scope
@@ -61,7 +61,7 @@ and GPU sprite layouts do not change. New AEX and pinned/selected Core must be
 published as one pair. Old Core ABI3 cannot accept new requests; no Core-only
 publication across this boundary. Prior paired builds provide rollback, and old
 saved projects still evaluate through the existing identity path.
-BuildWindows's runtime-only publication checks all five installed AEX hashes
+BuildWindows's runtime-only publication checks all six installed AEX hashes
 against their paired build artifacts before creating runtime files or replacing
 the selector. A fingerprint from an unpublished full build alone is insufficient.
 An incompatible candidate remains buildable with -NoRuntimePublish.
@@ -127,12 +127,56 @@ existing Particle angle convention, using a precompiled bounded pseudoinverse
 for reflection/shear and rank-deficient inherited matrices. Numerical reference
 parity and animated Null velocity semantics remain observable AE gates.
 
+## Native authoring and Null sampling contract
+
+Append native kind4, independent match name org.starfieldfx.node.transform,
+schema1 and fourteen controls in the reference order. Native stream indices1..14
+use new explicit disk IDs1401..1414. Existing kinds/IDs/stream indices remain.
+Metadata uses the existing bounded four-edge and UUID record after control14.
+Append optional core key8:uint32 for a project-local AEGP layer ID;0 means None.
+The native PF_LAYER selection is constant structure, while controls2..14 animate.
+The portable resource ID does not encode an AE object or layer index. The CEP
+adapter resolves it against the target composition when reading/writing the
+layer selector; unresolved resources must fail rather than bind another layer.
+
+The Null's current anchor maps to its world position in the effect layer's frame.
+Input canonical coordinates are offsets from that anchor, using the effect
+layer's pixel grid. Full Null-to-world and world-to-effect-layer affine matrices
+retain parent scale/shear/reflection. None yields identity. A new centred Null
+with unit scale/rotation and an untransformed full-comp effect layer yields
+identity. This is an independently specified absolute pose convention, with no
+implicit reference-frame capture. Actual Stardust numerical parity is open.
+Local native Position converts pixels to canonical coordinates (+Y down to up);
+native X/Z angles change sign, Y retains sign, before core Euler composition.
+Anchor XY/Z uses the same centred canonical frame, with native Z0 -> core Z0.
+
+Do not call AEGP suites during render/pre-render to follow another layer. UI-only
+compilation records twelve raw pixel-space affine coefficients in synthetic
+binding fields15..26 of the new native kind. They are not native parameter
+indices or disk IDs. Extend the kind-specific field bound of record0x8002/v1;
+the existing layout and existing kind records remain byte-compatible. Main-effect
+owned numeric aliases evaluate generated UUID-selected expressions using the
+documented layer-space transform methods at each requested time. Transform
+playback converts those twelve coefficients into core key7 without host objects.
+Source selection uses the native PF_LAYER reference, preserving layer reorder.
+Bounds, failed layer transforms and singular effect-layer frames reject the edit
+or render; a singular source Null itself remains valid.
+
+Synthetic fields never use a native numeric parameter as a constancy proof.
+With a selected source, keep them dynamic even if its numeric node controls have
+no keys. With None, certify identity only through the actual alias PF states and
+the constant resource selection. Invalidated states retain exact sampling. Core
+pose sampling remains once per branch/current time and at Auxiliary parent birth.
+The fixed512-alias bank bound remains; overflow rejects atomically. ABI4 native
+publication adds StarfieldTransform.aex to the paired module guard and bundle.
+
 ## Remaining native and host contracts
 
-The core graph kind and ordered Force/Transform/Auxiliary stages are implemented.
-Native effect and CEP authoring are the next integration gate. The adapter must
-capture Null motion at each shutter sample
-and convert to the particle world frame; no host object may cross into core.
+The core graph kind and ordered Force/Transform/Auxiliary stages, native effect
+and numeric Null capture are implemented in the source candidate. CEP graph,
+inspector, resource selector and preset roundtrip are the next integration gate.
+The adapter samples the numeric pose at shutter and Auxiliary birth times;
+no host object crosses into core.
 Null reference-pose and anchor semantics require host evidence. Existing
 wire/kind/disk IDs remain. Do not expose an inert node while these gates are open.
 
@@ -161,3 +205,16 @@ and inherited velocity/style, origin history, pseudoinverse orientation, graph
 codec/frozen replay, derived bounds/cancellation and live rectangular CPU pixels.
 Native/CEP controls and actual AE/Null sampling remain unqualified. The installed
 native46/CEP49 bundle is retained while the source candidate uses Core ABI4.
+
+2026-10-07 native source evidence: Transform controls102, Particle controls91,
+matrix bridge48, actual generated matrix expressions63, native sync6884 plus
+camera12, TransformGraph589, publication guard12 and isolated deployment18
+checks pass. The existing generated expression/keyframe suite also passes after
+updating retired fixture indices and its gateway injection signature. Source
+build47 compiles with May2023 /MT, NoDistPublish and NoRuntimePublish. The new
+module and ABI4 remain uninstalled while native46/CEP49 hashes are retained.
+The native suite covers None constancy, selected Null remaining dynamic,
+numeric render playback without AEGP calls, IDs rather than layer indices,
+coordinate/sign conversion and pre-publication rejection with balanced refs.
+Layer selection's supervised stream timing, expression dimensions/engine,
+camera geometry, shutter and persistence require actual AE2023 evidence.

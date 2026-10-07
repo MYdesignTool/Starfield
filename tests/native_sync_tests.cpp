@@ -17,9 +17,12 @@
 #include "starfield/core/ColorGradient.hpp"
 #include "GradientEditorModel.hpp"
 #include "ParticleLayout.hpp"
+#include "TransformBinding.hpp"
+#include "MotionBlur.hpp"
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SequenceCodec.hpp"
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -63,7 +66,13 @@ struct Fixture {
     std::vector<AEGP_StreamVal2> values;
     std::vector<PF_ParamDef> params;
 };
-std::array<Fixture, 4> fixtures;
+std::array<Fixture, 5> fixtures;
+bool transform_present{};
+using Matrix=transform_binding::Matrix;
+Matrix null_world{1,0,0,910,0,1,0,490,0,0,1,0,0,0,0,1};
+Matrix owner_world{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+core::Vec3 null_anchor{50,50,0};
+int affine_reads{},synthetic_native_reads{};
 struct Ref { std::size_t effect{}; A_long index{}; };
 std::size_t effect_index(AEGP_EffectRefH value) { return reinterpret_cast<std::size_t>(value) - 1; }
 AEGP_EffectRefH effect_ref(std::size_t i) { return reinterpret_cast<AEGP_EffectRefH>(i + 1); }
@@ -152,7 +161,19 @@ double evaluated_binding(A_long index, A_long time) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
         return expr.find(u"fx.param("+number(records::uuid_first_index(kind)+7)+u").value === "+number(value))!=std::u16string::npos;
     };
-    std::size_t id = identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
+    std::size_t id = identity(records::Kind::transform,5) ? 4 : identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
+    if(id==4 && expr.find(u"var selected = fx.param(1).value")!=std::u16string::npos) {
+        const std::u16string marker=u"result = identity[";
+        const auto first=expr.find(marker)+marker.size(),last=expr.find(u"]",first);
+        std::string digits;for(auto c:expr.substr(first,last-first))digits+=char(c);
+        const auto entry=std::stoi(digits);
+        if(fixtures[4].values[1].layer_id==0) {
+            const transform_binding::PixelAffine value{1,0,0,960,0,1,0,540,0,0,1,0};return value[entry];
+        }
+        auto sampled=null_world;sampled[3]+=time;
+        auto value=transform_binding::relative_anchor_affine(sampled,owner_world,null_anchor);
+        return value.has_value()?value.value()[entry]:kNativeBindingUnavailable;
+    }
     const std::u16string needle=u"result = fx.param(";
     auto from=expr.find(needle)+needle.size(); auto to=expr.find(u")",from);
     const auto digits=expr.substr(from,to-from);
@@ -162,6 +183,7 @@ double evaluated_binding(A_long index, A_long time) {
     if(component_marker!=std::u16string::npos) {
         int component=expr[component_marker+8]-u'0';
         if(id==1 && source==4) return component ? value.two_d.y : value.two_d.x + time;
+        if(id==4 && source==2)return component ? value.two_d.y : value.two_d.x;
         return component==0 ? value.color.redF*(1.0-time/48.0) : component==1 ? value.color.greenF : value.color.blueF;
     }
     return (id==2 && source==5) || (id==3 && source==1) ? value.one_d+time :
@@ -186,6 +208,10 @@ int main() {
                            kTimeRemapSecondsId, kPreviewChanceId}) main.values[i].one_d = main.params[i].u.fs_d.value;
     for (const A_long i : {kTimeRemapEnabledId, kPreviewEnabledId}) main.values[i].one_d = main.params[i].u.bd.value;
     main.values[kControlSourceId].one_d = kNodeControlSource;
+    for(std::size_t i=0;i<kMotionParameterIds.size();++i) {
+        const auto index=kMotionParameterIds[i];
+        main.values[index].one_d=motion_popup(i)?main.params[index].u.pd.value:main.params[index].u.fs_d.value;
+    }
     for (const auto kind : {records::Kind::emitter, records::Kind::particle, records::Kind::force}) {
         const std::size_t id = kind == records::Kind::force ? 3 : static_cast<std::size_t>(kind) + 1;
         fixtures[id].values.resize(records::parameter_count(kind));
@@ -204,11 +230,12 @@ int main() {
     particle.values[1].one_d=1;particle.values[2].one_d=2;
     particle.values[5].one_d=10;particle.values[6].one_d=10;
     particle.values[8].one_d=100;particle.values[10].one_d=1;
-    particle.values[11].color={1,1,1,1};particle.values[30].one_d=3;
-    particle.values[33].one_d=100;particle.values[34].one_d=100;
+    particle.values[11].color={1,1,1,1};particle.values[records::particle_layout::up_axis].one_d=3;
+    particle.values[records::particle_layout::size_over_life].one_d=100;particle.values[records::particle_layout::opacity_over_life].one_d=100;
     particle.values[12].one_d=2;particle.values[13].one_d=0;particle.values[15].one_d=100;
     particle.values[14].color={1,1,1,1};particle.values[16].color={1,1,1,1};
-    particle.values[71].one_d=1;particle.values[76].one_d=1;particle.values[99].one_d=50;particle.values[100].one_d=50;particle.values[101].one_d=0;
+    particle.values[records::particle_layout::orient].one_d=1;particle.values[records::particle_layout::random_limit].one_d=1;
+    particle.values[records::particle_layout::anchor_x].one_d=50;particle.values[records::particle_layout::anchor_y].one_d=50;
     main.values[kTimeSamplingHzId].one_d=1;main.values[kAccelerationId].one_d=1;main.values[kAccelerationId].one_d=1;
     connection(1, records::Kind::emitter, 2, 11);
     connection(2, records::Kind::particle, 4, 12);
@@ -221,7 +248,7 @@ int main() {
     items.AEGP_GetItemPixelAspectRatio = [](AEGP_ItemH, A_Ratio* aspect)->A_Err { *aspect = {1, 1}; return 0; };
     pf.AEGP_GetEffectLayer = [](PF_ProgPtr, AEGP_LayerH* layer)->A_Err { *layer = reinterpret_cast<AEGP_LayerH>(1); return 0; };
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(0); return 0; };
-    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = 4; return 0; };
+    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
@@ -231,18 +258,23 @@ int main() {
         return PF_Err_BAD_CALLBACK_PARAM;
     };
     stream.AEGP_GetNewEffectStreamByIndex = [](AEGP_PluginID, AEGP_EffectRefH ref, A_long index, AEGP_StreamRefH* out)->A_Err {
+        if(effect_index(ref)==4 && index>=15 && index<=26)++synthetic_native_reads;
         ++live_refs; *out = reinterpret_cast<AEGP_StreamRefH>(new Ref{effect_index(ref), index}); return 0;
     };
     stream.AEGP_GetStreamType = [](AEGP_StreamRefH ref, AEGP_StreamType* type)->A_Err {
         const auto& key = *reinterpret_cast<Ref*>(ref);
         if (key.index == wrong_type) { wrong_type = -1; *type = AEGP_StreamType_COLOR; }
+        else if(key.effect==4 && key.index==1)*type=AEGP_StreamType_LAYER_ID;
+        else if(key.effect==5)*type=AEGP_StreamType_ThreeD_SPATIAL;
         else *type = key.index == kGraphParameterId ? AEGP_StreamType_ARB : AEGP_StreamType_OneD;
         return 0;
     };
     stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time* time, A_Boolean pre_expression, AEGP_StreamValue2* out)->A_Err {
         auto& key = *reinterpret_cast<Ref*>(ref);
         if (!key.effect && key.index == fail_read) { fail_read = -1; return PF_Err_BAD_CALLBACK_PARAM; }
-        out->streamH = ref; out->val = fixtures[key.effect].values[key.index];
+        out->streamH = ref;
+        if(key.effect==5) {out->val.three_d={null_anchor.x,null_anchor.y,null_anchor.z};return 0;}
+        out->val = fixtures[key.effect].values[key.index];
         if (!key.effect && key.index>=kNativeBindingFirstIndex && !pre_expression)
             out->val.one_d=evaluated_binding(key.index,time->value);
         if (!key.effect && key.index == kGraphParameterId) out->val.arbH = reinterpret_cast<AEGP_ArbBlockVal>(clone(reinterpret_cast<PF_Handle>(out->val.arbH)));
@@ -333,7 +365,17 @@ int main() {
     emitter.params[4].param_type = PF_Param_POINT; emitter.params[4].u.td.x_value = 400 << 16; emitter.params[4].u.td.y_value = 600 << 16;
     emitter.params[4].uu.change_flags = PF_ChangeFlag_CHANGED_VALUE;
     PF_UserChangedParamExtra changed{}; changed.param_index = 4; PF_OutData output{};
-    check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0, "native Origin commits with saved node value still old");
+    const auto first_edit_error=sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed);
+    if(first_edit_error)std::printf("First native edit: %d %s\n",first_edit_error,output.return_msg);
+    check(first_edit_error == 0, "native Origin commits with saved node value still old");
+    if(first_edit_error) {
+        std::vector<PF_ParamDef*> renderer_params;for(auto& p:main.params)renderer_params.push_back(&p);
+        core::Graph candidate;bool found{};const auto error=compile_native_node_graph(&renderer_data,renderer_params.data(),candidate,found,701);
+        const auto validation=core::validate_graph(candidate,core::particle_node_registry());
+        std::printf("Compiler diagnostic: error %d nodes %zu edges %zu registry %s\n",error,candidate.nodes.size(),candidate.edges.size(),core::describe(validation.error.code));
+        for(const auto& node:candidate.nodes)std::printf("  %s parameters %zu\n",node.type_key.c_str(),node.parameters.size());
+        return 1;
+    }
     auto graph = saved_graph(); auto origin = std::get<core::Vec3>(parameter(graph, core::graph_keys::kEmitterNode, core::graph_keys::kEmitterOrigin));
     check(std::abs(origin.x - 640.0 / 1080) < 1e-9 && std::abs(origin.y + 1860.0 / 1080) < 1e-9, "callback Origin beats delayed old stream with quarter normalization");
     check(emitter.values[4].two_d.x == 960 && emitter.values[4].two_d.y == 540, "source remains owned by host edit");
@@ -390,6 +432,7 @@ int main() {
             bank.additional_fields[bank.additional_count++]={layout::gradient_first+2*static_cast<A_long>(i)+1,
                 node_sync::ValueKind::color,{stop.color.x,stop.color.y,stop.color.z,1}};
         }
+        bank.additional_fields[bank.additional_count++]={layout::gradient_interpolation,node_sync::ValueKind::scalar,{0,0,0,0}};
         const auto previous_bytes=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
         const double previous_revision=main.values[kGraphRevisionId].one_d;
         auto rejected=bank;fail_set=kGraphParameterId;
@@ -430,8 +473,8 @@ int main() {
               "single changed count reproduces mixed old-bank rejection with exact bad position index");
         for(A_long index=layout::gradient;index<layout::gradient_first+16;++index) {
             auto followup=edit(1,index,index==layout::gradient?5:0);
-            check(node_sync::capture_gradient_bank(callback_params.data(),followup) && followup.additional_count==17,
-                  "every gradient callback captures all seventeen fields atomically");
+            check(node_sync::capture_gradient_bank(callback_params.data(),followup) && followup.additional_count==18,
+                  "every gradient callback captures all stops and interpolation atomically");
             check(direct_edit(followup)==0 && followup.accepted,"full callback bank publishes while AEGP still exposes the old two-stop bank");
         }
         auto incomplete=edit(1,layout::gradient,5);callback_params[layout::gradient_first+1]=nullptr;
@@ -444,11 +487,11 @@ int main() {
     }
     auto gravity = edit(3, 1, 1080); check(direct_edit(gravity) == 0, "Force Gravity publishes");
     check(std::get<core::Vec3>(parameter(saved_graph(), core::graph_keys::kForceNode, core::graph_keys::kGravity)).y == -1, "Gravity units remain intact");
-    for (int count : {35, 52}) {
+    for (int count : {records::particle_layout::size_curve, records::particle_layout::opacity_curve}) {
         particle.values[count].one_d = 2; particle.values[count + 1].one_d = 0;
         particle.values[count + 2].one_d = 100; particle.values[count + 3].one_d = 1; particle.values[count + 4].one_d = 0;
     }
-    auto curve = edit(1, 39, 60); check(direct_edit(curve) == 0, "single curve bank value commits");
+    auto curve = edit(1, records::particle_layout::size_curve+4, 60); check(direct_edit(curve) == 0, "single curve bank value commits");
     graph = saved_graph();
     core::AgeCurve size_curve{}, opacity_curve{};
     const bool size_ok = core::decode_age_curve(std::get<core::OpaqueBytes>(parameter(graph, core::graph_keys::kParticleNode, core::graph_keys::kSizeOverLifeCurve)), size_curve, 0, 100);
@@ -546,7 +589,7 @@ int main() {
     emitter.values[1].one_d = 1;
     emitter.values[6].one_d = 0;
     renderer_data.inter.checkout_param = [](PF_ProgPtr, PF_ParamIndex index, A_long time, A_long, A_u_long, PF_ParamDef* output)->PF_Err {
-        if(index<kNativeBindingFirstIndex || index==kTimeSamplingHzId || index==kAccelerationId) {
+        if(index<kNativeBindingFirstIndex || index>=kNativeBindingFirstIndex+kNativeBindingCapacity) {
             *output=fixtures[0].params.at(index);
             if(index==kGraphParameterId) output->u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(fixtures[0].values[index].arbH);
             if(index==kControlSourceId) output->u.pd.value=static_cast<A_long>(fixtures[0].values[index].one_d);
@@ -991,6 +1034,96 @@ int main() {
     dispose(ui_graph_handle);
     lazy_dependencies=false;
     temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
+
+    // Append the new kind without changing the legacy fixture or its expression
+    // artifact. These checks execute the real UI compiler and numeric playback.
+    {
+        using namespace core::graph_keys;
+        auto& transform=fixtures[4];transform_present=true;
+        transform.name="org.starfieldfx.node.transform";
+        transform.values.resize(records::parameter_count(records::Kind::transform));
+        transform.params.resize(transform.values.size());
+        for(auto& p:transform.params)p.param_type=PF_Param_FLOAT_SLIDER;
+        uuid(4,records::uuid_first_index(records::Kind::transform),5);
+        transform.values[2].two_d={960,540};
+        for(A_long i=10;i<=14;++i)transform.values[i].one_d=100;
+        connection(3,records::Kind::force,5,13);connection(4,records::Kind::transform,255,14);
+        std::vector<PF_ParamDef*> renderer_params;for(auto& p:main.params)renderer_params.push_back(&p);
+        core::Graph transformed;bool found{};
+        check(compile_native_node_graph(&renderer_data,renderer_params.data(),transformed,found,701)==0 && found,
+            "Transform None compiles with native schema and synthetic fields");
+        auto tf=std::find_if(transformed.nodes.begin(),transformed.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
+        check(tf!=transformed.nodes.end() && tf->schema_version==1,"compiler appends the independent Transform kind");
+        const auto transform_id=tf->id;
+        check(std::get<std::uint32_t>(parameter(transformed,kTransformNode,kTransformInheritLayer))==0,
+            "None resource is project-local zero");
+        const auto& inherited=std::get<core::OpaqueBytes>(parameter(transformed,kTransformNode,kTransformInheritedMatrix));
+        check(inherited.size()==132 && inherited[0]==std::byte{1},"UI capture writes the bounded affine payload");
+        const auto anchor=std::get<core::Vec3>(parameter(transformed,kTransformNode,kTransformAnchor));
+        check(anchor.x==0 && anchor.y==0 && anchor.z==0,
+            "native centred Anchor XY and Z0 map to canonical zero");
+        check(core::validate_graph(transformed,core::particle_node_registry()).ok(),"new native graph passes current registry");
+        {NativeBindingTransaction bindings(&renderer_data,701);check(bindings.install(transformed)==0,"new synthetic expressions install");bindings.accept();}
+        temporal_metadata_enabled=true;synthetic_native_reads=0;
+        capture_native_temporal_metadata(&renderer_data,transformed,701);
+        check(synthetic_native_reads==0,"constancy proof never queries synthetic fields as native metadata streams");
+        renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
+            *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=evaluated_binding(i,t);return 0;
+        };
+        NativeAnimationPlan none_plan(transformed,1920,1080,1);none_plan.prepare_constants(&renderer_data);
+        check(none_plan.constant_node(transform_id)!=nullptr,"None affine can certify identity through alias states");
+        // Native numbers still use callback values; pixel and angle signs convert once.
+        auto move=edit(4,4,108);check(direct_edit(move)==0 && move.accepted,"native Transform Position edit publishes atomically");
+        auto synthetic_edit=edit(4,15,0);check(!node_sync::valid_edit(synthetic_edit),"synthetic binding fields cannot be authored as native controls");
+        auto typed_marker=edit(4,1,0);typed_marker.value_kind=node_sync::ValueKind::point2;
+        check(!node_sync::valid_edit(typed_marker),"resource selection marker requires its declared type");
+        check(std::abs(std::get<core::Vec3>(parameter(saved_graph(),kTransformNode,kTransformPosition)).x-.1)<1e-12,
+            "native Position pixels convert to canonical units");
+        transform.values[4].one_d=108;transform.values[7].one_d=10;transform.values[8].one_d=20;transform.values[9].one_d=30;
+        layers.AEGP_GetLayerParentComp=[](AEGP_LayerH,AEGP_CompH* comp)->A_Err {*comp=reinterpret_cast<AEGP_CompH>(1);return 0;};
+        layers.AEGP_GetLayerFromLayerID=[](AEGP_CompH,AEGP_LayerIDVal id,AEGP_LayerH* out)->A_Err {
+            *out=id==77?reinterpret_cast<AEGP_LayerH>(2):nullptr;return 0;
+        };
+        layers.AEGP_ConvertLayerToCompTime=[](AEGP_LayerH,const A_Time* time,A_Time* out)->A_Err {*out=*time;return 0;};
+        layers.AEGP_GetLayerToWorldXform=[](AEGP_LayerH layer,const A_Time* time,A_Matrix4* out)->A_Err {
+            ++affine_reads;auto matrix=layer==reinterpret_cast<AEGP_LayerH>(2)?null_world:owner_world;
+            if(layer==reinterpret_cast<AEGP_LayerH>(2))matrix[3]+=time->value;
+            for(unsigned r=0;r<4;++r)for(unsigned c=0;c<4;++c)out->mat[r][c]=matrix[c*4+r];return 0;
+        };
+        stream.AEGP_GetNewLayerStream=[](AEGP_PluginID,AEGP_LayerH,AEGP_LayerStream which,AEGP_StreamRefH* out)->A_Err {
+            check(which==AEGP_LayerStream_ANCHORPOINT,"Null capture samples its anchor stream");
+            ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{5,0});return 0;
+        };
+        transform.values[1].layer_id=77;renderer_data.current_time=0;
+        auto select=edit(4,1,0);
+        check(direct_edit(select)==0 && select.accepted,"PF layer marker resolves the authoritative resource ID");
+        transformed=saved_graph();check(std::get<std::uint32_t>(parameter(transformed,kTransformNode,kTransformInheritLayer))==77,
+            "selected resource uses ID instead of layer index");
+        const auto rotation=std::get<core::Vec3>(parameter(transformed,kTransformNode,kTransformRotation));
+        check(rotation.x==-10 && rotation.y==20 && rotation.z==-30,"native Euler signs map to the core frame");
+        synthetic_native_reads=0;capture_native_temporal_metadata(&renderer_data,transformed,701);
+        check(synthetic_native_reads==0,"selected Null synthetic fields skip native constancy queries");
+        NativeAnimationPlan dynamic_plan(transformed,1920,1080,1);dynamic_plan.prepare_constants(&renderer_data);
+        check(!dynamic_plan.constant_node(transform_id),"unkeyed node controls cannot freeze Null or parent motion");
+        const auto before_render_suites=aegp_suite_requests,before_affine_reads=affine_reads;
+        renderer_data.current_time=24;core::GraphNode sampled;
+        check(dynamic_plan.sample(&renderer_data,transform_id,sampled)==0,"animated Null coefficients sample through numeric aliases");
+        auto sampled_graph=transformed;for(auto& n:sampled_graph.nodes)if(n.id==transform_id)n=sampled;
+        const auto& bytes=std::get<core::OpaqueBytes>(parameter(sampled_graph,kTransformNode,kTransformInheritedMatrix));
+        std::uint64_t bits{};for(unsigned b=0;b<8;++b)bits|=std::uint64_t(std::to_integer<unsigned char>(bytes[4+3*8+b]))<<(8*b);
+        check(std::abs(std::bit_cast<double>(bits)-24./1080)<1e-12,"Null animation moves the canonical pose at exact sample time");
+        check(aegp_suite_requests==before_render_suites && affine_reads==before_affine_reads,
+            "render playback invokes no AEGP or layer-transform callback");
+        const auto before_bad_writes=sets;transform.values[1].layer_id=88;
+        auto missing=edit(4,1,0);check(direct_edit(missing)!=0 && !missing.accepted && sets==before_bad_writes,
+            "unresolved resource rejects before any publication");
+        transform.values[1].layer_id=77;owner_world[0]=0;
+        auto singular=edit(4,4,200);check(direct_edit(singular)!=0 && !singular.accepted && sets==before_bad_writes,
+            "singular owner frame rejects atomically");
+        owner_world[0]=1;renderer_data.current_time=0;
+        check(live_refs==0 && acquisitions==0,"Transform capture and failure paths balance host references");
+        transform_present=false;temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
+    }
 
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.

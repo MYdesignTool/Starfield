@@ -50,12 +50,19 @@ graph envelope remain version1. Existing node kinds/keys/IDs are unchanged.
 | 5 | f64 | yes | Particles Scale in percent |
 | 6 | f64 | yes | Particles Opacity in percent |
 | 7 | opaque_bytes | no | Sampled inherited affine matrix; missing means identity |
+| 8 | u32 | no | Project-local AE layer ID; zero means None |
 
 Key7 is exactly132 bytes: `[1,0,0,0]`, then sixteen little-endian finite IEEE-754
 doubles in row-major order acting on column vectors. The final row must be
 `[0,0,0,1]`; authored entries are bounded to +/-1e6. Core evaluation validates
-all authored values, including parked nodes. Native Null authoring will append
-a separate resource key rather than replacing the sampled matrix contract.
+all authored values, including parked nodes. Key8 is bounded to0..INT32_MAX.
+A nonzero resource requires a resolved key7 matrix before core evaluation;
+host objects and layer indices never enter core. The native adapter captures
+that pose in UI compilation and samples twelve numeric expression aliases at
+render time. Binding record0x8002/v1 appends kind4 with native fields1..14 and
+synthetic affine fields15..26, with its existing byte layout and512-slot bound.
+Source1 is constant structure;2..26 are animated binding inputs. Synthetic
+indices are not native effect stream indices. Existing kind records are unchanged.
 Older registries reject this new kind as unsupported; publish the ABI4 native
 pair before exposing it in CEP. Keep prior paired builds for rollback.
 

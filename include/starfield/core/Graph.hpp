@@ -250,6 +250,7 @@ inline constexpr ParameterKey kWindSpinCurve{9};
 inline constexpr ParameterKey kTransformAnchor{1},kTransformPosition{2},kTransformRotation{3};
 inline constexpr ParameterKey kTransformSystemScale{4},kTransformParticleScale{5},kTransformParticleOpacity{6};
 inline constexpr ParameterKey kTransformInheritedMatrix{7};
+inline constexpr ParameterKey kTransformInheritLayer{8}; // project-local layer ID; 0=None
 // Output-scoped globals; optional values default to disabled / 100%.
 inline constexpr ParameterKey kTimeRemapEnabled{2};
 inline constexpr ParameterKey kTimeRemapSeconds{3};

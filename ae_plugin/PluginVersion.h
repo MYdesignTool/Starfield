@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 46: main-effect CPU/GPU shutter exposure and camera sampling.
-#define STARFIELD_VERSION_BUILD 46
-#define STARFIELD_VERSION_PACKED 32814 /* 0x802E */
+// Build 47: paired Core ABI4, ordered Transform node and numeric Null sampling.
+#define STARFIELD_VERSION_BUILD 47
+#define STARFIELD_VERSION_PACKED 32815 /* 0x802F */

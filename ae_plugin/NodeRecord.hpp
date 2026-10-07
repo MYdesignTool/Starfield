@@ -4,6 +4,7 @@
 #include "AE_Effect.h"
 
 #include "ParticleLayout.hpp"
+#include "TransformLayout.hpp"
 #include <array>
 #include <iterator>
 
@@ -17,15 +18,19 @@ inline constexpr A_long kMaxOutgoingEdges = 4;
 inline constexpr A_long kConnectionUuidChunks = 8;
 inline constexpr A_long kConnectionRecordChunks = 16; // destination UUID + edge UUID
 
-enum class Kind : A_long { emitter=0, particle=1, force=3 }; // 2 is not a node kind.
+enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 is not a node kind.
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
         case Kind::emitter: return 34;
         case Kind::particle: return particle_layout::last;
         case Kind::force: return 11+particle_layout::curve_span-1;
+        case Kind::transform: return transform_layout::last;
     }
     return 0;
+}
+[[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
+    return kind==Kind::transform?transform_layout::matrix_last:base_parameter_count(kind);
 }
 
 [[nodiscard]] constexpr A_long layout_x_index(Kind kind) noexcept { return base_parameter_count(kind) + 1; }
@@ -53,6 +58,11 @@ enum class Kind : A_long { emitter=0, particle=1, force=3 }; // 2 is not a node 
 // identities stable independently of stream indices (schema/node-parameters.json).
 namespace disk_ids {
 enum : A_long {
+    kTransformInheritId=1401,kTransformAnchorXYId=1402,kTransformAnchorZId=1403,
+    kTransformPositionXId=1404,kTransformPositionYId=1405,kTransformPositionZId=1406,
+    kTransformRotationXId=1407,kTransformRotationYId=1408,kTransformRotationZId=1409,
+    kTransformScaleXId=1410,kTransformScaleYId=1411,kTransformScaleZId=1412,
+    kTransformParticlesScaleId=1413,kTransformParticlesOpacityId=1414,
     kAuxiliarySourceId = 136,
     kLifeRandomId = 212, kParticleShapeId = 213, kSizeYId = 214,
     kFeatherId = 216, kUpAxisId = 217, kOrientToId = 218,
@@ -135,6 +145,11 @@ enum : A_long {
 [[nodiscard]] constexpr bool disk_ids_are_unique_and_bounded() noexcept {
     using namespace disk_ids;
     constexpr A_long fixed[] = {
+        kTransformInheritId,kTransformAnchorXYId,kTransformAnchorZId,
+        kTransformPositionXId,kTransformPositionYId,kTransformPositionZId,
+        kTransformRotationXId,kTransformRotationYId,kTransformRotationZId,
+        kTransformScaleXId,kTransformScaleYId,kTransformScaleZId,
+        kTransformParticlesScaleId,kTransformParticlesOpacityId,
         kEmitterTypeId, kBirthRateId, kSeedId, kEmitterParticleSizeId,
         kOriginXYId, kOriginZId, kVelocityXId, kVelocityYId, kVelocityZId, kDiscSizeId, kSpeedRandomId,
         kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId, kEmissionSpeedId,

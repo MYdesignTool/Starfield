@@ -18,7 +18,7 @@ $taskScratch = Join-Path $taskRepo "artifacts\transform-publication-tests\$([Gui
 $taskBuilt = Join-Path $taskScratch 'artifacts\plugin\2023\x64\Release'
 $taskInstalled = Join-Path $taskScratch 'dist'
 New-Item -ItemType Directory -Force -Path $taskBuilt,$taskInstalled | Out-Null
-$taskNames = @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldHost')
+$taskNames = @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')
 Rejected $taskScratch
 foreach ($taskName in $taskNames) {
     [IO.File]::WriteAllText((Join-Path $taskBuilt "$taskName.aex"),"paired-$taskName")

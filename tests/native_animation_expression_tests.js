@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const expressions = JSON.parse(fs.readFileSync(path.join(root, "artifacts/native-animation-expressions.json"), "utf8"));
-assert.equal(expressions.length, 67);
+assert.equal(expressions.length, 74);
 function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {name:`Node UUID ${n}`,value:n === 7 ? uuid : 0};
@@ -12,8 +12,8 @@ function node(firstUuid, uuid, values) {
 }
 let frameTime=0;
 const thisProperty={propertyGroup(level){assert.equal(level,1);return {propertyIndex:0};}};
-const emitter = node(99, 1, {4:()=>[250+frameTime*100,500]}), particle = node(149,2,{10:1,11:[0.3,0.5,0.7,1]});
-const force = node(95,4,{}), duplicate = node(99,777,{4:[999,999]});
+const emitter = node(102, 1, {4:()=>[250+frameTime*100,500]}), particle = node(510,2,{10:1,11:[0.3,0.5,0.7,1]});
+const force = node(208,4,{}), duplicate = node(102,777,{4:[999,999]});
 for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
     const parade = {numProperties:effects.length};
     const layer = name => {assert.equal(name,"ADBE Effect Parade");return parade;};
@@ -23,20 +23,20 @@ for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[fo
         /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
         const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx.param(106).value === 1") ? emitter : expression.includes("fx.param(156).value === 2") ? particle : force;
+        const source = expression.includes("fx.param(109).value === 1") ? emitter : expression.includes("fx.param(517).value === 2") ? particle : force;
         let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
     }
 }
-const originExpression=expressions.find(expr=>expr.includes("fx.param(106).value === 1") && expr.includes("result = fx.param(4).value[0]"));
+const originExpression=expressions.find(expr=>expr.includes("fx.param(109).value === 1") && expr.includes("result = fx.param(4).value[0]"));
 const missingLayer=()=>({numProperties:0});missingLayer.effect=()=>{throw new Error("missing effect");};
 assert.equal(vm.runInNewContext(originExpression,{thisLayer:missingLayer,thisProperty}),-1099511627776,"missing UUID cannot turn particle settings into zero");
-const failingEmitter=node(99,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
+const failingEmitter=node(102,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
 const failingLayer=()=>({numProperties:1});failingLayer.effect=()=>failingEmitter;
 assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer,thisProperty}),/Origin XY evaluation failed/,
     "source-property failures are not caught as unrelated effects");
-// Renderer aliases overlap the native UUID indices (99..106, 149..156).
+// Renderer aliases overlap the native UUID indices (102..109, 510..517).
 // Looking at their numeric values while searching creates expression-to-
 // expression dependencies, including a dependency on the current alias itself.
 let unrelatedReads=0;
@@ -63,7 +63,7 @@ assert.equal(vm.runInNewContext(originExpression,{thisLayer:ownLayer,
     thisProperty:{propertyGroup:()=>({propertyIndex:1})}}),emitter.param(4).value[0]);
 // Exercise the actual gateway setter without exposing test entry points in production.
 const gateway = fs.readFileSync(path.join(root,"cep_panel/jsx/starfield_gateway.jsx"),"utf8")
-    .replace("    function setNodeControl(effect, name, value) {","    $.global.testSetNodeControl = setNodeControl;\n    function setNodeControl(effect, name, value) {");
+    .replace("    function setNodeControl(effect, control, value) {","    $.global.testSetNodeControl = setNodeControl;\n    function setNodeControl(effect, control, value) {");
 const global = {};
 vm.runInNewContext(gateway, {$:{global}, app:{}});
 const keyframes = [[0,10],[2,20]]; let staticWrites=0;

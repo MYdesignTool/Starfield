@@ -6,6 +6,7 @@
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
 #include "SPBasic.h"
+#include "EditorPresetPicker.hpp"
 
 #include <array>
 #include <cstdio>
@@ -17,6 +18,10 @@ PF_Err register_node_graph_sync(PF_InData*) noexcept { return PF_Err_NONE; }
 PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef*[]) noexcept {return PF_Err_NONE;}
 PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
                                  const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
+namespace starfield::adapter {
+bool choose_curve_preset(PF_InData*,starfield::core::AgeCurve&) noexcept {return false;}
+bool choose_gradient_preset(PF_InData*,starfield::core::ColorGradient&) noexcept {return false;}
+}
 
 namespace {
 int checks = 0, failures = 0;
@@ -78,6 +83,8 @@ int main() {
     constexpr Kind kind = Kind::emitter;
 #elif defined(STARFIELD_NODE_KIND_PARTICLE)
     constexpr Kind kind = Kind::particle;
+#elif defined(STARFIELD_NODE_KIND_TRANSFORM)
+    constexpr Kind kind = Kind::transform;
 #else
     constexpr Kind kind = Kind::force;
 #endif
@@ -90,11 +97,13 @@ int main() {
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
-    bool dimensions_valid=true,hidden_valid=true;
+    bool dimensions_valid=true,hidden_valid=true;A_long registered_index=0;
     for(const auto& def:registered) {
+        ++registered_index;
         const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
         dimensions_valid &= custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
-        if(def.ui_flags&PF_PUI_NO_ECW_UI)hidden_valid &= bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
+        if(registered_index>base_parameter_count(kind))hidden_valid &=
+            bool(def.ui_flags&PF_PUI_NO_ECW_UI) && bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
     }
     check(dimensions_valid,"only the custom gradient has nonstandard control dimensions");
     check(hidden_valid,"all internal node metadata retains hidden flags and zero dimensions");
@@ -122,11 +131,14 @@ int main() {
         check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
         check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
         check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");
-        for(A_long index:{72,73,74,77,78,79,80}) check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
+        for(A_long index:{particle_layout::angle,particle_layout::angle+1,particle_layout::angle+2,
+            particle_layout::speed,particle_layout::speed+1,particle_layout::speed+2,particle_layout::limit_angle})
+            check(registered[index-1].param_type==PF_Param_ANGLE,"particle angles and spin use native AE Angle controls");
         check(std::strcmp(registered[12].name,"Color Gradient 0 Position")==0 && (registered[12].flags&PF_ParamFlag_CANNOT_TIME_VARY),"gradient endpoint positions stay structural");
         check((registered[13].ui_flags&PF_PUI_INVISIBLE)!=0,"gradient colors are edited by the native visual control");
         check(std::strcmp(registered[11].name,"Color Gradient")==0 && (registered[11].ui_flags&PF_PUI_CONTROL) && registered[11].ui_height==178,"native gradient control replaces numerical stop banks");
-        check(registered[3].param_type==PF_Param_GROUP_START && registered[30].param_type==PF_Param_GROUP_END,"Particle Properties grouping preserves root Life controls");
+        check(registered[particle_layout::properties-1].param_type==PF_Param_GROUP_START &&
+            registered[particle_layout::properties_end-1].param_type==PF_Param_GROUP_END,"Particle Properties grouping preserves root Life controls");
     }
     if constexpr(kind==Kind::emitter) {
         check(registered[1].u.pd.num_choices==4,"Emitting exposes timing choices");
@@ -141,14 +153,30 @@ int main() {
         check(registered[0].u.fs_d.slider_max==100 && registered[0].u.fs_d.valid_max==100000,"Force typed range does not determine scrub sensitivity");
         check(registered[8].u.fs_d.slider_max==10 && registered[8].u.fs_d.precision==PF_Precision_TENTHS,"Spin delay uses seconds and a useful native range");
     }
+    if constexpr(kind==Kind::transform) {
+        const char* names[]{"Inherit Motion (Null Layer)","Anchor XY","Anchor Z","Position X","Position Y","Position Z",
+            "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"};
+        for(A_long i=0;i<14;++i)check(std::strcmp(registered[i].name,names[i])==0 && registered[i].uu.id==1401+i,
+            "Transform visible ordering and disk IDs match the authoring contract");
+        check(registered[0].param_type==PF_Param_LAYER && registered[0].u.ld.dephault==PF_LayerDefault_NONE &&
+            (registered[0].flags & PF_ParamFlag_CANNOT_TIME_VARY),"inherited layer is a constant resource selector");
+        check(registered[1].param_type==PF_Param_POINT,"Anchor XY uses a native point");
+        for(A_long i=6;i<9;++i)check(registered[i].param_type==PF_Param_ANGLE &&
+            (registered[i].flags & PF_ParamFlag_START_COLLAPSED),"Transform rotations animate and default collapsed");
+        for(A_long i=9;i<14;++i)check(registered[i].u.fs_d.value==100,"Transform scale and opacity default to 100 percent");
+        check(registered[9].u.fs_d.valid_min<0,"system Scale accepts reflection");
+        check(binding_field_count(kind)==26 && base_parameter_count(kind)==14,
+            "synthetic affine bindings have their own bound, separate from native indices");
+    }
     int colors = 0;
     bool controls_constant = true, controls_animated = true, interpolation_unrestricted = true, colors_supervised = true;
     A_long control_index = 0;
-    const A_long last_animated = kind == Kind::emitter ? 33 : kind == Kind::particle ? 14 : 10;
+    const A_long last_animated = kind == Kind::emitter ? 33 : kind == Kind::particle || kind==Kind::transform ? 14 : 10;
     for (const auto& control : registered) {
         ++control_index;
         if (control.param_type == PF_Param_GROUP_START || control.param_type == PF_Param_GROUP_END) continue;
-        if ((kind==Kind::particle?particle_layout::animated(control_index):control_index<=last_animated) && !(kind==Kind::emitter && control_index==2))
+        if ((kind==Kind::particle?particle_layout::animated(control_index):control_index<=last_animated) &&
+            !(kind==Kind::emitter && control_index==2) && !(kind==Kind::transform && control_index==1))
             controls_animated &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) == 0;
         else controls_constant &= (control.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0;
         interpolation_unrestricted &= (control.flags & PF_ParamFlag_CANNOT_INTERP) == 0;

@@ -12,14 +12,15 @@ param(
     [switch]$ParticleTransform,
     [switch]$TransformTransport,
     [switch]$TransformGraph,
+    [switch]$TransformBinding,
     [switch]$TraceIncludes,
     [ValidatePattern('^([A-Za-z0-9_./-]+)?$')][string]$PresetCatalog = '',
-    [ValidateSet('Emitter', 'Particle', 'Force')][string]$NodeKind = 'Particle',
+    [ValidateSet('Emitter', 'Particle', 'Force', 'Transform')][string]$NodeKind = 'Particle',
     [string]$MSVCVarsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 )
 
 $ErrorActionPreference = 'Stop'
-if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent + [int]$HostBootstrap.IsPresent + [int]$GradientEditor.IsPresent + [int]$ParticleTransform.IsPresent + [int]$TransformTransport.IsPresent + [int]$TransformGraph.IsPresent) -gt 1) { throw 'Select only one test scope.' }
+if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent + [int]$HostBootstrap.IsPresent + [int]$GradientEditor.IsPresent + [int]$ParticleTransform.IsPresent + [int]$TransformTransport.IsPresent + [int]$TransformGraph.IsPresent + [int]$TransformBinding.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
@@ -37,7 +38,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
 
 try {
     $aliasRoot = $drive
-    $testFolder = if ($TransformGraph) { 'transform-graph-tests' } elseif ($TransformTransport) { 'transform-transport-tests' } elseif ($ParticleTransform) { 'particle-transform-tests' } elseif ($GradientEditor) { 'gradient-editor-tests' } elseif ($HostBootstrap) { 'host-bootstrap-tests' } elseif ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
+    $testFolder = if ($TransformBinding) { 'transform-binding-tests' } elseif ($TransformGraph) { 'transform-graph-tests' } elseif ($TransformTransport) { 'transform-transport-tests' } elseif ($ParticleTransform) { 'particle-transform-tests' } elseif ($GradientEditor) { 'gradient-editor-tests' } elseif ($HostBootstrap) { 'host-bootstrap-tests' } elseif ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
 
@@ -73,6 +74,7 @@ try {
         $sources += @('tests\camera_capture_tests.cpp', 'ae_plugin\NodeGraphSync.cpp', 'ae_plugin\Camera.cpp',
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
             'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalUI.cpp')
+        $sources += 'ae_plugin\MotionBlur.cpp'
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp','ae_plugin\ParticleGradientUI.cpp') }
     if ($Gpu) { $sources += 'ae_plugin\ParticleGradientUI.cpp' }
@@ -81,6 +83,7 @@ try {
     if ($ParticleTransform) { $sources = @('tests\particle_transform_tests.cpp','src\core\ParticleTransform.cpp') }
     if ($TransformTransport) { $sources[0] = 'tests\transform_transport_tests.cpp' }
     if ($TransformGraph) { $sources[0] = 'tests\transform_graph_tests.cpp' }
+    if ($TransformBinding) { $sources = @('tests\transform_binding_tests.cpp'); $responseExtra = @('/I "'+$aliasRoot+'\ae_plugin"') }
 
     $responseLines = @(
         '/nologo',
@@ -94,6 +97,7 @@ try {
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
     )
+    if ($TransformBinding) { $responseLines += $responseExtra }
     if ($Gpu -or $NodeEffects) { $responseLines += "/I `"$aliasRoot\artifacts\gpu-build\generated`"" }
     if ($RendererControls) { $responseLines += '/DSTARFIELD_TEST_RENDERER_CONTROLS' }
     if ($TraceIncludes) { $responseLines += '/showIncludes' }

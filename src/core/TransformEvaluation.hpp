@@ -11,6 +11,11 @@ struct TransformBranchPlan {
 Result<CompiledParticleTransform> read_transform(const GraphNode& node) {
     using R=Result<CompiledParticleTransform>;
     ParticleTransformSettings settings;
+    if(const auto* raw=find_value(node,kTransformInheritLayer)) {
+        const auto* resource=std::get_if<std::uint32_t>(raw);
+        if(!resource || *resource>0x7fffffffu || (*resource && !find_value(node,kTransformInheritedMatrix)))
+            return R::failure(ErrorCode::invalid_request,"unresolved Transform layer resource");
+    }
     for(const auto item:{std::pair{kTransformAnchor,&settings.anchor},std::pair{kTransformPosition,&settings.position},
         std::pair{kTransformRotation,&settings.rotation_degrees},std::pair{kTransformSystemScale,&settings.scale_percent}}) {
         const auto* raw=find_value(node,item.first);const auto* value=raw?std::get_if<Vec3>(raw):nullptr;

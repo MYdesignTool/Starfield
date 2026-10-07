@@ -66,9 +66,11 @@ static_assert(std::is_trivially_copyable_v<NativeEdit>);
 inline bool valid_edit(const NativeEdit& edit) noexcept {
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
-    if (edit.node_kind > 3 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
+    if (edit.node_kind > 4 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
         edit.parameter_index <= 0 || edit.parameter_index > native_nodes::particle_layout::last || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
+    if(edit.node_kind==4 && (edit.parameter_index>14 || edit.additional_count ||
+        edit.value_kind!=(edit.parameter_index==2?ValueKind::point2:ValueKind::scalar)))return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
     for(unsigned i=0;i<edit.additional_count;++i) {
         const auto& field=edit.additional_fields[i];

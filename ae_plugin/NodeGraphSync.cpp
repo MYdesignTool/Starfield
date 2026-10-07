@@ -35,6 +35,11 @@ constexpr char kRegistrationName[] = "Starfield Force Node Sync";
 constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
     starfield::adapter::native_nodes::Kind::force);
 constexpr A_long kNodeKind = 3;
+#elif defined(STARFIELD_NODE_KIND_TRANSFORM)
+constexpr char kRegistrationName[] = "Starfield Transform Node Sync";
+constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
+    starfield::adapter::native_nodes::Kind::transform);
+constexpr A_long kNodeKind = 4;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
@@ -126,6 +131,9 @@ bool capture_edit(PF_InData& data, const PF_ParamDef& param,
         case PF_Param_FLOAT_SLIDER: edit.value[0] = param.u.fs_d.value; break;
         case PF_Param_POPUP: edit.value[0] = param.u.pd.value; break;
         case PF_Param_CHECKBOX: edit.value[0] = param.u.bd.value; break;
+        // PF_LayerDef contains pixels, not a selected layer ID. The UI-only
+        // compiler reads the authoritative AEGP layer resource for this edit.
+        case PF_Param_LAYER: if(edit.node_kind!=4 || edit.parameter_index!=1)return false;break;
         case PF_Param_ANGLE: edit.value[0] = param.u.ad.value / 65536.0; break;
         case PF_Param_POINT:
             edit.value_kind = ValueKind::point2;

@@ -39,8 +39,12 @@
     <TargetName>StarfieldForce</TargetName><NodePiPL>NodeForcePiPL.r</NodePiPL>
     <NodeKindDefine>STARFIELD_NODE_KIND_FORCE</NodeKindDefine>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Transform'">
+    <TargetName>StarfieldTransform</TargetName><NodePiPL>NodeTransformPiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_TRANSFORM</NodeKindDefine>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(NodePiPL)'==''">
-    <NodeKindError>NodeKind must be Emitter, Particle, or Force.</NodeKindError>
+    <NodeKindError>NodeKind must be Emitter, Particle, Force, or Transform.</NodeKindError>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>

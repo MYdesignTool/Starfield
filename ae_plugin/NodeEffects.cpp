@@ -25,7 +25,7 @@ static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
-enum class NodeEffectKind { emitter, particle, force };
+enum class NodeEffectKind { emitter, particle, force, transform };
 
 // Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
 // Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
@@ -38,6 +38,8 @@ constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::emitter;
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::particle;
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::force;
+#elif defined(STARFIELD_NODE_KIND_TRANSFORM)
+constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::transform;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
@@ -80,6 +82,10 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
             case kSpinId: def.u.fs_d.slider_max = 100.0f; break;
             case kSpinDelayId: def.u.fs_d.slider_max = 10.0f; break;
             case kOriginZId: def.u.fs_d.slider_min = -50.0f; def.u.fs_d.slider_max = 50.0f; break;
+            case kTransformAnchorZId: case kTransformPositionXId: case kTransformPositionYId: case kTransformPositionZId:
+                def.u.fs_d.slider_min=-100.0f;def.u.fs_d.slider_max=100.0f;break;
+            case kTransformScaleXId: case kTransformScaleYId: case kTransformScaleZId:
+            case kTransformParticlesScaleId: def.u.fs_d.slider_max=200.0f;break;
             case kSpinFrequencyId: case kAirDensityId: case kDiscSizeId: case kDragId: def.u.fs_d.slider_max = 1.0f; break;
             case kEmissionAngleXId: case kEmissionAngleYId: case kEmissionAngleZId:
                 def.u.fs_d.slider_min = -180.0f; def.u.fs_d.slider_max = 180.0f; break;
@@ -92,7 +98,8 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
     if (id == kLifeRandomId || id == kFeatherId || id == kParticleAngleRandomId || id == kRotationSpeedRandomId || id == kGravityRandomId || id == kSpinResistId || id == kOpacityId || id == kSizeRandomId || id == kOpacityRandomId ||
         id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId ||
         id == kEmitChanceId || id == kEmitLifeStartId || id == kEmitLifeEndId ||
-        id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId) {
+        id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId ||
+        (id>=kTransformScaleXId && id<=kTransformParticlesOpacityId)) {
         def.u.fs_d.display_flags = PF_ValueDisplayFlag_PERCENT;
     }
     def.u.fs_d.curve_tolerance = AEFX_AUDIO_DEFAULT_CURVE_TOLERANCE;
@@ -463,6 +470,29 @@ PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return PF_Err_NONE;
 }
 
+PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
+    PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;layer.flags=kNodeEditableFlags|kNodeConstantFlags;
+    layer.uu.id=kTransformInheritId;layer.u.ld.dephault=PF_LayerDefault_NONE;
+    std::snprintf(layer.name,sizeof(layer.name),"Inherit Motion (Null Layer)");
+    auto error=add_checked_parameter(data,layer);if(error)return error;
+    error=add_point2d(data,"Anchor XY",kTransformAnchorXYId);if(error)return error;
+    error=add_slider(data,"Anchor Z",kTransformAnchorZId,-1000000,1000000,0);if(error)return error;
+    for(const auto& p:{std::pair{"Position X",kTransformPositionXId},std::pair{"Position Y",kTransformPositionYId},std::pair{"Position Z",kTransformPositionZId}}) {
+        error=add_slider(data,p.first,p.second,-1000000,1000000,0);if(error)return error;
+    }
+    for(const auto& p:{std::pair{"Rotation X",kTransformRotationXId},std::pair{"Rotation Y",kTransformRotationYId},std::pair{"Rotation Z",kTransformRotationZId}}) {
+        error=add_angle(data,p.first,p.second);if(error)return error;
+    }
+    for(const auto& p:{std::pair{"Scale X",kTransformScaleXId},std::pair{"Scale Y",kTransformScaleYId},std::pair{"Scale Z",kTransformScaleZId}}) {
+        error=add_slider(data,p.first,p.second,-10000,10000,100);if(error)return error;
+    }
+    error=add_slider(data,"Particles Scale",kTransformParticlesScaleId,0,10000,100);if(error)return error;
+    error=add_slider(data,"Particles Opacity",kTransformParticlesOpacityId,0,100,100);if(error)return error;
+    error=add_node_record(data,Kind::transform);if(error)return error;
+    error=add_node_identity(data);if(error)return error;
+    output->num_params=parameter_count(Kind::transform);return PF_Err_NONE;
+}
+
 PF_Err render_passthrough(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef* output) noexcept {
     if (!in_data || !in_data->utils || !in_data->utils->copy || !params || !params[0] || !output) {
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
@@ -544,6 +574,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             } else if constexpr (kNodeEffectKind == NodeEffectKind::particle) {
                 return setup_particle(in_data, out_data);
 
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::transform) {
+                return setup_transform(in_data,out_data);
             } else {
                 return setup_force(in_data, out_data);
             }

@@ -13,6 +13,9 @@
 #elif defined(STARFIELD_NODE_KIND_FORCE)
 #define STARFIELD_NODE_NAME "Starfield Force"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.force"
+#elif defined(STARFIELD_NODE_KIND_TRANSFORM)
+#define STARFIELD_NODE_NAME "Starfield Transform"
+#define STARFIELD_NODE_MATCH "org.starfieldfx.node.transform"
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

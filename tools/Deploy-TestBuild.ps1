@@ -20,7 +20,11 @@ $oldRuntime = Join-Path $repo 'artifacts\runtime'
 $backup = Join-Path $repo "artifacts\disabled\$BackupName"
 $recordPath = Join-Path $backup 'deployment.json'
 $names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNode.aex',
-           'StarfieldForce.aex', 'StarfieldHost.aex', 'StarfieldCore.dll')
+           'StarfieldForce.aex', 'StarfieldTransform.aex', 'StarfieldHost.aex', 'StarfieldCore.dll')
+# Preserve CEP-only rollback support for the installed pre-Transform bundle.
+if ($KeepNative -and -not (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTransform.aex'))) {
+    $names = @($names | Where-Object { $_ -ne 'StarfieldTransform.aex' })
+}
 $retiredNames = @('StarfieldAppearance.aex')
 $allowedNames = @($names) + @($retiredNames)
 $rootNames = @($allowedNames) + @($allowedNames | ForEach-Object { [IO.Path]::ChangeExtension($_, '.pdb') })

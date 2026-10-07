@@ -636,7 +636,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kTransformSystemScale,ParameterKind::vector3_float64,true},
         ParameterDescriptor{kTransformParticleScale,ParameterKind::float64,true},
         ParameterDescriptor{kTransformParticleOpacity,ParameterKind::float64,true},
-        ParameterDescriptor{kTransformInheritedMatrix,ParameterKind::opaque_bytes,false}};
+        ParameterDescriptor{kTransformInheritedMatrix,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kTransformInheritLayer,ParameterKind::uint32,false}};
     registry.types.push_back(std::move(emitter));
     registry.types.push_back(std::move(particle));
     registry.types.push_back(std::move(force));

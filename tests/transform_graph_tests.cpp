@@ -283,6 +283,12 @@ void invalid_and_inherited() {
     const auto cancelled=evaluate_particle_graph(graph,{1,1},stop);
     check(!cancelled.has_value() && cancelled.error().code==ErrorCode::cancelled,"Transform cancellation lost");
     graph=base();splice(graph,NodeId{uuid(3)},transform_node(4),14);sampled.graph=graph;
+    auto unresolved=graph;set(node(unresolved,kTransformNode),kTransformInheritLayer,std::uint32_t{77});
+    check(!evaluate_particle_graph(unresolved,{1,1},never).has_value(),"unresolved Transform resource accepted");
+    matrix(node(unresolved,kTransformNode),ParticleTransformSettings{}.inherited_motion);
+    check(evaluate_particle_graph(unresolved,{1,1},never).has_value(),"resolved project resource rejected");
+    set(node(unresolved,kTransformNode),kTransformInheritLayer,std::uint32_t{0xffffffff});
+    check(!evaluate_particle_graph(unresolved,{1,1},never).has_value(),"invalid signed layer resource accepted");
     sampled.animate=[](auto& n,double){if(n.type_key==kTransformNode)n.schema_version=2;};
     const auto changed_schema=evaluate_temporal_particle_graph(graph,{1,1},never,{},sampled);
     check(!changed_schema.has_value() && changed_schema.error().code==ErrorCode::invalid_request,"sampled Transform schema mismatch accepted");

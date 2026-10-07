@@ -16,7 +16,7 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
     # The artifact fingerprint proves which AEX was BUILT, not which AEX is
     # installed. An unpublished full build must not enable an incompatible hot
     # Core update. Verify the complete native pair before touching the selector.
-    foreach ($taskModule in @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldHost')) {
+    foreach ($taskModule in @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')) {
         $taskBuiltNative = Join-Path $RepositoryRoot "artifacts\plugin\$Label\$Architecture\$BuildConfiguration\$taskModule.aex"
         $taskInstalledNative = Join-Path $RepositoryRoot "dist\$taskModule.aex"
         if (-not (Test-Path -LiteralPath $taskBuiltNative) -or -not (Test-Path -LiteralPath $taskInstalledNative) -or
@@ -59,6 +59,7 @@ $adapterInputs = @(
     'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp',
     'ae_plugin\StarfieldHostPiPL.r', 'ae_plugin\StarfieldHost.vcxproj',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
+    'ae_plugin\TransformLayout.hpp', 'ae_plugin\TransformBinding.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
     'ae_plugin\GpuRender.cpp', 'ae_plugin\GpuRender.hpp', 'ae_plugin\gpu\SpriteKernel.h',
@@ -74,6 +75,7 @@ $adapterInputs = @(
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
+    'ae_plugin\NodeTransformPiPL.r',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
@@ -143,7 +145,7 @@ try {
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
 
-    foreach ($nodeKind in @('Emitter', 'Particle', 'Force')) {
+    foreach ($nodeKind in @('Emitter', 'Particle', 'Force', 'Transform')) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"
         $nodeArguments = @(
@@ -226,7 +228,7 @@ try {
         }
         Write-Host ''
         Write-Host "Installable build: $(Join-Path $publishedDir 'StarfieldParticle.aex')" -ForegroundColor Green
-        foreach ($nodeModule in @('StarfieldEmitter', 'StarfieldParticleNode', 'StarfieldForce', 'StarfieldHost')) {
+        foreach ($nodeModule in @('StarfieldEmitter', 'StarfieldParticleNode', 'StarfieldForce', 'StarfieldTransform', 'StarfieldHost')) {
             $builtNodeAex = Join-Path $repositoryRoot "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration\$nodeModule.aex"
             if (-not (Test-Path -LiteralPath $builtNodeAex)) { throw "Node build reported success but $builtNodeAex is missing." }
             Copy-Item -LiteralPath $builtNodeAex -Destination (Join-Path $publishedDir "$nodeModule.aex") -Force
