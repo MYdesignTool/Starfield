@@ -33,6 +33,26 @@ CompItem eligibility; main-order regression passes30 checks. The complete May202
 main-order-tests.log and build.log). Compilation and fake-host tests still do
 not qualify the real AE2023 Texture menu or source rendering.
 
+At18:00 +08:00 a fresh read-only process check found no AfterFX/AfterFX_64.
+Standing authorization published a086b9fe098e7f9b9553b02395f9379ff1e18f64 as
+native56/CEP56/ABI6 through the existing Junctions and Deploy-TestBuild.ps1.
+Seven native/Core hashes, eleven CEP hashes, the unchanged Core selector and
+paired rollback validation passed. Installed texture-panel fixtures pass47
+checks. Exact native55/CEP55 before-state is retained; actual AE2023 menu,
+selection and texture rendering remain open. Native55's host failure is not
+superseded by these fake-host passing counts. No process/registry/cache changed.
+Receipts: artifacts/m3-13-native56-deploy-before.json,
+artifacts/m3-13-native56-deploy-after.json,
+artifacts/m3-13-native56-deploy-wrapper.log,
+artifacts/m3-13-native56-rollback-report.log,
+artifacts/m3-13-native56-live-texture-panel-tests.log.
+
+One-step rollback to native55/CEP55, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native56-panel56-script-inventory-20261008' -Restore
+```
+
 The owner reports that native54's Texture selector shows only None while a
 sibling `Comp 2` precomposition exists. Static inspection finds that the menu
 requires HAS_VIDEO on every source item, including compositions. This is a
