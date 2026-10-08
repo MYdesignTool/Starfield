@@ -23,8 +23,9 @@ constexpr auto kind=native_nodes::Kind::transform;
 constexpr A_long guard_index=native_nodes::sync_guard_index(kind);
 struct Button {
     A_long x,y,width,height{21};
-    explicit Button(const PF_EffectWindowInfo& info):x(info.current_frame.left+2),
-        y(info.current_frame.top+3),width(std::clamp<A_long>(info.current_frame.right-x-2,0,114)){}
+    explicit Button(const PF_EffectWindowInfo& info,bool selector=false):x(info.current_frame.left+2),
+        y(info.current_frame.top+(selector?3:30)),
+        width(std::clamp<A_long>(info.current_frame.right-x-2,0,selector?230:114)){}
     bool hit(A_long h,A_long v)const {return width>=40 && h>=x && h<x+width && v>=y && v<y+height;}
 };
 PF_Err draw_button(PF_InData* data,PF_EventExtra* event) {
@@ -39,8 +40,13 @@ PF_Err draw_button(PF_InData* data,PF_EventExtra* event) {
     if(!error)error=bot->GetSupplier(ref,&source);
     if(!error)error=bot->GetSurface(ref,&target);
     if(error || !source || !target)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
-    const Button b(event->effect_win);
-    if(b.width<40)return PF_Err_NONE;
+    std::vector<TransformLayerChoice> choices;AEGP_LayerIDVal selected{};
+    error=read_transform_layers(data,choices,selected,false);if(error)return static_cast<PF_Err>(error);
+    std::u16string label=u"Missing layer";
+    for(const auto& choice:choices)if(choice.id==selected){label=choice.name;break;}
+    for(bool selector:{true,false}) {
+    const Button b(event->effect_win,selector);
+    if(b.width<40)continue;
     for(unsigned border=0;border<2 && !error;++border) {
         const DRAWBOT_ColorRGBA color=border?DRAWBOT_ColorRGBA{.22f,.22f,.23f,1}:DRAWBOT_ColorRGBA{.43f,.43f,.45f,1};
         const DRAWBOT_RectF32 bounds{float(b.x+border),float(b.y+border),float(b.width-2*border),float(b.height-2*border)};
@@ -56,19 +62,77 @@ PF_Err draw_button(PF_InData* data,PF_EventExtra* event) {
     if(!error)error=supplier->NewDefaultFont(source,11,&font);
     if(!error)error=supplier->NewBrush(source,&color,&brush);
     const DRAWBOT_PointF32 at{float(b.x+7),float(b.y+14)};
-    if(!error)error=surface->DrawString(target,brush,font,reinterpret_cast<const DRAWBOT_UTF16Char*>(u"Create Null"),
-        &at,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_None,float(b.width-12));
+    if(!error)error=surface->DrawString(target,brush,font,reinterpret_cast<const DRAWBOT_UTF16Char*>(selector?label.c_str():u"Create Null"),
+        &at,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_End,float(b.width-(selector?28:12)));
+    const DRAWBOT_PointF32 arrow{float(b.x+b.width-18),float(b.y+14)};
+    if(!error && selector)error=surface->DrawString(target,brush,font,reinterpret_cast<const DRAWBOT_UTF16Char*>(u"\u25be"),
+        &arrow,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_None,14);
     if(brush)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(brush));
     if(font)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(font));
+    }
     return static_cast<PF_Err>(error);
 }
 }
 
-PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params[]) noexcept try {
+PF_Err read_transform_layers(PF_InData* data,std::vector<TransformLayerChoice>& choices,
+                             AEGP_LayerIDVal& selected,bool full_inventory) noexcept try {
+    choices.clear();selected=0;const auto plugin=node_graph_sync_plugin_id();
+    if(!data || !data->pica_basicP || !data->effect_ref || !plugin)return PF_Err_BAD_CALLBACK_PARAM;
+    Suite<AEGP_PFInterfaceSuite1> pf(data->pica_basicP,kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1);
+    Suite<AEGP_LayerSuite9> layers(data->pica_basicP,kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
+    Suite<AEGP_StreamSuite6> streams(data->pica_basicP,kAEGPStreamSuite,kAEGPStreamSuiteVersion6);
+    Suite<AEGP_EffectSuite4> effects(data->pica_basicP,kAEGPEffectSuite,kAEGPEffectSuiteVersion4);
+    Suite<AEGP_MemorySuite1> memory(data->pica_basicP,kAEGPMemorySuite,kAEGPMemorySuiteVersion1);
+    if(!pf || !layers || !streams || !effects || !memory)return PF_Err_BAD_CALLBACK_PARAM;
+    struct Refs {const AEGP_StreamSuite6* streams;const AEGP_EffectSuite4* effects;
+        AEGP_EffectRefH effect{};AEGP_StreamRefH source{};
+        ~Refs(){if(source)streams->AEGP_DisposeStream(source);if(effect)effects->AEGP_DisposeEffect(effect);}
+    } refs{streams.value,effects.value};
+    AEGP_LayerH owner{};AEGP_CompH comp{};A_long count{};
+    auto error=pf->AEGP_GetEffectLayer(data->effect_ref,&owner);
+    if(!error)error=layers->AEGP_GetLayerParentComp(owner,&comp);
+    if(!error)error=layers->AEGP_GetCompNumLayers(comp,&count);
+    if(error || !owner || !comp || count<0 || count>4096)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+    error=pf->AEGP_GetNewEffectForEffect(plugin,data->effect_ref,&refs.effect);
+    if(!error)error=streams->AEGP_GetNewEffectStreamByIndex(plugin,refs.effect,1,&refs.source);
+    AEGP_StreamType type{};
+    if(!error)error=streams->AEGP_GetStreamType(refs.source,&type);
+    if(error || type!=AEGP_StreamType_LAYER_ID)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+    // The Layer selector is constant structure; DRAW need not supply frame timing.
+    const A_Time time{0,1};AEGP_StreamValue2 value{};
+    if(!error)error=streams->AEGP_GetNewStreamValue(plugin,refs.source,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+    if(error)return static_cast<PF_Err>(error);
+    selected=value.val.layer_id;streams->AEGP_DisposeStreamValue(&value);
+    choices.push_back({0,u"None"});
+    if(!full_inventory && !selected)return PF_Err_NONE;
+    for(A_long i=0;i<count;++i) {
+        AEGP_LayerH layer{};AEGP_LayerIDVal id{};
+        error=layers->AEGP_GetCompLayerByIndex(comp,i,&layer);
+        if(!error)error=layers->AEGP_GetLayerID(layer,&id);
+        if(error)return static_cast<PF_Err>(error);
+        if(!full_inventory && id!=selected)continue;
+        AEGP_MemHandle name{};
+        error=layers->AEGP_GetLayerName(plugin,layer,&name,nullptr);
+        if(error)return static_cast<PF_Err>(error);
+        struct Name {const AEGP_MemorySuite1* memory;AEGP_MemHandle handle;bool locked{};
+            ~Name(){if(locked)memory->AEGP_UnlockMemHandle(handle);if(handle)memory->AEGP_FreeMemHandle(handle);}
+        } owned{memory.value,name};
+        if(!name)return PF_Err_BAD_CALLBACK_PARAM;
+        void* text{};error=memory->AEGP_LockMemHandle(name,&text);owned.locked=!error;
+        if(error || !text)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+        choices.push_back({id,reinterpret_cast<const char16_t*>(text)});
+        if(!full_inventory)break;
+    }
+    return PF_Err_NONE;
+}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
+namespace {
+PF_Err change_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],
+                            const AEGP_LayerIDVal* existing) noexcept try {
     const auto plugin=node_graph_sync_plugin_id();
     if(!data || !out || !data->pica_basicP || !data->effect_ref || !plugin || !params || !params[1] ||
        params[1]->param_type!=PF_Param_LAYER || !params[guard_index] ||
-       params[guard_index]->param_type!=PF_Param_FLOAT_SLIDER || params[guard_index]->u.fs_d.value!=0 || !data->time_scale)
+       params[guard_index]->param_type!=PF_Param_FLOAT_SLIDER || params[guard_index]->u.fs_d.value!=0)
         return PF_Err_BAD_CALLBACK_PARAM;
     Suite<AEGP_PFInterfaceSuite1> pf(data->pica_basicP,kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1);
     Suite<AEGP_LayerSuite9> layers(data->pica_basicP,kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
@@ -87,7 +151,8 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     A_Err error=pf->AEGP_GetEffectLayer(data->effect_ref,&owner);
     if(!error)error=layers->AEGP_GetLayerParentComp(owner,&comp);
     if(!error)error=layers->AEGP_GetCompNumLayers(comp,&layer_count);
-    if(error || !owner || !comp || layer_count<0 || layer_count>=4096)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+    if(error || !owner || !comp || layer_count<0 || layer_count>4096 || (!existing && layer_count==4096))
+        return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
     error=pf->AEGP_GetNewEffectForEffect(plugin,data->effect_ref,&refs.effect);
     if(!error)error=streams->AEGP_GetNewEffectStreamByIndex(plugin,refs.effect,1,&refs.source);
     if(!error)error=streams->AEGP_GetNewEffectStreamByIndex(plugin,refs.effect,guard_index,&refs.guard);
@@ -96,7 +161,7 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     if(!error)error=streams->AEGP_GetStreamType(refs.guard,&guard_type);
     if(error || source_type!=AEGP_StreamType_LAYER_ID || guard_type!=AEGP_StreamType_OneD)
         return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
-    const A_Time time{data->current_time,data->time_scale};AEGP_StreamValue2 previous{};
+    const A_Time time{0,1};AEGP_StreamValue2 previous{};
     error=streams->AEGP_GetNewStreamValue(plugin,refs.source,AEGP_LTimeMode_LayerTime,&time,TRUE,&previous);
     if(error)return static_cast<PF_Err>(error);
     const auto previous_id=previous.val.layer_id;streams->AEGP_DisposeStreamValue(&previous);
@@ -104,7 +169,17 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     if(error)return static_cast<PF_Err>(error);
     const auto previous_guard=previous.val.one_d;streams->AEGP_DisposeStreamValue(&previous);
     if(previous_guard!=0)return PF_Err_BAD_CALLBACK_PARAM;
-    error=utility->AEGP_StartUndoGroup("Starfield: Create Transform Null");
+    if(existing && *existing) {
+        bool found=false;
+        for(A_long i=0;i<layer_count && !error;++i) {
+            AEGP_LayerH layer{};AEGP_LayerIDVal id{};
+            error=layers->AEGP_GetCompLayerByIndex(comp,i,&layer);
+            if(!error)error=layers->AEGP_GetLayerID(layer,&id);
+            if(!error && id==*existing){found=true;break;}
+        }
+        if(error || !found)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+    }
+    error=utility->AEGP_StartUndoGroup(existing?"Starfield: Select Transform Null":"Starfield: Create Transform Null");
     if(error)return static_cast<PF_Err>(error);
     struct Undo {const AEGP_UtilitySuite6* utility;~Undo(){utility->AEGP_EndUndoGroup();}} undo{utility.value};
     const auto guard=[&](double value) {
@@ -118,10 +193,11 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
         return streams->AEGP_SetStreamValue(plugin,refs.source,&v);
     };
     AEGP_LayerH created{};const char* stage="create Null";
+    AEGP_LayerIDVal id=existing?*existing:0;
+    if(!existing) {
     error=comps->AEGP_CreateNullInComp(reinterpret_cast<const A_UTF16Char*>(u"Starfield Transform Null"),comp,nullptr,&created);
     if(!error && !created)error=PF_Err_BAD_CALLBACK_PARAM;
     if(!error){stage="enable 3D";error=layers->AEGP_SetLayerFlag(created,AEGP_LayerFlag_LAYER_IS_3D,TRUE);}
-    AEGP_LayerIDVal id{};
     if(!error){stage="read Null ID";error=layers->AEGP_GetLayerID(created,&id);if(!error && id<=0)error=PF_Err_BAD_CALLBACK_PARAM;}
     if(!error){
         stage="name Null";
@@ -129,6 +205,7 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
         std::snprintf(name.data(),name.size(),"Starfield Transform Null %ld",static_cast<long>(id));
         for(std::size_t i=0;name[i] && i+1<utf.size();++i)utf[i]=static_cast<A_UTF16Char>(name[i]);
         error=layers->AEGP_SetLayerName(created,utf.data());
+    }
     }
     if(!error){stage="guard selection";error=guard(1);}
     if(!error){stage="reference Null";error=select(id);}
@@ -147,14 +224,30 @@ PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     }
     out->out_flags|=PF_OutFlag_REFRESH_UI|PF_OutFlag_FORCE_RERENDER;return PF_Err_NONE;
 } catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params[]) noexcept {
+    return change_transform_null(data,out,params,nullptr);
+}
+PF_Err set_transform_null_source(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],AEGP_LayerIDVal id) noexcept {
+    if(id<0)return PF_Err_BAD_CALLBACK_PARAM;
+    return change_transform_null(data,out,params,&id);
+}
 
 PF_Err transform_null_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
     if(!event || !data || !out || !event->contextH || event->effect_win.index!=1 || event->effect_win.area!=PF_EA_CONTROL)
         return PF_Err_NONE;
     PF_Err error=PF_Err_NONE;
     if(event->e_type==PF_Event_DRAW)error=draw_button(data,event);
-    else if(event->e_type==PF_Event_DO_CLICK && Button(event->effect_win).hit(event->u.do_click.screen_point.h,event->u.do_click.screen_point.v))
-        error=create_transform_null(data,out,params);
+    else if(event->e_type==PF_Event_DO_CLICK) {
+        const auto point=event->u.do_click.screen_point;
+        if(Button(event->effect_win,true).hit(point.h,point.v)) {
+            std::vector<TransformLayerChoice> choices;AEGP_LayerIDVal current{},selected{};
+            error=read_transform_layers(data,choices,current);
+            if(!error && choose_transform_layer(data,choices,current,selected))
+                error=set_transform_null_source(data,out,params,selected);
+        } else if(Button(event->effect_win).hit(point.h,point.v))error=create_transform_null(data,out,params);
+        else return PF_Err_NONE;
+    }
     else return PF_Err_NONE;
     event->evt_out_flags|=PF_EO_HANDLED_EVENT;return error;
 }catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}

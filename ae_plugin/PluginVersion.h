@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 49: Layer-object Null expressions and a native Create Null control.
-#define STARFIELD_VERSION_BUILD 49
-#define STARFIELD_VERSION_PACKED 32817 /* 0x8031 */
+// Build 50: complete Transform layer selector and empty opening-shutter frames.
+#define STARFIELD_VERSION_BUILD 50
+#define STARFIELD_VERSION_PACKED 32818 /* 0x8032 */

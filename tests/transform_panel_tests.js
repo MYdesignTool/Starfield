@@ -53,7 +53,7 @@ rejects(()=>presets.decode(JSON.stringify({format:"org.starfieldfx.preset",versi
 const combined=presets.apply(graphWithNull,{type:"applyPreset",presetId:"orbit",mode:"add",applyRenderSettings:false,layerHeightPixels:1080},next);
 equal(combined.nodes.find(n=>n.id===transform.id).parameters.find(p=>p.key==="8").value,77);
 const gatewaySource=fs.readFileSync(path.join(panelRoot,"jsx/starfield_gateway.jsx"),"utf8").replace("    function readNativeNode(effect, layer) {",
-    "    $.global.tf={read:readNativeNode,write:setNodeParameters,validate:validateNodeManifest,resources:validateTransformResources,index:layerResourceIndex,inventory:layerInventory,clear:function(){nativePropertyIndexes=[];nativeLayerInventory=null;}};\n    function readNativeNode(effect, layer) {");
+    "    $.global.tf={read:readNativeNode,write:setNodeParameters,remove:removeNativeNodeEffects,validate:validateNodeManifest,resources:validateTransformResources,index:layerResourceIndex,inventory:layerInventory,clear:function(){nativePropertyIndexes=[];nativeLayerInventory=null;}};\n    function readNativeNode(effect, layer) {");
 const global={},context=vm.createContext({$:{global},app:{}});vm.runInContext(gatewaySource,context);
 const api=global.tf,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const labels=["Inherit Motion (Null Layer)","Anchor XY","Anchor Z","Position X","Position Y","Position Z","Rotation X","Rotation Y","Rotation Z",
@@ -109,4 +109,15 @@ const client=transactions.create({codec,edits,call(operation,fields,callback){
 let outcome;client.apply({type:"setParameters",changes:[{nodeId:transform.id,parameterKey:"8",valueType:3,value:77}]},response=>outcome=response,"target");
 ok(outcome.ok);equal(nodeManifest[0].parameters.find(p=>p.key==="8").value,77);ok(!nodeManifest[0].parameters.some(p=>p.key==="7"));
 equal(snapshots.normalize({ok:true,snapshot:snapshot(tfGraph,1)}).snapshot.layerResources,resources);
+// Remove a selected-source Transform through the same transaction and native
+// effect-removal functions as CEP. The referenced Null is a separate resource.
+client.apply({type:"deleteNodes",nodeIds:[transform.id]},response=>outcome=response,"target");
+ok(outcome.ok);equal(nodeManifest.length,0);
+const deletedGraph=edits.apply(graph,{type:"deleteNodes",nodeIds:[transform.id]});
+ok(!deletedGraph.nodes.some(n=>n.id===transform.id));
+ok(!deletedGraph.edges.some(e=>e.sourceNode===transform.id || e.destinationNode===transform.id));
+const nativeItems=[effect];
+layer.property=()=>({get numProperties(){return nativeItems.length;},property(i){return nativeItems[i-1]||null;}});
+effect.remove=()=>nativeItems.splice(nativeItems.indexOf(effect),1);
+api.clear();api.remove(layer,realm([transform.id]));equal(nativeItems.length,0);equal(layers.length,3);
 console.log(`transform_panel_tests: ${checks} checks passed; host qualification remains open`);

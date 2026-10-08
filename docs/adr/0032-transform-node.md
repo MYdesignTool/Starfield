@@ -370,3 +370,50 @@ tools/Restore-TestBuild.ps1 -PluginDir
 passes. The full command and verified before/after hashes are also recorded in
 artifacts/m3-11-native49-deployment.md. Actual AE2023 selected Null motion,
 creation/undo and reopen gates remain open pending owner observation.
+
+## Complete layer control and opening-shutter frames — 2026-10-08
+
+The owner reports native49 still does not work, the Layer dropdown disappeared,
+and Transform cannot be deleted in CEP. The supplied error is now `Starfield
+shutter sampling: historical time exceeds AE range (stream -1)`, rather than
+the earlier binding installation error. This does not establish all positive
+time Null behavior as qualified.
+
+PF_PUI_CONTROL replaces the standard PF_LAYER control area. Native49 drew only
+Create Null in that area. Native50 owns a complete two-row area: selected layer
+dropdown above Create Null. An explicit dropdown click opens a native Windows
+menu of None and current composition layer names, bound by stable AEGP layer
+IDs. Names and choices are reacquired from the owner composition; duplicate
+names and reordered layer indices do not become identities. Drawing reads only
+the selected name, not every layer name. The full inventory is bounded to4096
+layers and exists only for the click callback. Menu cancellation performs no
+write. Selection validates a still-present resource, uses the existing guarded
+binding transaction and restores the previous resource on failure. It creates
+no additional Null. Constant selectors/guards can be read during DRAW without
+frame timing. No disk ID or physical parameter is inserted; the two UI rows
+remain within parameter1's control area.
+
+The temporal evaluator built Transform plans and sampled active Transform
+nodes before its negative-time/zero-cap empty-frame return. A negative shutter
+opening at simulation zero therefore reached the adapter's nonnegative history
+guard. Native50 still validates authored Transform controls on empty frames but
+skips Transform sampling when simulation time is negative or Output cap is0.
+The shutter sample returns no particles, matching existing ordinary evaluator
+behavior. Positive-time/birth-time animation and the signed shutter interval
+are retained. No Render.hpp, C ABI4, graph/sequence schema or record contract
+changes; the shared evaluation fix is published as a complete paired build.
+Build50 code/PiPL packing agrees at32818.
+
+Candidate evidence: May2023 /MT full build without publishing passes;
+Transform graph594; NativeSync7106 plus Camera12 (including the real adapter
+capture with a selected Null at shutter time -1/48); native Transform controls102;
+layer/creation UI141; actual generated Transform expressions168; the existing
+74-expression/keyframe JS scope passes. Focused CEP checks95 include deleting
+a selected-source Transform through the graph transaction and native effect
+removal path, removing incident edges and keeping the referenced Null layer.
+The owner-reported CEP failure was not reproduced; no CEP runtime change is
+asserted to fix it. The status-bar error and actual Delete/context-menu behavior
+remain requested owner evidence. Logs: artifacts/m3-11-native50-{build,
+transform-graph,sync,transform-controls,null-ui,expressions,legacy-expressions,
+transform-panel}.log. Actual menu appearance, positive-time Null motion,
+CEP deletion, undo and reopen remain AE2023 host gates.

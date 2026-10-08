@@ -105,7 +105,7 @@ int main() {
         ++registered_index;
         const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
         const bool null_button=kind==Kind::transform && registered_index==1;
-        dimensions_valid &= null_button?(def.ui_width==160 && def.ui_height==28 && bool(def.ui_flags&PF_PUI_CONTROL)):
+        dimensions_valid &= null_button?(def.ui_width==240 && def.ui_height==56 && bool(def.ui_flags&PF_PUI_CONTROL)):
             custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
         if(registered_index>base_parameter_count(kind))hidden_valid &=
             bool(def.ui_flags&PF_PUI_NO_ECW_UI) && bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;

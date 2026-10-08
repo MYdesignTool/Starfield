@@ -283,6 +283,19 @@ void invalid_and_inherited() {
     const auto cancelled=evaluate_particle_graph(graph,{1,1},stop);
     check(!cancelled.has_value() && cancelled.error().code==ErrorCode::cancelled,"Transform cancellation lost");
     graph=base();splice(graph,NodeId{uuid(3)},transform_node(4),14);sampled.graph=graph;
+    unsigned empty_queries=0;sampled.animate=[&](auto&,double){++empty_queries;};
+    const auto before_zero=evaluate_temporal_particle_graph(graph,{-1,48},never,{},sampled);
+    check(before_zero.has_value() && before_zero.value().particles.empty() && empty_queries==0,
+          "negative opening-shutter sample returns empty without querying a Transform");
+    set(node(graph,kOutputNode),kParticleCount,std::uint32_t{0});sampled.graph=graph;
+    const auto zero_cap=evaluate_temporal_particle_graph(graph,{1,1},never,{},sampled);
+    check(zero_cap.has_value() && zero_cap.value().particles.empty() && empty_queries==0,
+          "zero Output cap skips temporal Transform sampling");
+    set(node(graph,kTransformNode),kTransformParticleOpacity,101.);sampled.graph=graph;
+    check(!evaluate_temporal_particle_graph(graph,{-1,48},never,{},sampled).has_value(),
+          "empty temporal frames still reject invalid authored Transform controls");
+    graph=base();splice(graph,NodeId{uuid(3)},transform_node(4),14);sampled.graph=graph;
+    sampled.animate={};
     auto unresolved=graph;set(node(unresolved,kTransformNode),kTransformInheritLayer,std::uint32_t{77});
     check(!evaluate_particle_graph(unresolved,{1,1},never).has_value(),"unresolved Transform resource accepted");
     matrix(node(unresolved,kTransformNode),ParticleTransformSettings{}.inherited_motion);

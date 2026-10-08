@@ -474,7 +474,9 @@ PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
 PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
     PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;layer.flags=kNodeEditableFlags|kNodeConstantFlags;
-    layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=160;layer.ui_height=28;
+    // PF_PUI_CONTROL replaces the default layer selector: our area must include
+    // both the layer dropdown and the separate Create Null button below it.
+    layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=240;layer.ui_height=56;
     layer.uu.id=kTransformInheritId;layer.u.ld.dephault=PF_LayerDefault_NONE;
     std::snprintf(layer.name,sizeof(layer.name),"Inherit Motion (Null Layer)");
     auto error=add_checked_parameter(data,layer);if(error)return error;

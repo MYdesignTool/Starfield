@@ -1165,6 +1165,19 @@ int main() {
         check(std::abs(std::bit_cast<double>(bits)-24./1080)<1e-12,"Null animation moves the canonical pose at exact sample time");
         check(aegp_suite_requests==before_render_suites && affine_reads==before_affine_reads,
             "render playback invokes no AEGP or layer-transform callback");
+        static const auto transform_frame_checkout=renderer_data.inter.checkout_param;
+        renderer_data.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long time,A_long step,A_u_long scale,PF_ParamDef* value)->PF_Err {
+            if(index==kTimeRemapEnabledId){*value={};value->param_type=PF_Param_CHECKBOX;return 0;}
+            return transform_frame_checkout(ref,index,time,step,scale,value);
+        };
+        std::vector<CapturedParticleFrame> opening_frames;
+        const std::array<core::RationalTime,1> opening_times{{{-1,48}}};PF_OutData opening_output{};
+        check(capture_motion_particles(&renderer_data,&opening_output,transformed,1920,1080,opening_times,core::NeverCancelled{},opening_frames)==0 &&
+              opening_frames.size()==1 && opening_frames[0].particles.particles.empty(),
+              "selected Null accepts an empty negative opening-shutter sample instead of AE range error");
+        check(last_native_history_trace().node_samples==0 && !opening_output.return_msg[0],
+              "opening-shutter sample does not request historical Transform aliases");
+        renderer_data.inter.checkout_param=transform_frame_checkout;
         transform.values[1].layer_id=0;
         auto deselect=edit(4,1,0);
         check(direct_edit(deselect)==0 && deselect.accepted,"selecting None regenerates identity bindings");

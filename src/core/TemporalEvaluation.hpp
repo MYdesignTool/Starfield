@@ -214,7 +214,10 @@ public:
                 for(auto dest:outgoing[plan_nodes[i]->id])plan_outgoing[i].push_back(plan_indices.at(dest));
                 if(plan_nodes[i]->type_key==kTransformNode) {
                     auto authored=read_transform(*plan_nodes[i]);if(!authored.has_value())return R::failure(authored.error());
-                    if(plan_active[i]) {
+                    // Before simulation zero there are no particles. A negative
+                    // opening-shutter sample must not request a host transform.
+                    // Still validate the authored Transform above on empty frames.
+                    if(plan_active[i] && now>=0 && cap) {
                         auto sampled=transform_at(*plan_nodes[i],now);if(!sampled.has_value())return R::failure(sampled.error());
                         plan_transforms[i]=sampled.take_value();
                     }
