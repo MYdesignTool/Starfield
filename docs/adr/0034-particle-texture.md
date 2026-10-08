@@ -2,6 +2,33 @@
 
 Status: implementation in progress, 2026-10-08. Task M3-13.
 
+## Precomposition picker correction, 2026-10-08
+
+The owner reports that native54's Texture selector shows only None while a
+sibling `Comp 2` precomposition exists. Static inspection finds that the menu
+requires HAS_VIDEO on every source item, including compositions. This is a
+candidate explanation pending actual AE2023 observation. Source eligibility
+must explicitly accept AEGP_ItemType_COMP, including an empty precomposition;
+only AEGP_ItemType_FOOTAGE requires HAS_VIDEO. Self, Null, audio-only footage
+and layers without a source item remain excluded by the current Source contract.
+The existing CEP checks use AVLayer.hasVideo, not the Item suite's track flags;
+focused fixtures must verify precomposition inventory, read/write and relinking.
+The correction keeps all IDs, stream indices, schemas, sequence data and ABI6.
+Prepare native55/CEP55 in isolation while AE is running, then publish the pair
+only after a fresh no-AE check, retaining the exact native54/CEP54 rollback.
+
+Correction candidate evidence: the shared native selector fixture passes163
+checks, including front/back precomp inventory without HAS_VIDEO, video versus
+audio footage, self/Null/source-less exclusions, selected-name paint, suite
+failures and reference cleanup. CEP texture fixtures pass47 checks including
+precomp resource inventory, stable-ID read/write and portable preset relinking;
+main-order regression passes30 checks. The complete May2023 /MT build passes
+with dist/runtime publication disabled. Logs: artifacts/m3-13-native55-build.log,
+artifacts/m3-13-native55-selector-tests.log,
+artifacts/m3-13-native55-texture-panel-tests.log and
+artifacts/m3-13-native55-main-order-regression.log. These fixtures do not establish
+actual AE2023 precomp selection or animated texture rendering.
+
 ## Scope and reference
 
 The active owner goal covers AE2023 main-effect naming/order, remaining Particle

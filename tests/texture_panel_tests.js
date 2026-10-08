@@ -36,7 +36,7 @@ reject(()=>presets.encode(graph,"Missing",null,[]),/metadata is unavailable/);
 const malformed=clone(data);malformed.resources.push(malformed.resources[0]);reject(()=>presets.decode(JSON.stringify(malformed)),/Invalid preset texture/);
 const unsafe=clone(data);unsafe.version=1;unsafe.graphHex=codec.toHex(graph);reject(()=>presets.decode(JSON.stringify(unsafe)),/resource map/);
 const source=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8").replace("    function readNativeNode(effect, layer) {",
-    "    $.global.textureApi={read:readNativeNode,write:setNodeParameters,clear:function(){nativePropertyIndexes=[];nativeLayerInventory=null;}};\n    function readNativeNode(effect, layer) {");
+    "    $.global.textureApi={read:readNativeNode,write:setNodeParameters,inventory:layerInventory,clear:function(){nativePropertyIndexes=[];nativeLayerInventory=null;}};\n    function readNativeNode(effect, layer) {");
 const global={},context=vm.createContext({$:{global},app:{}});vm.runInContext(source,context);
 const api=global.textureApi,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const props=require("./node_property_fixture.js").nodeControls();
@@ -54,4 +54,23 @@ sources.reverse();api.clear();api.write(effect,realm(record),layer);equal(props[
 equal(clone(api.read(effect,layer)).parameters.find(p=>p.key==="31").value,55);
 record.parameters.find(p=>p.key==="31").value=9;reject(()=>api.write(effect,realm(record),layer),/other than its renderer/);equal(props["Panel Sync Guard"].value,0);
 record.parameters.find(p=>p.key==="31").value=999;api.clear();reject(()=>api.write(effect,realm(record),layer),/no longer exists/);equal(props["Panel Sync Guard"].value,0);
+const precomp={...layer,id:88,name:"Comp 2",source:{name:"Comp 2",numLayers:0},hasVideo:true,nullLayer:false};
+const audio={...layer,id:89,name:"Audio",source:{name:"Sound"},hasVideo:false};
+const nullLayer={...layer,id:90,name:"Null",source:{name:"Solid"},hasVideo:true,nullLayer:true};
+sources.push(precomp,audio,nullLayer);layer.containingComp.numLayers=sources.length;api.clear();
+const inventory=clone(api.inventory(layer));
+equal(inventory.entries.find(e=>e.id===88).texture,true);
+for(const id of [9,89,90])equal(inventory.entries.find(e=>e.id===id).texture,false);
+record.parameters.find(p=>p.key==="31").value=88;api.write(effect,realm(record),layer);
+equal(props["org.starfieldfx.node.particle-233"].value,4);
+equal(clone(api.read(effect,layer)).parameters.find(p=>p.key==="31").value,88);
+const precompGraph=codec.fromHex(codec.toHex(graph));precompGraph.nodes.find(n=>n.id===particle.id).parameters.find(p=>p.key==="31").value=88;
+const precompEntry=presets.decode(presets.encode(precompGraph,"Precomp texture",null,inventory.entries));
+const relinked=presets.apply(graph,{type:"applyPreset",presetGraph:precompEntry.graph,presetResources:precompEntry.resources,
+    layerResources:inventory.entries.map(e=>({...e,id:e.id+1000})),mode:"replace",applyRenderSettings:true},next);
+equal(relinked.nodes.find(n=>n.type===edits.types.particle).parameters.find(p=>p.key==="31").value,1088);
+for(const id of [89,90]) {
+    record.parameters.find(p=>p.key==="31").value=id;
+    reject(()=>api.write(effect,realm(record),layer),/other than its renderer/);equal(props["Panel Sync Guard"].value,0);
+}
 console.log(`texture_panel_tests: ${checks} checks passed; AE2023 qualification remains open`);

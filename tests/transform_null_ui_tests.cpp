@@ -9,12 +9,12 @@
 
 namespace {
 int checks{},failures{},suites{},refs{},undo_start{},undo_end{},created{},deleted{},published{};
-int fail{},layer_count=2,names{};double guard{};AEGP_LayerIDVal selection=77;bool three_d{},cancel_menu=true;
+int fail{},layer_count=2,names{},item_flag_reads{};double guard{};AEGP_LayerIDVal selection=77;bool three_d{},cancel_menu=true,texture_inventory{};
 AEGP_LayerIDVal expected_selection=101,menu_selection=101;
 std::u16string name;constexpr int guard_index=starfield::adapter::native_nodes::sync_guard_index(starfield::adapter::native_nodes::Kind::transform);
 AEGP_PFInterfaceSuite1 pf{};AEGP_LayerSuite9 layers{};AEGP_CompSuite11 comps{};
 AEGP_StreamSuite6 streams{};AEGP_EffectSuite4 effects{};AEGP_UtilitySuite6 utility{};
-AEGP_MemorySuite1 memory{};
+AEGP_MemorySuite1 memory{};AEGP_ItemSuite9 items{};
 void check(bool ok,const char* why){++checks;if(!ok){++failures;std::printf("FAILED: %s\n",why);}}
 AEGP_LayerH layer(int id){return reinterpret_cast<AEGP_LayerH>(static_cast<std::intptr_t>(id));}
 A_Err acquire(const char* n,int32,const void** out){
@@ -25,11 +25,12 @@ A_Err acquire(const char* n,int32,const void** out){
     else if(!std::strcmp(n,kAEGPEffectSuite))*out=&effects;
     else if(!std::strcmp(n,kAEGPUtilitySuite))*out=&utility;
     else if(!std::strcmp(n,kAEGPMemorySuite))*out=&memory;
+    else if(!std::strcmp(n,kAEGPItemSuite))*out=&items;
     else return 1;
     ++suites;return 0;
 }
 A_Err release(const char*,int32){--suites;return 0;}
-void reset(){fail=0;layer_count=2;selection=77;guard=0;three_d=false;cancel_menu=true;expected_selection=101;
+void reset(){fail=0;layer_count=2;selection=77;guard=0;three_d=false;cancel_menu=true;expected_selection=101;texture_inventory=false;item_flag_reads=0;
     name.clear();created=deleted=published=undo_start=undo_end=0;}
 }
 AEGP_PluginID node_graph_sync_plugin_id() noexcept{return 701;}
@@ -62,10 +63,23 @@ int main(){
     layers.AEGP_SetLayerFlag=[](AEGP_LayerH v,AEGP_LayerFlags f,A_Boolean enabled)->A_Err{
         check(v==layer(2) && f==AEGP_LayerFlag_LAYER_IS_3D && enabled,"only the newly created Null gets its 3D switch");
         if(fail==3)return 516;three_d=true;return 0;};
-    layers.AEGP_GetLayerID=[](AEGP_LayerH l,AEGP_LayerIDVal* v)->A_Err{if(fail==4)return 516;*v=l==layer(1)?77:101;return 0;};
+    layers.AEGP_GetLayerID=[](AEGP_LayerH l,AEGP_LayerIDVal* v)->A_Err{if(fail==4)return 516;*v=l==layer(1)?77:99+static_cast<A_long>(reinterpret_cast<std::intptr_t>(l));return 0;};
     layers.AEGP_GetCompLayerByIndex=[](AEGP_CompH,A_long index,AEGP_LayerH* v)->A_Err{*v=layer(index+1);return 0;};
     layers.AEGP_GetLayerName=[](AEGP_PluginID,AEGP_LayerH l,AEGP_MemHandle* v,AEGP_MemHandle*)->A_Err{
-        ++names;*v=reinterpret_cast<AEGP_MemHandle>(new std::u16string(l==layer(1)?u"Null & one":u"Null two"));return 0;};
+        ++names;*v=reinterpret_cast<AEGP_MemHandle>(new std::u16string(texture_inventory?
+            (l==layer(2)?u"Comp 2":u"Video footage"):(l==layer(1)?u"Null & one":u"Null two")));return 0;};
+    layers.AEGP_GetLayerFlags=[](AEGP_LayerH l,AEGP_LayerFlags* v)->A_Err{
+        *v=l==layer(5)?AEGP_LayerFlag_NULL_LAYER:0;return 0;};
+    layers.AEGP_GetLayerSourceItem=[](AEGP_LayerH l,AEGP_ItemH* v)->A_Err{
+        *v=l==layer(6)?nullptr:reinterpret_cast<AEGP_ItemH>(l);return 0;};
+    items.AEGP_GetItemType=[](AEGP_ItemH item,AEGP_ItemType* v)->A_Err{
+        if(fail==10)return 516;
+        const auto id=reinterpret_cast<std::intptr_t>(item);
+        *v=id==2?AEGP_ItemType_COMP:id==7?AEGP_ItemType_FOLDER:id==8?AEGP_ItemType_NONE:AEGP_ItemType_FOOTAGE;return 0;};
+    items.AEGP_GetItemFlags=[](AEGP_ItemH item,AEGP_ItemFlags* v)->A_Err{
+        ++item_flag_reads;check(item!=reinterpret_cast<AEGP_ItemH>(layer(2)),"precomp eligibility never depends on footage video-track flags");
+        if(fail==11)return 516;
+        *v=item==reinterpret_cast<AEGP_ItemH>(layer(4))?AEGP_ItemFlag_HAS_AUDIO:AEGP_ItemFlag_HAS_VIDEO;return 0;};
     memory.AEGP_LockMemHandle=[](AEGP_MemHandle h,void** v)->A_Err{*v=const_cast<char16_t*>(reinterpret_cast<std::u16string*>(h)->c_str());return 0;};
     memory.AEGP_UnlockMemHandle=[](AEGP_MemHandle)->A_Err{return 0;};
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle h)->A_Err{--names;delete reinterpret_cast<std::u16string*>(h);return 0;};
@@ -79,10 +93,12 @@ int main(){
         ++refs;*v=reinterpret_cast<AEGP_StreamRefH>(static_cast<std::intptr_t>(index));return 0;};
     streams.AEGP_DisposeStream=[](AEGP_StreamRefH)->A_Err{--refs;return 0;};
     streams.AEGP_GetStreamType=[](AEGP_StreamRefH v,AEGP_StreamType* t)->A_Err{
-        *t=v==reinterpret_cast<AEGP_StreamRefH>(1)?AEGP_StreamType_LAYER_ID:AEGP_StreamType_OneD;return 0;};
+        const auto index=reinterpret_cast<std::intptr_t>(v);
+        *t=(index==1 || index==521 || index==522)?AEGP_StreamType_LAYER_ID:AEGP_StreamType_OneD;return 0;};
     streams.AEGP_GetNewStreamValue=[](AEGP_PluginID,AEGP_StreamRefH v,AEGP_LTimeMode,const A_Time*,A_Boolean pre,AEGP_StreamValue2* out)->A_Err{
         check(pre,"captures the selector and guard without expression evaluation");if(fail==1)return 516;
-        out->streamH=v;if(v==reinterpret_cast<AEGP_StreamRefH>(1))out->val.layer_id=selection;else out->val.one_d=guard;return 0;};
+        out->streamH=v;const auto index=reinterpret_cast<std::intptr_t>(v);
+        if(index==1 || index==521 || index==522)out->val.layer_id=selection;else out->val.one_d=guard;return 0;};
     streams.AEGP_DisposeStreamValue=[](AEGP_StreamValue2*)->A_Err{return 0;};
     streams.AEGP_SetStreamValue=[](AEGP_PluginID,AEGP_StreamRefH v,AEGP_StreamValue2* value)->A_Err{
         if(v==reinterpret_cast<AEGP_StreamRefH>(1)){
@@ -146,5 +162,23 @@ int main(){
     check(starfield::adapter::read_transform_layers(&data,choices,selected,false)==0 && choices.size()==1 && choices[0].name==u"None",
           "None paint does not need the full composition name inventory");
     check(!suites && !refs && !names,"selector paint releases strings, streams and suites");
+    reset();texture_inventory=true;layer_count=8;selection=0;
+    for(const auto index:{521,522}) {
+        item_flag_reads=0;
+        check(starfield::adapter::read_transform_layers(&data,choices,selected,true,index)==0 &&
+              selected==0 && choices.size()==3 && choices[0].id==0 &&
+              choices[1].id==101 && choices[1].name==u"Comp 2" && choices[2].id==102,
+              "both texture menus include empty precomps and video footage, excluding self/Null/audio/camera/folder");
+        check(item_flag_reads==2 && !suites && !refs && !names,"only footage reads track flags and the texture inventory releases every reference");
+    }
+    selection=101;
+    check(starfield::adapter::read_transform_layers(&data,choices,selected,false,521)==0 &&
+          choices.size()==2 && choices.back().id==101 && choices.back().name==u"Comp 2" && item_flag_reads==2,
+          "selected precomp paint resolves its stable ID without enumerating footage flags");
+    for(const auto phase:{10,11}) {
+        fail=phase;
+        check(starfield::adapter::read_transform_layers(&data,choices,selected,true,521)==516 && !suites && !refs && !names,
+              "item type/footage flag failures preserve the error and release all references");
+    }
     std::printf("Transform Null UI: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

@@ -114,12 +114,21 @@ PF_Err read_transform_layers(PF_InData* data,std::vector<TransformLayerChoice>& 
         if(!full_inventory && id!=selected)continue;
         if(full_inventory && parameter_index!=1) {
             AEGP_ItemH item{};AEGP_LayerFlags flags{};AEGP_ItemFlags item_flags{};
+            AEGP_ItemType item_type{};
             if(layer==owner)continue;
             error=layers->AEGP_GetLayerFlags(layer,&flags);
             if(!error)error=layers->AEGP_GetLayerSourceItem(layer,&item);
-            if(!error && item)error=items->AEGP_GetItemFlags(item,&item_flags);
+            if(!error && item && !(flags&AEGP_LayerFlag_NULL_LAYER)) {
+                error=items->AEGP_GetItemType(item,&item_type);
+                if(!error && item_type==AEGP_ItemType_FOOTAGE)
+                    error=items->AEGP_GetItemFlags(item,&item_flags);
+            }
             if(error)return static_cast<PF_Err>(error);
-            if(!item || (flags&AEGP_LayerFlag_NULL_LAYER) || !(item_flags&AEGP_ItemFlag_HAS_VIDEO))continue;
+            // A precomp is a renderable source even when it has no video track.
+            // Track flags distinguish footage from audio; they are not a comp test.
+            if(!item || (flags&AEGP_LayerFlag_NULL_LAYER) ||
+               (item_type!=AEGP_ItemType_COMP &&
+                (item_type!=AEGP_ItemType_FOOTAGE || !(item_flags&AEGP_ItemFlag_HAS_VIDEO))))continue;
         }
         AEGP_MemHandle name{};
         error=layers->AEGP_GetLayerName(plugin,layer,&name,nullptr);
