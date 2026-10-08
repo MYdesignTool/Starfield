@@ -1,6 +1,6 @@
 # ADR 0036 — Configurable Particle Cloud
 
-Status: implementation in progress, 2026-10-08. Task M3-15.
+Status: numeric/native/CEP implementation deployed; AE2023 host gates open, 2026-10-08. Task M3-15.
 
 ## Behavior and evidence
 
@@ -160,3 +160,17 @@ m3-15-cloud-callback-tests.log, m3-15-texture-cloud-selector-tests.log and
 m3-15-cloud-gateway-transactions.log. Paired deployment and its exact56 backup,
 hashes, selector and undo receipt are recorded separately. Actual AE2023 Cloud
 appearance, animation, undo/reopen and the earlier Texture menu gate remain open.
+
+## Paired publication, 2026-10-08
+
+native57/CEP57/ABI7 installed from f60910adf9b331d9bdb06a3fb09053a1f7511ee1.
+Fresh process checks confirmed no AfterFX/AfterFX_64. Existing native/CEP
+Junctions retained. Seven native/Core hashes, eleven prepared CEP hashes, runtime
+selector and Restore-TestBuild paired report verified. Exact native56/CEP56
+backup: artifacts/disabled/m3-15-native57-panel57-cloud-20261008. Before/after
+receipts: artifacts/m3-15-native57-deploy-before.json and
+m3-15-native57-deploy-after.json; one-step undo is in docs/current-state.md.
+No process start/stop, registry/cache/environment switches were changed. Source
+commit was pushed to the owner repository. Actual AE appearance/animation,
+undo/reopen and Texture-menu gates remain open; the complete owner goal remains
+active for remaining Particle families.
