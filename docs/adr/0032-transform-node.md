@@ -490,3 +490,17 @@ earlier source fixtures do not establish the new attachment behavior. Compilatio
 does not qualify attachment, deletion, undo or reopen in AE2023.
 CEP51 was staged under artifacts/prepared/m3-11-native51-panel51 before paired
 publication. Actual deployment receipts and owner observations remain separate.
+
+Development publication at2026-10-08 12:43 local time: a fresh read-only check
+confirmed no AfterFX/AfterFX_64 process. Native51/Core ABI4 + CEP51 replaces
+native50/CEP50 through the existing Starfield/CEP Junctions. Source milestone is
+3be78876c3145871ff5595e02a42200ca0c19947. Seven installed native/Core hashes,
+eleven CEP runtime file hashes and selected Core StarfieldCore-4AFB4BCCE9403CF0.dll
+were verified; paired rollback read-only verification passes. Receipts:
+artifacts/m3-11-native51-deploy-before.json and m3-11-native51-deploy-after.json.
+One-step rollback with AE closed: tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-11-native51-panel51-relative-null-20261008' -Restore. Full instructions and
+evidence are in artifacts/m3-11-native51-deployment.md. No AE process, Junction,
+registry setting or unrelated host resource was changed. Actual AE2023 deletion,
+relative attachment, subsequent motion, undo and reopen remain owner gates.
