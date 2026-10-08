@@ -417,3 +417,19 @@ remain requested owner evidence. Logs: artifacts/m3-11-native50-{build,
 transform-graph,sync,transform-controls,null-ui,expressions,legacy-expressions,
 transform-panel}.log. Actual menu appearance, positive-time Null motion,
 CEP deletion, undo and reopen remain AE2023 host gates.
+
+Development publication at2026-10-08 11:45 local time: after the owner reported
+AE closed, a fresh read-only process check confirmed zero AfterFX/AfterFX_64
+processes. Native50/Core ABI4 + CEP50 replaces native49/CEP50 through
+tools/Deploy-TestBuild.ps1 and the existing Junction. Source candidate is
+dc6d1039660a8fc684c7c2713b8293b84ec42d33. Seven installed native/Core hashes,
+eleven unchanged CEP50 runtime source hashes and selected Core
+StarfieldCore-4AFB4BCCE9403CF0.dll were verified. Native and CEP Junction targets
+are retained. Receipts are artifacts/m3-11-native50-deploy-before.json and
+m3-11-native50-deploy-after.json. One-step rollback to native49/CEP50, with AE
+closed: tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-11-native50-panel50-selector-shutter-20261008' -Restore. Read-only rollback
+verification passes; the full command and before/after hashes are also in
+artifacts/m3-11-native50-deployment.md. No AE process was started or stopped by
+the agent. Actual Null, menu, CEP deletion, undo and reopen gates remain open.
