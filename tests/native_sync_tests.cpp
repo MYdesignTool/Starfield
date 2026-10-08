@@ -69,6 +69,7 @@ struct Fixture {
 };
 std::array<Fixture, 5> fixtures;
 bool transform_present{};
+bool cloud_animation_test{};
 using Matrix=transform_binding::Matrix;
 Matrix null_world{1,0,0,910,0,1,0,490,0,0,1,0,0,0,0,1};
 Matrix owner_world{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
@@ -82,7 +83,7 @@ AEGP_EffectSuite4 effect{};
 AEGP_StreamSuite6 stream{};
 AEGP_DynamicStreamSuite4 dynamic{};
 bool dynamic_enabled{};
-std::array<AEGP_DynStreamFlags,82> visibility_flags{};
+std::array<AEGP_DynStreamFlags,records::parameter_count(records::Kind::particle)> visibility_flags{};
 int visibility_sets{};
 AEGP_UtilitySuite6 utility{};
 AEGP_MemorySuite1 memory{};
@@ -203,6 +204,8 @@ double evaluated_binding(A_long index, A_long time) {
         if(id==4 && source==2)return component ? value.two_d.y : value.two_d.x;
         return component==0 ? value.color.redF*(1.0-time/48.0) : component==1 ? value.color.greenF : value.color.blueF;
     }
+    if(cloud_animation_test && id==2 && source>=records::particle_layout::cloud_circles && source<=records::particle_layout::cloud_density)
+        return value.one_d+time/24.0;
     return (id==2 && source==5) || (id==3 && source==1) ? value.one_d+time :
         (id==2 && source==8) ? 100.0-time : (id==2 && source==2) ? 2.0+time/24.0 : value.one_d;
 }
@@ -240,6 +243,13 @@ int main() {
     fixtures[2].name = "org.starfieldfx.node.particle";
     fixtures[3].name = "org.starfieldfx.node.force";
     auto& emitter = fixtures[1]; auto& particle = fixtures[2];
+    particle.values[records::particle_layout::cloud_circles].one_d=10;
+    particle.values[records::particle_layout::cloud_aspect].one_d=150;
+    particle.values[records::particle_layout::cloud_density].one_d=66;
+    particle.values[records::particle_layout::transfer].one_d=1;
+    particle.values[records::particle_layout::texture_time].one_d=1;
+    particle.values[records::particle_layout::texture_color].one_d=1;
+    particle.values[records::particle_layout::texture_ratio].one_d=1;
     emitter.values[1].one_d = 1; emitter.values[2].one_d = 1; emitter.values[3].one_d = 30;
     emitter.values[4].two_d = {960, 540}; emitter.values[6].one_d = 100;
     for (int i : {8, 9, 10, 20, 22, 28, 29}) emitter.values[i].one_d = 100;
@@ -281,7 +291,9 @@ int main() {
     stream.AEGP_GetStreamType = [](AEGP_StreamRefH ref, AEGP_StreamType* type)->A_Err {
         const auto& key = *reinterpret_cast<Ref*>(ref);
         if (key.index == wrong_type) { wrong_type = -1; *type = AEGP_StreamType_COLOR; }
-        else if(key.effect==4 && key.index==1)*type=AEGP_StreamType_LAYER_ID;
+        else if((key.effect==4 && key.index==1) || (key.effect==2 &&
+                (key.index==records::particle_layout::texture_front || key.index==records::particle_layout::texture_back)))
+            *type=AEGP_StreamType_LAYER_ID;
         else if(key.effect==5)*type=AEGP_StreamType_ThreeD_SPATIAL;
         else *type = key.index == kGraphParameterId ? AEGP_StreamType_ARB : AEGP_StreamType_OneD;
         return 0;
@@ -360,8 +372,9 @@ int main() {
         };
         const auto original_pf=pf.AEGP_GetNewEffectForEffect;
         pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH* ref)->A_Err{*ref=effect_ref(2);return 0;};
-        std::array<PF_ParamDef,82> ui_values{};std::array<PF_ParamDef*,82> ui_params{};
-        for(unsigned i=0;i<82;++i)ui_params[i]=&ui_values[i];
+        std::array<PF_ParamDef,records::parameter_count(records::Kind::particle)> ui_values{};
+        std::array<PF_ParamDef*,ui_values.size()> ui_params{};
+        for(unsigned i=0;i<ui_values.size();++i)ui_params[i]=&ui_values[i];
         ui_values[layout::shape].param_type=ui_values[layout::color_mode].param_type=PF_Param_POPUP;
         ui_values[layout::shape].u.pd.value=ui_values[layout::color_mode].u.pd.value=1;
         const int before_writes=sets;
@@ -375,10 +388,62 @@ int main() {
               !(visibility_flags[layout::size_y]&AEGP_DynStreamFlag_HIDDEN) &&
               !(visibility_flags[layout::gradient]&AEGP_DynStreamFlag_HIDDEN),"rectangle and gradient modes reveal controls through actual stream flags");
         check(sets==before_writes && acquisitions==0 && live_refs==0,"UI visibility authors no parameter values and releases suites and stream references");
+        ui_values[layout::shape].u.pd.value=3;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 &&
+              !(visibility_flags[layout::cloud]&AEGP_DynStreamFlag_HIDDEN) &&
+              !(visibility_flags[layout::cloud_density]&AEGP_DynStreamFlag_HIDDEN) &&
+              (visibility_flags[layout::size_y]&AEGP_DynStreamFlag_HIDDEN),"Cloud reveals its group and round-member controls only");
+        ui_values[layout::shape].u.pd.value=1;
+        ui_values[records::sync_guard_index(records::Kind::particle)].param_type=PF_Param_FLOAT_SLIDER;
+        ui_values[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=1;
+        check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 &&
+              !(visibility_flags[layout::cloud_density]&AEGP_DynStreamFlag_HIDDEN),"CEP sync guard temporarily exposes conditional Cloud controls");
         dynamic_enabled=false;pf.AEGP_GetNewEffectForEffect=original_pf;
         check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 && acquisitions==0,"unavailable optional visibility suite cannot reject effect loading");
     }
     check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
+#if defined(STARFIELD_CLOUD_CALLBACK_TEST)
+    {
+        namespace layout=records::particle_layout;using namespace core::graph_keys;
+        PF_InData particle_data=renderer_data;particle_data.effect_ref=reinterpret_cast<PF_ProgPtr>(3);
+        particle_data.num_params=static_cast<A_long>(particle.params.size());
+        std::vector<PF_ParamDef*> pp;for(auto& p:particle.params)pp.push_back(&p);
+        particle.params[layout::cloud_circles].u.fs_d.value=10;
+        particle.params[layout::cloud_aspect].u.fs_d.value=150;
+        particle.params[layout::cloud_density].u.fs_d.value=1000;
+        particle.params[layout::shape].param_type=PF_Param_POPUP;particle.params[layout::shape].u.pd.value=3;
+        PF_UserChangedParamExtra cloud_changed{};cloud_changed.param_index=layout::cloud_density;PF_OutData cloud_out{};
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&cloud_changed)==0 &&
+              particle.params[layout::cloud_enabled].u.fs_d.value==1 &&
+              (particle.params[layout::cloud_enabled].uu.change_flags&PF_ChangeFlag_CHANGED_VALUE) &&
+              std::get<double>(parameter(saved_graph(),kParticleNode,kCloudDensity))==1000,
+              "actual Particle USER_CHANGED persists activation only after the atomic Cloud graph commit");
+        particle.params[layout::cloud_enabled].u.fs_d.value=0;
+        particle.params[layout::cloud_enabled].uu.change_flags=0;
+        fail_set=kGraphParameterId;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&cloud_changed)!=0 &&
+              particle.params[layout::cloud_enabled].u.fs_d.value==0 && particle.params[layout::cloud_enabled].uu.change_flags==0,
+              "failed actual native callback leaves the legacy activation field untouched");
+        cloud_changed.param_index=layout::shape;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&cloud_changed)==0 &&
+              particle.params[layout::cloud_enabled].u.fs_d.value==1 &&
+              std::get<std::uint32_t>(parameter(saved_graph(),kParticleNode,kParticleShape))==2,
+              "explicit native Shape=Cloud activates the configurable group");
+        particle.params[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=1;
+        const auto before=sets;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&cloud_changed)==0 && sets==before,
+              "actual Particle CEP guard suppresses implicit Cloud activation publication");
+        check(live_refs==0 && acquisitions==0,"actual Cloud callbacks release every acquired host reference");
+        dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
+        for(auto& p:main.params)if(p.param_type==PF_Param_ARBITRARY_DATA) {
+            if(handles.contains(p.u.arb_d.value))dispose(p.u.arb_d.value);
+            if(handles.contains(p.u.arb_d.dephault))dispose(p.u.arb_d.dephault);
+        }
+        check(handles.empty(),"Cloud callback graph handles released");
+        std::printf("Cloud callbacks: %d checks, %d failures\n",checks,failures);
+        return failures?1:0;
+    }
+#endif
     PF_InData node_data = renderer_data; node_data.effect_ref = reinterpret_cast<PF_ProgPtr>(2);
     node_data.num_params = static_cast<A_long>(emitter.params.size()); node_data.downsample_x = {1, 4}; node_data.downsample_y = {1, 4};
     std::vector<PF_ParamDef*> pointers; for (auto& param : emitter.params) pointers.push_back(&param);
@@ -566,7 +631,7 @@ int main() {
           main.values[kGraphRevisionId].one_d == 16777215,
           "largest integer revision survives host float storage and exact verification");
     auto animated_graph = saved_graph();
-    check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 74,
+    check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 79,
           "all emitter particle force scalar and vector/color components have bindings");
     const auto expression_baseline = expressions;
     {
@@ -1203,6 +1268,92 @@ int main() {
         transform_present=false;temporal_metadata_enabled=false;remember_native_control_proofs(&renderer_data,{});
     }
 
+    {
+        namespace layout=records::particle_layout;using namespace core::graph_keys;
+        const auto has_cloud=[](const core::Graph& g) {
+            for(const auto& n:g.nodes)if(n.type_key==kParticleNode)
+                for(const auto& p:n.parameters)if(p.key==kCloudCircles || p.key==kCloudAspect || p.key==kCloudDensity)return true;
+            return false;
+        };
+        connection(2,records::Kind::particle,4,12);
+        connection(3,records::Kind::force,255,13);
+        particle.values[layout::shape].one_d=3;
+        particle.values[layout::cloud_enabled].one_d=0;
+        auto legacy_edit=edit(1,layout::size,10);
+        const auto legacy_error=direct_edit(legacy_edit);
+        if(legacy_error)std::printf("Cloud legacy fixture error %d stage %s stream %ld binding %ld\n",legacy_error,
+            node_sync::stage_name(legacy_edit.stage),long(legacy_edit.stream_index),long(legacy_edit.binding_parameter));
+        if(legacy_error) {
+            std::vector<PF_ParamDef*> mp;for(auto& p:main.params)mp.push_back(&p);
+            core::Graph diagnostic;bool found{};compile_native_node_graph(&renderer_data,mp.data(),diagnostic,found,701,&legacy_edit);
+            const auto v=core::validate_graph(diagnostic,core::particle_node_registry());
+            std::printf("Cloud topology diagnostic: %s: %s nodes %zu edges %zu\n",core::describe(v.error.code),v.error.detail,diagnostic.nodes.size(),diagnostic.edges.size());
+            for(const auto& e:diagnostic.edges)std::printf("Cloud edge %u to %u\n",unsigned(e.source_node.value.bytes[15]),unsigned(e.destination_node.value.bytes[15]));
+        }
+        check(legacy_error==0 && !has_cloud(saved_graph()),"appended defaults preserve old native Cloud on unrelated edits");
+        const auto legacy=saved_graph();
+        // Rebuild the real private record at each historical Particle field bound.
+        for(unsigned version=1;version<=4;++version) {
+            auto old=legacy;
+            for(auto& bytes:old.optional_records)if(bytes.size()>12 && bytes[0]==std::byte{2} && bytes[1]==std::byte{0x80}) {
+                const auto get16=[&](std::size_t at){return std::to_integer<unsigned>(bytes[at])|(std::to_integer<unsigned>(bytes[at+1])<<8);};
+                core::OpaqueBytes trimmed(bytes.begin(),bytes.begin()+12);trimmed[2]=std::byte(version);trimmed[3]=std::byte{0};
+                std::size_t at=12;
+                while(at<bytes.size()) {
+                    if(at+20>bytes.size()){check(false,"binding fixture node header bounded");return 1;}
+                    const auto kind=get16(at+16),count=get16(at+18);const auto start=trimmed.size();
+                    trimmed.insert(trimmed.end(),bytes.begin()+at,bytes.begin()+at+20);at+=20;
+                    if(at+32*count>bytes.size()){check(false,"binding fixture scalar records bounded");return 1;}
+                    unsigned kept=0;
+                    for(unsigned f=0;f<count;++f,at+=32) {
+                        const auto limit=kind==1?(version<3?442u:version==3?519u:526u):533u;
+                        if(get16(at)<=limit) {trimmed.insert(trimmed.end(),bytes.begin()+at,bytes.begin()+at+32);++kept;}
+                    }
+                    trimmed[start+18]=std::byte(kept&255);trimmed[start+19]=std::byte(kept>>8);
+                }
+                for(unsigned i=0;i<4;++i)trimmed[4+i]=std::byte((trimmed.size()>>(8*i))&255);
+                bytes=std::move(trimmed);
+            }
+            NativeAnimationPlan old_plan(old,1920,1080,1);
+            check(old_plan.valid() && sample_native_node_animation(&renderer_data,old,1920,1080)==0 && !has_cloud(old),
+                  "historical binding versions retain legacy Cloud and their original field limits");
+        }
+        auto bad_old=legacy;
+        for(auto& r:bad_old.optional_records)if(r.size()>12 && r[0]==std::byte{2} && r[1]==std::byte{0x80})r[2]=std::byte{4};
+        check(!NativeAnimationPlan(bad_old,1920,1080,1).valid(),"v4 rejects an appended activation field without migration");
+        auto activate=edit(1,layout::cloud_density,1000);
+        activate.additional_fields[activate.additional_count++]={layout::cloud_enabled,node_sync::ValueKind::scalar,{1,0,0,0}};
+        const auto activation_error=direct_edit(activate);
+        if(activation_error)std::printf("Cloud activation fixture error %d stage %s stream %ld binding %ld\n",activation_error,
+            node_sync::stage_name(activate.stage),long(activate.stream_index),long(activate.binding_parameter));
+        check(node_sync::valid_edit(activate) && activation_error==0 && activate.accepted,"Cloud activation and Density commit atomically before the host saves streams");
+        if(activation_error)return 1;
+        auto configured=saved_graph();
+        check(std::get<std::uint32_t>(parameter(configured,kParticleNode,kCloudCircles))==10 &&
+              std::get<double>(parameter(configured,kParticleNode,kCloudAspect))==150 &&
+              std::get<double>(parameter(configured,kParticleNode,kCloudDensity))==1000,"native graph receives explicit Cloud values and defaults");
+        auto forged=activate;forged.parameter_index=layout::size;
+        check(!node_sync::valid_edit(forged),"unrelated edits cannot inject the Cloud activation override");
+        forged=activate;forged.additional_fields[0].value[0]=0;
+        check(!node_sync::valid_edit(forged),"activation override only admits the constant enabled value");
+        particle.values[layout::cloud_enabled].one_d=1;
+        for(auto [index,value]:{std::pair{layout::cloud_circles,0.0},std::pair{layout::cloud_circles,1001.0},
+                               std::pair{layout::cloud_aspect,0.0},std::pair{layout::cloud_density,-1.0},std::pair{layout::cloud_density,1001.0}}) {
+            const auto previous=saved_graph();auto rejected=edit(1,index,value);
+            check(direct_edit(rejected)!=0 && !rejected.accepted &&
+                  core::serialize_graph(previous,core::particle_node_registry()).value()==core::serialize_graph(saved_graph(),core::particle_node_registry()).value(),
+                  "invalid Cloud range rejects without replacing the saved graph");
+        }
+        particle.values[layout::cloud_circles].one_d=10.4;
+        auto round=edit(1,layout::cloud_density,66);check(direct_edit(round)==0,"native animated Circles captures a rounded integer");
+        auto animated=saved_graph();cloud_animation_test=true;renderer_data.current_time=6;
+        check(sample_native_node_animation(&renderer_data,animated,1920,1080)==0 &&
+              std::get<std::uint32_t>(parameter(animated,kParticleNode,kCloudCircles))==11 &&
+              std::get<double>(parameter(animated,kParticleNode,kCloudAspect))==150.25 &&
+              std::get<double>(parameter(animated,kParticleNode,kCloudDensity))==66.25,"Cloud aliases sample all three controls at render time and round Circles");
+        cloud_animation_test=false;renderer_data.current_time=0;
+        check(live_refs==0 && acquisitions==0,"Cloud conversion and compatibility sampling release all host references");
+    }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {

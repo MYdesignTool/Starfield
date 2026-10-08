@@ -77,7 +77,12 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
     for(unsigned i=0;i<edit.additional_count;++i) {
         const auto& field=edit.additional_fields[i];
-        if(field.index<1 || field.index>native_nodes::particle_layout::last || static_cast<unsigned>(field.kind)>3)return false;
+        namespace layout=native_nodes::particle_layout;
+        const bool cloud_activation=edit.node_kind==1 && field.index==layout::cloud_enabled &&
+            field.kind==ValueKind::scalar && field.value==std::array<double,4>{1,0,0,0} &&
+            ((edit.parameter_index>=layout::cloud_circles && edit.parameter_index<=layout::cloud_density) ||
+             (edit.parameter_index==layout::shape && edit.value_kind==ValueKind::scalar && edit.value[0]==3));
+        if(field.index<1 || (field.index>layout::last && !cloud_activation) || static_cast<unsigned>(field.kind)>3)return false;
         for(double value:field.value)if(!std::isfinite(value))return false;
         for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
     }

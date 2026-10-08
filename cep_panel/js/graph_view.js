@@ -87,7 +87,10 @@
                 choices:["Current Time","Play Once","Loop","Stretch","Random Still Frame","Random Once","Random Loop","Freeze Frame"]},
             "34": {label:"Texture Color Use",kind:"popup",min:1,max:3,displayOffset:1,choices:["Default","Alpha","Lightness"]},
             "35": {label:"Use Texture Ratio",kind:"popup",values:[0,1],choices:["Off","On"]},
-            "36": {label:"Ignore Perspective",kind:"popup",values:[0,1],choices:["Off","On"]}
+            "36": {label:"Ignore Perspective",kind:"popup",values:[0,1],choices:["Off","On"]},
+            "37": {label:"Circles",kind:"slider",decimals:0,step:1,min:1,max:1000},
+            "38": {label:"Aspect",kind:"slider",decimals:2,step:1,min:1,max:1000},
+            "39": {label:"Density",kind:"slider",decimals:2,step:1,min:0,max:1000}
         },
         force: {
             "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
@@ -387,11 +390,17 @@
             if(kind==="particle")[0,0,0,0,1,0].forEach(function(value,i){
                 if(!findParameter(source,String(31+i)))displayParameters.push({key:String(31+i),type:3,value:value});
             });
+            if(kind==="particle")[10,150,66].forEach(function(value,i){
+                if(!findParameter(source,String(37+i)))displayParameters.push({key:String(37+i),type:i===0?3:4,value:value});
+            });
             for (var p = 0; p < displayParameters.length; p++) {
                 var graphParameter = displayParameters[p];
                 var spec = specs[graphParameter.key];
                 if (kind === "particle") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
+                    if(Number(graphParameter.key)>=37 && Number(graphParameter.key)<=39 &&
+                        Number((findParameter(source,"15") || {}).value)!==2)continue;
+                    if(graphParameter.key==="16" && Number((findParameter(source,"15") || {}).value)===2)continue;
                     if(Number(graphParameter.key)>=31 && Number(graphParameter.key)<=36 &&
                         Number((findParameter(source,"15") || {}).value)!==3)continue;
                 }
@@ -540,7 +549,7 @@
             if (kind === "particle") {
                 var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
                     "12":8,"1":9,"2":10,"23":11,"30":12,"24":13,"4":14,"6":15,"17":16,"18":17,"19":18,
-                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31};
+                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31,"37":32,"38":33,"39":34};
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });

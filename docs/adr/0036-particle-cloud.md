@@ -30,9 +30,18 @@ fixed five-circle shape. Any present Cloud key activates the configurable style,
 with defaults for omitted members. Fresh native/CEP nodes author all three.
 Existing graph keys, match names, sequence schemas and disk IDs stay unchanged.
 Native controls will append after Texture end527: Cloud topic528, Circles529,
-Aspect530, Density531, end532; disk239..241 and topics2922/2923. The private
-binding version must advance before these fields are exposed; older binding
-versions keep their former limits and legacy semantics.
+Aspect530, Density531, end532; disk239..241 and topics2922/2923. Hidden constant
+Cloud Style Enabled533/disk242 defaults0 so appended AE defaults cannot silently
+change old Cloud effects. The supervised gateway writes1 when any Cloud graph
+key exists,0 otherwise; native Shape=Cloud or Cloud-slider edits activate1 in
+the same graph transaction, persisting it only after acceptance. Fresh CEP/Core
+nodes author all three keys. Circles animation rounds the sampled count.
+Private binding5 captures the flag and aliases only the three public sliders.
+Readers retain v1/2 Particle limit442, v3 limit519, v4 limit526; missing flag is
+legacy. Current Particle total534 preserves all prior IDs and stream indices.
+Cloud Properties is conditional on Shape=Cloud; the sync guard exposes its
+controls during an explicit gateway write. Provisional numeric bounds stay
+documented above. No released public sequence/node schema or match name changes.
 
 Settings.hpp owns the numeric ParticleCloudStyle. EvaluatedGraph shares at most
 4096 styles; ParticleInstance carries a 1-based style index and a24-bit random
@@ -117,3 +126,37 @@ milestone does not expose unfinished controls or replace its actual Texture
 host gate. Source/GPU driver checks do not qualify AE2023 Cloud appearance,
 authoring/animation/preset/undo/reopen or real AE shutter behavior. The complete
 owner goal remains active, including other remaining Particle behavior families.
+
+## Native/CEP authoring milestone, 2026-10-08
+
+Candidate57 completes the appended controls, conditional Cloud inspector/native
+group, supervised activation flag, exact disk-ID gateway reads/writes, optional
+legacy/partial defaults, private binding5 and historical v1..4 bounds. Circles
+is rounded when sampled from an animated AE float slider. Density admits0..1000.
+Cloud graph values survive codec/preset Add/Replace and failed transaction rollback.
+The installed CEP56 source stays untouched during preparation; the candidate is
+under artifacts/prepared/m3-15-native57-panel57/cep_panel and is staged directly.
+
+- RunCloudNativeSyncTests.ps1 -Run -Bindings:7635 native checks plus12 camera
+  checks,0 failures. Real adapter conversion, aliases, historical binding bounds,
+  native graph rejection and UI visibility; bounded historical fixture records.
+- RunCloudNativeSyncTests.ps1 -Run:277 checks,0 failures. Actual Particle
+  USER_CHANGED Cloud/Shape callback, accepted-only flag persistence, rejection
+  and supervised CEP guard; no AE process used.
+- RunTextureSelectorTests.ps1 -Run:276 checks,0 failures. Actual Particle
+  parameter registration now534, prior Texture streams unchanged, Cloud IDs,
+  defaults, animation/constant flags and bounded inventory dispatch.
+- cloud_panel_tests.js:49 checks pass; texture_panel_tests.js:47 checks pass.
+  Candidate-root fixtures cover public fields, ranges, old/partial graphs,
+  exact disk IDs, codec, preset resources and Add/Replace.
+- panel_native_node_gateway_tests.js passes against the isolated candidate,
+  including complete indexed-effect transactions, Cloud values, failed commit
+  rollback and Cloud preset Add/Replace with exactly one Output. The test host
+  model now follows current main labels and the same preset router as the panel.
+- Complete May2023 /MT build passes, log artifacts/m3-15-cloud-authoring-build.log.
+
+Current logs use artifacts/m3-15-cloud-native-sync.log,
+m3-15-cloud-callback-tests.log, m3-15-texture-cloud-selector-tests.log and
+m3-15-cloud-gateway-transactions.log. Paired deployment and its exact56 backup,
+hashes, selector and undo receipt are recorded separately. Actual AE2023 Cloud
+appearance, animation, undo/reopen and the earlier Texture menu gate remain open.

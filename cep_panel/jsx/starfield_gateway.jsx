@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-56";
+    var GATEWAY_BUILD = "native-presets-57";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -727,6 +727,11 @@
         return {name:names[String(key)],diskId:202+Number(key)};
     }
 
+    function cloudControl(key) {
+        var names={"37":"Circles","38":"Aspect","39":"Density","40":"Cloud Style Enabled"};
+        return {name:names[String(key)],diskId:202+Number(key)};
+    }
+
     function textureSourceLayer(source,renderer) {
         if(!source || source===renderer || (renderer && source.id===renderer.id) || !source.source || source.nullLayer)return false;
         return (typeof CompItem!=="undefined" && source.source instanceof CompItem) || !!source.hasVideo;
@@ -946,6 +951,9 @@
                     scalar(tk,textureControl(tk),3);
                     if(tk<=34)node.parameters[node.parameters.length-1].value--;
                 }
+                var cloudEnabled=Number(nodeControlValue(effect,cloudControl(40)));
+                if(cloudEnabled!==0 && cloudEnabled!==1)throw new Error("Invalid Cloud activation flag.");
+                if(cloudEnabled)for(var ck=37;ck<=39;ck++)scalar(ck,cloudControl(ck),ck===37?3:4);
                 for(var group=0;group<2;group++) {
                     var label=group?"Speed":"Angle";
                     node.parameters.push({key:group?"20":"18",type:5,value:[Number(nodeControlValue(effect,label+" X")),
@@ -1068,6 +1076,11 @@
                 var hasTransfer=false;
                 for(var tp=0;tp<node.parameters.length;tp++)if(String(node.parameters[tp].key)==="30")hasTransfer=true;
                 if(!hasTransfer)setNodeControl(effect,"Transfer Mode",1);
+                var cloudEnabled=false;
+                for(var ck=37;ck<=39;ck++)if(nodeParameter(node,ck))cloudEnabled=true;
+                setNodeControl(effect,cloudControl(40),cloudEnabled?1:0);
+                if(cloudEnabled)for(var ck=37;ck<=39;ck++)if(!nodeParameter(node,ck))
+                    setNodeControl(effect,cloudControl(ck),[10,150,66][ck-37]);
                 for(var tk=31;tk<=36;tk++)if(!nodeParameter(node,tk))
                     setNodeControl(effect,textureControl(tk),tk===33 || tk===34 || tk===35?1:0);
             }
@@ -1154,6 +1167,13 @@
                                 }
                                 setNodeControl(effect,textureControl(key),sourceIndex);
                             } else setNodeControl(effect,textureControl(key),value+(Number(key)<=34?1:0));
+                        }
+                        else if(Number(key)>=37 && Number(key)<=39) {
+                            var ck=Number(key);
+                            if(parameter.type!==(ck===37?3:4) || typeof value!=="number" || !isFinite(value) ||
+                                value<(ck===39?0:1) || value>1000 || (ck===37 && Math.floor(value)!==value))
+                                throw new Error("Invalid Cloud parameter: "+key);
+                            setNodeControl(effect,cloudControl(ck),value);
                         }
                         else if(scalars[key]) setNodeControl(effect,scalars[key],value);
                         else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);

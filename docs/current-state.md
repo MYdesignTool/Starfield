@@ -1,42 +1,52 @@
 # 当前工程状态
 
-核对日期：2026-10-08。工作树的原生版本标记为 build55 / packed32823，Core ABI 为6；dist 当前安装记录为 native54 / CEP54 / ABI6。工作树有未提交的 M3 业务改动，本页不把它们记作已部署版本。
+核对日期：2026-10-08。当前 Cloud 作者候选为 native57 / packed32825 / Core ABI7 / CEP57；尚未发布。安装基线为 native56 / CEP56 / ABI6，来源 a086b9fe098e7f9b9553b02395f9379ff1e18f64。Core 数值里程碑 f5b0844 已推送，作者候选在本轮完成。MNT-01 共享改动保留并排除于实现提交。
 
-## 源码与部署
+## 源码与安装
 
-| 项目 | 源码候选 | 当前开发安装记录 |
+| 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build55，packed32823 | native54，packed32822 |
-| Core ABI | 6 | 6 |
-| CEP | panel54 | panel54 |
-| 节点 | Emitter、Auxiliary、Particle、Force、Transform、Output | Emitter、Auxiliary、Particle、Force、Transform、固定 Output |
-| Transform | Core/原生/CEP 候选在工作树 | 随 native54 成对部署；AE 行为验收仍开放 |
+| 原生版本 | build57，packed32825 | native56，packed32824 |
+| Core ABI | 7 | 6 |
+| CEP | panel57（隔离候选） | panel56（live Junction） |
+| Particle | total534；Cloud 追加528..533；binding5 | total528；Texture520..527；binding4 |
+| 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
+| 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
 
-Appearance 已按 owner 要求退出当前注册表、构建与部署。旧效果/工程是否迁移遵循对应 ADR；整理工作不引入迁移，也不更改身份、ID、ABI 或主要实现。
+Appearance 已退出当前注册表、构建与部署。MFR/Compute Cache 未启用。GPU F32 逐设备/逐帧协商；实际驱动的数值检查不等于 AE 宿主资格。
 
-GPU F32 能力在原生 PiPL/runtime 中声明，逐设备/逐帧协商并保留 CPU 路径。MFR/Compute Cache 仍未启用。已存在 GPU 源码和软件场景测试不代表任何实际 GPU 或 AE 构建已经通过完整验收。
+## Cloud 候选
 
-## 安装证据
+Cloud 是一个逻辑粒子的圆群。Circles/Aspect/Density 默认10/150/66，Density0..1000；0 重合为一个圆，1000 增大成员中心散布。Circles1..1000、Aspect1..1000 是待参考证据确认的独立范围。确切随机分布和缩放仍需外观比对。
 
-native54/CEP54 配对记录位于 artifacts/m3-14-native54-deploy-after.json。只读 SHA-256 核对确认 dist 中六个 AEX 与 StarfieldCore.dll 和收据一致；StarfieldRuntime/current.txt 指向 StarfieldCore-037D48F4411A16E8.dll。本次工作区整理没有部署或触碰 dist、AE、CEP 用户目录、进程或注册表。
+optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定五圆。原生 hidden constant activation533/disk242 默认0；明确 Shape=Cloud 或修改 Cloud 参数才激活。新 CEP/Core 节点写入显式默认。既有 IDs、match names、node schema7/envelope1/序列契约保留。详见 ADR0036。
+
+## 本轮验证
+
+- 原生绑定7635 + 相机12，0失败；实际 Particle Cloud 回调277，0失败；实际控件注册/Texture selector276，0失败。
+- Cloud CEP49、Texture CEP47 检查通过；完整 gateway/coordinator 的 Cloud 提交、失败回滚、预设 Add/Replace 通过。
+- 完整 May2023 /MT 构建通过：artifacts/m3-15-cloud-authoring-build.log。
+- Core 未变更于 f5b0844 的数值里程碑；其2441项 Cloud 核心和1116项私有 CUDA/OpenCL 驱动证据见 ADR0036。作者接入不替代真实 AE gate。
+- 具体运行命令见 docs/testing.md；日志 artifacts/m3-15-cloud-native-sync.log、m3-15-cloud-callback-tests.log、m3-15-texture-cloud-selector-tests.log、m3-15-cloud-gateway-transactions.log。
+
+## 当前安装证据与回滚
+
+native56/CEP56 配对收据：artifacts/m3-13-native56-deploy-after.json。七个 native/Core 和十一项 CEP 文件已按收据只读核对。Runtime selector：StarfieldCore-037D48F4411A16E8.dll.
 
 | dist 文件 | SHA-256 |
 | --- | --- |
-| StarfieldParticle.aex | 88F94BCC7CBD786843B6802F04792AA93CD78058A070B6C038C9F9EDB8089365 |
-| StarfieldEmitter.aex | D52DBCEF5215008A438633CA95AB347C481B86A3401F307B716779EF3A8654EC |
-| StarfieldParticleNode.aex | C48853C534E849F4D22D344705251B2C2715EE7CB2AFDF251685C6601186AFC0 |
-| StarfieldForce.aex | 43D0735D226A851E964C89DA03700F99AA70443A2DDA25C4445CE77978D9D4F4 |
-| StarfieldTransform.aex | B8D5255F70B55B3F601DF1F295F9D07BC241101BC0A449AC836FD5AA2E65B971 |
-| StarfieldHost.aex | BA70AFBE274E90A74A2978F3903C26C3021D143394ED42CCD11D74ABD0B4A87E |
+| StarfieldParticle.aex | C119154D35C77D7954901F2E75A91398FE2BEA59A6325BCF2BB5EB03C631DF1D |
+| StarfieldEmitter.aex | 8E8C3D2246C49D244EBE4DB3C27473C29EEABFF0232F0E7E1FD354836E230805 |
+| StarfieldParticleNode.aex | 7491F39C381B686046CC93D0AB095D0903EB36BCBF406E14BF082A74B72B528E |
+| StarfieldForce.aex | DC293664508BB6E25B27A89A6901C3DC6A8AAFDF6F71C0F4AFE6938D41255672 |
+| StarfieldTransform.aex | 91E8642D2A87A809684273299BAADF1919FEA94C40C6A5F7E676C49AE0E7CE78 |
+| StarfieldHost.aex | 9BA5A6E5BEAE8FC4E07B4AF0897FA972659607CBE6D752A11FE9ABCDAE8E0475 |
 | StarfieldCore.dll | 037D48F4411A16E812A970BFEA6DDD604F1EF4CD9CA0ED4901F3F2FF848BDD6E |
 
-native54/CEP54 备份位于 artifacts/disabled/m3-14-native54-panel54-main-order-20261008；回滚信息见对应部署收据，仍按 ADR0011 操作。
+native56 的 exact native55/CEP55 备份：artifacts/disabled/m3-13-native56-panel56-script-inventory-20261008。新的57成对发布将另保留 exact56；发布前需 fresh no-AE 检查，按 ADR0011 和 tools/Deploy-TestBuild.ps1 执行。进程起停、注册表/缓存/全局 host switches 均不在该授权中。
 
-## 本次验证
+## 开放 gate
 
-- 清理检查点（2026-10-07）：面板入口 RunPanelTests.cjs 的20个套件全部通过，日志 artifacts/panel-tests/。
-- 主 Core：11,895 项检查、0 失败，日志 artifacts/workspace-cleanup-20261007/core.log。
-- 清理检查点：18个 C++ 范围及6个发布/隔离部署 PowerShell 套件通过；GPU驱动、时间线和曲线编辑器重跑收据见 artifacts/workspace-cleanup-20261007/。这些结果不覆盖随后新增的业务改动。
-- 原分析报告核验保留在 artifacts/report-verification-20261007/报告核验结论.md；其失败计数描述整理前的时点，不能当作整理后的测试结果。
-
-宿主证据来自已记录的 AE 2023.5.0 Build52 owner 观察，详见 [行为验收](compatibility-matrix.md)。本次源测试不补足实际 AE、GPU、保存/重开、撤销、运动模糊或 Null 几何验收。
+- owner 的 native55 Texture menu 仍只显示 None；native56 owner-pinned public layer inventory 已部署，实际新结果待确认。
+- native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
+- Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。

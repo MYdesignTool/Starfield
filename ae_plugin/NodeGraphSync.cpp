@@ -244,7 +244,11 @@ PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) 
     // guard opens the conditional controls synchronously for the complete batch;
     // resetting it in the gateway's finally block restores mode-based visibility.
     for(auto [index,hidden]:{std::pair{layout::gradient,!syncing && params[layout::color_mode]->u.pd.value==1},
-                             std::pair{layout::size_y,!syncing && params[layout::shape]->u.pd.value==1}}) {
+                             std::pair{layout::size_y,!syncing && (params[layout::shape]->u.pd.value==1 || params[layout::shape]->u.pd.value==3)},
+                             std::pair{layout::cloud,!syncing && params[layout::shape]->u.pd.value!=3},
+                             std::pair{layout::cloud_circles,!syncing && params[layout::shape]->u.pd.value!=3},
+                             std::pair{layout::cloud_aspect,!syncing && params[layout::shape]->u.pd.value!=3},
+                             std::pair{layout::cloud_density,!syncing && params[layout::shape]->u.pd.value!=3}}) {
         AEGP_StreamRefH ref{};
         if(scope.streams->AEGP_GetNewEffectStreamByIndex(plugin,scope.effect,index,&ref) || !ref)continue;
         AEGP_DynStreamFlags flags{};
@@ -289,6 +293,16 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         if(particle_gradient && !gradient_bank && !age_bank)return PF_Err_BAD_CALLBACK_PARAM;
         if(gradient_bank && !starfield::adapter::node_sync::capture_gradient_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
         if(age_bank && !starfield::adapter::node_sync::capture_age_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
+        namespace layout=starfield::adapter::native_nodes::particle_layout;
+        const bool activate_cloud=kNodeKind==1 &&
+            ((extra->param_index>=layout::cloud_circles && extra->param_index<=layout::cloud_density) ||
+             (extra->param_index==layout::shape && edit.value[0]==3));
+        if(activate_cloud) {
+            if(!params[layout::cloud_enabled] || params[layout::cloud_enabled]->param_type!=PF_Param_FLOAT_SLIDER)
+                return PF_Err_BAD_CALLBACK_PARAM;
+            auto& field=edit.additional_fields[edit.additional_count++];
+            field.index=layout::cloud_enabled;field.value[0]=1;
+        }
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
@@ -319,6 +333,10 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         suites.effect->AEGP_DisposeEffect(renderer);
         if (!error) error = edit.accepted && edit.revision > 0 ? edit.status :
             (edit.status ? edit.status : PF_Err_BAD_CALLBACK_PARAM);
+        if(!error && activate_cloud) {
+            params[layout::cloud_enabled]->u.fs_d.value=1;
+            params[layout::cloud_enabled]->uu.change_flags|=PF_ChangeFlag_CHANGED_VALUE;
+        }
         if (out_data) {
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
             else if(edit.stage==starfield::adapter::node_sync::Stage::animation_bindings && edit.binding_stage)

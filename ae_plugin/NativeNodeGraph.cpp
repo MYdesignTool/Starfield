@@ -53,7 +53,7 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, particle_layout::texture_end+1> fields{};
+    std::array<RawField, particle_layout::cloud_enabled+1> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -490,7 +490,7 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
     const bool transfers=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?4:attachments?2:1); append_u32(bytes, 0);
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?5:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -537,7 +537,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 4) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 5) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
@@ -553,7 +553,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             const auto field_limit = node.kind==Kind::transform && version==1 ?
                 transform_layout::matrix_last : node.kind==Kind::particle && version<3 ?
                 particle_layout::last : node.kind==Kind::particle && version==3 ?
-                particle_layout::transfer : native_nodes::binding_field_count(node.kind);
+                particle_layout::transfer : node.kind==Kind::particle && version==4 ?
+                particle_layout::texture_perspective : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -842,6 +843,20 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
             if((popup && (integer<1 || integer>(index==particle_layout::texture_time?8u:3u))) || (!popup && integer>1))
                 return suites.fail(index);
             add_value(node,key,popup?integer-1:integer);
+        }
+        integer=0;
+        if(!suites.playback || suites.playback->fields[particle_layout::cloud_enabled].present)
+            if(!read_uint(suites,plugin_id,effect,particle_layout::cloud_enabled,time,integer) || integer>1)
+                return suites.fail(particle_layout::cloud_enabled);
+        if(integer) {
+            std::uint32_t circles{};double aspect{},density{};
+            if(!read_uint(suites,plugin_id,effect,particle_layout::cloud_circles,time,circles) || circles<1 || circles>1000)
+                return suites.fail(particle_layout::cloud_circles);
+            if(!read_one_d(suites,plugin_id,effect,particle_layout::cloud_aspect,time,aspect) || aspect<1 || aspect>1000)
+                return suites.fail(particle_layout::cloud_aspect);
+            if(!read_one_d(suites,plugin_id,effect,particle_layout::cloud_density,time,density) || density<0 || density>1000)
+                return suites.fail(particle_layout::cloud_density);
+            add_value(node,kCloudCircles,circles);add_value(node,kCloudAspect,aspect);add_value(node,kCloudDensity,density);
         }
         if(!read_uint(suites,plugin_id,effect,particle_layout::limit_2d,time,integer) || integer>1)return false;
         add_value(node,kLimitTo2D,integer);

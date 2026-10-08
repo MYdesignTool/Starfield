@@ -59,7 +59,8 @@
             { key: "24", type: 3, value: 2 }, {key:"25",type:3,value:0},
             {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}, {key:"30",type:3,value:0},
             {key:"31",type:3,value:0},{key:"32",type:3,value:0},{key:"33",type:3,value:0},
-            {key:"34",type:3,value:0},{key:"35",type:3,value:1},{key:"36",type:3,value:0}
+            {key:"34",type:3,value:0},{key:"35",type:3,value:1},{key:"36",type:3,value:0},
+            {key:"37",type:3,value:10},{key:"38",type:4,value:150},{key:"39",type:4,value:66}
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },
@@ -112,7 +113,7 @@
             fail("invalid_native_node_record", "The host returned an unsupported " + kind + " record version.");
         }
         DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
-        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3};
+        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4};
         if (kind === "force") optional = {"9":7};
         if (kind === "transform") optional = {"7":7,"8":3};
         Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
@@ -462,6 +463,20 @@
                 if(change.valueType!==3 || !Number.isInteger(value) || value<0 || value>max)
                     fail("invalid_parameter","Invalid Particle texture/transfer value.");
                 node.parameters.push({key:change.parameterKey,type:3,value:value});continue;
+            }
+            if(node.type===TYPES.particle && Number(change.parameterKey)>=37 && Number(change.parameterKey)<=39) {
+                var cloudKey=Number(change.parameterKey);
+                if(change.valueType!==(cloudKey===37?3:4) || typeof value!=="number" || !Number.isFinite(value) ||
+                    value<(cloudKey===39?0:1) || value>1000 || (cloudKey===37 && !Number.isInteger(value)))
+                    fail("invalid_parameter","Invalid Cloud parameter.");
+                if(found<0) {node.parameters.push({key:change.parameterKey,type:change.valueType,value:value});continue;}
+            }
+            if(node.type===TYPES.particle && change.parameterKey==="15" && change.valueType===3 && value===2) {
+                [10,150,66].forEach(function(defaultValue,index) {
+                    var cloudKey=String(37+index);
+                    if(!node.parameters.some(function(p){return p.key===cloudKey;}))
+                        node.parameters.push({key:cloudKey,type:index===0?3:4,value:defaultValue});
+                });
             }
             if (node.type === TYPES.transform && change.parameterKey === "8") {
                 if (change.valueType !== 3 || !Number.isInteger(value) || value < 0 || value > 2147483647)

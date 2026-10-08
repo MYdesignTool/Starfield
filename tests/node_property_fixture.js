@@ -51,7 +51,8 @@ function nodeControls() {
     opacity.matchName="org.starfieldfx.node.particle-204";
     properties[opacity.matchName]=opacity;
     for(const [name,value,id] of [["Transfer Mode",1,232],["Layer",0,233],["Dark Side",0,234],
-        ["Texture Time Sample",1,235],["Texture Color Use",1,236],["Use Texture Ratio",1,237],["Ignore Perspective",0,238]])
+        ["Texture Time Sample",1,235],["Texture Color Use",1,236],["Use Texture Ratio",1,237],["Ignore Perspective",0,238],
+        ["Circles",10,239],["Aspect",150,240],["Density",66,241],["Cloud Style Enabled",0,242]])
         properties[name]=disk(name,value,id);
     for(const [label,count,age,value,extraAge,extraValue,mode] of [
         ["Size",700,710,720,3000,3100,3610],["Opacity",800,810,820,3200,3300,3611],

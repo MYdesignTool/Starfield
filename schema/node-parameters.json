@@ -1,11 +1,13 @@
 {
-  "identityRevision": 9,
+  "identityRevision": 10,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "scriptBindingPolicy": "PF group/topic entries are presentation markers, not script PropertyGroup containers. Native curve count/mode/knots and the duplicate Particle scalar Opacity resolve from the effect root by exact parameter matchName derived from these disk IDs. Display names, topic paths and mutable indices are not fallbacks. Panel42 / ADR0030.",
   "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main27/index1/disk1631 (Motion Blur appended616..625) ; numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030. Native Transform1/base14 appends disk1401..1414 and binding fields15..26; Core ABI4/snapshot4 require a full paired build47. Existing kind IDs and graph envelope are retained. ADR0032. ADR0033/build52 appends Particle Transfer Mode disk232/stream519 after existing metadata; old streams/IDs unchanged, graph key30 optional Normal, binding v3/snapshot5/Core ABI5; paired native/CEP required.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "angleUiDefaults": "All native PF_Param_ANGLE controls start collapsed (PF_ParamFlag_START_COLLAPSED), including Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This changes the initial UI state only, preserves user expansion, and keeps keyframes/IDs/schemas unchanged. Build38 / ADR0028.",
   "fixed": {
+    "cloud_circles": 239, "cloud_aspect": 240, "cloud_density": 241, "cloud_enabled": 242,
+    "cloud_topic": 2922, "cloud_end": 2923,
     "texture_front": 233, "texture_back": 234, "texture_time": 235, "texture_color": 236,
     "texture_ratio": 237, "texture_perspective": 238, "texture_topic": 2920, "texture_end": 2921,
     "emitter_type": 101,
@@ -506,6 +508,19 @@
     "freezeFrame": "Source image at each particle's birth: render time minus particle age, clamped to the clip frame grid.",
     "nativeAuthoring": "Appended Particle streams520..527/disk2920,233..238,2921; private binding v4. Base442 and metadata443..518/Transfer519 remain fixed. Main manifest28 owns resource slots626..753/count754. ADR0034; AE2023 stage/time/undo qualification remains open.",
     "backend": "CPU; Texture scenes return typed unsupported_format from GPU scene preparation for per-frame fallback."
+  },
+  "cloudRender": {
+    "adr": "0036-particle-cloud",
+    "candidateBuild": 57,
+    "coreAbi": 7,
+    "snapshotVersion": 7,
+    "shape": 2,
+    "optionalGraphKeys": {"circles": 37, "aspect": 38, "density": 39},
+    "defaults": {"circles": 10, "aspect": 150, "density": 66},
+    "ranges": {"circles": [1,1000], "aspect": [1,1000], "density": [0,1000]},
+    "rangeEvidence": "Density maximum1000 is owner-confirmed. Circles and Aspect ranges are provisional independent limits awaiting reference evidence.",
+    "nativeAuthoring": "Append topic528, Circles529/239, Aspect530/240, Density531/241, end532, hidden constant activation533/242; total534. Existing metadata and IDs retained. Binding5 aliases public sliders only; v1..4 keep historical bounds. Missing graph style/activation0 preserves legacy five-circle Cloud. Explicit native Cloud selection/slider edits or CEP authored style activate the configurable group.",
+    "backend": "CPU/CUDA/OpenCL union of precomputed stable member circles, one logical particle and group opacity. Zero Density collapses to a round circle. Actual AE2023 appearance/persistence gates remain open."
   },
   "editorCatalog": "schema/editor-presets.json: 20 independently authored curve profiles, 19 gradient palettes; native modal chooser at each editor Presets button, no vendor folder structure.",
   "transformBinding": {

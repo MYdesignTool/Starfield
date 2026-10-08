@@ -239,8 +239,20 @@ int main(){
         check(ui->events==PF_CustomEFlag_EFFECT,"actual Particle registers effect-window custom events");return 0;};
     PF_OutData registered_out{};
     check(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&registered_out,nullptr,nullptr,nullptr)==0 &&
-          registered_out.num_params==528 && registered_native.size()==527,
+          registered_out.num_params==534 && registered_native.size()==533,
           "actual Particle registration preserves the complete physical parameter count");
+    for(const auto index:{529,530,531}) {
+        const auto& def=registered_native[index-1];
+        check(def.param_type==PF_Param_FLOAT_SLIDER && def.uu.id==index-290 &&
+              !(def.flags&PF_ParamFlag_CANNOT_TIME_VARY) && (def.flags&PF_ParamFlag_SUPERVISE),
+              "Cloud public controls append unique IDs and support supervised animation");
+        check(def.u.fs_d.valid_min==(index==531?0:1) && def.u.fs_d.valid_max==1000 &&
+              def.u.fs_d.value==(index==529?10:index==530?150:66),"Cloud defaults and typed ranges match the numeric contract");
+    }
+    const auto& activation=registered_native[532];
+    check(activation.uu.id==242 && activation.u.fs_d.value==0 &&
+          (activation.flags&PF_ParamFlag_CANNOT_TIME_VARY) && (activation.ui_flags&PF_PUI_INVISIBLE),
+          "constant hidden activation defaults to legacy without shifting prior controls");
     for(const auto index:{521,522}) {
         const auto& def=registered_native[index-1];
         check(def.param_type==PF_Param_LAYER && def.uu.id==(index==521?233:234) &&

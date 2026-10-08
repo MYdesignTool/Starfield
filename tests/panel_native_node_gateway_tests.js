@@ -4,10 +4,11 @@
 // This exercises the gateway/coordinator, not the native compiler or AE host.
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
-const codec = require("../cep_panel/js/graph_codec.js"), layout = require("../cep_panel/js/graph_layout.js");
-const edits = require("../cep_panel/js/graph_edits.js"), transactions = require("../cep_panel/js/graph_transactions.js");
-const view = require("../cep_panel/js/graph_view.js");
-const source = fs.readFileSync(path.join(__dirname, "../cep_panel/jsx/starfield_gateway.jsx"), "utf8");
+const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../cep_panel");
+const codec = require(path.join(panelRoot,"js/graph_codec.js")), layout = require(path.join(panelRoot,"js/graph_layout.js"));
+const edits = require(path.join(panelRoot,"js/graph_edits.js")), transactions = require(path.join(panelRoot,"js/graph_transactions.js"));
+const view = require(path.join(panelRoot,"js/graph_view.js"));
+const source = fs.readFileSync(path.join(panelRoot,"jsx/starfield_gateway.jsx"), "utf8");
 const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
 let epoch = 0, rejectNext = false, revision = 0, commits = 0, roundWireNumbers = false, beforeSubmit = null;
 let rejectNextAdd = null;
@@ -61,7 +62,8 @@ function graphFromEffects() {
     const fixture=require("./native_snapshot_fixture.js");
     for(const effect of items.filter(effect=>effect!==renderer)) {
         const c=effect.properties,v=name=>clone(c[name].value),id=readUuid(c,"Node UUID ");
-        const kind=effect.matchName.split(".").pop(),node=fixture.node(kind,id);
+        const kind=effect.matchName.split(".").pop(),node=edits.apply({version:1,nodes:[],edges:[],optionalRecords:[]},
+            {type:"addNode",nodeType:kind},()=>id).nodes[0];
         const set=(key,value)=>node.parameters.find(p=>p.key===String(key)).value=value;
         const scalar=entries=>entries.forEach(([key,name,scale=1,offset=0])=>set(key,v(name)*scale+offset));
         if(kind==="emitter") {
@@ -79,6 +81,8 @@ function graphFromEffects() {
             set(5,v("Spin")/2160);
             scalar([[2,"Air Density"],[3,"Gravity random"],[6,"Spin Frequency"],[7,"Spin resist"],[8,"Spin Delay (Seconds)"]]);
         } else {
+            if(v("Cloud Style Enabled"))scalar([[37,"Circles"],[38,"Aspect"],[39,"Density"]]);
+            else node.parameters=node.parameters.filter(p=>Number(p.key)<37);
             set(1,v("Color").slice(0,3));set(18,[v("Angle X"),v("Angle Y"),v("Angle Z")]);set(20,[v("Speed X"),v("Speed Y"),v("Speed Z")]);
             scalar([[3,"Size (Pixels)"],[4,"Size Over Life"],[5,"Opacity",.01],[6,"Opacity Over Life"],
                 [9,"Size Random"],[10,"Opacity Random"],[11,"Life (Seconds)"],[12,"Particle Color",1,-1],
@@ -100,7 +104,7 @@ function graphFromEffects() {
             sourceNode:id,sourcePort:kind==="emitter"?"1":"2",destinationNode:readUuid(c,"Connection "+slot+" Target UUID "),destinationPort:"1"});
     }
     const output=fixture.node("output",outputId),v=name=>renderer.properties[name].value;
-    const values=[v("Max Particles"),v("Time Remapping On / Off"),v("Time (Seconds)"),v("Preview"),v("Particle chance"),
+    const values=[v("Max Particles"),v("On / Off"),v("Time (Seconds)"),v("Preview"),v("Particle chance"),
         v("Acceleration")-1,[30,60,120][v("Time Sampling")-1],...Array.from({length:8},(_,i)=>v("org.starfieldfx.particle-"+(1641+i)) - ([0,3,7].includes(i)?1:0))];
     output.parameters.forEach((p,i)=>p.value=values[i]);graph.nodes.push(output);
     positions[outputId]={x:v("Layout Output X"),y:v("Layout Output Y")};return layout.set(graph,positions);
@@ -119,7 +123,7 @@ function invoke(operation,fields={}) {
         requestId:operation,operation,target:{token:"p5-c17-l29"},pinTarget:false},fields))));
 }
 let next=10;
-const snapshots=require("../cep_panel/js/native_graph_snapshot.js");
+const snapshots=require(path.join(panelRoot,"js/native_graph_snapshot.js"));
 assert.equal(invoke("getGraphSnapshot").snapshot.initialized,false);
 const boot=snapshots.normalize(invoke("syncGraphSnapshot"));
 assert.equal(boot.ok,true,JSON.stringify(boot));assert.equal(boot.snapshot.initialized,true);
@@ -144,7 +148,10 @@ assert.equal(numericNodeVisits,new Set(Object.values(particleRaw.properties)).si
     "all unresolved curve fields share one bounded property traversal per effect/request");
 hideDirectCurveIds=false;
 const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleId=initial.nodes.find(n=>n.type===edits.types.particle).id;
-const client=transactions.create({codec,edits,idFactory:()=>uuid(next++),call:(op,fields,cb)=>{
+const presets=require(path.join(panelRoot,"js/presets.js"));
+const transactionEdits=Object.assign({},edits,{apply:(graph,edit,nextId)=>edit.type==="applyPreset"?
+    presets.apply(graph,edit,nextId):edits.apply(graph,edit,nextId)});
+const client=transactions.create({codec,edits:transactionEdits,idFactory:()=>uuid(next++),call:(op,fields,cb)=>{
     if(op==="submitGraph"&&beforeSubmit){const change=beforeSubmit;beforeSubmit=null;change();}
     cb(invoke(op,fields));
 }});
@@ -276,5 +283,24 @@ assert.equal(items.length,beforeFailedAddCount,"failed Particle creation must no
 assert.equal(snapshot().graphHex,beforeFailedAdd,"failed creation preserves existing nodes and connections");
 assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
 rejectNextAdd=null;
+const cloudId=codec.fromHex(snapshot().graphHex).nodes.find(n=>n.type===edits.types.particle).id;
+const cloudChanges=[[15,2,3],[37,34,3],[38,230,4],[39,1000,4]].map(([key,value,valueType])=>
+    ({nodeId:cloudId,parameterKey:String(key),valueType,value}));
+assert.equal(apply({type:"setParameters",changes:cloudChanges}).ok,true,"Cloud values commit through the complete indexed-effect transaction");
+const cloudSource=codec.fromHex(snapshot().graphHex),cloudBeforeFailure=snapshot().graphHex;
+const cloudValues=g=>g.nodes.filter(n=>n.type===edits.types.particle).map(n=>[37,38,39].map(k=>n.parameters.find(p=>p.key===String(k))?.value));
+assert.deepEqual(cloudValues(cloudSource),[[34,230,1000]]);
+rejectNext=true;
+assert.equal(apply({type:"setParameters",changes:[{nodeId:cloudId,parameterKey:"39",valueType:4,value:0}]}).ok,false);
+assert.equal(snapshot().graphHex,cloudBeforeFailure,"failed Cloud graph commit restores exact values and activation");
+assert.deepEqual(cloudValues(codec.fromHex(snapshot().graphHex)),[[34,230,1000]]);
+for(const mode of ["add","replace"]) {
+    const result=apply({type:"applyPreset",presetGraph:cloudSource,mode,applyRenderSettings:true});
+    assert.equal(result.ok,true,"Cloud preset "+mode+" commits with current native node schema: "+JSON.stringify(result));
+    const applied=codec.fromHex(snapshot().graphHex);
+    assert.equal(applied.nodes.filter(n=>n.type===edits.types.output).length,1);
+    assert.ok(cloudValues(applied).every(v=>v[0]===34 && v[1]===230 && v[2]===1000));
+    assert.equal(cloudValues(applied).length,mode==="add"?2:1);
+}
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

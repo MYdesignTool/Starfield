@@ -455,6 +455,16 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     error=add_checkbox(in_data,"Ignore Perspective",kTexturePerspectiveId);if(error)return error;
     PF_ParamDef end{};end.param_type=PF_Param_GROUP_END;end.uu.id=kTextureEndId;
     error=add_checked_parameter(in_data,end);if(error)return error;
+    topic.uu.id=kCloudTopicId;std::snprintf(topic.name,sizeof(topic.name),"Cloud Properties");
+    error=add_checked_parameter(in_data,topic);if(error)return error;
+    error=add_slider(in_data,"Circles",kCloudCirclesId,1,1000,10,PF_Precision_INTEGER);if(error)return error;
+    error=add_slider(in_data,"Aspect",kCloudAspectId,1,1000,150,PF_Precision_HUNDREDTHS);if(error)return error;
+    error=add_slider(in_data,"Density",kCloudDensityId,0,1000,66,PF_Precision_HUNDREDTHS);if(error)return error;
+    end.uu.id=kCloudEndId;error=add_checked_parameter(in_data,end);if(error)return error;
+    // Older effects acquire appended defaults when reopened. A separate constant
+    // flag preserves their fixed five-circle shape until explicitly authored.
+    error=add_slider(in_data,"Cloud Style Enabled",kCloudEnabledId,0,1,0,PF_Precision_INTEGER,
+        kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);
     PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
