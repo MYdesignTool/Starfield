@@ -1,4 +1,5 @@
 #include "GpuRender.hpp"
+#include "starfield/core/Settings.hpp"
 #include "AE_EffectCBSuites.h"
 #include "AE_EffectGPUSuites.h"
 #include "AE_Macros.h"
@@ -10,6 +11,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstddef>
@@ -123,20 +125,20 @@ struct Device {
             runtime.cuMemcpyHtoDAsync(reinterpret_cast<DevicePtr>(buffer),source,bytes,info.command_queuePV) :
             runtime.clEnqueueWriteBuffer(info.command_queuePV,buffer,0,0,bytes,source,0,nullptr,nullptr);
     }
-    int dispatch(void* output,const std::array<void*,3>& buffers,std::array<unsigned,11>& values,float gain,unsigned rows) {
+    int dispatch(void* output,const std::array<void*,4>& buffers,std::array<unsigned,11>& values,float gain,unsigned rows) {
         if(info.device_framework==PF_GPU_Framework_CUDA) {
-            std::array<DevicePtr,4> ptrs{reinterpret_cast<DevicePtr>(output),reinterpret_cast<DevicePtr>(buffers[0]),
-                reinterpret_cast<DevicePtr>(buffers[1]),reinterpret_cast<DevicePtr>(buffers[2])};
-            std::array<void*,16> args{};
-            for(unsigned i=0;i<4;++i) args[i]=&ptrs[i];
-            for(unsigned i=0;i<11;++i) args[i+4]=&values[i];
-            args[15]=&gain;
+            std::array<DevicePtr,5> ptrs{reinterpret_cast<DevicePtr>(output),reinterpret_cast<DevicePtr>(buffers[0]),
+                reinterpret_cast<DevicePtr>(buffers[1]),reinterpret_cast<DevicePtr>(buffers[2]),reinterpret_cast<DevicePtr>(buffers[3])};
+            std::array<void*,17> args{};
+            for(unsigned i=0;i<5;++i) args[i]=&ptrs[i];
+            for(unsigned i=0;i<11;++i) args[i+5]=&values[i];
+            args[16]=&gain;
             return runtime.cuLaunchKernel(kernel,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,info.command_queuePV,args.data(),nullptr);
         }
-        std::array<void*,4> ptrs{output,buffers[0],buffers[1],buffers[2]};
-        for(unsigned i=0;i<4;++i) {const auto err=runtime.clSetKernelArg(kernel,i,sizeof(void*),&ptrs[i]);if(err) return err;}
-        for(unsigned i=0;i<11;++i) {const auto err=runtime.clSetKernelArg(kernel,i+4,sizeof(unsigned),&values[i]);if(err) return err;}
-        if(const auto err=runtime.clSetKernelArg(kernel,15,sizeof(float),&gain);err)return err;
+        std::array<void*,5> ptrs{output,buffers[0],buffers[1],buffers[2],buffers[3]};
+        for(unsigned i=0;i<5;++i) {const auto err=runtime.clSetKernelArg(kernel,i,sizeof(void*),&ptrs[i]);if(err) return err;}
+        for(unsigned i=0;i<11;++i) {const auto err=runtime.clSetKernelArg(kernel,i+5,sizeof(unsigned),&values[i]);if(err) return err;}
+        if(const auto err=runtime.clSetKernelArg(kernel,16,sizeof(float),&gain);err)return err;
         const std::size_t global[2]{values[0],rows};
         // Let each driver choose legal local sizes, including narrow ROI worlds.
         return runtime.clEnqueueNDRangeKernel(info.command_queuePV,kernel,2,nullptr,global,nullptr,0,nullptr,nullptr);
@@ -162,7 +164,7 @@ Device* device(const void* value) noexcept {
 }
 struct FrameMemory {
     const PF_GPUDeviceSuite1& suite; PF_ProgPtr effect; Device& device;
-    std::array<void*,3> buffers{}; void* pinned{}; bool submitted{};
+    std::array<void*,4> buffers{}; void* pinned{}; bool submitted{};
     ~FrameMemory() {
         // Drain even on an enqueue/launch error before releasing pinned inputs.
         if(submitted) (void)device.sync();
@@ -235,24 +237,39 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     if(scene.sprite_count>8000000 || scene.index_count>32u*1024u*1024u || roi_width<0 || roi_height<0 || roi_width>output->width || roi_height>output->height ||
         scene.tiles_x!=(unsigned(roi_width)+15)/16 || scene.tiles_y!=(unsigned(roi_height)+15)/16 ||
         (scene.sprite_count && !scene.sprites) || (scene.index_count && !scene.tile_indices) ||
-        (roi_width && roi_height && !scene.tile_offsets)) return PF_Err_BAD_CALLBACK_PARAM;
+        (roi_width && roi_height && !scene.tile_offsets) || scene.cloud_circle_count>core::kMaxCloudMembers ||
+        (scene.cloud_circle_count && !scene.cloud_circles)) return PF_Err_BAD_CALLBACK_PARAM;
+    for(std::uint32_t i=0;i<scene.sprite_count;++i) {
+        if((i&4095)==0) {const auto aborted=PF_ABORT(in);if(aborted)return aborted;}
+        const auto& s=scene.sprites[i];
+        if(s.reserved[0]>3 || (s.reserved[2] && s.shape!=2) || s.reserved[2]>core::kMaxCloudCircles ||
+            s.reserved[1]>scene.cloud_circle_count || s.reserved[2]>scene.cloud_circle_count-s.reserved[1] ||
+            (!s.reserved[2] && s.reserved[1]))return PF_Err_BAD_CALLBACK_PARAM;
+    }
+    for(std::uint32_t i=0;i<scene.cloud_circle_count;++i) {
+        if((i&4095)==0) {const auto aborted=PF_ABORT(in);if(aborted)return aborted;}
+        const auto& c=scene.cloud_circles[i];
+        if(!std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.radius) || c.radius<=0 || c.radius>1 || c.reserved!=0)
+            return PF_Err_BAD_CALLBACK_PARAM;
+    }
     // Relative placement is supplied through normalized output origins by SmartRender.
     const auto roi_x=roi_width && roi_height?std::int64_t(scene.region.left)-world_left:0,roi_y=roi_width && roi_height?std::int64_t(scene.region.top)-world_top:0;
     if(roi_x<0 || roi_y<0 || roi_x+roi_width>output->width || roi_y+roi_height>output->height) return PF_Err_BAD_CALLBACK_PARAM;
     FrameMemory memory{gpu,in->effect_ref,*d};
-    std::array<std::size_t,3> bytes{std::max<std::size_t>(16,std::size_t(scene.sprite_count)*sizeof(SfGpuSprite)),
+    std::array<std::size_t,4> bytes{std::max<std::size_t>(16,std::size_t(scene.sprite_count)*sizeof(SfGpuSprite)),
         std::max<std::size_t>(16,(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*sizeof(std::uint32_t)),
-        std::max<std::size_t>(16,std::size_t(scene.index_count)*sizeof(std::uint32_t))};
-    const auto total=bytes[0]+bytes[1]+bytes[2];
+        std::max<std::size_t>(16,std::size_t(scene.index_count)*sizeof(std::uint32_t)),
+        std::max<std::size_t>(16,std::size_t(scene.cloud_circle_count)*sizeof(SfGpuCloudCircle))};
+    const auto total=bytes[0]+bytes[1]+bytes[2]+bytes[3];
     if(total>512u*1024u*1024u)return PF_Err_OUT_OF_MEMORY;
     const auto host_error=gpu.AllocateHostMemory(in->effect_ref,index,total,&memory.pinned);
     if(host_error || !memory.pinned) return host_error?host_error:PF_Err_OUT_OF_MEMORY;
     std::memset(memory.pinned,0,total);
-    const void* sources[3]{scene.sprites,scene.tile_offsets,scene.tile_indices};
-    const std::size_t sizes[3]{std::size_t(scene.sprite_count)*sizeof(SfGpuSprite),
-        roi_width && roi_height?(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*4:0,std::size_t(scene.index_count)*4};
+    const void* sources[4]{scene.sprites,scene.tile_offsets,scene.tile_indices,scene.cloud_circles};
+    const std::size_t sizes[4]{std::size_t(scene.sprite_count)*sizeof(SfGpuSprite),
+        roi_width && roi_height?(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*4:0,std::size_t(scene.index_count)*4,std::size_t(scene.cloud_circle_count)*sizeof(SfGpuCloudCircle)};
     auto* staging=static_cast<std::byte*>(memory.pinned);
-    for(unsigned i=0;i<3;++i) {
+    for(unsigned i=0;i<4;++i) {
         if(sizes[i]) std::memcpy(staging,sources[i],sizes[i]);
         const auto allocation=gpu.AllocateDeviceMemory(in->effect_ref,index,bytes[i],&memory.buffers[i]);
         if(allocation || !memory.buffers[i]) return allocation?allocation:PF_Err_OUT_OF_MEMORY;

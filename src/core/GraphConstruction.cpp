@@ -60,7 +60,8 @@ Result<Graph> make_emitter_particle_output_graph(const Settings& settings, NodeI
         GraphNode particle_node{particle, kParticleNode, 7, {
             {kColorStart, color_start}, {kColorEnd, color_end},
             {kSizeStart, settings.particle_size}, {kSizeEnd, size_end},
-            {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end}}};
+            {kOpacityStart, settings.opacity}, {kOpacityEnd, opacity_end},
+            {kCloudCircles, std::uint32_t{10}}, {kCloudAspect, 150.0}, {kCloudDensity, 66.0}}};
         if (settings.appearance_enabled && settings.size_over_life.count != 0) {
             particle_node.parameters.push_back({kSizeOverLifeCurve, encode_age_curve(settings.size_over_life)});
         }

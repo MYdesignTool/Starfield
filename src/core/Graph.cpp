@@ -588,6 +588,9 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kTextureColorUse, ParameterKind::uint32, false},
         ParameterDescriptor{kTextureUseRatio, ParameterKind::uint32, false},
         ParameterDescriptor{kTextureIgnorePerspective, ParameterKind::uint32, false},
+        ParameterDescriptor{kCloudCircles, ParameterKind::uint32, false},
+        ParameterDescriptor{kCloudAspect, ParameterKind::float64, false},
+        ParameterDescriptor{kCloudDensity, ParameterKind::float64, false},
 
     };
 

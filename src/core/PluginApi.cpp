@@ -150,6 +150,8 @@ SfCoreStatus SF_CORE_CALL prepare_gpu_scene(const SfCoreRenderRequest* input, Sf
         output->sprite_count = static_cast<uint32_t>(owned->sprites.size());
         output->index_count = static_cast<uint32_t>(owned->indices.size());
         output->sprites = owned->sprites.data(); output->tile_offsets = owned->offsets.data();
+        output->cloud_circle_count=static_cast<uint32_t>(owned->cloud_circles.size());
+        output->cloud_circles=owned->cloud_circles.data();
         output->tile_indices = owned->indices.data(); output->opaque_handle = owned.release();
         output->status = SF_CORE_OK;
         return SF_CORE_OK;

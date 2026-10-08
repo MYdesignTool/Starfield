@@ -59,7 +59,7 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
             if (unit_value(0, identity, RandomPurpose::preview_chance) * 100 >= preview) continue;
         }
         sprite_geometry::Sprite sprite;
-        if (sprite_geometry::project_sprite(p, request, grid, sprite,evaluated.value().sprite_bases)) projected.push_back(sprite);
+        if (sprite_geometry::project_sprite(p, request, grid, sprite,evaluated.value().sprite_bases,0,false,evaluated.value().cloud_styles)) projected.push_back(sprite);
     }
     if (request.camera.enabled) std::stable_sort(projected.begin(), projected.end(),
         [](const auto& a, const auto& b) { return a.depth > b.depth; });
@@ -71,18 +71,26 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
         const auto& s = projected[i]; const auto& p = *s.particle;
         const double determinant = s.ax * s.by - s.ay * s.bx;
         if (!std::isfinite(determinant) || std::abs(determinant) < 1e-12) continue;
-        const double rx = p.shape == 1 ? std::abs(s.ax) + std::abs(s.bx) : std::hypot(s.ax, s.bx);
-        const double ry = p.shape == 1 ? std::abs(s.ay) + std::abs(s.by) : std::hypot(s.ay, s.by);
+        const auto [rx,ry]=sprite_geometry::sprite_bounds(s);
         const double x = s.x - scene.region.left, y = s.y - scene.region.top;
         const auto left = std::int32_t(std::clamp(std::floor(x-rx-1), 0., double(width)));
         const auto top = std::int32_t(std::clamp(std::floor(y-ry-1), 0., double(height)));
         const auto right = std::int32_t(std::clamp(std::ceil(x+rx+1), 0., double(width)));
         const auto bottom = std::int32_t(std::clamp(std::ceil(y+ry+1), 0., double(height)));
         if (right <= left || bottom <= top) continue;
+        const auto member_count=s.cloud_style ? (s.cloud_style->density==0?1u:s.cloud_style->circles) : 0u;
+        if(member_count>kMaxCloudMembers-scene.cloud_circles.size())
+            return R::failure(ErrorCode::unsupported_format,"GPU Cloud members exceed budget");
+        const auto member_offset=static_cast<std::uint32_t>(scene.cloud_circles.size());
+        for(std::uint32_t member=0;member<member_count;++member) {
+            const auto c=cloud_circle(*s.cloud_style,p.cloud_random_key,member);
+            scene.cloud_circles.push_back({float(c.x),float(c.y),float(c.radius),0});
+        }
+        const double edge=s.cloud_style?std::min(std::hypot(s.ax,s.bx),std::hypot(s.ay,s.by)):std::min(rx,ry);
         SfGpuSprite sprite{float(x), float(y), float(s.by/determinant), float(-s.bx/determinant),
-            float(-s.ay/determinant), float(s.ax/determinant), float(std::min(rx,ry)), float(p.feather_percent/100),
+            float(-s.ay/determinant), float(s.ax/determinant), float(edge), float(p.feather_percent/100),
             float(p.color.x), float(p.color.y), float(p.color.z), float(p.opacity), left, top, right, bottom, p.shape,
-            {static_cast<std::uint32_t>(p.transfer_mode),0,0}};
+            {static_cast<std::uint32_t>(p.transfer_mode),member_count?member_offset:0,member_count}};
         // Extreme projection is a per-frame CPU fallback, never a truncated GPU scene.
         const float numeric[]{sprite.x,sprite.y,sprite.inverse_ax,sprite.inverse_ay,sprite.inverse_bx,sprite.inverse_by,
             sprite.edge_scale,sprite.feather,sprite.red,sprite.green,sprite.blue,sprite.opacity};
@@ -92,7 +100,7 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
         for (auto ty = top/16; ty <= (bottom-1)/16; ++ty) for (auto tx = left/16; tx <= (right-1)/16; ++tx) {
             const auto tile = std::size_t(ty)*scene.tiles_x+tx;
             ++scene.offsets[tile+1];
-            visits += std::uint64_t(std::min(16u,width-std::uint32_t(tx)*16)) * std::min(16u,height-std::uint32_t(ty)*16);
+            visits += std::uint64_t(std::min(16u,width-std::uint32_t(tx)*16)) * std::min(16u,height-std::uint32_t(ty)*16)*std::max(1u,member_count);
             if (visits > max_pixel_visits) return R::failure(ErrorCode::unsupported_format, "GPU scene exceeds tile work budget");
         }
     }

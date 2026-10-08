@@ -247,11 +247,24 @@ PF_Err prepare_motion_gpu(PF_InData*,PF_OutData* out,const SfCoreApi& api,SfCore
         const auto tiles=std::size_t(scene.tiles_x)*scene.tiles_y;
         if(scene.tile_size!=16 || scene.tiles_x!=merged.tiles_x || scene.tiles_y!=merged.tiles_y ||
             std::memcmp(&scene.region,&merged.region,sizeof(scene.region)) || (tiles && !scene.tile_offsets) ||
-            (scene.sprite_count && !scene.sprites) || (scene.index_count && !scene.tile_indices))return failure(out,"invalid sample scene");
-        const auto sprite_base=storage.sprites.size(),index_base=storage.indices.size();
-        const auto bytes=(sprite_base+scene.sprite_count)*sizeof(SfGpuSprite)+(index_base+scene.index_count+storage.offsets.size()+tiles+1)*4;
-        if(bytes>kMotionByteBudget || sprite_base+scene.sprite_count>8000000 || index_base+scene.index_count>32u*1024u*1024u)return failure(out,"GPU exposure exceeds memory budget",PF_Err_OUT_OF_MEMORY);
-        if(scene.sprite_count)storage.sprites.insert(storage.sprites.end(),scene.sprites,scene.sprites+scene.sprite_count);
+            (scene.sprite_count && !scene.sprites) || (scene.index_count && !scene.tile_indices) ||
+            (scene.cloud_circle_count && !scene.cloud_circles))return failure(out,"invalid sample scene");
+        const auto sprite_base=storage.sprites.size(),index_base=storage.indices.size(),cloud_base=storage.cloud_circles.size();
+        const auto bytes=(sprite_base+scene.sprite_count)*sizeof(SfGpuSprite)+(index_base+scene.index_count+storage.offsets.size()+tiles+1)*4+
+            (cloud_base+scene.cloud_circle_count)*sizeof(SfGpuCloudCircle);
+        if(bytes>kMotionByteBudget || sprite_base+scene.sprite_count>8000000 || index_base+scene.index_count>32u*1024u*1024u ||
+            cloud_base+scene.cloud_circle_count>core::kMaxCloudMembers)return failure(out,"GPU exposure exceeds memory budget",PF_Err_OUT_OF_MEMORY);
+        if(scene.cloud_circle_count)storage.cloud_circles.insert(storage.cloud_circles.end(),scene.cloud_circles,scene.cloud_circles+scene.cloud_circle_count);
+        for(std::uint32_t i=0;i<scene.sprite_count;++i) {
+            if((i&4095)==0 && cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            auto sprite=scene.sprites[i];
+            if(sprite.reserved[2]) {
+                if(sprite.shape!=2 || sprite.reserved[2]>core::kMaxCloudCircles || sprite.reserved[1]>scene.cloud_circle_count ||
+                    sprite.reserved[2]>scene.cloud_circle_count-sprite.reserved[1])return PF_Err_BAD_CALLBACK_PARAM;
+                sprite.reserved[1]+=static_cast<std::uint32_t>(cloud_base);
+            } else if(sprite.reserved[1])return PF_Err_BAD_CALLBACK_PARAM;
+            storage.sprites.push_back(sprite);
+        }
         for(std::size_t i=0;i<tiles+1;++i)storage.offsets.push_back(static_cast<std::uint32_t>(index_base+(tiles?scene.tile_offsets[i]:0)));
         for(std::uint32_t i=0;i<scene.index_count;++i) {
             if((i&4095)==0 && cancel.is_cancelled())return PF_Interrupt_CANCEL;
@@ -261,6 +274,7 @@ PF_Err prepare_motion_gpu(PF_InData*,PF_OutData* out,const SfCoreApi& api,SfCore
     }
     merged.sprite_count=static_cast<std::uint32_t>(storage.sprites.size());merged.index_count=static_cast<std::uint32_t>(storage.indices.size());
     merged.sprites=storage.sprites.data();merged.tile_offsets=storage.offsets.data();merged.tile_indices=storage.indices.data();
+    merged.cloud_circle_count=static_cast<std::uint32_t>(storage.cloud_circles.size());merged.cloud_circles=storage.cloud_circles.data();
     return PF_Err_NONE;
 } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
   catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}

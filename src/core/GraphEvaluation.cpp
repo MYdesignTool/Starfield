@@ -57,7 +57,25 @@ struct ParticleValues {
     AgeCurve rotation_curve{};
     ParticleTextureStyle texture;
     std::uint32_t texture_style_index{};
+    ParticleCloudStyle cloud;
+    bool configurable_cloud{};
+    std::uint32_t cloud_style_index{};
 };
+
+using CloudStyleMap = std::map<std::tuple<std::uint32_t,double,double>,std::uint32_t>;
+Result<std::uint32_t> retain_cloud_style(EvaluatedGraph& graph,CloudStyleMap& indices,ParticleValues& values) {
+    using R=Result<std::uint32_t>;
+    if(values.shape!=2 || !values.configurable_cloud)return R::success(0);
+    const auto& s=values.cloud;const auto key=std::tuple{s.circles,s.aspect,s.density};
+    auto found=indices.find(key);
+    if(found==indices.end()) {
+        if(graph.cloud_styles.size()>=kMaxCloudStyles)
+            return R::failure(ErrorCode::work_limit_exceeded,"Cloud style budget exceeded");
+        graph.cloud_styles.push_back(s);
+        found=indices.emplace(key,static_cast<std::uint32_t>(graph.cloud_styles.size())).first;
+    }
+    values.cloud_style_index=found->second;return R::success(found->second);
+}
 
 using TextureStyleMap = std::map<std::array<std::uint32_t, 6>, std::uint32_t>;
 Result<std::uint32_t> retain_texture_style(EvaluatedGraph& graph, TextureStyleMap& indices, ParticleValues& values) {
@@ -268,6 +286,11 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
+        result.configurable_cloud=find_value(node,kCloudCircles) || find_value(node,kCloudAspect) || find_value(node,kCloudDensity);
+        if(!enumeration(kCloudCircles,kMaxCloudCircles,result.cloud.circles) ||
+           !scalar(kCloudAspect,1000,result.cloud.aspect) || !scalar(kCloudDensity,1000,result.cloud.density) ||
+           !valid_cloud_style(result.cloud))
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Cloud property outside bounds");
         std::uint32_t texture_time = 0, texture_color = 0;
         if (!enumeration(kTextureFront, UINT32_MAX, result.texture.front) ||
             !enumeration(kTextureBack, UINT32_MAX, result.texture.back) ||
@@ -302,6 +325,12 @@ void apply_particle_properties(ParticleInstance& particle,const ParticleValues& 
     std::uint32_t seed,Vec3 birth_position,const CompiledParticleTransform* transform = nullptr) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
     particle.transfer_mode=static_cast<ParticleTransferMode>(values.transfer_mode);
+    particle.cloud_style_index=values.cloud_style_index;
+    if(values.cloud_style_index) {
+        auto identity=particle.id;
+        for(auto byte:particle.emitter_id.value.bytes)identity=mix64(identity^byte);
+        particle.cloud_random_key=static_cast<std::uint32_t>(stream_bits(seed,identity,RandomPurpose::particle_cloud)>>40);
+    }
     particle.texture_style_index = values.texture_style_index;
     if (values.shape == 3) {
         auto identity = particle.id;
@@ -527,7 +556,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         }
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
+        CloudStyleMap cloud_indices;
         for (auto index : active_particles) {
+            auto cloud=retain_cloud_style(result,cloud_indices,*particles[index]);
+            if(!cloud.has_value())return R::failure(cloud.error());
             auto retained = retain_texture_style(result, texture_indices, *particles[index]);
             if (!retained.has_value()) return R::failure(retained.error());
         }

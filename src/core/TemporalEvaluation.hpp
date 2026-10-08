@@ -196,6 +196,7 @@ public:
             return R::failure(ErrorCode::invalid_request,"Particle chance outside 0..100");
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
+        CloudStyleMap cloud_indices;
         for(const auto& [id,node]:nodes) if(active[id]) result.evaluated_nodes.push_back(id);
         const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
         std::vector<const GraphNode*> plan_nodes;
@@ -338,6 +339,8 @@ public:
                 auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
                 auto sampled_particle=read_particle(particle_node.value());if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
                 auto particle_values=sampled_particle.take_value();
+                auto cloud=retain_cloud_style(result,cloud_indices,particle_values);
+                if(!cloud.has_value())return R::failure(cloud.error());
                 auto retained = retain_texture_style(result, texture_indices, particle_values);
                 if (!retained.has_value()) return R::failure(retained.error());
                 const double life=particle_values.lifetime_seconds,age=std::max(0.0,now-birth);

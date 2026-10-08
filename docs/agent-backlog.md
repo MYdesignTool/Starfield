@@ -54,3 +54,11 @@ owner 完整 goal 的主效果排布要求。M3-13 Source 里程碑 native53/CEP
 拥有：主 Parameters/MotionBlur/NativeGraphCommit 索引映射、PresetsUI/MainLauncher、主 schema、CEP 主全局查找、版本/构建指纹、focused main tests、ADR0035、配对发布。
 迁移：仅重排 main610..625，保留所有磁盘 ID/默认值/type、逻辑 parameter id、其余物理索引及 ABI6；具体映射由 ADR0035 先行规定。
 完成条件：已有主分组按参考相对顺序排列、开关/Panel/Presets 入口、必要最小检查、May2023 构建与闭宿主配对发布；旧工程动画/撤销/重开及数字索引表达式由 AE2023 实机验收。完整目标及剩余粒子行为族继续开放。
+
+## M3-15 — Particle Cloud 圆群（2026-10-08）
+
+当前执行卡。M3-13 native56/CEP56 已部署，真实 Texture 菜单 gate 等待 owner；上个 goal turn 产生代码、测试、构建、发布和推送，属于 progress。
+拥有：Settings/ParticleCloud、ParticleInstance、graph keys/registry/construction/evaluation/history、MotionBlur、SpriteGeometry/CPU/GPU scene/kernel/driver、PluginApi、版本与构建指纹、native Particle 控件/绑定/记录、CEP inspector/gateway/preset、node schema、focused Cloud tests、ADR0036 与配对发布。
+证据：owner 的 Density0/66/100/200/1000 截图；Circles10、Aspect150 不变，Density0 重合为圆，Density 增大使成员中心散布，最大1000。确切随机分布与 Aspect 轴向缩放仍是独立实现假设，须实机比对。
+迁移：ADR0036 先行；optional keys37..39、shared Cloud style、snapshot7/Core ABI7，旧图/快照保留固定五圆；追加 native 控件，不改既有 IDs/序列 schema。Core 数值里程碑之后完成作者控件再配对发布，不提前暴露无效 UI。
+完成条件：Circles/Aspect/Density 全链路可用、圆群统一透明度/运动/寿命/身份、稳定种子、CPU/GPU 和 shutter/crop/预算兼容、必要最小测试、May2023 构建、闭宿主配对发布与回滚；AE2023 外观/动画/undo/reopen 验收。其余 Particle 行为族与原完整目标继续开放。

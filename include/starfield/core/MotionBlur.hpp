@@ -17,11 +17,18 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
        !std::isfinite(amount) || amount<0 || amount>1 || limit>kMaxParticleCount ||
        first.particles.size()>kMaxParticleCount || last.particles.size()>kMaxParticleCount ||
        first.sprite_bases.size()>kMaxParticleSpriteBases || last.sprite_bases.size()>kMaxParticleSpriteBases ||
-       first.texture_styles.size()>kMaxTextureStyles || last.texture_styles.size()>kMaxTextureStyles)
+       first.texture_styles.size()>kMaxTextureStyles || last.texture_styles.size()>kMaxTextureStyles ||
+       first.cloud_styles.size()>kMaxCloudStyles || last.cloud_styles.size()>kMaxCloudStyles)
         return R::failure(ErrorCode::invalid_request,"invalid motion interpolation input");
     for(const auto* endpoint:{&first,&last})for(const auto& basis:endpoint->sprite_bases)
         if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid motion sprite basis");
     for(const auto* endpoint:{&first,&last}) {
+        for(const auto& style:endpoint->cloud_styles)if(!valid_cloud_style(style))
+            return R::failure(ErrorCode::invalid_request,"invalid motion Cloud style");
+        for(const auto& p:endpoint->particles)if(p.cloud_style_index>endpoint->cloud_styles.size() ||
+            (p.shape!=2 && p.cloud_style_index) || p.cloud_random_key>0xffffffu ||
+            (!p.cloud_style_index && p.cloud_random_key))
+            return R::failure(ErrorCode::invalid_request,"missing motion Cloud style");
         for(const auto& style:endpoint->texture_styles) if(!valid_texture_style(style))
             return R::failure(ErrorCode::invalid_request,"invalid motion texture style");
         for(const auto& p:endpoint->particles) if(p.texture_style_index>endpoint->texture_styles.size() ||
@@ -52,6 +59,7 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
     // including one-endpoint births/deaths, instead of copying matrices per slot.
     std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> basis_pairs;
     std::map<std::pair<bool,std::uint32_t>,std::uint32_t> texture_indices;
+    std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> cloud_pairs;
     constexpr auto absent=std::numeric_limits<std::uint32_t>::max();
     constexpr ParticleSpriteBasis identity_basis{1,0,0,0,1,0,0,0,1};
     const auto basis_at=[&](const EvaluatedGraph& graph,std::uint32_t at)->const ParticleSpriteBasis& {
@@ -78,6 +86,23 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
             p.position.x+=p.velocity.x*dt;p.position.y+=p.velocity.y*dt;p.position.z+=p.velocity.z*dt;
         }
         if(p.age_seconds>=0 && p.age_seconds<p.lifetime_seconds) {
+            if(p.cloud_style_index) {
+                const auto key=std::pair{a?a->cloud_style_index:absent,b?b->cloud_style_index:absent};
+                auto found=cloud_pairs.find(key);
+                if(found==cloud_pairs.end()) {
+                    if(output.cloud_styles.size()==kMaxCloudStyles)
+                        return R::failure(ErrorCode::work_limit_exceeded,"motion Cloud styles exceed budget");
+                    const auto& source=a?first:last;
+                    auto style=source.cloud_styles[p.cloud_style_index-1];
+                    if(a && b && b->cloud_style_index) {
+                        const auto& other=last.cloud_styles[b->cloud_style_index-1];
+                        style.aspect=lerp(style.aspect,other.aspect);style.density=lerp(style.density,other.density);
+                    }
+                    output.cloud_styles.push_back(style);
+                    found=cloud_pairs.emplace(key,static_cast<std::uint32_t>(output.cloud_styles.size())).first;
+                }
+                p.cloud_style_index=found->second;
+            }
             if(p.shape==3) {
                 const auto key=std::pair{a!=nullptr,p.texture_style_index};
                 auto found=texture_indices.find(key);

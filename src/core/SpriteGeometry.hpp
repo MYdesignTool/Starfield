@@ -2,6 +2,7 @@
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Render.hpp"
 #include "starfield/core/ParticleTransform.hpp"
+#include "starfield/core/ParticleCloud.hpp"
 #include <algorithm>
 #include <cmath>
 namespace starfield::core::sprite_geometry {
@@ -30,6 +31,7 @@ struct Sprite {
     bool back_facing{};
     const TextureFrameView* texture_frame{};
     const ParticleTextureStyle* texture_style{};
+    const ParticleCloudStyle* cloud_style{};
 };
 inline bool valid_camera(const RenderRequest::Camera& camera) noexcept {
     if (!camera.enabled) return true;
@@ -50,13 +52,18 @@ inline Vec3 rotate_axis(Vec3 value,Vec3 angles) noexcept {
     return value;
 }
 inline bool project_sprite(const ParticleInstance& particle, const RenderRequest& request, const PixelGrid& grid, Sprite& sprite,
-    std::span<const ParticleSpriteBasis> bases = {}, double texture_ratio = 0, bool ignore_perspective = false) noexcept {
+    std::span<const ParticleSpriteBasis> bases = {}, double texture_ratio = 0, bool ignore_perspective = false,
+    std::span<const ParticleCloudStyle> clouds = {}) noexcept {
     sprite.particle=&particle;
+    if(particle.cloud_style_index) {
+        if(particle.shape!=2 || particle.cloud_style_index>clouds.size())return false;
+        sprite.cloud_style=&clouds[particle.cloud_style_index-1];
+    }
     const double rx=particle.size_pixels*.5;
     const bool texture=particle.shape==3;
     const double texture_par=texture?request.frame.pixel_aspect_ratio:1;
     const double physical_rx=rx*texture_par;
-    const double ry=texture && texture_ratio>0 ? physical_rx/texture_ratio : particle.shape==0?rx:particle.size_y_pixels*.5;
+    const double ry=texture && texture_ratio>0 ? physical_rx/texture_ratio : (particle.shape==0 || sprite.cloud_style)?rx:particle.size_y_pixels*.5;
     if(!(rx>0) || !(ry>0) || !(particle.opacity>0)) return false;
     const bool billboard=(particle.shape!=1 && particle.shape!=3) || particle.limit_to_2d;
     // Texture axes rotate in physical pixel units. Convert X back to layer
@@ -130,7 +137,20 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         std::isfinite(sprite.ay) && std::isfinite(sprite.bx) && std::isfinite(sprite.by);
 }
 
-inline double sprite_coverage(const ParticleInstance& particle,double x,double y,double edge_scale) noexcept {
+inline std::pair<double,double> sprite_bounds(const Sprite& s) noexcept {
+    if(s.cloud_style) {
+        const auto& c=*s.cloud_style;
+        const double spread=c.circles==1?0:c.density/100;
+        const double hx=1+spread*c.aspect/100,hy=1+spread;
+        return {hx*std::abs(s.ax)+hy*std::abs(s.bx),hx*std::abs(s.ay)+hy*std::abs(s.by)};
+    }
+    const bool rectangle=s.particle->shape==1 || s.particle->shape==3;
+    return {rectangle?std::abs(s.ax)+std::abs(s.bx):std::hypot(s.ax,s.bx),
+        rectangle?std::abs(s.ay)+std::abs(s.by):std::hypot(s.ay,s.by)};
+}
+
+inline double sprite_coverage(const ParticleInstance& particle,double x,double y,double edge_scale,
+    std::span<const CloudCircle> members = {}) noexcept {
     const double feather=particle.feather_percent/100;
     const auto circle=[&](double distance,double scale) {
         const double aa=std::clamp(.5+(1-distance)*scale,0.0,1.0);
@@ -138,6 +158,18 @@ inline double sprite_coverage(const ParticleInstance& particle,double x,double y
     };
     if(particle.shape==1 || particle.shape==3) return circle(std::max(std::abs(x),std::abs(y)),edge_scale);
     if(particle.shape==0) return circle(std::hypot(x,y),edge_scale);
+    if(!members.empty()) {
+        double remaining=1;
+        for(const auto& member:members) {
+            const double dx=x-member.x,dy=y-member.y;
+            // Cheap rejection avoids a sqrt for the sparse high-Density clouds.
+            const double margin=member.radius+.5/edge_scale;
+            if(std::abs(dx)>margin || std::abs(dy)>margin)continue;
+            remaining*=1-circle(std::hypot(dx,dy)/member.radius,edge_scale*member.radius);
+            if(remaining<=0)break;
+        }
+        return 1-remaining;
+    }
     // A deterministic five-circle cluster. All lobes remain inside the sprite
     // bounds, so ROI/work accounting and future GPU parity use the same extent.
     double remaining=1;

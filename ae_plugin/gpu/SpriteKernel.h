@@ -25,9 +25,22 @@ SF_INLINE float sf_circle(float d, float scale, float feather) {
     float aa=sf_clamp(.5f+(1.f-d)*scale);
     return aa*(feather>0.f?sf_clamp((1.f-d)/feather):1.f);
 }
-SF_INLINE float sf_coverage(sf_uint shape,float x,float y,float edge,float feather) {
+typedef struct SfCloudCircle { float x,y,radius,reserved; } SfCloudCircle;
+SF_INLINE float sf_coverage(sf_uint shape,float x,float y,float edge,float feather,
+    SF_GLOBAL const SfCloudCircle* members,sf_uint offset,sf_uint count) {
     if(shape==1) return sf_circle(fmaxf(fabsf(x),fabsf(y)),edge,feather);
     if(shape==0) return sf_circle(sqrtf(x*x+y*y),edge,feather);
+    if(count) {
+        float remaining=1.f;
+        for(sf_uint i=0;i<count;++i) {
+            SfCloudCircle c=members[offset+i];
+            float dx=x-c.x,dy=y-c.y,margin=c.radius+.5f/edge;
+            if(fabsf(dx)>margin || fabsf(dy)>margin)continue;
+            remaining*=1.f-sf_circle(sqrtf(dx*dx+dy*dy)/c.radius,edge*c.radius,feather);
+            if(remaining<=0.f)break;
+        }
+        return 1.f-remaining;
+    }
     float remaining=1.f;
     const float cx[5]={0.f,-.35f,.35f,-.2f,.2f};
     const float cy[5]={0.f,-.2f,-.2f,.35f,.35f};
@@ -39,7 +52,7 @@ SF_INLINE float sf_coverage(sf_uint shape,float x,float y,float edge,float feath
 }
 SF_KERNEL void starfield_sprite_render(SF_GLOBAL float* output,
     SF_GLOBAL const SfSprite* sprites,SF_GLOBAL const sf_uint* offsets,
-    SF_GLOBAL const sf_uint* indices,sf_uint width,sf_uint height,
+    SF_GLOBAL const sf_uint* indices,SF_GLOBAL const SfCloudCircle* members,sf_uint width,sf_uint height,
     sf_uint row_floats,sf_uint tiles_x,sf_uint first_y,sf_uint roi_x,sf_uint roi_y,
     sf_uint roi_width,sf_uint roi_height,sf_uint straight,sf_uint samples,float gain) {
     sf_uint px=SF_X,py=SF_Y+first_y;
@@ -56,7 +69,8 @@ SF_KERNEL void starfield_sprite_render(SF_GLOBAL float* output,
                 SfSprite s=sprites[indices[k]];
                 if(x<(sf_uint)s.left || y<(sf_uint)s.top || x>=(sf_uint)s.right || y>=(sf_uint)s.bottom) continue;
                 float dx=(float)x+.5f-s.x,dy=(float)y+.5f-s.y;
-                float alpha=sf_coverage(s.shape,dx*s.ia+dy*s.ib,dx*s.ic+dy*s.id,s.edge,s.feather)*s.opacity;
+                float alpha=sf_coverage(s.shape,dx*s.ia+dy*s.ib,dx*s.ic+dy*s.id,s.edge,s.feather,
+                    members,s.reserved[1],s.reserved[2])*s.opacity;
                 if(alpha<=0.f) continue;
                 float rem=1.f-alpha;
                 if(s.reserved[0]==3) {sr*=rem;sg*=rem;sb*=rem;sa*=rem;}

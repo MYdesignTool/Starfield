@@ -224,7 +224,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 sprite.texture_frame=texture_frames.at({source->resource_id,index.value()});
                 sprite.texture_style=&style;
                 sprites.push_back(sprite);
-            } else if (project_sprite(particle,request,grid,sprite,evaluated.value().sprite_bases)) sprites.push_back(sprite);
+            } else if (project_sprite(particle,request,grid,sprite,evaluated.value().sprite_bases,0,false,evaluated.value().cloud_styles)) sprites.push_back(sprite);
         }
         if (request.camera.enabled) std::stable_sort(sprites.begin(), sprites.end(), [](const Sprite& a, const Sprite& b) {
             return a.depth > b.depth;
@@ -245,9 +245,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         }
 
         const double pixel_x = sprite.x - roi.left, pixel_y = sprite.y - roi.top;
-        const bool rectangle=particle.shape==1 || particle.shape==3;
-        const double radius_x = rectangle?std::abs(sprite.ax)+std::abs(sprite.bx):std::hypot(sprite.ax,sprite.bx);
-        const double radius_y = rectangle?std::abs(sprite.ay)+std::abs(sprite.by):std::hypot(sprite.ay,sprite.by);
+        const auto [radius_x,radius_y]=sprite_bounds(sprite);
         if (!(radius_x > 0.0) || !(radius_y > 0.0)) {
             continue;
         }
@@ -260,7 +258,8 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
             continue; // fully outside the region of interest
         }
 
-        const auto box_pixels = static_cast<std::uint64_t>(right - left) * static_cast<std::uint64_t>(bottom - top);
+        const auto member_count=sprite.cloud_style ? (sprite.cloud_style->density==0?1u:sprite.cloud_style->circles) : 1u;
+        const auto box_pixels = static_cast<std::uint64_t>(right - left) * static_cast<std::uint64_t>(bottom - top)*member_count;
         if (limits_.max_sprite_pixel_ops != 0 &&
             box_pixels > limits_.max_sprite_pixel_ops - sprite_pixels) {
             return OutputResult::failure(ErrorCode::work_limit_exceeded,
@@ -272,7 +271,14 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         // without any neighborhood or random sampling.
         const double determinant = sprite.ax * sprite.by - sprite.ay * sprite.bx;
         if (!std::isfinite(determinant) || std::abs(determinant) < 1e-12) continue;
-        const double edge_scale = std::min(radius_x, radius_y);
+        const double edge_scale = sprite.cloud_style ? std::min(std::hypot(sprite.ax,sprite.bx),std::hypot(sprite.ay,sprite.by)) : std::min(radius_x, radius_y);
+        std::array<CloudCircle,kMaxCloudCircles> cloud_storage;
+        std::span<const CloudCircle> members;
+        if(sprite.cloud_style) {
+            auto writable=std::span{cloud_storage}.first(member_count);
+            make_cloud_circles(*sprite.cloud_style,particle.cloud_random_key,writable);
+            members=writable;
+        }
 
         for (std::int64_t y = top; y < bottom; ++y) {
             if (cancellation.is_cancelled()) {
@@ -285,7 +291,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 const double delta_x = (dx * sprite.by - dy * sprite.bx) / determinant;
                 const double delta_y = (dy * sprite.ax - dx * sprite.ay) / determinant;
                 if (!std::isfinite(delta_x) || !std::isfinite(delta_y)) continue;
-                const double coverage=sprite_coverage(particle,delta_x,delta_y,edge_scale);
+                const double coverage=sprite_coverage(particle,delta_x,delta_y,edge_scale,members);
                 if (coverage <= 0.0) {
                     continue;
                 }

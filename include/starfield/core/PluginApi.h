@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 6u
+#define SF_CORE_ABI_VERSION 7u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -114,8 +114,10 @@ typedef struct SfGpuSprite {
     float x, y, inverse_ax, inverse_ay, inverse_bx, inverse_by;
     float edge_scale, feather, red, green, blue, opacity;
     int32_t left, top, right, bottom;
-    uint32_t shape, reserved[3]; /* ABI5: reserved[0] is ParticleTransferMode (0..3); remaining words zero. */
+    uint32_t shape, reserved[3]; /* ABI7: transfer, Cloud member offset/count; zero count keeps legacy. */
 } SfGpuSprite;
+typedef struct SfGpuCloudCircle { float x, y, radius, reserved; } SfGpuCloudCircle;
+
 typedef struct SfCoreGpuSceneResult {
     uint32_t struct_size;
     SfCoreStatus status;
@@ -126,6 +128,8 @@ typedef struct SfCoreGpuSceneResult {
     const uint32_t* tile_offsets; /* tiles_x * tiles_y + 1 entries */
     const uint32_t* tile_indices;
     void* opaque_handle;
+    uint32_t cloud_circle_count;
+    const SfGpuCloudCircle* cloud_circles;
 } SfCoreGpuSceneResult;
 
 typedef struct SfCoreApi {

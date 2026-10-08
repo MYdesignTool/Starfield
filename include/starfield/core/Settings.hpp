@@ -60,6 +60,14 @@ inline constexpr double kMaxGravityMagnitude = 100'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
 inline constexpr double kMaxParticleColor = 64.0;
 enum class ParticleTransferMode : std::uint32_t { normal=0, add=1, screen=2, stencil=3 };
+inline constexpr std::uint32_t kMaxCloudCircles = 1000;
+inline constexpr std::size_t kMaxCloudStyles = 4096;
+inline constexpr std::size_t kMaxCloudMembers = 2'000'000;
+struct ParticleCloudStyle {
+    std::uint32_t circles{10};
+    double aspect{150};
+    double density{66};
+};
 inline constexpr double kMaxEmissionSpeed = 100'000.0;
 inline constexpr double kMaxEmissionAngleDegrees = 100'000.0;
 inline constexpr double kMaxDirectionSpanDegrees = 180.0;

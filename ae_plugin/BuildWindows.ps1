@@ -87,6 +87,7 @@ $adapterInputs = @(
     'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp', 'src\core\TransformEvaluation.hpp',
     'include\starfield\core\ParticleSimulation.hpp',
     'include\starfield\core\ParticleTransform.hpp',
+    'include\starfield\core\ParticleCloud.hpp',
     'include\starfield\core\Random.hpp',
     'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
     'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',

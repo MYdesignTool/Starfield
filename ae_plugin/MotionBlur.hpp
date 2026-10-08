@@ -42,6 +42,7 @@ struct MotionExposure {
     const MotionExposure&,const WorldLayout&,PF_EffectWorld*,HostBitDepth,const core::Cancellation&) noexcept;
 struct MotionGpuStorage {
     std::vector<SfGpuSprite> sprites;
+    std::vector<SfGpuCloudCircle> cloud_circles;
     std::vector<std::uint32_t> offsets,indices;
 };
 [[nodiscard]] PF_Err prepare_motion_gpu(PF_InData*,PF_OutData*,const SfCoreApi&,SfCoreRenderRequest,

@@ -38,6 +38,8 @@ struct ParticleInstance {
     ParticleTransferMode transfer_mode{ParticleTransferMode::normal};
     // 1-based shared style index; zero is reserved for non-texture particles.
     std::uint32_t texture_style_index{}, texture_random_key{};
+    // Zero keeps legacy five-circle Cloud. Members remain one logical particle.
+    std::uint32_t cloud_style_index{}, cloud_random_key{};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

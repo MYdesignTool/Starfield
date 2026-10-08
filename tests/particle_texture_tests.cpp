@@ -182,8 +182,8 @@ void projection_render_abi() {
     g.particles.back().transfer_mode=ParticleTransferMode::stencil;output=render(g);near(pixel(output)[3],0,"texture Stencil uses source alpha");
     auto missing=request(evaluated());check(!CpuParticleRenderer{}.render(missing,never).has_value(),"missing resources do not substitute");
     check(prepare_sprite_scene(missing,never).error().code==ErrorCode::unsupported_format,"texture gets typed CPU fallback");
-    SfCoreApi api{};check(StarfieldCore_GetApi(6,sizeof(api),&api)==1,"ABI six accepted");check(StarfieldCore_GetApi(5,sizeof(api),&api)==0,"old ABI rejected");
-    check(StarfieldCore_GetApi(6,sizeof(api),&api)==1,"ABI table restored");
+    SfCoreApi api{};check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"current ABI accepted");check(StarfieldCore_GetApi(6,sizeof(api),&api)==0,"old ABI rejected");
+    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1,"ABI table restored");
     const auto wire=serialize_graph(*request(evaluated()).graph,particle_node_registry());check(wire.has_value(),"frozen texture sequence serializes");
     SfCoreRenderRequest abi{};abi.struct_size=sizeof(abi);abi.frame={32,32,32,32,{0,0,32,32},1,1,1,30,2,0,1,1,1};abi.graph_bytes=wire.value().data();abi.graph_byte_count=wire.value().size();
     SfTextureSource sources[]{{sizeof(SfTextureSource),7,0,4,.5,2,2,2},{sizeof(SfTextureSource),8,0,4,.5,1,1,1}};

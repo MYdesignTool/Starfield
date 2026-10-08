@@ -8,6 +8,7 @@ struct SpriteScene {
     RectI region;
     std::uint32_t tiles_x{}, tiles_y{};
     std::vector<SfGpuSprite> sprites;
+    std::vector<SfGpuCloudCircle> cloud_circles;
     std::vector<std::uint32_t> offsets, indices;
 };
 [[nodiscard]] Result<SpriteScene> prepare_sprite_scene(const RenderRequest&, const Cancellation&);

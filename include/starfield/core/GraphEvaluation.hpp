@@ -5,6 +5,7 @@
 #include "starfield/core/EmitterHistory.hpp"
 #include "starfield/core/EmissionTimeline.hpp"
 #include "starfield/core/ParticleTransform.hpp"
+#include "starfield/core/ParticleCloud.hpp"
 #include <memory>
 
 namespace starfield::core {
@@ -16,6 +17,7 @@ struct EvaluatedGraph {
     std::vector<NodeId> evaluated_nodes;
     std::vector<ParticleSpriteBasis> sprite_bases;
     std::vector<ParticleTextureStyle> texture_styles;
+    std::vector<ParticleCloudStyle> cloud_styles;
 };
 
 // Pre-render supplies actual authored values at historical times. No host
