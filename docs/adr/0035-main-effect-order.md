@@ -101,3 +101,30 @@ Evidence:
   Log: artifacts/m3-14-main-order-build.log.
 
 These checks do not qualify AE saved-project migration or Source texture behavior.
+
+## Paired deployment, 2026-10-08
+
+At 17:08 +08:00, a fresh no-AfterFX/AfterFX_64 check allowed publication under
+the standing owner authorization. Source4d64765a8e7ceceeaa5ff5f7229e77c9d1a66a25
+is installed as native54/CEP54/ABI6 through Deploy-TestBuild.ps1 and the existing
+two Junctions. Seven native/Core and eleven CEP hashes were verified; the Core
+selector remains StarfieldCore-037D48F4411A16E8.dll and its selected DLL hash
+matches StarfieldCore.dll. The verified backup contains exact native53/CEP53.
+The read-only paired rollback report passed. No process/registry change occurred.
+
+Receipts: artifacts/m3-14-native54-deploy-before.json,
+artifacts/m3-14-native54-deploy-after.json,
+artifacts/m3-14-native54-native-deploy.log,
+artifacts/m3-14-native54-deploy-wrapper.log,
+artifacts/m3-14-native54-rollback-report.log.
+
+One-step rollback, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-14-native54-panel54-main-order-20261008' -Restore
+```
+
+The owner's fresh-effect error retry, actual group/menu display and saved-project
+migration are pending. Use native54/CEP54 for the next host feedback. M3-13 Source
+time/footage/undo gates, Masks/Effects and the remaining Particle families stay
+open under the complete goal.
