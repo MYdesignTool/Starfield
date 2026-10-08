@@ -42,6 +42,8 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 
 ## M3-13 — Particle Texture / Layer 采样（2026-10-08）
 
+2026-10-08 owner native57 已能列出 Comp 2；选择后在纹理源校验返回512。当前优先修复原生提交临时 PF 上下文缺失 effect_ref 时的 owner 传递，保留事务回滚；暂停安排新的行为族。拥有 NativeGraphCommit/NativeNodeGraph、focused native binding tests、version/isolated CEP pairing、ADR0034 与配对发布。build58/CEP58 候选不改变 IDs/schema/ABI7；修复后实际选择/渲染仍待 owner 验收。
+
 当前完整 goal 继续；不是以已完成的 Transform/Transfer 代替剩余要求。
 拥有：Settings/ParticleTexture、Render.hpp/C ABI/快照、图求值/CPU/GPU fallback、AE texture 作者与 SmartFX checkout、CEP/资源/预设、schema/version、focused texture tests、ADR0034。
 依赖：已部署 native52/CEP52、ABI5；参考字段和八种采样菜单已核对。Freeze Frame 经 owner 明确选择为粒子出生时的图层画面。

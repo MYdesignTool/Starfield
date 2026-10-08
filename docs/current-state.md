@@ -4,6 +4,8 @@
 
 ## 源码与安装
 
+native58/CEP58 修复候选已构建，尚未部署（fresh AE check：PID28924）。owner 确认 Comp 2 已列出，但选择时报512；原生提交临时 PF 上下文没有 effect_ref，已改为向绑定事务传入确认过的 owner layer。IDs/schema/ABI7 不变。原生7773+相机12检查、隔离 CEP 纹理47与完整事务通过；May2023 /MT 构建通过。候选 artifacts/prepared/m3-13-native58-panel58；日志 m3-13-native58-*。实际选择/渲染 gate 开放。部署后另记57配对回滚。
+
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
 | 原生版本 | build57，packed32825 | native57，packed32825 |
@@ -55,6 +57,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- owner 的 native55 Texture menu 仍只显示 None；native56 owner-pinned public layer inventory 已部署，实际新结果待确认。
+- owner 确认 native57 Texture menu 已能列出 Comp 2；选择时报 `validate texture source layers` /512，native58 修复候选等待闭 AE 发布与实际验收。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。

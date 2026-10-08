@@ -2,6 +2,37 @@
 
 Status: implementation in progress, 2026-10-08. Task M3-13.
 
+## Native selection transaction correction, 2026-10-08
+
+Owner native57 evidence confirms that Comp 2 now appears, but selecting it
+fails at `validate texture source layers` with error512, followed by an invalid
+parameter dialog. NativeGraphCommit builds a local PF_InData with no effect_ref;
+the binding installer incorrectly queries that absent PF effect to recover the
+owner layer, despite NativeEdit already carrying the validated owner layer.
+Pass that borrowed UI layer directly into NativeBindingTransaction. Ordinary
+main-effect callers retain the real PF effect lookup; missing contexts fail
+before querying AE. Split owner/comp/source diagnostics and retain self/deleted
+source rejection and atomic resource/graph rollback. No IDs, stream indices,
+schema, sequence, Core ABI or numeric texture behavior change. Build58/CEP58
+will be a paired maintenance candidate. Strict null-PF fixtures must exercise
+front/back native selection, subsequent edits, deselection and publication
+failure; compilation does not qualify actual AE selection or rendering.
+
+Candidate58 evidence: tests/RunCloudNativeSyncTests.ps1 -Run -Bindings passes
+7773 native checks plus12 camera checks,0 failures. The PF layer fixture rejects
+null effect_ref and stores resource slots as LAYER_ID; its previously permissive
+callback and scalar union storage had hidden this transaction gap. New checks
+cover front/back selection, retained references on another edit, main PF lookup,
+missing contexts, deleted/self references, None, and graph-publication rollback
+of slots/revision/bytes/expressions. Isolated CEP58 Texture checks47 and complete
+gateway transactions pass. The May2023 /MT build passes with both publication
+switches disabled. The startup fixture now accepts STARFIELD_PANEL_ROOT and
+passes against the actual isolated58 gateway/panel pair. Logs: artifacts/m3-13-native58-binding-tests.log,
+artifacts/m3-13-native58-build.log, artifacts/m3-13-native58-texture_panel_tests.log,
+artifacts/m3-13-native58-panel_native_node_gateway_tests.log,
+artifacts/m3-13-native58-panel_startup_tests.log. Real AE selection
+and pixel rendering remain open; owner Comp 2 inventory success is retained.
+
 ## Precomposition picker correction, 2026-10-08
 
 Owner AE2023 evidence after native55 deployment still shows only None with

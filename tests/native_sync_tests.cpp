@@ -39,6 +39,7 @@ using namespace starfield::adapter;
 namespace core = starfield::core;
 namespace records = starfield::adapter::native_nodes;
 int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{}, aegp_suite_requests{};
+int null_pf_layer_queries{};
 void check(bool condition, const char* message) {
     ++checks; if (!condition) { ++failures; std::printf("FAILED: %s\n", message); }
 }
@@ -273,7 +274,19 @@ int main() {
     layers.AEGP_GetLayerCurrentTime = [](AEGP_LayerH, AEGP_LTimeMode, A_Time* time)->A_Err { *time = {0, 24}; return 0; };
     items.AEGP_GetItemDimensions = [](AEGP_ItemH, A_long* width, A_long* height)->A_Err { *width = 1920; *height = 1080; return 0; };
     items.AEGP_GetItemPixelAspectRatio = [](AEGP_ItemH, A_Ratio* aspect)->A_Err { *aspect = {1, 1}; return 0; };
-    pf.AEGP_GetEffectLayer = [](PF_ProgPtr, AEGP_LayerH* layer)->A_Err { *layer = reinterpret_cast<AEGP_LayerH>(1); return 0; };
+    pf.AEGP_GetEffectLayer = [](PF_ProgPtr ref, AEGP_LayerH* layer)->A_Err {
+        if(!ref){++null_pf_layer_queries;*layer=nullptr;return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+        *layer = reinterpret_cast<AEGP_LayerH>(1); return 0;
+    };
+    layers.AEGP_GetLayerParentComp=[](AEGP_LayerH layer,AEGP_CompH* comp)->A_Err {
+        if(layer!=reinterpret_cast<AEGP_LayerH>(1))return PF_Err_BAD_CALLBACK_PARAM;
+        *comp=reinterpret_cast<AEGP_CompH>(10);return 0;
+    };
+    layers.AEGP_GetLayerFromLayerID=[](AEGP_CompH comp,AEGP_LayerIDVal id,AEGP_LayerH* source)->A_Err {
+        if(comp!=reinterpret_cast<AEGP_CompH>(10))return PF_Err_BAD_CALLBACK_PARAM;
+        *source=id==1?reinterpret_cast<AEGP_LayerH>(1):id>=77 && id<=79?reinterpret_cast<AEGP_LayerH>(id):nullptr;
+        return 0;
+    };
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(0); return 0; };
     effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
@@ -291,7 +304,8 @@ int main() {
     stream.AEGP_GetStreamType = [](AEGP_StreamRefH ref, AEGP_StreamType* type)->A_Err {
         const auto& key = *reinterpret_cast<Ref*>(ref);
         if (key.index == wrong_type) { wrong_type = -1; *type = AEGP_StreamType_COLOR; }
-        else if((key.effect==4 && key.index==1) || (key.effect==2 &&
+        else if((!key.effect && key.index>=kTextureResourceFirstIndex && key.index<kTextureResourceFirstIndex+kTextureResourceCapacity) ||
+                (key.effect==4 && key.index==1) || (key.effect==2 &&
                 (key.index==records::particle_layout::texture_front || key.index==records::particle_layout::texture_back)))
             *type=AEGP_StreamType_LAYER_ID;
         else if(key.effect==5)*type=AEGP_StreamType_ThreeD_SPATIAL;
@@ -322,6 +336,8 @@ int main() {
             auto copy = clone(reinterpret_cast<PF_Handle>(value->val.arbH));
             dispose(reinterpret_cast<PF_Handle>(fixtures[0].values[key.index].arbH));
             fixtures[0].values[key.index].arbH = reinterpret_cast<AEGP_ArbBlockVal>(copy);
+        } else if(key.index>=kTextureResourceFirstIndex && key.index<kTextureResourceFirstIndex+kTextureResourceCapacity) {
+            fixtures[0].values[key.index].layer_id=value->val.layer_id;
         } else {
             // Model host float storage; integer receipts must remain exact.
             fixtures[0].values[key.index].one_d = static_cast<PF_FpShort>(value->val.one_d);
@@ -499,6 +515,67 @@ int main() {
     check(commit_native_graph_edit(&local_edit, 701, &local_output) == 0 && local_edit.accepted,
           "publication needs no renderer callback or registered main AEGP ID");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kParticleLifetimeSeconds)) == 9, "Particle lifetime saved");
+    {
+        namespace layout=records::particle_layout;
+        const auto select_texture=[&](A_long index,AEGP_LayerIDVal id) {
+            // The custom selector saves its authoritative constant stream under
+            // a guard before the native commit, matching the production path.
+            particle.values[index].layer_id=id;
+            auto request=edit(1,index,0);
+            const auto result=direct_edit(request);
+            return result==0 && request.accepted;
+        };
+        check(select_texture(layout::texture_front,77),"native front selection uses borrowed owner with absent local PF effect_ref");
+        check(std::get<std::uint32_t>(parameter(saved_graph(),core::graph_keys::kParticleNode,core::graph_keys::kTextureFront))==77 &&
+            main.values[kTextureResourceCountIndex].one_d==1 && main.values[kTextureResourceFirstIndex].layer_id==77,
+            "front resource reaches graph and renderer-owned checkout slot");
+        check(select_texture(layout::texture_back,78) && main.values[kTextureResourceCountIndex].one_d==2 &&
+            main.values[kTextureResourceFirstIndex+1].layer_id==78,"native back selection publishes the second resource");
+        auto subsequent=edit(1,2,9);
+        check(direct_edit(subsequent)==0 && subsequent.accepted,"other Particle edits retain selected texture resources");
+        const auto textured=saved_graph();
+        const auto bytes=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
+        const auto before_revision=main.values[kGraphRevisionId].one_d;
+        const auto before_expressions=expressions;
+        particle.values[layout::texture_front].layer_id=79;
+        auto failed_selection=edit(1,layout::texture_front,0);fail_set=kGraphParameterId;
+        check(direct_edit(failed_selection)!=0 && !failed_selection.accepted &&
+            main.values[kGraphRevisionId].one_d==before_revision &&
+            handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==bytes &&
+            main.values[kTextureResourceCountIndex].one_d==2 && main.values[kTextureResourceFirstIndex].layer_id==77 &&
+            main.values[kTextureResourceFirstIndex+1].layer_id==78 && expressions==before_expressions,
+            "failed graph publication restores texture slots, graph, revision and animation bindings");
+        particle.values[layout::texture_front].layer_id=77; // Selector restores its source stream after rejection.
+        const auto before_rejected_sets=sets;
+        for(auto id:{1,99}) {
+            particle.values[layout::texture_front].layer_id=id;
+            auto invalid_source=edit(1,layout::texture_front,0);
+            check(direct_edit(invalid_source)!=0 && !invalid_source.accepted && sets==before_rejected_sets &&
+                invalid_source.binding_stage && std::strcmp(invalid_source.binding_stage,"validate texture source layers")==0,
+                "self and deleted texture sources reject before any writes");
+        }
+        particle.values[layout::texture_front].layer_id=77;
+        auto local=renderer_data;local.effect_ref=nullptr;
+        {
+            NativeBindingTransaction bindings(&local,701,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1));
+            check(bindings.install(textured)==0,"binding transaction accepts validated borrowed owner without PF context");bindings.accept();
+        }
+        {
+            NativeBindingTransaction bindings(&local,701,effect_ref(0));const char* stage=nullptr;
+            check(bindings.install(textured,nullptr,&stage)==PF_Err_BAD_CALLBACK_PARAM && stage &&
+                std::strcmp(stage,"resolve texture owner layer")==0,"missing owner and PF context fails before a host query");
+        }
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(textured)==0,"main-effect texture transaction still resolves its real PF effect");bindings.accept();
+        }
+        check(select_texture(layout::texture_front,0) && main.values[kTextureResourceCountIndex].one_d==1 &&
+            main.values[kTextureResourceFirstIndex].layer_id==78 && main.values[kTextureResourceFirstIndex+1].layer_id==0,
+            "front deselection retains back and clears unused resource tail");
+        check(select_texture(layout::texture_back,0) && main.values[kTextureResourceCountIndex].one_d==0 &&
+            main.values[kTextureResourceFirstIndex].layer_id==0,"last deselection clears all renderer resources");
+        check(null_pf_layer_queries==0 && live_refs==0 && acquisitions==0,"texture transactions never query a null PF effect and release all suites and streams");
+    }
     auto opacity = edit(1, 8, 25); check(direct_edit(opacity) == 0, "Particle opacity publishes");
     check(std::get<double>(parameter(saved_graph(), core::graph_keys::kParticleNode, core::graph_keys::kOpacityStart)) == .25, "percent opacity normalized");
     auto color = edit(1, 11, 0); color.value_kind = node_sync::ValueKind::color; color.value = {.2, .3, .4, 1};

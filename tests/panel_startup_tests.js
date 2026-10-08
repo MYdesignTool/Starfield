@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const panelRoot = process.env.STARFIELD_PANEL_ROOT || path.join(__dirname, "..", "cep_panel");
 
 class FakeElement {
     constructor(id) {
@@ -31,7 +32,7 @@ elements.autoRefresh.checked = true;
 const timers = new Map();
 let nextTimerId = 1;
 const gatewayHost = {};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,"..","cep_panel","jsx","starfield_gateway.jsx"),"utf8"), {$:{global:gatewayHost}});
+vm.runInNewContext(fs.readFileSync(path.join(panelRoot,"jsx","starfield_gateway.jsx"),"utf8"), {$:{global:gatewayHost}});
 const actualReadyToken = gatewayHost.SFLD_ready();
 let stateCalls = 0, gatewayLoads = 0, gatewayProbes = 0;
 let pulseCalls = 0, pulseStamp = "idle", holdPulse = false, pendingPulse;
@@ -128,9 +129,9 @@ const document = {
     addEventListener() {}
 };
 
-const graphViewSource = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "graph_view.js"), "utf8");
+const graphViewSource = fs.readFileSync(path.join(panelRoot, "js", "graph_view.js"), "utf8");
 vm.runInNewContext(graphViewSource, { window, document, Date, Math, JSON, String, Number, isFinite });
-const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "js", "panel.js"), "utf8");
+const source = fs.readFileSync(path.join(panelRoot, "js", "panel.js"), "utf8");
 vm.runInNewContext(source, { window, document, Date:Clock, Math, JSON, String, Number, isFinite });
 
 assert.strictEqual(stateCalls, 1, "panel should request the current target immediately on startup");

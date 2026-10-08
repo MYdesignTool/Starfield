@@ -6,7 +6,7 @@
     // Keep the page and the reason visible when a dependency did not load.
     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-57",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+    var cep=window.__adobe_cep__,gatewayBuild="native-presets-58",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}

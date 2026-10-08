@@ -1248,6 +1248,7 @@ struct NativeBindingTransaction::Impl {
     PF_InData* data{};
     AEGP_PluginID id{};
     AEGP_EffectRefH renderer{};
+    AEGP_LayerH owner_layer{};
     bool owned_renderer{};
     SuiteSet suites;
     const AEGP_MemorySuite1* memory{};
@@ -1255,7 +1256,8 @@ struct NativeBindingTransaction::Impl {
     struct ResourceChange {AEGP_StreamRefH ref{};AEGP_LayerIDVal previous{};bool count{},changed{};};
     std::vector<ResourceChange> resources;
     bool accepted{};
-    Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r) : data(d), id(i), renderer(r), suites(d) {}
+    Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r, AEGP_LayerH owner)
+        : data(d), id(i), renderer(r), owner_layer(owner), suites(d) {}
     ~Impl() {
         for(auto& change:resources) {
             if(!accepted && change.changed) {
@@ -1280,7 +1282,10 @@ struct NativeBindingTransaction::Impl {
 };
 
 NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginID id, AEGP_EffectRefH renderer)
-    : impl_(std::make_unique<Impl>(data, id, renderer)) {}
+    : NativeBindingTransaction(data,id,renderer,nullptr) {}
+NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginID id,
+    AEGP_EffectRefH renderer, AEGP_LayerH owner_layer)
+    : impl_(std::make_unique<Impl>(data, id, renderer, owner_layer)) {}
 NativeBindingTransaction::~NativeBindingTransaction() = default;
 void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; }
 
@@ -1320,12 +1325,20 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         resource_ids.erase(std::unique(resource_ids.begin(),resource_ids.end()),resource_ids.end());
         if(resource_ids.size()>kTextureResourceCapacity)return PF_Err_BAD_CALLBACK_PARAM;
         if(!resource_ids.empty()) {
-            stage("validate texture source layers");
+            stage("acquire texture source layer suite");
             ae=tx.suites.basic->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,reinterpret_cast<const void**>(&tx.suites.layer));
-            AEGP_LayerH owner{};AEGP_CompH comp{};
-            if(!ae)ae=tx.suites.pf_interface->AEGP_GetEffectLayer(tx.data->effect_ref,&owner);
-            if(!ae)ae=tx.suites.layer->AEGP_GetLayerParentComp(owner,&comp);
-            if(ae || !owner || !comp)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            if(ae || !tx.suites.layer)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            stage("resolve texture owner layer");
+            AEGP_LayerH owner=tx.owner_layer;AEGP_CompH comp{};
+            if(!owner) {
+                if(!tx.data || !tx.data->effect_ref)return PF_Err_BAD_CALLBACK_PARAM;
+                ae=tx.suites.pf_interface->AEGP_GetEffectLayer(tx.data->effect_ref,&owner);
+                if(ae || !owner)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            }
+            stage("resolve texture owner composition");
+            ae=tx.suites.layer->AEGP_GetLayerParentComp(owner,&comp);
+            if(ae || !comp)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            stage("validate texture source layers");
             for(const auto id:resource_ids) {
                 AEGP_LayerH source{};ae=tx.suites.layer->AEGP_GetLayerFromLayerID(comp,id,&source);
                 if(ae || !source || source==owner)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);

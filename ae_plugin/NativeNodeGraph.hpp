@@ -39,7 +39,11 @@ private:
 // UI-only transaction. Restores changed dependency expressions unless accepted.
 class NativeBindingTransaction {
 public:
+    // NativeEdit's local PF context has no effect_ref. Borrow its validated UI
+    // owner layer; main-effect callers can resolve their real PF effect instead.
     NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH = nullptr);
+    NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH,
+                             AEGP_LayerH owner_layer);
     ~NativeBindingTransaction();
     NativeBindingTransaction(const NativeBindingTransaction&) = delete;
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;

@@ -166,7 +166,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         edit->stage = node_sync::Stage::allocation;
         error = create_graph_parameter(data, graph, &publish.graph);
         if (error) return edit->status = error;
-        NativeBindingTransaction bindings(data, plugin_id, edit->renderer);
+        NativeBindingTransaction bindings(data, plugin_id, edit->renderer, edit->layer);
         edit->stage = node_sync::Stage::animation_bindings;
         error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter);
         if (error) return edit->status = error;
