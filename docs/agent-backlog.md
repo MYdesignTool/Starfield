@@ -1172,3 +1172,11 @@ plus pinned/selected Core verified; deployment and rollback recorded in build-ma
 P-02J source/build/deployment complete: 761 scoped checks plus generated expression/
 CEP keyed-write checks pass; build 18 installed through the existing Junction,
 all six hashes/backups verified. Owner AE animation gate remains pending.
+
+## M3-12 — Particle Transfer Mode 与节点效果定位（2026-10-08）
+
+owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后展开并滚动到原生效果。
+拥有：Particle Core 类型/graph/求值/快照/CPU/GPU，Particle native 控件/记录/绑定，StarfieldHost UI reveal 命令、CEP graph inspector/gateway/preset 映射，node schema、Core ABI/version、配对发布、ADR0033。
+依赖：M3-11 当前 native51/CEP51；owner 本次已确认上次删除和相对 Null 引用修复无问题。广泛 undo/reopen gate 保留。
+迁移：ADR0033 先行；追加 disk232/stream519，保留现有 streams/IDs，graph key30 optional/Normal，private binding v3/snapshot5/Core ABI5。
+完成条件：全链路实现与构建，AE 关闭后配对发布并核对哈希/回滚；本次不新增或运行实现测试。实机行为由 owner 验收。

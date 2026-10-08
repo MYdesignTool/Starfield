@@ -79,7 +79,8 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
         if (right <= left || bottom <= top) continue;
         SfGpuSprite sprite{float(x), float(y), float(s.by/determinant), float(-s.bx/determinant),
             float(-s.ay/determinant), float(s.ax/determinant), float(std::min(rx,ry)), float(p.feather_percent/100),
-            float(p.color.x), float(p.color.y), float(p.color.z), float(p.opacity), left, top, right, bottom, p.shape, {}};
+            float(p.color.x), float(p.color.y), float(p.color.z), float(p.opacity), left, top, right, bottom, p.shape,
+            {static_cast<std::uint32_t>(p.transfer_mode),0,0}};
         // Extreme projection is a per-frame CPU fallback, never a truncated GPU scene.
         const float numeric[]{sprite.x,sprite.y,sprite.inverse_ax,sprite.inverse_ay,sprite.inverse_bx,sprite.inverse_by,
             sprite.edge_scale,sprite.feather,sprite.red,sprite.green,sprite.blue,sprite.opacity};

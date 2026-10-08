@@ -66,7 +66,10 @@
     }
     function motionDefaults(graph) {
         var values=[1,360,0,0,8,70,0,0];
-        graph.nodes.forEach(function(node){if(node.type!==edits.types.output)return;
+        graph.nodes.forEach(function(node){
+            if(node.type===edits.types.particle && !node.parameters.some(function(p){return p.key==="30";}))
+                node.parameters.push({key:"30",type:3,value:0});
+            if(node.type!==edits.types.output)return;
             values.forEach(function(value,i){var key=String(8+i);
                 if(!node.parameters.some(function(p){return p.key===key;}))node.parameters.push({key:key,type:i===0||i===3||i===7?3:4,value:value});
             });

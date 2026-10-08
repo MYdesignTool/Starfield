@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-51";
+    var GATEWAY_BUILD = "native-presets-52";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -911,7 +911,7 @@
                 scalar(11,"Life (Seconds)");scalar(14,"Life Random");scalar(16,"Size Y (Pixels)");
                 scalar(19,"Angle Random");scalar(21,"Rotation Speed Random");scalar(23,"Particle Feather");
                 scalar(26,"Limit Angle");scalar(28,"Anchor X (Percent)");scalar(29,"Anchor Y (Percent)");scalar(22,"Limit To 2D",3);
-                var enums=[[15,"Shape"],[17,"Orient To"],[25,"Random Limit"],[24,"Up Axis"]];
+                var enums=[[15,"Shape"],[17,"Orient To"],[25,"Random Limit"],[24,"Up Axis"],[30,"Transfer Mode"]];
                 for(var ei=0;ei<enums.length;ei++) {
                     scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
                 }
@@ -1033,6 +1033,11 @@
         }
         setNodeControl(effect, "Panel Sync Guard", 1);
         try {
+            if(node.type === "org.starfieldfx.nodes.particle") {
+                var hasTransfer=false;
+                for(var tp=0;tp<node.parameters.length;tp++)if(String(node.parameters[tp].key)==="30")hasTransfer=true;
+                if(!hasTransfer)setNodeControl(effect,"Transfer Mode",1);
+            }
             writeNodeRecord(effect, node);
             var type = node.type;
             for (var i = 0; i < node.parameters.length; i++) {
@@ -1103,7 +1108,7 @@
                     else if (key === "11" && type === "org.starfieldfx.nodes.particle") setNodeControl(effect, "Life (Seconds)", value);
                     else if(type==="org.starfieldfx.nodes.particle") {
                         var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Rotation Speed Random","23":"Particle Feather","26":"Limit Angle","28":"Anchor X (Percent)","29":"Anchor Y (Percent)","22":"Limit To 2D"};
-                        var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis"};
+                        var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis","30":"Transfer Mode"};
                         if(scalars[key]) setNodeControl(effect,scalars[key],value);
                         else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
                         else if(key==="27") writeNodeCurve(effect,"Rotation",value);
@@ -2260,12 +2265,18 @@
             var layer = resolved.target.layer;
             var effect = request.nodeId === "000000000000000000000000000000ff" ? resolved.target.effect : nodeEffectById(layer, request.nodeId);
             if (!effect) return fail("missing_node", "The selected node effect was removed; refresh the graph.");
-            // Selection is transient host UI state. UUID lookup survives reorder,
-            // duplicate names and native effect deletion; it writes no controls.
-            var selected = layer.selectedProperties;
-            for (var i = selected.length - 1; i >= 0; i--) selected[i].selected = false;
+            // Selection and native reveal are transient UI state. No parameter
+            // is written to trigger navigation or invalidate rendered frames.
+            var selectedLayers=layer.containingComp.selectedLayers;
+            for(var sl=0;sl<selectedLayers.length;sl++) {
+                var selected=selectedLayers[sl].selectedProperties;
+                for(var i=selected.length-1;i>=0;i--)selected[i].selected=false;
+            }
             layer.selected = true;
             effect.selected = true;
+            var reveal=app.findMenuCommandId("Starfield Reveal Selected Effect");
+            if(!reveal)throw new Error("Native effect reveal requires the current Starfield Host build.");
+            app.executeCommand(reveal);
             return reply({ok:true, operation:"selectNodeEffect", nodeId:request.nodeId, requestId:request.requestId || ""});
         } catch (error) { return fail("selection_failed", error.toString()); }
     }

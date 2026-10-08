@@ -44,8 +44,10 @@ constexpr A_long kNodeKind = 4;
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
 
-constexpr A_long kIdentityFirstIndex = kLastParameterIndex - 8;
-constexpr A_long kSyncGuardIndex = kLastParameterIndex;
+constexpr A_long kIdentityFirstIndex = starfield::adapter::native_nodes::uuid_first_index(
+    static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind));
+constexpr A_long kSyncGuardIndex = starfield::adapter::native_nodes::sync_guard_index(
+    static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind));
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
 
 using namespace starfield::adapter::native_nodes::disk_ids;
@@ -270,7 +272,7 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         // aliases change_flags, so testing it silently drops native edits.
         // Node records follow the authored parameters in the runtime layout.
         constexpr auto kind = static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind);
-        if (extra->param_index > starfield::adapter::native_nodes::base_parameter_count(kind)) return PF_Err_NONE;
+        if (!starfield::adapter::native_nodes::authored_parameter(kind,extra->param_index)) return PF_Err_NONE;
         std::array<std::uint16_t, 8> node_id{};
         if (!read_node_id(params, node_id)) return PF_Err_BAD_CALLBACK_PARAM;
         starfield::adapter::node_sync::NativeEdit edit;

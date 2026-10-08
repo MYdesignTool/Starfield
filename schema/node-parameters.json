@@ -1,8 +1,8 @@
 {
-  "identityRevision": 7,
+  "identityRevision": 8,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "scriptBindingPolicy": "PF group/topic entries are presentation markers, not script PropertyGroup containers. Native curve count/mode/knots and the duplicate Particle scalar Opacity resolve from the effect root by exact parameter matchName derived from these disk IDs. Display names, topic paths and mutable indices are not fallbacks. Panel42 / ADR0030.",
-  "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main27/index1/disk1631 (Motion Blur appended616..625) ; numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030. Native Transform1/base14 appends disk1401..1414 and binding fields15..26; Core ABI4/snapshot4 require a full paired build47. Existing kind IDs and graph envelope are retained. ADR0032.",
+  "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main27/index1/disk1631 (Motion Blur appended616..625) ; numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030. Native Transform1/base14 appends disk1401..1414 and binding fields15..26; Core ABI4/snapshot4 require a full paired build47. Existing kind IDs and graph envelope are retained. ADR0032. ADR0033/build52 appends Particle Transfer Mode disk232/stream519 after existing metadata; old streams/IDs unchanged, graph key30 optional Normal, binding v3/snapshot5/Core ABI5; paired native/CEP required.",
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "angleUiDefaults": "All native PF_Param_ANGLE controls start collapsed (PF_ParamFlag_START_COLLAPSED), including Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This changes the initial UI state only, preserves user expansion, and keeps keyframes/IDs/schemas unchanged. Build38 / ADR0028.",
   "fixed": {
@@ -113,7 +113,8 @@
     "transform_scale_y": 1411,
     "transform_scale_z": 1412,
     "transform_particles_scale": 1413,
-    "transform_particles_opacity": 1414
+    "transform_particles_opacity": 1414,
+    "particle_transfer_mode": 232
   },
   "outgoingConnections": {
     "first": 500,
@@ -337,7 +338,8 @@
     "forceSchemaVersion": 3,
     "outputSchemaVersion": 4,
     "particleSchemaVersion": 7,
-    "transformSchemaVersion": 1
+    "transformSchemaVersion": 1,
+    "particleTransferModeKey": 30
   },
   "nativeControlOrder": {
     "emitter": [
@@ -395,7 +397,8 @@
       "Rotation Over Life",
       "Anchor X (Percent)",
       "Anchor Y (Percent)",
-      "Limit To 2D"
+      "Limit To 2D",
+      "Transfer Mode"
     ],
     "force": [
       "Gravity",

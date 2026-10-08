@@ -59,6 +59,7 @@ inline constexpr double kMaxVelocitySpread = 100.0;
 inline constexpr double kMaxGravityMagnitude = 100'000.0;
 inline constexpr double kMaxLinearDrag = 100.0;
 inline constexpr double kMaxParticleColor = 64.0;
+enum class ParticleTransferMode : std::uint32_t { normal=0, add=1, screen=2, stencil=3 };
 inline constexpr double kMaxEmissionSpeed = 100'000.0;
 inline constexpr double kMaxEmissionAngleDegrees = 100'000.0;
 inline constexpr double kMaxDirectionSpanDegrees = 180.0;

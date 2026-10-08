@@ -59,7 +59,14 @@ SF_KERNEL void starfield_sprite_render(SF_GLOBAL float* output,
                 float alpha=sf_coverage(s.shape,dx*s.ia+dy*s.ib,dx*s.ic+dy*s.id,s.edge,s.feather)*s.opacity;
                 if(alpha<=0.f) continue;
                 float rem=1.f-alpha;
-                sr=s.r*alpha+sr*rem;sg=s.g*alpha+sg*rem;sb=s.b*alpha+sb*rem;sa=alpha+sa*rem;
+                if(s.reserved[0]==3) {sr*=rem;sg*=rem;sb*=rem;sa*=rem;}
+                else {
+                    float cr=s.r*alpha,cg=s.g*alpha,cb=s.b*alpha;
+                    if(s.reserved[0]==1) {sr+=cr;sg+=cg;sb+=cb;}
+                    else if(s.reserved[0]==2) {sr=cr+sr-cr*sr;sg=cg+sg-cg*sg;sb=cb+sb-cb*sb;}
+                    else {sr=cr+sr*rem;sg=cg+sg*rem;sb=cb+sb*rem;}
+                    sa=alpha+sa*rem;
+                }
             }
             r+=sr;g+=sg;b+=sb;a+=sa;
         }

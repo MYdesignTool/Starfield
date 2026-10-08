@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 4u
+#define SF_CORE_ABI_VERSION 5u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -99,7 +99,7 @@ typedef struct SfGpuSprite {
     float x, y, inverse_ax, inverse_ay, inverse_bx, inverse_by;
     float edge_scale, feather, red, green, blue, opacity;
     int32_t left, top, right, bottom;
-    uint32_t shape, reserved[3];
+    uint32_t shape, reserved[3]; /* ABI5: reserved[0] is ParticleTransferMode (0..3); remaining words zero. */
 } SfGpuSprite;
 typedef struct SfCoreGpuSceneResult {
     uint32_t struct_size;

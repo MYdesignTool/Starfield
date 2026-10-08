@@ -581,6 +581,7 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kRotationOverLife, ParameterKind::opaque_bytes, false},
         ParameterDescriptor{kAnchorX, ParameterKind::float64, false},
         ParameterDescriptor{kAnchorY, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleTransferMode, ParameterKind::uint32, false},
 
     };
 

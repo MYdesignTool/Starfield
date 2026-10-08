@@ -35,6 +35,7 @@ struct ParticleInstance {
     // 0 preserves the identity path. Other indices are 1-based into the owning
     // EvaluatedGraph's shared table; never copy nine doubles per particle.
     std::uint32_t sprite_basis_index{0};
+    ParticleTransferMode transfer_mode{ParticleTransferMode::normal};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

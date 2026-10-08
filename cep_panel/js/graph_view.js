@@ -79,7 +79,8 @@
             "26": {label:"Limit Angle",kind:"slider",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
             "27": {hidden:true},
             "28": {label:"Anchor X (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
-            "29": {label:"Anchor Y (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"}
+            "29": {label:"Anchor Y (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
+            "30": {label:"Transfer Mode",kind:"popup",min:1,max:4,displayOffset:1,choices:["Normal","Add","Screen","Stencil"]}
         },
         force: {
             "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
@@ -375,6 +376,7 @@
             var specs = SPECS[kind];
             var displayParameters=source.parameters.slice();
             if(kind==="transform" && !findParameter(source,"8"))displayParameters.push({key:"8",type:3,value:0});
+            if(kind==="particle" && !findParameter(source,"30"))displayParameters.push({key:"30",type:3,value:0});
             for (var p = 0; p < displayParameters.length; p++) {
                 var graphParameter = displayParameters[p];
                 var spec = specs[graphParameter.key];

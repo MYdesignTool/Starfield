@@ -17,13 +17,15 @@ inline constexpr A_long shape=1, life=2, life_random=3, properties=4,
     speed=limit_angle+1, speed_random=speed+3, rotation_curve=speed_random+1,
     anchor_x=rotation_curve+curve_span, anchor_y=anchor_x+1, limit_2d=anchor_y+1, rotation_end=limit_2d+1;
 inline constexpr A_long last=rotation_end;
+// Appended after legacy metadata (443..518); never shift UUID/connection streams.
+inline constexpr A_long transfer=519;
 constexpr A_long curve_base(A_long index) noexcept {
     for(auto base:{size_curve,opacity_curve,rotation_curve})
         if(index>=base && index<base+curve_span)return base;
     return 0;
 }
 constexpr bool animated(A_long index) noexcept {
-    return (index>=shape && index<=life_random) || (index>=size && index<=color) ||
+    return index==transfer || (index>=shape && index<=life_random) || (index>=size && index<=color) ||
         (index>=feather && index<=up_axis) || (index>=size_over_life && index<=opacity_over_life) ||
         (index>=orient && index<=speed_random) || (index>=anchor_x && index<=limit_2d);
 }

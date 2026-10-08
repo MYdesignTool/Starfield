@@ -436,6 +436,8 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     error = add_node_identity(in_data);
     if (error != PF_Err_NONE) return error;
+    error = add_popup(in_data,"Transfer Mode",kParticleTransferId,4,1,"Normal|Add|Screen|Stencil");
+    if (error != PF_Err_NONE) return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);
     PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;

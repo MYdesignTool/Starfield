@@ -260,10 +260,19 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 }
                 float* pixel = row + static_cast<std::size_t>(x) * 4;
                 const float remaining = 1.0f - alpha;
-                pixel[0] = static_cast<float>(particle.color.x) * alpha + pixel[0] * remaining;
-                pixel[1] = static_cast<float>(particle.color.y) * alpha + pixel[1] * remaining;
-                pixel[2] = static_cast<float>(particle.color.z) * alpha + pixel[2] * remaining;
-                pixel[3] = alpha + pixel[3] * remaining;
+                if (particle.transfer_mode == ParticleTransferMode::stencil) {
+                    for (unsigned channel=0; channel<4; ++channel) pixel[channel] *= remaining;
+                } else {
+                    const float source[]{static_cast<float>(particle.color.x)*alpha,
+                        static_cast<float>(particle.color.y)*alpha,static_cast<float>(particle.color.z)*alpha};
+                    for (unsigned channel=0; channel<3; ++channel) {
+                        if (particle.transfer_mode == ParticleTransferMode::add) pixel[channel] += source[channel];
+                        else if (particle.transfer_mode == ParticleTransferMode::screen)
+                            pixel[channel] = source[channel]+pixel[channel]-source[channel]*pixel[channel];
+                        else pixel[channel] = source[channel]+pixel[channel]*remaining;
+                    }
+                    pixel[3] = alpha+pixel[3]*remaining;
+                }
             }
         }
     }

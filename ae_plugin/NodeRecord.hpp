@@ -30,7 +30,11 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
     return 0;
 }
 [[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
-    return kind==Kind::transform?transform_layout::compensation_last:base_parameter_count(kind);
+    return kind==Kind::transform?transform_layout::compensation_last:
+        kind==Kind::particle?particle_layout::transfer:base_parameter_count(kind);
+}
+[[nodiscard]] constexpr bool authored_parameter(Kind kind,A_long index) noexcept {
+    return index>0 && (index<=base_parameter_count(kind) || (kind==Kind::particle && index==particle_layout::transfer));
 }
 
 [[nodiscard]] constexpr A_long layout_x_index(Kind kind) noexcept { return base_parameter_count(kind) + 1; }
@@ -41,7 +45,10 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
     return connection_first_index(kind) + kMaxOutgoingEdges * kConnectionRecordChunks;
 }
 [[nodiscard]] constexpr A_long sync_guard_index(Kind kind) noexcept { return uuid_first_index(kind) + 8; }
-[[nodiscard]] constexpr A_long last_parameter_index(Kind kind) noexcept { return sync_guard_index(kind); }
+[[nodiscard]] constexpr A_long last_parameter_index(Kind kind) noexcept {
+    return kind==Kind::particle?particle_layout::transfer:sync_guard_index(kind);
+}
+static_assert(sync_guard_index(Kind::particle)+1==particle_layout::transfer);
 // PF_OutData::num_params includes parameter 0 (the input layer), while registered
 // node controls occupy indices 1..last_parameter_index.
 [[nodiscard]] constexpr A_long parameter_count(Kind kind) noexcept { return last_parameter_index(kind) + 1; }
@@ -69,7 +76,7 @@ enum : A_long {
     kParticleAngleXId = 219, kParticleAngleYId = 220, kParticleAngleZId = 221,
     kParticleAngleRandomId = 222, kRotationSpeedXId = 223, kRotationSpeedYId = 224,
     kRotationSpeedZId = 225, kRotationSpeedRandomId = 226, kLimitTo2DId = 227,
-    kRandomLimitId=228,kLimitAngleId=229,kAnchorXId=230,kAnchorYId=231,
+    kRandomLimitId=228,kLimitAngleId=229,kAnchorXId=230,kAnchorYId=231,kParticleTransferId=232,
     kRotationCurveCountId=960,kRotationCurveAgeFirstId=970,kRotationCurveValueFirstId=980,
     kEmitterOrientXId=137,kEmitterOrientYId=138,kEmitterOrientZId=139,
     kParticlePropertiesId=2910, kParticlePropertiesEndId=2911,
@@ -160,7 +167,7 @@ enum : A_long {
         kAuxiliarySourceId,kLifeRandomId,kParticleShapeId,kSizeYId,kFeatherId,kUpAxisId,kOrientToId,
         kParticleAngleXId,kParticleAngleYId,kParticleAngleZId,kParticleAngleRandomId,kRotationSpeedXId,kRotationSpeedYId,kRotationSpeedZId,kRotationSpeedRandomId,kLimitTo2DId,
         kParticleColorModeId, kColorGradientCountId,
-        kRandomLimitId,kLimitAngleId,kAnchorXId,kAnchorYId,kRotationCurveCountId,
+        kRandomLimitId,kLimitAngleId,kAnchorXId,kAnchorYId,kParticleTransferId,kRotationCurveCountId,
         kParticlePropertiesId, kParticlePropertiesEndId, kParticleOverLifeId,
         kParticleOverLifeEndId, kParticleRotationId, kParticleRotationEndId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,

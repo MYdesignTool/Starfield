@@ -49,6 +49,7 @@ struct ParticleValues {
     ColorGradient gradient{white_gradient()};
     double life_random_percent{}, size_y{10}, feather_percent{}, angle_random_percent{}, speed_random_percent{};
     std::uint32_t shape{}, orient_to{}, up_axis{2};
+    std::uint32_t transfer_mode{};
     bool limit_to_2d{false};
     Vec3 angles{}, rotation_speed{};
     std::uint32_t random_limit{};
@@ -247,7 +248,7 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
         if(!scalar(kAnchorX,100,result.anchor_x) || !scalar(kAnchorY,100,result.anchor_y) ||
-           !enumeration(kRandomLimit,4,result.random_limit))
+           !enumeration(kRandomLimit,4,result.random_limit) || !enumeration(kParticleTransferMode,3,result.transfer_mode))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle anchor/random limit outside bounds");
         if(const auto* v=find_value(node,kLimitAngle))result.limit_angle=std::get<double>(*v);
         if(!std::isfinite(result.limit_angle) || std::abs(result.limit_angle)>32768)
@@ -270,6 +271,7 @@ double birth_lifetime(const ParticleValues& values,std::uint32_t seed,std::uint6
 void apply_particle_properties(ParticleInstance& particle,const ParticleValues& values,
     std::uint32_t seed,Vec3 birth_position,const CompiledParticleTransform* transform = nullptr) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
+    particle.transfer_mode=static_cast<ParticleTransferMode>(values.transfer_mode);
     particle.feather_percent=values.feather_percent;
     particle.anchor_x_percent=values.anchor_x;particle.anchor_y_percent=values.anchor_y;
     particle.size_y_pixels=values.size_start>0?particle.size_pixels*values.size_y/values.size_start:0;

@@ -57,7 +57,7 @@
             { key: "27", type: 7, value: defaultRotationCurve() },
             { key: "22", type: 3, value: 0 }, { key: "23", type: 4, value: 0 },
             { key: "24", type: 3, value: 2 }, {key:"25",type:3,value:0},
-            {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}
+            {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}, {key:"30",type:3,value:0}
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },
@@ -110,7 +110,7 @@
             fail("invalid_native_node_record", "The host returned an unsupported " + kind + " record version.");
         }
         DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
-        if (kind === "particle") optional = {"7":7,"8":7,"27":7};
+        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3};
         if (kind === "force") optional = {"9":7};
         if (kind === "transform") optional = {"7":7,"8":3};
         Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
@@ -486,6 +486,10 @@
     function apply(inputGraph, edit, idFactory) {
         if (!edit || typeof edit.type !== "string") fail("invalid_edit", "edit type is required");
         var graph = copyGraph(inputGraph);
+        graph.nodes.forEach(function(node){
+            if(node.type===TYPES.particle && !node.parameters.some(function(p){return p.key==="30";}))
+                node.parameters.push({key:"30",type:3,value:0});
+        });
         var positions = layout.resolve(graph);
         idFactory = idFactory || randomId;
         if (edit.type === "addNode") addNode(graph, edit, idFactory, positions);

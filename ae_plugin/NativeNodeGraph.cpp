@@ -53,7 +53,7 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, particle_layout::last+1> fields{};
+    std::array<RawField, particle_layout::transfer+1> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -490,7 +490,8 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     std::sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, attachments?2:1); append_u32(bytes, 0);
+    const bool transfers=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?3:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -537,7 +538,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version != 1 && version != 2) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version != 1 && version != 2 && version != 3) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
@@ -551,7 +552,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             // Keep writer/reader bounds tied to the current per-kind layout,
             // rather than the retired Particle81 control count.
             const auto field_limit = node.kind==Kind::transform && version==1 ?
-                transform_layout::matrix_last : native_nodes::binding_field_count(node.kind);
+                transform_layout::matrix_last : node.kind==Kind::particle && version<3 ?
+                particle_layout::last : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -560,6 +562,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                     index >= node.fields.size() || node.fields[index].present ||
                     !read(2, type) || type > 3 || !read(2, slot) || !read(2, reserved) || reserved != 0) return false;
                 auto& field = node.fields[index]; field.present = true;
+                if(node.kind==Kind::particle && !native_nodes::authored_parameter(node.kind,static_cast<A_long>(index)))return false;
+                if(node.kind==Kind::particle && index==particle_layout::transfer && type!=0)return false;
                 field.type = static_cast<node_sync::ValueKind>(type);
                 if(node.kind==Kind::transform && field.type!=(index==transform_layout::anchor_xy ?
                     node_sync::ValueKind::point2 : node_sync::ValueKind::scalar))return false;
@@ -578,7 +582,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                     if (!std::isfinite(scalar)) return false;
                 }
             }
-            if(node.kind==Kind::transform && version==2) {
+            if(node.kind==Kind::transform && version>=2) {
                 transform_binding::PixelAffine offset{};
                 if(!attachment_fields(node,offset))return false;
             }
@@ -813,6 +817,13 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
             if(!read_uint(suites,plugin_id,effect,index,time,integer) || integer<1) return false;
             add_value(node,key,integer-1);
         }
+        integer=1;
+        // Saved v1/v2 binding records predate Transfer Mode and retain Normal.
+        if(!suites.playback || suites.playback->fields[particle_layout::transfer].present) {
+            if(!read_uint(suites,plugin_id,effect,particle_layout::transfer,time,integer) || integer<1 || integer>4)
+                return suites.fail(particle_layout::transfer);
+        }
+        add_value(node,kParticleTransferMode,integer-1);
         if(!read_uint(suites,plugin_id,effect,particle_layout::limit_2d,time,integer) || integer>1)return false;
         add_value(node,kLimitTo2D,integer);
         for(auto [first,key]:{std::pair{particle_layout::angle,kParticleAngles},std::pair{particle_layout::speed,kRotationSpeed}}) {
@@ -1024,8 +1035,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
     graph = {};
     found_node_effects = false;
     if (!in_data || !params || !in_data->pica_basicP || (!in_data->effect_ref && !(edit && edit->layer))) return PF_Err_BAD_CALLBACK_PARAM;
-    if (edit && (!node_sync::valid_edit(*edit) || edit->parameter_index >
-        native_nodes::base_parameter_count(static_cast<Kind>(edit->node_kind)))) return PF_Err_BAD_CALLBACK_PARAM;
+    if (edit && !node_sync::valid_edit(*edit)) return PF_Err_BAD_CALLBACK_PARAM;
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
 
     try {

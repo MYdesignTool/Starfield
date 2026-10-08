@@ -504,3 +504,7 @@ One-step rollback with AE closed: tools/Restore-TestBuild.ps1 -PluginDir
 evidence are in artifacts/m3-11-native51-deployment.md. No AE process, Junction,
 registry setting or unrelated host resource was changed. Actual AE2023 deletion,
 relative attachment, subsequent motion, undo and reopen remain owner gates.
+
+2026-10-08 owner follow-up: “确认没问题” accepts the preceding native51/CEP51
+deletion and relative attachment correction. This does not establish broader
+undo/reopen, all parent/affine cases or shutter qualification.
