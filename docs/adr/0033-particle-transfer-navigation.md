@@ -1,6 +1,6 @@
 # ADR 0033 — Particle transfer and effect navigation
 
-Status: implementation candidate, 2026-10-08. Task M3-12.
+Status: implemented/deployed; AE2023 behavior gates open, 2026-10-08. Task M3-12.
 
 The owner requests particle-to-particle compositing and scrolling Effect Controls
 to the native effect selected on the CEP canvas. The four Transfer Mode choices
@@ -80,3 +80,17 @@ No implementation tests were added or run in this request. Compilation is not
 host qualification. Actual blending, navigation, undo and project reopen remain
 gates. The final second full build and six-script syntax compilation both pass;
 their evidence refers to the command-based navigation candidate.
+
+2026-10-08 13:21 local: fresh read-only checks confirmed neither AfterFX nor
+AfterFX_64 running. Native52/packed32820/Core ABI5 and CEP52 were published through
+the existing Junctions with tools/Deploy-TestBuild.ps1. Source milestone:
+fb832f40b187b278e3f5da54ff35380a2124f352. Seven native/Core files, eleven CEP files
+and runtime Core selector hashes were verified; paired rollback read-only checks
+passed. Receipts: artifacts/m3-12-native52-deploy-before.json and
+artifacts/m3-12-native52-deploy-after.json. Prior native51/CEP51 is retained under
+artifacts/disabled/m3-12-native52-panel52-transfer-20261008. One-step undo with AE
+closed: tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-12-native52-panel52-transfer-20261008' -Restore. No host process, Junction,
+registry, cache or unrelated host resource was changed. Actual AE2023 blending,
+selection/reveal, undo and reopening remain owner gates.
