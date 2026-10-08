@@ -208,6 +208,7 @@
                     var authoredEdit = {};
                     Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
                     authoredEdit.layerHeightPixels = base.geometry ? Number(base.geometry.height) : 1;
+                    authoredEdit.layerResources=base.layerResources || [];
                     var updated = edits.apply(graph, authoredEdit, idFactory);
                     graphHex = codec.toHex(updated);
                     if (graphHex.length / 2 > maxBytes) {

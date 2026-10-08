@@ -9,6 +9,7 @@
 #include "EmitterHistory.hpp"
 #include "MotionBlur.hpp"
 #include "WorldBridge.hpp"
+#include "TextureResources.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -178,6 +179,7 @@ struct PreRenderState {
     core::OpaqueBytes graph_bytes;
     SfCoreGpuSceneResult gpu_scene{};
     MotionExposure motion;MotionGpuStorage motion_gpu;
+    TexturePreparation textures;
     A_long gpu_world_width{},gpu_world_height{};
     ~PreRenderState() { if(generation && gpu_scene.struct_size==sizeof(gpu_scene)) generation->api().release_gpu_scene(&gpu_scene); }
     std::shared_ptr<const CoreGeneration> generation;
@@ -291,6 +293,8 @@ PF_Err make_request(PF_InData* in_data,PF_OutData* out_data,HostBitDepth depth,c
         frame.pixel_aspect_ratio};
     request.graph_bytes = state.graph_bytes.data();
     request.graph_byte_count = state.graph_bytes.size();
+    request.texture_source_count=static_cast<std::uint32_t>(state.textures.abi_sources.size());
+    request.texture_sources=state.textures.abi_sources.data();
     const PF_Err camera_error = capture_camera(in_data, request);
     if (camera_error) {
         std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
@@ -304,7 +308,7 @@ PF_Err make_request(PF_InData* in_data,PF_OutData* out_data,HostBitDepth depth,c
 }
 
 PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth, const PreRenderState& state,
-                    PF_EffectWorld* output_world) noexcept {
+                    PF_EffectWorld* output_world,const TextureStaging& textures) noexcept {
     WorldLayout output_layout{};
     if (!describe_world(*output_world, output_layout)) {
         return PF_Err_INTERNAL_STRUCT_DAMAGED;
@@ -315,6 +319,8 @@ PF_Err render_frame(PF_InData* in_data, PF_OutData* out_data, HostBitDepth depth
         SfCoreRenderRequest request{};
         const auto request_error=make_request(in_data,out_data,depth,state,output_layout,cancellation,request);
         if(request_error) return request_error;
+        request.texture_frame_count=static_cast<std::uint32_t>(textures.frames.size());
+        request.texture_frames=textures.frames.data();
         if(state.motion.enabled)return render_motion_cpu(in_data,out_data,state.generation->api(),request,state.motion,output_layout,output_world,depth,cancellation);
         SfCoreRenderResult rendered{};
         rendered.struct_size = sizeof(rendered);
@@ -471,6 +477,8 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
                                                      static_cast<A_u_long>(sizeof(generation_identity)),
                                                      &generation_identity);
     if (cache_err != PF_Err_NONE) return cache_err;
+    if(const auto error=prepare_texture_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
+        double(state->par.num)/state->par.den,history_cancel,state->textures);error)return error;
     const double exposure_key[2]{state->motion.enabled?1.0:0.0,state->motion.gain};
     if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(exposure_key),exposure_key);error)return error;
     for(const auto& sample:state->motion.samples) {
@@ -573,6 +581,9 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         }
     } input_checkin{in_data, extra};
 
+    HostCancellation texture_cancel(in_data);TextureStaging textures;
+    if(const auto error=stage_texture_resources(in_data,out_data,extra,state->textures,depth,texture_cancel,textures);error)return error;
+
     PF_EffectWorld* output_world = nullptr;
     const PF_Err output_err = extra->cb->checkout_output(in_data->effect_ref, &output_world);
     if (output_err != PF_Err_NONE) {
@@ -592,7 +603,7 @@ PF_Err smart_render(PF_InData* in_data, PF_OutData* out_data, PF_SmartRenderExtr
         err=render_gpu_scene(in_data,out_data,extra->input->gpu_data,extra->input->what_gpu,extra->input->device_index,
             state->gpu_scene,output_world,output_world->origin_x,output_world->origin_y,true,
             state->motion.enabled?static_cast<unsigned>(state->motion.samples.size()):1u,static_cast<float>(state->motion.gain));
-    } else {err=render_frame(in_data,out_data,depth,*state,output_world);if(!err) record_cpu_execution();}
+    } else {err=render_frame(in_data,out_data,depth,*state,output_world,textures);if(!err) record_cpu_execution();}
 
     timer.value.complete=err==PF_Err_NONE;
     return err;

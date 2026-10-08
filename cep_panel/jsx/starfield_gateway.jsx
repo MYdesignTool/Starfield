@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-52";
+    var GATEWAY_BUILD = "native-presets-53";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -721,6 +721,24 @@
             "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
     }
 
+    function textureControl(key) {
+        var names={"31":"Layer","32":"Dark Side","33":"Texture Time Sample","34":"Texture Color Use",
+            "35":"Use Texture Ratio","36":"Ignore Perspective"};
+        return {name:names[String(key)],diskId:202+Number(key)};
+    }
+
+    function readTextureLayer(effect,layer,key) {
+        var index=Number(nodeControlValue(effect,textureControl(key)));
+        if(!isFinite(index) || Math.floor(index)!==index || index<0)
+            throw new Error("Invalid Texture layer selection.");
+        if(!index)return 0;
+        if(!layer.containingComp || index>layer.containingComp.numLayers)throw new Error("Texture source layer is unavailable.");
+        var source=layer.containingComp.layer(index);
+        if(source===layer || !source.source || source.nullLayer || !source.hasVideo)
+            throw new Error("Texture needs a video layer other than its renderer.");
+        return Number(source.id);
+    }
+
     function transformGeometry(layer) {
         var width=Number(layer.width),height=Number(layer.height),aspect=layer.source ? Number(layer.source.pixelAspect) : 1;
         if(!(width>0) || !(height>0) || !isFinite(width) || !isFinite(height) || !(aspect>0) || !isFinite(aspect))
@@ -742,17 +760,19 @@
             // Camera and light layers have no anchor and cannot supply this affine.
             var transform=source.property("ADBE Transform Group");
             if(!transform || !transform.property("ADBE Anchor Point"))continue;
-            entries.push({id:id,name:String(source.name),index:i});byId["$"+id]=i;
+            entries.push({id:id,name:String(source.name),index:i,
+                sourceName:source.source?String(source.source.name):"",
+                texture:source!==layer && !!source.source && !source.nullLayer && !!source.hasVideo});byId["$"+id]=i;
         }
         nativeLayerInventory={comp:comp,entries:entries,byId:byId};return nativeLayerInventory;
     }
 
     function layerResourceIndex(layer,id) {
         if(typeof id!=="number" || !isFinite(id) || Math.floor(id)!==id || id<0 || id>2147483647)
-            throw new Error("Inherit Motion needs a valid project layer ID or None.");
+            throw new Error("Choose a valid project layer ID or None.");
         if(id===0)return 0;
         var index=layerInventory(layer).byId["$"+id];
-        if(!index)throw new Error("The Inherit Motion layer no longer exists in this composition. Choose a layer or None.");
+        if(!index)throw new Error("The selected layer no longer exists in this composition. Choose a layer or None.");
         return index;
     }
 
@@ -915,6 +935,12 @@
                 for(var ei=0;ei<enums.length;ei++) {
                     scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
                 }
+                node.parameters.push({key:"31",type:3,value:readTextureLayer(effect,layer,31)});
+                node.parameters.push({key:"32",type:3,value:readTextureLayer(effect,layer,32)});
+                for(var tk=33;tk<=36;tk++) {
+                    scalar(tk,textureControl(tk),3);
+                    if(tk<=34)node.parameters[node.parameters.length-1].value--;
+                }
                 for(var group=0;group<2;group++) {
                     var label=group?"Speed":"Angle";
                     node.parameters.push({key:group?"20":"18",type:5,value:[Number(nodeControlValue(effect,label+" X")),
@@ -1037,6 +1063,8 @@
                 var hasTransfer=false;
                 for(var tp=0;tp<node.parameters.length;tp++)if(String(node.parameters[tp].key)==="30")hasTransfer=true;
                 if(!hasTransfer)setNodeControl(effect,"Transfer Mode",1);
+                for(var tk=31;tk<=36;tk++)if(!nodeParameter(node,tk))
+                    setNodeControl(effect,textureControl(tk),tk===33 || tk===34 || tk===35?1:0);
             }
             writeNodeRecord(effect, node);
             var type = node.type;
@@ -1109,7 +1137,20 @@
                     else if(type==="org.starfieldfx.nodes.particle") {
                         var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Rotation Speed Random","23":"Particle Feather","26":"Limit Angle","28":"Anchor X (Percent)","29":"Anchor Y (Percent)","22":"Limit To 2D"};
                         var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis","30":"Transfer Mode"};
-                        if(scalars[key]) setNodeControl(effect,scalars[key],value);
+                        if(Number(key)>=31 && Number(key)<=36) {
+                            if(parameter.type!==3 || typeof value!=="number" || !isFinite(value) || Math.floor(value)!==value || value<0 ||
+                                value>(Number(key)<=32?2147483647:Number(key)===33?7:Number(key)===34?2:1))throw new Error("Invalid Texture parameter: "+key);
+                            if(Number(key)<=32) {
+                                var sourceIndex=layerResourceIndex(layer,value);
+                                if(sourceIndex) {
+                                    var sourceLayer=layer.containingComp.layer(sourceIndex);
+                                    if(sourceLayer===layer || !sourceLayer.source || sourceLayer.nullLayer || !sourceLayer.hasVideo)
+                                        throw new Error("Texture needs a video layer other than its renderer.");
+                                }
+                                setNodeControl(effect,textureControl(key),sourceIndex);
+                            } else setNodeControl(effect,textureControl(key),value+(Number(key)<=34?1:0));
+                        }
+                        else if(scalars[key]) setNodeControl(effect,scalars[key],value);
                         else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
                         else if(key==="27") writeNodeCurve(effect,"Rotation",value);
                         else if(key==="18" || key==="20") {
@@ -1424,7 +1465,10 @@
         var nodes = readNativeNodes(resolved.target.layer), repairNeeded = false;
         var hasTransform=false;
         for(var resourceNode=0;resourceNode<nodes.length;resourceNode++)
-            if(nodes[resourceNode].type==="org.starfieldfx.nodes.transform")hasTransform=true;
+            if(nodes[resourceNode].type==="org.starfieldfx.nodes.transform" ||
+                (nodes[resourceNode].type==="org.starfieldfx.nodes.particle" &&
+                    (Number(nodeParameter(nodes[resourceNode],15).value)===3 ||
+                     Number(nodeParameter(nodes[resourceNode],31).value)>0 || Number(nodeParameter(nodes[resourceNode],32).value)>0)))hasTransform=true;
         try { validateNodeManifest(nodes); } catch (invalidRecord) { repairNeeded = true; }
         var renderer = readRendererRecord(resolved);
         return { initialized: Number(resolved.properties.nodeEffectsReady.value) === 1 && revision > 0 && !repairNeeded,
@@ -2367,7 +2411,7 @@
         try {
             file=File.openDialog("Import Starfield preset","Starfield presets:*.sfldpreset;*.json");
             if(!file)return reply({ok:true,cancelled:true});
-            if(file.length>51200)return fail("size_limit_exceeded","The preset file exceeds the supported size.");
+            if(file.length>256*1024)return fail("size_limit_exceeded","The preset file exceeds the supported size.");
             file.encoding="UTF-8";if(!file.open("r"))return fail("preset_file_error",file.error || "Unable to read this preset.");opened=true;
             var text=file.read();if(file.error)return fail("preset_file_error",file.error);
             return reply({ok:true,text:text,path:file.fsName});
@@ -2375,11 +2419,11 @@
         finally{if(opened)file.close();}
     };
     host.SFLD_writePresetFile=function(requestJson) {
-        var request=parseRequest(requestJson);if(!request || request.operation!=="writePresetFile" || typeof request.text!=="string" || request.text.length>51200)return fail("invalid_request","Invalid preset save request.");
+        var request=parseRequest(requestJson);if(!request || request.operation!=="writePresetFile" || typeof request.text!=="string" || request.text.length>256*1024)return fail("invalid_request","Invalid preset save request.");
         var file=null,opened=false;
         try {
             var data=JSON.parse(request.text);
-            if(!data || data.format!=="org.starfieldfx.preset" || data.version!==1 || typeof data.name!=="string" || !data.name || data.name.length>120 ||
+            if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2) || typeof data.name!=="string" || !data.name || data.name.length>120 ||
                 typeof data.graphHex!=="string" || !data.graphHex || data.graphHex.length>MAX_GRAPH_BYTES*2 || data.graphHex.length%2 || !/^[0-9a-f]+$/i.test(data.graphHex))return fail("invalid_preset","Unsupported preset data.");
             file=File.saveDialog("Save Starfield preset","Starfield presets:*.sfldpreset");if(!file)return reply({ok:true,cancelled:true});
             if(!/\.sfldpreset$/i.test(file.name))file=new File(file.fsName+".sfldpreset");

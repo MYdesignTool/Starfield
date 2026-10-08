@@ -65,7 +65,7 @@
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
             "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" },
             "14": {label:"Life Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
-            "15": {label:"Shape",kind:"popup",min:1,max:3,displayOffset:1,choices:["Circle","Rectangle","Cloud"]},
+            "15": {label:"Shape",kind:"popup",min:1,max:4,displayOffset:1,choices:["Circle","Rectangle","Cloud","Texture"]},
             "16": {label:"Size Y (Pixels)",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
             "17": {label:"Orient To",kind:"popup",min:1,max:3,displayOffset:1,choices:["Nothing","Motion(particle)","Emitter"]},
             "18": {label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
@@ -80,7 +80,14 @@
             "27": {hidden:true},
             "28": {label:"Anchor X (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
             "29": {label:"Anchor Y (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
-            "30": {label:"Transfer Mode",kind:"popup",min:1,max:4,displayOffset:1,choices:["Normal","Add","Screen","Stencil"]}
+            "30": {label:"Transfer Mode",kind:"popup",min:1,max:4,displayOffset:1,choices:["Normal","Add","Screen","Stencil"]},
+            "31": {label:"Texture Layer",kind:"popup",values:[0],choices:["None"]},
+            "32": {label:"Dark Side",kind:"popup",values:[0],choices:["None"]},
+            "33": {label:"Texture Time Sample",kind:"popup",min:1,max:8,displayOffset:1,
+                choices:["Current Time","Play Once","Loop","Stretch","Random Still Frame","Random Once","Random Loop","Freeze Frame"]},
+            "34": {label:"Texture Color Use",kind:"popup",min:1,max:3,displayOffset:1,choices:["Default","Alpha","Lightness"]},
+            "35": {label:"Use Texture Ratio",kind:"popup",values:[0,1],choices:["Off","On"]},
+            "36": {label:"Ignore Perspective",kind:"popup",values:[0,1],choices:["Off","On"]}
         },
         force: {
             "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
@@ -377,11 +384,16 @@
             var displayParameters=source.parameters.slice();
             if(kind==="transform" && !findParameter(source,"8"))displayParameters.push({key:"8",type:3,value:0});
             if(kind==="particle" && !findParameter(source,"30"))displayParameters.push({key:"30",type:3,value:0});
+            if(kind==="particle")[0,0,0,0,1,0].forEach(function(value,i){
+                if(!findParameter(source,String(31+i)))displayParameters.push({key:String(31+i),type:3,value:value});
+            });
             for (var p = 0; p < displayParameters.length; p++) {
                 var graphParameter = displayParameters[p];
                 var spec = specs[graphParameter.key];
                 if (kind === "particle") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
+                    if(Number(graphParameter.key)>=31 && Number(graphParameter.key)<=36 &&
+                        Number((findParameter(source,"15") || {}).value)!==3)continue;
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
                 if (spec && spec.hidden) continue;
@@ -392,6 +404,19 @@
                     if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
                 }
                 var parameter = viewParameter(node, kind, graphParameter, spec);
+                if(kind==="particle" && (graphParameter.key==="31" || graphParameter.key==="32")) {
+                    parameter.choices=["None"];parameter.enumValues=[0];
+                    (layerResources || []).forEach(function(resource){
+                        if(resource.texture && Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
+                            parameter.enumValues.indexOf(resource.id)<0) {
+                            parameter.choices.push(String(resource.name));parameter.enumValues.push(resource.id);
+                        }
+                    });
+                    var textureSelected=parameter.enumValues.indexOf(graphParameter.value);
+                    if(textureSelected<0) {parameter.choices.push("Unavailable layer ("+graphParameter.value+")");
+                        parameter.enumValues.push(graphParameter.value);textureSelected=parameter.enumValues.length-1;}
+                    parameter.value=textureSelected+1;node.params.push(parameter);continue;
+                }
                 if (kind === "transform") {
                     var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
                     var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
@@ -514,7 +539,8 @@
             }
             if (kind === "particle") {
                 var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
-                    "12":8,"1":9,"2":10,"23":11,"24":12,"4":13,"6":14,"17":15,"18":16,"19":17,"25":18,"26":19,"20":20,"21":21,"28":22,"29":23,"22":24};
+                    "12":8,"1":9,"2":10,"23":11,"30":12,"24":13,"4":14,"6":15,"17":16,"18":17,"19":18,
+                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31};
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });

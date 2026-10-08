@@ -135,7 +135,11 @@ bool capture_edit(PF_InData& data, const PF_ParamDef& param,
         case PF_Param_CHECKBOX: edit.value[0] = param.u.bd.value; break;
         // PF_LayerDef contains pixels, not a selected layer ID. The UI-only
         // compiler reads the authoritative AEGP layer resource for this edit.
-        case PF_Param_LAYER: if(edit.node_kind!=4 || edit.parameter_index!=1)return false;break;
+        case PF_Param_LAYER:
+            if(!((edit.node_kind==4 && edit.parameter_index==1) ||
+                 (edit.node_kind==1 && (edit.parameter_index==starfield::adapter::native_nodes::particle_layout::texture_front ||
+                                       edit.parameter_index==starfield::adapter::native_nodes::particle_layout::texture_back))))return false;
+            break;
         case PF_Param_ANGLE: edit.value[0] = param.u.ad.value / 65536.0; break;
         case PF_Param_POINT:
             edit.value_kind = ValueKind::point2;

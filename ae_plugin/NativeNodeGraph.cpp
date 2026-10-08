@@ -53,7 +53,7 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, particle_layout::transfer+1> fields{};
+    std::array<RawField, particle_layout::texture_end+1> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -173,8 +173,7 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
 }
 
 bool read_layer_resource(SuiteSet& suites, AEGP_PluginID id, AEGP_EffectRefH effect,
-                         const A_Time& time, std::uint32_t& output) noexcept {
-    constexpr A_long index=transform_layout::inherit;
+                         const A_Time& time, std::uint32_t& output,A_long index=transform_layout::inherit) noexcept {
     if(suites.playback) {
         std::array<double,3> value{};
         if(!playback_value(suites,index,node_sync::ValueKind::scalar,value) ||
@@ -491,7 +490,7 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
     const bool transfers=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?3:attachments?2:1); append_u32(bytes, 0);
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?4:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -538,7 +537,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version != 1 && version != 2 && version != 3) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 4) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
@@ -553,7 +552,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             // rather than the retired Particle81 control count.
             const auto field_limit = node.kind==Kind::transform && version==1 ?
                 transform_layout::matrix_last : node.kind==Kind::particle && version<3 ?
-                particle_layout::last : native_nodes::binding_field_count(node.kind);
+                particle_layout::last : node.kind==Kind::particle && version==3 ?
+                particle_layout::transfer : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -563,7 +563,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                     !read(2, type) || type > 3 || !read(2, slot) || !read(2, reserved) || reserved != 0) return false;
                 auto& field = node.fields[index]; field.present = true;
                 if(node.kind==Kind::particle && !native_nodes::authored_parameter(node.kind,static_cast<A_long>(index)))return false;
-                if(node.kind==Kind::particle && index==particle_layout::transfer && type!=0)return false;
+                if(node.kind==Kind::particle && index>=particle_layout::transfer && type!=0)return false;
                 field.type = static_cast<node_sync::ValueKind>(type);
                 if(node.kind==Kind::transform && field.type!=(index==transform_layout::anchor_xy ?
                     node_sync::ValueKind::point2 : node_sync::ValueKind::scalar))return false;
@@ -824,6 +824,25 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
                 return suites.fail(particle_layout::transfer);
         }
         add_value(node,kParticleTransferMode,integer-1);
+        for(auto [index,key]:{std::pair{particle_layout::texture_front,kTextureFront},
+                             std::pair{particle_layout::texture_back,kTextureBack}}) {
+            integer=0;
+            if(!suites.playback || suites.playback->fields[index].present)
+                if(!read_layer_resource(suites,plugin_id,effect,time,integer,index))return false;
+            add_value(node,key,integer);
+        }
+        for(auto [index,key]:{std::pair{particle_layout::texture_time,kTextureTimeMode},
+                             std::pair{particle_layout::texture_color,kTextureColorUse},
+                             std::pair{particle_layout::texture_ratio,kTextureUseRatio},
+                             std::pair{particle_layout::texture_perspective,kTextureIgnorePerspective}}) {
+            const bool popup=index==particle_layout::texture_time || index==particle_layout::texture_color;
+            integer=popup || index==particle_layout::texture_ratio?1:0;
+            if(!suites.playback || suites.playback->fields[index].present)
+                if(!read_uint(suites,plugin_id,effect,index,time,integer))return false;
+            if((popup && (integer<1 || integer>(index==particle_layout::texture_time?8u:3u))) || (!popup && integer>1))
+                return suites.fail(index);
+            add_value(node,key,popup?integer-1:integer);
+        }
         if(!read_uint(suites,plugin_id,effect,particle_layout::limit_2d,time,integer) || integer>1)return false;
         add_value(node,kLimitTo2D,integer);
         for(auto [first,key]:{std::pair{particle_layout::angle,kParticleAngles},std::pair{particle_layout::speed,kRotationSpeed}}) {
@@ -1218,9 +1237,19 @@ struct NativeBindingTransaction::Impl {
     SuiteSet suites;
     const AEGP_MemorySuite1* memory{};
     std::vector<Change> changes;
+    struct ResourceChange {AEGP_StreamRefH ref{};AEGP_LayerIDVal previous{};bool count{},changed{};};
+    std::vector<ResourceChange> resources;
     bool accepted{};
     Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r) : data(d), id(i), renderer(r), suites(d) {}
     ~Impl() {
+        for(auto& change:resources) {
+            if(!accepted && change.changed) {
+                AEGP_StreamValue2 value{};value.streamH=change.ref;
+                if(change.count)value.val.one_d=double(change.previous);else value.val.layer_id=change.previous;
+                suites.stream->AEGP_SetStreamValue(id,change.ref,&value);
+            }
+            if(change.ref)suites.stream->AEGP_DisposeStream(change.ref);
+        }
         for (auto& change : changes) {
             if (!accepted && change.changed) {
                 AEGP_StreamValue2 value{}; value.streamH = change.ref; value.val.one_d = change.previous_value;
@@ -1249,7 +1278,6 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
-        if (nodes.empty()) return PF_Err_NONE;
         auto& tx = *impl_;
         stage("acquire binding suites");
         auto error = tx.suites.acquire(); if (error) return error;
@@ -1262,6 +1290,59 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             tx.owned_renderer = true;
             if (ae || !tx.renderer) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
         }
+        // Resource slots belong to the renderer: SmartFX cannot checkout a sibling
+        // Particle effect's PF_LAYER parameter. Clear only the former occupied tail.
+        std::vector<AEGP_LayerIDVal> resource_ids;
+        for(const auto& node:nodes)if(node.kind==Kind::particle)
+            for(auto index:{particle_layout::texture_front,particle_layout::texture_back}) {
+                const auto& field=node.fields[index];if(!field.present)continue;
+                const double value=field.value[0];
+                if(field.type!=node_sync::ValueKind::scalar || value<0 || value>0x7fffffff || std::floor(value)!=value)
+                    return PF_Err_BAD_CALLBACK_PARAM;
+                if(value>0)resource_ids.push_back(static_cast<AEGP_LayerIDVal>(value));
+            }
+        std::sort(resource_ids.begin(),resource_ids.end());
+        resource_ids.erase(std::unique(resource_ids.begin(),resource_ids.end()),resource_ids.end());
+        if(resource_ids.size()>kTextureResourceCapacity)return PF_Err_BAD_CALLBACK_PARAM;
+        if(!resource_ids.empty()) {
+            stage("validate texture source layers");
+            ae=tx.suites.basic->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,reinterpret_cast<const void**>(&tx.suites.layer));
+            AEGP_LayerH owner{};AEGP_CompH comp{};
+            if(!ae)ae=tx.suites.pf_interface->AEGP_GetEffectLayer(tx.data->effect_ref,&owner);
+            if(!ae)ae=tx.suites.layer->AEGP_GetLayerParentComp(owner,&comp);
+            if(ae || !owner || !comp)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            for(const auto id:resource_ids) {
+                AEGP_LayerH source{};ae=tx.suites.layer->AEGP_GetLayerFromLayerID(comp,id,&source);
+                if(ae || !source || source==owner)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            }
+        }
+        tx.resources.reserve(kTextureResourceCapacity+1);
+        auto set_resource=[&](A_long index,bool count,AEGP_LayerIDVal desired)->PF_Err {
+            tx.resources.emplace_back();auto& change=tx.resources.back();change.count=count;
+            if(failed_stream)*failed_stream=index;
+            stage("open texture resource stream");
+            A_Err result=tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id,tx.renderer,index,&change.ref);
+            if(result || !change.ref)return static_cast<PF_Err>(result?result:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamType type{};result=tx.suites.stream->AEGP_GetStreamType(change.ref,&type);
+            if(result || type!=(count?AEGP_StreamType_OneD:AEGP_StreamType_LAYER_ID))return static_cast<PF_Err>(result?result:PF_Err_BAD_CALLBACK_PARAM);
+            const A_Time time{tx.data->current_time,tx.data->time_scale};AEGP_StreamValue2 previous{};
+            result=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,change.ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&previous);
+            if(result)return static_cast<PF_Err>(result);
+            const double old=count?previous.val.one_d:double(previous.val.layer_id);
+            tx.suites.stream->AEGP_DisposeStreamValue(&previous);
+            if(!std::isfinite(old) || old<0 || old>(count?kTextureResourceCapacity:0x7fffffff) || std::floor(old)!=old)return PF_Err_BAD_CALLBACK_PARAM;
+            change.previous=static_cast<AEGP_LayerIDVal>(old);
+            if(change.previous==desired)return PF_Err_NONE;
+            AEGP_StreamValue2 value{};value.streamH=change.ref;
+            if(count)value.val.one_d=double(desired);else value.val.layer_id=desired;
+            change.changed=true;stage("write texture resource stream");
+            return static_cast<PF_Err>(tx.suites.stream->AEGP_SetStreamValue(tx.id,change.ref,&value));
+        };
+        if(auto result=set_resource(kTextureResourceCountIndex,true,static_cast<AEGP_LayerIDVal>(resource_ids.size()));result)return result;
+        const auto old_count=tx.resources.front().previous;
+        for(A_long slot=0;slot<std::max<A_long>(old_count,static_cast<A_long>(resource_ids.size()));++slot)
+            if(auto result=set_resource(kTextureResourceFirstIndex+slot,false,
+                slot<static_cast<A_long>(resource_ids.size())?resource_ids[slot]:0);result)return result;
         tx.changes.reserve(kNativeBindingCapacity);
         for (const auto& node : nodes) for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
             const auto& field = node.fields[index]; if (!field.present || field.slot < 0) continue;

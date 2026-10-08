@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 27,
-  "schemaVersion": 27,
-  "revisionNote": "M3-10 build46 appends Motion Blur controls 616..625/disk1640..1649. Existing native layouts and Core ABI3 remain unchanged. ADR0031.",
+  "manifestVersion": 28,
+  "schemaVersion": 28,
+  "revisionNote": "M3-13 build53 appends hidden texture layer resources626..753/disk1700..1827 and count754/disk1828. Existing streams/IDs remain fixed. Core ABI6; paired native/CEP build required. ADR0034.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -1436,6 +1436,11 @@
       ]
     }
   ],
+  "textureResources": {
+    "firstIndex": 626, "count": 128, "firstDiskId": 1700,
+    "countIndex": 754, "countDiskId": 1828, "type": "layer", "hidden": true,
+    "policy": "Sorted unique nonzero project layer IDs; UI transaction mirrors and rolls back selectors. ADR0034."
+  },
   "nativeRenderBindings": {
     "firstIndex": 98,
     "count": 512,

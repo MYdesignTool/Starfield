@@ -92,9 +92,9 @@ Version6 is emitted only for texture styles. Old readers reject its version.
 All counts and unused bits are checked;4096 style and128 source limits align
 with existing graph bounds. Sequence schema and match names stay unchanged.
 
-Native controls will append after existing Particle stream519 and preserve
-UUID/connection/guard indices. Main resource layer slots and optional private
-binding metadata will be specified before adapter changes. SmartFX must checkout
+Native controls append after existing Particle stream519 and preserve
+UUID/connection/guard indices. The adapter layout below specifies main resource
+layer slots and private binding metadata. SmartFX must checkout
 each unique requested source/time dependency in pre-render, then pair every pixel
 checkout/checkin, copying working-space data into numeric staging storage. It
 must honor cancellation, shutter times, source layer retiming and missing layers;
@@ -102,13 +102,51 @@ no UI renderer, global cache, render-time project mutation or host process chang
 
 ## Gates
 
-Adapter implementation notes, still open: SmartFX checkout indices belong to
-the renderer, so sibling Particle PF_LAYER controls require renderer-owned
-resource slots and a UI transaction that restores every changed selector on
-failure. Layer identity mirroring alone is not evidence that AE's
-Source/Masks/Effects selection was copied. Resolve that selection contract
-before qualifying these controls. Append-only native/main layouts and any
-private binding changes must be specified here before implementation.
+## Adapter append layout, 2026-10-08
+
+Particle streams520/527 are the Texture topic/end (disk2920/2921);
+521 Layer,522 Dark Side,523 Texture Time Sample,524 Texture Color Use,
+525 Use Texture Ratio and526 Ignore Perspective use disk233..238. The original
+base442, record443..518 and Transfer519 never move. Private binding version4
+permits the new authored fields through526; v1/v2 Particle limits remain442
+and v3 remains519. Layer references are constant project-local IDs, not animation
+aliases. The numeric modes/checkboxes use the existing alias mechanism.
+
+The renderer appends128 hidden PF_LAYER slots at626..753 (disk1700..1827) and
+a hidden previous resource count at754 (disk1828). Main manifest28 describes
+this append; released IDs and sequence schema remain unchanged. Sorted unique
+nonzero front/back IDs define the resource slot assignment. UI binding installs
+the layer stream values in the same transaction as aliases, restores changed
+values on failure and clears the former tail when resources are removed. This
+does not require per-particle UI suite calls or synthetic metadata alias fields.
+
+Pre-render obtains current source dimensions/PAR and visible clip interval from
+the public Layer/Item suites. The source clip is sampled on the composition
+frame grid expressed in the renderer's layer clock. SmartFX's layer checkout
+performs source footage/precomp animation, source stretch and time remapping.
+The owner layer's comp/layer conversion defines that clock; reversed clocks
+normalize the interval. Nonlinear owner time-remap and Source/Masks/Effects stage
+mirroring remain explicit AE2023 gates. No private layer selector bits are read.
+Requests are deduplicated across the whole shutter exposure before pixel reads.
+
+The native Texture selectors use the existing public custom layer menu with
+video-source/self/Null filtering. This candidate implements Source only; it does
+not display AE's Masks/Effects stage options while their dependency/mirroring
+contract is unresolved. Transform's selector/Create Null behavior stays intact.
+Masks/Effects remains remaining work under the full goal, not a qualified feature.
+
+Portable preset v2 adds at most128 texture bindings by node UUID/key, layer name
+and source name; graph resource IDs are saved as None and relinked only after a
+unique match in the target composition. Missing/ambiguous matches reject before
+mutating AE. Version1 remains readable. The file limit becomes256KiB; the graph
+limit stays24KiB. Transform's previous portable-resource restriction is unchanged.
+
+
+The renderer-owned slot pool and rollback transaction now implement the
+SmartFX dependency boundary for sibling Particle controls. Layer identity
+mirroring alone is not evidence that AE's Source/Masks/Effects selection was
+copied. Source-only selection is explicit in this candidate; the other two
+stages require a separate dependency/mirroring contract before exposure.
 
 The public Adobe expression reference documents sourceTime(), source frame
 duration/PAR and layer in/out/start times. It also notes that reversed layers
@@ -149,3 +187,45 @@ this milestone's staging. Installed native52/CEP52 and its selector remain
 unchanged; dist Particle/Core hashes were checked against the existing native52
 receipt. Compilation and numeric tests do not qualify AE texture footage,
 source/masks/effects stage selection, or undo/reopen.
+
+## Source adapter milestone evidence, 2026-10-08
+
+Build53/CEP53 now append the native Texture controls, mirror stable layer IDs
+into renderer-owned slots in a reversible UI transaction, and deduplicate
+SmartFX frame dependencies over the whole shutter exposure. Callback-local
+8/16/32-bit pixel worlds are copied into bounded premultiplied RGBA staging;
+every successful pixel checkout is checked in on success, cancellation and
+failure. The reverse owner clock anchors its half-open grid at source in-point.
+Native and CEP menus expose Source only. The Source/Masks/Effects phase selector
+and owner nonlinear time-remap qualification remain open.
+
+Portable preset v2 stores layer/source names separately from numeric graph IDs.
+Unique resource matches are resolved before Add/Replace mutation; existing graph
+resource IDs survive Add. The native selector excludes self/Null/non-video layers.
+Freeze Frame uses the source frame at each particle's birth, as the owner chose.
+
+Focused evidence (current source candidate; not AE host qualification):
+
+- `tests/RunTextureAdapterTests.ps1 -Run`: 136 checks, 0 failures.
+  Log: artifacts/m3-13-texture-adapter-tests.log.
+- `tests/texture_panel_tests.js`: 36 checks passed.
+  Log: artifacts/m3-13-texture-panel-tests.log.
+- `tests/RunParticleTextureTests.ps1 -Run`: 112 checks passed.
+  Log: artifacts/m3-13-texture-core-tests.log.
+- Shared Transform Null selector: 141 checks, 0 failures.
+  Log: artifacts/m3-13-transform-null-tests.log.
+- Transform CEP: 95 checks passed; native Particle/Emitter/Force gateway,
+  Add/Replace preset codec and bounded preset-manager transactions passed.
+  Logs: artifacts/m3-13-transform-panel-regression.log,
+  artifacts/m3-13-texture-gateway-regression.log,
+  artifacts/m3-13-preset-regression.log,
+  artifacts/m3-13-preset-performance-regression.log.
+- Complete May2023 /MT native/Core build with dist/runtime publication disabled.
+  Log: artifacts/m3-13-texture-adapter-build.log.
+
+Deployment requires a fresh no-AE process check and an exact native52/CEP52
+baseline. The paired publication receipt and one-step rollback will be recorded
+after installed hashes are verified. Real AE2023 source footage, time modes,
+8/16/32-bit working space, shutter, crop/downsample/PAR, undo and reopen remain
+owner host gates. Face/Model/Cloud/Path/Shadow and main-effect ordering remain
+work under the active complete goal.

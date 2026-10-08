@@ -782,6 +782,17 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     AEFX_CLR_STRUCT(def);
     PF_END_TOPIC(1612);
     if(const auto motion_error=append_motion_parameters(in_data,out_data);motion_error)return motion_error;
+    for(A_long slot=0;slot<kTextureResourceCapacity;++slot) {
+        AEFX_CLR_STRUCT(def);
+        def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
+        def.ui_flags=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
+        PF_ADD_LAYER("Texture Resource",PF_LayerDefault_NONE,kTextureResourceFirstDiskId+slot);
+    }
+    AEFX_CLR_STRUCT(def);
+    def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
+    def.ui_flags=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
+    PF_ADD_FLOAT_SLIDERX("Texture Resource Count",0,kTextureResourceCapacity,0,kTextureResourceCapacity,0,
+        PF_Precision_INTEGER,0,0,1828);
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }

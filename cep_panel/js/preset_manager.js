@@ -1,12 +1,12 @@
 (function(){
     "use strict";
     var presets=window.StarfieldPresets,codec=window.StarfieldGraphCodec,snapshots=window.StarfieldNativeGraphSnapshot;
-    var entries=presets.catalog.slice(),category=null,selected=null,targetToken=null,revision=null,graph=null,busy=false,serial=0;
+    var entries=presets.catalog.slice(),category=null,selected=null,targetToken=null,revision=null,graph=null,resources=[],busy=false,serial=0;
     var el={};["grid","preview","search","target","breadcrumb","selected-title","description","structure","status","refresh","import","save","home","up","all","render-settings","cancel","replace","add"].forEach(function(id){el[id]=document.getElementById(id);});
     // Keep the page and the reason visible when a dependency did not load.
     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-52",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+    var cep=window.__adobe_cep__,gatewayBuild="native-presets-53",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
@@ -34,14 +34,14 @@
         call("getState",{},function(response){if(!response.ok){el.target.textContent="Select a layer with Starfield in After Effects.";failure(response);return;}
             targetToken=response.target.token;el.target.textContent=response.target.comp+" / "+response.target.layer;
             call("getGraphSnapshot",{},function(record){if(!record.ok){failure(record);return;}var normalized=snapshots.normalize(record);if(!normalized.ok){failure(normalized);return;}
-                revision=normalized.snapshot.revision;if(normalized.snapshot.initialized)graph=codec.fromHex(normalized.snapshot.graphHex);
+                revision=normalized.snapshot.revision;resources=normalized.snapshot.layerResources || [];if(normalized.snapshot.initialized)graph=codec.fromHex(normalized.snapshot.graphHex);
                 status("Target pinned. Choose a preset, then Add or Replace.");pending(false);
             });
         });
     }
     function initialize(callback){
         call("getGraphSnapshot",{},function(record){if(!record.ok){callback(record);return;}
-            var finish=function(response){if(!response.ok){callback(response);return;}var normalized=snapshots.normalize(response);if(normalized.ok){revision=normalized.snapshot.revision;graph=codec.fromHex(normalized.snapshot.graphHex);}callback(normalized);};
+            var finish=function(response){if(!response.ok){callback(response);return;}var normalized=snapshots.normalize(response);if(normalized.ok){revision=normalized.snapshot.revision;resources=normalized.snapshot.layerResources || [];graph=codec.fromHex(normalized.snapshot.graphHex);}callback(normalized);};
             if(record.snapshot.initialized)finish(record);else call("syncGraphSnapshot",{},finish);
         });
     }
@@ -49,7 +49,7 @@
         if(busy || !selected || !targetToken)return;pending(true);status("Applying "+selected.name+"…");
         var choice=selected,settings=el["render-settings"].checked;
         initialize(function(response){if(!response.ok){failure(response);return;}
-            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,mode:mode,applyRenderSettings:settings},function(committed){
+            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,presetResources:choice.resources || [],mode:mode,applyRenderSettings:settings},function(committed){
                 if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+" Undo in After Effects restores the previous graph.");pending(false);
             },targetToken,revision,response);
         });
@@ -83,7 +83,7 @@
     el.cancel.addEventListener("click",function(){if(busy)return;if(cep && cep.closeExtension)cep.closeExtension();else window.close();});
     el.import.addEventListener("click",function(){if(busy)return;pending(true);call("readPresetFile",{},function(response){if(!response.ok){failure(response);return;}if(response.cancelled){pending(false);return;}try{var entry=presets.decode(response.text);entries.push(entry);category="My Presets";el.search.value="";select(entry);status("Imported "+entry.name+". Choose Add or Replace to apply.");pending(false);}catch(error){failure({error:{code:error.code||"invalid_preset",message:error.message}});}});});
     el.save.addEventListener("click",function(){if(busy || !targetToken)return;var name=window.prompt("Preset name","My Particle Setup");if(!name)return;pending(true);
-        initialize(function(response){if(!response.ok){failure(response);return;}var text;try{text=presets.encode(graph,name,"My Presets");}catch(error){failure({error:{code:error.code,message:error.message}});return;}
+        initialize(function(response){if(!response.ok){failure(response);return;}var text;try{text=presets.encode(graph,name,"My Presets",resources);}catch(error){failure({error:{code:error.code,message:error.message}});return;}
             call("writePresetFile",{text:text},function(saved){if(!saved.ok){failure(saved);return;}if(saved.cancelled){pending(false);return;}var entry=presets.decode(text);entries.push(entry);category="My Presets";select(entry);status("Saved "+entry.name+" to "+saved.path);pending(false);});
         });
     });

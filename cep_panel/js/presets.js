@@ -69,15 +69,21 @@
         graph.nodes.forEach(function(node){
             if(node.type===edits.types.particle && !node.parameters.some(function(p){return p.key==="30";}))
                 node.parameters.push({key:"30",type:3,value:0});
+            if(node.type===edits.types.particle)[0,0,0,0,1,0].forEach(function(value,i){
+                var key=String(31+i);if(!node.parameters.some(function(p){return p.key===key;}))node.parameters.push({key:key,type:3,value:value});
+            });
             if(node.type!==edits.types.output)return;
             values.forEach(function(value,i){var key=String(8+i);
                 if(!node.parameters.some(function(p){return p.key===key;}))node.parameters.push({key:key,type:i===0||i===3||i===7?3:4,value:value});
             });
         });return graph;
     }
-    function authoring(graph,context){
+    function authoring(graph,context,allowTextureResources){
         var clean=motionDefaults(clone(graph)),positions=layout.resolve(clean);clean.optionalRecords=[];
         clean.nodes.forEach(function(node){
+            if(node.type===edits.types.particle && !allowTextureResources)
+                node.parameters.forEach(function(p){if((p.key==="31" || p.key==="32") && p.value!==0)
+                    fail("Texture layer bindings need a resource map when saving or importing a preset.");});
             if(node.type!==edits.types.transform)return;
             var source=node.parameters.filter(function(p){return p.key==="8";})[0];
             if(source && (source.type!==3 || source.value!==0))
@@ -106,7 +112,16 @@
     }
     function apply(base,edit,idFactory){
         if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
-        var preset=authoring(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels),"Selected preset"),current=motionDefaults(clone(base));
+        var selected=clone(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels));
+        var bindings=edit.presetResources || [];
+        validateResourceBindings(selected,bindings);
+        bindings.forEach(function(binding){
+            var matches=(edit.layerResources || []).filter(function(resource){return resource.texture &&
+                resource.name===binding.layerName && resource.sourceName===binding.sourceName;});
+            if(matches.length!==1)fail("Texture layer '"+binding.layerName+"' needs one matching layer and source in the current composition.");
+            selected.nodes.filter(function(n){return n.id===binding.nodeId;})[0].parameters.filter(function(p){return p.key===binding.key;})[0].value=matches[0].id;
+        });
+        var preset=authoring(selected,"Selected preset",true),current=motionDefaults(clone(base));
         var oldOutput=current.nodes.filter(function(n){return n.type===edits.types.output;})[0];if(!oldOutput)fail("The current graph has no Output.");
         var positions=layout.resolve(current),sourcePositions=layout.resolve(preset),occupied={};
         current.nodes.concat(preset.nodes).forEach(function(n){occupied[n.id]=true;});current.edges.concat(preset.edges).forEach(function(e){occupied[e.id]=true;});
@@ -120,7 +135,41 @@
         preset.edges.forEach(function(e){current.edges.push({id:next(),sourceNode:map[e.sourceNode],sourcePort:e.sourcePort,destinationNode:map[e.destinationNode],destinationPort:e.destinationPort});});
         current=layout.set(current,positions);validate(current,"Updated project");return current;
     }
-    function encode(graph,name,category){if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");return JSON.stringify({format:"org.starfieldfx.preset",version:1,name:name.trim(),category:category||"My Presets",graphHex:codec.toHex(authoring(graph))},null,2);}
-    function decode(text){if(typeof text!=="string" || text.length>MAX_BYTES*2+2048)fail("Preset file is too large.");var data=JSON.parse(text);if(!data || data.format!=="org.starfieldfx.preset" || data.version!==1 || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");var graph=authoring(codec.fromHex(data.graphHex));return {id:"imported-"+edits.randomId(),name:data.name,category:"My Presets",description:"Imported Starfield preset",color:"#91bde0",graph:graph};}
+    function validateResourceBindings(graph,bindings) {
+        if(!Array.isArray(bindings) || bindings.length>128)fail("Invalid preset texture resource map.");
+        var seen={};bindings.forEach(function(binding){
+            if(!binding || typeof binding.nodeId!=="string" || (binding.key!=="31" && binding.key!=="32") ||
+                typeof binding.layerName!=="string" || !binding.layerName || binding.layerName.length>256 ||
+                typeof binding.sourceName!=="string" || binding.sourceName.length>256 || seen[binding.nodeId+":"+binding.key])fail("Invalid preset texture resource binding.");
+            var nodes=graph.nodes.filter(function(n){return n.id===binding.nodeId && n.type===edits.types.particle;});
+            if(nodes.length!==1 || !nodes[0].parameters.some(function(p){return p.key===binding.key && p.type===3 && p.value===0;}))fail("Preset texture resource does not match its graph.");
+            seen[binding.nodeId+":"+binding.key]=true;
+        });
+    }
+    function encode(graph,name,category,resources){
+        if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");
+        var clean=motionDefaults(clone(graph)),bindings=[];
+        clean.nodes.forEach(function(node){if(node.type!==edits.types.particle)return;
+            node.parameters.forEach(function(p){if((p.key!=="31" && p.key!=="32") || !p.value)return;
+                var matches=(resources || []).filter(function(r){return r.texture && r.id===p.value;});
+                if(matches.length!==1)fail("Texture layer metadata is unavailable; refresh the target before saving.");
+                bindings.push({nodeId:node.id,key:p.key,layerName:matches[0].name,sourceName:matches[0].sourceName || ""});p.value=0;
+            });
+        });
+        validateResourceBindings(clean,bindings);
+        var text=JSON.stringify({format:"org.starfieldfx.preset",version:bindings.length?2:1,name:name.trim(),
+            category:category||"My Presets",graphHex:codec.toHex(authoring(clean)),resources:bindings},null,2);
+        if(text.length>MAX_BYTES*2+128*1024 || unescape(encodeURIComponent(text)).length>256*1024 ||
+            JSON.stringify(text).length>252*1024)fail("Preset resource metadata exceeds the file limit.");
+        return text;
+    }
+    function decode(text){
+        if(typeof text!=="string" || text.length>MAX_BYTES*2+128*1024)fail("Preset file is too large.");var data=JSON.parse(text);
+        if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2) || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");
+        var graph=authoring(codec.fromHex(data.graphHex)),bindings=data.version===2?data.resources:[];
+        validateResourceBindings(graph,bindings);
+        return {id:"imported-"+edits.randomId(),name:data.name,category:"My Presets",description:"Imported Starfield preset",
+            color:"#91bde0",graph:graph,resources:bindings};
+    }
     return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
 }));

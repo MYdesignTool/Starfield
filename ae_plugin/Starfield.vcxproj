@@ -55,6 +55,7 @@
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />
+    <ClCompile Include="TextureResources.cpp" />
     <ClCompile Include="GpuRender.cpp" />
     <ClCompile Include="EmitterHistoryCapture.cpp" />
     <ClCompile Include="WorldBridge.cpp" />

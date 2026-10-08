@@ -130,10 +130,10 @@ PF_Err add_angle(PF_InData* in_data,const char* name,A_long id) noexcept {
     def.u.ad.value=def.u.ad.dephault=0; // Native AE turns + degrees and dial.
     return add_checked_parameter(in_data,def);
 }
-PF_Err add_checkbox(PF_InData* data,const char* name,A_long id) noexcept {
+PF_Err add_checkbox(PF_InData* data,const char* name,A_long id,bool initial=false) noexcept {
     PF_ParamDef def{};def.param_type=PF_Param_CHECKBOX;def.flags=kNodeEditableFlags;def.uu.id=id;
     std::snprintf(def.name,sizeof(def.name),"%s",name);def.u.bd.u.nameptr=name;
-    def.u.bd.value=def.u.bd.dephault=FALSE;return add_checked_parameter(data,def);
+    def.u.bd.value=def.u.bd.dephault=initial?TRUE:FALSE;return add_checked_parameter(data,def);
 }
 
 PF_Err add_point3d(PF_InData* in_data, const char* name, A_long id,
@@ -275,7 +275,7 @@ PF_Err particle_group(PF_InData* data,const char* name,A_long id,bool end=false,
 PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
     PF_Err error = PF_Err_NONE;
     {
-        error=add_popup(in_data,"Shape",kParticleShapeId,3,1,"Circle|Rectangle|Cloud");if(error)return error;
+        error=add_popup(in_data,"Shape",kParticleShapeId,4,1,"Circle|Rectangle|Cloud|Texture");if(error)return error;
         error=add_slider(in_data,"Life (Seconds)",kLifetimeId,0,10000,2,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Life Random",kLifeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=particle_group(in_data,"Particle Properties",kParticlePropertiesId);if(error)return error;
@@ -438,6 +438,23 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     error = add_popup(in_data,"Transfer Mode",kParticleTransferId,4,1,"Normal|Add|Screen|Stencil");
     if (error != PF_Err_NONE) return error;
+    PF_ParamDef topic{};topic.param_type=PF_Param_GROUP_START;topic.uu.id=kTextureTopicId;
+    topic.flags=PF_ParamFlag_START_COLLAPSED;std::snprintf(topic.name,sizeof(topic.name),"Texture");
+    error=add_checked_parameter(in_data,topic);if(error)return error;
+    for(const auto& control:{std::pair{"Layer",kTextureFrontId},std::pair{"Dark Side",kTextureBackId}}) {
+        PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;
+        layer.flags=kNodeEditableFlags|kNodeConstantFlags;layer.uu.id=control.second;
+        layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=240;layer.ui_height=26;
+        layer.u.ld.dephault=PF_LayerDefault_NONE;std::snprintf(layer.name,sizeof(layer.name),"%s",control.first);
+        error=add_checked_parameter(in_data,layer);if(error)return error;
+    }
+    error=add_popup(in_data,"Texture Time Sample",kTextureTimeId,8,1,
+        "Current Time|Play Once|Loop|Stretch|Random Still Frame|Random Once|Random Loop|Freeze Frame");if(error)return error;
+    error=add_popup(in_data,"Texture Color Use",kTextureColorId,3,1,"Default|Alpha|Lightness");if(error)return error;
+    error=add_checkbox(in_data,"Use Texture Ratio",kTextureRatioId,true);if(error)return error;
+    error=add_checkbox(in_data,"Ignore Perspective",kTexturePerspectiveId);if(error)return error;
+    PF_ParamDef end{};end.param_type=PF_Param_GROUP_END;end.uu.id=kTextureEndId;
+    error=add_checked_parameter(in_data,end);if(error)return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);
     PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
@@ -602,6 +619,9 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 const auto* event=static_cast<PF_EventExtra*>(extra);
+                if(event && (event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_front ||
+                             event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_back))
+                    return starfield::adapter::texture_layer_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 if(event && starfield::adapter::native_nodes::particle_layout::curve_base(event->effect_win.index))
                     return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
