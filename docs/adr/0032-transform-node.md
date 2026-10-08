@@ -311,3 +311,47 @@ tools/Restore-TestBuild.ps1 -PluginDir
 passes; the paired backup and one-step command are also in
 artifacts/m3-11-native48-deployment.md. AE creation/Null/undo/reopen gates remain
 open until owner observation.
+
+## Selected Null and native creation control — 2026-10-08
+
+The owner confirms that native48/CEP50 can add Transform with None and that
+its numeric controls take effect. Selecting a Null still fails with animation
+binding parameter1, stream156, error516, and inherited motion does not apply.
+The expression read of the Layer Control's `.value` is a suspected cause;
+the exact AE failure is not established by the source fixtures.
+
+Native49 uses the expression Layer object returned by `fx.param(1)` directly,
+without a scripting-DOM numeric value or a layer-index lookup. None expressions
+retain their separate identity path. The direct native edit now forwards the
+binding operation, source parameter and alias stream in failures, matching the
+diagnostic detail already available to graph commits. This is a private local
+callback change, not a change to a serialized record or the Core ABI.
+
+The owner's requested Create Null button is in the native Effect Controls,
+below Inherit Motion (Null Layer), in parameter1's custom control area. It uses
+the effect owner's composition, creates one Null, enables its 3D layer switch,
+names it `Starfield Transform Null <AEGP layer ID>`, and selects that stable
+resource ID before publishing the binding. The layer-count preflight is4096.
+Creation and binding share one undo group. On failure, compensation restores
+the previous selector and sync guard and removes only the new layer; a failed
+compensation is reported. No CEP change is required.
+
+No public/native parameter ID, stream order/count, graph/sequence schema,
+saved record byte contract, effect identity or Core ABI4 changes. The existing
+PF_LAYER control is reused instead of inserting a stream into released layouts.
+Transform's newly implemented CUSTOM_UI flag agrees in runtime, PiPL and its
+build verifier. Build49 code/PiPL version packing agrees at32817.
+
+Candidate checks: Transform Null UI102 (including guarded selector writes,
+rollback through nine failure phases, click bounds, balanced suites/references
+and one undo group); NativeSync7016 plus Camera12; TransformBinding60;
+Transform controls102; Particle controls91; actual generated Transform
+expressions168. The existing74-expression/keyframe JS checks also pass. The
+full May2023 /MT native build passes with -NoDistPublish and -NoRuntimePublish.
+Logs are artifacts/m3-11-native49-{null-ui,sync,binding,transform-controls,
+particle-controls,expressions,legacy-expressions,build}.log. Run
+tests/RunTransformNullTests.ps1 for the new focused native-button checks;
+NativeSync and TransformBinding generate the expression fixtures for the JS
+scope as described above. These are source/fake-host checks. Actual AE2023
+selected Null motion, button placement, 3D creation, undo and reopen remain
+owner qualification gates.

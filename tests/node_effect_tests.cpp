@@ -7,6 +7,7 @@
 #include "NodeRecord.hpp"
 #include "SPBasic.h"
 #include "EditorPresetPicker.hpp"
+#include "TransformNullUI.hpp"
 
 #include <array>
 #include <cstdio>
@@ -19,6 +20,7 @@ PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef*[]) noexcept {re
 PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
                                  const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
 namespace starfield::adapter {
+PF_Err transform_null_event(PF_InData*,PF_OutData*,PF_ParamDef*[],PF_EventExtra*) noexcept {return PF_Err_NONE;}
 bool choose_curve_preset(PF_InData*,starfield::core::AgeCurve&) noexcept {return false;}
 bool choose_gradient_preset(PF_InData*,starfield::core::ColorGradient&) noexcept {return false;}
 }
@@ -93,7 +95,8 @@ int main() {
     check(EffectMain(PF_Cmd_GLOBAL_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "global setup succeeds");
     check(out.out_flags2 == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2),
           "float awareness always advertises implemented SmartFX");
-    check(out.out_flags == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS), "node remains internal/menu-hidden with declared UI capabilities");
+    check(out.out_flags == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
+        kind==Kind::transform?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS), "node remains internal/menu-hidden with declared UI capabilities");
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
@@ -101,11 +104,13 @@ int main() {
     for(const auto& def:registered) {
         ++registered_index;
         const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
-        dimensions_valid &= custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
+        const bool null_button=kind==Kind::transform && registered_index==1;
+        dimensions_valid &= null_button?(def.ui_width==160 && def.ui_height==28 && bool(def.ui_flags&PF_PUI_CONTROL)):
+            custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
         if(registered_index>base_parameter_count(kind))hidden_valid &=
             bool(def.ui_flags&PF_PUI_NO_ECW_UI) && bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
     }
-    check(dimensions_valid,"only the custom gradient has nonstandard control dimensions");
+    check(dimensions_valid,"only declared custom controls have nonstandard dimensions");
     check(hidden_valid,"all internal node metadata retains hidden flags and zero dimensions");
     if(kind==Kind::emitter) for(A_long index:{12,13,14})
         check(registered[index-1].param_type==PF_Param_ANGLE &&

@@ -9,6 +9,7 @@
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
 #include "ParticleGradientUI.hpp"
+#include "TransformNullUI.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
@@ -23,6 +24,7 @@ static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                            PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
+static_assert(STARFIELD_TRANSFORM_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
 enum class NodeEffectKind { emitter, particle, force, transform };
@@ -472,6 +474,7 @@ PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
 
 PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
     PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;layer.flags=kNodeEditableFlags|kNodeConstantFlags;
+    layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=160;layer.ui_height=28;
     layer.uu.id=kTransformInheritId;layer.u.ld.dephault=PF_LayerDefault_NONE;
     std::snprintf(layer.name,sizeof(layer.name),"Inherit Motion (Null Layer)");
     auto error=add_checked_parameter(data,layer);if(error)return error;
@@ -490,7 +493,9 @@ PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
     error=add_slider(data,"Particles Opacity",kTransformParticlesOpacityId,0,100,100);if(error)return error;
     error=add_node_record(data,Kind::transform);if(error)return error;
     error=add_node_identity(data);if(error)return error;
-    output->num_params=parameter_count(Kind::transform);return PF_Err_NONE;
+    output->num_params=parameter_count(Kind::transform);
+    PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
+    return data->inter.register_ui?PF_REGISTER_UI(data,&ui):PF_Err_NONE;
 }
 
 PF_Err render_passthrough(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef* output) noexcept {
@@ -560,7 +565,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             out_data->my_version = PF_VERSION(STARFIELD_VERSION_MAJOR, STARFIELD_VERSION_MINOR,
                                               STARFIELD_VERSION_BUG, STARFIELD_VERSION_STAGE,
                                               STARFIELD_VERSION_BUILD);
-            out_data->out_flags = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
+            out_data->out_flags = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
+                kNodeEffectKind==NodeEffectKind::transform?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
             out_data->out_flags2 = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2;
             if (register_node_graph_sync(in_data) != PF_Err_NONE) {
                 std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
@@ -595,7 +601,9 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 if(event && starfield::adapter::native_nodes::particle_layout::curve_base(event->effect_win.index))
                     return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
-            } else return PF_Err_NONE;
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::transform)
+                return starfield::adapter::transform_null_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+            else return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);
         case PF_Cmd_SMART_PRE_RENDER:

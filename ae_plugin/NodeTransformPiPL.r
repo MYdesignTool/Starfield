@@ -13,7 +13,7 @@ resource 'PiPL' (16013) {
     AE_Effect_Spec_Version { PF_PLUG_IN_VERSION, PF_PLUG_IN_SUBVERS },
     AE_Effect_Version { STARFIELD_VERSION_PACKED },
     AE_Effect_Info_Flags { 0 },
-    AE_Effect_Global_OutFlags { STARFIELD_NODE_OUT_FLAGS },
+    AE_Effect_Global_OutFlags { STARFIELD_TRANSFORM_OUT_FLAGS },
     AE_Effect_Global_OutFlags_2 { STARFIELD_NODE_OUT_FLAGS2 },
     AE_Effect_Match_Name { "org.starfieldfx.node.transform" },
     AE_Reserved_Info { 0 }

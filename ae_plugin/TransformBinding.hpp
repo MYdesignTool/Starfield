@@ -78,9 +78,10 @@ inline std::string matrix_expression(unsigned entry, bool inherited = true) {
         text += "var identity = [1,0,0,thisLayer.width*0.5,0,1,0,thisLayer.height*0.5,0,0,1,0];\n";
         return text+"result = identity["+std::to_string(entry)+"];\n";
     }
-    text+=R"(var selected = fx.param(1).value;
-var src = typeof selected === "number" ? (selected === 0 ? null : thisComp.layer(selected)) : selected;
-if (src == null) throw new Error("Starfield: inherited layer unavailable");
+    // AE expression layer controls resolve to a Layer object. Their scripting
+    // DOM numeric .value/index representation is not the expression contract.
+    text+=R"(var src = fx.param(1);
+if (src == null || typeof src === "number") throw new Error("Starfield: inherited layer unavailable");
 function point(v) { return [v[0],v[1],v.length > 2 ? v[2] : 0]; }
 function axis(layer,n) {
     var v = [0,0,0]; v[n] = 1; var w = layer.toWorldVec(v,time);

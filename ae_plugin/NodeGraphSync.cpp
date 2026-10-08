@@ -205,6 +205,8 @@ PF_Err register_node_graph_sync(PF_InData* in_data) noexcept {
     return static_cast<PF_Err>(error ? error : PF_Err_BAD_CALLBACK_PARAM);
 }
 
+AEGP_PluginID node_graph_sync_plugin_id() noexcept {return g_plugin_id.load(std::memory_order_acquire);}
+
 PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) noexcept {
     namespace layout=starfield::adapter::native_nodes::particle_layout;
     const auto plugin=g_plugin_id.load(std::memory_order_acquire);
@@ -313,6 +315,11 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
             (edit.status ? edit.status : PF_Err_BAD_CALLBACK_PARAM);
         if (out_data) {
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
+            else if(edit.stage==starfield::adapter::node_sync::Stage::animation_bindings && edit.binding_stage)
+                std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
+                    "Starfield native edit failed: animation binding: %s (parameter %ld, binding %ld, stream %ld, error %d).",
+                    edit.binding_stage,static_cast<long>(extra->param_index),static_cast<long>(edit.binding_parameter),
+                    static_cast<long>(edit.stream_index),static_cast<int>(error));
             else std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
                 "Starfield native edit failed: %s (parameter %ld, stream %ld, error %d).",
                 starfield::adapter::node_sync::stage_name(edit.stage), static_cast<long>(extra->param_index),

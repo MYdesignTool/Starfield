@@ -54,6 +54,8 @@ struct NativeEdit {
     bool accepted{};
     Stage stage{Stage::context};
     mutable A_long stream_index{-1};
+    const char* binding_stage{}; // static diagnostic text, local callback only
+    A_long binding_parameter{-1};
     AEGP_EffectRefH renderer{};
     AEGP_LayerH layer{};
     PF_UtilCallbacks* handles{};

@@ -600,6 +600,9 @@ int main() {
     check(direct_edit(rejected_binding)==PF_Err_BAD_CALLBACK_PARAM &&
           rejected_binding.stage==node_sync::Stage::animation_bindings && rejected_binding.stream_index==kNativeBindingFirstIndex,
           "AE parser disabling a binding is rejected at the exact stream before graph publication");
+    check(rejected_binding.binding_stage && std::strcmp(rejected_binding.binding_stage,"verify expression enabled")==0 &&
+          rejected_binding.binding_parameter>0,
+          "direct native edit retains the failing binding operation and source parameter");
     check(expressions==disabled_expression_baseline && expression_enabled[0],
           "disabled-binding rejection restores old expressions and enabled states");
     expressions=expression_baseline;

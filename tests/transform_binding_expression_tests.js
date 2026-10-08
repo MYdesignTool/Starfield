@@ -22,8 +22,8 @@ function layer(m, anchor, twoD) {
 }
 function run(owner, source) {
     return (source ? expressions : bodies.none).map(text => vm.runInNewContext(text + "\nresult;", {
-        result:-1,time:2.5,thisLayer:owner,thisComp:{layer(i){assert.equal(i,7);return source;}},
-        fx:{param(i){assert.equal(i,1);return {value: source ? 7 : 0};}}
+        result:-1,time:2.5,thisLayer:owner,thisComp:{layer(){throw Error("layer indices are not expression resources");}},
+        fx:{param(i){assert.equal(i,1);return source || 0;}}
     },{timeout:1000}));
 }
 function compare(actual, expected) {
@@ -40,11 +40,11 @@ assert.throws(()=>run(layer([0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],[]),source),/singu
 // Layer-object values are supported without relying on mutable layer indices.
 for(let i=0;i<12;i++) {
     const value=vm.runInNewContext(expressions[i]+"\nresult;",{result:0,time:2.5,thisLayer:owner,
-        fx:{param(){return {value:source};}}});
+        fx:{param(){return source;}}});
     assert(Math.abs(value-run(owner,source)[i])<1e-10);checks++;
 }
 assert.throws(()=>vm.runInNewContext(expressions[0],{time:2.5,thisLayer:owner,
-    thisComp:{layer(){throw Error("missing layer");}},fx:{param(){return {value:7};}}}),/missing layer/);checks++;
+    fx:{param(){throw Error("missing layer");}}}),/missing layer/);checks++;
 // None can throw on property access in AE. UI compilation already validated
 // the constant resource; identity aliases must not access its empty selector.
 let selectorReads=0;
@@ -55,7 +55,7 @@ for(const text of bodies.none) {
 assert.equal(selectorReads,0);checks++;
 for(const text of expressions) {
     assert.throws(()=>vm.runInNewContext(text+"\nresult;",{time:2.5,thisLayer:owner,
-        fx:{param(){return {value:0};}}}),/inherited layer unavailable/);checks++;
+        fx:{param(){return 0;}}}),/inherited layer unavailable/);checks++;
 }
 
 // Execute the complete expressions emitted by the actual native transaction,
@@ -68,8 +68,8 @@ function effect(uuid, sourceValue) {
         if(index>=82 && index<=89)return {name:`Node UUID ${index-82}`,value:index===89?uuid:0};
         assert.equal(index,1);
         selectorReads++;
-        if(sourceValue === undefined)return {get value(){throw Error("empty layer selector");}};
-        return {value:sourceValue};
+        if(sourceValue === undefined)throw Error("empty layer selector");
+        return sourceValue;
     }};
 }
 const unrelated={param(){return {name:"Other parameter",get value(){throw Error("unrelated numeric read");}};}};
@@ -86,7 +86,9 @@ for(const effects of [[unrelated,noneEffect,duplicate],[unrelated,duplicate,unre
     compare(complete(noneBindings,owner,effects),[1,0,0,960,0,1,0,540,0,0,1,0]);
 }
 assert.equal(selectorReads,0);checks++;
-for(const sourceValue of [7,source]) for(const effects of [
+const proxy=Object.create(source);
+Object.defineProperty(proxy,"value",{get(){throw Error("Layer object is not a numeric property");}});
+for(const sourceValue of [source,proxy]) for(const effects of [
     [unrelated,effect(5,sourceValue),duplicate],[unrelated,duplicate,unrelated,effect(5,sourceValue)]]) {
     compare(complete(selectedBindings,owner,effects,source),[-1,.15,0,-2.5,0,-.75,-.05,-78,.8,0,2,540]);
 }
@@ -96,4 +98,7 @@ assert.throws(()=>complete(selectedBindings,owner,[unrelated,effect(5)]),/empty 
 const oldNone=noneBindings.map(({expression})=>({expression:expression.replace(
     "var identity =", "var selected = fx.param(1).value;\nvar identity =")}));
 assert.throws(()=>complete(oldNone,owner,[unrelated,noneEffect]),/empty layer selector/);checks++;
+const oldSelected=selectedBindings.map(({expression})=>({expression:expression.replace(
+    "var src = fx.param(1);", "var src = fx.param(1).value;")}));
+assert.throws(()=>complete(oldSelected,owner,[unrelated,effect(5,proxy)]),/Layer object is not a numeric property/);checks++;
 console.log(`Transform expressions: ${checks} checks passed.`);

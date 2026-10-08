@@ -5,6 +5,7 @@
 #include "entry.h"
 
 #include "AE_EffectCB.h"
+#include "AE_GeneralPlug.h"
 
 extern "C" {
 DllExport PF_Err EffectMain(PF_Cmd, PF_InData*, PF_OutData*, PF_ParamDef*[], PF_LayerDef*, void*);
@@ -13,6 +14,7 @@ DllExport PF_Err PluginDataEntryFunction2(PF_PluginDataPtr, PF_PluginDataCB2, SP
 }
 
 [[nodiscard]] PF_Err register_node_graph_sync(PF_InData* in_data) noexcept;
+[[nodiscard]] AEGP_PluginID node_graph_sync_plugin_id() noexcept;
 [[nodiscard]] PF_Err update_native_particle_visibility(PF_InData* in_data,PF_ParamDef* params[]) noexcept;
 [[nodiscard]] PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data,
                                                PF_ParamDef* params[],
