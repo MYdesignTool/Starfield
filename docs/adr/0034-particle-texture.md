@@ -229,3 +229,31 @@ after installed hashes are verified. Real AE2023 source footage, time modes,
 8/16/32-bit working space, shutter, crop/downsample/PAR, undo and reopen remain
 owner host gates. Face/Model/Cloud/Path/Shadow and main-effect ordering remain
 work under the active complete goal.
+
+## Paired Source candidate deployment, 2026-10-08
+
+At 16:34 +08:00, a fresh process check found neither AfterFX nor AfterFX_64.
+The standing owner authorization was used through tools/Deploy-TestBuild.ps1
+and the two existing native/CEP Junctions. Source commit
+dbc9be0ed0f0237bf0543b4795d0a1921a699205 is deployed as native53/CEP53/Core ABI6.
+Seven installed native/Core hashes, eleven CEP source hashes and the selected
+Core file hash were verified. Native52/CEP52 was captured as a paired backup;
+Restore-TestBuild's read-only rollback validation passed. No process or registry
+was changed. AE2023 host qualification remains open.
+
+Receipts: artifacts/m3-13-native53-deploy-before.json,
+artifacts/m3-13-native53-deploy-after.json,
+artifacts/m3-13-native53-native-deploy.log,
+artifacts/m3-13-native53-deploy-wrapper.log,
+artifacts/m3-13-native53-rollback-report.log.
+Selected Core: StarfieldCore-037D48F4411A16E8.dll.
+
+One-step rollback to native52/CEP52, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native53-panel53-texture-20261008' -Restore
+```
+
+The numeric/fake-host tests above establish bounded logic and failure cleanup,
+not actual AE footage or Source/Masks/Effects parity. Keep the complete goal
+active while those gates and the remaining Particle/main-effect work are open.
