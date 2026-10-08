@@ -2,9 +2,11 @@
 const assert = require("assert");
 const fs = require("fs");
 const vm = require("vm");
-const expressions = JSON.parse(fs.readFileSync("artifacts/transform-matrix-expressions.json", "utf8"));
+const bodies = JSON.parse(fs.readFileSync("artifacts/transform-matrix-expressions.json", "utf8"));
+const expressions = bodies.selected;
 assert.equal(expressions.length, 12);
-let checks = 1;
+assert.equal(bodies.none.length, 12);
+let checks = 2;
 function layer(m, anchor, twoD) {
     function map(v, point) {
         const out = [0,0,0];
@@ -19,7 +21,7 @@ function layer(m, anchor, twoD) {
         toWorldVec(v,t){assert.equal(t,2.5);return map(v,false);}};
 }
 function run(owner, source) {
-    return expressions.map(text => vm.runInNewContext(text + "\nresult;", {
+    return (source ? expressions : bodies.none).map(text => vm.runInNewContext(text + "\nresult;", {
         result:-1,time:2.5,thisLayer:owner,thisComp:{layer(i){assert.equal(i,7);return source;}},
         fx:{param(i){assert.equal(i,1);return {value: source ? 7 : 0};}}
     },{timeout:1000}));
@@ -43,4 +45,55 @@ for(let i=0;i<12;i++) {
 }
 assert.throws(()=>vm.runInNewContext(expressions[0],{time:2.5,thisLayer:owner,
     thisComp:{layer(){throw Error("missing layer");}},fx:{param(){return {value:7};}}}),/missing layer/);checks++;
+// None can throw on property access in AE. UI compilation already validated
+// the constant resource; identity aliases must not access its empty selector.
+let selectorReads=0;
+for(const text of bodies.none) {
+    const context={thisLayer:owner,fx:{param(){selectorReads++;throw Error("empty layer selector");}}};
+    assert(Number.isFinite(vm.runInNewContext(text+"\nresult;",context)));checks++;
+}
+assert.equal(selectorReads,0);checks++;
+for(const text of expressions) {
+    assert.throws(()=>vm.runInNewContext(text+"\nresult;",{time:2.5,thisLayer:owner,
+        fx:{param(){return {value:0};}}}),/inherited layer unavailable/);checks++;
+}
+
+// Execute the complete expressions emitted by the actual native transaction,
+// including the UUID gate, effect search and renderer skip, not just the body.
+const noneBindings=JSON.parse(fs.readFileSync("artifacts/transform-none-animation-expressions.json","utf8"));
+const selectedBindings=JSON.parse(fs.readFileSync("artifacts/transform-selected-animation-expressions.json","utf8"));
+assert.equal(noneBindings.length,12);assert.equal(selectedBindings.length,12);checks+=2;
+function effect(uuid, sourceValue) {
+    return {param(index) {
+        if(index>=82 && index<=89)return {name:`Node UUID ${index-82}`,value:index===89?uuid:0};
+        assert.equal(index,1);
+        selectorReads++;
+        if(sourceValue === undefined)return {get value(){throw Error("empty layer selector");}};
+        return {value:sourceValue};
+    }};
+}
+const unrelated={param(){return {name:"Other parameter",get value(){throw Error("unrelated numeric read");}};}};
+function complete(bindings, geometry, effects, source) {
+    const host=()=>({numProperties:effects.length});Object.assign(host,geometry);
+    host.effect=index=>effects[index-1];
+    return bindings.map(({expression})=>vm.runInNewContext(expression,{thisLayer:host,time:2.5,
+        thisProperty:{propertyGroup(){return {propertyIndex:1};}},
+        thisComp:{layer(index){assert.equal(index,7);return source;}}},{timeout:1000}));
+}
+selectorReads=0;
+const noneEffect=effect(5),duplicate=effect(777,source);
+for(const effects of [[unrelated,noneEffect,duplicate],[unrelated,duplicate,unrelated,noneEffect]]) {
+    compare(complete(noneBindings,owner,effects),[1,0,0,960,0,1,0,540,0,0,1,0]);
+}
+assert.equal(selectorReads,0);checks++;
+for(const sourceValue of [7,source]) for(const effects of [
+    [unrelated,effect(5,sourceValue),duplicate],[unrelated,duplicate,unrelated,effect(5,sourceValue)]]) {
+    compare(complete(selectedBindings,owner,effects,source),[-1,.15,0,-2.5,0,-.75,-.05,-78,.8,0,2,540]);
+}
+assert.deepEqual(complete(noneBindings,owner,[unrelated,duplicate]),Array(12).fill(-1099511627776));checks++;
+assert.throws(()=>complete(selectedBindings,owner,[unrelated,effect(5)]),/empty layer selector/);checks++;
+// Reproduce the old unsafe read against the same host-shaped None fixture.
+const oldNone=noneBindings.map(({expression})=>({expression:expression.replace(
+    "var identity =", "var selected = fx.param(1).value;\nvar identity =")}));
+assert.throws(()=>complete(oldNone,owner,[unrelated,noneEffect]),/empty layer selector/);checks++;
 console.log(`Transform expressions: ${checks} checks passed.`);

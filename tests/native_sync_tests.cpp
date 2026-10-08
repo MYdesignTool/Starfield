@@ -45,6 +45,7 @@ void check(bool condition, const char* message) {
 bool ignore_graph{};
 A_long fail_set = -1;
 A_long fail_read = -1;
+A_long fail_evaluated_read = -1;
 A_long wrong_type = -1;
 bool corrupt_receipt{};
 struct Memory { std::vector<std::byte> bytes; };
@@ -148,6 +149,22 @@ node_sync::NativeEdit edit(std::uint32_t kind, A_long index, double value) {
 PF_Err direct_edit(node_sync::NativeEdit& request) {
     PF_OutData output{}; return commit_native_graph_edit(&request, 701, &output);
 }
+void save_transform_expressions(const char* path) {
+    std::ofstream output(path);output<<"[";bool first=true;unsigned count=0;
+    for(std::size_t slot=0;slot<expressions.size();++slot) {
+        const auto& expression=expressions[slot];
+        if(expression.find(u"// Starfield Transform affine entry ")==std::u16string::npos)continue;
+        if(!first)output<<",";first=false;++count;
+        output<<"{\"stream\":"<<kNativeBindingFirstIndex+slot<<",\"expression\":\"";
+        for(auto c:expression) {
+            if(c==u'\n')output<<"\\n";
+            else {if(c==u'\\' || c==u'\"')output<<"\\";output<<static_cast<char>(c);}
+        }
+        output<<"\"}";
+    }
+    output<<"]";
+    check(bool(output) && count==12,"complete Transform expressions recorded for real UUID lookup execution");
+}
 }
 double evaluated_binding(A_long index, A_long time) {
     const auto slot=index-kNativeBindingFirstIndex;
@@ -162,9 +179,9 @@ double evaluated_binding(A_long index, A_long time) {
         return expr.find(u"fx.param("+number(records::uuid_first_index(kind)+7)+u").value === "+number(value))!=std::u16string::npos;
     };
     std::size_t id = identity(records::Kind::transform,5) ? 4 : identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
-    if(id==4 && expr.find(u"var selected = fx.param(1).value")!=std::u16string::npos) {
-        const std::u16string marker=u"result = identity[";
-        const auto first=expr.find(marker)+marker.size(),last=expr.find(u"]",first);
+    if(id==4 && expr.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
+        const std::u16string marker=u"// Starfield Transform affine entry ";
+        const auto first=expr.find(marker)+marker.size(),last=expr.find(u"\n",first);
         std::string digits;for(auto c:expr.substr(first,last-first))digits+=char(c);
         const auto entry=std::stoi(digits);
         if(fixtures[4].values[1].layer_id==0) {
@@ -272,6 +289,9 @@ int main() {
     stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time* time, A_Boolean pre_expression, AEGP_StreamValue2* out)->A_Err {
         auto& key = *reinterpret_cast<Ref*>(ref);
         if (!key.effect && key.index == fail_read) { fail_read = -1; return PF_Err_BAD_CALLBACK_PARAM; }
+        if (!key.effect && !pre_expression && key.index == fail_evaluated_read) {
+            fail_evaluated_read=-1;return PF_Err_BAD_CALLBACK_PARAM;
+        }
         out->streamH = ref;
         if(key.effect==5) {out->val.three_d={null_anchor.x,null_anchor.y,null_anchor.z};return 0;}
         out->val = fixtures[key.effect].values[key.index];
@@ -1064,6 +1084,33 @@ int main() {
             "native centred Anchor XY and Z0 map to canonical zero");
         check(core::validate_graph(transformed,core::particle_node_registry()).ok(),"new native graph passes current registry");
         {NativeBindingTransaction bindings(&renderer_data,701);check(bindings.install(transformed)==0,"new synthetic expressions install");bindings.accept();}
+        save_transform_expressions("artifacts/transform-none-animation-expressions.json");
+        const auto matrix_alias=std::find_if(expressions.begin(),expressions.end(),[](const auto& text) {
+            return text.find(u"// Starfield Transform affine entry 0\n")!=std::u16string::npos;
+        });
+        check(matrix_alias!=expressions.end(),"first Transform matrix alias exists");
+        const auto matrix_stream=kNativeBindingFirstIndex+static_cast<A_long>(matrix_alias-expressions.begin());
+        const auto before_expression_failure=expressions;
+        expressions[matrix_stream-kNativeBindingFirstIndex]=u"0";
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);A_long failed_stream=-1,failed_parameter=-1;
+            const char* failed_stage=nullptr;fail_evaluated_read=matrix_stream;
+            check(bindings.install(transformed,&failed_stream,&failed_stage,&failed_parameter)==PF_Err_BAD_CALLBACK_PARAM &&
+                failed_stream==matrix_stream && failed_parameter==15 &&
+                failed_stage && std::strcmp(failed_stage,"read evaluated value")==0,
+                "binding failure identifies the synthetic parameter and precise host operation");
+        }
+        check(expressions[matrix_stream-kNativeBindingFirstIndex]==u"0" && live_refs==0 && acquisitions==0,
+            "failed matrix evaluation restores expression text and releases host references");
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);const char* failed_stage=nullptr;
+            nonfinite_alias=matrix_stream;
+            check(bindings.install(transformed,nullptr,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+                failed_stage && std::strcmp(failed_stage,"verify finite bound value")==0,
+                "invalid evaluated results are distinguished from host suite failures");
+        }
+        nonfinite_alias=-1;
+        expressions=before_expression_failure;
         temporal_metadata_enabled=true;synthetic_native_reads=0;
         capture_native_temporal_metadata(&renderer_data,transformed,701);
         check(synthetic_native_reads==0,"constancy proof never queries synthetic fields as native metadata streams");
@@ -1097,6 +1144,7 @@ int main() {
         transform.values[1].layer_id=77;renderer_data.current_time=0;
         auto select=edit(4,1,0);
         check(direct_edit(select)==0 && select.accepted,"PF layer marker resolves the authoritative resource ID");
+        save_transform_expressions("artifacts/transform-selected-animation-expressions.json");
         transformed=saved_graph();check(std::get<std::uint32_t>(parameter(transformed,kTransformNode,kTransformInheritLayer))==77,
             "selected resource uses ID instead of layer index");
         const auto rotation=std::get<core::Vec3>(parameter(transformed,kTransformNode,kTransformRotation));
@@ -1114,6 +1162,20 @@ int main() {
         check(std::abs(std::bit_cast<double>(bits)-24./1080)<1e-12,"Null animation moves the canonical pose at exact sample time");
         check(aegp_suite_requests==before_render_suites && affine_reads==before_affine_reads,
             "render playback invokes no AEGP or layer-transform callback");
+        transform.values[1].layer_id=0;
+        auto deselect=edit(4,1,0);
+        check(direct_edit(deselect)==0 && deselect.accepted,"selecting None regenerates identity bindings");
+        unsigned identity_bindings=0;
+        for(const auto& expression:expressions) if(expression.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
+            ++identity_bindings;
+            check(expression.find(u"fx.param(1)")==std::u16string::npos,
+                "deselecting the source removes every layer-property dependency");
+        }
+        check(identity_bindings==12 && std::get<std::uint32_t>(parameter(saved_graph(),kTransformNode,kTransformInheritLayer))==0,
+            "None preserves the resource and matrix record contract");
+        transform.values[1].layer_id=77;
+        auto reselect=edit(4,1,0);
+        check(direct_edit(reselect)==0 && reselect.accepted,"reselecting a Null restores dynamic bindings");
         const auto before_bad_writes=sets;transform.values[1].layer_id=88;
         auto missing=edit(4,1,0);check(direct_edit(missing)!=0 && !missing.accepted && sets==before_bad_writes,
             "unresolved resource rejects before any publication");

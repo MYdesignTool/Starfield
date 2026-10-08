@@ -262,3 +262,37 @@ One-step undo, with AE closed: tools/Restore-TestBuild.ps1 -PluginDir
 'm3-11-native47-panel50-transform-20261007' -Restore. Its read-only verification
 passed. No AE process or unrelated host setting was changed; M3-11 host gates
 remain open.
+
+## Empty layer selector correction — 2026-10-08
+
+The owner reports that adding Transform in native47/CEP50 fails with animation
+binding stream294, error516. The previous message did not distinguish a suite
+error from the adapter's own rejected evaluated value; the exact host operation
+and cause remain unconfirmed. Inspection found that every default synthetic
+expression reads the empty PF_LAYER property before taking the None branch.
+The existing JS fixture returned numeric0 for None and did not model a throwing
+empty layer property. The full generated expression now has that regression
+fixture, which reproduces the unsafe read in the previous expression.
+
+Native48 uses the constant, UI-validated resource field to generate identity
+expressions for None, without accessing the layer selector. Choosing a source
+or returning to None regenerates the expressions through the supervised edit.
+Selected sources retain exact temporal sampling and explicit failures for
+unavailable layers; failures are not converted to identity. Binding rejection
+messages include the source parameter and precise read/write/verification step.
+
+This changes no parameter ID, effect identity, graph/sequence schema, saved
+record bytes or Core ABI4. Existing aliases are repaired through the normal UI
+binding transaction, with expression/value/state rollback on failure. Build48
+code/PiPL packing agrees at32816. Actual AE2023 creation, Null motion, undo and
+reopen remain owner qualification gates.
+
+Candidate evidence: May2023 /MT full native build with -NoDistPublish and
+-NoRuntimePublish passes. NativeSync7015 plus Camera12, affine/None60 and actual
+generated expression167 checks pass; the existing74-expression/keyframe JS
+suite also passes. Run NativeSync and TransformBinding C++ scopes before the
+Transform expression JS suite to generate both complete aliases and body data.
+Logs: artifacts/m3-11-native48-build.log, m3-11-native48-sync.log,
+m3-11-native48-binding.log, m3-11-native48-expressions.log and
+m3-11-native48-legacy-expressions.log. These are source/fake-host results,
+not confirmation that the owner's stream294 error is resolved in AE.

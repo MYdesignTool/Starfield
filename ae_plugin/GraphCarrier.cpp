@@ -81,12 +81,14 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         if (error) return reject(output, params, nonce, "graph allocation failed", error);
         NativeBindingTransaction bindings(data, graph_carrier_plugin_id());
         A_long failed_binding = -1;
-        error = bindings.install(graph, &failed_binding);
+        A_long failed_parameter = -1;
+        const char* failed_stage = "unknown";
+        error = bindings.install(graph, &failed_binding, &failed_stage, &failed_parameter);
         if (error) {
             data->utils->host_dispose_handle(replacement);
-            char reason[100]{};
-            std::snprintf(reason, sizeof(reason), "animation binding stream %ld failed (error %ld)",
-                static_cast<long>(failed_binding), static_cast<long>(error));
+            char reason[200]{};
+            std::snprintf(reason, sizeof(reason), "animation binding stream %ld, parameter %ld, %s failed (error %ld)",
+                static_cast<long>(failed_binding), static_cast<long>(failed_parameter), failed_stage, static_cast<long>(error));
             return reject(output, params, nonce, reason, error);
         }
         error = write_graph_snapshot(data, params, graph);

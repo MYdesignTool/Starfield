@@ -68,15 +68,20 @@ inline starfield::core::Result<Matrix> canonical_matrix(const PixelAffine& pixel
 // Insert inside the UUID-selected branch of a main-effect numeric expression.
 // The same bounded inverse as the UI capture is evaluated at expression time.
 // Only documented toWorld/toWorldVec methods are used; no script-side host writes.
-inline std::string matrix_expression(unsigned entry) {
+inline std::string matrix_expression(unsigned entry, bool inherited = true) {
     const unsigned row=entry/4,column=entry%4;
-    std::string text=R"(var selected = fx.param(1).value;
+    std::string text="// Starfield Transform affine entry "+std::to_string(entry)+"\n";
+    // PF_LAYER is constant structure. None is already validated during UI
+    // compilation; do not evaluate an empty AE layer property in an expression.
+    // Changing the source recompiles these aliases through the supervised edit.
+    if (!inherited) {
+        text += "var identity = [1,0,0,thisLayer.width*0.5,0,1,0,thisLayer.height*0.5,0,0,1,0];\n";
+        return text+"result = identity["+std::to_string(entry)+"];\n";
+    }
+    text+=R"(var selected = fx.param(1).value;
 var src = typeof selected === "number" ? (selected === 0 ? null : thisComp.layer(selected)) : selected;
-if (src == null) {
-    var identity = [1,0,0,thisLayer.width*0.5,0,1,0,thisLayer.height*0.5,0,0,1,0];
-)";
-    text+="result = identity["+std::to_string(entry)+"];\n} else {\n";
-    text+=R"(function point(v) { return [v[0],v[1],v.length > 2 ? v[2] : 0]; }
+if (src == null) throw new Error("Starfield: inherited layer unavailable");
+function point(v) { return [v[0],v[1],v.length > 2 ? v[2] : 0]; }
 function axis(layer,n) {
     var v = [0,0,0]; v[n] = 1; var w = layer.toWorldVec(v,time);
     return [w[0],w[1],w.length > 2 ? w[2] : (n === 2 ? 1 : 0)];
@@ -101,7 +106,7 @@ var v=[target[0]-origin[0],target[1]-origin[1],target[2]-origin[2]];
 )";
     else text+="var v=axis(src,"+std::to_string(column)+");\n";
     text+="result = rows["+std::to_string(row)+"][3]*v[0]+rows["+std::to_string(row)+"][4]*v[1]+rows["+std::to_string(row)+"][5]*v[2];\n";
-    text+="if (!isFinite(result)) throw new Error(\"Starfield: invalid Null layer transform\");\n}\n";
+    text+="if (!isFinite(result)) throw new Error(\"Starfield: invalid Null layer transform\");\n";
     return text;
 }
 }

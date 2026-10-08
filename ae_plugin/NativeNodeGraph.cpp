@@ -548,7 +548,8 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
     }
     text += "; } catch (unrelatedEffect) {} if (match) { ";
     if(node.kind==Kind::transform && transform_layout::matrix_field(index))
-        text+=transform_binding::matrix_expression(static_cast<unsigned>(index-transform_layout::matrix_first));
+        text+=transform_binding::matrix_expression(static_cast<unsigned>(index-transform_layout::matrix_first),
+            node.fields[transform_layout::inherit].value[0] != 0);
     else {
         text += "result = fx.param(" + std::to_string(index) + ").value";
         if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
@@ -1126,6 +1127,7 @@ struct NativeBindingTransaction::Impl {
         A_Boolean enabled{};
         double previous_value{};
         A_long index{-1};
+        A_long parameter{-1};
         bool changed{};
     };
     PF_InData* data{};
@@ -1157,18 +1159,24 @@ NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginI
 NativeBindingTransaction::~NativeBindingTransaction() = default;
 void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; }
 
-PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream) noexcept {
+PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
+                                        const char** failed_stage, A_long* failed_parameter) noexcept {
     if (failed_stream) *failed_stream = -1;
+    if (failed_parameter) *failed_parameter = -1;
+    const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
+    stage("decode binding record");
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
         if (nodes.empty()) return PF_Err_NONE;
         auto& tx = *impl_;
+        stage("acquire binding suites");
         auto error = tx.suites.acquire(); if (error) return error;
         A_Err ae = tx.suites.basic->AcquireSuite(kAEGPMemorySuite, kAEGPMemorySuiteVersion1,
             reinterpret_cast<const void**>(&tx.memory));
         if (ae) return static_cast<PF_Err>(ae);
         if (!tx.renderer) {
+            stage("resolve renderer");
             ae = tx.suites.pf_interface->AEGP_GetNewEffectForEffect(tx.id, tx.data->effect_ref, &tx.renderer);
             tx.owned_renderer = true;
             if (ae || !tx.renderer) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
@@ -1179,19 +1187,26 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             for (A_long component = 0; component < component_count(field.type); ++component) {
                 tx.changes.emplace_back(); auto& change = tx.changes.back();
                 change.index = kNativeBindingFirstIndex + field.slot + component;
+                change.parameter = index;
                 if (failed_stream) *failed_stream = change.index;
+                if (failed_parameter) *failed_parameter = index;
+                stage("open alias stream");
                 ae = tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id, tx.renderer,
                     kNativeBindingFirstIndex + field.slot + component, &change.ref);
                 if (ae || !change.ref) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
                 AEGP_StreamType type = AEGP_StreamType_NO_DATA;
+                stage("read alias type");
                 ae = tx.suites.stream->AEGP_GetStreamType(change.ref, &type);
                 if (ae || type != AEGP_StreamType_OneD) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+                stage("read expression state");
                 ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &change.enabled);
                 if (ae) return static_cast<PF_Err>(ae);
                 AEGP_MemHandle handle{};
+                stage("read expression text");
                 ae = tx.suites.stream->AEGP_GetExpression(tx.id, change.ref, &handle);
                 if (ae) return static_cast<PF_Err>(ae);
                 if (handle) {
+                    stage("lock expression text");
                     void* text = nullptr; ae = tx.memory->AEGP_LockMemHandle(handle, &text);
                     struct LockedExpression {
                         const AEGP_MemorySuite1* suite;
@@ -1212,16 +1227,22 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 // freshly compiled node identity and source parameter above.
                 const A_Time sample_time{tx.data->current_time, tx.data->time_scale};
                 AEGP_StreamValue2 previous{};
+                stage("read previous value");
                 ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, TRUE, &previous);
                 if (ae) return static_cast<PF_Err>(ae);
                 change.previous_value = previous.val.one_d;
                 tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 change.changed = true;
                 AEGP_StreamValue2 sentinel{}; sentinel.streamH = change.ref; sentinel.val.one_d = kNativeBindingUnavailable;
+                stage("write alias sentinel");
                 ae = tx.suites.stream->AEGP_SetStreamValue(tx.id, change.ref, &sentinel);
                 if (ae) return static_cast<PF_Err>(ae);
+                stage("write expression");
                 ae = tx.suites.stream->AEGP_SetExpression(tx.id, change.ref, reinterpret_cast<const A_UTF16Char*>(desired.c_str()));
-                if (!ae) ae = tx.suites.stream->AEGP_SetExpressionState(tx.id, change.ref, TRUE);
+                if (!ae) {
+                    stage("enable expression");
+                    ae = tx.suites.stream->AEGP_SetExpressionState(tx.id, change.ref, TRUE);
+                }
                 if (ae) return static_cast<PF_Err>(ae);
             }
         }
@@ -1232,16 +1253,21 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         for (const auto& change : tx.changes) {
             if (!change.changed) continue;
             if (failed_stream) *failed_stream = change.index;
+            if (failed_parameter) *failed_parameter = change.parameter;
             AEGP_StreamValue2 evaluated{};
+            stage("read evaluated value");
             ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, FALSE, &evaluated);
             if (ae) return static_cast<PF_Err>(ae);
             const double value = evaluated.val.one_d;
             tx.suites.stream->AEGP_DisposeStreamValue(&evaluated);
             A_Boolean enabled = FALSE;
+            stage("verify expression enabled");
             ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &enabled);
             if (ae || !enabled) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+            stage("verify finite bound value");
             if (!std::isfinite(value) || value == kNativeBindingUnavailable) return PF_Err_BAD_CALLBACK_PARAM;
         }
+        stage("accepted bindings");
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }

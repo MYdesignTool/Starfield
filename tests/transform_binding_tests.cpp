@@ -36,15 +36,23 @@ int main() {
     for(const auto bad: {starfield::core::LayerUnits{0,1080,1},{1920,-1,1},{1920,1080,0}})
         check(!canonical_matrix(expected,bad).has_value(),"invalid geometry rejects");
     auto excessive=expected;excessive[0]=1e7;check(!canonical_matrix(excessive,units).has_value(),"matrix bound rejects");
-    std::ofstream output("artifacts/transform-matrix-expressions.json");output<<"[";
-    for(unsigned i=0;i<12;++i) {
-        if(i)output<<",";output<<"\"";
-        for(char c:matrix_expression(i)) {
-            if(c=='\n')output<<"\\n";else if(c=='\r')output<<"\\r";
-            else {if(c=='\\' || c=='\"')output<<'\\';output<<c;}
+    std::ofstream output("artifacts/transform-matrix-expressions.json");output<<"{";
+    for(bool inherited:{false,true}) {
+        if(inherited)output<<",";
+        output<<"\""<<(inherited?"selected":"none")<<"\":[";
+        for(unsigned i=0;i<12;++i) {
+            if(i)output<<",";output<<"\"";
+            const auto expression=matrix_expression(i,inherited);
+            if(!inherited)check(expression.find("fx.param(1)")==std::string::npos,
+                "None expression never dereferences the PF layer property");
+            for(char c:expression) {
+                if(c=='\n')output<<"\\n";else if(c=='\r')output<<"\\r";
+                else {if(c=='\\' || c=='\"')output<<'\\';output<<c;}
+            }
+            output<<"\"";
         }
-        output<<"\"";
+        output<<"]";
     }
-    output<<"]\n";check(bool(output),"actual expression bodies emitted for JS execution checks");
+    output<<"}\n";check(bool(output),"actual expression bodies emitted for JS execution checks");
     std::printf("Transform binding: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

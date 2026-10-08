@@ -43,7 +43,8 @@ public:
     ~NativeBindingTransaction();
     NativeBindingTransaction(const NativeBindingTransaction&) = delete;
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;
-    PF_Err install(const core::Graph&, A_long* failed_stream = nullptr) noexcept;
+    PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
+                   const char** failed_stage = nullptr, A_long* failed_parameter = nullptr) noexcept;
     void accept() noexcept;
 private:
     struct Impl;
