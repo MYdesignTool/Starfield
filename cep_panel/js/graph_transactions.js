@@ -53,7 +53,9 @@
             if (node.type === "org.starfieldfx.nodes.output") continue;
             var nativeNode = { id: node.id, type: node.type, schemaVersion: node.schemaVersion,
                 position: positions[node.id], outgoing: [],
-                parameters: node.parameters.map(function (parameter) {
+                parameters: node.parameters.filter(function(parameter) {
+                    return node.type !== "org.starfieldfx.nodes.transform" || String(parameter.key) !== "7";
+                }).map(function (parameter) {
                     return { key: String(parameter.key), type: parameter.type, value: jsonValue(parameter.value) };
                 }) };
             byId["$" + node.id] = nativeNode;
@@ -119,6 +121,13 @@
             var keys = Object.keys(params).concat(Object.keys(savedParams));
             for (var p = 0; p < keys.length; p++) {
                 var key = keys[p], a = params[key], b = savedParams[key];
+                // This matrix is derived at the requested time by the native
+                // adapter; ordinary authoring snapshots own only controls/ID.
+                if (kind === "transform" && key === "7") continue;
+                if (kind === "transform" && key === "8" && (!a || !b)) {
+                    var resource = a || b;
+                    if (resource.type === 3 && resource.value === 0) continue;
+                }
                 var label=kind+" "+((kind==="particle" ? {"7":"Size Over Life","8":"Opacity Over Life","13":"Color Gradient","27":"Rotation Over Life"} :
                     kind==="force" ? {"9":"Wind and Spin Over Life"} : {})[key] || "parameter "+key);
                 if (!a || !b) {

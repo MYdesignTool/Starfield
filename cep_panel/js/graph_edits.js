@@ -13,13 +13,15 @@
         emitter: "org.starfieldfx.nodes.emitter",
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
+        transform: "org.starfieldfx.nodes.transform",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
@@ -63,6 +65,11 @@
             { key: "5", type: 4, value: 0 }, { key: "6", type: 4, value: 0 },
             { key: "7", type: 4, value: 0 }, { key: "8", type: 4, value: 0 }
         ],
+        transform: [
+            {key:"1",type:5,value:[0,0,0]}, {key:"2",type:5,value:[0,0,0]},
+            {key:"3",type:5,value:[0,0,0]}, {key:"4",type:5,value:[100,100,100]},
+            {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
+        ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
             {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30},{key:"8",type:3,value:1},{key:"9",type:4,value:360},{key:"10",type:4,value:0},{key:"11",type:3,value:0},{key:"12",type:4,value:8},{key:"13",type:4,value:70},{key:"14",type:4,value:0},{key:"15",type:3,value:0}]
     };
@@ -105,6 +112,7 @@
         DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
         if (kind === "particle") optional = {"7":7,"8":7,"27":7};
         if (kind === "force") optional = {"9":7};
+        if (kind === "transform") optional = {"7":7,"8":3};
         Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
         record.parameters.forEach(function (p) {
             var key = String(p.key);
@@ -430,6 +438,8 @@
             }
             var node = nodeById(graph, change.nodeId);
             if (!node) fail("missing_node", "cannot edit a node absent from the graph");
+            if (node.type === TYPES.transform && change.parameterKey === "7")
+                fail("invalid_parameter", "Inherited motion is sampled by After Effects.");
             var found = -1;
             for (var p = 0; p < node.parameters.length; p++) {
                 if (node.parameters[p].key === change.parameterKey) { found = p; break; }
@@ -444,6 +454,11 @@
                 continue;
             }
             var value = copyValue(change.value);
+            if (node.type === TYPES.transform && change.parameterKey === "8") {
+                if (change.valueType !== 3 || !Number.isInteger(value) || value < 0 || value > 2147483647)
+                    fail("invalid_parameter", "Choose an available layer or None.");
+                if (found < 0) { node.parameters.push({key:"8",type:3,value:value}); continue; }
+            }
             if (found < 0) {
                 if ((node.type !== TYPES.particle) ||
                     (change.parameterKey !== "7" && change.parameterKey !== "8" && !(node.type===TYPES.particle && change.parameterKey==="13")) ||

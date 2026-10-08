@@ -45,6 +45,9 @@
           <button type="button" data-node-type="force" aria-label="Drag Force onto graph" title="Force · drag onto graph">
             <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13m-3-3 3 3-3 3M3 12h18m-3-3 3 3-3 3M3 17h10m-3-3 3 3-3 3"/></g></svg>
           </button>
+          <button type="button" data-node-type="transform" aria-label="Drag Transform onto graph" title="Transform · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2"/><path d="m12 3-3 3m3-3 3 3m6 6-3-3m3 3-3 3m-6 6-3-3m3 3 3-3m-9-6 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
         </div>
         <button id="nodePaletteToggle" class="node-palette-toggle" type="button" aria-controls="nodePaletteItems" aria-expanded="true" aria-label="Collapse node palette" title="Collapse nodes">‹</button>
       </aside>
@@ -97,6 +100,7 @@
     <button type="button" role="menuitem" data-action="addNode" data-node-type="auxiliary">Auxiliary</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
     <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="transform">Transform</button>
     <div class="context-menu-separator"></div>
     <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
     <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected <span>Del / Backspace</span></button>

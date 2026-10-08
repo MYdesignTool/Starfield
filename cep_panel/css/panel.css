@@ -245,6 +245,7 @@ button:hover, button:focus-visible { border-color: var(--accent); }
 .graph-node.emitter { left: 235px; top: 22px; --node-color: #e5aa69; }
 .graph-node.particle { left: 235px; top: 100px; --node-color: #b7a0e9; }
 .graph-node.force { left: 235px; top: 178px; --node-color: #94a9ed; }
+.graph-node.transform { --node-color: #8dc9dd; }
 .graph-node.output { left: 235px; top: 256px; --node-color: #83c9b1; }
 .graph-node.selected {
   border-color: var(--node-color);

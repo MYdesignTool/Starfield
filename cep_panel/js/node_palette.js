@@ -1,7 +1,7 @@
 // Pointer-based palette: local preview only until one valid canvas drop.
 (function (root) {
     "use strict";
-    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force" };
+    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force", transform: "Transform" };
     function create(options) {
         var palette=options.root, items=options.items, toggle=options.toggle;
         var viewport=options.viewport, doc=options.document || document, win=options.window || window;

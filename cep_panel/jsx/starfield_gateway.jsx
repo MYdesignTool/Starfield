@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-49";
+    var GATEWAY_BUILD = "native-presets-50";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -28,6 +28,7 @@
     var graphNonceCounter = 0;
     // Property references live only inside one synchronous gateway request.
     var nativePropertyIndexes = [];
+    var nativeLayerInventory = null;
     var GRAPH_CARRIERS = {
         revision: { index: 39, name: "Graph Revision" },
         guard: { index: 40, name: "Panel Graph Sync Guard" },
@@ -40,7 +41,8 @@
     var NATIVE_NODE_TYPES = {
         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
-        "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" }
+        "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
+        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" }
     };
 
     // One row per bound effect parameter. `index` is the registered parameter index
@@ -141,6 +143,7 @@
 
     function reply(payload) {
         nativePropertyIndexes = [];
+        nativeLayerInventory = null;
         payload.protocol = PROTOCOL;
         payload.version = VERSION;
         payload.gatewayBuild = GATEWAY_BUILD;
@@ -155,6 +158,7 @@
 
     function parseRequest(text) {
         nativePropertyIndexes = [];
+        nativeLayerInventory = null;
         if (typeof text !== "string" || text.length === 0 || text.length > MAX_REQUEST_BYTES) return null;
         var request = null;
         try { request = JSON.parse(text); } catch (error) { return null; }
@@ -712,6 +716,90 @@
         return id;
     }
 
+    function transformControl(index) {
+        return {name:["Inherit Motion (Null Layer)","Anchor XY","Anchor Z","Position X","Position Y","Position Z",
+            "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
+    }
+
+    function transformGeometry(layer) {
+        var width=Number(layer.width),height=Number(layer.height),aspect=layer.source ? Number(layer.source.pixelAspect) : 1;
+        if(!(width>0) || !(height>0) || !isFinite(width) || !isFinite(height) || !(aspect>0) || !isFinite(aspect))
+            throw new Error("The Transform layer dimensions are unavailable.");
+        return {width:width,height:height,aspect:aspect};
+    }
+
+    function layerInventory(layer) {
+        var comp=layer.containingComp;
+        if(!comp)throw new Error("The Transform composition is unavailable.");
+        if(nativeLayerInventory && nativeLayerInventory.comp===comp)return nativeLayerInventory;
+        var count=Number(comp.numLayers),entries=[],byId={};
+        if(!isFinite(count) || Math.floor(count)!==count || count<0 || count>4096)
+            throw new Error("The composition exceeds the 4096-layer resource limit.");
+        for(var i=1;i<=count;i++) {
+            var source=comp.layer(i),id=Number(source.id);
+            if(!isFinite(id) || Math.floor(id)!==id || id<=0 || id>2147483647 || byId["$"+id])
+                throw new Error("After Effects did not provide unique layer resource IDs.");
+            // Camera and light layers have no anchor and cannot supply this affine.
+            var transform=source.property("ADBE Transform Group");
+            if(!transform || !transform.property("ADBE Anchor Point"))continue;
+            entries.push({id:id,name:String(source.name),index:i});byId["$"+id]=i;
+        }
+        nativeLayerInventory={comp:comp,entries:entries,byId:byId};return nativeLayerInventory;
+    }
+
+    function layerResourceIndex(layer,id) {
+        if(typeof id!=="number" || !isFinite(id) || Math.floor(id)!==id || id<0 || id>2147483647)
+            throw new Error("Inherit Motion needs a valid project layer ID or None.");
+        if(id===0)return 0;
+        var index=layerInventory(layer).byId["$"+id];
+        if(!index)throw new Error("The Inherit Motion layer no longer exists in this composition. Choose a layer or None.");
+        return index;
+    }
+
+    function validateTransformRecord(node) {
+        if(node.schemaVersion!==1)throw new Error("Unsupported Transform schema.");
+        var found={};
+        for(var i=0;i<node.parameters.length;i++) {
+            var p=node.parameters[i],key=String(p.key),v=p.value;
+            if(key==="8") {
+                if(p.type!==3 || typeof v!=="number" || !isFinite(v) || Math.floor(v)!==v || v<0 || v>2147483647)
+                    throw new Error("Invalid Transform layer resource.");
+            } else if(key==="1" || key==="2" || key==="3" || key==="4") {
+                if(p.type!==5 || !(v instanceof Array) || v.length!==3)throw new Error("Invalid Transform vector "+key+".");
+                var limit=key==="4"?10000:key==="3"?32768:1000000;
+                for(var a=0;a<3;a++)if(typeof v[a]!=="number" || !isFinite(v[a]) || Math.abs(v[a])>limit)
+                    throw new Error("Transform vector is out of range: "+key+".");
+            } else if(key==="5" || key==="6") {
+                if(p.type!==4 || typeof v!=="number" || !isFinite(v) || v<0 || v>(key==="5"?10000:100))
+                    throw new Error("Invalid Transform particle multiplier.");
+            } else throw new Error("Transform authoring parameter is unsupported: "+key+".");
+            found[key]=true;
+        }
+        for(var required=1;required<=6;required++)if(!found[String(required)])throw new Error("Transform controls are incomplete.");
+    }
+
+    function validateTransformResources(nodes,layer) {
+        for(var n=0;n<nodes.length;n++)if(nodes[n].type==="org.starfieldfx.nodes.transform") {
+            var g=transformGeometry(layer);
+            for(var p=0;p<nodes[n].parameters.length;p++) {
+                var entry=nodes[n].parameters[p],key=String(entry.key),v=entry.value;
+                if(key==="8")layerResourceIndex(layer,v);
+                if(key==="1" || key==="2") {
+                    var pixels=key==="1" ? [g.width/2+v[0]*g.height/g.aspect,g.height/2-v[1]*g.height,v[2]*g.height] :
+                        [v[0]*g.height/g.aspect,-v[1]*g.height,v[2]*g.height];
+                    if(key==="1" && (pixels[0]<-32768 || pixels[0]>32767.99998474121 ||
+                        pixels[1]<-32768 || pixels[1]>32767.99998474121))throw new Error("Anchor XY exceeds the native point range.");
+                    for(var axis=key==="1"?2:0;axis<3;axis++)if(!isFinite(pixels[axis]) || Math.abs(pixels[axis])>1000000)
+                        throw new Error("Transform position exceeds its native pixel range.");
+                }
+                if(key==="3")for(var angle=0;angle<3;angle++) {
+                    var nativeAngle=v[angle]*(angle===1?1:-1);
+                    if(nativeAngle<-32768 || nativeAngle>32767.99998474121)throw new Error("Transform rotation exceeds its native angle range.");
+                }
+            }
+        }
+    }
+
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
@@ -756,6 +844,29 @@
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
+        } else if (type === "org.starfieldfx.nodes.transform") {
+            var tg=transformGeometry(layer),anchor=nodeControlValue(effect,transformControl(2));
+            node.parameters.push({key:"1",type:5,value:[(Number(anchor[0])-tg.width/2)*tg.aspect/tg.height,
+                .5-Number(anchor[1])/tg.height,Number(nodeControlValue(effect,transformControl(3)))/tg.height]});
+            for(var group=0;group<3;group++) {
+                var components=[];
+                for(var axis=0;axis<3;axis++) {
+                    var component=Number(nodeControlValue(effect,transformControl(4+3*group+axis)));
+                    components.push(group===0 ? component*(axis===0?tg.aspect:axis===1?-1:1)/tg.height :
+                        group===1 ? component*(axis===1?1:-1) : component);
+                }
+                node.parameters.push({key:String(2+group),type:5,value:components});
+            }
+            scalar(5,transformControl(13));scalar(6,transformControl(14));
+            var sourceIndex=Number(nodeControlValue(effect,transformControl(1))),resource=0;
+            if(!isFinite(sourceIndex) || Math.floor(sourceIndex)!==sourceIndex || sourceIndex<0)
+                throw new Error("Invalid Inherit Motion layer selection.");
+            if(sourceIndex!==0) {
+                var inventory=layerInventory(layer),sourceLayer=inventory.comp.layer(sourceIndex);
+                resource=Number(sourceLayer.id);
+                if(inventory.byId["$"+resource]!==sourceIndex)throw new Error("Inherit Motion requires a layer with an anchor.");
+            }
+            node.parameters.push({key:"8",type:3,value:resource});validateTransformRecord(node);
         } else if (type === "org.starfieldfx.nodes.force") {
             var forceHeight = Number(layer.height);
             var forceAspect=layer.source ? Number(layer.source.pixelAspect) : 1;
@@ -964,6 +1075,19 @@
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+                } else if (type === "org.starfieldfx.nodes.transform") {
+                    var geometry=transformGeometry(layer);
+                    if(key==="1") {
+                        setNodeControl(effect,transformControl(2),[geometry.width/2+value[0]*geometry.height/geometry.aspect,
+                            geometry.height/2-value[1]*geometry.height]);
+                        setNodeControl(effect,transformControl(3),value[2]*geometry.height);
+                    } else if(key==="2" || key==="3" || key==="4") {
+                        for(var axis=0;axis<3;axis++)setNodeControl(effect,transformControl(4+3*(Number(key)-2)+axis),
+                            key==="2" ? value[axis]*geometry.height*(axis===0?1/geometry.aspect:axis===1?-1:1) :
+                            key==="3" ? value[axis]*(axis===1?1:-1) : value[axis]);
+                    } else if(key==="5" || key==="6")setNodeControl(effect,transformControl(Number(key)+8),value);
+                    else if(key==="8")setNodeControl(effect,transformControl(1),layerResourceIndex(layer,value));
+                    else throw new Error("Transform graph parameter is not mapped: "+key);
                 } else if (type === "org.starfieldfx.nodes.particle") {
                     if (key === "1") setNodeControl(effect,"Color",[value[0],value[1],value[2],1]);
                     else if(key==="12" && type==="org.starfieldfx.nodes.particle") setNodeControl(effect,"Particle Color",Number(value)+1);
@@ -1057,6 +1181,7 @@
                 connection.target = connection.target.toLowerCase();
                 edgeIds["$" + connection.id] = true;
             }
+            if(node.type==="org.starfieldfx.nodes.transform")validateTransformRecord(node);
         }
         var knownTargets = nodeIds(nodes);
         knownTargets["$000000000000000000000000000000ff"] = true;
@@ -1280,11 +1405,15 @@
         var checksum = (high * 65536 + low).toString(16);
         while (checksum.length < 8) checksum = "0" + checksum;
         var nodes = readNativeNodes(resolved.target.layer), repairNeeded = false;
+        var hasTransform=false;
+        for(var resourceNode=0;resourceNode<nodes.length;resourceNode++)
+            if(nodes[resourceNode].type==="org.starfieldfx.nodes.transform")hasTransform=true;
         try { validateNodeManifest(nodes); } catch (invalidRecord) { repairNeeded = true; }
         var renderer = readRendererRecord(resolved);
         return { initialized: Number(resolved.properties.nodeEffectsReady.value) === 1 && revision > 0 && !repairNeeded,
             repairNeeded: repairNeeded, revision: revision, checksum: checksum, nativeNodes: nodes,
-            renderer: renderer, geometry: { width:Number(resolved.target.layer.width), height:Number(resolved.target.layer.height),
+            renderer: renderer, layerResources: hasTransform ?
+                layerInventory(resolved.target.layer).entries : [], geometry: { width:Number(resolved.target.layer.width), height:Number(resolved.target.layer.height),
                 pixelAspect:resolved.target.layer.source ? Number(resolved.target.layer.source.pixelAspect) : 1 },
             recordStamp:authoringStamp(nodes,renderer) };
     }
@@ -1563,6 +1692,7 @@
         try {
             previousNodes = validateNodeManifest(snapshot.nativeNodes);
             desiredNodes = validateNodeManifest(request.nodeManifest);
+            validateTransformResources(desiredNodes,resolved.target.layer);
             validateRendererManifest(request.baseRendererManifest);
             validateRendererManifest(request.rendererManifest);
         } catch (manifestError) {
@@ -1814,7 +1944,7 @@
         var legacyRevision = source === "AE Controls" ? currentRevision(target,{}) : null;
         // No sibling control reads, curve decoding, simulation or writes here.
         var stamp = JSON.stringify([token,source,Number(target.comp.time),markers,
-            parade ? parade.numProperties : 0,Number(target.layer.width),Number(target.layer.height),
+            parade ? parade.numProperties : 0,Number(target.comp.numLayers),Number(target.layer.width),Number(target.layer.height),
             target.layer.source ? Number(target.layer.source.pixelAspect) : 1,renderer,legacyRevision]);
         return reply({ok:true,operation:"getPanelPulse",requestId:request.requestId || "",
             target:{token:token},stamp:stamp,frameStatus:frame});

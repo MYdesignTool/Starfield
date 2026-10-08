@@ -74,6 +74,15 @@
     }
     function authoring(graph,context){
         var clean=motionDefaults(clone(graph)),positions=layout.resolve(clean);clean.optionalRecords=[];
+        clean.nodes.forEach(function(node){
+            if(node.type!==edits.types.transform)return;
+            var source=node.parameters.filter(function(p){return p.key==="8";})[0];
+            if(source && (source.type!==3 || source.value!==0))
+                fail("A Transform references a project layer. Set Inherit Motion to None before exporting or importing this preset.");
+            // The sampled affine belongs to the current host, not a preset.
+            node.parameters=node.parameters.filter(function(p){return p.key!=="7";});
+            if(!source)node.parameters.push({key:"8",type:3,value:0});
+        });
         clean=layout.set(clean,positions);validate(clean,context);return clean;
     }
     function validate(graph,context){

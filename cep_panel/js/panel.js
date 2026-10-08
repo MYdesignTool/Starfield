@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-49";
+    var GATEWAY_BUILD = "native-presets-50";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -230,11 +230,11 @@
     }
 
     var NODE_TYPES = {
-        emitter: true, particle: true, force: true, output: true
+        emitter: true, particle: true, force: true, transform: true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
-        force: { x: 235, y: 178 }, output: { x: 235, y: 256 }
+        force: { x: 235, y: 178 }, transform: {x:235,y:220}, output: { x: 235, y: 256 }
     };
 
     function positionFor(node, index) {
@@ -360,7 +360,7 @@
         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed",
+        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd",
                        output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
             if (!isSupportedNode(state.nodes[i])) continue;
@@ -581,6 +581,7 @@
             return "Size " + shortNumber(parameterValue(node, "particle_size") || graphParameterValue(node, 3)) +
                    " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
         }
+        if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
         var status = state.frameStatus;
         if (status && status.available === false) return "Live count unavailable";
         var maxParticles = status ? status.maxParticles :
@@ -2301,7 +2302,7 @@
             select.dataset.graphType = String(parameter.graphType);
             select.disabled = parameter.readonly === true;
         }
-        select.title = "Choose the emitter type";
+        select.title = parameter.label;
         select._graphParameter = parameter;
         select.addEventListener("change", onEdit);
         return select;
@@ -2493,8 +2494,10 @@
         lastFullRefreshAt = Date.now();
         var targetChanged = state.targetToken !== response.target.token;
         var graphChanged = window.StarfieldGraphView.graphSnapshotChanged(state.graphSnapshot, graphSnapshot);
+        var resourcesChanged=!!graphSnapshot && (!state.graphSnapshot ||
+            JSON.stringify(state.graphSnapshot.layerResources)!==JSON.stringify(graphSnapshot.layerResources));
         var graphLayoutChanged = false;
-        var changed = targetChanged || state.revision !== response.revision || graphChanged ||
+        var changed = targetChanged || state.revision !== response.revision || graphChanged || resourcesChanged ||
                       state.controlSource !== response.controlSource;
         if (targetChanged) resetViewForTarget();
         var layoutChanged = false;
@@ -2505,10 +2508,11 @@
             try {
                 var reusable = !targetChanged && state.graph && state.graphSnapshot &&
                     state.graphSnapshot.graphHex === graphSnapshot.graphHex &&
-                    JSON.stringify(state.graphSnapshot.geometry) === JSON.stringify(graphSnapshot.geometry);
+                    JSON.stringify(state.graphSnapshot.geometry) === JSON.stringify(graphSnapshot.geometry) &&
+                    JSON.stringify(state.graphSnapshot.layerResources) === JSON.stringify(graphSnapshot.layerResources);
                 if (!reusable) {
                     var graph = window.StarfieldGraphCodec.fromHex(graphSnapshot.graphHex);
-                    var view = window.StarfieldGraphView.project(graph, null, graphSnapshot.geometry);
+                    var view = window.StarfieldGraphView.project(graph, null, graphSnapshot.geometry, graphSnapshot.layerResources);
                     graphLayoutChanged = !window.StarfieldGraphView.samePositions(nodePositions, view.positions);
                     state.graph = graph;
                     state.nodes = view.nodes;

@@ -12,6 +12,7 @@
         emitter: "org.starfieldfx.nodes.emitter",
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
+        transform: "org.starfieldfx.nodes.transform",
         output: "org.starfieldfx.nodes.output"
     };
     var SPECS = {
@@ -91,6 +92,16 @@
             "8": { label: "Spin Delay (Seconds)", kind: "slider", decimals: 1, step: 0.1, min: 0, max: 10000 },
             "9": { hidden:true }
         },
+        transform: {
+            "1": {label:"Anchor",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "2": {label:"Position",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "3": {label:"Rotation",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "4": {label:"Scale",kind:"point3d",decimals:1,step:1,min:-10000,max:10000,unit:"%"},
+            "5": {label:"Particles Scale",kind:"slider",decimals:1,step:1,min:0,max:10000,unit:"%"},
+            "6": {label:"Particles Opacity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "7": {hidden:true},
+            "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
+        },
         output: {
             "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
             "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
@@ -101,7 +112,7 @@
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force",
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",
                    output: "Output" };
 
     function fail(code, message) {
@@ -333,7 +344,7 @@
         decodeGradient(bytes);return bytes;
     }
 
-    function project(graph, layoutOverride, geometry) {
+    function project(graph, layoutOverride, geometry, layerResources) {
         if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
             Object.prototype.toString.call(graph.edges) !== "[object Array]") {
             fail("invalid_graph", "the decoded graph has no node and edge arrays");
@@ -362,8 +373,10 @@
                 node.gradient=decodeGradient(gradient?gradient.value:null);
             }
             var specs = SPECS[kind];
-            for (var p = 0; p < source.parameters.length; p++) {
-                var graphParameter = source.parameters[p];
+            var displayParameters=source.parameters.slice();
+            if(kind==="transform" && !findParameter(source,"8"))displayParameters.push({key:"8",type:3,value:0});
+            for (var p = 0; p < displayParameters.length; p++) {
+                var graphParameter = displayParameters[p];
                 var spec = specs[graphParameter.key];
                 if (kind === "particle") {
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
@@ -377,6 +390,48 @@
                     if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
                 }
                 var parameter = viewParameter(node, kind, graphParameter, spec);
+                if (kind === "transform") {
+                    var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
+                    var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
+                    var ta=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
+                    if (graphParameter.key === "8") {
+                        parameter.choices=["None"];parameter.enumValues=[0];
+                        (layerResources || []).forEach(function(resource){
+                            if(Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
+                                parameter.enumValues.indexOf(resource.id)<0) {
+                                parameter.choices.push(String(resource.name));parameter.enumValues.push(resource.id);
+                            }
+                        });
+                        var selected=parameter.enumValues.indexOf(graphParameter.value);
+                        if(selected<0) { parameter.choices.push("Unavailable layer ("+graphParameter.value+")");
+                            parameter.enumValues.push(graphParameter.value);selected=parameter.enumValues.length-1; }
+                        parameter.value=selected+1;node.params.push(parameter);continue;
+                    }
+                    if (graphParameter.key === "1") {
+                        parameter.kind="point2d";parameter.label="Anchor XY";parameter.key+=":xy";
+                        parameter.min=-32768;parameter.max=32767.99998474121;
+                        parameter.channelMin=[parameter.min,parameter.min];parameter.channelMax=[parameter.max,parameter.max];
+                        parameter.originComponent="xy";parameter.canonicalOrigin=graphParameter.value.slice();
+                        parameter.geometry={width:tw,height:th,pixelAspect:ta};
+                        parameter.value=[tw/2+graphParameter.value[0]*th/ta,th/2-graphParameter.value[1]*th];
+                        node.params.push(parameter);
+                        var tz=viewParameter(node,kind,graphParameter,spec);
+                        tz.kind="slider";tz.label="Anchor Z";tz.key+=":z";
+                        tz.originComponent="z";tz.canonicalOrigin=graphParameter.value.slice();tz.geometry=parameter.geometry;
+                        tz.value=graphParameter.value[2]*th;node.params.push(tz);continue;
+                    }
+                    if (["2","3","4"].indexOf(graphParameter.key)>=0) {
+                        [0,1,2].forEach(function(axis){
+                            var component=viewParameter(node,kind,graphParameter,spec);
+                            component.kind="slider";component.key+=":"+axis;
+                            component.label=spec.label+" "+["X","Y","Z"][axis];
+                            component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                            component.displayScale=graphParameter.key==="2" ? th*(axis===0?1/ta:axis===1?-1:1) :
+                                graphParameter.key==="3" ? (axis===1?1:-1) : 1;
+                            component.value=graphParameter.value[axis]*component.displayScale;node.params.push(component);
+                        });continue;
+                    }
+                }
                 if(kind==="particle" && ["18","20"].indexOf(graphParameter.key)>=0) {
                     [0,1,2].forEach(function(axis) {
                         var component=viewParameter(node,kind,graphParameter,spec);
@@ -446,6 +501,10 @@
                             { key: key, type: 4, value: 0 }, specs[key]));
                     }
                 });
+            }
+            if (kind === "transform") {
+                var transformOrder=["8","1","2","3","4","5","6"];
+                node.params.sort(function(a,b){return transformOrder.indexOf(a.graphKey)-transformOrder.indexOf(b.graphKey);});
             }
             if (kind === "emitter") {
                 var emitterOrder = ["5","23","2","6","12","22","14","15","16","17","32","18","19","20","21","10","24","25","26","27","28","29","30","3"];

@@ -22,7 +22,7 @@ function fixture() {
     const win=new Element("window"),doc=new Element("document"),body=new Element("body");doc.body=body;doc.createElement=name=>new Element(name);
     const root=new Element("palette"),items=new Element("items"),toggle=new Element("toggle"),viewport=new Element("viewport");
     root.appendChild(items);root.appendChild(toggle);body.appendChild(root);body.appendChild(viewport);
-    const nodes={};for(const kind of ["emitter","auxiliary","particle","force"]){const button=new Element(kind);button.setAttribute("data-node-type",kind);items.appendChild(button);nodes[kind]=button;}
+    const nodes={};for(const kind of ["emitter","auxiliary","particle","force","transform"]){const button=new Element(kind);button.setAttribute("data-node-type",kind);items.appendChild(button);nodes[kind]=button;}
     const canvas=new Element("canvas");viewport.appendChild(canvas);let surface=canvas,guard="target1/revision1",resizeCount=0,prepareCount=0;
     doc.elementFromPoint=()=>surface;
     const calls=[];vm.runInNewContext(source,{window:win,document:doc,isFinite});
@@ -42,7 +42,7 @@ initial.toggle.fire("click");assert.strictEqual(initial.items.hidden,true);asser
 assert.strictEqual(initial.toggle.textContent,"›");pointer(initial);assert.ok(!initial.palette.isDragging());
 initial.toggle.fire("click");assert.strictEqual(initial.items.hidden,false);assert.strictEqual(initial.resizeCount(),3);
 
-for(const kind of ["emitter","auxiliary","particle","force"]) {
+for(const kind of ["emitter","auxiliary","particle","force","transform"]) {
     const f=fixture();pointer(f,kind);assert.ok(f.palette.isDragging());assert.strictEqual(f.nodes[kind].captured,1);
     for(let i=0;i<120;i++)move(f,170+i*.1,190);
     assert.strictEqual(f.calls.length,0,"pointer movement must not write the graph");
@@ -78,7 +78,7 @@ unknown.items.fire("pointerdown",{target:output,pointerId:1,button:0,buttons:1})
 
 const html=fs.readFileSync(path.join(panelRoot,"index.html"),"utf8");
 const paletteMarkup=html.slice(html.indexOf('<aside id="nodePalette"'),html.indexOf('<div id="graphScroll"'));
-assert.deepStrictEqual(Array.from(paletteMarkup.matchAll(/data-node-type="([^"]+)"/g),x=>x[1]),["emitter","auxiliary","particle","force"]);
+assert.deepStrictEqual(Array.from(paletteMarkup.matchAll(/data-node-type="([^"]+)"/g),x=>x[1]),["emitter","auxiliary","particle","force","transform"]);
 assert.ok(html.indexOf("js/node_palette.js")<html.indexOf("js/panel.js"));
 assert.match(html,/aria-controls="nodePaletteItems" aria-expanded="true"/);
-console.log("node_palette_tests passed: four kinds, default expansion, collapse, drop, cancellation, target guards and no movement writes");
+console.log("node_palette_tests passed: five kinds, default expansion, collapse, drop, cancellation, target guards and no movement writes");

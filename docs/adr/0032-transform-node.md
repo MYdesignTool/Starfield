@@ -1,6 +1,6 @@
 # ADR 0032: independent Transform node
 
-- Status: core graph, affine/render transport and native/Null candidate implemented; CEP authoring and AE qualification open.
+- Status: core graph, affine/render transport, native/Null and CEP authoring candidates implemented; AE qualification open.
 - Task: M3-11, AE2023 baseline.
 
 ## Reference and scope
@@ -174,7 +174,8 @@ publication adds StarfieldTransform.aex to the paired module guard and bundle.
 
 The core graph kind and ordered Force/Transform/Auxiliary stages, native effect
 and numeric Null capture are implemented in the source candidate. CEP graph,
-inspector, resource selector and preset roundtrip are the next integration gate.
+inspector, resource selector and numeric preset roundtrip are implemented in the
+panel50 source candidate. Native47/Core ABI4 and panel50 form the development pair.
 The adapter samples the numeric pose at shutter and Auxiliary birth times;
 no host object crosses into core.
 Null reference-pose and anchor semantics require host evidence. Existing
@@ -218,3 +219,46 @@ numeric render playback without AEGP calls, IDs rather than layer indices,
 coordinate/sign conversion and pre-publication rejection with balanced refs.
 Layer selection's supervised stream timing, expression dimensions/engine,
 camera geometry, shutter and persistence require actual AE2023 evidence.
+
+## CEP authoring and preset resource policy — 2026-10-07
+
+The palette and context menu create Transform1 with the fourteen reference
+controls. Inspector pixels/AE angle signs convert to the existing canonical
+keys; the inherited matrix key7 is hidden and never submitted as authoring.
+Only the native adapter owns its current/birth/shutter-time sampled value.
+Acknowledgement compares ordinary controls, layout, edges and resource ID,
+not a stale derived matrix. Omitted resource key8 is equivalent to None.
+
+The gateway resolves source disk1401 from the current composition's layer ID to
+its current index immediately before writing. Readback converts the PF_LAYER
+index back to that ID. Missing IDs, layers without an Anchor Point, malformed
+records and unrepresentable native point/angle/pixel values reject before the
+undo group or mutation. The composition resource inventory is bounded to4096
+layers, cached for only one synchronous request, and discarded on reply. Idle
+pulses read only numLayers; a full snapshot refreshes choices. Rename labels may
+require Refresh. Numeric controls retain existing keyframe/expression guards.
+
+Numeric Transform presets with None roundtrip through Save/Import/Add/Replace;
+sampled matrix key7 is removed. A selected project-local layer ID cannot be
+ported safely to another project: export/import rejects a nonzero key8 with an
+explicit instruction to choose None. Add of an ordinary preset preserves
+existing project Transform resources. A portable resource-remapping UI is a
+separate future contract; never infer a match from a name or recycled layer ID.
+
+The isolated panel candidate passes20 JS suites, including89 focused Transform
+checks covering control order, unit/sign conversion, reorder-safe IDs, resource
+preflight, native disk lookup, animation-preserving writes, native snapshot and
+transaction receipts, and numeric preset Add/Replace. This does not qualify
+actual AE2023 Null dimensions, parenting, render, undo or persistence.
+
+Development publication: native47/Core ABI4 + CEP50 deployed through the existing
+Starfield and CEP Junctions after a read-only check found AE closed. Seven native
+and eleven changed CEP file hashes plus the selected Core were verified; the
+installed panel repeats all20 passing suites. Before/after receipts are
+artifacts/m3-11-panel50-deploy-before.json and m3-11-panel50-deploy-after.json.
+The native46/CEP49 backup is artifacts/disabled/m3-11-native47-panel50-transform-20261007.
+One-step undo, with AE closed: tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-11-native47-panel50-transform-20261007' -Restore. Its read-only verification
+passed. No AE process or unrelated host setting was changed; M3-11 host gates
+remain open.
