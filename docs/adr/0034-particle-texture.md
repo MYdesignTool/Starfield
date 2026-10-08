@@ -4,6 +4,35 @@ Status: implementation in progress, 2026-10-08. Task M3-13.
 
 ## Precomposition picker correction, 2026-10-08
 
+Owner AE2023 evidence after native55 deployment still shows only None with
+Comp 2 present. The HAS_VIDEO-only explanation is insufficient; do not count
+the fake-host precomp fixture as proof of the real selector. The next candidate
+reads Texture menu entries through AE's public scripting layer inventory only
+on an explicit menu click, pinned to the effect owner's composition item ID and
+layer ID. It does not use activeItem/selectedLayers, mutate the project or poll
+from DRAW/render/idle. CompItem sources are accepted explicitly; audiovisual
+footage uses AVLayer.hasVideo. Stable IDs and bounded UTF16 names return through
+a validated ASCII record with balanced result/error memory handles. Transform
+and selected-name paint retain their current native paths. Native enumeration
+remains available only where the scripting callback is unavailable. Scripting
+errors reject the click rather than silently returning an empty menu. Full
+paired native56/CEP56 publication and actual AE menu/selection remain gates.
+
+Native56 candidate evidence covers the actual NodeEffects.cpp Particle parameter
+registration and EffectMain dispatch, not only a standalone inventory helper:
+tests/RunTextureSelectorTests.ps1 -Run passes269 checks. It verifies streams521/522,
+disk233/234, custom UI flags/dimensions, both click paths, cancellation without
+publication, owner identities, bounded UTF16, injected script/lock/size failures
+and result/error/suite cleanup. tests/texture_layer_inventory_script_tests.js
+evaluates the actual generated script and passes12 checks, including a precomp
+with hasVideo=false, another active composition and Unicode/length boundaries.
+The isolated CEP56 texture fixture passes47 checks with the same explicit
+CompItem eligibility; main-order regression passes30 checks. The complete May2023
+/MT build passes with publication disabled. Logs use artifacts/m3-13-native56-*
+(dispatch-tests.log, script-tests.log, texture-panel-tests.log,
+main-order-tests.log and build.log). Compilation and fake-host tests still do
+not qualify the real AE2023 Texture menu or source rendering.
+
 The owner reports that native54's Texture selector shows only None while a
 sibling `Comp 2` precomposition exists. Static inspection finds that the menu
 requires HAS_VIDEO on every source item, including compositions. This is a

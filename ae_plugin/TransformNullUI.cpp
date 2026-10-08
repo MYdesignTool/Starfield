@@ -1,6 +1,7 @@
 #include "TransformNullUI.hpp"
 #include "NodeEffects.hpp"
 #include "NodeRecord.hpp"
+#include "TextureLayerInventory.hpp"
 #include "AE_EffectCBSuites.h"
 #include "adobesdk/DrawbotSuite.h"
 #include <algorithm>
@@ -106,6 +107,34 @@ PF_Err read_transform_layers(PF_InData* data,std::vector<TransformLayerChoice>& 
     selected=value.val.layer_id;streams->AEGP_DisposeStreamValue(&value);
     choices.push_back({0,u"None"});
     if(!full_inventory && !selected)return PF_Err_NONE;
+    if(full_inventory && parameter_index!=1) {
+        Suite<AEGP_UtilitySuite6> utility(data->pica_basicP,kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
+        if(utility && utility->AEGP_ExecuteScript) {
+            Suite<AEGP_CompSuite11> comps(data->pica_basicP,kAEGPCompSuite,kAEGPCompSuiteVersion11);
+            if(!comps || !items)return PF_Err_BAD_CALLBACK_PARAM;
+            AEGP_ItemH item{};A_long comp_id{};AEGP_LayerIDVal owner_id{};
+            error=comps->AEGP_GetItemFromComp(comp,&item);
+            if(!error)error=items->AEGP_GetItemID(item,&comp_id);
+            if(!error)error=layers->AEGP_GetLayerID(owner,&owner_id);
+            if(error || comp_id<=0 || owner_id<=0)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+            struct ResultMemory {
+                const AEGP_MemorySuite1* memory;AEGP_MemHandle result{},diagnostic{};bool locked{};
+                ~ResultMemory(){if(locked)memory->AEGP_UnlockMemHandle(result);
+                    if(result)memory->AEGP_FreeMemHandle(result);if(diagnostic)memory->AEGP_FreeMemHandle(diagnostic);}
+            } owned{memory.value};
+            const auto script=texture_layer_inventory_script(comp_id,owner_id);
+            error=utility->AEGP_ExecuteScript(plugin,script.c_str(),FALSE,&owned.result,&owned.diagnostic);
+            if(error || !owned.result)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+            void* result{};error=memory->AEGP_LockMemHandle(owned.result,&result);owned.locked=!error;
+            if(error || !result)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+            AEGP_MemSize size{};error=memory->AEGP_GetMemHandleSize(owned.result,&size);
+            if(error || size<1 || size>kTextureInventoryMaxBytes+1)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
+            const auto* text=static_cast<const char*>(result);std::size_t length=0;
+            while(length<size && text[length])++length;
+            if(length==size)return PF_Err_BAD_CALLBACK_PARAM;
+            return parse_texture_layer_inventory({text,length},comp_id,owner_id,choices);
+        }
+    }
     for(A_long i=0;i<count;++i) {
         AEGP_LayerH layer{};AEGP_LayerIDVal id{};
         error=layers->AEGP_GetCompLayerByIndex(comp,i,&layer);

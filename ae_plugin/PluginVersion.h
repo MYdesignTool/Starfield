@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 55: Texture precomposition inventory; fixed disk IDs and unchanged ABI6.
-#define STARFIELD_VERSION_BUILD 55
-#define STARFIELD_VERSION_PACKED 32823 /* 0x8037 */
+// Build 56: owner-pinned public Texture menu inventory; unchanged IDs and ABI6.
+#define STARFIELD_VERSION_BUILD 56
+#define STARFIELD_VERSION_PACKED 32824 /* 0x8038 */

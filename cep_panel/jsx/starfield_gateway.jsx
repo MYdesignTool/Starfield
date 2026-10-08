@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-55";
+    var GATEWAY_BUILD = "native-presets-56";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -727,6 +727,11 @@
         return {name:names[String(key)],diskId:202+Number(key)};
     }
 
+    function textureSourceLayer(source,renderer) {
+        if(!source || source===renderer || (renderer && source.id===renderer.id) || !source.source || source.nullLayer)return false;
+        return (typeof CompItem!=="undefined" && source.source instanceof CompItem) || !!source.hasVideo;
+    }
+
     function readTextureLayer(effect,layer,key) {
         var index=Number(nodeControlValue(effect,textureControl(key)));
         if(!isFinite(index) || Math.floor(index)!==index || index<0)
@@ -734,7 +739,7 @@
         if(!index)return 0;
         if(!layer.containingComp || index>layer.containingComp.numLayers)throw new Error("Texture source layer is unavailable.");
         var source=layer.containingComp.layer(index);
-        if(source===layer || !source.source || source.nullLayer || !source.hasVideo)
+        if(!textureSourceLayer(source,layer))
             throw new Error("Texture needs a video layer other than its renderer.");
         return Number(source.id);
     }
@@ -762,7 +767,7 @@
             if(!transform || !transform.property("ADBE Anchor Point"))continue;
             entries.push({id:id,name:String(source.name),index:i,
                 sourceName:source.source?String(source.source.name):"",
-                texture:source!==layer && !!source.source && !source.nullLayer && !!source.hasVideo});byId["$"+id]=i;
+                texture:textureSourceLayer(source,layer)});byId["$"+id]=i;
         }
         nativeLayerInventory={comp:comp,entries:entries,byId:byId};return nativeLayerInventory;
     }
@@ -1144,7 +1149,7 @@
                                 var sourceIndex=layerResourceIndex(layer,value);
                                 if(sourceIndex) {
                                     var sourceLayer=layer.containingComp.layer(sourceIndex);
-                                    if(sourceLayer===layer || !sourceLayer.source || sourceLayer.nullLayer || !sourceLayer.hasVideo)
+                                    if(!textureSourceLayer(sourceLayer,layer))
                                         throw new Error("Texture needs a video layer other than its renderer.");
                                 }
                                 setNodeControl(effect,textureControl(key),sourceIndex);

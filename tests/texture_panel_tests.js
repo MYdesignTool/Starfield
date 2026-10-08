@@ -37,7 +37,8 @@ const malformed=clone(data);malformed.resources.push(malformed.resources[0]);rej
 const unsafe=clone(data);unsafe.version=1;unsafe.graphHex=codec.toHex(graph);reject(()=>presets.decode(JSON.stringify(unsafe)),/resource map/);
 const source=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8").replace("    function readNativeNode(effect, layer) {",
     "    $.global.textureApi={read:readNativeNode,write:setNodeParameters,inventory:layerInventory,clear:function(){nativePropertyIndexes=[];nativeLayerInventory=null;}};\n    function readNativeNode(effect, layer) {");
-const global={},context=vm.createContext({$:{global},app:{}});vm.runInContext(source,context);
+class CompItem {constructor(name){this.name=name;this.numLayers=0;}}
+const global={},context=vm.createContext({$:{global},app:{},CompItem});vm.runInContext(source,context);
 const api=global.textureApi,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const props=require("./node_property_fixture.js").nodeControls();
 for(const property of new Set(Object.values(props))){property.numKeys=0;property.setValue=function(value){this.value=value;};}
@@ -54,7 +55,7 @@ sources.reverse();api.clear();api.write(effect,realm(record),layer);equal(props[
 equal(clone(api.read(effect,layer)).parameters.find(p=>p.key==="31").value,55);
 record.parameters.find(p=>p.key==="31").value=9;reject(()=>api.write(effect,realm(record),layer),/other than its renderer/);equal(props["Panel Sync Guard"].value,0);
 record.parameters.find(p=>p.key==="31").value=999;api.clear();reject(()=>api.write(effect,realm(record),layer),/no longer exists/);equal(props["Panel Sync Guard"].value,0);
-const precomp={...layer,id:88,name:"Comp 2",source:{name:"Comp 2",numLayers:0},hasVideo:true,nullLayer:false};
+const precomp={...layer,id:88,name:"Comp 2",source:new CompItem("Comp 2"),hasVideo:false,nullLayer:false};
 const audio={...layer,id:89,name:"Audio",source:{name:"Sound"},hasVideo:false};
 const nullLayer={...layer,id:90,name:"Null",source:{name:"Solid"},hasVideo:true,nullLayer:true};
 sources.push(precomp,audio,nullLayer);layer.containingComp.numLayers=sources.length;api.clear();

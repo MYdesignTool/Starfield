@@ -64,6 +64,7 @@ $adapterInputs = @(
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
     'ae_plugin\TextureResources.cpp', 'ae_plugin\TextureResources.hpp',
     'ae_plugin\PresetsUI.cpp', 'ae_plugin\PresetsUI.hpp', 'ae_plugin\MainLauncher.hpp',
+    'ae_plugin\TextureLayerInventory.hpp',
     'ae_plugin\GpuRender.cpp', 'ae_plugin\GpuRender.hpp', 'ae_plugin\gpu\SpriteKernel.h',
     'tools\Build-GpuKernels.py',
     'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\EmitterHistory.hpp',
