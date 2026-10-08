@@ -1,34 +1,6 @@
-# Current feature audit
+# 功能核对入口
 
-Review baseline: working tree on 2026-09-30, including the preview-coordinate, transparent-output, CEP startup-discovery, over-life curve, per-axis emitter-size, and Particle variation source changes.
-
-## What the implementation currently does
-
-- The AE adapter uses SmartFX, reads input metadata for geometry, and converts host parameters into a host-independent CPU render request. It does not read or composite the input pixel world.
-- The core evaluates a deterministic birth/lifetime schedule at an absolute time, supports seeded Point/Box/Sphere/Disc birth positions, per-particle velocity spread, and direct full-resolution pixel dimensions for Box/Sphere. Box uses XYZ, Sphere is transformed to an ellipsoid, and the current Disc uses its own Disc Size control. Gravity and linear drag integrate in closed form; particles render as soft-edged 2D discs over transparent black.
-- Particle Size Random and Opacity Random percentages independently attenuate the evaluated age curves using stable per-particle random streams. Both default to zero; exact Stardust distribution parity and AE 2023 persistence/undo/render behavior remain unverified.
-- G-01/G-02/G-03 define the graph schema, bounded codec and validation, and CPU evaluation of emitter/Particle branches, serial forces, parallel force merges, optional Appearance, and Output. G-04 adds an AE arbitrary-data graph parameter, render-time snapshots and explicit legacy-control capture; every bound control is supervised so a Node Graph edit rewrites the canonical graph in the same user-change transaction.
-- P-02 adds a dockable CEP panel (`cep_panel/`, ADR 0009) with a dynamic top-down graph view, UUID-keyed ports and edges, draggable cards, pan/zoom, minimap, and a floating selected-node inspector. The panel loads the project graph snapshot and routes topology, layout, and typed parameter edits through ADR 0013's revision-checked carrier. Size/Opacity Over Life are edited as bounded polylines; the panel supports point dragging, Life percentage/value entry with horizontal scrubbing, and previous/next knot selection. Node Graph mode stores curve payloads and endpoint values in one graph transaction; AE Controls mode uses the hidden project curve bank. The curves evaluate on Particle and legacy Appearance nodes. Graph callback, undo, save/reopen, stale-state rejection, and render response remain unqualified in AE 2023 (P-02B/P-02C).
-
-## Why the current result feels far from Stardust
-
-The M2 target was a render vertical slice, not a feature-parity release. M3-01B uses direct per-axis layer-pixel emitter dimensions for Box and Sphere, while the Disc keeps its dedicated diameter control, P-02C adds editable piecewise-linear Size/Opacity curves, and M3-05 adds seeded per-particle size/opacity variation. Their AE project persistence, undo, and rendered appearance have not been checked in the host. The picture remains a flat 2D disc: Z does not affect projection, depth, or occlusion. Textures, layer sources, particles-from-layers, meshes, materials, lights, volumes, motion blur, and file-based presets are still absent. Core graph evaluation supports branches and merged forces, and the current panel source can stage and edit dynamic graphs; its carrier and topology operations still need AE qualification. The effect has 26 authored render controls, grouped in the original topics plus the appended Emitter Dimensions and Particle Variation topics; three graph and source controls are also registered.
-
-The output contract is particle-only RGBA over transparency (ADR 0005), following the owner's AE feedback. AE 2023.5.0 Build 52 visually confirmed the rebuilt binary renders particles over the transparency grid. The adapter clears the host output world before copying the renderer's sparse particle buffer, preventing any source pixels pre-seeded by AE from remaining visible.
-
-## Verification gaps
-
-- AE 2023.5.0 Build 52 Full/Half/Third/Quarter readouts confirm preview-scaled centre normalization. Alpha-only output and all bit depths were visually confirmed on candidate `D22D43BAD15C5173867907369B2EF3293A3FD601C308158665A1F3FD0AB0816B`, and again on the H-01 split pair. The split build also has save/reopen, effect copy/undo, lower-layer compositing, shape distinctions, gravity and size-change observations. Exact graph-byte persistence remains open.
-- The CEP parameter form populated automatically after the project and target effect layer were selected; no manual Refresh was used. If no target is selected, the panel retries transient discovery errors with a delay capped at 5 seconds until it finds one.
-- The installed pair is `StarfieldParticle.aex` `B7362B01AC0E935D8AD596A70D61690DA4D586EEEC3E939328BA1BDC420069D5` plus a pinned `StarfieldCore.dll` `A4F104B5858DE5938F87B93D4B59FF89A5E324CD238DFDB3AD67B31327CD2545`; the development junction selects `StarfieldCore-095219764514FFCA.dll` (`095219764514FFCA1A5C3CFD36D78E6C8368ECF32C6C17576A8C26F2FA584564`). Core (6,196) and adapter (395) checks pass; panel gateway/startup fake-host checks pass. All of this was re-verified against the working tree on 2026-09-28.
-- G-01 through G-04 have core/native code and fake-host coverage. AE Controls save/reopen, effect copy and undo/redo have host evidence; Node Graph-mode persistence and build-1 migration remain unqualified. Capturing controls stores current-time constants; it does not transform historical animation into node tracks.
-- The CEP panel protocol is implemented and now has host-independent fake-host checks for animation protection and rollback. Name-based parameter lookup, scripted writes to supervised streams, undo grouping, and the Node Graph rewrite path still need AE 2023 qualification recorded in `cep_panel/README.md` and `docs/compatibility-matrix.md`.
-- The three delivery examples are documented recipes and panel presets; none has been rendered in the host yet.
-- The current revision-11 AE 2023 candidate builds with the May 2023 SDK: AEX SHA-256 `D367A3830A23F312E1D3150DBB392ADDF9E5073A182E40836AAA86458A188E6D`, Core DLL SHA-256 `D77BD11088A5D54B479FDA19FFED5183F8E8D85CC4490D0AB931F74B1678CC97`. The core suite passes 11,082 checks, the adapter fake-host suite passes 676 checks, and graph-view/edit, gateway, and startup panel checks pass. The candidate AEX has not been installed; the build selected `StarfieldCore-D77BD11088A5D54B.dll` in this checkout's runtime manifest. Smart Render retains a loaded generation through `acquire_core()`; the Effect Controls Options action calls `reload_core()`. AE 2023 variation response, graph persistence, undo, and save/reopen checks remain open.
-
-## Next product steps
-
-1. Finish the H-01 host gates on the installed split pair: switch generations while an AE render is actually in flight, compare exact frames against the previous monolithic build, then exercise repeated switches, reverse-time requests, render queue and cancellation. The `C0830F…` "no main window" build is obsolete — the split pair is installed and loaded.
-2. Continue CEP qualification for name lookup, one-undo-group edits, stale-state rejection, and the Node Graph rewrite path (`cep_panel/README.md`). Automatic discovery has already passed in AE without a Refresh click.
-3. Record the three delivery examples from `docs/examples.md` as still frames at t ≥ 1 s.
-4. Qualify the integrated graph transactions and curve persistence in AE 2023, then add the next node kernels (spawn/aux particles, textures, depth) with observed reference cases and rendered fixtures.
+原2026-09-30审计将相机、Motion Blur、预设和节点画布描述为未实现，已不适用于当前工作树。
+已实现/开发中/已部署的区别见 [current-state.md](current-state.md)，剩余产品工作见 [roadmap.md](roadmap.md)，实际 host 证据见 [compatibility-matrix.md](compatibility-matrix.md)。
+当前范围包含独立原生节点、动画/历史、曲线/渐变、程序形状、相机/深度、CPU/GPU 和 Motion Blur；Transform 的原生/Core 候选与 CEP/AE 完成度仍须区分。
+这不代表达到 Stardust 数值/功能 parity。Texture、Transfer、网格/体积/材质等参考行为族仍按独立案例安排。

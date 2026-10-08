@@ -1,97 +1,21 @@
-# Build31 current development surface
+# AE 适配层
 
-Appearance is removed by owner request. Emitter/Auxiliary, Particle, Force and
-Output are the current nodes; Particle owns color/gradient, size/opacity and
-Over Life. Recreate graphs containing Appearance. Remaining native disk IDs,
-Particle schema4/base75, Emitter schema6/base31, Force schema2/base27 and CoreABI3
-are paired; the unused Color End disk ID207 definition is retained.
-Main layout35/36 now has Particle labels; main manifest24 and public IDs stay.
-Reopen CEP for native-idle-31. Connection/layout edits preserve authored controls
-and keys. StarfieldHost.aex adds bounded read-only initialization on active-comp
-UI idle, requiring real AE2023 no-Options qualification. Older sections below are
-historical checkpoints, not the current node inventory. See ADR0026.
+当前候选与安装版本见 [当前状态](../docs/current-state.md)；构建/发布规则见 [构建说明](../docs/build-matrix.md)。旧 Build31 引言和27控制/Appearance描述已移入历史记录。
 
-# AE adapter (M2/M3-01/M3-01B)
+| 文件 | 职责 |
+| --- | --- |
+| EffectMain、PluginFlags、PluginVersion、PiPL | selector、宣告能力与打包身份 |
+| Parameters、GraphParameter | 参数注册/checkout、ARB graph 复制/保存/恢复 |
+| GraphCarrier、NativeGraphCommit、NodeGraphSync | 数值提交收据、原生编译与作者事务 |
+| NativeNodeGraph、NativeTemporalCache/UI、EmitterHistoryCapture | UI 绑定准备、render 数值采样与历史 |
+| NodeEffects、NodeRecord、各 layout | 独立原生作者效果、磁盘身份与曲线/渐变布局 |
+| TransformBinding/Layout | Transform 和 Null 资源/数值绑定；实际宿主验收开放 |
+| Camera、MotionBlur、SmartRender、WorldBridge、GpuRender | 宿主几何/曝光、SmartFX、世界转换与设备协商 |
+| CoreLoader、Diagnostics | 不可变 Core lease、选择文件及诊断 |
+| StarfieldHost | UI idle 初始化 |
 
-The adapter registers 24 render controls plus graph data, source selection and explicit
-capture controls (27 active non-input parameters), declares SmartFX, and renders immutable
-emitter/force/appearance/output snapshots through the versioned C ABI in
-`StarfieldCore.dll`, which owns the deterministic CPU renderer. Legacy mode preserves animated slider values. The effect writes particles
-over transparent black and does not composite the input layer's pixels. Host types stop at this
-directory: `Parameters.*` converts AE controls into core settings, `WorldBridge.*` converts the AE
-output world to and from owned core buffers,
-`SmartRender.*` runs the pre-render/render pair and maps core errors onto AE errors,
-and `EffectMain.cpp` is dispatch plus the global flags.
+AE 类型与句柄只存在于此目录；C ABI 不传 C++/AE 对象。主 AEX 也包含图编解码及冻结历史所需的共享 Core 源码，不是所有求值都独占 DLL。/MT 模块内分配/释放，generation/result 生命周期由 CoreLoader/SmartRender 管理。
+节点 AEX 是菜单隐藏的普通参数容器并支持 SmartFX 透传；Output 是主 renderer，Auxiliary 是 Emitter 的结构模式。Appearance 已退役。
+原生 GPU F32 已声明并受设备/帧 gate 约束；MFR/Compute Cache 仍关闭。宿主观察见 [行为验收](../docs/compatibility-matrix.md)。
 
-Files:
-
-| File | Role |
-|---|---|
-| `EffectMain.cpp` | Entry points, selector dispatch, global setup flags |
-| `Parameters.*` | Manifest registration, `PF_CHECKOUT_PARAM` snapshot, and the scoped checkin guard |
-| `GraphParameter.*` | Host arbitrary-data ownership, persistence callbacks, graph checkout and explicit control capture |
-| `SmartRender.*` | `PF_Cmd_SMART_PRE_RENDER` / `PF_Cmd_SMART_RENDER`, cancellation, error mapping |
-| `WorldBridge.*` | Host world ↔ core buffer conversion (8/16/32 bpc, rowbytes, alpha) plus shared host geometry helpers |
-| `Diagnostics.*` | Options-button manual core reload plus host-value and recent-render-geometry readout |
-| `CoreLoader.*` | Runtime DLL selection, ABI validation, immutable generation leases and failed-reload fallback |
-| `PluginFlags.h` | Single source for the PiPL and runtime out-flags |
-| `PluginVersion.h` | Single source for the PiPL and runtime version |
-| `StarfieldPiPL.r` | PiPL resource; flags and version are included from the two headers above |
-| `BuildPiPL.ps1` | Runs Adobe's PiPL pipeline and fails the build if the generated resource disagrees with those headers |
-| `Starfield.vcxproj` | Windows x64 MSBuild project for the effect module |
-| `StarfieldCore.vcxproj` | Independently buildable Windows x64 particle core DLL |
-
-The effect advertises `PF_OutFlag2_SUPPORTS_SMART_RENDER`,
-`PF_OutFlag2_REVEALS_ZERO_ALPHA`, and
-`PF_OutFlag2_FLOAT_COLOR_AWARE` and `PF_OutFlag2_I_MIX_GUID_DEPENDENCIES`
-together with `PF_OutFlag_DEEP_COLOR_AWARE`,
-`PF_OutFlag_PIX_INDEPENDENT`, `PF_OutFlag_USE_OUTPUT_EXTENT`, and
-`PF_OutFlag_I_DO_DIALOG` (the diagnostic readout). The zero-alpha flag keeps AE from trimming
-transparent input pixels before this source-independent particle render. It deliberately does **not** advertise
-MFR/threaded rendering, GPU or Compute Cache. Graph data is a hidden AE arbitrary parameter,
-not sequence data. The corrected 24-parameter candidate was loaded in AE 2023.5.0 Build 52;
-the owner reports that emitter placement now looks correct at Full and Quarter preview.
-The owner reports 8/16/32-bpc rendering and time consistency. On 2026-09-28, AE 2023.5.0 Build 52
-confirmed candidate `D22D43BAD15C5173867907369B2EF3293A3FD601C308158665A1F3FD0AB0816B` renders particles
-over the transparency grid, with no solid input pixels left in the output. The
-current H-01 split build was loaded in AE 2023.5.0 Build 52: its Full/Quarter
-preview updated on manual Core reload without restarting AE, and a missing
-Core kept the prior generation. Visual 8/16/32-bpc output, transparency, and
-save/close/reopen passed. The two modules use `/MT` in Release to avoid AE's
-old app-local MSVC runtime. In-flight AE render switching and exact pixel
-comparison to the monolith remain open. The CEP panel populated its form after the project and effect layer
-were selected, without a manual Refresh. Effect-state retention after save/reopen,
-duplicate, undo/redo, and remaining panel checks have the evidence boundary recorded in
-`docs/compatibility-matrix.md`. The Options geometry belongs
-to whichever effect instance rendered most recently, so it may not describe the current
-comp. See `docs/compatibility-matrix.md` for the exact evidence boundary.
-
-The Windows x64 MSBuild project uses the local May 2023 Adobe SDK by default and follows
-Adobe's PiPL resource conversion pipeline. It writes build outputs under `artifacts/plugin/`;
-override `STARFIELD_AE_SDK_ROOT` to build against another local SDK.
-
-From the repository root, build with `powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1`.
-The script maps the workspace to a temporary drive letter because Adobe's legacy PiPL
-toolchain does not reliably parse paths containing spaces or non-ASCII characters. To
-spell out the defaults, pass `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023`.
-Both commands write `artifacts/plugin/2023/x64/Release/StarfieldParticle.aex`.
-They also write `artifacts/core-dll/2023/x64/Release/StarfieldCore.dll`
-and publish the matched pair into `dist/`. For frequent renderer changes use
-`powershell -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -CoreOnly`.
-That command leaves `StarfieldParticle.aex` untouched and atomically selects a
-content-addressed DLL in `dist/StarfieldRuntime/current.txt`. With the explicitly
-authorized developer junction installed, click the effect's **Options** button
-to load the selected generation and request a refreshed AE frame. The previous
-generation remains usable until its in-flight render leases and owned pixel
-results are released. The developer installation is one junction from
-`Plug-ins/Starfield` to `dist`; the runtime is a real subdirectory within it.
-Full builds refuse AEX publication while AE runs. Candidate builds use
-`-NoRuntimePublish -NoDistPublish`; `tools/Deploy-TestBuild.ps1` reports unless
-`-Install` or `-Rollback` is explicitly passed after authorization.
-Current qualification targets AE 2023 only; newer-host adaptation is deferred.
-
-CMake builds the host-independent core, shared core ABI, and self-tests
-(`tests/core_tests.cpp`; on a machine without CMake use
-`powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1`). The Windows MSBuild
-project remains the authoritative AE module build because it also runs PiPLTool and
-compiles the generated resource.
+从根目录使用 BuildWindows.ps1 -NoDistPublish -NoRuntimePublish 编译候选。MSBuild/PiPL 使用该脚本的路径处理；C++ 测试现在使用相对响应文件而不创建临时盘符。所有输出在 artifacts，SDK 不入 Git。

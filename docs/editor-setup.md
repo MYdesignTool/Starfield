@@ -1,49 +1,15 @@
-# C++ editor configuration
+# 编辑器配置
 
-Open `tools/Starfield.code-workspace` in VS Code, or open `newStardust` directly
-as the folder. Opening only the parent forensic workspace will not apply the
-child project's `.vscode/c_cpp_properties.json`.
+打开 tools/Starfield.code-workspace 或直接打开 newStardust；仅打开父 forensic 工作区不会应用本工程的 C++ 配置。
+项目配置使用 C++20、MSVC x64、当前 Core 和本地 May2023 SDK。原生 variant 定义必须与正在查看的 Emitter/Particle/Force/Transform 代码一致；Appearance 已退役。PluginApi.h 是当前 ABI 的唯一声明，不从旧检查点复制 ABI2。
 
-The tracked project configuration uses C++20, MSVC x64, explicit current Core and
-May 2023 SDK include paths and the target node definition. Win32 is the default
-Emitter configuration; select Particle/Appearance/Force when inspecting that
-variant of NodeEffects.cpp/NodeGraphSync.cpp. Compiler discovery remains automatic
-so no machine-specific MSVC version is pinned in source. The actual native build
-still uses BuildWindows.ps1. No SDK headers are included in Git.
+IntelliSense/browse 缓存位于忽略的 artifacts/editor，不扫描父目录旧源码或 deployed binaries。tools/Clean-Workspace.ps1 可报告并清掉此工作区的再生成缓存，不改用户 profile 缓存/全局编辑器设置。
+诊断持续时由 owner 执行 C/C++: Reset IntelliSense Database，再 Developer: Reload Window。用 Go to Definition 确认 SfCoreRenderRequest 指向本 checkout 的 PluginApi.h。
 
-The default browse database and IntelliSense cache live under ignored
-`artifacts/editor`. Avoid recursive include search over parent forensic material,
-generated files and deployed binaries. This only configures this workspace;
-no global editor settings or profile caches are modified by repository scripts.
-
-For the owner-reported C/C++(135) diagnostics in camera_capture_tests.cpp, the
-current `include/starfield/core/PluginApi.h` defines Core ABI 2 and all reported
-members: camera_enabled, layer_to_view and image_to_layer. NativeSync's actual
-MSVC compile/test log is the compiler evidence. A stale editor cache/header
-configuration remains a hypothesis until the owner's editor refresh confirms it.
-
-Rechecked on 2026-10-02 with NativeSync -TraceIncludes: MSVC 14.51.36231 compiled
-the actual camera_capture_tests.cpp and Camera.cpp, both including this checkout's
-PluginApi.h through the temporary mapped drive. Native sync 14 and camera capture
-12 checks pass, with zero failures. Log: artifacts/build13-editor-native-sync.log.
-Project configuration JSON parses and git diff --check passes. No runtime source,
-ABI layout or deployed AEX/Core changed in this editor-configuration repair.
-
-If diagnostics persist after opening the workspace, run
-`C/C++: Reset IntelliSense Database`, then `Developer: Reload Window` from the
-command palette. Use Go to Definition on SfCoreRenderRequest to verify it resolves
-to this checkout's `include/starfield/core/PluginApi.h`, not an older workspace.
-These are owner-operated editor actions; the agent does not delete profile caches.
-
-Minimal compiler verification with include provenance:
+实际编译/include provenance 的入口：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 -NativeSync -TraceIncludes
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 -NativeSync -TraceIncludes
 ```
 
-The script maps the checkout temporarily to a free drive for MSVC. Include traces
-must identify that mapped checkout's `include/starfield/core/PluginApi.h`.
-Scratch output remains under artifacts; this does not build/deploy a new AEX.
-
-Configuration semantics follow the primary
-[Microsoft C++ configuration documentation](https://code.visualstudio.com/docs/cpp/customize-cpp-settings).
+测试响应文件使用仓库 cwd 下的相对路径，避免非 ASCII 路径进入 CL 参数；不再通过 subst 映射盘符。原生 PiPL 构建仍由 BuildWindows.ps1 管理。编辑器提示和编译日志分别判断，历史 editor 修复不是当前 ABI 验收。

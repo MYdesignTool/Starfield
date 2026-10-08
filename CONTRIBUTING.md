@@ -19,7 +19,7 @@ This repository uses Git for staged development. Keep each independent task on i
 
 - Build the AE module with `ae_plugin/BuildWindows.ps1`; local SDK files and all generated files are excluded by `.gitignore`.
 - CMake builds only the host-independent core.
-- Record host load/render/lifecycle evidence separately from compile results. AE 2023 confirmed load, controls, and rendering on an earlier M2 parameter revision; the current 13-control M3-01 build and lifecycle still need host qualification.
+- Record host load/render/lifecycle evidence separately from compilation and source tests. Read docs/current-state.md and docs/compatibility-matrix.md for the actual candidate and remaining gates; earlier host observations do not qualify every later revision.
 
 ## Review
 
