@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-50";
+    var GATEWAY_BUILD = "native-presets-51";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1395,6 +1395,18 @@
         return { target: target, token: token, properties: properties };
     }
 
+    // Native parade edits may change AE's current selection. Once preflight
+    // validated the requested renderer, reacquire that same project/comp/layer
+    // for commit, rollback and guard cleanup. Never follow a new selection in
+    // the middle of a transaction or reuse invalid indexed-group properties.
+    function pinGraphTransaction(request, token) {
+        var pinned = {};
+        for (var key in request) if (Object.prototype.hasOwnProperty.call(request,key)) pinned[key] = request[key];
+        pinned.pinTarget = true;
+        pinned.target = {token:token};
+        return pinned;
+    }
+
     function nativeSnapshot(resolved) {
         var revision = Number(resolved.properties.revision.value);
         var high = Number(resolved.properties.checksumHigh.value), low = Number(resolved.properties.checksumLow.value);
@@ -1583,6 +1595,7 @@
     function syncGraphSnapshot(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        request = pinGraphTransaction(request,resolved.token);
         var groupOpen = false, added = [], layer = resolved.target.layer;
         var wasReady = Number(resolved.properties.nodeEffectsReady.value);
         try {
@@ -1672,6 +1685,7 @@
     function submitGraph(request) {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
+        request = pinGraphTransaction(request,resolved.token);
         if (typeof request.baseGraphRevision !== "number" || !isFinite(request.baseGraphRevision) ||
             Math.floor(request.baseGraphRevision) !== request.baseGraphRevision || request.baseGraphRevision < 1 ||
             request.baseGraphRevision > MAX_GRAPH_REVISION) {

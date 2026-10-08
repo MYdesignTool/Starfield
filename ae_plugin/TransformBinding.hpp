@@ -4,6 +4,9 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <charconv>
+#include <limits>
+#include <stdexcept>
 #include <string>
 
 namespace starfield::adapter::transform_binding {
@@ -65,10 +68,48 @@ inline starfield::core::Result<Matrix> canonical_matrix(const PixelAffine& pixel
     return R::success(std::move(result));
 }
 
+inline PixelAffine compose_affine(const PixelAffine& left,const PixelAffine& right) noexcept {
+    PixelAffine result{};
+    for(unsigned r=0;r<3;++r) {
+        result[r*4+3]=left[r*4+3];
+        for(unsigned k=0;k<3;++k) {
+            for(unsigned c=0;c<3;++c)result[r*4+c]+=left[r*4+k]*right[k*4+c];
+            result[r*4+3]+=left[r*4+k]*right[k*4+3];
+        }
+    }
+    return result;
+}
+
+// Save the attachment offset as numbers, rather than re-evaluating an animated
+// layer at the old binding time. Later edits to its keyframes cannot move the
+// captured reference pose. Full affine composition retains parenting/shear.
+inline starfield::core::Result<PixelAffine> attachment_offset(
+    const PixelAffine& source,const PixelAffine& preserved) {
+    Matrix frame{},identity{};frame[15]=identity[15]=1;
+    identity[0]=identity[5]=identity[10]=1;
+    std::copy(source.begin(),source.end(),frame.begin());
+    auto inverse=relative_anchor_affine(identity,frame,{});
+    if(!inverse.has_value())return inverse;
+    auto result=compose_affine(inverse.value(),preserved);
+    for(double v:result)if(!std::isfinite(v) || std::abs(v)>1e12)
+        return starfield::core::Result<PixelAffine>::failure(
+            starfield::core::ErrorCode::invalid_request,"invalid Transform attachment offset");
+    return starfield::core::Result<PixelAffine>::success(std::move(result));
+}
+
+inline std::string expression_number(double value) {
+    std::array<char,64> buffer{};
+    auto result=std::to_chars(buffer.data(),buffer.data()+buffer.size(),value,
+        std::chars_format::general,std::numeric_limits<double>::max_digits10);
+    if(result.ec!=std::errc{})throw std::runtime_error("invalid Transform expression coefficient");
+    return {buffer.data(),result.ptr};
+}
+
 // Insert inside the UUID-selected branch of a main-effect numeric expression.
 // The same bounded inverse as the UI capture is evaluated at expression time.
 // Only documented toWorld/toWorldVec methods are used; no script-side host writes.
-inline std::string matrix_expression(unsigned entry, bool inherited = true) {
+inline std::string matrix_expression(unsigned entry, bool inherited = true,
+                                     const PixelAffine* compensation = nullptr) {
     const unsigned row=entry/4,column=entry%4;
     std::string text="// Starfield Transform affine entry "+std::to_string(entry)+"\n";
     // PF_LAYER is constant structure. None is already validated during UI
@@ -105,7 +146,14 @@ for (var c=0;c<3;c++) {
     if(column==3)text+=R"(var target=point(src.toWorld(src.anchorPoint.value,time)), origin=point(thisLayer.toWorld([0,0,0],time));
 var v=[target[0]-origin[0],target[1]-origin[1],target[2]-origin[2]];
 )";
-    else text+="var v=axis(src,"+std::to_string(column)+");\n";
+    else if(!compensation)text+="var v=axis(src,"+std::to_string(column)+");\n";
+    else text+="var v=[0,0,0];\n";
+    if(compensation)for(unsigned k=0;k<3;++k) {
+        const auto coefficient=(*compensation)[k*4+column];
+        if(coefficient==0)continue;
+        text+="var a=axis(src,"+std::to_string(k)+"), weight="+expression_number(coefficient)+";\n";
+        text+="for (var j=0;j<3;j++) v[j]+=a[j]*weight;\n";
+    }
     text+="result = rows["+std::to_string(row)+"][3]*v[0]+rows["+std::to_string(row)+"][4]*v[1]+rows["+std::to_string(row)+"][5]*v[2];\n";
     text+="if (!isFinite(result)) throw new Error(\"Starfield: invalid Null layer transform\");\n";
     return text;

@@ -6,6 +6,9 @@ inline constexpr int particles_scale=13,particles_opacity=14,last=14;
 // Synthetic binding fields, not native parameters. Twelve pixel affine entries
 // are read through main-effect numeric aliases on the render-safe playback path.
 inline constexpr int matrix_first=15,matrix_last=26;
+// Version-2 private binding record only. These constant calibration fields are
+// not physical AE parameters and consume no main-effect animation aliases.
+inline constexpr int compensation_first=27,compensation_last=38;
 inline constexpr bool animated(int index) noexcept {return index>=2 && index<=matrix_last;}
 inline constexpr bool matrix_field(int index) noexcept {return index>=matrix_first && index<=matrix_last;}
 }

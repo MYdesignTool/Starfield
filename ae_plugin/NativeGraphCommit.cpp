@@ -135,6 +135,24 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
             publish.streams->AEGP_DisposeStream(ref);
             if (ae_error) return edit->status = static_cast<PF_Err>(ae_error);
         }
+        edit->stage = node_sync::Stage::capture; edit->stream_index = kGraphParameterId;
+        // Direct node callbacks have no renderer params[] delivery. Retain the
+        // saved graph before compiling so existing attachment offsets survive
+        // both native control edits and reference changes. Publish owns the value
+        // until completion and reuses it for exact rollback below.
+        constexpr std::size_t saved_graph_slot=4;
+        ae_error=publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id,publish.renderer,
+            kGraphParameterId,&publish.refs[saved_graph_slot]);
+        AEGP_StreamType saved_graph_type=AEGP_StreamType_NO_DATA;
+        if(!ae_error && !publish.refs[saved_graph_slot])ae_error=PF_Err_BAD_CALLBACK_PARAM;
+        if(!ae_error)ae_error=publish.streams->AEGP_GetStreamType(publish.refs[saved_graph_slot],&saved_graph_type);
+        if(!ae_error && saved_graph_type!=AEGP_StreamType_ARB)ae_error=PF_Err_BAD_CALLBACK_PARAM;
+        if(!ae_error)ae_error=publish.streams->AEGP_GetNewStreamValue(plugin_id,publish.refs[saved_graph_slot],
+            AEGP_LTimeMode_LayerTime,&time,TRUE,&publish.old[saved_graph_slot]);
+        if(ae_error)return edit->status=static_cast<PF_Err>(ae_error);
+        publish.read[saved_graph_slot]=true;
+        scratch[kGraphParameterId].param_type=PF_Param_ARBITRARY_DATA;
+        scratch[kGraphParameterId].u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(publish.old[saved_graph_slot].val.arbH);
         edit->stage = node_sync::Stage::compile; edit->stream_index = -1;
         core::Graph graph;
         bool found = false;
@@ -170,6 +188,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         edit->stage = node_sync::Stage::capture;
         for (std::size_t i = 0; i < indices.size(); ++i) {
             edit->stream_index = indices[i];
+            if(publish.read[i])continue;
             ae_error = publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id, publish.renderer,
                 indices[i], &publish.refs[i]);
             if (ae_error || !publish.refs[i]) return edit->status = static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);

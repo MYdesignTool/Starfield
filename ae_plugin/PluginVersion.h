@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 50: complete Transform layer selector and empty opening-shutter frames.
-#define STARFIELD_VERSION_BUILD 50
-#define STARFIELD_VERSION_PACKED 32818 /* 0x8032 */
+// Build 51: persistent relative Null attachment and stable CEP graph targets.
+#define STARFIELD_VERSION_BUILD 51
+#define STARFIELD_VERSION_PACKED 32819 /* 0x8033 */

@@ -30,7 +30,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
     return 0;
 }
 [[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
-    return kind==Kind::transform?transform_layout::matrix_last:base_parameter_count(kind);
+    return kind==Kind::transform?transform_layout::compensation_last:base_parameter_count(kind);
 }
 
 [[nodiscard]] constexpr A_long layout_x_index(Kind kind) noexcept { return base_parameter_count(kind) + 1; }

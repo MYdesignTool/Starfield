@@ -85,6 +85,7 @@ struct SuiteSet {
         return static_cast<PF_Err>(error);
     }
     RawNode* recording{};
+    const RawNode* previous_node{}; // saved attachment, borrowed for UI compilation
     const RawNode* playback{};
     PF_InData* data{};
     AEGP_LayerH owner_layer{};
@@ -195,14 +196,10 @@ bool read_layer_resource(SuiteSet& suites, AEGP_PluginID id, AEGP_EffectRefH eff
     return record_value(suites,index,node_sync::ValueKind::scalar,{double(output),0,0});
 }
 
-bool read_inherited_affine(SuiteSet& suites, AEGP_PluginID id, std::uint32_t resource,
+bool read_layer_affine(SuiteSet& suites, AEGP_PluginID id, std::uint32_t resource,
                            const core::LayerUnits& units, transform_binding::PixelAffine& pixel) {
-    if(suites.playback) {
-        for(A_long i=0;i<12;++i)
-            if(!read_one_d(suites,id,nullptr,transform_layout::matrix_first+i,{},pixel[i]))return false;
-        return true;
-    }
-    if(resource==0)pixel={1,0,0,units.layer_width*.5,0,1,0,units.layer_height*.5,0,0,1,0};
+    (void)units;
+    if(resource==0)pixel={1,0,0,0,0,1,0,0,0,0,1,0};
     else {
         if(!suites.data || !suites.owner_layer || !suites.data->time_scale)return false;
         if(!suites.layer && suites.basic->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,
@@ -237,8 +234,65 @@ bool read_inherited_affine(SuiteSet& suites, AEGP_PluginID id, std::uint32_t res
         if(!relative.has_value())return false;
         pixel=relative.value();
     }
-    for(A_long i=0;i<12;++i)
-        if(!record_value(suites,transform_layout::matrix_first+i,node_sync::ValueKind::scalar,{pixel[i],0,0}))return false;
+    return true;
+}
+
+bool attachment_fields(const RawNode& node,transform_binding::PixelAffine& offset) noexcept {
+    for(A_long i=0;i<12;++i) {
+        const auto& field=node.fields[transform_layout::compensation_first+i];
+        if(!field.present || field.type!=node_sync::ValueKind::scalar || field.slot>=0 ||
+           !std::isfinite(field.value[0]) || std::abs(field.value[0])>1e12)return false;
+        offset[i]=field.value[0];
+    }
+    return true;
+}
+
+bool read_inherited_affine(SuiteSet& suites, AEGP_PluginID id, std::uint32_t resource,
+                           const core::LayerUnits& units, transform_binding::PixelAffine& pixel) {
+    if(suites.playback) {
+        for(A_long i=0;i<12;++i)
+            if(!read_one_d(suites,id,nullptr,transform_layout::matrix_first+i,{},pixel[i]))return false;
+        return true;
+    }
+    using transform_binding::PixelAffine;
+    const PixelAffine identity{1,0,0,0,0,1,0,0,0,0,1,0};
+    const PixelAffine centred{1,0,0,units.layer_width*.5,0,1,0,units.layer_height*.5,0,0,1,0};
+    PixelAffine current{},offset{},preserved=centred;
+    if(!read_layer_affine(suites,id,resource,units,current))return suites.fail(transform_layout::inherit);
+    const auto* previous=suites.previous_node;
+    if(!resource)offset=centred;
+    else if(previous) {
+        const auto& source=previous->fields[transform_layout::inherit];
+        if(!source.present || source.type!=node_sync::ValueKind::scalar || source.value[0]<0 ||
+           source.value[0]>0x7fffffff || std::floor(source.value[0])!=source.value[0])return false;
+        const auto old_resource=static_cast<std::uint32_t>(source.value[0]);
+        PixelAffine old_offset{};
+        const bool calibrated=attachment_fields(*previous,old_offset);
+        if(old_resource==resource) {
+            // Legacy v1 selected resources retain their absolute behavior until
+            // the owner changes the reference. A normal graph edit never binds again.
+            offset=calibrated?old_offset:identity;
+        } else {
+            if(old_resource) {
+                PixelAffine old_frame{};
+                if(!read_layer_affine(suites,id,old_resource,units,old_frame))return suites.fail(transform_layout::inherit);
+                preserved=calibrated?transform_binding::compose_affine(old_frame,old_offset):old_frame;
+            } else preserved=centred;
+            auto attached=transform_binding::attachment_offset(current,preserved);
+            if(!attached.has_value())return suites.fail(transform_layout::inherit);
+            offset=attached.value();
+        }
+    } else {
+        auto attached=transform_binding::attachment_offset(current,preserved);
+        if(!attached.has_value())return suites.fail(transform_layout::inherit);
+        offset=attached.value();
+    }
+    pixel=resource?transform_binding::compose_affine(current,offset):offset;
+    for(A_long i=0;i<12;++i) {
+        if(!std::isfinite(offset[i]) || std::abs(offset[i])>1e12 ||
+           !record_value(suites,transform_layout::compensation_first+i,node_sync::ValueKind::scalar,{offset[i],0,0}) ||
+           !record_value(suites,transform_layout::matrix_first+i,node_sync::ValueKind::scalar,{pixel[i],0,0}))return false;
+    }
     return true;
 }
 
@@ -435,7 +489,8 @@ core::OpaqueBytes make_layout_record(std::vector<LayoutEntry>& entries) {
 core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     std::sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
     core::OpaqueBytes bytes;
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, 1); append_u32(bytes, 0);
+    const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -482,7 +537,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || version != 1 || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version != 1 && version != 2) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
@@ -495,7 +550,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             // belong in the record but do not consume animation alias slots.
             // Keep writer/reader bounds tied to the current per-kind layout,
             // rather than the retired Particle81 control count.
-            const auto field_limit = native_nodes::binding_field_count(node.kind);
+            const auto field_limit = node.kind==Kind::transform && version==1 ?
+                transform_layout::matrix_last : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -522,6 +578,10 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                     if (!std::isfinite(scalar)) return false;
                 }
             }
+            if(node.kind==Kind::transform && version==2) {
+                transform_binding::PixelAffine offset{};
+                if(!attachment_fields(node,offset))return false;
+            }
             nodes.push_back(std::move(node));
         }
         if (at != bytes.size()) return false;
@@ -547,9 +607,12 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
         text += "fx.param(" + std::to_string(first + chunk) + ").value === " + std::to_string(word);
     }
     text += "; } catch (unrelatedEffect) {} if (match) { ";
-    if(node.kind==Kind::transform && transform_layout::matrix_field(index))
+    if(node.kind==Kind::transform && transform_layout::matrix_field(index)) {
+        transform_binding::PixelAffine offset{};
+        const bool calibrated=attachment_fields(node,offset);
         text+=transform_binding::matrix_expression(static_cast<unsigned>(index-transform_layout::matrix_first),
-            node.fields[transform_layout::inherit].value[0] != 0);
+            node.fields[transform_layout::inherit].value[0] != 0,calibrated?&offset:nullptr);
+    }
     else {
         text += "result = fx.param(" + std::to_string(index) + ").value";
         if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
@@ -986,6 +1049,12 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                     in_data->pixel_aspect_ratio.den ?
                                         static_cast<double>(in_data->pixel_aspect_ratio.num) / in_data->pixel_aspect_ratio.den : 1.0};
         std::vector<RawNode> raw_nodes;
+        std::vector<RawNode> previous_nodes;
+        if(params[kGraphParameterId] && params[kGraphParameterId]->param_type==PF_Param_ARBITRARY_DATA &&
+           params[kGraphParameterId]->u.arb_d.value) {
+            auto saved=read_graph_parameter(in_data,params[kGraphParameterId]->u.arb_d.value);
+            if(!saved.has_value() || !read_binding_record(saved.value(),previous_nodes))return PF_Err_BAD_CALLBACK_PARAM;
+        }
         std::vector<Connection> connections;
         std::vector<LayoutEntry> layout_entries;
         graph.nodes.reserve(static_cast<std::size_t>(effect_count) + 1u);
@@ -1029,6 +1098,8 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                 }
             }
             RawNode raw; raw.id = core::NodeId{uuid}; raw.kind = kind;
+            suites.previous_node=nullptr;
+            for(const auto& old:previous_nodes)if(old.id==raw.id && old.kind==raw.kind){suites.previous_node=&old;break;}
             suites.recording = &raw;
             core::GraphNode node{core::NodeId{uuid}, type_key, schema_version, {}};
             if (!read_node_parameters(suites, plugin_id, effect.value, kind, time, units, node))

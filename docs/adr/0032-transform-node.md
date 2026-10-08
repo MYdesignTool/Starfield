@@ -433,3 +433,60 @@ closed: tools/Restore-TestBuild.ps1 -PluginDir
 verification passes; the full command and before/after hashes are also in
 artifacts/m3-11-native50-deployment.md. No AE process was started or stopped by
 the agent. Actual Null, menu, CEP deletion, undo and reopen gates remain open.
+
+## Stable graph transaction and relative attachment — 2026-10-08
+
+The owner reports that CEP deletion still fails with `graph_commit_failed:
+Select a layer carrying Starfield Particle`, followed by the same error during
+node-effect rollback. The gateway accepted initial preflight, but resolved the
+renderer against the current selection again after a structural Effect Parade
+edit. Selection changes during the edit are a source-level hypothesis consistent
+with that message; actual AE execution of the correction remains open.
+CEP51 pins the validated project/composition/layer token for the duration of
+submit/bootstrap, including commit, compensation and guard cleanup. It still
+reacquires invalidated effect/property references and fails if the original
+identity disappears. The initial selection-following/pinned preference is
+retained. It never redirects a partial transaction to a different selected layer.
+
+The owner explicitly requests attachment from the instant the reference is
+chosen: choosing it leaves the current particle state unchanged; subsequent
+layer motion applies. Native51 stores an affine attachment offset B as constants.
+With F(t) mapping source-anchor coordinates into the effect-layer pixel frame,
+the inherited pixel map is F(t)*B. At a new reference, B = inverse(F(t_bind))*G,
+where G is the previous inherited map sampled at that same instant. For a fresh
+Transform, G is the identity canonical frame, whose pixel translation is the
+effect-layer centre. Switching to another selected source preserves G. None
+retains the existing identity behavior and portable numeric preset contract.
+Choosing the same resource or editing controls/topology preserves B without rebinding.
+Null creation follows this same capture path. Captured numbers do not re-evaluate
+old keyframes at a recorded time. Parent motion, reflection and shear remain full
+affine operations. A singular source at attachment cannot define a reversible
+frame and rejects before graph publication; singular motion after attachment
+remains representable. Ordinary canonical bounds still apply after composition.
+
+Migration: physical Transform streams, disk IDs, UUID/metadata layout, graph
+envelope/schema1, Transform node schema1, sequence schema and Core ABI4 stay
+unchanged. The adapter-private optional record0x8002 has version2 when Transform
+is present, adding constant synthetic fields27..38 for B to the existing field
+format. They are not AE parameters and consume no animation aliases; fields15..26
+retain twelve sampled numeric matrix entries. Records without Transform retain
+version1. The new reader accepts version1 and version2, requiring all twelve
+finite/bounded constant offset fields for each version2 Transform. Old readers
+reject version2 rather than interpreting the new attachment as absolute motion.
+An unchanged version1 resource preserves its old absolute behavior, using an
+identity offset for a selected source; only changing its reference establishes
+the new relative attachment. Existing authored controls/animation are preserved.
+Native callbacks now borrow the saved renderer ARB value before compilation,
+retain it through the transaction, and reuse it for exact publication rollback.
+Saved calibrated projects require native51 or newer. Binary rollback retains
+native50/CEP50 and its prior project semantics; no saved file is rewritten by
+deployment itself.
+
+Native51 code/PiPL packing agrees at32819. The final May2023 /MT full build with
+-NoDistPublish and -NoRuntimePublish passes (artifacts/m3-11-native51-build.log).
+Node syntax compilation of the staged panel.js, preset_manager.js and gateway
+passes. No implementation test suite was added or run in this request; the
+earlier source fixtures do not establish the new attachment behavior. Compilation
+does not qualify attachment, deletion, undo or reopen in AE2023.
+CEP51 was staged under artifacts/prepared/m3-11-native51-panel51 before paired
+publication. Actual deployment receipts and owner observations remain separate.
