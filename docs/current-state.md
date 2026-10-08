@@ -6,11 +6,11 @@
 
 native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递。原生7773+相机12检查、隔离 CEP 纹理47、完整事务与启动通过；May2023 /MT 构建通过。部署前 fresh process check 无 AE，七个 native/Core、十一项 CEP、runtime selector 与 exact57 配对回滚核对。候选 artifacts/prepared/m3-13-native58-panel58 保留，日志 m3-13-native58-*。
 
-当前方向候选：冻结7861a2b源码，仅加入 SpriteGeometry 的 Texture 相机轴/绕序修正；四角贴图在修复前第114项失败，修复后4322项与 Cloud2441项通过。CoreOnly /MT 构建通过，全部原 native58 adapter 输入字节哈希匹配。六个 AEX 与 CEP 不变，待 fresh no-AE 发布。候选位于 artifacts/prepared/m3-13-native58-texture-orientation/source，Core SHA256 B509D97495EEDF7BF23A2AC254419CEF00B69356C78AD5838D31DAA48C58F5D5；没有纳入未完成的 M3-16。
+默认方向 Core 维护已于22:56 +08:00发布：冻结7861a2b源码，仅加入fe6498afbdc378cc0c91546429d11f63ae28df16的 SpriteGeometry Texture 相机轴/绕序修正；四角贴图在修复前第114项失败，修复后4322项与 Cloud2441项通过。CoreOnly /MT 构建通过，全部原 native58 adapter 输入字节哈希匹配。fresh process check 无 AE，通过 Deploy-TestBuild 安装；六个 AEX 与十一项 CEP 哈希不变，七个 native/Core、十一项 CEP、selector、回滚旧文件均已独立核对。实际方向待 owner 验收。候选位于 artifacts/prepared/m3-13-native58-texture-orientation/source；没有纳入未完成的 M3-16。
 
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build58，packed32826；Core 方向维护候选 | native58，packed32826 |
+| 原生版本 | build58，packed32826；Core 方向维护 | native58，packed32826 + Core 方向修复 |
 | Core ABI | 7 | 7 |
 | CEP | panel58 | panel58（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
@@ -35,7 +35,7 @@ optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定�
 
 ## 当前安装证据与回滚
 
-native58/CEP58 配对收据：artifacts/m3-13-native58-deploy-before.json、m3-13-native58-deploy-after.json。发布前 fresh process checks 均无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 和既有 native/CEP Junction。七个 native/Core、十一项 CEP、runtime selector 与一键配对恢复 report 全部核对。Runtime selector：StarfieldCore-7840E5B1298D129B.dll.
+native58/CEP58 初次配对收据：artifacts/m3-13-native58-deploy-before.json、m3-13-native58-deploy-after.json。当前 Core 方向维护收据：artifacts/m3-13-texture-orientation-deploy-before.json、m3-13-texture-orientation-deploy-after.json。发布前 fresh process checks 均无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 和既有 native/CEP Junction。七个 native/Core、十一项 CEP、runtime selector、一键配对恢复 report 与旧文件全部核对。当前 runtime selector：StarfieldCore-B509D97495EEDF7B.dll.
 
 | dist 文件 | SHA-256 |
 | --- | --- |
@@ -45,14 +45,14 @@ native58/CEP58 配对收据：artifacts/m3-13-native58-deploy-before.json、m3-1
 | StarfieldForce.aex | 0A7A94FE1D541B2555BD54A711B0E1E75A19F4B4B610C3C576E8F865953BE796 |
 | StarfieldTransform.aex | E1D5EE3986EA059BE7D6E06577D012E67004FD8210D7576ACBF7882E11FFA85F |
 | StarfieldHost.aex | CC45D0A1DED203420531ED7AE29B262452BD8A85DA3FEE06B3CC7FD95D3FDF75 |
-| StarfieldCore.dll | 7840E5B1298D129B98C8ABA3B5025DC82E765BE79C66E3FDEE786CA5016BBF54 |
+| StarfieldCore.dll | B509D97495EEDF7BF23A2AC254419CEF00B69356C78AD5838D31DAA48C58F5D5 |
 
-exact native57/CEP57 备份：artifacts/disabled/m3-13-native58-panel58-texture-owner-20261008。既有历史备份保留。回滚报告：artifacts/m3-13-native58-rollback-report.log；发布日志：artifacts/m3-13-native58-deploy-wrapper.log。
+当前维护的 exact native58/CEP58（旧 Core7840E5B1298D129B）备份：artifacts/disabled/m3-13-native58-core-texture-orientation-20261008。既有 native57/CEP57 与历史备份保留。回滚报告：artifacts/m3-13-texture-orientation-rollback-report.log；发布日志：artifacts/m3-13-texture-orientation-deploy-wrapper.log。
 
 AE 关闭后的单步回滚（仓库根目录）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native58-panel58-texture-owner-20261008' -Restore
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native58-core-texture-orientation-20261008' -Restore
 ```
 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
@@ -61,6 +61,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 - M3-16 纯核心 Shift Seed/Birth Chance 策略已提交f83e20f；独立40985检查、0失败。图求值/历史/辅助发射/预算/身份工作树保留，作者未完成，不暴露 UI、不发布到 Core；ADR0037 规定后续完整迁移。当前暂缓以处理 M3-13 方向反馈。
 
-- owner 确认 native58 Comp 2 可选择并正常显示纹理；默认镜像修复待发布/实际方向验收。该观察不关闭八种时间采样、背面、撤销/保存重开及 Source/Masks/Effects gate。
+- owner 确认 native58 Comp 2 可选择并正常显示纹理；默认镜像 Core 修复已发布，待实际方向验收。该观察不关闭八种时间采样、背面、撤销/保存重开及 Source/Masks/Effects gate。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。

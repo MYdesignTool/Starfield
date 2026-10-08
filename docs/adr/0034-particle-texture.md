@@ -33,6 +33,23 @@ Six native58 AEX files and CEP58 retain their exact installed hashes. Publish
 through Deploy-TestBuild only after a fresh no-AE check, retaining the previous
 Core selector and complete native58 baseline for one-step rollback.
 
+At22:56 +08:00 a fresh read-only check found no AfterFX/AfterFX_64. Standing
+authorization deployed the Core maintenance through Deploy-TestBuild, preserving
+six native58 and eleven CEP58 hashes. Installed seven native/Core files, eleven
+CEP files, the B509D97495EEDF7B runtime selector, and exact previous58 backup
+files were independently verified; the paired Restore report passed. The Core
+source is7861a2b plus projection patch fe6498afbdc378cc0c91546429d11f63ae28df16.
+No host process, registry, Adobe cache or Junction changed. Actual default
+orientation and the broader sampling/persistence gates remain open.
+
+Receipts: artifacts/m3-13-texture-orientation-deploy-{before,after}.json,
+artifacts/m3-13-texture-orientation-deploy-wrapper.log and
+artifacts/m3-13-texture-orientation-rollback-report.log. One-step undo, AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native58-core-texture-orientation-20261008' -Restore
+```
+
 ## Native selection transaction correction, 2026-10-08
 
 Owner native57 evidence confirms that Comp 2 now appears, but selecting it

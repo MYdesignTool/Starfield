@@ -42,7 +42,7 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 
 ## M3-13 — Particle Texture / Layer 采样（2026-10-08）
 
-2026-10-08 native58/CEP58 已发布；owner 确认 Comp 2 可以选择并显示。当前唯一活动卡为 M3-13：修复默认 Texture 镜像。四角贴图复现相机路径额外取反 Y；Texture 投影及绕序修正后4322检查通过，共用 Cloud 回归2441通过。CoreOnly /MT 候选基于冻结7861a2b，全部 adapter 字节指纹匹配；六个 native58 AEX 与 CEP58 不变。候选待 fresh no-AE 发布、哈希/回滚和实际方向验收；八种采样/持久化及 Source/Masks/Effects 等完整 gate 继续。M3-16 工作树保留，暂缓推进，避免修复包混入未完成行为。
+2026-10-08 native58/CEP58 已发布；owner 确认 Comp 2 可以选择并显示。当前唯一活动卡为 M3-13：修复默认 Texture 镜像。四角贴图复现相机路径额外取反 Y；Texture 投影及绕序修正后4322检查通过，共用 Cloud 回归2441通过。CoreOnly /MT 基于冻结7861a2b，全部 adapter 字节指纹匹配；六个 native58 AEX 与 CEP58 不变。fe6498a已推送，22:56 +08:00 fresh no-AE 成对维护发布，18文件哈希、selector、exact58旧文件及一键恢复 report 核对。默认方向待实际验收；八种采样/持久化及 Source/Masks/Effects 等完整 gate 继续。M3-16 工作树保留，暂缓推进，避免修复包混入未完成行为。
 
 当前完整 goal 继续；不是以已完成的 Transform/Transfer 代替剩余要求。
 拥有：Settings/ParticleTexture、Render.hpp/C ABI/快照、图求值/CPU/GPU fallback、AE texture 作者与 SmartFX checkout、CEP/资源/预设、schema/version、focused texture tests、ADR0034。
