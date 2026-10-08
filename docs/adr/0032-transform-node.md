@@ -296,3 +296,18 @@ Logs: artifacts/m3-11-native48-build.log, m3-11-native48-sync.log,
 m3-11-native48-binding.log, m3-11-native48-expressions.log and
 m3-11-native48-legacy-expressions.log. These are source/fake-host results,
 not confirmation that the owner's stream294 error is resolved in AE.
+
+Development publication at2026-10-08 10:11 local time: native48/Core ABI4 + CEP50
+replaces native47/CEP50 after a fresh read-only process check found AE closed.
+Source candidate is f0f6ad5411dba59c191e1cc5685301de00b5684c. Seven installed
+native/Core hashes, eleven unchanged CEP runtime sources and selected Core
+StarfieldCore-575DB0A96931776E.dll were verified. The native and CEP Junction
+targets are retained. Before/after receipts are
+artifacts/m3-11-native48-deploy-before.json and m3-11-native48-deploy-after.json.
+Rollback to native47/CEP50, after closing AE:
+tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-11-native48-panel50-none-binding-20261008' -Restore. Its read-only verification
+passes; the paired backup and one-step command are also in
+artifacts/m3-11-native48-deployment.md. AE creation/Null/undo/reopen gates remain
+open until owner observation.
