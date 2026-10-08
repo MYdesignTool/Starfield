@@ -29,6 +29,26 @@ artifacts/m3-13-native55-texture-panel-tests.log and
 artifacts/m3-13-native55-main-order-regression.log. These fixtures do not establish
 actual AE2023 precomp selection or animated texture rendering.
 
+At17:25 +08:00 a fresh read-only process check found no AfterFX/AfterFX_64.
+The standing deployment authorization published source
+eee7e91422ee01138dc15c77e533edd4473a8b3e as native55/CEP55 through the existing
+Junctions and tools/Deploy-TestBuild.ps1. Seven native/Core and eleven CEP hashes,
+the unchanged ABI6 Core selector and the paired rollback report were verified.
+The installed CEP texture fixture also passes47 checks. Exact native54/CEP54
+before-state and paired backup are retained. No process, registry or Adobe cache
+was changed. Actual AE2023 precomp menu/selection/rendering remain owner gates.
+Receipts: artifacts/m3-13-native55-deploy-before.json,
+artifacts/m3-13-native55-deploy-after.json,
+artifacts/m3-13-native55-deploy-wrapper.log,
+artifacts/m3-13-native55-rollback-report.log and
+artifacts/m3-13-native55-live-texture-panel-tests.log.
+
+One-step rollback to native54/CEP54, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native55-panel55-precomp-20261008' -Restore
+```
+
 ## Scope and reference
 
 The active owner goal covers AE2023 main-effect naming/order, remaining Particle
