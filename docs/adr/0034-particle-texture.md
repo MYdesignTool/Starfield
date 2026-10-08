@@ -33,6 +33,25 @@ artifacts/m3-13-native58-panel_native_node_gateway_tests.log,
 artifacts/m3-13-native58-panel_startup_tests.log. Real AE selection
 and pixel rendering remain open; owner Comp 2 inventory success is retained.
 
+## AE2023 stage API audit, 2026-10-08
+
+The current [SDK change log](https://ae-plugins.docsforadobe.dev/intro/whats-new/)
+places independent PF_LAYER render-stage getters/setters in StreamSuite7 of
+SDK26.5. The local May2023 AE_GeneralPlug.h exposes StreamSuite6 and layer_id
+only in its public stream value. Do not import the newer suite as an AE2023
+implementation or read reserved PF_LayerDef bits. User-facing Source/Masks/
+Effects has existed since14.2, but mirroring that choice into a hidden renderer
+slot is a separate capability from displaying the host menu.
+
+[Layer render options](https://ae-plugins.docsforadobe.dev/aegps/aegp-suites/)
+can render a layer with effects at non-render time; the SDK warns about cycles
+when effects render other layers during rendering. No button/idle frame cache
+or render-time AEGP recursion is adopted as a substitute for dependency-tracked
+SmartFX sampling. Source/Masks/Effects remains an AE2023 architecture gate;
+its next implementation must prove stage persistence, actual dependencies,
+cyclic reference handling and preset/undo mirroring through supported APIs.
+This research does not narrow the owner's full Particle objective.
+
 ## Precomposition picker correction, 2026-10-08
 
 Owner AE2023 evidence after native55 deployment still shows only None with

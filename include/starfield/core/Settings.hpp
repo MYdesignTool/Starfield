@@ -68,6 +68,10 @@ struct ParticleCloudStyle {
     double aspect{150};
     double density{66};
 };
+struct ParticleBirthControls {
+    std::int32_t seed_shift{};
+    double chance_percent{100};
+};
 inline constexpr double kMaxEmissionSpeed = 100'000.0;
 inline constexpr double kMaxEmissionAngleDegrees = 100'000.0;
 inline constexpr double kMaxDirectionSpanDegrees = 180.0;

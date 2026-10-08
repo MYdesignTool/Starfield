@@ -4,13 +4,13 @@
 
 ## 源码与安装
 
-native58/CEP58 修复候选已构建，尚未部署（fresh AE check：PID28924）。owner 确认 Comp 2 已列出，但选择时报512；原生提交临时 PF 上下文没有 effect_ref，已改为向绑定事务传入确认过的 owner layer。IDs/schema/ABI7 不变。原生7773+相机12检查、隔离 CEP 纹理47与完整事务通过；May2023 /MT 构建通过。候选 artifacts/prepared/m3-13-native58-panel58；日志 m3-13-native58-*。实际选择/渲染 gate 开放。部署后另记57配对回滚。
+native58/CEP58 修复候选7861a2ba63cff245a0840539a3933da10b8077c0已推送、构建，尚未部署（fresh AE check：PID28924）。owner 确认 Comp 2 已列出，但选择时报512；原生提交临时 PF 上下文没有 effect_ref，已改为向绑定事务传入确认过的 owner layer。IDs/schema/ABI7 不变。原生7773+相机12检查、隔离 CEP 纹理47、完整事务与启动通过；May2023 /MT 构建通过。候选 artifacts/prepared/m3-13-native58-panel58，包括固定 native-bundle/candidate.json；部署包装已固定源码身份并验证候选哈希。日志 m3-13-native58-*。实际选择/渲染 gate 开放。部署后另记57配对回滚。
 
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build57，packed32825 | native57，packed32825 |
+| 原生版本 | frozen build58，packed32826 | native57，packed32825 |
 | Core ABI | 7 | 7 |
-| CEP | panel57 | panel57（既有 live Junction） |
+| CEP | isolated panel58 | panel57（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
@@ -56,6 +56,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
 
 ## 开放 gate
+
+- M3-16 纯核心 Shift Seed/Birth Chance 策略已实现；独立40985检查、0失败。尚未接入图求值/作者/历史/预算/身份，不暴露 UI、不发布到 Core；ADR0037 规定后续完整迁移。冻结 native58 包不包含该未完成功能。
 
 - owner 确认 native57 Texture menu 已能列出 Comp 2；选择时报 `validate texture source layers` /512，native58 修复候选等待闭 AE 发布与实际验收。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。

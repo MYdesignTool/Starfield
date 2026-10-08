@@ -65,3 +65,11 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 迁移：ADR0036 先行；optional keys37..39、shared Cloud style、snapshot7/Core ABI7，旧图/快照保留固定五圆；追加 native 控件，不改既有 IDs/序列 schema。Core 数值里程碑之后完成作者控件再配对发布，不提前暴露无效 UI。
 作者里程碑：build57/CEP57 候选完成 Cloud topic528、Circles529、Aspect530、Density531、end532 与 hidden constant activation533，保留旧效果；private binding5 兼容旧 v1..4。原生绑定/相机7647、实际 Particle 回调277、控件/Texture selector276、Cloud CEP49、Texture CEP47 与完整 gateway Cloud Add/Replace/rollback 检查通过，May2023 构建通过。native57/CEP57/ABI7 已闭宿主成对发布，七个 native 与十一项 CEP 哈希、runtime selector、一键 exact56 配对回滚报告通过；真实 AE gate 仍开放；其余共享 MNT 改动保留并排除。
 完成条件：Circles/Aspect/Density 全链路可用、圆群统一透明度/运动/寿命/身份、稳定种子、CPU/GPU 和 shutter/crop/预算兼容、必要最小测试、May2023 构建、闭宿主配对发布与回滚；AE2023 外观/动画/undo/reopen 验收。其余 Particle 行为族与原完整目标继续开放。
+
+## M3-16 — Particle Shift Seed / Birth Chance（2026-10-08）
+
+M3-13 native58/CEP58 修复已完成源码、构建和 focused gates，等待 AE 关闭发布；已固定7861a2b安装包，此卡不覆盖它。本卡是下一独立行为族。
+拥有：Settings/ParticleBirth/Random、graph optional keys/registry/construction/evaluation/history、候选扫描预算和 branch identity、native Particle 控件/记录/绑定、CEP inspector/gateway/presets、node schema、构建/version、focused birth tests、ADR0037 与未来配对发布。Render.hpp、ABI7 与 snapshot7 计划保持；需要变更时先修订 ADR。
+参考：owner 参数库存默认 Shift Seed0/Birth Chance100；官方指南要求偏移同一发射源的 seed、按出生概率筛选其粒子。范围边界与精确 RNG 仍需参考确认。先完成纯核心确定性策略，随后接入静态/历史/Auxiliary 求值及 native/CEP 作者；未接入前不暴露控件、不声明完成。
+迁移：optional keys40/41；缺字段保留旧分支行为，明确作者字段启用完整发射源分支。新 native 控件追加且通过独立 hidden activation 保留旧工程。已有 purpose1..20/IDs 不重用，出生筛选新增 purpose21。
+完成条件：偏移影响发射运动和全部随机属性；概率0/100/中间值、动画按出生采样、父子发射、共享 cap/work/cancel、稳定身份与 shutter 匹配；focused tests、AE2023 构建、闭宿主发布、回滚、owner 可见行为和 undo/reopen gate。完整目标仍 active。
