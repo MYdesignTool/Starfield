@@ -34,8 +34,9 @@ inline constexpr double kNativeBindingUnavailable = -1099511627776.0;
 inline constexpr A_long kTextureResourceFirstIndex=626, kTextureResourceCapacity=128;
 inline constexpr A_long kTextureResourceFirstDiskId=1700, kTextureResourceCountIndex=754;
 inline constexpr std::size_t kTotalEffectParameterCount = kTextureResourceCountIndex;
-inline constexpr A_long kAccelerationId = 614; // popup GPU=1 / CPU=2
-inline constexpr A_long kTimeSamplingHzId = 611; // popup 1/2/3 -> 30/60/120 Hz
+// Manifest29 changes registration positions only; disk IDs1611/1601 stay fixed.
+inline constexpr A_long kAccelerationId = 624; // popup GPU=1 / CPU=2
+inline constexpr A_long kTimeSamplingHzId = 621; // popup 1/2/3 -> 30/60/120 Hz
 
 inline constexpr A_long kTypeId = 2;
 inline constexpr A_long kParticlesPerSecondId = 3;

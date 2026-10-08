@@ -1,4 +1,5 @@
 #include "PresetsUI.hpp"
+#include "MainLauncher.hpp"
 #include "GraphCarrier.hpp"
 #include "AE_EffectSuites.h"
 #include "AE_GeneralPlug.h"
@@ -44,11 +45,43 @@ void decode_picture() noexcept try {
     std::vector<std::uint8_t> image(300*100*4);if(FAILED(converted->CopyPixels(nullptr,1200,static_cast<UINT>(image.size()),image.data())))return;
     pixels=std::move(image); // Owned CPU bytes only; no COM/Adobe objects survive.
 } catch(...) {}
-void launch(PF_InData* data) noexcept {
+void launch(PF_InData* data,MainLauncherAction action) noexcept {
     Suite<AEGP_UtilitySuite6> utility(data->pica_basicP,kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
     if(!utility || !utility->AEGP_ExecuteScript)return;
-    constexpr auto script="(function(){var id=app.findMenuCommandId('Starfield Presets');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions, then click Presets.');}())";
+    if(action==MainLauncherAction::none)return;
+    const auto script=action==MainLauncherAction::panel ?
+        "(function(){var id=app.findMenuCommandId('Starfield Particle Controls');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions.');}())" :
+        "(function(){var id=app.findMenuCommandId('Starfield Presets');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions, then click Presets.');}())";
     (void)utility->AEGP_ExecuteScript(graph_carrier_plugin_id(),script,FALSE,nullptr,nullptr);
+}
+void draw_actions(PF_InData* data,DRAWBOT_SupplierRef source,DRAWBOT_SurfaceRef target,
+    const DRAWBOT_SupplierSuite1* supplier,const DRAWBOT_SurfaceSuite1* surface,
+    const DRAWBOT_PointF32& origin,const MainLauncherLayout& layout) {
+    Suite<DRAWBOT_PathSuite1> paths(data->pica_basicP,kDRAWBOT_PathSuite,kDRAWBOT_PathSuite_Version1);
+    if(!paths)return;
+    DRAWBOT_BrushRef background{},foreground{};DRAWBOT_FontRef font{};
+    const DRAWBOT_ColorRGBA bg{.23f,.24f,.26f,1},fg{.85f,.9f,1,1};
+    if(!supplier->NewBrush(source,&bg,&background) && background &&
+       !supplier->NewBrush(source,&fg,&foreground) && foreground &&
+       !supplier->NewDefaultFont(source,11,&font) && font) {
+        const DRAWBOT_UTF16Char* labels[]{reinterpret_cast<const DRAWBOT_UTF16Char*>(u"Panel: Click To Open"),
+            reinterpret_cast<const DRAWBOT_UTF16Char*>(u"Presets: Browse")};
+        for(int i=0;i<2;++i) {
+            const float x=origin.x+i*(layout.action_width+4);
+            const DRAWBOT_RectF32 bounds{x,origin.y+layout.action_top,float(layout.action_width),22};
+            DRAWBOT_PathRef path{};
+            if(!supplier->NewPath(source,&path) && path) {
+                if(!paths->AddRect(path,&bounds))(void)surface->FillPath(target,background,path,kDRAWBOT_FillType_EvenOdd);
+                supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(path));
+            }
+            const DRAWBOT_PointF32 at{x+5,bounds.top+15};
+            (void)surface->DrawString(target,foreground,font,labels[i],&at,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_End,
+                float((std::max)(1,layout.action_width-10)));
+        }
+    }
+    if(font)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(font));
+    if(foreground)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(foreground));
+    if(background)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(background));
 }
 void draw(PF_InData* data,PF_EventExtra* event) {
     Suite<PF_EffectCustomUISuite2> ui(data->pica_basicP,kPFEffectCustomUISuite,kPFEffectCustomUISuiteVersion2);
@@ -79,8 +112,10 @@ void draw(PF_InData* data,PF_EventExtra* event) {
         return;
     }
     const auto& frame=event->effect_win.current_frame;
-    const int width=std::clamp(int(frame.right-frame.left)-4,30,300),height=width/3;
+    const auto layout=main_launcher_layout(frame.right-frame.left);
+    const int width=layout.width,height=layout.image_height;
     const DRAWBOT_PointF32 origin{float(frame.left+2),float(frame.top+2)};
+    draw_actions(data,source,target,supplier.value,surface.value,origin,layout);
     if(disabled.size()>=64 && !disabled.contains(event->contextH))disabled.erase(disabled.begin());
     auto& failed=disabled[event->contextH];std::call_once(decoded,decode_picture);
     DRAWBOT_Boolean bgra{},argb{};
@@ -116,7 +151,12 @@ PF_Err main_presets_event(PF_InData* data,PF_OutData*,PF_EventExtra* event) noex
     if(!event->contextH || !*event->contextH || (**event->contextH).w_type!=PF_Window_EFFECT ||
         event->effect_win.index!=1 || (event->effect_win.area!=PF_EA_CONTROL && event->effect_win.area!=PF_EA_PARAM_TITLE))return PF_Err_NONE;
     if(event->e_type==PF_Event_DRAW)draw(data,event);
-    else if(event->effect_win.area==PF_EA_CONTROL)launch(data);
+    else if(event->effect_win.area==PF_EA_CONTROL) {
+        const auto& frame=event->effect_win.current_frame;
+        const auto layout=main_launcher_layout(frame.right-frame.left);
+        const auto& point=event->u.do_click.screen_point;
+        launch(data,main_launcher_action(layout,point.h-frame.left-2,point.v-frame.top-2));
+    }
     event->evt_out_flags|=PF_EO_HANDLED_EVENT;return PF_Err_NONE;
 } catch(...) {return PF_Err_NONE;}
 }

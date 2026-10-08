@@ -9,7 +9,7 @@
 
 namespace starfield::adapter {
 inline constexpr std::size_t kMotionByteBudget=512u*1024u*1024u;
-inline constexpr std::array<A_long,8> kMotionParameterIds{617,618,619,620,621,622,623,624};
+inline constexpr std::array<A_long,8> kMotionParameterIds{611,612,613,614,615,616,617,618};
 inline constexpr std::array<core::ParameterKey,8> kMotionParameterKeys{
     core::graph_keys::kMotionBlur,core::graph_keys::kShutterAngle,core::graph_keys::kShutterPhase,core::graph_keys::kMotionBlurType,
     core::graph_keys::kMotionBlurLevels,core::graph_keys::kLinearAccuracy,core::graph_keys::kOpacityBoost,core::graph_keys::kMotionBlurDisregard};

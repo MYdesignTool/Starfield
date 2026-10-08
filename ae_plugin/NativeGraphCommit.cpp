@@ -104,7 +104,8 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         const A_Time time{data->current_time, data->time_scale};
         edit->stage = node_sync::Stage::controls;
         constexpr std::array<A_long, 18> controls{kMaxParticlesId, kLayoutOutputXId, kLayoutOutputYId,
-            kGraphRevisionId, kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,617,618,619,620,621,622,623,624};
+            kGraphRevisionId, kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,
+            kMotionParameterIds[0],kMotionParameterIds[1],kMotionParameterIds[2],kMotionParameterIds[3],kMotionParameterIds[4],kMotionParameterIds[5],kMotionParameterIds[6],kMotionParameterIds[7]};
         for (const A_long index : controls) {
             edit->stream_index = index;
             AEGP_StreamRefH ref = nullptr;
@@ -126,8 +127,8 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
                 } else if(index==kTimeSamplingHzId) {
                     if(value.val.one_d<1 || value.val.one_d>3 || std::floor(value.val.one_d)!=value.val.one_d) ae_error=PF_Err_BAD_CALLBACK_PARAM;
                     else {scratch[index].param_type=PF_Param_POPUP;scratch[index].u.pd.value=static_cast<A_long>(value.val.one_d);}
-                } else if(index==kAccelerationId || index==617 || index==620 || index==624) {
-                    if(value.val.one_d<1 || value.val.one_d>(index==617?3:2) || std::floor(value.val.one_d)!=value.val.one_d) ae_error=PF_Err_BAD_CALLBACK_PARAM;
+                } else if(index==kAccelerationId || index==kMotionParameterIds[0] || index==kMotionParameterIds[3] || index==kMotionParameterIds[7]) {
+                    if(value.val.one_d<1 || value.val.one_d>(index==kMotionParameterIds[0]?3:2) || std::floor(value.val.one_d)!=value.val.one_d) ae_error=PF_Err_BAD_CALLBACK_PARAM;
                     else {scratch[index].param_type=PF_Param_POPUP;scratch[index].u.pd.value=static_cast<A_long>(value.val.one_d);}
                 } else scratch[index].u.fs_d.value = value.val.one_d;
                 publish.streams->AEGP_DisposeStreamValue(&value);

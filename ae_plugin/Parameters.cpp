@@ -409,7 +409,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // Own the title paint/click as well: NO_DATA alone still creates an AE twirly.
     def.param_type=PF_Param_NO_DATA;def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
     def.ui_flags=PF_PUI_TOPIC|PF_PUI_CONTROL|PF_PUI_DONT_ERASE_TOPIC;
-    def.ui_width=304;def.ui_height=104;def.uu.id=1631;
+    def.ui_width=304;def.ui_height=130;def.uu.id=1631;
     err=PF_ADD_PARAM(in_data,-1,&def);if(err)return err;
     // Type and Origin are registered by hand instead of through PF_ADD_POPUP or
     // PF_ADD_POINT_3D: those macros call PF_ADD_PARAM themselves and never set
@@ -740,7 +740,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     AEFX_CLR_STRUCT(def);
     PF_ADD_TOPIC("Time Remapping", 920);
     AEFX_CLR_STRUCT(def);
-    PF_ADD_CHECKBOX("Time Remapping On / Off", "", FALSE, PF_ParamFlag_SUPERVISE, 921);
+    PF_ADD_CHECKBOX("On / Off", "", FALSE, PF_ParamFlag_SUPERVISE, 921);
     AEFX_CLR_STRUCT(def);
     PF_ADD_FLOAT_SLIDERX("Time (Seconds)", -1000000, 1000000, 0, 10, 0, PF_Precision_HUNDREDTHS,
                         PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, 922);
@@ -767,6 +767,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
         const auto binding_error = PF_ADD_PARAM(in_data, -1, &def);
         if (binding_error) return binding_error;
     }
+    // Reorder only610..625; saved disk IDs and alias/resource positions stay fixed.
+    if(const auto motion_error=append_motion_parameters(in_data,out_data);motion_error)return motion_error;
     AEFX_CLR_STRUCT(def);
     PF_ADD_TOPIC("Simulation Settings", 1600);
     AEFX_CLR_STRUCT(def);
@@ -781,7 +783,6 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_ADD_POPUP("Acceleration", 2, 1, "GPU|CPU", 1611);
     AEFX_CLR_STRUCT(def);
     PF_END_TOPIC(1612);
-    if(const auto motion_error=append_motion_parameters(in_data,out_data);motion_error)return motion_error;
     for(A_long slot=0;slot<kTextureResourceCapacity;++slot) {
         AEFX_CLR_STRUCT(def);
         def.flags=PF_ParamFlag_CANNOT_TIME_VARY;
@@ -937,7 +938,8 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             // These registered controls are read through callbacks in SmartFX,
             // independently of the count of parameters delivered in params[].
             core::Graph snapshot = *graph;
-            constexpr std::array<A_long, 14> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,617,618,619,620,621,622,623,624};
+            constexpr std::array<A_long, 14> indices{kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,
+                kMotionParameterIds[0],kMotionParameterIds[1],kMotionParameterIds[2],kMotionParameterIds[3],kMotionParameterIds[4],kMotionParameterIds[5],kMotionParameterIds[6],kMotionParameterIds[7]};
             constexpr std::array<core::ParameterKey, 14> keys{core::graph_keys::kTimeRemapEnabled, core::graph_keys::kTimeRemapSeconds,
                 core::graph_keys::kPreviewEnabled, core::graph_keys::kPreviewChance,core::graph_keys::kTimeSamplingHz,core::graph_keys::kAcceleration,core::ParameterKey{8},core::ParameterKey{9},core::ParameterKey{10},core::ParameterKey{11},core::ParameterKey{12},core::ParameterKey{13},core::ParameterKey{14},core::ParameterKey{15}};
             for (std::size_t i = 0; i < indices.size(); ++i) {
@@ -1120,8 +1122,9 @@ PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
             return sync_graph_from_controls(in_data, out_data, params);
         }
         const bool renderer_global = extra->param_index == kTimeRemapEnabledId || extra->param_index == kTimeRemapSecondsId ||
-            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId || extra->param_index==kTimeSamplingHzId || extra->param_index==kAccelerationId || (extra->param_index>=617 && extra->param_index<=624);
-        if(extra->param_index==617 || extra->param_index==620) {if(const auto ui_error=update_motion_ui(in_data,params);ui_error)return ui_error;}
+            extra->param_index == kPreviewEnabledId || extra->param_index == kPreviewChanceId || extra->param_index==kTimeSamplingHzId || extra->param_index==kAccelerationId ||
+            std::find(kMotionParameterIds.begin(),kMotionParameterIds.end(),extra->param_index)!=kMotionParameterIds.end();
+        if(extra->param_index==kMotionParameterIds[0] || extra->param_index==kMotionParameterIds[3]) {if(const auto ui_error=update_motion_ui(in_data,params);ui_error)return ui_error;}
         if (!is_bound_control(extra->param_index) && !renderer_global) return PF_Err_NONE;
         if ((extra->param_index == kMaxParticlesId || renderer_global) && params[kNodeEffectsReadyId] &&
             params[kNodeEffectsReadyId]->param_type == PF_Param_FLOAT_SLIDER &&

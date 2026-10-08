@@ -96,11 +96,12 @@ PF_Err append_motion_parameters(PF_InData* in,PF_OutData*) noexcept {
     group={};group.param_type=PF_Param_GROUP_END;group.uu.id=1649;return PF_ADD_PARAM(in,-1,&group);
 }
 PF_Err update_motion_ui(PF_InData* data,PF_ParamDef* params[]) noexcept {
-    if(!data || !data->pica_basicP || !params || !params[617] || !params[620])return PF_Err_BAD_CALLBACK_PARAM;
+    if(!data || !data->pica_basicP || !params || !params[kMotionParameterIds[0]] || !params[kMotionParameterIds[3]])return PF_Err_BAD_CALLBACK_PARAM;
     const PF_ParamUtilsSuite3* suite{};
     auto error=data->pica_basicP->AcquireSuite(kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3,reinterpret_cast<const void**>(&suite));
     if(error)return static_cast<PF_Err>(error);
-    const bool off=params[617]->u.pd.value==1,on=params[617]->u.pd.value==3,linear=params[620]->u.pd.value==1;
+    const bool off=params[kMotionParameterIds[0]]->u.pd.value==1,on=params[kMotionParameterIds[0]]->u.pd.value==3,
+        linear=params[kMotionParameterIds[3]]->u.pd.value==1;
     for(std::size_t i=1;i<8 && !error;++i) {
         const auto id=kMotionParameterIds[i];if(!params[id]) {error=PF_Err_BAD_CALLBACK_PARAM;break;}
         auto def=*params[id];const bool disabled=off || ((i==1 || i==2)&&!on) || (i==4&&linear) || (i==5&&!linear);

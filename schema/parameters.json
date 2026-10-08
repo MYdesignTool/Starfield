@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 28,
-  "schemaVersion": 28,
-  "revisionNote": "M3-13 build53 appends hidden texture layer resources626..753/disk1700..1827 and count754/disk1828. Existing streams/IDs remain fixed. Core ABI6; paired native/CEP build required. ADR0034.",
+  "manifestVersion": 29,
+  "schemaVersion": 29,
+  "revisionNote": "M3-14 build54 reorders only main streams610..625 by fixed disk IDs. Permanent logical parameter IDs stay unchanged; index overrides moved positions. ABI6, aliases98..609/resources626..754 stay fixed. ADR0035.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -24,25 +24,25 @@
     },
     {
       "index": 610,
+      "diskId": 1640,
+      "label": "Motion Blur",
+      "endIndex": 619,
+      "endDiskId": 1649,
+      "collapsed": true
+    },
+    {
+      "index": 620,
       "diskId": 1600,
       "label": "Simulation Settings",
-      "endIndex": 612,
+      "endIndex": 622,
       "endDiskId": 1602
     },
     {
-      "index": 613,
+      "index": 623,
       "diskId": 1610,
       "label": "GPU Rendering",
-      "endIndex": 615,
-      "endDiskId": 1612
-    },
-    {
-      "index": 616,
-      "diskId": 1640,
-      "label": "Motion Blur",
       "endIndex": 625,
-      "endDiskId": 1649,
-      "collapsed": true
+      "endDiskId": 1612
     }
   ],
   "parameters": [
@@ -1240,7 +1240,7 @@
       "id": 91,
       "diskId": 921,
       "key": "time_remap_enabled",
-      "label": "Time Remapping On / Off",
+      "label": "On / Off",
       "type": "checkbox",
       "default": 0,
       "min": 0,
@@ -1302,7 +1302,8 @@
         60,
         120
       ],
-      "note": "Simulation Settings topic at 610 and end at 612; derived inputs 98..609 unchanged."
+      "note": "Simulation Settings streams620..622; fixed disk1601; native alias inputs98..609 unchanged.",
+      "index": 621
     },
     {
       "id": 614,
@@ -1320,7 +1321,8 @@
         0,
         1
       ],
-      "note": "GPU Rendering group 613/disk 1610 and end 615/disk 1612. Acceptance depends on AE framework/device and per-frame scene eligibility."
+      "note": "GPU Rendering streams623..625/disk1610..1612. Actual device/frame qualification remains open.",
+      "index": 624
     },
     {
       "id": 617,
@@ -1339,7 +1341,8 @@
         0,
         1,
         2
-      ]
+      ],
+      "index": 611
     },
     {
       "id": 618,
@@ -1351,7 +1354,8 @@
       "animated": true,
       "min": 0,
       "max": 720,
-      "collapsed": true
+      "collapsed": true,
+      "index": 612
     },
     {
       "id": 619,
@@ -1363,7 +1367,8 @@
       "animated": true,
       "min": -720,
       "max": 720,
-      "collapsed": true
+      "collapsed": true,
+      "index": 613
     },
     {
       "id": 620,
@@ -1380,7 +1385,8 @@
       "values": [
         0,
         1
-      ]
+      ],
+      "index": 614
     },
     {
       "id": 621,
@@ -1392,7 +1398,8 @@
       "animated": true,
       "min": 2,
       "max": 64,
-      "collapsed": true
+      "collapsed": true,
+      "index": 615
     },
     {
       "id": 622,
@@ -1404,7 +1411,8 @@
       "animated": true,
       "min": 1,
       "max": 100,
-      "collapsed": true
+      "collapsed": true,
+      "index": 616
     },
     {
       "id": 623,
@@ -1416,7 +1424,8 @@
       "animated": true,
       "min": 0,
       "max": 1000,
-      "collapsed": true
+      "collapsed": true,
+      "index": 617
     },
     {
       "id": 624,
@@ -1433,12 +1442,18 @@
       "values": [
         0,
         1
-      ]
+      ],
+      "index": 618
     }
   ],
   "textureResources": {
-    "firstIndex": 626, "count": 128, "firstDiskId": 1700,
-    "countIndex": 754, "countDiskId": 1828, "type": "layer", "hidden": true,
+    "firstIndex": 626,
+    "count": 128,
+    "firstDiskId": 1700,
+    "countIndex": 754,
+    "countDiskId": 1828,
+    "type": "layer",
+    "hidden": true,
     "policy": "Sorted unique nonzero project layer IDs; UI transaction mirrors and rolls back selectors. ADR0034."
   },
   "nativeRenderBindings": {
@@ -1454,7 +1469,7 @@
   },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Manifest27 appends main indices616..625/disk1640..1649. Existing streams and IDs remain unchanged; prior main effects acquire appended defaults through AE. Native Emitter7/Particle7/Force3/Output4, Core ABI3 and sequence lifecycle are unchanged. ADR0031.",
+    "migrationPolicy": "Manifest29 permutes streams610..625 by fixed disk IDs: Motion Blur610..619, Simulation620..622, GPU623..625. Parameter id is permanent logical identity; index defaults to id and overrides moved rows. Existing saved values restore by disk ID. Other stream bounds/defaults/types/sequence/ABI6 stay fixed. Numeric-index expressions and saved AE2023 projects require host verification. ADR0035.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."
@@ -1471,8 +1486,12 @@
     ],
     "constant": true,
     "uiWidth": 304,
-    "uiHeight": 104,
+    "uiHeight": 130,
     "asset": "cep_panel/assets/starfield-presets-banner.png",
-    "extensionId": "org.starfieldfx.panel.presets"
+    "extensionId": "org.starfieldfx.panel.presets",
+    "actions": [
+      "Panel: Click To Open",
+      "Presets: Browse"
+    ]
   }
 }

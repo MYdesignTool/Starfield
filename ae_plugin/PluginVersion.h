@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 53: ABI6 Source texture resources and native/CEP authoring. AE qualification remains open.
-#define STARFIELD_VERSION_BUILD 53
-#define STARFIELD_VERSION_PACKED 32821 /* 0x8035 */
+// Build 54: main UI order/launcher migration, fixed disk IDs and unchanged ABI6.
+#define STARFIELD_VERSION_BUILD 54
+#define STARFIELD_VERSION_PACKED 32822 /* 0x8036 */

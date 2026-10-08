@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-53";
+    var GATEWAY_BUILD = "native-presets-54";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1524,6 +1524,13 @@
     var MOTION_FIELDS=["motionBlur","shutterAngle","shutterPhase","motionBlurType","motionBlurLevels","linearAccuracy","opacityBoost","motionBlurDisregard"],
         MOTION_DEFAULTS=[1,360,0,0,8,70,0,0],MOTION_MIN=[0,0,-720,0,2,1,0,0],MOTION_MAX=[2,720,720,1,64,100,1000,1];
     function motionPopup(i){return i===0 || i===3 || i===7;}
+    function timeRemapControl(effect){
+        // Fixed disk ID survives label/order changes. Old labels support older bundles.
+        var control=findEffectProperty(effect,MATCH_NAME+"-0921",true) ||
+            findEffectProperty(effect,"Time Remapping On / Off",false) || findEffectProperty(effect,"On / Off",false);
+        if(!control)throw new Error("Main Time Remapping control is missing (disk921).");
+        return control;
+    }
     function motionValue(record,i){return typeof record[MOTION_FIELDS[i]]==="undefined"?MOTION_DEFAULTS[i]:record[MOTION_FIELDS[i]];}
     function motionProperty(effect,i){
         // Disk IDs avoid the duplicate Motion Blur topic/popup display name.
@@ -1560,7 +1567,7 @@
             values = [record.maxParticles, record.position.x, record.position.y, record.timeRemapEnabled || 0,
                 record.timeRemapSeconds || 0, record.previewEnabled || 0, typeof record.previewChance === "number" ? record.previewChance : 100, ({30:1,60:2,120:3})[record.timeSamplingHz || 30], (record.acceleration || 0)+1];
         for (var i = 0; i < names.length; i++) {
-            var property = findEffectProperty(resolved.target.effect, names[i]);
+            var property = i===3 ? timeRemapControl(resolved.target.effect) : findEffectProperty(resolved.target.effect, names[i]);
             if (!property || typeof property.setValue !== "function") throw new Error("An Output control stream is missing.");
             if (!sameValue(property.value, values[i])) {
                 if (property.numKeys > 0 && typeof property.setValueAtTime === "function") property.setValueAtTime(resolved.target.comp.time,values[i]);
@@ -1579,7 +1586,7 @@
     function readRendererRecord(resolved) {
         var record = { id: "000000000000000000000000000000ff",
             maxParticles: Number(findEffectProperty(resolved.target.effect, "Max Particles").value),
-            timeRemapEnabled:Number(findEffectProperty(resolved.target.effect,"Time Remapping On / Off").value),
+            timeRemapEnabled:Number(timeRemapControl(resolved.target.effect).value),
             timeRemapSeconds:Number(findEffectProperty(resolved.target.effect,"Time (Seconds)").value),
             previewEnabled:Number(findEffectProperty(resolved.target.effect,"Preview").value),
             previewChance:Number(findEffectProperty(resolved.target.effect,"Particle chance").value),
@@ -2030,7 +2037,7 @@
             // the legacy Effect Controls streams are no longer authoritative.
             return reply({ ok: true, operation: "getFrameStatus", requestId: request.requestId || "",
                            targetToken: token, available: true, graphMode: true, timeSeconds:
-                               Number(findEffectProperty(target.effect,"Time Remapping On / Off").value) ?
+                               Number(timeRemapControl(target.effect).value) ?
                                Number(findEffectProperty(target.effect,"Time (Seconds)").value) : timeSeconds });
         }
 
