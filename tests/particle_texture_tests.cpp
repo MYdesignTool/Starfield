@@ -195,9 +195,50 @@ void projection_render_abi() {
     frames[0].pixel_float_count=UINT64_MAX;check(api.render(&abi,&result)==SF_CORE_WORK_LIMIT,"ABI byte count bounded before span");
     abi.texture_source_count=129;check(api.render(&abi,&result)==SF_CORE_WORK_LIMIT,"ABI source count bounded");
 }
+void asymmetric_orientation() {
+    // Source rows run downward: red/green at the top, blue/yellow at the bottom.
+    // A uniform source cannot detect a reflected UV axis.
+    float corners[]{1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,0,1};
+    float dark_side[]{0,1,1,1, 1,0,1,1, 1,1,1,1, .25f,.25f,.25f,1};
+    const auto render=[&](ParticleInstance p,bool camera,ParticleSpriteBasis basis={1,0,0,0,1,0,0,0,1}) {
+        auto g=evaluated();g.particles[0]=p;g.texture_styles[0].use_ratio=0;
+        g.sprite_bases.push_back(basis);
+        auto req=request(std::move(g));req.texture_sources={{7,0,4,.5,2,2,1},{8,0,4,.5,2,2,1}};
+        req.texture_frames={{7,2,2,2,8,corners},{8,2,2,2,8,dark_side}};
+        if(camera) {
+            req.camera.enabled=true;req.camera.focal_x=req.camera.focal_y=100;req.camera.near_clip=.01;
+            req.camera.layer_to_view={1,0,0,0,0,1,0,0,0,0,1,0,-16,-16,100,1};
+            req.camera.image_to_layer={1,0,0,0,1,0,0,0,1};req.camera.center_x=req.camera.center_y=16;
+        }
+        return take(CpuParticleRenderer{}.render(req,never));
+    };
+    auto p=particle();auto flat=render(p,false),camera=render(p,true);
+    const unsigned x[]{10,21,10,21},y[]{10,10,21,21};
+    for(unsigned i=0;i<4;++i)for(unsigned c=0;c<4;++c) {
+        near(pixel(flat,x[i],y[i])[c],corners[i*4+c],"flat default preserves source corners");
+        near(pixel(camera,x[i],y[i])[c],corners[i*4+c],"camera default preserves source corners");
+    }
+    for(double angle:{90.,180.,270.}) {
+        p.rotation_degrees.z=angle;flat=render(p,false);camera=render(p,true);
+        for(unsigned i=0;i<4;++i)for(unsigned c=0;c<4;++c)
+            near(pixel(camera,x[i],y[i])[c],pixel(flat,x[i],y[i])[c],"camera and flat rotation preserve the same UV axes");
+    }
+    p=particle();p.rotation_degrees.y=180;flat=render(p,false);camera=render(p,true);
+    near(pixel(camera,10,10)[0],1,"rotated back face uses mirrored dark-side top-right");
+    near(pixel(camera,10,10)[2],1,"rotated back face uses the dark-side source");
+    for(unsigned i=0;i<4;++i)for(unsigned c=0;c<4;++c)
+        near(pixel(camera,x[i],y[i])[c],pixel(flat,x[i],y[i])[c],"back face agrees between camera and flat view");
+    p=particle();p.sprite_basis_index=1;ParticleSpriteBasis reflected{-1,0,0,0,1,0,0,0,1};
+    flat=render(p,false,reflected);camera=render(p,true,reflected);
+    for(unsigned i=0;i<4;++i)for(unsigned c=0;c<4;++c)
+        near(pixel(camera,x[i],y[i])[c],pixel(flat,x[i],y[i])[c],"explicit Transform reflection remains reflected");
+    p=particle();p.anchor_y_percent=0;flat=render(p,false);camera=render(p,true);
+    for(unsigned row=0;row<32;++row)for(unsigned col=0;col<32;++col)for(unsigned c=0;c<4;++c)
+        near(pixel(camera,col,row)[c],pixel(flat,col,row)[c],"camera and flat anchors keep source row direction");
+}
 }
 int main() {
-    try {time_modes();planning_and_validation();filtering_color();wire_graph_motion();projection_render_abi();
+    try {time_modes();planning_and_validation();filtering_color();wire_graph_motion();projection_render_abi();asymmetric_orientation();
         std::printf("Particle texture: %u checks passed (Core numeric contract only).\n",checks);return 0;
     } catch(const std::exception& error) {std::printf("FAIL after %u checks: %s\n",checks,error.what());return 1;}
 }

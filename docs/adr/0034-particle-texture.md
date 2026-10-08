@@ -2,6 +2,37 @@
 
 Status: implementation in progress, 2026-10-08. Task M3-13.
 
+## Source orientation correction, 2026-10-08
+
+Native58/CEP58 was deployed at22:33 +08:00 from7861a2b. The owner now
+confirms that Comp 2 selection and texture pixels work, but the default source
+is reflected. An asymmetric four-corner source reproduces the defect in the
+Core camera path: display-space texture Y is already downward-positive, yet
+view_axis negates it again. Uniform-color render tests missed this UV defect.
+
+For Texture only, camera projection now maps that axis into downward-positive
+layer coordinates directly, and adjusts the view-space front-face winding to
+match. This restores source row/column order and flat/camera parity while
+retaining explicit rotations, Transform reflections, anchor placement and
+dark-side selection. Historic analytic primitive projection is retained.
+No parameter ID, animation binding, graph schema, snapshot or ABI7 changes.
+
+Focused source tests fail before the fix at check114, then pass4322 checks,
+including default corners, Z rotations, back source, Transform reflection and
+anchor parity. Shared Cloud regression passes2441 checks. Texture continues to
+use the CPU path with typed GPU fallback. These are numeric tests, not new AE
+qualification. Actual owner default orientation, sampling and persistence remain
+gates. Logs are under artifacts/prepared/m3-13-native58-texture-orientation/source/artifacts/.
+
+Build a CoreOnly /MT candidate from frozen7861a2b with the projection patch,
+excluding unfinished M3-16 and shared MNT edits. Every adapter-input byte hash
+must match the original native58 build: restore archive line endings only when
+the expected hash matches; never replace the fingerprint to bypass the guard.
+The candidate Core hash is B509D97495EEDF7BF23A2AC254419CEF00B69356C78AD5838D31DAA48C58F5D5.
+Six native58 AEX files and CEP58 retain their exact installed hashes. Publish
+through Deploy-TestBuild only after a fresh no-AE check, retaining the previous
+Core selector and complete native58 baseline for one-step rollback.
+
 ## Native selection transaction correction, 2026-10-08
 
 Owner native57 evidence confirms that Comp 2 now appears, but selecting it

@@ -107,9 +107,13 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         const double x=(m[0]*u+m[1]*v+m[2])/w,y=(m[3]*u+m[4]*v+m[5])/w;
         sprite.x=x*grid.scale_x;sprite.y=y*grid.scale_y;
         const auto view_axis=[&](Vec3 axis) {
-            Vec3 axis_view{axis.x,-axis.y,0};
+            // Texture axes and UV rows use the same downward-positive layer Y.
+            // Negating Y again in the camera path reflects an otherwise
+            // unrotated source. Keep the historic analytic primitive convention.
+            const double layer_y=texture?axis.y:-axis.y;
+            Vec3 axis_view{axis.x,layer_y,0};
             if(!billboard || transformed) {
-                const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,-axis.y,axis.z};
+                const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,layer_y,axis.z};
                 axis_view={};
                 for(int row=0;row<3;++row) {
                     axis_view.x+=local_axis[row]*camera.layer_to_view[row*4];
@@ -121,7 +125,8 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         };
         const auto av=view_axis(a), bv=view_axis(b);
         const Vec3 normal{av.y*bv.z-av.z*bv.y,av.z*bv.x-av.x*bv.z,av.x*bv.y-av.y*bv.x};
-        sprite.back_facing=normal.x*view[0]+normal.y*view[1]+normal.z*view[2] > 0;
+        const double facing=normal.x*view[0]+normal.y*view[1]+normal.z*view[2];
+        sprite.back_facing=texture?facing<0:facing>0;
         const auto project_axis=[&](Vec3 axis_view,double& dx,double& dy) {
             const double du=ignore_perspective?axis_view.x:camera.focal_x*(axis_view.x*view[2]-view[0]*axis_view.z)/(view[2]*view[2]);
             const double dv=ignore_perspective?axis_view.y:camera.focal_y*(axis_view.y*view[2]-view[1]*axis_view.z)/(view[2]*view[2]);

@@ -6,9 +6,9 @@
 
 | 任务 | 下一步 | 关闭条件 |
 | --- | --- | --- |
-| M3-13 Texture | 发布冻结 native58/CEP58 的选择引用修复；继续 AE2023 Source/Masks/Effects 契约 | 真实选择/时间采样/渲染、阶段依赖与撤销/重开 |
+| M3-13 Texture | native58/CEP58 选择/显示已确认；优先发布默认镜像 Core 修复，再继续 AE2023 Source/Masks/Effects 契约 | 真实方向/时间采样/渲染、阶段依赖与撤销/重开 |
 | M3-15 Cloud | native57/CEP57 作者已部署，等待参考外观与范围确认 | Circles/Aspect/Density 外观、动画、预算与宿主持久化 |
-| M3-16 Birth controls | 纯核心策略里程碑通过；接入 static/history/Auxiliary 与作者 | seed影响完整发射源、概率筛选/身份/预算、配对发布与实际 AE 验收 |
+| M3-16 Birth controls | 纯核心策略已提交；图/历史/Auxiliary 源码保留，待 M3-13 方向维护完成后继续作者接入 | seed影响完整发射源、概率筛选/身份/预算、配对发布与实际 AE 验收 |
 | M3-11 Transform | 原生/CEP 实现与 native54/panel54 配对部署已完成 | 原生/CEP 往返、带动画的 Null、不同图路径、几何、撤销/重开与 shutter 在 AE2023 验收 |
 | P-02L 节点 palette | 验收 panel54 的拖入、坐标、取消与交互 | owner 的实际 AE 外观/拖动/撤销证据 |
 | P-02K 性能 | 量测 idle、seek、多发射器及 Add/Replace | 宿主延迟/光标观察与正确性；源码调用减少不能替代计时 |

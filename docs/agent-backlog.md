@@ -42,7 +42,7 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 
 ## M3-13 — Particle Texture / Layer 采样（2026-10-08）
 
-2026-10-08 owner native57 已能列出 Comp 2；选择后在纹理源校验返回512。当前优先修复原生提交临时 PF 上下文缺失 effect_ref 时的 owner 传递，保留事务回滚；暂停安排新的行为族。拥有 NativeGraphCommit/NativeNodeGraph、focused native binding tests、version/isolated CEP pairing、ADR0034 与配对发布。build58/CEP58 候选不改变 IDs/schema/ABI7；修复后实际选择/渲染仍待 owner 验收。
+2026-10-08 native58/CEP58 已发布；owner 确认 Comp 2 可以选择并显示。当前唯一活动卡为 M3-13：修复默认 Texture 镜像。四角贴图复现相机路径额外取反 Y；Texture 投影及绕序修正后4322检查通过，共用 Cloud 回归2441通过。CoreOnly /MT 候选基于冻结7861a2b，全部 adapter 字节指纹匹配；六个 native58 AEX 与 CEP58 不变。候选待 fresh no-AE 发布、哈希/回滚和实际方向验收；八种采样/持久化及 Source/Masks/Effects 等完整 gate 继续。M3-16 工作树保留，暂缓推进，避免修复包混入未完成行为。
 
 当前完整 goal 继续；不是以已完成的 Transform/Transfer 代替剩余要求。
 拥有：Settings/ParticleTexture、Render.hpp/C ABI/快照、图求值/CPU/GPU fallback、AE texture 作者与 SmartFX checkout、CEP/资源/预设、schema/version、focused texture tests、ADR0034。
@@ -68,7 +68,7 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-16 — Particle Shift Seed / Birth Chance（2026-10-08）
 
-M3-13 native58/CEP58 修复已完成源码、构建和 focused gates，等待 AE 关闭发布；已固定7861a2b安装包，此卡不覆盖它。本卡是下一独立行为族。
+M3-13 native58/CEP58 已部署，选择/显示由 owner 确认。M3-16 纯核心策略已提交；图求值/历史/辅助发射/预算改动在工作树中保留，作者尚未接入。当前因 owner Texture 方向反馈暂缓此卡，仅推进 M3-13；其冻结维护包不包含本卡改动。
 拥有：Settings/ParticleBirth/Random、graph optional keys/registry/construction/evaluation/history、候选扫描预算和 branch identity、native Particle 控件/记录/绑定、CEP inspector/gateway/presets、node schema、构建/version、focused birth tests、ADR0037 与未来配对发布。Render.hpp、ABI7 与 snapshot7 计划保持；需要变更时先修订 ADR。
 参考：owner 参数库存默认 Shift Seed0/Birth Chance100；官方指南要求偏移同一发射源的 seed、按出生概率筛选其粒子。范围边界与精确 RNG 仍需参考确认。先完成纯核心确定性策略，随后接入静态/历史/Auxiliary 求值及 native/CEP 作者；未接入前不暴露控件、不声明完成。
 迁移：optional keys40/41；缺字段保留旧分支行为，明确作者字段启用完整发射源分支。新 native 控件追加且通过独立 hidden activation 保留旧工程。已有 purpose1..20/IDs 不重用，出生筛选新增 purpose21。
