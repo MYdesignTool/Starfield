@@ -355,3 +355,18 @@ NativeSync and TransformBinding generate the expression fixtures for the JS
 scope as described above. These are source/fake-host checks. Actual AE2023
 selected Null motion, button placement, 3D creation, undo and reopen remain
 owner qualification gates.
+
+Development publication at2026-10-08 10:46 local time: native49/Core ABI4 + CEP50
+replaces native48/CEP50 after a fresh read-only check confirmed AE closed.
+Source candidate is0253ee956ddd20079e2b082879a3ac2253f7a27c. Seven installed
+native/Core hashes and eleven unchanged CEP50 runtime source hashes were
+verified. Core selector remains StarfieldCore-575DB0A96931776E.dll; native and
+CEP Junction targets are retained. Receipts are
+artifacts/m3-11-native49-deploy-before.json and m3-11-native49-deploy-after.json.
+One-step rollback to native48/CEP50, with AE closed:
+tools/Restore-TestBuild.ps1 -PluginDir
+'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName
+'m3-11-native49-panel50-null-20261008' -Restore. Read-only rollback verification
+passes. The full command and verified before/after hashes are also recorded in
+artifacts/m3-11-native49-deployment.md. Actual AE2023 selected Null motion,
+creation/undo and reopen gates remain open pending owner observation.
