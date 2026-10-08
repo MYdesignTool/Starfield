@@ -36,6 +36,8 @@ Result<SpriteScene> prepare_sprite_scene(const RenderRequest& request, const Can
     }();
     if (!evaluated.has_value()) return R::failure(evaluated.error());
     const auto& particles=evaluated.value().particles;
+    if (std::any_of(particles.begin(), particles.end(), [](const auto& p) { return p.shape==3; }))
+        return R::failure(ErrorCode::unsupported_format, "texture particles require the CPU backend");
     const auto grid = sprite_geometry::make_grid(frame);
     double preview = 100;
     if (request.graph) for (const auto& node : request.graph->nodes) if (node.type_key == graph_keys::kOutputNode) {

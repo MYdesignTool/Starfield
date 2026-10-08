@@ -15,6 +15,7 @@ struct EvaluatedGraph {
     // of the single output execute. The snapshot and its identities stay intact.
     std::vector<NodeId> evaluated_nodes;
     std::vector<ParticleSpriteBasis> sprite_bases;
+    std::vector<ParticleTextureStyle> texture_styles;
 };
 
 // Pre-render supplies actual authored values at historical times. No host

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 52: particle transfer modes and native effect reveal.
-#define STARFIELD_VERSION_BUILD 52
-#define STARFIELD_VERSION_PACKED 32820 /* 0x8034 */
+// Build 53 candidate: ABI6 texture resources; native/CEP texture integration remains in progress.
+#define STARFIELD_VERSION_BUILD 53
+#define STARFIELD_VERSION_PACKED 32821 /* 0x8035 */

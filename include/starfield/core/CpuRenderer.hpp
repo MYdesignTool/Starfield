@@ -14,10 +14,9 @@ struct RenderLimits {
     std::uint64_t max_sprite_pixel_ops{0};
 };
 
-// Deterministic CPU reference backend for the current particle slice: particles
-// are rasterized as soft-edged discs using evaluated per-particle RGB/opacity/size
-// and composited over the optional source with premultiplied "over" (ADR 0005).
-// Depth and motion blur remain future work.
+// Deterministic CPU reference backend: analytic Circle/Rectangle/Cloud and
+// bilinear Texture sprites, premultiplied transfer modes, camera depth ordering
+// and shared Transform bases. The adapter invokes this for each shutter sample.
 class CpuParticleRenderer final : public Renderer {
 public:
     CpuParticleRenderer() = default;

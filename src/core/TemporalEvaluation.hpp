@@ -195,6 +195,7 @@ public:
            (!std::isfinite(std::get<double>(*chance)) || std::get<double>(*chance)<0 || std::get<double>(*chance)>100))
             return R::failure(ErrorCode::invalid_request,"Particle chance outside 0..100");
         EvaluatedGraph result;
+        TextureStyleMap texture_indices;
         for(const auto& [id,node]:nodes) if(active[id]) result.evaluated_nodes.push_back(id);
         const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
         std::vector<const GraphNode*> plan_nodes;
@@ -335,8 +336,11 @@ public:
                         return R::failure(ErrorCode::invalid_request,"Auxiliary percentage outside 0..100");
                 auto emitter=read_emitter(emitter_node.value());if(!emitter.has_value()) return R::failure(emitter.error());
                 auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
-                auto particle_values=read_particle(particle_node.value());if(!particle_values.has_value()) return R::failure(particle_values.error());
-                const double life=particle_values.value().lifetime_seconds,age=std::max(0.0,now-birth);
+                auto sampled_particle=read_particle(particle_node.value());if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
+                auto particle_values=sampled_particle.take_value();
+                auto retained = retain_texture_style(result, texture_indices, particle_values);
+                if (!retained.has_value()) return R::failure(retained.error());
+                const double life=particle_values.lifetime_seconds,age=std::max(0.0,now-birth);
                 if(age<life) {
                     auto appearance=particle_values;
                     Settings settings=emitter.value().value;settings.particle_lifetime_seconds=life;
@@ -360,7 +364,7 @@ public:
                     if(!auxiliary) parents.push_back({});
                     for(const auto& parent:parents) {
                         if(++work>kTemporalWorkLimit) return R::failure(ErrorCode::work_limit_exceeded,"auxiliary history work limit");
-                        auto own=settings;auto looks=appearance.value();std::uint64_t identity=slot;
+                        auto own=settings;auto looks=appearance;std::uint64_t identity=slot;
                         if(auxiliary) {
                             const double fraction=parent.age_seconds/parent.lifetime_seconds;
                             const double start=percent(kEmitLifeStart,0),end=percent(kEmitLifeEnd,1);
@@ -381,7 +385,7 @@ public:
                                 color={blend(color.x,parent.color.x,inherit),blend(color.y,parent.color.y,inherit),blend(color.z,parent.color.z,inherit)};
                             }
                         }
-                        const double actual_life=birth_lifetime(particle_values.value(),own.seed,identity);
+                        const double actual_life=birth_lifetime(particle_values,own.seed,identity);
                         if(age>=actual_life) continue;
                         own.particle_lifetime_seconds=actual_life;
                         own.gravity={};own.linear_drag=0;own.forces.clear();
@@ -397,7 +401,7 @@ public:
                         const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
                         apply_particle_style(instance,looks,own.seed);
-                        apply_particle_properties(instance,particle_values.value(),own.seed,birth_position,tf);
+                        apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));

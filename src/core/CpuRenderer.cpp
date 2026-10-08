@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+#include <map>
 
 namespace starfield::core {
 namespace {
@@ -111,6 +112,8 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     }
     const FrameSpec& frame = validated.value();
     if (!valid_camera(request.camera)) return OutputResult::failure(ErrorCode::invalid_request, "invalid camera projection");
+    const auto resources=validate_texture_resources(request.texture_sources,request.texture_frames,cancellation);
+    if (!resources.has_value()) return OutputResult::failure(resources.error());
     const RectI roi = frame.region_of_interest;
 
     RenderOutput output;
@@ -164,6 +167,19 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     }
     const auto& particles=evaluated.value().particles;
 
+    std::map<std::uint32_t,const TextureSource*> texture_sources;
+    std::map<std::pair<std::uint32_t,std::uint32_t>,const TextureFrameView*> texture_frames;
+    try {
+        for (const auto& source:request.texture_sources) texture_sources.emplace(source.resource_id,&source);
+        for (const auto& texture:request.texture_frames) texture_frames.emplace(std::pair{texture.resource_id,texture.frame_index},&texture);
+        if (!evaluated.value().texture_styles.empty()) {
+            const auto planned=plan_texture_frames(evaluated.value(),request.texture_sources,to_seconds(frame.time),cancellation);
+            if (!planned.has_value()) return OutputResult::failure(planned.error());
+            for (const auto& wanted:planned.value()) if (!texture_frames.contains({wanted.resource_id,wanted.frame_index}))
+                return OutputResult::failure(ErrorCode::invalid_request,"requested texture frame is missing");
+        }
+    } catch (const std::bad_alloc&) { return OutputResult::failure(ErrorCode::allocation_failed,"texture lookup allocation failed"); }
+
     const PixelGrid grid = make_grid(frame);
     std::uint64_t sprite_pixels = 0;
 
@@ -190,7 +206,25 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 if (unit_value(0, identity, RandomPurpose::preview_chance) * 100 >= preview_chance) continue;
             }
             Sprite sprite{};
-            if (project_sprite(particles[i], request, grid, sprite,evaluated.value().sprite_bases)) sprites.push_back(sprite);
+            const auto& particle=particles[i];
+            if (particle.shape==3) {
+                const auto& style=evaluated.value().texture_styles[particle.texture_style_index-1];
+                if (!style.front && !style.back) continue;
+                auto source=texture_sources.at(style.front?style.front:style.back);
+                const auto ratio=[&]() {return style.use_ratio ? double(source->width)*source->pixel_aspect_ratio/source->height : 0.;};
+                if (!project_sprite(particle,request,grid,sprite,evaluated.value().sprite_bases,ratio(),style.ignore_perspective!=0)) continue;
+                if (!sprite.back_facing && !style.front) continue;
+                if (sprite.back_facing && style.back && style.back!=style.front) {
+                    source=texture_sources.at(style.back);
+                    if (!project_sprite(particle,request,grid,sprite,evaluated.value().sprite_bases,ratio(),style.ignore_perspective!=0)) continue;
+                }
+                auto index=texture_frame_index(*source,style.time_mode,to_seconds(frame.time),particle.age_seconds,
+                    particle.lifetime_seconds,particle.texture_random_key);
+                if (!index.has_value()) return OutputResult::failure(index.error());
+                sprite.texture_frame=texture_frames.at({source->resource_id,index.value()});
+                sprite.texture_style=&style;
+                sprites.push_back(sprite);
+            } else if (project_sprite(particle,request,grid,sprite,evaluated.value().sprite_bases)) sprites.push_back(sprite);
         }
         if (request.camera.enabled) std::stable_sort(sprites.begin(), sprites.end(), [](const Sprite& a, const Sprite& b) {
             return a.depth > b.depth;
@@ -211,8 +245,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         }
 
         const double pixel_x = sprite.x - roi.left, pixel_y = sprite.y - roi.top;
-        const double radius_x = particle.shape==1?std::abs(sprite.ax)+std::abs(sprite.bx):std::hypot(sprite.ax,sprite.bx);
-        const double radius_y = particle.shape==1?std::abs(sprite.ay)+std::abs(sprite.by):std::hypot(sprite.ay,sprite.by);
+        const bool rectangle=particle.shape==1 || particle.shape==3;
+        const double radius_x = rectangle?std::abs(sprite.ax)+std::abs(sprite.bx):std::hypot(sprite.ax,sprite.bx);
+        const double radius_y = rectangle?std::abs(sprite.ay)+std::abs(sprite.by):std::hypot(sprite.ay,sprite.by);
         if (!(radius_x > 0.0) || !(radius_y > 0.0)) {
             continue;
         }
@@ -249,12 +284,20 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 const double dx = static_cast<double>(x) + 0.5 - pixel_x;
                 const double delta_x = (dx * sprite.by - dy * sprite.bx) / determinant;
                 const double delta_y = (dy * sprite.ax - dx * sprite.ay) / determinant;
+                if (!std::isfinite(delta_x) || !std::isfinite(delta_y)) continue;
                 const double coverage=sprite_coverage(particle,delta_x,delta_y,edge_scale);
                 if (coverage <= 0.0) {
                     continue;
                 }
 
-                const auto alpha = static_cast<float>(coverage * particle.opacity);
+                std::array<float,4> source{};
+                if (sprite.texture_frame) source=color_texture(sample_texture(*sprite.texture_frame,(delta_x+1)*.5,(delta_y+1)*.5),
+                    sprite.texture_style->color_use,{particle.color.x,particle.color.y,particle.color.z},coverage*particle.opacity);
+                else {
+                    const auto a=static_cast<float>(coverage*particle.opacity);
+                    source={static_cast<float>(particle.color.x)*a,static_cast<float>(particle.color.y)*a,static_cast<float>(particle.color.z)*a,a};
+                }
+                const auto alpha = source[3];
                 if (!(alpha > 0.0f)) {
                     continue;
                 }
@@ -263,8 +306,6 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 if (particle.transfer_mode == ParticleTransferMode::stencil) {
                     for (unsigned channel=0; channel<4; ++channel) pixel[channel] *= remaining;
                 } else {
-                    const float source[]{static_cast<float>(particle.color.x)*alpha,
-                        static_cast<float>(particle.color.y)*alpha,static_cast<float>(particle.color.z)*alpha};
                     for (unsigned channel=0; channel<3; ++channel) {
                         if (particle.transfer_mode == ParticleTransferMode::add) pixel[channel] += source[channel];
                         else if (particle.transfer_mode == ParticleTransferMode::screen)

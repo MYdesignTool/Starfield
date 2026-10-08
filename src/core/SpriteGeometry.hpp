@@ -27,6 +27,9 @@ inline PixelGrid make_grid(const FrameSpec& frame) noexcept {
 struct Sprite {
     const ParticleInstance* particle{};
     double x{}, y{}, depth{}, ax{}, ay{}, bx{}, by{};
+    bool back_facing{};
+    const TextureFrameView* texture_frame{};
+    const ParticleTextureStyle* texture_style{};
 };
 inline bool valid_camera(const RenderRequest::Camera& camera) noexcept {
     if (!camera.enabled) return true;
@@ -47,17 +50,22 @@ inline Vec3 rotate_axis(Vec3 value,Vec3 angles) noexcept {
     return value;
 }
 inline bool project_sprite(const ParticleInstance& particle, const RenderRequest& request, const PixelGrid& grid, Sprite& sprite,
-    std::span<const ParticleSpriteBasis> bases = {}) noexcept {
+    std::span<const ParticleSpriteBasis> bases = {}, double texture_ratio = 0, bool ignore_perspective = false) noexcept {
     sprite.particle=&particle;
     const double rx=particle.size_pixels*.5;
-    const double ry=particle.shape==0?rx:particle.size_y_pixels*.5;
+    const bool texture=particle.shape==3;
+    const double texture_par=texture?request.frame.pixel_aspect_ratio:1;
+    const double physical_rx=rx*texture_par;
+    const double ry=texture && texture_ratio>0 ? physical_rx/texture_ratio : particle.shape==0?rx:particle.size_y_pixels*.5;
     if(!(rx>0) || !(ry>0) || !(particle.opacity>0)) return false;
-    const bool billboard=particle.shape!=1 || particle.limit_to_2d;
-    Vec3 a{rx,0,0},b{0,ry,0};
+    const bool billboard=(particle.shape!=1 && particle.shape!=3) || particle.limit_to_2d;
+    // Texture axes rotate in physical pixel units. Convert X back to layer
+    // pixels at projection, so source PAR is preserved on anamorphic outputs.
+    Vec3 a{physical_rx,0,0},b{0,ry,0};
     Vec3 angles=particle.rotation_degrees;
     if(billboard) angles.x=angles.y=0;
-    else if(particle.up_axis==0) {a={0,0,rx};b={0,ry,0};}
-    else if(particle.up_axis==1) {a={rx,0,0};b={0,0,ry};}
+    else if(particle.up_axis==0) {a={0,0,physical_rx};b={0,ry,0};}
+    else if(particle.up_axis==1) {a={physical_rx,0,0};b={0,0,ry};}
     a=rotate_axis(a,angles);b=rotate_axis(b,angles);
     const bool transformed=particle.sprite_basis_index!=0;
     if(transformed) {
@@ -76,8 +84,9 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
     if(!request.camera.enabled) {
         sprite.x=(.5+particle.position.x/grid.aspect)*grid.frame_width;
         sprite.y=(.5-particle.position.y)*grid.frame_height;
-        sprite.ax=a.x*grid.scale_x;sprite.ay=a.y*grid.scale_y;
-        sprite.bx=b.x*grid.scale_x;sprite.by=b.y*grid.scale_y;
+        sprite.ax=a.x/texture_par*grid.scale_x;sprite.ay=a.y*grid.scale_y;
+        sprite.bx=b.x/texture_par*grid.scale_x;sprite.by=b.y*grid.scale_y;
+        sprite.back_facing = a.x*b.y-a.y*b.x < 0;
     } else {
         const auto& camera=request.camera;const auto& frame=request.frame;
         const double local[4]{frame.layer_width*.5+particle.position.x*frame.layer_height/frame.pixel_aspect_ratio,
@@ -90,21 +99,29 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         if(!std::isfinite(w) || std::abs(w)<1e-12) return false;
         const double x=(m[0]*u+m[1]*v+m[2])/w,y=(m[3]*u+m[4]*v+m[5])/w;
         sprite.x=x*grid.scale_x;sprite.y=y*grid.scale_y;
-        const auto project_axis=[&](Vec3 axis,double& dx,double& dy) {
-            double axis_view[3]{axis.x,-axis.y,0};
+        const auto view_axis=[&](Vec3 axis) {
+            Vec3 axis_view{axis.x,-axis.y,0};
             if(!billboard || transformed) {
                 const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,-axis.y,axis.z};
-                for(int col=0;col<3;++col) {
-                    axis_view[col]=0;
-                    for(int row=0;row<3;++row) axis_view[col]+=local_axis[row]*camera.layer_to_view[row*4+col];
+                axis_view={};
+                for(int row=0;row<3;++row) {
+                    axis_view.x+=local_axis[row]*camera.layer_to_view[row*4];
+                    axis_view.y+=local_axis[row]*camera.layer_to_view[row*4+1];
+                    axis_view.z+=local_axis[row]*camera.layer_to_view[row*4+2];
                 }
             }
-            const double du=camera.focal_x*(axis_view[0]*view[2]-view[0]*axis_view[2])/(view[2]*view[2]);
-            const double dv=camera.focal_y*(axis_view[1]*view[2]-view[1]*axis_view[2])/(view[2]*view[2]);
+            return axis_view;
+        };
+        const auto av=view_axis(a), bv=view_axis(b);
+        const Vec3 normal{av.y*bv.z-av.z*bv.y,av.z*bv.x-av.x*bv.z,av.x*bv.y-av.y*bv.x};
+        sprite.back_facing=normal.x*view[0]+normal.y*view[1]+normal.z*view[2] > 0;
+        const auto project_axis=[&](Vec3 axis_view,double& dx,double& dy) {
+            const double du=ignore_perspective?axis_view.x:camera.focal_x*(axis_view.x*view[2]-view[0]*axis_view.z)/(view[2]*view[2]);
+            const double dv=ignore_perspective?axis_view.y:camera.focal_y*(axis_view.y*view[2]-view[1]*axis_view.z)/(view[2]*view[2]);
             dx=((m[0]-x*m[6])*du+(m[1]-x*m[7])*dv)/w*grid.scale_x;
             dy=((m[3]-y*m[6])*du+(m[4]-y*m[7])*dv)/w*grid.scale_y;
         };
-        project_axis(a,sprite.ax,sprite.ay);project_axis(b,sprite.bx,sprite.by);
+        project_axis(av,sprite.ax,sprite.ay);project_axis(bv,sprite.bx,sprite.by);
     }
     const double anchor_x=1-particle.anchor_x_percent/50,anchor_y=particle.anchor_y_percent/50-1;
     sprite.x+=sprite.ax*anchor_x+sprite.bx*anchor_y;
@@ -119,7 +136,7 @@ inline double sprite_coverage(const ParticleInstance& particle,double x,double y
         const double aa=std::clamp(.5+(1-distance)*scale,0.0,1.0);
         return aa*(feather>0?std::clamp((1-distance)/feather,0.0,1.0):1);
     };
-    if(particle.shape==1) return circle(std::max(std::abs(x),std::abs(y)),edge_scale);
+    if(particle.shape==1 || particle.shape==3) return circle(std::max(std::abs(x),std::abs(y)),edge_scale);
     if(particle.shape==0) return circle(std::hypot(x,y),edge_scale);
     // A deterministic five-circle cluster. All lobes remain inside the sprite
     // bounds, so ROI/work accounting and future GPU parity use the same extent.

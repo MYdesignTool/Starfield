@@ -16,10 +16,18 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
     if(!std::isfinite(first_clock) || !std::isfinite(last_clock) ||
        !std::isfinite(amount) || amount<0 || amount>1 || limit>kMaxParticleCount ||
        first.particles.size()>kMaxParticleCount || last.particles.size()>kMaxParticleCount ||
-       first.sprite_bases.size()>kMaxParticleSpriteBases || last.sprite_bases.size()>kMaxParticleSpriteBases)
+       first.sprite_bases.size()>kMaxParticleSpriteBases || last.sprite_bases.size()>kMaxParticleSpriteBases ||
+       first.texture_styles.size()>kMaxTextureStyles || last.texture_styles.size()>kMaxTextureStyles)
         return R::failure(ErrorCode::invalid_request,"invalid motion interpolation input");
     for(const auto* endpoint:{&first,&last})for(const auto& basis:endpoint->sprite_bases)
         if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid motion sprite basis");
+    for(const auto* endpoint:{&first,&last}) {
+        for(const auto& style:endpoint->texture_styles) if(!valid_texture_style(style))
+            return R::failure(ErrorCode::invalid_request,"invalid motion texture style");
+        for(const auto& p:endpoint->particles) if(p.texture_style_index>endpoint->texture_styles.size() ||
+            (p.shape==3 ? !p.texture_style_index : p.texture_style_index!=0) || p.texture_random_key>0xffffffu)
+            return R::failure(ErrorCode::invalid_request,"missing motion texture style");
+    }
     using Identity=std::pair<NodeId,std::uint64_t>;
     std::map<Identity,std::pair<const ParticleInstance*,const ParticleInstance*>> pairs;
     std::size_t visited=0;
@@ -43,6 +51,7 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
     // An index is meaningful only with its endpoint table. Remap each pair once,
     // including one-endpoint births/deaths, instead of copying matrices per slot.
     std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> basis_pairs;
+    std::map<std::pair<bool,std::uint32_t>,std::uint32_t> texture_indices;
     constexpr auto absent=std::numeric_limits<std::uint32_t>::max();
     constexpr ParticleSpriteBasis identity_basis{1,0,0,0,1,0,0,0,1};
     const auto basis_at=[&](const EvaluatedGraph& graph,std::uint32_t at)->const ParticleSpriteBasis& {
@@ -69,6 +78,18 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
             p.position.x+=p.velocity.x*dt;p.position.y+=p.velocity.y*dt;p.position.z+=p.velocity.z*dt;
         }
         if(p.age_seconds>=0 && p.age_seconds<p.lifetime_seconds) {
+            if(p.shape==3) {
+                const auto key=std::pair{a!=nullptr,p.texture_style_index};
+                auto found=texture_indices.find(key);
+                if(found==texture_indices.end()) {
+                    if(output.texture_styles.size()==kMaxTextureStyles)
+                        return R::failure(ErrorCode::work_limit_exceeded,"motion texture styles exceed budget");
+                    const auto& source=a?first:last;
+                    output.texture_styles.push_back(source.texture_styles[p.texture_style_index-1]);
+                    found=texture_indices.emplace(key,static_cast<std::uint32_t>(output.texture_styles.size())).first;
+                }
+                p.texture_style_index=found->second;
+            }
             if((a && a->sprite_basis_index) || (b && b->sprite_basis_index)) {
                 const auto key=std::pair{a?a->sprite_basis_index:absent,b?b->sprite_basis_index:absent};
                 auto found=basis_pairs.find(key);

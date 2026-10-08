@@ -484,6 +484,19 @@
       "Draw"
     ]
   },
+  "textureRender": {
+    "adr": "0034-particle-texture",
+    "candidateBuild": 53,
+    "coreAbi": 6,
+    "snapshotVersion": 6,
+    "shape": 3,
+    "optionalGraphKeys": {"front": 31, "back": 32, "timeMode": 33, "colorUse": 34, "useRatio": 35, "ignorePerspective": 36},
+    "timeModes": ["Current Time", "Play Once", "Loop", "Stretch", "Random Still Frame", "Random Once", "Random Loop", "Freeze Frame"],
+    "colorUse": ["Default", "Alpha", "Lightness"],
+    "freezeFrame": "Source image at each particle's birth: render time minus particle age, clamped to the clip frame grid.",
+    "nativeAuthoring": "In progress; the Core milestone does not add native/CEP texture menus or layer checkouts. Existing native disk IDs, streams, binding records and Particle schema7 remain unchanged at this checkpoint.",
+    "backend": "CPU; Texture scenes return typed unsupported_format from GPU scene preparation for per-frame fallback."
+  },
   "editorCatalog": "schema/editor-presets.json: 20 independently authored curve profiles, 19 gradient palettes; native modal chooser at each editor Presets button, no vendor folder structure.",
   "transformBinding": {
     "kind": 4,

@@ -92,6 +92,30 @@ core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderReques
     request.camera.center_x = input.center_x;
     request.camera.center_y = input.center_y;
     request.camera.near_clip = input.near_clip;
+    if (input.texture_source_count > core::kMaxTextureSources || input.texture_frame_count > core::kMaxTextureFrames)
+        return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded, "texture ABI count exceeded");
+    if ((input.texture_source_count && !input.texture_sources) || (input.texture_frame_count && !input.texture_frames))
+        return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request, "texture ABI array is missing");
+    request.texture_sources.reserve(input.texture_source_count);
+    for (std::uint32_t i = 0; i < input.texture_source_count; ++i) {
+        const auto& s = input.texture_sources[i];
+        if (s.struct_size != sizeof(SfTextureSource))
+            return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request, "texture source ABI size mismatch");
+        request.texture_sources.push_back({s.resource_id, s.start_seconds, s.end_seconds, s.frame_seconds,
+            s.width, s.height, s.pixel_aspect_ratio});
+    }
+    request.texture_frames.reserve(input.texture_frame_count);
+    std::uint64_t texture_bytes = 0;
+    for (std::uint32_t i = 0; i < input.texture_frame_count; ++i) {
+        const auto& f = input.texture_frames[i];
+        if (f.struct_size != sizeof(SfTextureFrame) || !f.pixels || f.pixel_float_count > SIZE_MAX)
+            return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request, "texture frame ABI layout mismatch");
+        if (f.pixel_float_count > (core::kMaxTextureBytes - texture_bytes) / sizeof(float))
+            return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded, "texture ABI byte budget exceeded");
+        texture_bytes += f.pixel_float_count * sizeof(float);
+        request.texture_frames.push_back({f.resource_id, f.frame_index, f.width, f.height, f.row_floats,
+            {f.pixels, static_cast<std::size_t>(f.pixel_float_count)}});
+    }
     return core::Result<core::RenderRequest>::success(std::move(request));
 }
 

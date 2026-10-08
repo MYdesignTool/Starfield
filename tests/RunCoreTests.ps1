@@ -56,6 +56,7 @@ try {
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',
         'src\core\ParticleTransform.cpp',
+        'src\core\ParticleTexture.cpp',
         'src\core\PluginApi.cpp',
         'src\core\CpuRenderer.cpp',
         'src\core\SpriteScene.cpp'

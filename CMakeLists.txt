@@ -11,6 +11,7 @@ add_library(starfield_core STATIC
     src/core/EmitterHistory.cpp
     src/core/ParticleSimulation.cpp
     src/core/ParticleTransform.cpp
+    src/core/ParticleTexture.cpp
     src/core/Random.cpp
     src/core/Render.cpp
     src/core/SequenceCodec.cpp
@@ -44,6 +45,9 @@ endif()
 # ae_plugin/BuildWindows.ps1, which also runs the SDK's PiPL tool.
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(starfield_particle_texture_tests tests/particle_texture_tests.cpp src/core/PluginApi.cpp)
+    target_link_libraries(starfield_particle_texture_tests PRIVATE starfield_core)
+    add_test(NAME starfield_particle_texture_tests COMMAND starfield_particle_texture_tests)
     add_executable(starfield_core_tests tests/core_tests.cpp)
     target_sources(starfield_core_tests PRIVATE src/core/PluginApi.cpp)
     target_link_libraries(starfield_core_tests PRIVATE starfield_core)

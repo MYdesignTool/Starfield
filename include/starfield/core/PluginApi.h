@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 5u
+#define SF_CORE_ABI_VERSION 6u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -47,6 +47,18 @@ typedef struct SfCoreFrame {
     double pixel_aspect_ratio;
 } SfCoreFrame;
 
+typedef struct SfTextureSource {
+    uint32_t struct_size, resource_id;
+    double start_seconds, end_seconds, frame_seconds;
+    uint32_t width, height;
+    double pixel_aspect_ratio;
+} SfTextureSource;
+typedef struct SfTextureFrame {
+    uint32_t struct_size, resource_id, frame_index, width, height, row_floats;
+    const float* pixels; /* caller-owned numeric staging, never an AE world */
+    uint64_t pixel_float_count;
+} SfTextureFrame;
+
 /* The graph bytes and callback context are caller-owned during this call only.
  * pixel_format: 0=RGBA8, 1=RGBA16, 2=RGBA32F. Other enum fields follow the
  * values in Render.hpp; unknown values are rejected by the DLL. */
@@ -62,6 +74,9 @@ typedef struct SfCoreRenderRequest {
     double layer_to_view[16];
     double image_to_layer[9];
     double focal_x, focal_y, center_x, center_y, near_clip;
+    uint32_t texture_source_count, texture_frame_count;
+    const SfTextureSource* texture_sources;
+    const SfTextureFrame* texture_frames;
 } SfCoreRenderRequest;
 
 /* pixels and opaque_handle are owned by this DLL generation. The adapter copies

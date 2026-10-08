@@ -275,6 +275,8 @@ inline constexpr ParameterKey kParticleAngles{18}, kAngleRandom{19}, kRotationSp
 inline constexpr ParameterKey kLimitTo2D{22}, kParticleFeather{23}, kUpAxis{24};
 inline constexpr ParameterKey kRandomLimit{25}, kLimitAngle{26}, kRotationOverLife{27}, kAnchorX{28}, kAnchorY{29};
 inline constexpr ParameterKey kParticleTransferMode{30};
+inline constexpr ParameterKey kTextureFront{31}, kTextureBack{32}, kTextureTimeMode{33}, kTextureColorUse{34};
+inline constexpr ParameterKey kTextureUseRatio{35}, kTextureIgnorePerspective{36};
 inline constexpr ParameterKey kEmitterOrient{32}; // Emitter direction, distinct from shape angles.
 inline constexpr ParameterKey kAcceleration{6}; // Output: 0 GPU / 1 CPU
 inline constexpr ParameterKey kTimeSamplingHz{7};

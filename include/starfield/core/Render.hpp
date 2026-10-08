@@ -3,6 +3,7 @@
 #include "starfield/core/Error.hpp"
 #include "starfield/core/Settings.hpp"
 #include "starfield/core/Time.hpp"
+#include "starfield/core/ParticleTexture.hpp"
 
 #include <cstddef>
 #include <array>
@@ -173,6 +174,9 @@ struct RenderRequest {
         double center_x{0.0}, center_y{0.0};
         double near_clip{0.01};
     } camera;
+    // Caller-owned immutable numeric staging, valid for the duration of render.
+    std::vector<TextureSource> texture_sources;
+    std::vector<TextureFrameView> texture_frames;
 };
 
 struct RenderOutput {

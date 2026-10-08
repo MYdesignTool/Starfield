@@ -55,7 +55,28 @@ struct ParticleValues {
     std::uint32_t random_limit{};
     double limit_angle{},anchor_x{50},anchor_y{50};
     AgeCurve rotation_curve{};
+    ParticleTextureStyle texture;
+    std::uint32_t texture_style_index{};
 };
+
+using TextureStyleMap = std::map<std::array<std::uint32_t, 6>, std::uint32_t>;
+Result<std::uint32_t> retain_texture_style(EvaluatedGraph& graph, TextureStyleMap& indices, ParticleValues& values) {
+    using R = Result<std::uint32_t>;
+    if (values.shape != 3) return R::success(0);
+    const auto& s = values.texture;
+    const std::array key{s.front, s.back, static_cast<std::uint32_t>(s.time_mode),
+        static_cast<std::uint32_t>(s.color_use), s.use_ratio, s.ignore_perspective};
+    auto found = indices.find(key);
+    if (found != indices.end()) values.texture_style_index = found->second;
+    else {
+        if (graph.texture_styles.size() >= kMaxTextureStyles)
+            return R::failure(ErrorCode::work_limit_exceeded, "texture style budget exceeded");
+        graph.texture_styles.push_back(s);
+        values.texture_style_index = static_cast<std::uint32_t>(graph.texture_styles.size());
+        indices.emplace(key, values.texture_style_index);
+    }
+    return R::success(values.texture_style_index);
+}
 
 constexpr std::uint64_t kMaxBranchTraversalWork = 16'777'216;
 
@@ -243,10 +264,19 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
         std::uint32_t limit=0;
         if(!scalar(kLifeRandom,100,result.life_random_percent) || !scalar(kSizeY,100000,result.size_y) ||
            !scalar(kParticleFeather,100,result.feather_percent) || !scalar(kAngleRandom,100,result.angle_random_percent) ||
-           !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,2,result.shape) ||
+           !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,3,result.shape) ||
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
+        std::uint32_t texture_time = 0, texture_color = 0;
+        if (!enumeration(kTextureFront, UINT32_MAX, result.texture.front) ||
+            !enumeration(kTextureBack, UINT32_MAX, result.texture.back) ||
+            !enumeration(kTextureTimeMode, 7, texture_time) || !enumeration(kTextureColorUse, 2, texture_color) ||
+            !enumeration(kTextureUseRatio, 1, result.texture.use_ratio) ||
+            !enumeration(kTextureIgnorePerspective, 1, result.texture.ignore_perspective))
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request, "invalid texture property");
+        result.texture.time_mode = static_cast<TextureTimeMode>(texture_time);
+        result.texture.color_use = static_cast<TextureColorUse>(texture_color);
         if(!scalar(kAnchorX,100,result.anchor_x) || !scalar(kAnchorY,100,result.anchor_y) ||
            !enumeration(kRandomLimit,4,result.random_limit) || !enumeration(kParticleTransferMode,3,result.transfer_mode))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle anchor/random limit outside bounds");
@@ -272,6 +302,12 @@ void apply_particle_properties(ParticleInstance& particle,const ParticleValues& 
     std::uint32_t seed,Vec3 birth_position,const CompiledParticleTransform* transform = nullptr) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
     particle.transfer_mode=static_cast<ParticleTransferMode>(values.transfer_mode);
+    particle.texture_style_index = values.texture_style_index;
+    if (values.shape == 3) {
+        auto identity = particle.id;
+        for (auto byte : particle.emitter_id.value.bytes) identity = mix64(identity ^ byte);
+        particle.texture_random_key = static_cast<std::uint32_t>(stream_bits(seed, identity, RandomPurpose::particle_texture) >> 40);
+    }
     particle.feather_percent=values.feather_percent;
     particle.anchor_x_percent=values.anchor_x;particle.anchor_y_percent=values.anchor_y;
     particle.size_y_pixels=values.size_start>0?particle.size_pixels*values.size_y/values.size_start:0;
@@ -490,6 +526,11 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             return R::failure(ErrorCode::invalid_request, "graph cannot be evaluated in dependency order");
         }
         EvaluatedGraph result;
+        TextureStyleMap texture_indices;
+        for (auto index : active_particles) {
+            auto retained = retain_texture_style(result, texture_indices, *particles[index]);
+            if (!retained.has_value()) return R::failure(retained.error());
+        }
         result.evaluated_nodes.reserve(active_count);
         for (const std::size_t index : topological_order) result.evaluated_nodes.push_back(nodes[index]->id);
         const bool has_transforms=std::any_of(transforms.begin(),transforms.end(),[](const auto& value){return value.has_value();});

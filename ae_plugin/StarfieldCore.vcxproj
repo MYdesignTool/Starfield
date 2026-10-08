@@ -45,6 +45,7 @@
     <ClCompile Include="..\src\core\EmitterHistory.cpp" />
     <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
     <ClCompile Include="..\src\core\ParticleTransform.cpp" />
+    <ClCompile Include="..\src\core\ParticleTexture.cpp" />
     <ClCompile Include="..\src\core\PluginApi.cpp" />
     <ClCompile Include="..\src\core\Random.cpp" />
     <ClCompile Include="..\src\core\Render.cpp" />

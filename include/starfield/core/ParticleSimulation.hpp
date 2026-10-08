@@ -22,7 +22,7 @@ struct ParticleInstance {
     double lifetime_seconds{0.0};
     double size_pixels{0.0};
     double opacity{0.0};
-    std::uint32_t shape{0}; // Circle / Rectangle / Cloud
+    std::uint32_t shape{0}; // Circle / Rectangle / Cloud / Texture
     double size_y_pixels{0.0}; // 0 means use diameter in standalone settings
     Vec3 rotation_degrees{};
     double feather_percent{0};
@@ -36,6 +36,8 @@ struct ParticleInstance {
     // EvaluatedGraph's shared table; never copy nine doubles per particle.
     std::uint32_t sprite_basis_index{0};
     ParticleTransferMode transfer_mode{ParticleTransferMode::normal};
+    // 1-based shared style index; zero is reserved for non-texture particles.
+    std::uint32_t texture_style_index{}, texture_random_key{};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

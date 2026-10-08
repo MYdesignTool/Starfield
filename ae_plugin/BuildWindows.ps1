@@ -93,6 +93,7 @@ $adapterInputs = @(
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
     'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
     'src\core\ParticleSimulation.cpp', 'src\core\ParticleTransform.cpp', 'src\core\Random.cpp',
+    'src\core\ParticleTexture.cpp', 'include\starfield\core\ParticleTexture.hpp',
     'src\core\SequenceCodec.cpp', 'src\core\Settings.cpp', 'src\core\Time.cpp'
 )
 $adapterFingerprint = ($adapterInputs | ForEach-Object {

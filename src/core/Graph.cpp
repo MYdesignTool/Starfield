@@ -582,6 +582,12 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kAnchorX, ParameterKind::float64, false},
         ParameterDescriptor{kAnchorY, ParameterKind::float64, false},
         ParameterDescriptor{kParticleTransferMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureFront, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureBack, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureTimeMode, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureColorUse, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureUseRatio, ParameterKind::uint32, false},
+        ParameterDescriptor{kTextureIgnorePerspective, ParameterKind::uint32, false},
 
     };
 
