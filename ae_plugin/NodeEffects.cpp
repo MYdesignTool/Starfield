@@ -492,6 +492,7 @@ PF_Err setup_model(PF_InData* data,PF_OutData* output) noexcept {
     auto error=starfield::adapter::register_model_author_controls(data);if(error)return error;
     error=add_node_record(data,Kind::model);if(error)return error;
     error=add_node_identity(data);if(error)return error;
+    error=starfield::adapter::register_model_author_bounds(data);if(error)return error;
     output->num_params=parameter_count(Kind::model);
     return PF_Err_NONE;
 }

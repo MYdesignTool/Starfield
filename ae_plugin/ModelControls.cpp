@@ -90,6 +90,18 @@ PF_Err register_model_author_controls(PF_InData* data) noexcept {
     return PF_Err_NONE;
 }
 
+PF_Err register_model_author_bounds(PF_InData* data) noexcept {
+    if(!data||!data->inter.add_param)return PF_Err_BAD_CALLBACK_PARAM;
+    constexpr const char* names[]{"Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"};
+    for(int axis=0;axis<6;++axis){PF_ParamDef def{};def.param_type=PF_Param_FLOAT_SLIDER;def.flags=constant;def.ui_flags=invisible;
+        def.uu.id=layout::author_bounds_disk_id(layout::author_bounds_first+axis);
+        std::snprintf(def.name,sizeof(def.name),"%s",names[axis]);
+        def.u.fs_d.valid_min=def.u.fs_d.slider_min=-1e9f;def.u.fs_d.valid_max=def.u.fs_d.slider_max=1e9f;
+        def.u.fs_d.value=def.u.fs_d.dephault=axis<3?-.5:.5;def.u.fs_d.precision=PF_Precision_HUNDREDTHS;
+        const auto error=PF_ADD_PARAM(data,-1,&def);if(error)return error;}
+    return PF_Err_NONE;
+}
+
 core::Result<ModelAuthorCapture> capture_model_author_controls(PF_InData* data,
     std::span<PF_ParamDef* const> params,const core::Cancellation& cancellation) noexcept {
     using R=core::Result<ModelAuthorCapture>;
@@ -155,11 +167,12 @@ core::Result<core::GraphNode> model_author_graph_node(core::NodeId id,const Mode
 }
 
 PF_Err prepare_model_obj_parameter(PF_InData* data,std::string_view text,PF_ArbitraryH* output,
-    const core::Cancellation& cancellation) noexcept {
+    const core::Cancellation& cancellation,core::ModelBounds* bounds) noexcept {
     if(!output)return PF_Err_BAD_CALLBACK_PARAM;
     *output=nullptr;
     auto parsed=core::parse_model_obj(text,cancellation);
     if(!parsed.has_value())return host_error(parsed.error());
-    return create_model_geometry_parameter(data,parsed.value(),output,cancellation);
+    const auto error=create_model_geometry_parameter(data,parsed.value(),output,cancellation);
+    if(!error&&bounds)*bounds=parsed.value().bounds;return error;
 }
 }

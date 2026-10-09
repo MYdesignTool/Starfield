@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+作者边界追加候选：streams95..100/disks1519..1524，总101，metadata19..94和binding7 synthetic bounds19..24保持。导入十项保存/读回/逆序恢复；标准/ASAN原生模块各3040、导入事务各1559通过。隔离CEP作者74项、旧Texture80/Cloud49/Birth51及完整gateway事务通过；Model拖放/模型端口/普通参数记录/parked OBJ切换已接入候选patch。工具Prepare-ModelPanelCandidate只在artifacts复制和应用候选，不改live CEP。完整SDK冻结检查待记录；资源预设传输/复制/恢复及Particle菜单继续，未部署、实际AE gate开放。
+
 当前活动实现卡切换为M3-17；M3-16已部署并等待owner宿主验收，M3-13添加/背面报错反馈优先。完整目标不缩减。
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
 MotionBlur.hpp的Model style验证/组索引迁移/线性矩阵采样属于M3-17渲染契约，保留旧形状的快门行为；语义先行记录于ADR0038。

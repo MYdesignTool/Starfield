@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "status": "Unpublished Model author candidate; portable mesh preset transport pending",
+  "basePanel": 61,
+  "files": [
+    {
+      "path": "index.html",
+      "normalizedSha256": "2627895EB5BFFD70BF6743677FFDE6B5396C28A2C8BF9CD768239CAF50A5A40C"
+    },
+    {
+      "path": "css/panel.css",
+      "normalizedSha256": "2CC3633C239727324B1A4E1CE35202A2C05B1C4D1EEFC4B919FB044A14F6552D"
+    },
+    {
+      "path": "js/graph_edits.js",
+      "normalizedSha256": "8649C2A7A17B4FDA659F7D85E253A93FE6B09C41915938A4AE340EE40AB55A0A"
+    },
+    {
+      "path": "js/native_graph_snapshot.js",
+      "normalizedSha256": "C62CAEC11B865A01E9E053D0B278AFBDA73295CEDB31DC22F67F32C93DED2D19"
+    },
+    {
+      "path": "js/graph_view.js",
+      "normalizedSha256": "16CCD21B6226C171340097E373F68637742500EB948B044DAB1E9617644B8330"
+    },
+    {
+      "path": "js/node_palette.js",
+      "normalizedSha256": "12C25EE07FBA3810ED37586ED0FC30B3075E5B854A62B0D5DAF954E11117524F"
+    },
+    {
+      "path": "js/panel.js",
+      "normalizedSha256": "CE33E8D2124A9BC7D9ACDF90A92792AAB73C54DE061FC7CF025265CCC5A15336"
+    },
+    {
+      "path": "js/graph_transactions.js",
+      "normalizedSha256": "8478106C8D9FB872A8F0601A319A4BC8F2CC07320C9EE77C6A5D57DB986FCBA7"
+    },
+    {
+      "path": "jsx/starfield_gateway.jsx",
+      "normalizedSha256": "1226DD4907B0DD4693698F7B927EE5DB7D110705E996016179B6C8CC800E7C7B"
+    }
+  ]
+}

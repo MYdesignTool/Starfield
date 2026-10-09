@@ -6,6 +6,10 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+Model作者边界候选追加六项常量stream95..100/disk1519..1524，总101；导入与失败恢复同时处理Mesh/Revision/Source/bounds。UI编译核对SFMG1与边界，六项physical controls不写入binding7，回放仍用synthetic19..24。标准/ASAN原生模块各3040项，导入事务各1559项通过（均含复用452控件项）；日志artifacts/m3-17-model-author-bounds-{native-tests,native-asan,import-tests,import-asan}.log。首次检查发现physical95误记录为binding字段，已修复并补六项边界不一致拒绝检查；完整冻结SDK检查待下阶段记录。
+
+隔离CEP Model作者支持默认cube、Model输出1/Particle模型输入3、属性向量分量、原生普通参数读取和保留parked mesh的Cube/OBJ切换。74项作者检查、Texture80/Cloud49/Birth51与完整既有gateway事务回归通过；候选位于artifacts/prepared/m3-17-model-panel62-reproduced/cep_panel，未替换安装面板。tools/Prepare-ModelPanelCandidate.ps1默认报告，-Prepare在artifacts内复制已核对的CEP61基线并应用tools/candidates/model-panel-author.patch；不写live CEP。基线包含已有未提交面板维护，脚本以规范化文本哈希严格核对，其他checkout须先取得相同基线。下一步完成网格本体的有界预设导出/导入、复制/回滚及Particle Model菜单；现有native60/CEP61保持。
+
 导入源码da76183c82f9584367561e2742f0ac76c411e397冻结于artifacts/prepared/m3-17-model-import-da76183/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，包含ModelImportUI的Windows对话框与实际NodeEffects按钮路由。日志artifacts/m3-17-model-import-build.log，八输出/十八安装哈希m3-17-model-import-{build,installed}-hashes.json，安装native60/CEP61、0不匹配。此候选未部署，继续Particle Model菜单/隔离CEP和预设。
 
 原生OBJ导入候选接入Import OBJ按钮：AE所属Windows对话框、有界文件读入、网格准备、guard94下Mesh/Revision/Source写入与读回、图提交和失败恢复。标准/ASAN导入事务夹具各1019项通过（含复用452控件项），包括每项部分写失败、silent setter、图提交失败和恢复失败诊断；原生模块/binding2809复查通过。日志artifacts/m3-17-model-import-transaction-{tests,asan}.log和m3-17-model-import-native-binding-tests.log。完整SDK证据见上条；文件对话框/实际撤销和重开尚未在AE验收。下一步Particle Model菜单、隔离CEP/预设作者；安装native60/CEP61保持。

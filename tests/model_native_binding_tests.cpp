@@ -73,7 +73,7 @@ void registration_module(PF_InData& data){
     PF_OutData output{};
     CHECK(EffectMain(PF_Cmd_GLOBAL_SETUP,&data,&output,nullptr,nullptr,nullptr)==PF_Err_NONE);
     CHECK(output.my_version==STARFIELD_VERSION_PACKED&&output.out_flags==STARFIELD_NODE_OUT_FLAGS&&output.out_flags2==STARFIELD_NODE_OUT_FLAGS2);
-    CHECK(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&output,nullptr,nullptr,nullptr)==PF_Err_NONE&&output.num_params==95&&registered.size()==94);
+    CHECK(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&output,nullptr,nullptr,nullptr)==PF_Err_NONE&&output.num_params==101&&registered.size()==100);
     CHECK(registered[18].uu.id==adapter::native_nodes::disk_ids::kLayoutXId&&!std::strcmp(registered[18].name,"Node Layout X"));
     CHECK(registered[85].uu.id==adapter::native_nodes::uuid_id(0)&&!std::strcmp(registered[85].name,"Node UUID 0"));
     CHECK(registered[93].uu.id==adapter::native_nodes::disk_ids::kSyncGuardId);
@@ -82,7 +82,10 @@ void registration_module(PF_InData& data){
     CHECK(EffectMain(PF_Cmd_ARBITRARY_CALLBACK,&data,&output,nullptr,nullptr,&call)==PF_Err_NONE&&created);
     auto restored=take(adapter::read_model_geometry_parameter(&data,created,never));CHECK(restored.positions.size()==8&&restored.triangles.size()==12);
     call.id=1504;created=nullptr;CHECK(EffectMain(PF_Cmd_ARBITRARY_CALLBACK,&data,&output,nullptr,nullptr,&call)==PF_Err_BAD_CALLBACK_PARAM&&!created);
-    CHECK(adapter::native_nodes::parameter_count(adapter::native_nodes::Kind::model)==95);
+    CHECK(adapter::native_nodes::parameter_count(adapter::native_nodes::Kind::model)==101);
+    for(int axis=0;axis<6;++axis){const auto& field=registered.at(layout::author_bounds_first-1+axis);
+        CHECK(field.uu.id==1519+axis&&field.param_type==PF_Param_FLOAT_SLIDER&&field.u.fs_d.dephault==(axis<3?-.5:.5)&&
+            (field.ui_flags&PF_PUI_INVISIBLE)&&!adapter::native_nodes::authored_parameter(adapter::native_nodes::Kind::model,95+axis));}
     adapter::node_sync::NativeEdit edit;edit.node_kind=5;edit.uuid[7]=4;
     for(int index=1;index<=24;++index){edit.parameter_index=index;
         CHECK(adapter::node_sync::valid_edit(edit)==adapter::native_nodes::authored_parameter(adapter::native_nodes::Kind::model,index));}
@@ -216,10 +219,14 @@ void ui_capture(PF_InData& data){
         CHECK(graph.optional_records.size()==2&&graph.optional_records[1][2]==std::byte{7});}
     PF_ArbitraryH imported=nullptr;CHECK(prepare_model_obj_parameter(&data,"v 10 20 30\nv 14 20 30\nv 14 28 30\nf 1 2 3\n",&imported,never)==PF_Err_NONE);
     ui_values[0][layout::source].one_d=2;ui_values[0][layout::revision].one_d=77;ui_values[0][layout::mesh].arbH=reinterpret_cast<AEGP_ArbBlockVal>(imported);
+    const double bounds[]{10,20,30,14,28,30};for(int axis=0;axis<6;++axis)ui_values[0][layout::author_bounds_first+axis].one_d=bounds[axis];
     CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE&&ui_mesh_reads==1&&handles.contains(imported));
     const auto model=std::find_if(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.id==nid(4);});
     CHECK(model!=graph.nodes.end()&&std::get<core::OpaqueBytes>(value(*model,kModelResource))[15]==std::byte{4}&&
         std::get<std::uint32_t>(value(*model,kModelRevision))==77);
+    for(int axis=0;axis<6;++axis){ui_values[0][layout::author_bounds_first+axis].one_d+=1;
+        CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);
+        ui_values[0][layout::author_bounds_first+axis].one_d=bounds[axis];}
     wrong_mesh_type=true;CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);wrong_mesh_type=false;
     fail_mesh_read=true;CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);fail_mesh_read=false;
     handles.at(imported).back()^=std::byte{1};CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);

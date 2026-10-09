@@ -277,6 +277,46 @@ by this fixture; full SDK compilation and actual AE qualification remain open.
 
 ### Earlier native mesh persistence milestone
 
+### CEP-readable author bounds append
+
+Before the complete author release, append six hidden constant float sliders
+at Model streams95..100/disk1519..1524, after existing metadata/guard94.
+Model num_params becomes101; authored1..18 and metadata19..94 keep their
+indices and disk IDs. Bounds store minimumXYZ/maximumXYZ of the parked numeric
+mesh, with cube defaults(-.5,-.5,-.5)/(.5,.5,.5). They are derived resource
+metadata, not editable pose controls or animation aliases. Import commits and
+rolls them back with Mesh/Revision/Source. UI compilation verifies imported
+mesh bounds against these values; renderer binding7 continues to use the same
+six synthetic constants19..24, not physical95..100. Main manifest30/1012,
+Model schema1, graph keys and ABI8 remain unchanged. All Model candidates so
+far are unpublished; the append does not alter installed native60/CEP61.
+
+CEP can construct Model source/pose records from ordinary author controls and
+this small bounds bank without reading custom-value handles or exporting a mesh
+on every poll. Cube mode projects cube bounds/zero resource and revision while
+retaining parked author mesh data. Portable preset assets still require a
+separate explicit bounded numeric export/import transport before publication.
+
+The isolated CEP author delta is tracked under tools/candidates and prepared by
+tools/Prepare-ModelPanelCandidate.ps1 only beneath artifacts/prepared. It adds
+Model output1 and a separate Particle Model input3; particle-flow endpoints keep
+their existing ports. Normal snapshots read Source, pose, Revision and the six
+numeric bounds only. They never read CUSTOM_VALUE or export mesh bytes during
+polling. A parked asset descriptor remains outside the graph projection so
+switching Cube back to OBJ restores its UUID/revision/bounds without losing the
+native numeric mesh. Resource metadata is read-only to ordinary graph edits;
+native writes require exact revision and bounds agreement before mutation.
+Actual mesh export/import and imported-node duplicate/preset transactions are
+still pending; no partial Model palette or Particle selector is published.
+
+Focused fake-host evidence: standard/ASAN native module3040 and import1559
+checks each (including the existing452 control checks). Physical95..100 must
+not enter binding records; six stale-bounds variants are rejected. The isolated
+CEP author fixture has74 checks, including source switching, tiny bounds
+corruption, typed rejection before writes and the actual graph coordinator.
+Texture80/Cloud49/Birth51 and the existing full gateway transaction fixture
+also pass against this candidate. These results do not qualify an AE host.
+
 Import source da76183c82f9584367561e2742f0ac76c411e397, frozen at
 artifacts/prepared/m3-17-model-import-da76183/source, passes all eight May2023
 x64 Release /MT outputs with IncludeModelCandidate and both NoPublish switches.

@@ -53,7 +53,8 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5 
 }
 [[nodiscard]] constexpr A_long sync_guard_index(Kind kind) noexcept { return uuid_first_index(kind) + 8; }
 [[nodiscard]] constexpr A_long last_parameter_index(Kind kind) noexcept {
-    return kind==Kind::particle?particle_layout::birth_enabled:sync_guard_index(kind);
+    return kind==Kind::particle?particle_layout::birth_enabled:
+        kind==Kind::model?model_layout::author_bounds_last:sync_guard_index(kind);
 }
 static_assert(sync_guard_index(Kind::particle)+1==particle_layout::transfer);
 static_assert(layout_x_index(Kind::model)==19 && uuid_first_index(Kind::model)==86 && sync_guard_index(Kind::model)==94);
@@ -194,10 +195,12 @@ enum : A_long {
         kSizeCurveCountId, kOpacityCurveCountId, kSizeCurveInterpolationId, kOpacityCurveInterpolationId,
         kRotationCurveInterpolationId, kColorGradientInterpolationId, kWindSpinCurveInterpolationId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for(A_long index=1;index<=model_layout::last;++index)ids[count++]=model_layout::disk_id(index);
+    for(A_long index=model_layout::author_bounds_first;index<=model_layout::author_bounds_last;++index)
+        ids[count++]=model_layout::author_bounds_disk_id(index);
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
         for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
             ids[count++] = connection_uuid_id(slot, chunk);

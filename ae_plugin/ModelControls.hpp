@@ -16,6 +16,8 @@ struct ModelAuthorCapture {
 // Registers streams1..18 only. The node module appends shared identity/topology.
 // No Model module or selector is exposed until the full resource path is ready.
 [[nodiscard]] PF_Err register_model_author_controls(PF_InData*) noexcept;
+// Append streams95..100 after the shared node metadata.
+[[nodiscard]] PF_Err register_model_author_bounds(PF_InData*) noexcept;
 // Capture is UI-side. All returned data is owned numeric storage; no borrowed
 // host handle or pointer survives this callback.
 [[nodiscard]] core::Result<ModelAuthorCapture> capture_model_author_controls(
@@ -25,5 +27,5 @@ struct ModelAuthorCapture {
 // Prepares a new owned handle, leaves every live control untouched on success
 // and failure. Caller must commit through the UI transaction or dispose it.
 [[nodiscard]] PF_Err prepare_model_obj_parameter(PF_InData*,std::string_view,
-    PF_ArbitraryH*,const core::Cancellation&) noexcept;
+    PF_ArbitraryH*,const core::Cancellation&,core::ModelBounds* bounds=nullptr) noexcept;
 }

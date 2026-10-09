@@ -8,8 +8,8 @@
 namespace {
 constexpr auto guard=adapter::native_nodes::sync_guard_index(adapter::native_nodes::Kind::model);
 struct Ref{A_long index;};
-std::array<AEGP_StreamVal2,95> host_values{};
-std::array<PF_ParamDef,95> params{};std::array<PF_ParamDef*,95> pointers{};
+std::array<AEGP_StreamVal2,101> host_values{};
+std::array<PF_ParamDef,101> params{};std::array<PF_ParamDef*,101> pointers{};
 AEGP_PFInterfaceSuite1 pf{};AEGP_StreamSuite6 streams{};AEGP_EffectSuite4 effects{};AEGP_UtilitySuite6 utility{};SPBasicSuite basic{};
 PF_InData* context{};unsigned suites{},refs{},writes{},undo_groups{},undo_ends{},syncs{};
 int fail_index=-1,silent_index=-1;bool fail_sync{},fail_rollback{};
@@ -43,7 +43,9 @@ SPAPI A_Err end(){++undo_ends;return 0;}
 void setup(PF_InData& data){clear();context=&data;suites=refs=writes=undo_groups=undo_ends=syncs=0;fail_index=silent_index=-1;fail_sync=false;
     fail_rollback=false;host_values={};params={};CHECK(adapter::register_model_author_controls(&data)==0);
     for(unsigned i=1;i<=18;++i)params[i]=registered.at(i-1);
-    for(unsigned i=0;i<95;++i)pointers[i]=&params[i];
+    for(unsigned i=0;i<params.size();++i)pointers[i]=&params[i];
+    for(int axis=0;axis<6;++axis){params[layout::author_bounds_first+axis].param_type=PF_Param_FLOAT_SLIDER;
+        params[layout::author_bounds_first+axis].u.fs_d.value=axis<3?-.5:.5;host_values[layout::author_bounds_first+axis].one_d=axis<3?-.5:.5;}
     params[layout::mesh].u.arb_d.value=params[layout::mesh].u.arb_d.dephault;
     params[guard].param_type=PF_Param_FLOAT_SLIDER;
     host_values[layout::mesh].arbH=reinterpret_cast<AEGP_ArbBlockVal>(copy(params[layout::mesh].u.arb_d.value));
@@ -59,16 +61,20 @@ void transactions(PF_InData& data){
         host_values[layout::revision].one_d==1&&host_values[guard].one_d==0&&syncs==1&&undo_groups==1&&undo_ends==1);
     auto imported=take(adapter::read_model_geometry_parameter(&data,reinterpret_cast<PF_ArbitraryH>(host_values[layout::mesh].arbH),never));
     CHECK(imported.positions.size()==3&&imported.triangles.size()==1);
+    const double expected[]{0,0,0,1,1,0};for(int axis=0;axis<6;++axis)CHECK(host_values[layout::author_bounds_first+axis].one_d==expected[axis]);
     CHECK(params[layout::source].u.pd.value==2&&params[layout::revision].u.sd.value==1&&
         (out.out_flags&PF_OutFlag_FORCE_RERENDER)&&(params[layout::source].uu.change_flags&PF_ChangeFlag_CHANGED_VALUE));
     CHECK(refs==0&&suites==0&&locks==0);
     out={};CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),triangle,never)==0&&host_values[layout::revision].one_d==2&&undo_groups==undo_ends);
-    for(const auto failed:{guard,layout::mesh,layout::revision,layout::source}){
+    for(const auto failed:{guard,layout::mesh,layout::revision,layout::source,
+        layout::author_bounds_first,layout::author_bounds_first+1,layout::author_bounds_first+2,
+        layout::author_bounds_first+3,layout::author_bounds_first+4,layout::author_bounds_first+5}){
         setup(data);out={};const auto before=mesh_bytes();fail_index=failed;
         CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),triangle,never)==512&&mesh_bytes()==before&&
             host_values[layout::source].one_d==1&&host_values[layout::revision].one_d==0&&host_values[guard].one_d==0);
         CHECK(params[layout::source].u.pd.value==1&&params[layout::revision].u.sd.value==0&&params[guard].u.fs_d.value==0&&
             refs==0&&suites==0&&locks==0&&undo_groups==undo_ends&&handles.size()==2);
+        for(int axis=0;axis<6;++axis)CHECK(host_values[layout::author_bounds_first+axis].one_d==(axis<3?-.5:.5));
     }
     setup(data);out={};const auto before=mesh_bytes();fail_sync=true;
     CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),triangle,never)==512&&syncs==1&&mesh_bytes()==before&&

@@ -1,0 +1,545 @@
+diff --git a/cep_panel/index.html b/cep_panel/index.html
+index 8fa4cfa..e2ff06f 100644
+--- a/cep_panel/index.html
++++ b/cep_panel/index.html
+@@ -48,6 +48,9 @@
+           <button type="button" data-node-type="transform" aria-label="Drag Transform onto graph" title="Transform · drag onto graph">
+             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2"/><path d="m12 3-3 3m3-3 3 3m6 6-3-3m3 3-3 3m-6 6-3-3m3 3 3-3m-9-6 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+           </button>
++          <button type="button" data-node-type="model" aria-label="Drag Model onto graph" title="Model · drag onto graph">
++            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Zm-9 5 9 5 9-5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
++          </button>
+         </div>
+         <button id="nodePaletteToggle" class="node-palette-toggle" type="button" aria-controls="nodePaletteItems" aria-expanded="true" aria-label="Collapse node palette" title="Collapse nodes">‹</button>
+       </aside>
+@@ -101,6 +104,7 @@
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="transform">Transform</button>
++    <button type="button" role="menuitem" data-action="addNode" data-node-type="model">Model</button>
+     <div class="context-menu-separator"></div>
+     <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
+     <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected <span>Del / Backspace</span></button>
+diff --git a/cep_panel/css/panel.css b/cep_panel/css/panel.css
+index 8e92a9a..c00e5fb 100644
+--- a/cep_panel/css/panel.css
++++ b/cep_panel/css/panel.css
+@@ -246,6 +246,8 @@ button:hover, button:focus-visible { border-color: var(--accent); }
+ .graph-node.particle { left: 235px; top: 100px; --node-color: #b7a0e9; }
+ .graph-node.force { left: 235px; top: 178px; --node-color: #94a9ed; }
+ .graph-node.transform { --node-color: #8dc9dd; }
++.graph-node.model { --node-color: #8fc4a5; }
++.port.port-model { border-radius: 1px; background: #8fc4a5; }
+ .graph-node.output { left: 235px; top: 256px; --node-color: #83c9b1; }
+ .graph-node.selected {
+   border-color: var(--node-color);
+diff --git a/cep_panel/js/graph_edits.js b/cep_panel/js/graph_edits.js
+index 309f1c5..612ced0 100644
+--- a/cep_panel/js/graph_edits.js
++++ b/cep_panel/js/graph_edits.js
+@@ -14,14 +14,16 @@
+         particle: "org.starfieldfx.nodes.particle",
+         force: "org.starfieldfx.nodes.force",
+         transform: "org.starfieldfx.nodes.transform",
++        model: "org.starfieldfx.nodes.model",
+         output: "org.starfieldfx.nodes.output"
+     };
+-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, output: 4 };
++    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, output: 4 };
+     var PORTS = {
+         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
+-        "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
++        "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
+         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
+         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
++        "org.starfieldfx.nodes.model": { output: "1" },
+         "org.starfieldfx.nodes.output": { input: "1" }
+     };
+     var DEFAULTS = {
+@@ -74,6 +76,14 @@
+             {key:"3",type:5,value:[0,0,0]}, {key:"4",type:5,value:[100,100,100]},
+             {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
+         ],
++        model: [
++            {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
++            {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
++            {key:"6",type:5,value:[100,100,100]},
++            {key:"7",type:3,value:0}, {key:"8",type:3,value:0}, {key:"9",type:3,value:0},
++            {key:"10",type:3,value:0}, {key:"11",type:3,value:0},
++            {key:"12",type:7,value:defaultModelBounds()}, {key:"13",type:3,value:0}
++        ],
+         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
+             {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30},{key:"8",type:3,value:1},{key:"9",type:4,value:360},{key:"10",type:4,value:0},{key:"11",type:3,value:0},{key:"12",type:4,value:8},{key:"13",type:4,value:70},{key:"14",type:4,value:0},{key:"15",type:3,value:0}]
+     };
+@@ -88,6 +98,12 @@
+         return bytes;
+     }
+ 
++    function defaultModelBounds() {
++        var bytes=new Uint8Array(48),view=new DataView(bytes.buffer);
++        for(var axis=0;axis<6;axis++)view.setFloat64(axis*8,axis<3?-.5:.5,true);
++        return bytes;
++    }
++
+     function defaultRotationCurve() {
+         var bytes=new Uint8Array(36),view=new DataView(bytes.buffer);
+         bytes[0]=1;bytes[1]=2;view.setFloat64(20,1,true);
+@@ -220,14 +236,18 @@
+         if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
+         var sourceSchema = PORTS[source.type];
+         var destinationSchema = PORTS[destination.type];
++        var modelConnection=destinationSchema && source.type===TYPES.model && destination.type===TYPES.particle &&
++            String(destinationPort)===destinationSchema.modelInput;
+         if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
+-            destinationSchema.input !== String(destinationPort)) {
++            (!modelConnection && destinationSchema.input !== String(destinationPort))) {
+             fail("invalid_port", "connection must use a compatible built-in output and input port");
+         }
++        if(source.type===TYPES.model && !modelConnection)
++            fail("model_requires_particle", "Connect Model to the Particle Model input.");
+         if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
+             fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
+         }
+-        if (destination.type === TYPES.particle && source.type !== TYPES.emitter) {
++        if (destination.type === TYPES.particle && source.type !== TYPES.emitter && !modelConnection) {
+             fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
+         }
+         if (destination.type === TYPES.emitter) {
+@@ -275,7 +295,8 @@
+         var destinationSchema = PORTS[destination.type];
+         if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
+         var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
+-        var destinationPort = edit.inputPort === undefined ? destinationSchema.input : String(edit.inputPort);
++        var destinationPort = edit.inputPort === undefined ?
++            (source.type===TYPES.model ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
+         validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
+         for (var i = 0; i < graph.edges.length; i++) {
+             var existing = graph.edges[i];
+@@ -444,6 +465,32 @@
+             if (!node) fail("missing_node", "cannot edit a node absent from the graph");
+             if (node.type === TYPES.transform && change.parameterKey === "7")
+                 fail("invalid_parameter", "Inherited motion is sampled by After Effects.");
++            if(node.type===TYPES.model) {
++                if(["1","2","3","12"].indexOf(change.parameterKey)>=0)
++                    fail("invalid_parameter","Model geometry is owned by the native import transaction.");
++                if(change.parameterKey==="13") {
++                    if(change.valueType!==3 || (change.value!==0 && change.value!==1))
++                        fail("invalid_parameter","Choose Cube or OBJ.");
++                    var asset=(edit.modelAssets || {})[node.id],revision=0,resource=new Uint8Array(16),bounds=defaultModelBounds();
++                    if(change.value===1 && asset && asset.revision>0) {
++                        if(!Number.isInteger(asset.revision) || asset.revision>2147483647 || !Array.isArray(asset.bounds) || asset.bounds.length!==6)
++                            fail("invalid_parameter","The Model asset descriptor is invalid.");
++                        revision=asset.revision;
++                        for(var byte=0;byte<16;byte++)resource[byte]=parseInt(node.id.substr(byte*2,2),16);
++                        var boundView=new DataView(bounds.buffer);
++                        asset.bounds.forEach(function(v,axis){
++                            if(!Number.isFinite(v) || Math.abs(v)>1e9 || (axis>2 && v<asset.bounds[axis-3]))
++                                fail("invalid_parameter","The Model bounds are invalid.");
++                            boundView.setFloat64(axis*8,v,true);
++                        });
++                    }
++                    node.parameters.forEach(function(parameter){
++                        if(parameter.key==="1")parameter.value=resource;
++                        if(parameter.key==="2")parameter.value=revision;
++                        if(parameter.key==="12")parameter.value=bounds;
++                    });
++                }
++            }
+             var found = -1;
+             for (var p = 0; p < node.parameters.length; p++) {
+                 if (node.parameters[p].key === change.parameterKey) { found = p; break; }
+diff --git a/cep_panel/js/native_graph_snapshot.js b/cep_panel/js/native_graph_snapshot.js
+index 9ad537b..6888f3d 100644
+--- a/cep_panel/js/native_graph_snapshot.js
++++ b/cep_panel/js/native_graph_snapshot.js
+@@ -31,8 +31,8 @@
+                 positions[record.id] = record.position;
+                 record.outgoing.forEach(function (edge) {
+                     graph.edges.push({id:edge.id,sourceNode:record.id,
+-                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" ? "1" : "2",
+-                        destinationNode:edge.target,destinationPort:emitterTargets[edge.target] ? "2" : "1"});
++                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" || record.type === "org.starfieldfx.nodes.model" ? "1" : "2",
++                        destinationNode:edge.target,destinationPort:record.type === "org.starfieldfx.nodes.model" ? "3" : emitterTargets[edge.target] ? "2" : "1"});
+                 });
+             });
+             var output = snapshot.renderer;
+diff --git a/cep_panel/js/graph_view.js b/cep_panel/js/graph_view.js
+index ecdadd2..d441344 100644
+--- a/cep_panel/js/graph_view.js
++++ b/cep_panel/js/graph_view.js
+@@ -13,6 +13,7 @@
+         particle: "org.starfieldfx.nodes.particle",
+         force: "org.starfieldfx.nodes.force",
+         transform: "org.starfieldfx.nodes.transform",
++        model: "org.starfieldfx.nodes.model",
+         output: "org.starfieldfx.nodes.output"
+     };
+     var SPECS = {
+@@ -115,6 +116,18 @@
+             "7": {hidden:true},
+             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
+         },
++        model: {
++            "1": {hidden:true}, "2": {hidden:true}, "3": {hidden:true}, "12": {hidden:true},
++            "13": {label:"Source",kind:"popup",choices:["Cube","OBJ"],values:[0,1]},
++            "4": {label:"Offset",kind:"point3d",decimals:2,step:.1,min:-1e9,max:1e9},
++            "5": {label:"Angle",kind:"point3d",decimals:2,step:1,min:-32768,max:32767.99998,unit:"°"},
++            "6": {label:"Scale",kind:"point3d",decimals:2,step:1,min:-100000,max:100000,unit:"%"},
++            "7": {label:"Flip X",kind:"popup",choices:["Off","On"],values:[0,1]},
++            "8": {label:"Flip Y",kind:"popup",choices:["Off","On"],values:[0,1]},
++            "9": {label:"Flip Z",kind:"popup",choices:["Off","On"],values:[0,1]},
++            "10": {label:"Center",kind:"popup",choices:["Off","On"],values:[0,1]},
++            "11": {label:"Normalize",kind:"popup",choices:["Off","On"],values:[0,1]}
++        },
+         output: {
+             "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
+             "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
+@@ -125,7 +138,7 @@
+             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
+         }
+     };
+-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",
++    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",
+                    output: "Output" };
+ 
+     function fail(code, message) {
+@@ -373,8 +386,9 @@
+             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
+             var shape = findParameter(source,"5");
+             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
+-                         inputPort: kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+-                         outputPort: kind === "output" ? null : (kind === "emitter" ? "1" : "2"),
++                         inputPort: kind === "model" ? null : kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
++                         modelInputPort: kind === "particle" ? "3" : null,
++                         outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" ? "1" : "2"),
+                          params: [], graphParameters: source.parameters, curves: null,
+                          curveParameterKeys: kind === "particle"
+                             ? { size: "7", opacity: "8", rotation:"27", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
+@@ -431,6 +445,15 @@
+                         parameter.enumValues.push(graphParameter.value);textureSelected=parameter.enumValues.length-1;}
+                     parameter.value=textureSelected+1;node.params.push(parameter);continue;
+                 }
++                if(kind==="model" && ["4","5","6"].indexOf(graphParameter.key)>=0) {
++                    [0,1,2].forEach(function(axis){
++                        var component=viewParameter(node,kind,graphParameter,spec);
++                        component.kind="slider";component.key+=":"+axis;
++                        component.label=spec.label+" "+["X","Y","Z"][axis];
++                        component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
++                        component.displayScale=1;component.value=graphParameter.value[axis];node.params.push(component);
++                    });continue;
++                }
+                 if (kind === "transform") {
+                     var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
+                     var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
+diff --git a/cep_panel/js/node_palette.js b/cep_panel/js/node_palette.js
+index ae027f9..aa25e6a 100644
+--- a/cep_panel/js/node_palette.js
++++ b/cep_panel/js/node_palette.js
+@@ -1,7 +1,7 @@
+ // Pointer-based palette: local preview only until one valid canvas drop.
+ (function (root) {
+     "use strict";
+-    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force", transform: "Transform" };
++    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force", transform: "Transform", model: "Model" };
+     function create(options) {
+         var palette=options.root, items=options.items, toggle=options.toggle;
+         var viewport=options.viewport, doc=options.document || document, win=options.window || window;
+diff --git a/cep_panel/js/panel.js b/cep_panel/js/panel.js
+index 5e5c6fa..a43c51c 100644
+--- a/cep_panel/js/panel.js
++++ b/cep_panel/js/panel.js
+@@ -230,11 +230,11 @@
+     }
+ 
+     var NODE_TYPES = {
+-        emitter: true, particle: true, force: true, transform: true, output: true
++        emitter: true, particle: true, force: true, transform: true, model: true, output: true
+     };
+     var DEFAULT_NODE_POSITIONS = {
+         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
+-        force: { x: 235, y: 178 }, transform: {x:235,y:220}, output: { x: 235, y: 256 }
++        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, output: { x: 235, y: 256 }
+     };
+ 
+     function positionFor(node, index) {
+@@ -360,7 +360,7 @@
+         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
+         var bounds = { left: viewportLeft, top: viewportTop,
+                        right: viewportRight, bottom: viewportBottom };
+-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd",
++        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd", model:"#8fc4a5",
+                        output: "#83c9b1" };
+         for (var i = 0; i < state.nodes.length; i++) {
+             if (!isSupportedNode(state.nodes[i])) continue;
+@@ -530,22 +530,24 @@
+         if (!position) return null;
+         var display = displayPosition(position);
+         if (side === "bottom") return { x: display.x + NODE_WIDTH / 2, y: display.y + NODE_HEIGHT };
++        if (side === "model") return {x:display.x,y:display.y+NODE_HEIGHT/2};
+         return { x: display.x + NODE_WIDTH / 2, y: display.y };
+     }
+ 
+     function edgePath(edge, sides) {
+         var startSide = sides[edge[0]] ? sides[edge[0]].output : "bottom";
+-        var endSide = sides[edge[1]] ? sides[edge[1]].input : "top";
++        var endSide = edge.inputPort === "3" ? "model" : sides[edge[1]] ? sides[edge[1]].input : "top";
+         var start = portPoint(edge[0], startSide);
+         var end = portPoint(edge[1], endSide);
+         if (!start || !end) return null;
+         var distance = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
+         return "M" + start.x + " " + start.y + " C" + start.x + " " + (start.y + distance) + " " +
+-               end.x + " " + (end.y - distance) + " " + end.x + " " + end.y;
++               (endSide==="model"?end.x-distance:end.x) + " " + (endSide==="model"?end.y:end.y-distance) + " " + end.x + " " + end.y;
+     }
+ 
+     function placePort(port, side) {
+         if (!port) return;
++        if(side==="model") {port.style.left="-6px";port.style.top="calc(50% - 5px)";return;}
+         port.style.left = "calc(50% - 5px)";
+         port.style.top = side === "top" ? "-6px" : side === "bottom" ? (NODE_HEIGHT - 4) + "px" : "calc(50% - 5px)";
+     }
+@@ -582,6 +584,7 @@
+                    " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
+         }
+         if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
++        if(kind==="model")return graphParameterValue(node,13)===1?"OBJ":"Cube";
+         var status = state.frameStatus;
+         if (status && status.available === false) return "Live count unavailable";
+         var maxParticles = status ? status.maxParticles :
+@@ -704,6 +707,14 @@
+             card.appendChild(input);
+             portElements.input = input;
+         }
++        if(node.modelInputPort) {
++            var modelInput=document.createElement("span");
++            modelInput.className="port port-in port-model";modelInput.title="Model input";
++            modelInput.setAttribute("data-node-id",node.id);modelInput.setAttribute("data-port-direction","in");
++            modelInput.setAttribute("data-port-key",node.modelInputPort);
++            modelInput.addEventListener("pointerdown",function(event){beginPortDrag(node.id,"in",event);});
++            card.appendChild(modelInput);portElements.modelInput=modelInput;
++        }
+         if (node.outputPort !== null && node.outputPort !== undefined ? node.outputPort !== false : nodeKind(node) !== "output") {
+             var output = document.createElement("span");
+             output.className = "port port-out";
+@@ -727,6 +738,7 @@
+             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
+             var nodeSides = sides[nodeId] || { input: "top", output: "bottom" };
+             placePort(graphNodeElements[nodeId].input, nodeSides.input);
++            placePort(graphNodeElements[nodeId].modelInput,"model");
+             placePort(graphNodeElements[nodeId].output, nodeSides.output);
+         }
+         for (var i = 0; i < state.edges.length; i++) {
+@@ -773,7 +785,8 @@
+         if (connectionState) {
+             var currentSides = computePortSides();
+             var side = currentSides[connectionState.nodeId] || {};
+-            var fixedSide = connectionState.direction === "out" ? side.output : side.input;
++            var fixedSide = connectionState.direction === "in" && connectionState.portKey==="3" ? "model" :
++                connectionState.direction === "out" ? side.output : side.input;
+             var fixedPoint = portPoint(connectionState.nodeId, fixedSide ||
+                 (connectionState.direction === "out" ? "bottom" : "top"));
+             if (fixedPoint) {
+@@ -782,8 +795,10 @@
+                 var bend = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
+                 var c1x = start.x;
+                 var c1y = start.y + bend;
+-                var c2x = end.x;
+-                var c2y = end.y - bend;
++                var modelEnd=connectionState.direction === "in" ? connectionState.portKey==="3" :
++                    connectionState.snapPort && connectionState.snapPort.getAttribute("data-port-key")==="3";
++                var c2x = modelEnd ? end.x-bend : end.x;
++                var c2y = modelEnd ? end.y : end.y-bend;
+                 var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                 preview.setAttribute("class", "edge-preview");
+                 preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
+@@ -1008,7 +1023,7 @@
+         var sides = computePortSides();
+         for (var i = 0; i < state.edges.length; i++) {
+             var edge = state.edges[i];
+-            if (!edge || edge.length !== 2 || edge[0] === nodeId || edge[1] === nodeId) continue;
++            if (!edge || edge.length !== 2 || edge.inputPort==="3" || edge[0] === nodeId || edge[1] === nodeId) continue;
+             var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "bottom");
+             var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "top");
+             if (!start || !end) continue;
+@@ -1873,7 +1888,10 @@
+         var distanceSquared = 22 * 22;
+         for (var nodeId in graphNodeElements) {
+             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId) || nodeId === connectionState.nodeId) continue;
+-            var port = connectionState.direction === "out" ? graphNodeElements[nodeId].input : graphNodeElements[nodeId].output;
++            var candidates=connectionState.direction === "out" ?
++                [graphNodeElements[nodeId].input,graphNodeElements[nodeId].modelInput] : [graphNodeElements[nodeId].output];
++            for(var candidateIndex=0;candidateIndex<candidates.length;candidateIndex++) {
++            var port=candidates[candidateIndex];
+             if (!port) continue;
+             var bounds = port.getBoundingClientRect();
+             var dx = event.clientX - (bounds.left + bounds.width / 2);
+@@ -1887,6 +1905,7 @@
+             if (!window.StarfieldGraphEdits.canConnect(state.graph, from, to, outputPort, inputPort)) continue;
+             nearest = port;
+             distanceSquared = distance;
++            }
+         }
+         return nearest;
+     }
+@@ -1900,7 +1919,7 @@
+         if (port) {
+             port.classList.add("connection-snap");
+             connectionState.point = portPoint(port.getAttribute("data-node-id"),
+-                                              connectionState.direction === "out" ? "top" : "bottom");
++                                              connectionState.direction === "out" ? (port.getAttribute("data-port-key")==="3"?"model":"top") : "bottom");
+         } else {
+             connectionState.point = canvasPoint(event.clientX, event.clientY);
+         }
+diff --git a/cep_panel/js/graph_transactions.js b/cep_panel/js/graph_transactions.js
+index 6ee9c08..5314fd2 100644
+--- a/cep_panel/js/graph_transactions.js
++++ b/cep_panel/js/graph_transactions.js
+@@ -209,6 +209,11 @@
+                     Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
+                     authoredEdit.layerHeightPixels = base.geometry ? Number(base.geometry.height) : 1;
+                     authoredEdit.layerResources=base.layerResources || [];
++                    authoredEdit.modelAssets={};
++                    (base.nativeNodes || []).forEach(function(node){
++                        if(node.type==="org.starfieldfx.nodes.model" && node.modelAsset)
++                            authoredEdit.modelAssets[node.id]=node.modelAsset;
++                    });
+                     var updated = edits.apply(graph, authoredEdit, idFactory);
+                     graphHex = codec.toHex(updated);
+                     if (graphHex.length / 2 > maxBytes) {
+diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
+index 792b33f..d0767fb 100644
+--- a/cep_panel/jsx/starfield_gateway.jsx
++++ b/cep_panel/jsx/starfield_gateway.jsx
+@@ -42,7 +42,8 @@
+         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
+         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
+         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
+-        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" }
++        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
++        "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"}
+     };
+ 
+     // One row per bound effect parameter. `index` is the registered parameter index
+@@ -721,6 +722,62 @@
+             "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
+     }
+ 
++    function modelControl(index) {
++        var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
++            "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
++        return {name:index>=95 ? ["Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"][index-95] : names[index-1],
++            diskId:index>=95?1519+index-95:1500+index};
++    }
++
++    function modelAssetDescriptor(effect) {
++        var revision=Number(nodeControlValue(effect,modelControl(4))),bounds=[];
++        if(!isFinite(revision) || Math.floor(revision)!==revision || revision<0 || revision>2147483647)
++            throw new Error("Invalid Model mesh revision.");
++        for(var axis=0;axis<6;axis++) {
++            var bound=Number(nodeControlValue(effect,modelControl(95+axis)));
++            if(!isFinite(bound) || Math.abs(bound)>1e9 || (axis>=3 && bound<bounds[axis-3]))
++                throw new Error("Invalid Model mesh bounds.");
++            bounds.push(bound);
++        }
++        return {revision:revision,bounds:bounds};
++    }
++
++    function validateModelRecord(node) {
++        if(node.schemaVersion!==1)throw new Error("Unsupported Model schema.");
++        var fields={},types={"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3};
++        for(var i=0;i<node.parameters.length;i++) {
++            var p=node.parameters[i],key=String(p.key),v=p.value;
++            if(!Object.prototype.hasOwnProperty.call(types,key) || fields[key] || p.type!==types[key])throw new Error("Invalid Model field: "+key);
++            fields[key]=p;
++            if(p.type===5) {
++                var limit=key==="4"?1e9:key==="5"?32768:100000;
++                if(!(v instanceof Array) || v.length!==3)throw new Error("Invalid Model vector: "+key);
++                for(var axis=0;axis<3;axis++)if(typeof v[axis]!=="number" || !isFinite(v[axis]) || Math.abs(v[axis])>limit ||
++                    (key==="5" && v[axis]>=32768))throw new Error("Invalid Model vector: "+key);
++            } else if(p.type===3) {
++                if(typeof v!=="number" || !isFinite(v) || Math.floor(v)!==v || v<0 || v>(key==="2"?2147483647:1))
++                    throw new Error("Invalid Model scalar: "+key);
++            } else {
++                if(!(v instanceof Array) || v.length!==(key==="1"?16:48))throw new Error("Invalid Model metadata: "+key);
++                for(var byte=0;byte<v.length;byte++)if(typeof v[byte]!=="number" || v[byte]<0 || v[byte]>255 || Math.floor(v[byte])!==v[byte])
++                    throw new Error("Invalid Model metadata byte: "+key);
++            }
++        }
++        for(var key in types)if(Object.prototype.hasOwnProperty.call(types,key) && !fields[key])throw new Error("Missing Model field: "+key);
++        var imported=fields["13"].value===1 && fields["2"].value>0;
++        for(var byte=0;byte<16;byte++)if(fields["1"].value[byte]!== (imported?parseInt(node.id.substr(byte*2,2),16):0))
++            throw new Error("Model resource identity differs from its node.");
++        if(!imported && fields["2"].value!==0)throw new Error("Cube cannot reference an imported Model revision.");
++        var bounds=[];
++        for(var axis=0;axis<6;axis++) {
++            var bound=readGraphFloat64(fields["12"].value,axis*8);
++            if(Math.abs(bound)>1e9 || (axis>=3 && bound<bounds[axis-3]) || (!imported && bound!==(axis<3?-.5:.5)))
++                throw new Error("Invalid Model bounds.");
++            bounds.push(bound);
++        }
++        return {imported:imported,revision:fields["2"].value,bounds:bounds};
++    }
++
+     function textureControl(key) {
+         var names={"31":"Layer","32":"Dark Side","33":"Texture Time Sample","34":"Texture Color Use",
+             "35":"Use Texture Ratio","36":"Ignore Perspective"};
+@@ -879,6 +936,21 @@
+             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
+                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
+             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
++        } else if(type === "org.starfieldfx.nodes.model") {
++            var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
++            if(source!==1 && source!==2)throw new Error("Invalid Model Source.");
++            var imported=source===2 && asset.revision>0,resource=[],bounds=[];
++            for(var byte=0;byte<16;byte++)resource.push(imported?parseInt(node.id.substr(byte*2,2),16):0);
++            for(var axis=0;axis<6;axis++)appendFloat64(bounds,imported?asset.bounds[axis]:axis<3?-.5:.5);
++            node.parameters.push({key:"1",type:7,value:resource},{key:"2",type:3,value:imported?asset.revision:0});
++            for(var group=0;group<3;group++) {
++                var components=[];
++                for(var axis=0;axis<3;axis++)components.push(Number(nodeControlValue(effect,modelControl(5+3*group+axis))));
++                node.parameters.push({key:String(4+group),type:5,value:components});
++            }
++            for(var flag=0;flag<5;flag++)scalar(7+flag,modelControl(14+flag),3);
++            node.parameters.push({key:"12",type:7,value:bounds},{key:"13",type:3,value:source-1});
++            node.modelAsset=asset;validateModelRecord(node);
+         } else if (type === "org.starfieldfx.nodes.transform") {
+             var tg=transformGeometry(layer),anchor=nodeControlValue(effect,transformControl(2));
+             node.parameters.push({key:"1",type:5,value:[(Number(anchor[0])-tg.width/2)*tg.aspect/tg.height,
+@@ -1080,6 +1152,15 @@
+         if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
+             throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
+         }
++        if(node.type==="org.starfieldfx.nodes.model") {
++            var requestedModel=validateModelRecord(node),storedAsset=modelAssetDescriptor(effect);
++            if(requestedModel.imported) {
++                var boundsMatch=true;
++                for(var axis=0;axis<6;axis++)if(storedAsset.bounds[axis]!==requestedModel.bounds[axis])boundsMatch=false;
++                if(storedAsset.revision!==requestedModel.revision || !boundsMatch)
++                    throw new Error("The imported Model resource must be restored before authoring its controls.");
++            }
++        }
+         setNodeControl(effect, "Panel Sync Guard", 1);
+         try {
+             if(node.type === "org.starfieldfx.nodes.particle") {
+@@ -1140,6 +1221,13 @@
+                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
+                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
+                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
++                } else if(type === "org.starfieldfx.nodes.model") {
++                    if(key==="1" || key==="2" || key==="12")continue; // Native mesh transaction owns derived metadata.
++                    if(key==="13")setNodeControl(effect,modelControl(1),value+1);
++                    else if(Number(key)>=4 && Number(key)<=6)for(var axis=0;axis<3;axis++)
++                        setNodeControl(effect,modelControl(5+3*(Number(key)-4)+axis),value[axis]);
++                    else if(Number(key)>=7 && Number(key)<=11)setNodeControl(effect,modelControl(14+Number(key)-7),value);
++                    else throw new Error("Model graph parameter is not mapped: "+key);
+                 } else if (type === "org.starfieldfx.nodes.transform") {
+                     var geometry=transformGeometry(layer);
+                     if(key==="1") {
+@@ -1287,6 +1375,7 @@
+                 edgeIds["$" + connection.id] = true;
+             }
+             if(node.type==="org.starfieldfx.nodes.transform")validateTransformRecord(node);
++            if(node.type==="org.starfieldfx.nodes.model")validateModelRecord(node);
+         }
+         var knownTargets = nodeIds(nodes);
+         knownTargets["$000000000000000000000000000000ff"] = true;

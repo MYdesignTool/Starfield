@@ -145,7 +145,7 @@ bool playback_value(SuiteSet& suites, A_long index, node_sync::ValueKind type,
 }
 
 bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
-                A_long index, const A_Time& time, double& output) noexcept {
+                A_long index, const A_Time& time, double& output, bool record = true) noexcept {
     if (suites.playback) {
         std::array<double, 3> sampled{};
         if (!playback_value(suites, index, node_sync::ValueKind::scalar, sampled)) return false;
@@ -174,7 +174,7 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     suites.stream->AEGP_DisposeStreamValue(&value);
     if (!std::isfinite(result)) return suites.fail(index);
     output = result;
-    return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+    return !record || record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
 }
 
 bool read_layer_resource(SuiteSet& suites, AEGP_PluginID id, AEGP_EffectRefH effect,
@@ -708,6 +708,11 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
                 const auto released=suites.stream->AEGP_DisposeStreamValue(&value);
                 if(!mesh.has_value() || released)return suites.fail(model_layout::mesh);
                 bounds=mesh.value().bounds;
+                for(A_long b=0;b<6;++b){double stored{};
+                    // Author bounds are physical constant controls, not binding fields.
+                    // Only the synthetic bounds19..24 below enter the playback record.
+                    if(!read_one_d(suites,plugin_id,effect,model_layout::author_bounds_first+b,time,stored,false)||stored!=*fields[b])
+                        return suites.fail(model_layout::author_bounds_first+b);}
             }
             for(A_long b=0;b<6;++b)
                 if(!record_value(suites,model_layout::bounds_first+b,node_sync::ValueKind::scalar,{*fields[b],0,0}))return false;
