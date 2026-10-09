@@ -239,6 +239,15 @@ native60/ABI7/CEP61 is unchanged.
 
 ### Earlier native mesh persistence milestone
 
+The resource-bridge source eae10aecb11f0a50dae8d1a3605d6750dc6eccaa,
+frozen at artifacts/prepared/m3-17-model-resource-bridge-eae10ae/source,
+passes all eight May2023 x64 Release /MT targets with IncludeModelCandidate
+and both NoPublish switches. Main1012 registration/SFMR1 dispatch and SmartFX
+entry points are compiled. Log: artifacts/m3-17-model-resource-bridge-build.log;
+build and installed hash reports: m3-17-model-resource-bridge-{build,installed}-hashes.json.
+All18 installed native60/CEP61 files remain unchanged. OBJ/complete author
+publication and real AE qualification remain pending.
+
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
 arbitrary handle. It owns no graph identity, filenames or external file lookup;
 resource UUID/revision belong to the future Model author and immutable capture.

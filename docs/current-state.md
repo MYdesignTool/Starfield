@@ -6,6 +6,8 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+资源桥源码eae10aecb11f0a50dae8d1a3605d6750dc6eccaa冻结于artifacts/prepared/m3-17-model-resource-bridge-eae10ae/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过。日志artifacts/m3-17-model-resource-bridge-build.log，八输出哈希m3-17-model-resource-bridge-build-hashes.json；十八安装哈希保持native60/CEP61、0不匹配（m3-17-model-resource-bridge-installed-hashes.json）。主1012参数/SFMR1路由/SmartFX入口实际编译，OBJ按钮及完整CEP作者继续，未部署Model候选。
+
 当前未部署资源桥候选已接入manifest30主效果注册1012参数和SFMR1回调路由。NativeBindingTransaction安装、读回校验与失败回滚Model镜像；SmartFX只捕获实际Model粒子及快门样本使用的资源，复制为自有ABI8数值数组并混入GUID。标准/ASAN资源桥夹具各922项通过（含复用452控件检查），原生绑定2809、旧绑定8697及相机12通过。日志artifacts/m3-17-model-resource-bridge-{tests,asan}.log、m3-17-model-resource-native-binding-tests.log、m3-17-model-resource-legacy-regression.log。完整SDK构建待当前源码冻结后执行；OBJ按钮/Particle菜单/隔离CEP作者仍待接入，安装native60/CEP61保持。以下helper构建叙述为之前阶段证据。
 
 镜像持久化源码0d868eb35fa00ba50619460722cc9b9f504cd1bb冻结于artifacts/prepared/m3-17-model-mirror-0d868eb/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，main及五种node模块实际编译ModelMirrorParameter。日志artifacts/m3-17-model-mirror-build.log，八输出哈希artifacts/m3-17-model-mirror-build-hashes.json；十八安装哈希仍符合native60/CEP61，报告artifacts/m3-17-model-mirror-installed-hashes.json。注册helper未调用、未部署；下一步NativeBindingTransaction资源提交/回滚与SmartFX捕获，随后OBJ按钮/完整CEP作者。
