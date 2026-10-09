@@ -110,6 +110,7 @@ $adapterInputs = @(
     'ae_plugin\ModelRenderResources.cpp', 'ae_plugin\ModelRenderResources.hpp',
     'ae_plugin\ModelImportTransaction.cpp', 'ae_plugin\ModelImportUI.cpp', 'ae_plugin\ModelImportUI.hpp',
     'ae_plugin\ModelAssetMessage.hpp', 'ae_plugin\ModelAssetExport.hpp', 'ae_plugin\ModelAssetExport.cpp',
+    'ae_plugin\ModelAssetWrite.hpp', 'ae_plugin\ModelAssetWrite.cpp',
     'ae_plugin\ModelControls.cpp', 'ae_plugin\ModelControls.hpp', 'ae_plugin\ModelLayout.hpp',
     'src\core\ParticleSimulation.cpp', 'src\core\ParticleTransform.cpp', 'src\core\Random.cpp',
     'src\core\ParticleTexture.cpp', 'include\starfield\core\ParticleTexture.hpp',

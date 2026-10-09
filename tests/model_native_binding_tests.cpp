@@ -37,6 +37,8 @@ std::array<std::vector<AEGP_StreamVal2>,3> ui_values;
 AEGP_PFInterfaceSuite1 ui_pf{};AEGP_EffectSuite4 ui_effect{};AEGP_StreamSuite6 ui_stream{};
 unsigned ui_refs{},ui_suites{},ui_mesh_reads{};bool wrong_mesh_type{},fail_mesh_read{};
 unsigned ui_last_effect{};A_long ui_last_index{};
+PF_Handle ui_author_mesh{};unsigned ui_asset_writes{};
+int ui_write_fail=-1,ui_write_silent=-1,ui_read_after_write=-1,ui_guard_release_mode{};bool ui_rollback_silent{};
 const char* ui_names[]={"org.starfieldfx.node.model","org.starfieldfx.node.emitter","org.starfieldfx.node.particle"};
 unsigned checked_out{},checked_in{},aegp_queries{};int fail_checkout=-1;bool fail_checkin{},bad_numeric{};
 std::array<double,14> pose_aliases{};
@@ -190,6 +192,73 @@ void asset_export(PF_InData& data,PF_Handle imported){
     const auto zero_before=ui_mesh_reads;call(r);CHECK(r.error==ModelAssetError::none&&r.payload_bytes==0&&ui_mesh_reads==zero_before);
     ui_values[0][layout::source].one_d=2;ui_values[0][layout::revision].one_d=77;
 }
+void asset_write(PF_InData& data,PF_Handle imported){
+    using adapter::ModelAssetWriteRequest;using adapter::ModelAssetError;
+    const auto baseline=ui_values[0];
+    const auto desired_mesh=take(core::parse_model_obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n",never));
+    const auto encoded=take(core::encode_model_geometry(desired_mesh,never));
+    const auto copy_handle=[&](PF_Handle input){auto result=allocate(handles.at(input).size());CHECK(result);handles.at(result)=handles.at(input);return result;};
+    const auto reset=[&]{if(ui_author_mesh)dispose(ui_author_mesh);ui_values[0]=baseline;
+        ui_author_mesh=copy_handle(imported);ui_values[0][layout::mesh].arbH=reinterpret_cast<AEGP_ArbBlockVal>(ui_author_mesh);
+        ui_asset_writes=0;ui_write_fail=ui_write_silent=ui_read_after_write=-1;ui_guard_release_mode=0;ui_rollback_silent=false;};
+    ui_stream.AEGP_SetStreamValue=[](AEGP_PluginID,AEGP_StreamRefH ref,AEGP_StreamValue2* input)->A_Err {
+        const auto key=*reinterpret_cast<UiStream*>(ref);CHECK(key.effect==0);++ui_asset_writes;
+        if(key.index==94 && input->val.one_d==0 && ui_guard_release_mode==2){ui_guard_release_mode=0;return 0;}
+        if(key.index==ui_write_silent || (ui_rollback_silent && ui_asset_writes>10 && key.index==layout::mesh)){
+            ui_write_silent=-1;return 0;}
+        if(key.index==layout::mesh){const auto handle=reinterpret_cast<PF_Handle>(input->val.arbH);
+            const auto owned=allocate(handles.at(handle).size());CHECK(owned);handles.at(owned)=handles.at(handle);
+            dispose(ui_author_mesh);ui_author_mesh=owned;ui_values[0][key.index].arbH=reinterpret_cast<AEGP_ArbBlockVal>(owned);
+        }else ui_values[0][key.index]=input->val;
+        if(key.index==94 && input->val.one_d==0 && ui_guard_release_mode==1){ui_guard_release_mode=0;return 512;}
+        if(key.index==ui_write_fail){ui_write_fail=-1;return 512;}return 0;
+    };
+    const auto request=[&]{ModelAssetWriteRequest r;r.expected_uuid[15]=4;r.expected_source=2;r.expected_revision=77;
+        r.desired_source=2;r.desired_revision=17;r.mesh_bytes=reinterpret_cast<const std::uint8_t*>(encoded.data());r.mesh_length=static_cast<std::uint32_t>(encoded.size());
+        const double bounds[]{0,0,0,1,1,0};std::copy(std::begin(bounds),std::end(bounds),std::begin(r.desired_bounds));return r;};
+    const auto call=[&](ModelAssetWriteRequest& r){PF_OutData out{};CHECK(EffectMain(PF_Cmd_COMPLETELY_GENERAL,&data,&out,nullptr,nullptr,&r)==0);
+        CHECK(out.out_flags==0 && out.return_msg[0]==0 && ui_refs==0 && ui_suites==0 && locks==0 && handles.contains(imported));
+        for(int index=layout::origin;index<=layout::last;++index)CHECK(ui_values[0][index].one_d==baseline[index].one_d);
+        for(int part=0;part<8;++part)CHECK(ui_values[0][adapter::native_nodes::uuid_first_index(adapter::native_nodes::Kind::model)+part].one_d==baseline[adapter::native_nodes::uuid_first_index(adapter::native_nodes::Kind::model)+part].one_d);
+    };
+    const auto restored=[&]{CHECK(handles.at(ui_author_mesh)==handles.at(imported));CHECK(ui_values[0][layout::revision].one_d==77 && ui_values[0][layout::source].one_d==2 && ui_values[0][94].one_d==0);
+        for(int axis=0;axis<6;++axis)CHECK(ui_values[0][layout::author_bounds_first+axis].one_d==baseline[layout::author_bounds_first+axis].one_d);};
+    reset();auto r=request();call(r);CHECK(r.acknowledged==1 && r.error==ModelAssetError::none && r.rollback_error==0 &&
+        ui_values[0][layout::revision].one_d==17 && ui_values[0][layout::source].one_d==2 && ui_values[0][94].one_d==0 && handles.at(ui_author_mesh)==encoded);
+    reset();r=request();r.desired_source=1;call(r);CHECK(r.error==ModelAssetError::none && ui_values[0][layout::source].one_d==1 && ui_values[0][layout::revision].one_d==17);
+    for(unsigned source:{1u,2u}){reset();r=request();r.desired_source=source;r.desired_revision=0;r.mesh_bytes=nullptr;r.mesh_length=0;
+        for(int axis=0;axis<6;++axis)r.desired_bounds[axis]=axis<3?-.5:.5;call(r);CHECK(r.error==ModelAssetError::none && ui_values[0][layout::revision].one_d==0);
+        auto cube=take(adapter::read_model_geometry_parameter(&data,ui_author_mesh,never));CHECK(cube.positions.size()==8 && cube.triangles.size()==12);}
+    for(unsigned bad=0;bad<11;++bad){reset();r=request();switch(bad){case 0:r.magic=0;break;case 1:r.bytes--;break;case 2:r.version=2;break;case 3:r.operation=2;break;
+        case 4:r.expected_source=0;break;case 5:r.desired_source=0;break;case 6:r.desired_revision=2147483648u;break;case 7:r.mesh_bytes=nullptr;break;
+        case 8:r.mesh_length=8*1024*1024+1;break;case 9:std::fill(std::begin(r.expected_uuid),std::end(r.expected_uuid),std::uint8_t{});break;
+        case 10:r.desired_bounds[0]=std::numeric_limits<double>::quiet_NaN();break;}
+        call(r);CHECK(ui_asset_writes==0 && (bad<3?r.acknowledged==0:r.error==ModelAssetError::invalid_request));restored();}
+    for(unsigned bad=0;bad<4;++bad){reset();r=request();if(bad==0)r.expected_source=1;else if(bad==1)r.expected_revision=78;else if(bad==2)r.expected_uuid[15]=5;
+        else ui_values[0][94].one_d=1;call(r);CHECK(r.error==ModelAssetError::stale_author && ui_asset_writes==0);}
+    reset();r=request();r.desired_bounds[0]=.25;call(r);CHECK(r.error==ModelAssetError::invalid_geometry && ui_asset_writes==0);restored();
+    reset();auto corrupt=encoded;corrupt.back()^=std::byte{1};r=request();r.mesh_bytes=reinterpret_cast<const std::uint8_t*>(corrupt.data());call(r);
+    CHECK(r.error==ModelAssetError::invalid_geometry && ui_asset_writes==0);restored();
+    reset();r=request();r.is_cancelled=[](void*) noexcept ->std::int32_t {return 1;};call(r);CHECK(r.error==ModelAssetError::cancelled && ui_asset_writes==0);restored();
+    reset();r=request();r.is_cancelled=[](void*) noexcept ->std::int32_t {return ui_asset_writes!=0;};call(r);CHECK(r.error==ModelAssetError::cancelled && r.rollback_error==0);restored();
+    reset();r=request();r.is_cancelled=[](void*) noexcept ->std::int32_t {return ui_asset_writes>=11;};call(r);CHECK(r.error==ModelAssetError::cancelled && r.rollback_error==0);restored();
+    for(const auto index:{94,layout::mesh,layout::revision,layout::source,layout::author_bounds_first,layout::author_bounds_first+1,layout::author_bounds_first+2,
+        layout::author_bounds_first+3,layout::author_bounds_first+4,layout::author_bounds_first+5}){
+        reset();r=request();r.desired_source=1;ui_write_fail=index;call(r);CHECK(r.error==ModelAssetError::host_error && r.host_error==512 && r.rollback_error==0);restored();
+        reset();r=request();r.desired_source=1;ui_write_silent=index;call(r);CHECK(r.error==ModelAssetError::host_error && r.host_error==PF_Err_INTERNAL_STRUCT_DAMAGED && r.rollback_error==0);restored();
+        reset();r=request();r.desired_source=1;ui_read_after_write=index;call(r);CHECK(r.error==ModelAssetError::host_error && r.host_error==516 && r.rollback_error==0);restored();
+    }
+    for(int mode:{1,2}){reset();r=request();ui_guard_release_mode=mode;call(r);CHECK(r.error==ModelAssetError::host_error &&
+        r.host_error==(mode==1?512:PF_Err_INTERNAL_STRUCT_DAMAGED) && r.rollback_error==0);restored();}
+    reset();r=request();ui_write_fail=layout::source;ui_rollback_silent=true;call(r);CHECK(r.error==ModelAssetError::host_error && r.host_error==512 && r.rollback_error==PF_Err_INTERNAL_STRUCT_DAMAGED);
+    reset();r=request();data.in_flags|=PF_InFlag_PROJECT_IS_RENDER_ONLY;call(r);CHECK(r.error==ModelAssetError::unavailable && ui_asset_writes==0);data.in_flags&=~PF_InFlag_PROJECT_IS_RENDER_ONLY;
+    reset();r=request();fail_allocate=true;call(r);CHECK(r.error==ModelAssetError::allocation_failed && ui_asset_writes==0);restored();
+    reset();r=request();ui_values[0][layout::author_bounds_first].one_d+=.1;call(r);CHECK(r.error==ModelAssetError::stale_author && ui_asset_writes==0);
+    reset();r=request();handles.at(ui_author_mesh).back()^=std::byte{1};call(r);CHECK(r.error==ModelAssetError::invalid_geometry && ui_asset_writes==0);
+    reset();r=request();wrong_mesh_type=true;call(r);CHECK(r.error==ModelAssetError::host_error && ui_asset_writes==0);wrong_mesh_type=false;
+    reset();r=request();fail_mesh_read=true;call(r);CHECK(r.error==ModelAssetError::host_error && r.host_error==516 && ui_asset_writes==0);fail_mesh_read=false;
+    reset();dispose(ui_author_mesh);ui_author_mesh=nullptr;ui_values[0]=baseline;ui_stream.AEGP_SetStreamValue=nullptr;
+}
 void ui_capture(PF_InData& data){
     using namespace adapter;using records=adapter::native_nodes::Kind;
     CHECK(register_model_author_controls(&data)==PF_Err_NONE);
@@ -240,6 +309,7 @@ void ui_capture(PF_InData& data){
             AEGP_StreamType_LAYER_ID:AEGP_StreamType_OneD;return 0;};
     ui_stream.AEGP_GetNewStreamValue=[](AEGP_PluginID,AEGP_StreamRefH ref,AEGP_LTimeMode,const A_Time*,A_Boolean,AEGP_StreamValue2* out)->A_Err{
         const auto key=*reinterpret_cast<UiStream*>(ref);out->streamH=ref;out->val=ui_values[key.effect][key.index];
+        if(ui_asset_writes && key.index==ui_read_after_write){ui_read_after_write=-1;return 516;}
         if(key.effect==1&&key.index==4)out->val.two_d={960,540};
         if(key.effect==0&&key.index==layout::mesh){++ui_mesh_reads;if(fail_mesh_read)return 516;
             const auto input=reinterpret_cast<PF_Handle>(out->val.arbH);auto copy=allocate(handles.at(input).size());handles.at(copy)=handles.at(input);out->val.arbH=reinterpret_cast<AEGP_ArbBlockVal>(copy);}
@@ -274,6 +344,7 @@ void ui_capture(PF_InData& data){
     CHECK(model!=graph.nodes.end()&&std::get<core::OpaqueBytes>(value(*model,kModelResource))[15]==std::byte{4}&&
         std::get<std::uint32_t>(value(*model,kModelRevision))==77);
     asset_export(data,imported);
+    asset_write(data,imported);
     for(int axis=0;axis<6;++axis){ui_values[0][layout::author_bounds_first+axis].one_d+=1;
         CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);
         ui_values[0][layout::author_bounds_first+axis].one_d=bounds[axis];}

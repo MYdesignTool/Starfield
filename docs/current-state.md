@@ -6,6 +6,10 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+精确Model资产写入候选接入private SFMW/version1与实际Model generic分支：按预期UUID/Source/revision/guard核对后恢复Mesh、六项bounds及精确revision/Source；支持parked mesh和revision0默认cube。每次写入读回，部分失败、silent setter、取消均恢复原值，恢复失败独立诊断；不发布图、不建立独立undo、不写pose/UUID。标准/ASAN实际原生模块各7535检查通过（另复用控件452），日志artifacts/m3-17-model-asset-write-{tests,asan}.log；首次SDK非const setter/fixture编译及同Source silent期望错误已修正，失败日志保留。完整Host导入/整笔预设事务仍待接入，此seam不独立暴露；新的冻结SDK构建待记录，安装60/61保持。
+
+UI-idle桥源码3c10b5da15d01b96c505eb4909f595764eea6713已git archive冻结于artifacts/prepared/m3-17-model-asset-host-3c10b5d/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，实际Host新模块编译。日志artifacts/m3-17-model-asset-host-build.log，八输出/十八安装哈希m3-17-model-asset-host-{build,installed}-hashes.json；0安装不匹配。此freeze早于SFMW写入候选，不包含后者，实际AE上下文/时序gate仍开放。
+
 Model资源导出异步候选：Host菜单仅排队，UI idle在进入线程/重入守卫下核对project root/comp/layer/唯一renderer/Model UUID，再调用私有SFMX；每次最多八个32KiB数值页，不参与常规CEP轮询。隔离gateway保留有界plain session，核对revision/Source/guard/bounds，取消、过期和stale丢弃。标准/ASAN Host各147289检查，gateway联动576、SFMG1客户端/资源校验373通过；Model作者74、旧Texture80/Cloud49/Birth51及完整gateway事务回归通过。日志artifacts/m3-17-model-asset-host-*.log和m3-17-model-assets-tests.log。tools/candidates/model_assets.js与更新后的author patch由Prepare工具重现到artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel，未写live CEP。精确资产导入、完整预设文件IO/应用回滚和Model菜单继续；此Host新候选完整冻结SDK及实际AE上下文/时序尚未验收。
 
 此前导出seam源码9a441a8已git archive冻结于artifacts/prepared/m3-17-model-asset-export-9a441a8/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，±0.5默认新增警告已消除。日志artifacts/m3-17-model-asset-export-build.log，八输出/十八安装哈希m3-17-model-asset-export-{build,installed}-hashes.json；0安装不匹配，native60/CEP61和runtime选择不变。此freeze不含上段新Host传输，不用它宣称新Host构建已通过。

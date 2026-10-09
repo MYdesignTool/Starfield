@@ -14,10 +14,13 @@
 #include "ModelGeometryParameter.hpp"
 #include "ModelImportUI.hpp"
 #include "ModelAssetExport.hpp"
+#include "ModelAssetWrite.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
 #include <cstdio>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <utility>
 
@@ -698,8 +701,11 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             } else return PF_Err_NONE;
         case PF_Cmd_COMPLETELY_GENERAL:
             if constexpr(kNodeEffectKind==NodeEffectKind::model) {
-                if(extra)return starfield::adapter::export_model_asset(in_data,
-                    *static_cast<starfield::adapter::ModelAssetExportRequest*>(extra));
+                if(extra){std::uint32_t magic{};std::memcpy(&magic,extra,sizeof(magic));
+                    if(magic==0x53464d57)return starfield::adapter::write_model_asset(in_data,
+                        *static_cast<starfield::adapter::ModelAssetWriteRequest*>(extra));
+                    if(magic==0x53464d58)return starfield::adapter::export_model_asset(in_data,
+                        *static_cast<starfield::adapter::ModelAssetExportRequest*>(extra));}
             }
             return PF_Err_NONE;
         default:

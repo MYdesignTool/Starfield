@@ -727,3 +727,18 @@ host-wide configuration. Preset mesh codecs and asset import/whole-graph rollbac
 are separate pending work; this transport does not advertise a usable Model
 preset pipeline. Actual AE2023 UI-idle ExecuteScript/generic context and timing
 remain qualification gates. The candidate stays isolated from installed60/61.
+
+The next private write seam uses SFMW/version1, not SFMX or the Core ABI. Its
+borrowed byte span must remain alive for the synchronous Model generic call.
+It checks UUID and expected native Source/revision/guard before changing Mesh,
+six author bounds, revision and Source under guard94. Desired revisions are
+restored exactly, including a parked mesh while Source=Cube. Revision0 with an
+empty span explicitly resets the default unit cube/bounds; other revisions need
+a valid bounded SFMG1 whose derived bounds exactly match the request. Every
+setter is read back; any failure restores all touched fields in reverse order
+and reports rollback failure separately. Old values and refs are callback-owned.
+The caller owns the outer undo group and renderer graph/mirror transaction.
+This seam creates no independent undo group, publishes no graph and writes no
+pose or UUID. It must not be exposed as an independently usable preset operation
+until Host import transport and complete Add/Replace/duplicate rollback are
+connected. No persistent IDs, schemas or parameter types change.

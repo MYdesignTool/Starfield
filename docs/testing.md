@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-09 SFMW精确资产恢复：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelNativeBindingTests.ps1 -Run`及追加`-Sanitize`，各7535项、0失败，另复用控件452。日志artifacts/m3-17-model-asset-write-{tests,asan}.log。实际Model generic入口覆盖精确修订、parked/默认cube、参数/身份/边界/CRC拒绝、取消、每项部分写失败/silent setter/读回失败、最终guard释放失败和恢复失败诊断，以及全部值/句柄/流/suite回收。失败日志model-asset-write-{compile,same-source-fixture}-failed.log保留；同Source setter本来无可观察变化，fixture改为实际Source变化后验证拒绝，没有放宽断言。全preset/Host导入及真实AE gate仍待完成。
+
+源码3c10b5d UI-idle export bridge独立冻结May2023 x64 Release /MT八目标通过，显式IncludeModelCandidate/双NoPublish；日志artifacts/m3-17-model-asset-host-build.log，八输出/十八安装哈希m3-17-model-asset-host-{build,installed}-hashes.json。0安装不匹配，native60/CEP61保持；此freeze不包含之后SFMW写入候选。
+
 2026-10-09 Model UI-idle资源桥：`tests/RunModelAssetHostTests.ps1 -Run`及`-Sanitize`各147289通过；实际Host传输源、fake SDK suites覆盖空闲无script调用、非UI线程拒绝、project/comp/layer/唯一renderer/UUID、suite缺失、AEGP result/error句柄释放、页拒绝/取消、8MiB/256页、不完整generic ack/payload及错误。日志artifacts/m3-17-model-asset-host-{tests,asan}.log。首次漏include路径和fixture类型/标准库ADL命名冲突修复，失败日志model-asset-host-{include-failed,compile-failed}.log保留。Core共享参数头加入Host include，不新增Core链接依赖。
 
 Prepare工具已重现隔离候选artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel。设置测试进程STARFIELD_PANEL_ROOT后，model_asset_gateway_tests.js576、model_panel_author_tests.js74、Texture80/Cloud49/Birth51、完整panel_native_node_gateway_tests.js通过；日志artifacts/m3-17-model-asset-host-<test>.log。前者使用实际gateway及真实客户端，核对gateway重载保留plain data、guard/stale/Source/parked OBJ/越界页/超时/释放，不读取CUSTOM_VALUE。最初缺renderer数字propertyIndex的fixture失败记录在gateway-{first-failed,carrier-failed}.log。`node tests/model_assets_tests.js`373通过，包括SFMG1头/CRC/数值/索引/退化三角形/引用点bounds、65536顶点分页、资产图映射、客户端取消/过期；日志m3-17-model-assets-tests.log。最初UInt8Array把256截断成0的错误fixture改为普通array，失败日志m3-17-model-assets-fixture-byte-failed.log保留。完整预设IO/导入恢复及实际AE gate未关闭。

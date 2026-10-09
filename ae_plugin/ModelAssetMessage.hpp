@@ -25,4 +25,19 @@ struct ModelAssetExportRequest {
 };
 static_assert(std::is_standard_layout_v<ModelAssetExportRequest> &&
     std::is_trivially_copyable_v<ModelAssetExportRequest>);
+struct ModelAssetWriteRequest {
+    std::uint32_t magic{0x53464d57},bytes{sizeof(ModelAssetWriteRequest)},version{1},operation{1};
+    std::uint8_t expected_uuid[16]{};
+    std::uint32_t expected_source{},expected_revision{},desired_source{},desired_revision{};
+    const std::uint8_t* mesh_bytes{};
+    std::uint32_t mesh_length{};
+    double desired_bounds[6]{};
+    void* cancellation_context{};
+    std::int32_t (*is_cancelled)(void*) noexcept {};
+    std::uint32_t acknowledged{};
+    ModelAssetError error{ModelAssetError::unavailable};
+    std::int32_t host_error{},rollback_error{};
+};
+static_assert(std::is_standard_layout_v<ModelAssetWriteRequest> &&
+    std::is_trivially_copyable_v<ModelAssetWriteRequest>);
 }
