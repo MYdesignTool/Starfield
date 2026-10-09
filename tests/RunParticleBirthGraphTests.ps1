@@ -5,7 +5,7 @@ $taskDir='artifacts\particle-birth-graph-tests'
 if(-not $Run){Write-Host 'Report: compile/run birth graph and temporal/Auxiliary/cap regression with MSVC /MT. Add -Run to act.';exit 0}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 $taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory',
-    'Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
+    'Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null

@@ -12,7 +12,7 @@ if (-not $Run) {
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "Missing MSVC setup: $MSVCVarsPath" }
 $sources = @('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction',
     'GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform',
-    'ParticleTexture','PluginApi','CpuRenderer','SpriteScene') | ForEach-Object { 'src\core\' + $_ + '.cpp' }
+    'ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object { 'src\core\' + $_ + '.cpp' }
 $arguments = @('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/DNDEBUG','/MT','/Iinclude',
     ('/Fo' + $directory + '\'), ('/Fe' + $directory + '\particle_cloud_tests.exe'), 'tests\particle_cloud_tests.cpp') + $sources
 Push-Location -LiteralPath $repositoryRoot

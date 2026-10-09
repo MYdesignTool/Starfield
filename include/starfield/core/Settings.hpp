@@ -103,6 +103,18 @@ struct ModelGeometry {
     std::vector<ModelTriangle> triangles;
     ModelBounds bounds{};
 };
+using ModelResourceId = std::array<std::uint8_t,16>;
+inline constexpr std::size_t kMaxModelSources=256, kMaxModelStyles=4096, kMaxModelsPerStyle=256;
+inline constexpr std::size_t kMaxModelEncodedBytes=8u*1024u*1024u;
+inline constexpr std::uint64_t kMaxModelSourceBytes=64ull*1024ull*1024ull;
+inline constexpr double kMaxModelLocalMatrixCoefficient=1e12,kMaxModelLayerMatrixCoefficient=1e30;
+inline constexpr std::array<double,16> kIdentityModelMatrix{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+struct ModelResource { ModelResourceId id{}; ModelGeometry geometry; };
+struct ParticleModelInstance {
+    ModelResourceId resource{}; // zero selects the builtin unit cube
+    std::array<double,16> model_to_particle{kIdentityModelMatrix};
+};
+struct ParticleModelStyle { std::vector<ParticleModelInstance> instances; };
 
 // Transform node values use the same canonical world frame as particles.
 // The adapter converts AE pixels/signs and captures any inherited motion before

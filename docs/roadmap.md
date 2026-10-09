@@ -9,7 +9,7 @@
 | M3-13 Texture | owner已确认CEP61节点添加修复；继续背面及采样/持久化gate | 正反面、真实方向/时间采样/阶段依赖与撤销/重开 |
 | M3-15 Cloud | native57/CEP57 作者已部署，等待参考外观与范围确认 | Circles/Aspect/Density 外观、动画、预算与宿主持久化 |
 | M3-16 Birth controls | native60/CEP61构建/配对部署完成；继续AE2023出生控制、动画与持久化验收 | seed影响完整发射源、概率筛选/身份/预算及实际 AE 验收 |
-| M3-17 Model | 当前实现卡：几何与三角形投影/栅格/合成已完成数值里程碑，继续粒子pose/资源/作者；Shape/Use Model(s)菜单待参考 | 默认及资源模型真实渲染、迁移/持久化、完整作者与AE2023验收 |
+| M3-17 Model | 当前实现卡：几何、三角形、资源/pose和ABI8传输数值里程碑已完成，继续图/快照/粒子/作者；Shape/Use Model(s)菜单待参考 | 默认及资源模型真实渲染、迁移/持久化、完整作者与AE2023验收 |
 | M3-11 Transform | 原生/CEP 实现与 native54/panel54 配对部署已完成 | 原生/CEP 往返、带动画的 Null、不同图路径、几何、撤销/重开与 shutter 在 AE2023 验收 |
 | P-02L 节点 palette | 验收 panel54 的拖入、坐标、取消与交互 | owner 的实际 AE 外观/拖动/撤销证据 |
 | P-02K 性能 | 量测 idle、seek、多发射器及 Add/Replace | 宿主延迟/光标观察与正确性；源码调用减少不能替代计时 |

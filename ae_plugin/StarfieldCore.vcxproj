@@ -40,6 +40,7 @@
     <ClCompile Include="..\src\core\SpriteScene.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\ModelGeometry.cpp" />
+    <ClCompile Include="..\src\core\ModelResources.cpp" />
     <ClCompile Include="..\src\core\ModelScene.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />

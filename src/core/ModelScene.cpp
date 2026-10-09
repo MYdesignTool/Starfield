@@ -14,11 +14,11 @@ bool limits_valid(ModelSceneLimits l) noexcept {
     return l.projected_triangles<=hard_limits.projected_triangles &&
         l.surface_pixels<=hard_limits.surface_pixels && l.sample_visits<=hard_limits.sample_visits;
 }
-template<std::size_t N> bool bounded_matrix(const std::array<double,N>& m) noexcept {
-    return std::all_of(m.begin(),m.end(),[](double x){return std::isfinite(x)&&std::abs(x)<=max_matrix;});
+template<std::size_t N> bool bounded_matrix(const std::array<double,N>& m,double bound=max_matrix) noexcept {
+    return std::all_of(m.begin(),m.end(),[&](double x){return std::isfinite(x)&&std::abs(x)<=bound;});
 }
-bool affine(const std::array<double,16>& m) noexcept {
-    return bounded_matrix(m)&&m[3]==0&&m[7]==0&&m[11]==0&&m[15]==1;
+bool affine(const std::array<double,16>& m,double bound=max_matrix) noexcept {
+    return bounded_matrix(m,bound)&&m[3]==0&&m[7]==0&&m[11]==0&&m[15]==1;
 }
 Vec3 transform(Vec3 p,const std::array<double,16>& m) noexcept {
     return {p.x*m[0]+p.y*m[4]+p.z*m[8]+m[12],
@@ -70,7 +70,7 @@ Result<ModelScene> project_model_scene(const ModelGeometry& mesh,const ModelProj
     if(!limits_valid(limits))return R::failure(ErrorCode::invalid_request,"Model limits exceed hard caps");
     const auto frame_result=validate_frame(input.frame);if(!frame_result.has_value())return R::failure(frame_result.error());
     const auto valid=validate_model_geometry(mesh,cancellation);if(!valid.has_value())return R::failure(valid.error());
-    if(!affine(input.model_to_layer))return R::failure(ErrorCode::invalid_request,"Model transform must be bounded affine");
+    if(!affine(input.model_to_layer,kMaxModelLayerMatrixCoefficient))return R::failure(ErrorCode::invalid_request,"Model transform must be bounded affine");
     const auto& frame=frame_result.value();const auto& camera=input.camera;
     std::array<double,9> homography{};
     if(camera.enabled) {

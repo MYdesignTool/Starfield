@@ -57,6 +57,9 @@ try {
         'src\core\ParticleSimulation.cpp',
         'src\core\ParticleTransform.cpp',
         'src\core\ParticleTexture.cpp',
+        'src\core\ModelGeometry.cpp',
+        'src\core\ModelResources.cpp',
+        'src\core\ModelScene.cpp',
         'src\core\PluginApi.cpp',
         'src\core\CpuRenderer.cpp',
         'src\core\SpriteScene.cpp'

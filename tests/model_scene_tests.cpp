@@ -122,7 +122,7 @@ int main() {
     caps={};caps.sample_visits=0;failed(rasterize_model_scene(scene.value(),never,caps),ErrorCode::work_limit_exceeded,"sample visit cap is enforced");
     caps={};++caps.surface_pixels;failed(rasterize_model_scene(scene.value(),never,caps),ErrorCode::invalid_request,"caller cannot raise hard limits");
     auto bad=p;bad.model_to_layer[3]=1;failed(project_model_scene(cube,bad,never),ErrorCode::invalid_request,"non-affine model matrix rejects");
-    bad=p;bad.model_to_layer[0]=1e13;failed(project_model_scene(cube,bad,never),ErrorCode::invalid_request,"unbounded model matrix rejects");
+    bad=p;bad.model_to_layer[0]=1e31;failed(project_model_scene(cube,bad,never),ErrorCode::invalid_request,"unbounded model matrix rejects");
     bad=p;bad.frame.pixel_aspect_ratio=0;failed(project_model_scene(cube,bad,never),ErrorCode::invalid_request,"invalid frame rejects");
     auto raw=scene.value();raw.triangles[0].vertices[0].x=std::numeric_limits<double>::quiet_NaN();
     failed(rasterize_model_scene(raw,never),ErrorCode::invalid_request,"nonfinite projected vertex rejects");

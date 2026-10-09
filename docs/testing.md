@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-09 M3-17资源/pose：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelResourceTests.ps1 -Run`，MSVC /MT，2076项、0失败；日志 artifacts/m3-17-model-resource-tests-current.log。SFMG1每字节CRC/截断/头部/数值/索引拒绝、资源总预算/ID、分配/取消及Up Axis/Euler/2D/Transform/PAR/anchor/local pose均覆盖。
+
+ABI8：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelTransportTests.ps1 -Run`，以及追加 `-Sanitize`，两者30项、0失败；日志 artifacts/m3-17-model-transport-{tests,asan}-current.log。ASAN运行精确ABI7字节分配，检查不访问新尾部；数组/总预算预检在数值解引用前执行。三角形6406当前复查通过，既有Texture4322在ABI8候选上回归通过（日志 artifacts/m3-17-texture-abi8-regression.log）。标准/ASAN仅测试数值传输，未接入Model graph/shape/snapshot/作者，不关闭AE gate；当前native60/ABI7/CEP61保持。
+
 2026-10-09 M3-17完整构建：源码5d17802的git archive冻结于 artifacts/prepared/m3-17-triangle-5d17802/source，执行 `powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过，包含新ModelGeometry/ModelScene。日志 artifacts/m3-17-triangle-native-build.log。构建后十八安装哈希仍符合native60/CEP61；本数值里程碑未发布或接入完整Model粒子/资源/作者，不从构建推断宿主资格。
 
 2026-10-09 M3-17三角形：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelSceneTests.ps1 -Run`，MSVC /MT，6406检查、0失败；日志 artifacts/m3-17-model-scene-tests-current.log。覆盖透视深度/UV、近面/齐次horizon/ROI、每模型四采样去重/遮挡、反射/shear/downsample/PAR显式矩阵、四种transfer/HDR、预算预检、取消/分配失败/坏输入、仅触及目标像素及取消时丢弃部分staging。首次fixture误用了near_clip成员路径，随后取消阈值超过小cube实际轮询数；修正fixture后才记录通过。几何4141复查通过，日志 artifacts/m3-17-model-geometry-current-tests.log。纯数值API未接入粒子pose/资源/作者或wire，不能声明Model可在AE使用。

@@ -89,3 +89,4 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 2026-10-09三角形里程碑：ModelScene显式矩阵投影、近面/正W/ROI裁剪、透视深度/UV、每模型四采样遮挡与一次覆盖合成，四种transfer/HDR通过6406项MSVC /MT检查。ROI/反射/shear/downsample、horizon/预算/取消/分配失败均覆盖；合成只扫描触及像素。CMake与Core vcxproj接入数值源；粒子pose/资源、wire迁移、作者仍未实现，不暴露菜单或部署此独立里程碑。
 源码5d17802已推送，并在 artifacts/prepared/m3-17-triangle-5d17802/source 冻结后完整May2023 /MT构建通过（双NoPublish）；日志 artifacts/m3-17-triangle-native-build.log。安装18项保持native60/CEP61收据一致。下一步：明确Model资源/pose/wire迁移后接入粒子、CPU与作者；完整goal仍active，菜单参考与实际AE gate开放。
 完成条件：默认cube和Model资源能作为粒子显示，3D旋转/缩放/反射/近裁剪/深度/叠加/相机/快照/预算/shutter有效；原生/CEP/预设、配对构建/发布和真实AE2023持久化验收。
+2026-10-09资源里程碑：SFMG1有界网格codec和粒子pose通过2076项；RenderRequest数值资源/C ABI8尾部传输通过30项标准及ASAN检查，保留精确ABI7前缀。三角形6406复查通过。追加源列表/CMake/Core工程；未接入图/shape4/snapshot8/原生/CEP，未发布或关闭Model gate。迁移方案先行写入ADR0038；现有安装ABI7不变。

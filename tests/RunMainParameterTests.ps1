@@ -7,7 +7,7 @@ $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxil
 Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null
-    $taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','CpuRenderer','SpriteScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
+    $taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
     $taskArgs=@('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/MT','/DMSWindows','/DWIN32','/D_WINDOWS',
         '/D_CRT_SECURE_NO_WARNINGS','/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',

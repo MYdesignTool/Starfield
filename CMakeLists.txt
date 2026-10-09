@@ -6,6 +6,7 @@ add_library(starfield_core STATIC
     src/core/CpuRenderer.cpp
     src/core/Geometry.cpp
     src/core/ModelGeometry.cpp
+    src/core/ModelResources.cpp
     src/core/ModelScene.cpp
     src/core/Graph.cpp
     src/core/GraphConstruction.cpp
@@ -53,6 +54,12 @@ if(BUILD_TESTING)
     add_executable(starfield_model_scene_tests tests/model_scene_tests.cpp)
     target_link_libraries(starfield_model_scene_tests PRIVATE starfield_core)
     add_test(NAME starfield_model_scene_tests COMMAND starfield_model_scene_tests)
+    add_executable(starfield_model_resource_tests tests/model_resource_tests.cpp)
+    target_link_libraries(starfield_model_resource_tests PRIVATE starfield_core)
+    add_test(NAME starfield_model_resource_tests COMMAND starfield_model_resource_tests)
+    add_executable(starfield_model_transport_tests tests/model_transport_tests.cpp src/core/PluginApi.cpp)
+    target_link_libraries(starfield_model_transport_tests PRIVATE starfield_core)
+    add_test(NAME starfield_model_transport_tests COMMAND starfield_model_transport_tests)
     add_executable(starfield_particle_texture_tests tests/particle_texture_tests.cpp src/core/PluginApi.cpp)
     target_link_libraries(starfield_particle_texture_tests PRIVATE starfield_core)
     add_test(NAME starfield_particle_texture_tests COMMAND starfield_particle_texture_tests)

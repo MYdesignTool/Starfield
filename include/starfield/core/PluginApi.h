@@ -4,12 +4,14 @@
 /* ABI between StarfieldParticle.aex and a runtime-loaded core. No AE or C++ type
  * crosses this boundary. All pointers remain valid only for the duration stated. */
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 7u
+#define SF_CORE_ABI_VERSION 8u
+#define SF_CORE_LEGACY_ABI_VERSION 7u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
 #if defined(SF_CORE_BUILD_DLL)
@@ -59,6 +61,21 @@ typedef struct SfTextureFrame {
     uint64_t pixel_float_count;
 } SfTextureFrame;
 
+/* Immutable numeric arrays valid for this call only; no C++/AE object layout. */
+typedef struct SfModelPosition { double x, y, z, weight; } SfModelPosition;
+typedef struct SfModelAttribute { double x, y, z; } SfModelAttribute;
+typedef struct SfModelCorner { uint32_t position, texture, normal; } SfModelCorner;
+typedef struct SfModelTriangle { SfModelCorner corners[3]; } SfModelTriangle;
+typedef struct SfModelSource {
+    uint32_t struct_size;
+    uint8_t resource_id[16];
+    uint32_t position_count, texture_coordinate_count, normal_count, triangle_count;
+    const SfModelPosition* positions;
+    const SfModelAttribute* texture_coordinates;
+    const SfModelAttribute* normals;
+    const SfModelTriangle* triangles;
+} SfModelSource;
+
 /* The graph bytes and callback context are caller-owned during this call only.
  * pixel_format: 0=RGBA8, 1=RGBA16, 2=RGBA32F. Other enum fields follow the
  * values in Render.hpp; unknown values are rejected by the DLL. */
@@ -77,7 +94,11 @@ typedef struct SfCoreRenderRequest {
     uint32_t texture_source_count, texture_frame_count;
     const SfTextureSource* texture_sources;
     const SfTextureFrame* texture_frames;
+    /* ABI8 tail. ABI7 requests end immediately before model_source_count. */
+    uint32_t model_source_count;
+    const SfModelSource* model_sources;
 } SfCoreRenderRequest;
+#define SF_CORE_ABI7_RENDER_REQUEST_SIZE ((uint32_t)offsetof(SfCoreRenderRequest, model_source_count))
 
 /* pixels and opaque_handle are owned by this DLL generation. The adapter copies
  * pixels while its generation lease is alive, then calls release_render_result

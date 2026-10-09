@@ -2,6 +2,28 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Resource and transport milestone evidence
+
+ModelResources implements the SFMG1 numeric mesh codec and particle pose below.
+`tests/RunModelResourceTests.ps1 -Run` passes2076 checks with MSVC /MT; log
+artifacts/m3-17-model-resource-tests-current.log. Tests cover every cube payload
+byte/truncation, header/checksum/numeric/index rejection, resource IDs/counts/
+aggregate byte preflight, cancellation/allocation failure, and pose agreement
+with Texture axes under Up Axis/Euler/Limit To2D/Transform reflection and shear.
+Cube projection, PAR, anchors and local transforms also pass. The first fixture
+mixed incompatible types in one auto declaration; it was repaired before passing.
+
+RenderRequest now owns numeric Model sources; C ABI8 appends their call-lifetime
+arrays while accepting the exact old ABI7 prefix. Both normal and AddressSanitizer
+`tests/RunModelTransportTests.ps1 -Run` (add `-Sanitize`) pass30 checks, including
+an allocation with only the ABI7 byte span and poisoned absent tail fields.
+Counts, aggregate bytes and duplicate IDs reject before numeric array access;
+invalid/copied geometry and cancellation reject without publishing pixels.
+Logs: artifacts/m3-17-model-transport-{tests,asan}-current.log.
+No graph/shape/snapshot/native resource authoring is connected yet. Accepting an
+unused mesh source does not demonstrate Model rendering. The installed pairing
+remains native60/ABI7/CEP61; this shared ABI change requires a full paired build.
+
 ## Triangle milestone evidence
 
 tests/RunModelSceneTests.ps1 -Run passes6406 checks,0 failures with MSVC /MT;
@@ -94,6 +116,57 @@ Cartesian division. Curve/surface statements remain explicitly unsupported.
 
 ## Future render and migration boundary
 
+### Resource/Particle transport plan
+
+Mesh payloads belong to native Model resource storage, separate from CEP's
+frequently synchronized graph. Model resources use nonzero128-bit stable IDs,
+owned numeric geometry and no filename/host handle in Core. At most256 sources
+and64MiB total numeric payloads are accepted per request; each mesh remains
+bounded by the existing65536 vertex/triangle limits and an8MiB encoded cap.
+Native storage will use independent SFMG version1: a32-byte little-endian header
+(magic,version,header size,total bytes,payload CRC32,four counts), then position
+records32bytes,UVW/normals24bytes,triangle corners36bytes. Bounds are recomputed,
+never trusted from serialized metadata. Decode validates lengths/counts/checksum
+before allocation, and numeric/indices/triangles before publishing a resource.
+
+The next graph extension appends Model shape4, preserving shapes0..3. A new
+org.starfieldfx.nodes.model schema1 produces org.starfieldfx.types.model-stream
+on port1. Particle schema7 gains optional input port3; multiple Model connections
+form one logical geometry group, ordered by Model node UUID. Model parameters
+are key1 opaque16-byte resource ID (zero/missing=builtin cube), key2 optional
+uint32 resource revision, key3 optional opaque128-byte affine local transform.
+Meshes are not embedded in these graph parameters. Existing graphs/parameters,
+envelope1 and node disk IDs remain unchanged; older readers reject the new
+node/port/shape rather than interpreting them as another primitive.
+
+Model groups are shared by EvaluatedGraph and referenced by a new in-memory
+ParticleInstance model_style_index. Snapshot8 will retain the explicit200-byte
+particle stride and add a64-byte header/group table. The high16 shape-word bits
+select the Model group only for shape4; zero means the implicit cube. Each group
+contains bounded resource ID/local-affine entries. Snapshot3..7 readers remain.
+No sizeof(C++ object) is used as a wire layout.
+
+Core ABI8 appends model-source count/pointer to the ABI7 request prefix.
+Each C source exposes bounded numeric position/UVW/normal/corner arrays with a
+stable resource ID, never C++ containers or an AE world. The Core copies these
+arrays into its own validated geometry for the call. GetApi(7) remains available
+for exact ABI7-prefix requests with zero model sources; the adapter requests8
+after the full migration. This requires a complete paired build. No authoring
+menu/native disk ID is changed at this resource foundation step; append those
+bindings and packed version explicitly before authoring publication.
+
+Particle pose uses canonical upward-positive Y through source-local affine,
+Up Axis, the existing rotation convention and shared Transform basis, then
+converts to layer-pixel downward-positive Y once. A unit cube's side length is
+Size(Pixels) in physical output pixels; X divides by output PAR. Particle
+anchors offset that unit-size frame, while Model source-local transforms preserve
+their own origin. Limit To2D suppresses X/Y Euler angles as on existing sprites.
+Canonical rotation is X(-angleX),Y(angleY),Z(angleZ), in that order, matching
+the existing display-axis rotation. Layer matrix coefficients may reach1e30
+after composition; source-local/camera coefficients retain1e12 bounds. These
+numeric rules are independently implemented and still require reference/AE
+appearance evidence before claiming vendor parity.
+
 ### Numeric triangle milestone
 
 ModelScene.hpp stages a single mesh using an explicit affine row-vector
@@ -101,8 +174,9 @@ model-to-layer-pixel matrix and the existing FrameSpec/Camera values. This
 avoids guessing Particle Model menu/size semantics while reference menus are
 pending. It adds no field to RenderRequest, ParticleInstance, C ABI or snapshots.
 Layer pixels have downward-positive Y; the eventual Particle pose adapter must
-convert canonical upward-positive Y exactly once. Matrix coefficients and
-camera scalars are bounded at1e12. The camera layer-to-view matrix is affine.
+convert canonical upward-positive Y exactly once. Source-local/camera coefficients
+are bounded at1e12; a composed model-to-layer matrix may reach1e30. The camera
+layer-to-view matrix is affine.
 
 Triangles clip against view Z>=near_clip, the positive homogeneous image-to-layer
 branch containing the principal point, and ROI boundaries before division.

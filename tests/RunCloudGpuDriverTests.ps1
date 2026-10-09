@@ -50,7 +50,7 @@ auto r=request(shape,camera);r.frame.alpha_mode=alpha;
         [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash}
     }
     $fingerprints | ConvertTo-Json | Set-Content -LiteralPath "$directory\fixture-hashes.json" -Encoding UTF8
-    $sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
+    $sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
     $scopeStubs=@'
 #include "EmitterHistory.hpp"
 #include "EditorPresetPicker.hpp"

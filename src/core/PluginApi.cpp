@@ -1,4 +1,5 @@
 #include "starfield/core/PluginApi.h"
+#include "starfield/core/ModelResources.hpp"
 
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SpriteScene.hpp"
@@ -58,6 +59,11 @@ private:
     const SfCoreRenderRequest& request_;
 };
 
+bool render_request_size_valid(const SfCoreRenderRequest* input) noexcept {
+    return input && (input->struct_size==sizeof(SfCoreRenderRequest) ||
+        input->struct_size==SF_CORE_ABI7_RENDER_REQUEST_SIZE);
+}
+
 core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderRequest& input) {
     auto graph = decode_graph(input.graph_bytes, input.graph_byte_count);
     if (!graph.has_value()) return core::Result<core::RenderRequest>::failure(graph.error());
@@ -116,6 +122,64 @@ core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderReques
         request.texture_frames.push_back({f.resource_id, f.frame_index, f.width, f.height, f.row_floats,
             {f.pixels, static_cast<std::size_t>(f.pixel_float_count)}});
     }
+    // Never read the ABI8 tail of an ABI7-sized request.
+    if(input.struct_size==sizeof(SfCoreRenderRequest)) {
+        const auto count=input.model_source_count;
+        if(count>core::kMaxModelSources)return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded,"Model ABI source count exceeded");
+        if(count&&!input.model_sources)return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"Model ABI source array is missing");
+        const CallbackCancellation cancel(input);std::uint64_t bytes=0;
+        std::array<core::ModelResourceId,core::kMaxModelSources> ids{};
+        for(std::uint32_t i=0;i<count;++i) {
+            if(cancel.is_cancelled())return core::Result<core::RenderRequest>::failure(core::ErrorCode::cancelled,"Model ABI preflight cancelled");
+            const auto& s=input.model_sources[i];
+            if(s.struct_size!=sizeof(SfModelSource))return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"Model ABI source size mismatch");
+            if(s.position_count>core::kMaxModelVertices||s.texture_coordinate_count>core::kMaxModelVertices||
+                s.normal_count>core::kMaxModelVertices||s.triangle_count>core::kMaxModelTriangles)
+                return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded,"Model ABI geometry counts exceeded");
+            if(!s.position_count||!s.triangle_count||!s.positions||!s.triangles ||
+                (s.texture_coordinate_count&&!s.texture_coordinates)||(s.normal_count&&!s.normals))
+                return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"Model ABI geometry array is missing");
+            const std::uint64_t size=32ull+32ull*s.position_count+24ull*s.texture_coordinate_count+24ull*s.normal_count+36ull*s.triangle_count;
+            if(size>core::kMaxModelSourceBytes-bytes)return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded,"Model ABI source byte budget exceeded");
+            bytes+=size;std::copy_n(s.resource_id,16,ids[i].begin());
+            if(std::all_of(ids[i].begin(),ids[i].end(),[](auto b){return b==0;}))
+                return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"Model ABI resource ID is zero");
+        }
+        std::sort(ids.begin(),ids.begin()+count);
+        for(std::uint32_t i=1;i<count;++i)if(ids[i]==ids[i-1])
+            return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"duplicate Model ABI resource ID");
+        request.model_sources.reserve(count);
+        for(std::uint32_t i=0;i<count;++i) {
+            const auto& s=input.model_sources[i];core::ModelResource resource;
+            std::copy_n(s.resource_id,16,resource.id.begin());auto& mesh=resource.geometry;
+            std::uint64_t work=0;
+            const auto stopped=[&](){return (work++%256==0)&&cancel.is_cancelled();};
+            mesh.positions.reserve(s.position_count);
+            for(std::uint32_t p=0;p<s.position_count;++p) {
+                if(stopped())return core::Result<core::RenderRequest>::failure(core::ErrorCode::cancelled,"Model ABI copying cancelled");
+                const auto& v=s.positions[p];mesh.positions.push_back({{v.x,v.y,v.z},v.weight});
+            }
+            mesh.texture_coordinates.reserve(s.texture_coordinate_count);mesh.normals.reserve(s.normal_count);
+            for(std::uint32_t v=0;v<s.texture_coordinate_count;++v) {
+                if(stopped())return core::Result<core::RenderRequest>::failure(core::ErrorCode::cancelled,"Model ABI copying cancelled");
+                const auto& t=s.texture_coordinates[v];mesh.texture_coordinates.push_back({t.x,t.y,t.z});
+            }
+            for(std::uint32_t v=0;v<s.normal_count;++v) {
+                if(stopped())return core::Result<core::RenderRequest>::failure(core::ErrorCode::cancelled,"Model ABI copying cancelled");
+                const auto& n=s.normals[v];mesh.normals.push_back({n.x,n.y,n.z});
+            }
+            mesh.triangles.reserve(s.triangle_count);
+            for(std::uint32_t t=0;t<s.triangle_count;++t) {
+                if(stopped())return core::Result<core::RenderRequest>::failure(core::ErrorCode::cancelled,"Model ABI copying cancelled");
+                core::ModelTriangle triangle;
+                for(unsigned c=0;c<3;++c){const auto& v=s.triangles[t].corners[c];triangle.corners[c]={v.position,v.texture,v.normal};}
+                mesh.triangles.push_back(triangle);
+            }
+            const auto valid=core::validate_model_geometry(mesh,cancel);
+            if(!valid.has_value())return core::Result<core::RenderRequest>::failure(valid.error());
+            mesh.bounds=valid.value();request.model_sources.push_back(std::move(resource));
+        }
+    }
     return core::Result<core::RenderRequest>::success(std::move(request));
 }
 
@@ -123,7 +187,7 @@ SfCoreStatus SF_CORE_CALL prepare_gpu_scene(const SfCoreRenderRequest* input, Sf
     if (output == nullptr || output->struct_size != sizeof(SfCoreGpuSceneResult)) return SF_CORE_INVALID_REQUEST;
     *output = SfCoreGpuSceneResult{};
     output->struct_size = sizeof(SfCoreGpuSceneResult);
-    if (input == nullptr || input->struct_size != sizeof(SfCoreRenderRequest)) {
+    if (!render_request_size_valid(input)) {
         output->status = SF_CORE_INVALID_REQUEST;
         detail(output->detail, "core render ABI request size mismatch");
         return output->status;
@@ -174,7 +238,7 @@ SfCoreStatus SF_CORE_CALL render(const SfCoreRenderRequest* input, SfCoreRenderR
     if (output == nullptr || output->struct_size != sizeof(SfCoreRenderResult)) return SF_CORE_INVALID_REQUEST;
     *output = SfCoreRenderResult{};
     output->struct_size = sizeof(SfCoreRenderResult);
-    if (input == nullptr || input->struct_size != sizeof(SfCoreRenderRequest)) {
+    if (!render_request_size_valid(input)) {
         output->status = SF_CORE_INVALID_REQUEST;
         detail(output->detail, "core render ABI request size mismatch");
         return output->status;
@@ -263,8 +327,8 @@ SfCoreStatus SF_CORE_CALL inspect(const SfCoreInspectRequest* input, SfCoreInspe
 
 extern "C" SF_CORE_EXPORT int32_t SF_CORE_CALL StarfieldCore_GetApi(
     uint32_t abi_version, uint32_t api_struct_size, SfCoreApi* out_api) {
-    if (out_api == nullptr || abi_version != SF_CORE_ABI_VERSION || api_struct_size != sizeof(SfCoreApi))
+    if (out_api == nullptr || (abi_version != SF_CORE_ABI_VERSION && abi_version != SF_CORE_LEGACY_ABI_VERSION) || api_struct_size != sizeof(SfCoreApi))
         return 0;
-    *out_api = SfCoreApi{sizeof(SfCoreApi), SF_CORE_ABI_VERSION, render, release_render_result, inspect, prepare_gpu_scene, release_gpu_scene};
+    *out_api = SfCoreApi{sizeof(SfCoreApi), abi_version, render, release_render_result, inspect, prepare_gpu_scene, release_gpu_scene};
     return 1;
 }

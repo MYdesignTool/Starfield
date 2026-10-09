@@ -177,6 +177,8 @@ struct RenderRequest {
     // Caller-owned immutable numeric staging, valid for the duration of render.
     std::vector<TextureSource> texture_sources;
     std::vector<TextureFrameView> texture_frames;
+    // Owned immutable numeric geometry, independent of CEP graph synchronization.
+    std::vector<ModelResource> model_sources;
 };
 
 struct RenderOutput {
