@@ -42,6 +42,8 @@ CoreOnly 的 adapter-input 指纹会检查共享输入，runtime 发布还核对
 
 Transform 分别合成中心与精灵基底，保留 shear/reflection；Force 使用下游 Transform suffix。共享基底表最多4096项，snapshot4 保留200字节的显式粒子记录，仍能读取 snapshot3；内存对象 sizeof 不定义 wire stride。Null 作者选择与数值采样契约见 ADR0032。
 
+M3-17 Model候选的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证。输入只有字节文本与数字，未执行文件IO或宿主操作；渲染/资源作者尚未接入，Render.hpp/ABI7/snapshot7在本几何里程碑不变。未来迁移和完整Model gate由ADR0038管理，现有安装保持native60/CEP61。
+
 ## 渲染、资源与线程
 
 SmartFX 构造不可变图/历史、几何和 Core lease；相同 generation 保持到对应 render/result 释放。内容身份参与 cache GUID。渲染输出为透明背景上的粒子 RGBA，不合成输入像素。

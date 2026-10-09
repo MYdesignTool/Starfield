@@ -82,6 +82,28 @@ struct Vec3 {
     double z{};
 };
 
+// Model geometry is plain numeric staging. Its render/graph wire integration
+// is staged in ADR0038; these values contain no host references or file paths.
+inline constexpr std::uint32_t kMissingModelAttribute = 0xffffffffu;
+inline constexpr std::uint32_t kMaxModelVertices = 65536;
+inline constexpr std::uint32_t kMaxModelTriangles = 65536;
+inline constexpr double kMaxModelCoordinate = 1e9;
+struct ModelPosition { Vec3 value{}; double weight{1}; };
+struct ModelCorner {
+    std::uint32_t position{};
+    std::uint32_t texture{kMissingModelAttribute};
+    std::uint32_t normal{kMissingModelAttribute};
+};
+struct ModelTriangle { std::array<ModelCorner,3> corners{}; };
+struct ModelBounds { Vec3 minimum{}, maximum{}; };
+struct ModelGeometry {
+    std::vector<ModelPosition> positions;
+    std::vector<Vec3> texture_coordinates;
+    std::vector<Vec3> normals;
+    std::vector<ModelTriangle> triangles;
+    ModelBounds bounds{};
+};
+
 // Transform node values use the same canonical world frame as particles.
 // The adapter converts AE pixels/signs and captures any inherited motion before
 // entering the core. Matrices are row-major, applied to column vectors.

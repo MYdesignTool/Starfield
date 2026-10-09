@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 M3-17几何：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGeometryTests.ps1 -Run`，MSVC /MT，4141检查、0失败，日志 artifacts/m3-17-model-geometry-tests.log。覆盖cube闭合/绕序、OBJ四种角点索引/负索引、权重和UVW、凹多边形两种绕序/面积/稳定角点属性、引用边界、退化/相交/非平面拒绝、各项预算、取消和注入分配失败；平移与次正规有限尺度也通过。首次cube聚合初始化不符合MSVC，修正后才记录通过。测试只构建独立新几何代码，不修改安装或证明3D渲染/AE资格。
+
 2026-10-09 M3-16完整构建：冻结90b7a2b源码 `artifacts/prepared/m3-16-native60-panel61/source` 中执行 `ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT通过，日志 artifacts/m3-16-native60-build.log。09:14 +08:00无AE后发布native60/CEP61，十八个安装、十八个保存文件、前后selector独立核对，Restore只读report通过。收据 artifacts/m3-16-native60-deploy-{before,after}.json，构建/部署不替代实际AE2023新控件和Texture gate。
 
 2026-10-09 M3-16 作者：`tests/RunCloudNativeSyncTests.ps1 -Run -Bindings`（8441+相机12）、同脚本 `-Run`（实际 Particle回调344）、`tests/RunTextureSelectorTests.ps1 -Run`（实际注册269）均0失败。覆盖整数seed极值/类型、chance端点/小数、原子activation/失败、绑定v1..5历史边界、动画值及独立常量chance证明。测试夹具的 CanVaryOverTime 已补充表达式资格，避免错误地把表达式声明为不能动画的流。日志 artifacts/m3-16-birth-{binding,callback,registration}-tests.log。

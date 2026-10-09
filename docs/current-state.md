@@ -1,6 +1,6 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。当前活动卡 M3-16：出生控制 Core/native/CEP 接入、最小检查和完整 May2023 /MT 构建通过，实际 AE gate 仍开放。CEP61包含CEP60的 Texture 明确范围分支；已有引用时添加及背面采样仍待 owner 回复。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：单位cube与有界OBJ几何4141检查通过，继续三角形渲染/资源/作者，未暴露菜单或部署。CEP61包含CEP60的 Texture 明确范围分支；已有引用时添加及背面采样仍待 owner 回复。MNT-01 改动保留。
 
 ## 源码与安装
 
@@ -64,6 +64,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
 
 ## 开放 gate
+
+- M3-17新几何源为独立Model候选，不在installed60/61中；Settings新增纯数值几何类型但既有字段/ABI未改。完整Model渲染/资源/作者与Shape、Use Model(s)参考菜单仍开放。接入前修订ADR0038的确切graph/native/wire迁移；不能将解析器数值证据当作可用Model类型。
 
 - M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 
