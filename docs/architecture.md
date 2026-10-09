@@ -42,7 +42,7 @@ CoreOnly 的 adapter-input 指纹会检查共享输入，runtime 发布还核对
 
 Transform 分别合成中心与精灵基底，保留 shear/reflection；Force 使用下游 Transform suffix。共享基底表最多4096项，snapshot4 保留200字节的显式粒子记录，仍能读取 snapshot3；内存对象 sizeof 不定义 wire stride。Null 作者选择与数值采样契约见 ADR0032。
 
-M3-17 Model候选的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证。ModelScene用显式model-to-layer矩阵制作裁剪三角形、四采样覆盖/深度和独立粒子叠加。ModelResources负责SFMG1网格codec和粒子pose；RenderRequest自有网格，Core ABI8追加有界数值数组并接受ABI7精确前缀。输入只有字节文本与数字，未执行文件IO或宿主操作。图/shape/快照/作者仍待接入；snapshot7未变。迁移和完整Model gate由ADR0038管理，现有安装保持native60/ABI7/CEP61。
+M3-17 Model候选的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证及一次验证的mesh lease。ModelScene用显式model-to-layer矩阵制作裁剪三角形、四采样覆盖/深度和独立粒子叠加。ModelResources负责SFMG1网格codec和粒子pose；RenderRequest自有网格，Core ABI8追加有界数值数组并接受ABI7精确前缀。snapshot8保留200B粒子并共享模型组，旧3..7保留读取；CPU从显式evaluated记录绘制shape4，多个成员合并覆盖/深度再应用一次opacity。live图/采样/原生/CEP作者仍待接入。输入只有字节文本与数字，未执行文件IO或宿主操作。迁移和完整Model gate由ADR0038管理，现有安装保持native60/ABI7/CEP61。
 
 ## 渲染、资源与线程
 

@@ -6,6 +6,11 @@
 #include <new>
 
 namespace starfield::core {
+Result<ModelGeometryLease> compile_model_geometry(const ModelGeometry& mesh,const Cancellation& cancel) noexcept {
+    const auto valid=validate_model_geometry(mesh,cancel);
+    if(!valid.has_value())return Result<ModelGeometryLease>::failure(valid.error());
+    return Result<ModelGeometryLease>::success(ModelGeometryLease(mesh));
+}
 namespace {
 using MeshResult=Result<ModelGeometry>;
 constexpr double epsilon=1e-12;

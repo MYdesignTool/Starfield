@@ -3,6 +3,8 @@
 
 #include "starfield/core/ParticleSimulation.hpp"
 #include "starfield/core/Random.hpp"
+#include "starfield/core/ModelResources.hpp"
+#include "starfield/core/ModelScene.hpp"
 #include "SpriteGeometry.hpp"
 
 #include <algorithm>
@@ -114,6 +116,10 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     if (!valid_camera(request.camera)) return OutputResult::failure(ErrorCode::invalid_request, "invalid camera projection");
     const auto resources=validate_texture_resources(request.texture_sources,request.texture_frames,cancellation);
     if (!resources.has_value()) return OutputResult::failure(resources.error());
+    if(limits_.max_model_input_triangles>16'000'000 || limits_.max_model_sample_visits>512'000'000)
+        return OutputResult::failure(ErrorCode::invalid_request,"Model frame limits exceed hard caps");
+    const auto model_leases=compile_model_resources(request.model_sources,cancellation);
+    if(!model_leases.has_value())return OutputResult::failure(model_leases.error());
     const RectI roi = frame.region_of_interest;
 
     RenderOutput output;
@@ -167,6 +173,24 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
     }
     const auto& particles=evaluated.value().particles;
 
+    std::map<ModelResourceId,ModelGeometryLease> model_sources;
+    std::optional<ModelGeometry> cube_geometry;
+    std::optional<ModelGeometryLease> cube;
+    try {
+        for(std::size_t i=0;i<request.model_sources.size();++i)model_sources.emplace(request.model_sources[i].id,model_leases.value()[i]);
+        if(std::any_of(particles.begin(),particles.end(),[](const auto& p){return p.shape==4;})) {
+            auto mesh=make_unit_cube();if(!mesh.has_value())return OutputResult::failure(mesh.error());cube_geometry=mesh.take_value();
+            const auto lease=compile_model_geometry(*cube_geometry,cancellation);if(!lease.has_value())return OutputResult::failure(lease.error());cube=lease.value();
+            std::uint64_t model_style_work=0;
+            for(const auto& style:evaluated.value().model_styles)for(const auto& instance:style.instances) {
+                if(model_style_work++%64==0 && cancellation.is_cancelled())return OutputResult::failure(ErrorCode::cancelled,"Model group validation cancelled");
+                if(!valid_model_instance(instance))return OutputResult::failure(ErrorCode::invalid_request,"invalid Model group transform");
+                if(instance.resource!=ModelResourceId{} && !model_sources.contains(instance.resource))
+                    return OutputResult::failure(ErrorCode::invalid_request,"referenced Model resource is missing");
+            }
+        }
+    } catch(const std::bad_alloc&){return OutputResult::failure(ErrorCode::allocation_failed,"Model lookup allocation failed");}
+
     std::map<std::uint32_t,const TextureSource*> texture_sources;
     std::map<std::pair<std::uint32_t,std::uint32_t>,const TextureFrameView*> texture_frames;
     try {
@@ -207,7 +231,19 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
             }
             Sprite sprite{};
             const auto& particle=particles[i];
-            if (particle.shape==3) {
+            if(particle.shape==4) {
+                if(!(particle.size_pixels>0) || !(particle.opacity>0))continue;
+                sprite.particle=&particle;
+                if(request.camera.enabled) {
+                    const auto& m=request.camera.layer_to_view;
+                    const double x=frame.layer_width*.5+particle.position.x*frame.layer_height/frame.pixel_aspect_ratio;
+                    const double y=(.5-particle.position.y)*frame.layer_height,z=particle.position.z*frame.layer_height;
+                    sprite.depth=x*m[2]+y*m[6]+z*m[10]+m[14];
+                    if(!std::isfinite(sprite.depth))return OutputResult::failure(ErrorCode::invalid_request,"nonfinite Model particle camera depth");
+                }
+                // Keep centers behind the near plane: their mesh can cross it.
+                sprites.push_back(sprite);
+            } else if (particle.shape==3) {
                 const auto& style=evaluated.value().texture_styles[particle.texture_style_index-1];
                 if (!style.front && !style.back) continue;
                 auto source=texture_sources.at(style.front?style.front:style.back);
@@ -231,6 +267,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         });
     } catch (const std::bad_alloc&) { return OutputResult::failure(ErrorCode::allocation_failed, "camera sprite allocation failed"); }
 
+    std::uint64_t model_input_triangles=0,model_sample_visits=0;
     for (std::size_t index = 0; index < sprites.size(); ++index) {
         if ((index % kCancellationParticleInterval) == 0 && cancellation.is_cancelled()) {
             return OutputResult::failure(ErrorCode::cancelled, "cancelled during sprite rasterization");
@@ -239,6 +276,35 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         const auto& sprite = sprites[index];
         const ParticleInstance& particle = *sprite.particle;
         if (!(particle.opacity > 0.0)) continue;
+        if(particle.shape==4) {
+            const ParticleModelInstance implicit{};
+            const auto instances=particle.model_style_index ? std::span<const ParticleModelInstance>(evaluated.value().model_styles[particle.model_style_index-1].instances) : std::span<const ParticleModelInstance>(&implicit,1);
+            ModelScene scene;scene.region=roi;
+            ModelSceneLimits model_limits;
+            model_limits.sample_visits=std::min(model_limits.sample_visits,limits_.max_model_sample_visits-model_sample_visits);
+            for(const auto& instance:instances) {
+                const auto& lease=instance.resource==ModelResourceId{} ? *cube : model_sources.at(instance.resource);
+                const auto count=lease.geometry().triangles.size();
+                if(count>limits_.max_model_input_triangles-model_input_triangles)
+                    return OutputResult::failure(ErrorCode::work_limit_exceeded,"Model frame input triangle budget exceeded");
+                model_input_triangles+=count;
+                const auto pose=model_particle_matrix(particle,frame,evaluated.value().sprite_bases,instance);
+                if(!pose.has_value())return OutputResult::failure(pose.error());
+                ModelProjection projection{frame,request.camera,pose.value()};
+                auto projected=project_model_scene(lease,projection,cancellation,model_limits);
+                if(!projected.has_value())return OutputResult::failure(projected.error());
+                if(projected.value().triangles.size()>model_limits.projected_triangles-scene.triangles.size())
+                    return OutputResult::failure(ErrorCode::work_limit_exceeded,"Model group projected triangle budget exceeded");
+                try {scene.triangles.insert(scene.triangles.end(),projected.value().triangles.begin(),projected.value().triangles.end());}
+                catch(const std::bad_alloc&){return OutputResult::failure(ErrorCode::allocation_failed,"Model group triangle allocation failed");}
+            }
+            const auto surface=rasterize_model_scene(scene,cancellation,model_limits);
+            if(!surface.has_value())return OutputResult::failure(surface.error());
+            model_sample_visits+=surface.value().sample_visits;
+            const auto composed=composite_model_surface(surface.value(),particle.color,particle.opacity,particle.transfer_mode,roi,accumulation,cancellation);
+            if(!composed.has_value())return OutputResult::failure(composed.error());
+            continue;
+        }
         const double radius = 0.5 * particle.size_pixels;
         if (!(radius > 0.0)) {
             continue; // a zero-size particle is invisible by contract

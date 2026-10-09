@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-09 M3-17 snapshot8/CPU：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelParticleTests.ps1 -Run`，及追加 `-Sanitize`，均2695项、0失败；日志 artifacts/m3-17-model-particle-{tests,asan}-current.log。默认cube/导入多边形真实像素、组内一次透明度、近面中心后方/ROI/PAR/downsample/Transform/primitive排序/四种transfer/8及16bpc/C ABI均覆盖。Model变长表全部截断、坏count/length/matrix/index、旧3..7、混合Cloud/Texture、资源缺失、取消/分配及全帧共享预算通过。首个fixture缺SequenceResult helper，首次数值fixture选边界像素作内部断言及漏填近裁剪相机identity homography；修正后才记录通过。ASAN linker/debug参数已移出响应文件，避免MSVC忽略PDB参数。
+
+当前lease资源2076（artifacts/m3-17-model-resource-lease-current.log）、三角形6406（artifacts/m3-17-model-scene-lease-tests.log）、ABI前缀ASAN30（artifacts/m3-17-model-transport-snapshot8-asan.log）及既有Texture4322（artifacts/m3-17-texture-snapshot8-regression.log）复查通过。证据来自显式evaluated快照；live图/原生/CEP作者仍未接入，不能声明可用AE Model功能。
+
+资源源码8220f25在 artifacts/prepared/m3-17-resources-8220f25/source 完整May2023 /MT构建通过（双NoPublish），日志 artifacts/m3-17-resources-native-build.log；十八安装哈希与native60/CEP61一致，报告 artifacts/m3-17-resources-installed-hashes.json。此freeze早于snapshot8/CPU改动。
+
 2026-10-09 M3-17资源/pose：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelResourceTests.ps1 -Run`，MSVC /MT，2076项、0失败；日志 artifacts/m3-17-model-resource-tests-current.log。SFMG1每字节CRC/截断/头部/数值/索引拒绝、资源总预算/ID、分配/取消及Up Axis/Euler/2D/Transform/PAR/anchor/local pose均覆盖。
 
 ABI8：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelTransportTests.ps1 -Run`，以及追加 `-Sanitize`，两者30项、0失败；日志 artifacts/m3-17-model-transport-{tests,asan}-current.log。ASAN运行精确ABI7字节分配，检查不访问新尾部；数组/总预算预检在数值解引用前执行。三角形6406当前复查通过，既有Texture4322在ABI8候选上回归通过（日志 artifacts/m3-17-texture-abi8-regression.log）。标准/ASAN仅测试数值传输，未接入Model graph/shape/snapshot/作者，不关闭AE gate；当前native60/ABI7/CEP61保持。

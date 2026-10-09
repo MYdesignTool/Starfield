@@ -22,7 +22,7 @@ struct ParticleInstance {
     double lifetime_seconds{0.0};
     double size_pixels{0.0};
     double opacity{0.0};
-    std::uint32_t shape{0}; // Circle / Rectangle / Cloud / Texture
+    std::uint32_t shape{0}; // Circle / Rectangle / Cloud / Texture / Model
     double size_y_pixels{0.0}; // 0 means use diameter in standalone settings
     Vec3 rotation_degrees{};
     double feather_percent{0};
@@ -40,6 +40,8 @@ struct ParticleInstance {
     std::uint32_t texture_style_index{}, texture_random_key{};
     // Zero keeps legacy five-circle Cloud. Members remain one logical particle.
     std::uint32_t cloud_style_index{}, cloud_random_key{};
+    // Zero selects the builtin cube; otherwise a 1-based shared geometry group.
+    std::uint32_t model_style_index{};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

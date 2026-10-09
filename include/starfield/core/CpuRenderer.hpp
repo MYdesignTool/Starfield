@@ -12,10 +12,12 @@ struct RenderLimits {
     // still apply and every scan row checks cancellation. Explicit finite limits
     // fail with work_limit_exceeded instead of truncating the output.
     std::uint64_t max_sprite_pixel_ops{0};
+    std::uint64_t max_model_input_triangles{16'000'000};
+    std::uint64_t max_model_sample_visits{512'000'000};
 };
 
 // Deterministic CPU reference backend: analytic Circle/Rectangle/Cloud and
-// bilinear Texture sprites, premultiplied transfer modes, camera depth ordering
+// bilinear Texture sprites and solid Model triangles, premultiplied transfer modes, camera depth ordering
 // and shared Transform bases. The adapter invokes this for each shutter sample.
 class CpuParticleRenderer final : public Renderer {
 public:

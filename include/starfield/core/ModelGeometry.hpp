@@ -19,6 +19,17 @@ struct ModelParseLocation { std::size_t line{}; };
 
 // Bounds cover referenced geometry; unreferenced positions are still validated.
 [[nodiscard]] Result<ModelBounds> validate_model_geometry(const ModelGeometry&,const Cancellation&) noexcept;
+// Call-lifetime lease: the owner keeps the numeric mesh alive and unchanged.
+// Construction validates once; only this factory can create the lease.
+class ModelGeometryLease {
+public:
+    [[nodiscard]] const ModelGeometry& geometry() const noexcept {return *geometry_;}
+private:
+    explicit ModelGeometryLease(const ModelGeometry& mesh) noexcept : geometry_(&mesh) {}
+    const ModelGeometry* geometry_;
+    friend Result<ModelGeometryLease> compile_model_geometry(const ModelGeometry&,const Cancellation&) noexcept;
+};
+[[nodiscard]] Result<ModelGeometryLease> compile_model_geometry(const ModelGeometry&,const Cancellation&) noexcept;
 [[nodiscard]] Result<ModelGeometry> make_unit_cube() noexcept;
 // Never performs filesystem access or executes OBJ statements. A failed parse
 // returns no partial mesh. Optional weights/UVW and corner indices are retained.

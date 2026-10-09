@@ -64,6 +64,8 @@
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
     <ClCompile Include="..\src\core\EmitterHistory.cpp" />
+    <ClCompile Include="..\src\core\ModelGeometry.cpp" />
+    <ClCompile Include="..\src\core\ModelResources.cpp" />
     <ClCompile Include="..\src\core\ParticleSimulation.cpp" />
     <ClCompile Include="..\src\core\ParticleTransform.cpp" />
     <ClCompile Include="..\src\core\ParticleTexture.cpp" />

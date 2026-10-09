@@ -112,7 +112,7 @@ Result<ModelGeometry> decode_model_geometry(std::span<const std::byte> bytes,con
     } catch(const std::bad_alloc&){return R::failure(ErrorCode::allocation_failed,"Model decoding allocation failed");}
     catch(...){return R::failure(ErrorCode::internal_failure,"Model decoding failed");}
 }
-Result<std::size_t> validate_model_resources(std::span<const ModelResource> sources,const Cancellation& cancel) noexcept {
+static Result<std::size_t> preflight_model_resources(std::span<const ModelResource> sources,const Cancellation& cancel) noexcept {
     using R=Result<std::size_t>;
     if(sources.size()>kMaxModelSources)return R::failure(ErrorCode::work_limit_exceeded,"Model source count exceeded");
     std::array<ModelResourceId,kMaxModelSources> ids{};std::uint64_t bytes=0;
@@ -124,8 +124,25 @@ Result<std::size_t> validate_model_resources(std::span<const ModelResource> sour
     }
     std::sort(ids.begin(),ids.begin()+static_cast<std::ptrdiff_t>(sources.size()));
     for(std::size_t i=1;i<sources.size();++i)if(ids[i]==ids[i-1])return R::failure(ErrorCode::invalid_request,"duplicate Model source ID");
-    for(const auto& source:sources){const auto valid=validate_model_geometry(source.geometry,cancel);if(!valid.has_value())return R::failure(valid.error());}
     return R::success(sources.size());
+}
+Result<std::size_t> validate_model_resources(std::span<const ModelResource> sources,const Cancellation& cancel) noexcept {
+    const auto preflight=preflight_model_resources(sources,cancel);if(!preflight.has_value())return preflight;
+    for(const auto& source:sources){const auto valid=validate_model_geometry(source.geometry,cancel);if(!valid.has_value())return Result<std::size_t>::failure(valid.error());}
+    return preflight;
+}
+Result<std::vector<ModelGeometryLease>> compile_model_resources(std::span<const ModelResource> sources,const Cancellation& cancel) noexcept {
+    using R=Result<std::vector<ModelGeometryLease>>;
+    const auto preflight=preflight_model_resources(sources,cancel);if(!preflight.has_value())return R::failure(preflight.error());
+    try {
+        std::vector<ModelGeometryLease> leases;leases.reserve(sources.size());
+        for(const auto& source:sources) {
+            const auto lease=compile_model_geometry(source.geometry,cancel);if(!lease.has_value())return R::failure(lease.error());
+            leases.push_back(lease.value());
+        }
+        return R::success(std::move(leases));
+    } catch(const std::bad_alloc&){return R::failure(ErrorCode::allocation_failed,"Model resource lease allocation failed");}
+    catch(...){return R::failure(ErrorCode::internal_failure,"Model resource compilation failed");}
 }
 Result<std::array<double,16>> model_particle_matrix(const ParticleInstance& p,const FrameSpec& frame,
     std::span<const ParticleSpriteBasis> bases,const ParticleModelInstance& instance) noexcept {

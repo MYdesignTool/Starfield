@@ -14,6 +14,8 @@ namespace starfield::core {
     const Cancellation&) noexcept;
 [[nodiscard]] Result<std::size_t> validate_model_resources(std::span<const ModelResource>,
     const Cancellation&) noexcept;
+[[nodiscard]] Result<std::vector<ModelGeometryLease>> compile_model_resources(std::span<const ModelResource>,
+    const Cancellation&) noexcept;
 [[nodiscard]] Result<std::array<double,16>> model_particle_matrix(const ParticleInstance&,
     const FrameSpec&,std::span<const ParticleSpriteBasis> = {},
     const ParticleModelInstance& = {}) noexcept;

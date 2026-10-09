@@ -66,10 +66,16 @@ RectI triangle_bounds(const ModelProjectedTriangle& t,RectI region) noexcept {
 
 Result<ModelScene> project_model_scene(const ModelGeometry& mesh,const ModelProjection& input,
     const Cancellation& cancellation,ModelSceneLimits limits) noexcept {
+    const auto compiled=compile_model_geometry(mesh,cancellation);
+    if(!compiled.has_value())return Result<ModelScene>::failure(compiled.error());
+    return project_model_scene(compiled.value(),input,cancellation,limits);
+}
+Result<ModelScene> project_model_scene(const ModelGeometryLease& lease,const ModelProjection& input,
+    const Cancellation& cancellation,ModelSceneLimits limits) noexcept {
+    const auto& mesh=lease.geometry();
     using R=Result<ModelScene>;
     if(!limits_valid(limits))return R::failure(ErrorCode::invalid_request,"Model limits exceed hard caps");
     const auto frame_result=validate_frame(input.frame);if(!frame_result.has_value())return R::failure(frame_result.error());
-    const auto valid=validate_model_geometry(mesh,cancellation);if(!valid.has_value())return R::failure(valid.error());
     if(!affine(input.model_to_layer,kMaxModelLayerMatrixCoefficient))return R::failure(ErrorCode::invalid_request,"Model transform must be bounded affine");
     const auto& frame=frame_result.value();const auto& camera=input.camera;
     std::array<double,9> homography{};
@@ -182,6 +188,7 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
             }
         }
     }
+    surface.sample_visits=estimated_work;
     if(surface.region.empty())return R::success(std::move(surface));
     const auto width=static_cast<std::size_t>(surface.region.width()),height=static_cast<std::size_t>(surface.region.height());
     if(width*height>limits.surface_pixels)return R::failure(ErrorCode::work_limit_exceeded,"Model surface pixel cap exceeded");

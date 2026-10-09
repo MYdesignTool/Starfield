@@ -1,10 +1,12 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：几何4141、三角形6406、资源/pose2076及ABI8传输30项（含ASAN）通过，继续图/快照/粒子/作者接入，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：资源/pose2076、三角形6406、snapshot8/CPU像素2695及ABI8传输30（含ASAN）通过，继续live图/原生/CEP作者接入，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
 
 ## 源码与安装
 
-当前Model资源候选新增SFMG1 codec、唯一ID/64MiB总资源预检、粒子pose和RenderRequest自有数值资源。Core ABI8追加网格数组，并保留精确ABI7请求前缀，不读取其不存在的尾部；30项标准及ASAN检查通过。资源/pose2076和更新矩阵上限后的三角形6406复查通过，日志 artifacts/m3-17-model-*-current.log。图/shape4/snapshot8/native/CEP仍未接入；共享ABI变化要求完整配对构建，当前安装仍ABI7。
+当前Model候选在显式evaluated snapshot中支持shape4、snapshot8模型组和CPU实际像素；默认cube/导入多边形、三维pose、近裁剪、ROI/PAR/downsample、四种transfer及primitive共同排序均通过2695项标准与ASAN检查。一次验证的数值mesh lease供各粒子复用；同组成员先合并覆盖再应用一次opacity，frame共享输入三角形/采样预算。live图/原生/CEP作者未接入，未发布菜单或安装。现有Texture4322与资源2076/三角形6406回归通过；ABI8精确ABI7前缀ASAN30也通过。
+
+资源源码8220f25d1cc95b1aa5700fb962b8e137d8adf418已推送，冻结于 artifacts/prepared/m3-17-resources-8220f25/source，完整May2023 /MT全目标构建通过（双NoPublish），日志 artifacts/m3-17-resources-native-build.log。构建后十八安装哈希匹配native60/CEP61，报告 artifacts/m3-17-resources-installed-hashes.json。本freeze早于snapshot/CPU里程碑；共享ABI与ParticleInstance变化均要求完整配对构建。
 
 M3-17三角形源码里程碑5d178022aaf239e65426192b8d757103f2e01cd8已推送；其完整git archive冻结于 artifacts/prepared/m3-17-triangle-5d17802/source。May2023 x64 Release /MT全目标构建通过，包含ModelGeometry.cpp/ModelScene.cpp；命令使用-NoDistPublish -NoRuntimePublish，日志 artifacts/m3-17-triangle-native-build.log。构建后安装18项哈希再次符合native60/CEP61收据。该候选未接入资源/粒子作者，不发布纯数值Model里程碑，不从编译关闭AE gate。
 
@@ -69,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-17独立Model候选不在installed60/61中。ModelScene通过显式model-to-layer矩阵，处理近面/齐次图像/ROI裁剪、透视正确深度/UV、每模型四采样遮挡、一次覆盖率与四种叠加/HDR合成；6406检查通过。SFMG1资源/粒子pose2076及ABI8传输30（含ASAN）已接入数值契约；图/shape4/快照/作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值资源证据当作可用Model粒子类型。
+- M3-17独立Model候选不在installed60/61中。snapshot8/shape4经显式evaluated记录接入CPU；cube/资源网格、pose/覆盖/深度/四种transfer/ROI/PAR/near/预算的实际像素通过2695项标准及ASAN检查。live Model图/采样和原生/CEP作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值像素证据当作可用AE Model粒子作者。
 
 - M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 

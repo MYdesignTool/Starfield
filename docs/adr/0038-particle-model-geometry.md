@@ -2,6 +2,35 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Particle snapshot and CPU milestone evidence
+
+Snapshot8 now retains Model groups and the explicit200-byte particle stride;
+versions3..7 remain readable and keep their canonical bytes. CPU renders default
+cube/imported polygon groups from evaluated snapshots, with full particle pose,
+ROI/downsample/PAR, near clipping even when the center is behind the near plane,
+four transfer modes and stable ordering with primitive particles. Multiple mesh
+members combine coverage/depth before applying logical-particle opacity once.
+Numeric meshes compile to call-lifetime leases once per resource/CPU call.
+Shared frame input-triangle and sample-work limits fail without output pixels.
+The GPU scene API explicitly rejects Model for CPU fallback.
+
+`tests/RunModelParticleTests.ps1 -Run` and `-Run -Sanitize` each pass2695 checks;
+logs artifacts/m3-17-model-particle-{tests,asan}-current.log. They cover actual
+Core/C ABI pixels, Model tables and malformed lengths/indices/transforms,
+every truncated snapshot, legacy versions, mixed Texture/Cloud tables,
+allocation/cancellation, missing imported resources and shared frame caps.
+The initial fixture lacked a SequenceResult overload; its first numeric run
+tested a triangle boundary as an interior pixel and omitted the near-camera
+identity homography. These fixture failures were repaired before passing.
+MSVC link/debug flags were moved out of response files for correct ASAN symbols.
+Resource2076 and scene6406 rechecks pass; existing Texture4322 also passes with
+snapshot8/CPU candidate (artifacts/m3-17-texture-snapshot8-regression.log).
+ABI exact-prefix ASAN30 passes on the current candidate as well.
+
+The live graph's Model node/input/shape sampling and all native/CEP authoring
+remain pending. No new menu/selector or installed binary is published. This is
+render evidence from explicit evaluated snapshots, not a usable AE Model author.
+
 ## Resource and transport milestone evidence
 
 ModelResources implements the SFMG1 numeric mesh codec and particle pose below.
@@ -23,6 +52,13 @@ Logs: artifacts/m3-17-model-transport-{tests,asan}-current.log.
 No graph/shape/snapshot/native resource authoring is connected yet. Accepting an
 unused mesh source does not demonstrate Model rendering. The installed pairing
 remains native60/ABI7/CEP61; this shared ABI change requires a full paired build.
+
+Frozen resource source8220f25d1cc95b1aa5700fb962b8e137d8adf418 at
+artifacts/prepared/m3-17-resources-8220f25/source passes the full May2023
+x64 Release /MT build with both NoPublish switches; log
+artifacts/m3-17-resources-native-build.log. All18 installed pairing hashes still
+match native60/CEP61 (artifacts/m3-17-resources-installed-hashes.json).
+This freeze predates the snapshot/CPU milestone above; it is not published.
 
 ## Triangle milestone evidence
 
@@ -140,11 +176,28 @@ envelope1 and node disk IDs remain unchanged; older readers reject the new
 node/port/shape rather than interpreting them as another primitive.
 
 Model groups are shared by EvaluatedGraph and referenced by a new in-memory
-ParticleInstance model_style_index. Snapshot8 will retain the explicit200-byte
+ParticleInstance model_style_index. Snapshot8 retains the explicit200-byte
 particle stride and add a64-byte header/group table. The high16 shape-word bits
 select the Model group only for shape4; zero means the implicit cube. Each group
 contains bounded resource ID/local-affine entries. Snapshot3..7 readers remain.
 No sizeof(C++ object) is used as a wire layout.
+
+Snapshot8 groups are stored after the fixed node/basis/Texture/Cloud tables and
+before particles. A group starts with its total byte length including the8-byte
+header and member count, then144-byte entries (ID16 + affine matrix128). All
+group lengths/counts are preflighted before allocating entries. Shape4's axis
+word carries no random key; legacy shape words and snapshot3..7 stay unchanged.
+
+CPU Model instances share a call-lifetime validated geometry lease. The owner
+must keep that numeric mesh alive and unchanged; the factory validates once,
+then every particle projects the same geometry without rechecking all vertices.
+The old raw-mesh projection entry point still validates. Groups combine their
+triangles before depth/coverage so one logical particle applies opacity once.
+The staged frame caps are16million input triangles and512million sample visits;
+per-group projection/surface caps remain ModelSceneLimits. Models and sprites
+share stable logical-particle camera-center ordering; interpenetrating translucent
+meshes are still an open rendering contract. GPU sprite preparation rejects
+Model explicitly and routes the adapter to CPU, without claiming native Model GPU.
 
 Core ABI8 appends model-source count/pointer to the ABI7 request prefix.
 Each C source exposes bounded numeric position/UVW/normal/corner arrays with a

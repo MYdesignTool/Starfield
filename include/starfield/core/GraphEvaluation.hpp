@@ -18,6 +18,7 @@ struct EvaluatedGraph {
     std::vector<ParticleSpriteBasis> sprite_bases;
     std::vector<ParticleTextureStyle> texture_styles;
     std::vector<ParticleCloudStyle> cloud_styles;
+    std::vector<ParticleModelStyle> model_styles;
 };
 
 // Pre-render supplies actual authored values at historical times. No host

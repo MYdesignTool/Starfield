@@ -1,5 +1,6 @@
 #include "starfield/core/EmitterHistory.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
+#include "starfield/core/ModelResources.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -81,7 +82,7 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
     using R=Result<OpaqueBytes>;
     try {
         if(!time.scale || graph.particles.size()>kMaxParticleCount || graph.evaluated_nodes.size()>kMaxGraphNodes ||
-           graph.sprite_bases.size()>kMaxParticleSpriteBases || graph.texture_styles.size()>kMaxTextureStyles || graph.cloud_styles.size()>kMaxCloudStyles)
+           graph.sprite_bases.size()>kMaxParticleSpriteBases || graph.texture_styles.size()>kMaxTextureStyles || graph.cloud_styles.size()>kMaxCloudStyles || graph.model_styles.size()>kMaxModelStyles)
             return R::failure(ErrorCode::invalid_request,"invalid temporal particle snapshot");
         if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"snapshot encoding cancelled");
         const bool has_bases=!graph.sprite_bases.empty();
@@ -89,20 +90,28 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
             [](const auto& p){return p.transfer_mode!=ParticleTransferMode::normal;});
         const bool textures = !graph.texture_styles.empty();
         const bool clouds=!graph.cloud_styles.empty();
-        const bool extended=has_bases || transfers || textures || clouds;
-        const std::size_t length=(clouds?56:textures?48:extended?40:32)+16*graph.evaluated_nodes.size()+
+        const bool models=!graph.model_styles.empty() || std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.shape==4;});
+        std::size_t model_bytes=0;
+        for(const auto& style:graph.model_styles) {
+            if(style.instances.empty() || style.instances.size()>kMaxModelsPerStyle)
+                return R::failure(ErrorCode::invalid_request,"invalid Model group size");
+            model_bytes+=8+144*style.instances.size();
+        }
+        const bool extended=has_bases || transfers || textures || clouds || models;
+        const std::size_t length=(models?64:clouds?56:textures?48:extended?40:32)+model_bytes+16*graph.evaluated_nodes.size()+
             72*graph.sprite_bases.size()+24*graph.texture_styles.size()+24*graph.cloud_styles.size()+200*graph.particles.size();
         if(length>kMaxGraphPayloadBytes)return R::failure(ErrorCode::work_limit_exceeded,"temporal snapshot exceeds byte budget");
         OpaqueBytes bytes;bytes.reserve(length);
         const auto append=[&](std::uint64_t value,unsigned count) {
             for(unsigned i=0;i<count;++i) bytes.push_back(static_cast<std::byte>((value>>(8*i))&255));
         };
-        append(0x8004,2);append(clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
+        append(0x8004,2);append(models?8:clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
         append(std::bit_cast<std::uint64_t>(time.value),8);append(time.scale,8);
         append(graph.evaluated_nodes.size(),4);append(graph.particles.size(),4);
         if(extended){append(graph.sprite_bases.size(),4);append(0,4);}
-        if(textures || clouds){append(graph.texture_styles.size(),4);append(0,4);}
-        if(clouds){append(graph.cloud_styles.size(),4);append(0,4);}
+        if(textures || clouds || models){append(graph.texture_styles.size(),4);append(0,4);}
+        if(clouds || models){append(graph.cloud_styles.size(),4);append(0,4);}
+        if(models){append(graph.model_styles.size(),4);append(0,4);}
         for(const auto& node:graph.evaluated_nodes) for(auto b:node.value.bytes) append(b,1);
         for(const auto& basis:graph.sprite_bases) {
             if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid temporal sprite basis");
@@ -118,6 +127,15 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
             append(style.circles,4);append(0,4);
             append(std::bit_cast<std::uint64_t>(style.aspect),8);append(std::bit_cast<std::uint64_t>(style.density),8);
         }
+        for(const auto& style:graph.model_styles) {
+            append(8+144*style.instances.size(),4);append(style.instances.size(),4);
+            for(const auto& instance:style.instances) {
+                if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot encoding cancelled");
+                if(!valid_model_instance(instance))return R::failure(ErrorCode::invalid_request,"invalid snapshot Model transform");
+                for(auto b:instance.resource)append(b,1);
+                for(double value:instance.model_to_particle)append(std::bit_cast<std::uint64_t>(value),8);
+            }
+        }
         std::size_t index=0;
         for(const auto& p:graph.particles) {
             if((index++&63)==0 && cancellation && cancellation->is_cancelled())
@@ -128,19 +146,20 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
                 if(!std::isfinite(value)) return R::failure(ErrorCode::invalid_request,"nonfinite temporal particle");
                 append(std::bit_cast<std::uint64_t>(value),8);
             }
-            if(p.shape>3 || static_cast<std::uint32_t>(p.transfer_mode)>3 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
+            if(p.shape>4 || static_cast<std::uint32_t>(p.transfer_mode)>3 || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
                p.anchor_x_percent<0 || p.anchor_x_percent>100 || p.anchor_y_percent<0 || p.anchor_y_percent>100 ||
                p.sprite_basis_index>graph.sprite_bases.size() || p.texture_style_index>graph.texture_styles.size() ||
                (p.shape==3 ? !p.texture_style_index : p.texture_style_index!=0) || p.texture_random_key>0xffffffu ||
                (p.shape!=3 && p.texture_random_key!=0) || p.cloud_style_index>graph.cloud_styles.size() ||
                (p.shape!=2 && p.cloud_style_index!=0) || p.cloud_random_key>0xffffffu ||
-               (!p.cloud_style_index && p.cloud_random_key!=0))
+               (!p.cloud_style_index && p.cloud_random_key!=0) || p.model_style_index>graph.model_styles.size() ||
+               (p.shape!=4 && p.model_style_index!=0))
                 return R::failure(ErrorCode::invalid_request,"invalid temporal sprite properties");
             if(p.age_seconds<0 || p.lifetime_seconds<=0 || p.age_seconds>=p.lifetime_seconds ||
                p.size_pixels<0 || p.opacity<0 || p.opacity>1 ||
                p.color.x<0 || p.color.y<0 || p.color.z<0 || p.color.x>kMaxParticleColor || p.color.y>kMaxParticleColor || p.color.z>kMaxParticleColor)
                 return R::failure(ErrorCode::invalid_request,"invalid temporal particle values");
-            append(p.shape | (static_cast<std::uint32_t>(p.transfer_mode)<<8) | ((p.shape==2?p.cloud_style_index:p.texture_style_index)<<16),4);
+            append(p.shape | (static_cast<std::uint32_t>(p.transfer_mode)<<8) | ((p.shape==4?p.model_style_index:p.shape==2?p.cloud_style_index:p.texture_style_index)<<16),4);
             append(p.up_axis | ((p.shape==2?p.cloud_random_key:p.texture_random_key)<<8),4);append(p.limit_to_2d?1:0,4);append(p.sprite_basis_index,4);
         }
         return R::success(std::move(bytes));
@@ -157,24 +176,44 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
         const auto tag=read(2),version=read(2),length=read(4);
         const auto clock=std::bit_cast<std::int64_t>(read(8));const auto scale=read(8);
         const auto nodes=read(4),particles=read(4);
-        std::uint64_t bases=0, styles=0, clouds=0;
-        if(version>=4 && version<=7) {
+        std::uint64_t bases=0, styles=0, clouds=0, models=0;
+        if(version>=4 && version<=8) {
             if(bytes.size()<40)return R::failure(ErrorCode::invalid_request,"short Transform snapshot header");
             bases=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Transform snapshot header reserved field");
         }
-        if (version>=6 && version<=7) {
+        if (version>=6 && version<=8) {
             if(bytes.size()<48)return R::failure(ErrorCode::invalid_request,"short texture snapshot header");
             styles=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero texture snapshot reserved field");
         }
-        if(version==7) {
+        if(version>=7 && version<=8) {
             if(bytes.size()<56)return R::failure(ErrorCode::invalid_request,"short Cloud snapshot header");
             clouds=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Cloud snapshot reserved field");
         }
-        if(tag!=0x8004 || (version<3 || version>7) || length!=bytes.size() || !scale || !time.scale ||
+        if(version==8) {
+            if(bytes.size()<64)return R::failure(ErrorCode::invalid_request,"short Model snapshot header");
+            models=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Model snapshot reserved field");
+        }
+        const auto fixed=(version==8?64:version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+200*particles;
+        if(tag!=0x8004 || (version<3 || version>8) || length!=bytes.size() || !scale || !time.scale ||
             static_cast<long double>(clock)*time.scale!=static_cast<long double>(time.value)*scale ||
             nodes>kMaxGraphNodes || particles>kMaxParticleCount || bases>kMaxParticleSpriteBases || styles>kMaxTextureStyles || clouds>kMaxCloudStyles ||
-            bytes.size()!=(version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+200*particles)
+            models>kMaxModelStyles || bytes.size()<fixed || (version!=8 && bytes.size()!=fixed))
             return R::failure(ErrorCode::invalid_request,"invalid temporal snapshot header/time");
+        // Validate all variable group lengths before allocating or reading entries.
+        const auto particle_start=bytes.size()-200*particles;
+        if(version==8) {
+            const auto saved=at;at=static_cast<std::size_t>(fixed-200*particles);
+            for(std::uint64_t i=0;i<models;++i) {
+                if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot preflight cancelled");
+                if(at>particle_start || particle_start-at<8)return R::failure(ErrorCode::invalid_request,"short Model group header");
+                const auto group_length=read(4),members=read(4);
+                if(!members || members>kMaxModelsPerStyle || group_length!=8+144*members || group_length-8>particle_start-at)
+                    return R::failure(ErrorCode::invalid_request,"invalid Model group length/count");
+                at+=static_cast<std::size_t>(group_length-8);
+            }
+            if(at!=particle_start)return R::failure(ErrorCode::invalid_request,"trailing Model group payload");
+            at=saved;
+        }
         EvaluatedGraph result;result.evaluated_nodes.resize(static_cast<std::size_t>(nodes));
         for(auto& node:result.evaluated_nodes) for(auto& b:node.value.bytes) b=static_cast<std::uint8_t>(read(1));
         result.sprite_bases.resize(static_cast<std::size_t>(bases));
@@ -196,6 +235,16 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
             style.aspect=std::bit_cast<double>(read(8));style.density=std::bit_cast<double>(read(8));
             if(!valid_cloud_style(style))return R::failure(ErrorCode::invalid_request,"invalid temporal Cloud style");
         }
+        result.model_styles.resize(static_cast<std::size_t>(models));
+        for(auto& style:result.model_styles) {
+            (void)read(4);const auto members=read(4);style.instances.resize(static_cast<std::size_t>(members));
+            for(auto& instance:style.instances) {
+                if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot decoding cancelled");
+                for(auto& b:instance.resource)b=static_cast<std::uint8_t>(read(1));
+                for(auto& value:instance.model_to_particle)value=std::bit_cast<double>(read(8));
+                if(!valid_model_instance(instance))return R::failure(ErrorCode::invalid_request,"invalid snapshot Model transform");
+            }
+        }
         result.particles.resize(static_cast<std::size_t>(particles));
         std::size_t index=0;
         for(auto& p:result.particles) {
@@ -208,21 +257,23 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
             }
             const auto shape_word=static_cast<std::uint32_t>(read(4));
             if(version>=5) {
-                if(shape_word & ~(version>=6?0xffff0303u:0x303u))return R::failure(ErrorCode::invalid_request,"invalid snapshot transfer/shape bits");
+                if(shape_word & ~(version==8?0xffff0307u:version>=6?0xffff0303u:0x303u))return R::failure(ErrorCode::invalid_request,"invalid snapshot transfer/shape bits");
                 p.shape=shape_word&255u;p.transfer_mode=static_cast<ParticleTransferMode>((shape_word>>8)&3u);
-                if(version==7 && p.shape==2)p.cloud_style_index=shape_word>>16;
+                if(version==8 && p.shape==4)p.model_style_index=shape_word>>16;
+                else if(version>=7 && p.shape==2)p.cloud_style_index=shape_word>>16;
                 else if(version>=6)p.texture_style_index=shape_word>>16;
             } else p.shape=shape_word;
             const auto axis_word=static_cast<std::uint32_t>(read(4));
             p.up_axis=version>=6?axis_word&255u:axis_word;
-            if(version==7 && p.shape==2)p.cloud_random_key=axis_word>>8;
+            if(version>=7 && p.shape==2)p.cloud_random_key=axis_word>>8;
             else if(version>=6)p.texture_random_key=axis_word>>8;
             const auto limit=read(4);p.sprite_basis_index=static_cast<std::uint32_t>(read(4));p.limit_to_2d=limit!=0;
-            if(limit>1 || p.sprite_basis_index>bases || p.shape>(version>=6?3u:2u) || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
+            if(limit>1 || p.sprite_basis_index>bases || p.shape>(version==8?4u:version>=6?3u:2u) || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
                p.texture_style_index>styles || (p.shape==3 ? !p.texture_style_index : p.texture_style_index!=0) ||
                (p.shape!=3 && p.texture_random_key!=0) || p.cloud_style_index>clouds ||
                (p.shape!=2 && p.cloud_style_index!=0) || (!p.cloud_style_index && p.cloud_random_key!=0) ||
-               p.anchor_x_percent<0 || p.anchor_x_percent>100 || p.anchor_y_percent<0 || p.anchor_y_percent>100)
+               p.anchor_x_percent<0 || p.anchor_x_percent>100 || p.anchor_y_percent<0 || p.anchor_y_percent>100 ||
+               p.model_style_index>models || (p.shape!=4 && p.model_style_index!=0))
                 return R::failure(ErrorCode::invalid_request,"invalid temporal sprite properties");
             if(p.age_seconds<0 || p.lifetime_seconds<=0 || p.age_seconds>=p.lifetime_seconds ||
                 p.size_pixels<0 || p.opacity<0 || p.opacity>1 ||
