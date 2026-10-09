@@ -6,6 +6,8 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+镜像持久化源码0d868eb35fa00ba50619460722cc9b9f504cd1bb冻结于artifacts/prepared/m3-17-model-mirror-0d868eb/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，main及五种node模块实际编译ModelMirrorParameter。日志artifacts/m3-17-model-mirror-build.log，八输出哈希artifacts/m3-17-model-mirror-build-hashes.json；十八安装哈希仍符合native60/CEP61，报告artifacts/m3-17-model-mirror-installed-hashes.json。注册helper未调用、未部署；下一步NativeBindingTransaction资源提交/回滚与SmartFX捕获，随后OBJ按钮/完整CEP作者。
+
 最新资源候选增加ModelMirrorParameter：SFMR1以UUID/revision及CRC封装有界SFMG1，empty slot独立保存；所有ARB selectors、独立句柄所有权、注册失败回收和取消已实现。标准/ASAN各8021项检查通过（总计含复用ModelControls452），日志artifacts/m3-17-model-mirror-{tests,asan}.log。helper预留main755..1010/disk1900..2155和count1011/disk2200，当前main manifest29/755参数保持，尚未调用注册helper；完整Model镜像安装/rollback、SmartFX数值捕获及OBJ按钮事务仍待接入。helper已纳入main及node工程/fingerprint，未部署候选。
 
 原生模块/binding7源码7f5c7d8已冻结于artifacts/prepared/m3-17-model-native-7f5c7d8/source。`BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`完成May2023 x64 Release /MT八个目标，包含实际StarfieldModel.aex；日志artifacts/m3-17-model-native-build.log，八输出哈希artifacts/m3-17-model-native-build-hashes.json。初次SDK路径与随后漏链接ParticleTransform.cpp均已修正后重新冻结；失败日志保留。旧绑定8441及相机12回归通过（artifacts/m3-17-model-legacy-binding-regression.log，独立artifacts脚本追加mesh helper，不改共享runner）。十八安装哈希仍符合native60/CEP61，报告artifacts/m3-17-model-native-installed-hashes.json。没有Model部署；继续OBJ导入/资源镜像及SmartFX、完整CEP。

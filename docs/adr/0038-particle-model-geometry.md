@@ -200,6 +200,14 @@ artifacts/m3-17-model-mirror-{tests,asan}.log. Main manifest29/755 parameters
 remain registered; the new helper is not called until mirror transactions and
 immutable capture are implemented. This foundation is not a deployed author.
 
+Frozen source0d868eb35fa00ba50619460722cc9b9f504cd1bb under
+artifacts/prepared/m3-17-model-mirror-0d868eb/source passes all eight May2023
+x64 Release /MT outputs with IncludeModelCandidate and both NoPublish switches.
+ModelMirrorParameter is compiled in main/node candidate modules. Logs/hashes:
+artifacts/m3-17-model-mirror-build.log, m3-17-model-mirror-build-hashes.json and
+m3-17-model-mirror-installed-hashes.json. All18 installed files still match
+native60/CEP61. No registration call, publication or new host qualification.
+
 ### Native mesh persistence boundary
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
