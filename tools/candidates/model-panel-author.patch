@@ -407,7 +407,7 @@ index 6ee9c08..5314fd2 100644
                      graphHex = codec.toHex(updated);
                      if (graphHex.length / 2 > maxBytes) {
 diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
-index 792b33f..b0e14eb 100644
+index 792b33f..9699467 100644
 --- a/cep_panel/jsx/starfield_gateway.jsx
 +++ b/cep_panel/jsx/starfield_gateway.jsx
 @@ -42,7 +42,8 @@
@@ -543,7 +543,7 @@ index 792b33f..b0e14eb 100644
          }
          var knownTargets = nodeIds(nodes);
          knownTargets["$000000000000000000000000000000ff"] = true;
-@@ -2512,6 +2601,149 @@
+@@ -2512,6 +2601,152 @@
      host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
      host.SFLD_submitGraph = SFLD_submitGraph;
      host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;
@@ -690,6 +690,159 @@ index 792b33f..b0e14eb 100644
 +            host[modelBridgeKey]=null;
 +        return reply({ok:true});
 +    };
++    // File transport is loaded only by explicit preset file actions. Its sessions
++    // contain bounded plain data; these closures carry no host object references.
++    host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
      // Readiness probe for the panel's self-loading path: cheap, side-effect free.
      host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
  })();
+diff --git a/cep_panel/presets.html b/cep_panel/presets.html
+index 71d3e49..66226a3 100644
+--- a/cep_panel/presets.html
++++ b/cep_panel/presets.html
+@@ -7,5 +7,5 @@
+   <main><div id="grid" role="list" aria-label="Preset library"></div><aside id="details"><canvas id="preview" width="420" height="240" aria-label="Preset illustration"></canvas><h2 id="selected-title">Choose a preset</h2><p id="description">Browse a category or search the library. Add keeps the current nodes; Replace creates the selected setup.</p><p id="structure"></p></aside></main>
+   <div id="status" role="status" aria-live="polite">Loading library…</div>
+   <footer><label><input id="render-settings" type="checkbox" checked>Apply Render Settings</label><span id="note">Your current effect stays pinned until Refresh Target.</span><button id="cancel">Cancel</button><button id="replace" disabled>Replace</button><button id="add" class="primary" disabled>Add</button></footer>
+-  <script src="js/graph_codec.js?v=49"></script><script src="js/graph_layout.js?v=49"></script><script src="js/graph_edits.js?v=49"></script><script src="js/graph_view.js?v=49"></script><script src="js/native_graph_snapshot.js?v=49"></script><script src="js/graph_transactions.js?v=49"></script><script src="js/presets.js?v=49"></script><script src="js/preset_manager.js?v=49"></script>
++  <script src="js/graph_codec.js?v=49"></script><script src="js/graph_layout.js?v=49"></script><script src="js/graph_edits.js?v=49"></script><script src="js/graph_view.js?v=49"></script><script src="js/native_graph_snapshot.js?v=49"></script><script src="js/graph_transactions.js?v=49"></script><script src="js/model_assets.js?v=62"></script><script src="js/preset_files.js?v=62"></script><script src="js/presets.js?v=49"></script><script src="js/preset_manager.js?v=49"></script>
+ </body></html>
+diff --git a/cep_panel/js/presets.js b/cep_panel/js/presets.js
+index 68bbcc5..c2b00d6 100644
+--- a/cep_panel/js/presets.js
++++ b/cep_panel/js/presets.js
+@@ -4,9 +4,10 @@
+     var api=factory(node?require("./graph_edits.js"):root.StarfieldGraphEdits,
+         node?require("./graph_layout.js"):root.StarfieldGraphLayout,
+         node?require("./graph_codec.js"):root.StarfieldGraphCodec,
+-        node?require("./graph_view.js"):root.StarfieldGraphView);
++        node?require("./graph_view.js"):root.StarfieldGraphView,
++        node?require("./model_assets.js"):root.StarfieldModelAssets);
+     if(node)module.exports=api;else root.StarfieldPresets=api;
+-}(typeof window!=="undefined"?window:this,function(edits,layout,codec,view){
++}(typeof window!=="undefined"?window:this,function(edits,layout,codec,view,modelAssets){
+     "use strict";
+     var OUTPUT="000000000000000000000000000000ff",MAX_BYTES=24*1024;
+     var categories=["All presets","Backgrounds","Effects","Graphic Elements","Physical","Nodes","My Presets"];
+@@ -112,7 +113,10 @@
+     }
+     function apply(base,edit,idFactory){
+         if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
++        // Whole-graph native restoration is required before exposing mesh apply.
++        if((edit.presetModelAssets || []).length)fail("Model preset application needs the complete native asset transaction.");
+         var selected=clone(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels));
++        modelAssets.validate(selected,edit.presetModelAssets || []);
+         var bindings=edit.presetResources || [];
+         validateResourceBindings(selected,bindings);
+         bindings.forEach(function(binding){
+@@ -146,7 +150,7 @@
+             seen[binding.nodeId+":"+binding.key]=true;
+         });
+     }
+-    function encode(graph,name,category,resources){
++    function encode(graph,name,category,resources,meshes){
+         if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");
+         var clean=motionDefaults(clone(graph)),bindings=[];
+         clean.nodes.forEach(function(node){if(node.type!==edits.types.particle)return;
+@@ -157,19 +161,27 @@
+             });
+         });
+         validateResourceBindings(clean,bindings);
+-        var text=JSON.stringify({format:"org.starfieldfx.preset",version:bindings.length?2:1,name:name.trim(),
+-            category:category||"My Presets",graphHex:codec.toHex(authoring(clean)),resources:bindings},null,2);
+-        if(text.length>MAX_BYTES*2+128*1024 || unescape(encodeURIComponent(text)).length>256*1024 ||
++        clean=authoring(clean);
++        if(!modelAssets)fail("Model asset library did not load.");
++        var portable=modelAssets.validate(clean,meshes || []),version=portable.length?3:bindings.length?2:1;
++        var data={format:"org.starfieldfx.preset",version:version,name:name.trim(),
++            category:category||"My Presets",graphHex:codec.toHex(clean),resources:bindings};
++        if(version===3)data.modelAssets=portable;
++        var text=JSON.stringify(data,null,2);
++        if(version===3?text.length>128*1024*1024+256*1024:text.length>MAX_BYTES*2+128*1024 || unescape(encodeURIComponent(text)).length>256*1024 ||
+             JSON.stringify(text).length>252*1024)fail("Preset resource metadata exceeds the file limit.");
+         return text;
+     }
+     function decode(text){
+-        if(typeof text!=="string" || text.length>MAX_BYTES*2+128*1024)fail("Preset file is too large.");var data=JSON.parse(text);
+-        if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2) || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");
+-        var graph=authoring(codec.fromHex(data.graphHex)),bindings=data.version===2?data.resources:[];
++        if(typeof text!=="string" || text.length>128*1024*1024+256*1024)fail("Preset file is too large.");var data=JSON.parse(text);
++        if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2 && data.version!==3) || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");
++        if(data.version!==3 && text.length>MAX_BYTES*2+128*1024)fail("Legacy preset file is too large.");
++        var graph=authoring(codec.fromHex(data.graphHex)),bindings=data.version>=2?data.resources:[];
+         validateResourceBindings(graph,bindings);
++        if(!modelAssets)fail("Model asset library did not load.");
++        var meshes=modelAssets.validate(graph,data.version===3?data.modelAssets:[]);
+         return {id:"imported-"+edits.randomId(),name:data.name,category:"My Presets",description:"Imported Starfield preset",
+-            color:"#91bde0",graph:graph,resources:bindings};
++            color:"#91bde0",graph:graph,resources:bindings,modelAssets:meshes};
+     }
+     return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
+ }));
+diff --git a/cep_panel/js/preset_manager.js b/cep_panel/js/preset_manager.js
+index ebc4b13..f85e991 100644
+--- a/cep_panel/js/preset_manager.js
++++ b/cep_panel/js/preset_manager.js
+@@ -4,9 +4,9 @@
+     var entries=presets.catalog.slice(),category=null,selected=null,targetToken=null,revision=null,graph=null,resources=[],busy=false,serial=0;
+     var el={};["grid","preview","search","target","breadcrumb","selected-title","description","structure","status","refresh","import","save","home","up","all","render-settings","cancel","replace","add"].forEach(function(id){el[id]=document.getElementById(id);});
+     // Keep the page and the reason visible when a dependency did not load.
+-    var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions"].filter(function(name){return !window[name];});
++    var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions","StarfieldModelAssets","StarfieldPresetFiles"].filter(function(name){return !window[name];});
+     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
+-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-58",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
++    var cep=window.__adobe_cep__,gatewayBuild="native-presets-61",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
+     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
+     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
+@@ -18,16 +18,21 @@
+             Object.keys(fields||{}).forEach(function(key){request[key]=fields[key];});
+             request.gatewayBuild=gatewayBuild;
+             // Native file dialogs are user controlled; render/graph calls time out.
+-            var settled=false,timer=operation.indexOf("PresetFile")>=0?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
++            var fileOperation=operation.indexOf("PresetFile")>=0;
++            var settled=false,timer=operation==="beginPresetFileRead" || operation==="finishPresetFileWrite"?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
+             // Reads check readiness in this host turn; writes always reload and
+             // invoke atomically, preserving the cross-page generation guard.
+-            var readOnly=operation==="getState" || operation==="getGraphSnapshot";
+-            var script="(function(){try{if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+"){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));}"+
++            var readOnly=operation==="getState" || operation==="getGraphSnapshot" || operation.indexOf("ModelAsset")>=0 || fileOperation;
++            var script="(function(){try{if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+
++                (fileOperation?" || typeof __SFLD_presetFileAPI==='undefined'":" || typeof SFLD_"+operation+"!=='function'")+
++                "){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));}"+
+                 "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+")throw new Error('Gateway generation mismatch.');"+
++                (fileOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/preset_file_transport.jsx")+"));}":"")+
+                 "return SFLD_"+operation+"("+literal(JSON.stringify(request))+");}catch(e){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+literal(gatewayBuild)+",ok:false,error:{code:'gateway_load_failed',message:e.toString()}});}}())";
+             host(script,function(raw){if(settled)return;settled=true;if(timer)clearTimeout(timer);try{var response=JSON.parse(raw);if(!response || response.protocol!=="org.starfieldfx.panel" || response.version!==1 || response.gatewayBuild!==gatewayBuild)throw new Error("Unsupported host response or gateway generation.");callback(response);}catch(error){callback({ok:false,error:{code:"bad_response",message:"Invalid reply from After Effects: "+error.message}});}});
+     }
+     var client=window.StarfieldGraphTransactions.create({call:call,codec:codec,edits:{apply:presets.apply}});
++    var assets=window.StarfieldModelAssets.create({call:call}),files=window.StarfieldPresetFiles.create({call:call});
+     function failure(response){status(response && response.error?response.error.code+": "+response.error.message:"The host did not return a usable response.",true);pending(false);}
+     function refresh(){
+         if(busy)return;pending(true);targetToken=null;revision=null;graph=null;status("Finding the selected Starfield effect…");
+@@ -49,7 +54,7 @@
+         if(busy || !selected || !targetToken)return;pending(true);status("Applying "+selected.name+"…");
+         var choice=selected,settings=el["render-settings"].checked;
+         initialize(function(response){if(!response.ok){failure(response);return;}
+-            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,presetResources:choice.resources || [],mode:mode,applyRenderSettings:settings},function(committed){
++            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,presetResources:choice.resources || [],presetModelAssets:choice.modelAssets || [],mode:mode,applyRenderSettings:settings},function(committed){
+                 if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+" Undo in After Effects restores the previous graph.");pending(false);
+             },targetToken,revision,response);
+         });
+@@ -81,10 +86,13 @@
+     el.search.addEventListener("input",render);el.home.addEventListener("click",function(){browse(null);});el.up.addEventListener("click",function(){browse(null);});el.all.addEventListener("click",function(){browse("All presets");});
+     el.refresh.addEventListener("click",refresh);el.add.addEventListener("click",function(){apply("add");});el.replace.addEventListener("click",function(){apply("replace");});
+     el.cancel.addEventListener("click",function(){if(busy)return;if(cep && cep.closeExtension)cep.closeExtension();else window.close();});
+-    el.import.addEventListener("click",function(){if(busy)return;pending(true);call("readPresetFile",{},function(response){if(!response.ok){failure(response);return;}if(response.cancelled){pending(false);return;}try{var entry=presets.decode(response.text);entries.push(entry);category="My Presets";el.search.value="";select(entry);status("Imported "+entry.name+". Choose Add or Replace to apply.");pending(false);}catch(error){failure({error:{code:error.code||"invalid_preset",message:error.message}});}});});
++    el.import.addEventListener("click",function(){if(busy)return;pending(true);files.load(function(response){if(!response.ok){failure(response);return;}if(response.cancelled){pending(false);return;}try{var entry=presets.decode(response.text);entries.push(entry);category="My Presets";el.search.value="";select(entry);status("Imported "+entry.name+". Choose Add or Replace to apply.");pending(false);}catch(error){failure({error:{code:error.code||"invalid_preset",message:error.message}});}});});
+     el.save.addEventListener("click",function(){if(busy || !targetToken)return;var name=window.prompt("Preset name","My Particle Setup");if(!name)return;pending(true);
+-        initialize(function(response){if(!response.ok){failure(response);return;}var text;try{text=presets.encode(graph,name,"My Presets",resources);}catch(error){failure({error:{code:error.code,message:error.message}});return;}
+-            call("writePresetFile",{text:text},function(saved){if(!saved.ok){failure(saved);return;}if(saved.cancelled){pending(false);return;}var entry=presets.decode(text);entries.push(entry);category="My Presets";select(entry);status("Saved "+entry.name+" to "+saved.path);pending(false);});
++        initialize(function(response){if(!response.ok){failure(response);return;}
++            assets.collect(response.snapshot,targetToken,function(collected){if(!collected.ok){failure(collected);return;}
++                var text;try{text=presets.encode(graph,name,"My Presets",resources,collected.assets);}catch(error){failure({error:{code:error.code,message:error.message}});return;}
++                files.save(text,function(saved){if(!saved.ok){failure(saved);return;}if(saved.cancelled){pending(false);return;}var entry=presets.decode(text);entries.push(entry);category="My Presets";select(entry);status("Saved "+entry.name+" to "+saved.path+(saved.retainedBackup?". Previous file retained at "+saved.retainedBackup:""));pending(false);});
++            });
+         });
+     });
+     render();refresh();

@@ -6,11 +6,15 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
-精确Model资产写入候选接入private SFMW/version1与实际Model generic分支：按预期UUID/Source/revision/guard核对后恢复Mesh、六项bounds及精确revision/Source；支持parked mesh和revision0默认cube。每次写入读回，部分失败、silent setter、取消均恢复原值，恢复失败独立诊断；不发布图、不建立独立undo、不写pose/UUID。标准/ASAN实际原生模块各7535检查通过（另复用控件452），日志artifacts/m3-17-model-asset-write-{tests,asan}.log；首次SDK非const setter/fixture编译及同Source silent期望错误已修正，失败日志保留。完整Host导入/整笔预设事务仍待接入，此seam不独立暴露；新的冻结SDK构建待记录，安装60/61保持。
+隔离预设文件阶段实现version3 Model资产codec、Save Current实际网格收集及Import分页读取；v1/v2保持兼容。独立32768字符页/128MiB+256KiB文本限额不改变普通请求上限；用户选择文件后临时文件读回验证、rename发布与失败恢复，清理失败保留路径。真实候选codec/client/gateway/按钮共330项检查和未修改的旧preset断言通过，日志artifacts/m3-17-model-preset-file-tests.log；Model74/export576/Texture80/Cloud49/Birth51及完整gateway事务回归通过，m3-17-model-preset-files-*.log。新File行为全部使用内存夹具，没有实际磁盘/AE资格。候选可由Prepare重现；完整Model Add/Replace仍在项目变更前明确拒绝，原生整笔事务/duplicate和菜单继续，未部署。
+
+SFMW源码969dcf1已推送并git archive冻结于artifacts/prepared/m3-17-model-asset-write-969dcf1/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，实际ModelAssetWrite编译。日志artifacts/m3-17-model-asset-write-build.log，八输出/十八安装哈希m3-17-model-asset-write-{build,installed}-hashes.json；0安装不匹配，native60/CEP61及runtime selector保持。此freeze不包含之后的隔离预设文件改动。
+
+精确Model资产写入候选接入private SFMW/version1与实际Model generic分支：按预期UUID/Source/revision/guard核对后恢复Mesh、六项bounds及精确revision/Source；支持parked mesh和revision0默认cube。每次写入读回，部分失败、silent setter、取消均恢复原值，恢复失败独立诊断；不发布图、不建立独立undo、不写pose/UUID。标准/ASAN实际原生模块各7535检查通过（另复用控件452），日志artifacts/m3-17-model-asset-write-{tests,asan}.log；首次SDK非const setter/fixture编译及同Source silent期望错误已修正，失败日志保留。完整Host导入/整笔预设事务仍待接入，此seam不独立暴露；冻结SDK证据见上，安装60/61保持。
 
 UI-idle桥源码3c10b5da15d01b96c505eb4909f595764eea6713已git archive冻结于artifacts/prepared/m3-17-model-asset-host-3c10b5d/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，实际Host新模块编译。日志artifacts/m3-17-model-asset-host-build.log，八输出/十八安装哈希m3-17-model-asset-host-{build,installed}-hashes.json；0安装不匹配。此freeze早于SFMW写入候选，不包含后者，实际AE上下文/时序gate仍开放。
 
-Model资源导出异步候选：Host菜单仅排队，UI idle在进入线程/重入守卫下核对project root/comp/layer/唯一renderer/Model UUID，再调用私有SFMX；每次最多八个32KiB数值页，不参与常规CEP轮询。隔离gateway保留有界plain session，核对revision/Source/guard/bounds，取消、过期和stale丢弃。标准/ASAN Host各147289检查，gateway联动576、SFMG1客户端/资源校验373通过；Model作者74、旧Texture80/Cloud49/Birth51及完整gateway事务回归通过。日志artifacts/m3-17-model-asset-host-*.log和m3-17-model-assets-tests.log。tools/candidates/model_assets.js与更新后的author patch由Prepare工具重现到artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel，未写live CEP。精确资产导入、完整预设文件IO/应用回滚和Model菜单继续；此Host新候选完整冻结SDK及实际AE上下文/时序尚未验收。
+Model资源导出异步候选：Host菜单仅排队，UI idle在进入线程/重入守卫下核对project root/comp/layer/唯一renderer/Model UUID，再调用私有SFMX；每次最多八个32KiB数值页，不参与常规CEP轮询。隔离gateway保留有界plain session，核对revision/Source/guard/bounds，取消、过期和stale丢弃。标准/ASAN Host各147289检查，gateway联动576、SFMG1客户端/资源校验373通过；Model作者74、旧Texture80/Cloud49/Birth51及完整gateway事务回归通过。日志artifacts/m3-17-model-asset-host-*.log和m3-17-model-assets-tests.log。tools/candidates/model_assets.js与更新后的author patch由Prepare工具重现到artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel，未写live CEP。精确资产导入、完整预设文件IO/应用回滚和Model菜单继续；此Host完整冻结SDK证据见上；实际AE上下文/时序尚未验收。
 
 此前导出seam源码9a441a8已git archive冻结于artifacts/prepared/m3-17-model-asset-export-9a441a8/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，±0.5默认新增警告已消除。日志artifacts/m3-17-model-asset-export-build.log，八输出/十八安装哈希m3-17-model-asset-export-{build,installed}-hashes.json；0安装不匹配，native60/CEP61和runtime选择不变。此freeze不含上段新Host传输，不用它宣称新Host构建已通过。
 
@@ -76,8 +80,8 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 | Core ABI | 8（Model资源候选；接受ABI7前缀） | 7 |
 | CEP | panel61 | panel61（既有 live Junction） |
 | Particle | total537；Birth 追加534..536；binding6 | 同契约 |
-| 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
-| 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
+| 主效果 | manifest30，count1012；Model资源镜像追加 | manifest29，count755；命名/排序 ADR0035 |
+| 节点 | Emitter、Auxiliary、Particle、Force、Transform、Model候选、固定 Output | Model尚未部署；其余同节点族 |
 
 Appearance 已退出当前注册表、构建与部署。MFR/Compute Cache 未启用。GPU F32 逐设备/逐帧协商；实际驱动的数值检查不等于 AE 宿主资格。
 

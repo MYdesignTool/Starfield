@@ -4,7 +4,8 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskRecipe=Join-Path $PSScriptRoot 'candidates/model-panel-author-baseline.json'
 $taskPatch=Join-Path $PSScriptRoot 'candidates/model-panel-author.patch'
 $taskAllowed=@('index.html','css/panel.css','js/graph_edits.js','js/native_graph_snapshot.js','js/graph_view.js',
-    'js/node_palette.js','js/panel.js','js/graph_transactions.js','jsx/starfield_gateway.jsx')
+    'js/node_palette.js','js/panel.js','js/graph_transactions.js','jsx/starfield_gateway.jsx',
+    'presets.html','js/presets.js','js/preset_manager.js')
 if($DestinationName -notmatch '^[a-z0-9][a-z0-9-]{0,63}$'){throw 'Use a simple candidate directory name.'}
 $taskRelative='artifacts/prepared/'+$DestinationName
 $taskDestination=[IO.Path]::GetFullPath((Join-Path $taskRepo $taskRelative))
@@ -34,6 +35,8 @@ foreach($taskLine in [IO.File]::ReadAllLines($taskPatch)){
 New-Item -ItemType Directory -Path $taskDestination -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'cep_panel') -Destination (Join-Path $taskDestination 'cep_panel') -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_assets.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Destination (Join-Path $taskDestination 'cep_panel/js/preset_files.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Destination (Join-Path $taskDestination 'cep_panel/jsx/preset_file_transport.jsx')
 foreach($taskFile in $taskBaseline.files){
     if((Get-SourceHash (Join-Path $taskDestination ('cep_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
 }
@@ -46,6 +49,8 @@ try {
 } finally {Pop-Location}
 [ordered]@{basePanel=61;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
+    presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;
+    presetFileTransportSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
 Write-Host "Prepared isolated Model author candidate: $taskDestination"

@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-09 portable Model preset：Prepare生成隔离候选后，将进程STARFIELD_PANEL_ROOT设为其cep_panel，执行`node tests/model_preset_file_tests.js`，330项、0失败，并将未修改的tests/preset_tests.js断言重定向至候选依赖通过。覆盖v1/2/3、active/parked/缺失/坏mesh、图身份/修订、超过256KiB文件、页序/限额/取消/过期/重载、UTF-16边界、覆盖原文件、部分/静默文件失败与rename/恢复/清理诊断，实际preset_manager的Save Current/Import与生成evalScript也执行。所有新增文件行为为内存fixture，没有磁盘或AE资格；日志artifacts/m3-17-model-preset-file-tests.log。首次UI fixture缺window.prompt已修复，失败日志m3-17-model-preset-file-ui-fixture-failed.log保留。
+
+候选Model author74、export gateway576、Texture80、Cloud49、Birth51和完整native gateway事务通过，日志artifacts/m3-17-model-preset-files-<test>.log。tools/candidates中独立helper由Prepare复制，新增三项基线仍以规范化SHA256严格核对，live CEP保持。下一步Model整体Add/Replace/duplicate资产恢复；mesh apply当前明确拒绝，未从文件codec宣称完整预设应用。
+
+969dcf1 SFMW候选冻结于artifacts/prepared/m3-17-model-asset-write-969dcf1/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过。日志/八输出/十八安装对照为artifacts/m3-17-model-asset-write-{build.log,build-hashes.json,installed-hashes.json}；0安装不匹配，native60/CEP61保持。此freeze早于隔离预设文件阶段。
+
 2026-10-09 SFMW精确资产恢复：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelNativeBindingTests.ps1 -Run`及追加`-Sanitize`，各7535项、0失败，另复用控件452。日志artifacts/m3-17-model-asset-write-{tests,asan}.log。实际Model generic入口覆盖精确修订、parked/默认cube、参数/身份/边界/CRC拒绝、取消、每项部分写失败/silent setter/读回失败、最终guard释放失败和恢复失败诊断，以及全部值/句柄/流/suite回收。失败日志model-asset-write-{compile,same-source-fixture}-failed.log保留；同Source setter本来无可观察变化，fixture改为实际Source变化后验证拒绝，没有放宽断言。全preset/Host导入及真实AE gate仍待完成。
 
 源码3c10b5d UI-idle export bridge独立冻结May2023 x64 Release /MT八目标通过，显式IncludeModelCandidate/双NoPublish；日志artifacts/m3-17-model-asset-host-build.log，八输出/十八安装哈希m3-17-model-asset-host-{build,installed}-hashes.json。0安装不匹配，native60/CEP61保持；此freeze不包含之后SFMW写入候选。
@@ -8,7 +14,7 @@
 
 Prepare工具已重现隔离候选artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel。设置测试进程STARFIELD_PANEL_ROOT后，model_asset_gateway_tests.js576、model_panel_author_tests.js74、Texture80/Cloud49/Birth51、完整panel_native_node_gateway_tests.js通过；日志artifacts/m3-17-model-asset-host-<test>.log。前者使用实际gateway及真实客户端，核对gateway重载保留plain data、guard/stale/Source/parked OBJ/越界页/超时/释放，不读取CUSTOM_VALUE。最初缺renderer数字propertyIndex的fixture失败记录在gateway-{first-failed,carrier-failed}.log。`node tests/model_assets_tests.js`373通过，包括SFMG1头/CRC/数值/索引/退化三角形/引用点bounds、65536顶点分页、资产图映射、客户端取消/过期；日志m3-17-model-assets-tests.log。最初UInt8Array把256截断成0的错误fixture改为普通array，失败日志m3-17-model-assets-fixture-byte-failed.log保留。完整预设IO/导入恢复及实际AE gate未关闭。
 
-此前9a441a8导出seam完整May2023 x64 Release /MT八目标冻结构建通过，命令BuildWindows.ps1显式IncludeModelCandidate/双NoPublish；日志m3-17-model-asset-export-build.log，八输出与十八安装哈希m3-17-model-asset-export-{build,installed}-hashes.json。native60/CEP61未变。此构建早于新UI-idle桥，后者仍需新的冻结SDK构建；fake-host不能替代AE2023资格。
+此前9a441a8导出seam完整May2023 x64 Release /MT八目标冻结构建通过，命令BuildWindows.ps1显式IncludeModelCandidate/双NoPublish；日志m3-17-model-asset-export-build.log，八输出与十八安装哈希m3-17-model-asset-export-{build,installed}-hashes.json。native60/CEP61未变。此构建早于新UI-idle桥，后者独立冻结SDK证据见上；fake-host不能替代AE2023资格。
 
 2026-10-09 Model asset export：RunModelNativeBindingTests.ps1标准/ASAN各3483通过（含既有452控件项）。日志artifacts/m3-17-model-asset-export-{tests,asan}.log。实际NodeEffects generic分支验证请求版本/类型、UUID/Source/revision/guard/bounds、revision0无资产、Cube下parked OBJ、无host stream/lock进入sink、SFMG1持有副本、render-only拒绝、开始及复制时取消、坏ARB/host失败/sink拒绝、零payload错误响应。首次缺fixture plugin-id stub的链接失败日志model-asset-export-link-failed.log；flat mesh minZ变大先违反bounds再进入stale，修正fixture精确error期待，失败日志model-asset-export-{bounds-expectation-failed,asan-bounds-expectation-failed}.log保留。最后标准/ASAN编译没有新增警告；完整SDK与真实AE generic上下文、CEP桥/预设持久化待验收。
 

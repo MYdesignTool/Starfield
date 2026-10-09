@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Unpublished Model author candidate; portable mesh preset transport pending",
+  "status": "Unpublished Model author candidate; portable preset save/import implemented; whole-graph restore pending",
   "basePanel": 61,
   "files": [
     {
@@ -38,6 +38,18 @@
     {
       "path": "jsx/starfield_gateway.jsx",
       "normalizedSha256": "1226DD4907B0DD4693698F7B927EE5DB7D110705E996016179B6C8CC800E7C7B"
+    },
+    {
+      "path": "presets.html",
+      "normalizedSha256": "8BBCE4EB7E33423A1A103A5BA9824ED98A81CDF92B3B33D2C09DBEF5D04957ED"
+    },
+    {
+      "path": "js/presets.js",
+      "normalizedSha256": "8246E543630F9BC1A9BC077E72608D17806EA3A78148A87D0348E67290E176F5"
+    },
+    {
+      "path": "js/preset_manager.js",
+      "normalizedSha256": "B2301EF0E66A30658D7F0DD165BCF6A35A4C542A01A22ADEA0639E0EEF94861D"
     }
   ]
 }

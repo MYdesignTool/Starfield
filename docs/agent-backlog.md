@@ -82,9 +82,11 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+隔离preset version3保存/导入：实际Save Current采集有界SFMG1，codec核对owner UUID/revision/bounds及parked mesh，显式32768字符分页文件传输与rename失败恢复；330项实际候选codec/client/gateway/UI检查和旧preset断言通过，Model/Texture/Cloud/Birth/完整gateway回归通过。新的文件IO使用内存fixture；原生整笔Model Add/Replace/duplicate待接入，当前明确拒绝mesh apply，未部署。SFMW源码969dcf1冻结完整May2023 /MT八目标通过，十八安装哈希0不匹配，安装60/61保持；不是Model发布或AE资格。
+
 SFMW精确资产写入seam已接入Model generic入口，UUID/Source/revision/guard前置核对，十项Mesh/bounds/revision/Source/guard读回与失败恢复；标准/ASAN原生模块各7535通过，另控件452。调用者负责outer undo和整笔graph/mirror事务，尚未接入完整Host导入/预设应用，未暴露菜单。3c10b5d UI-idle导出桥完整冻结May2023 /MT八目标通过；十八安装哈希0不匹配，60/61保持。下一步有界预设保存/导入与整体Add/Replace/duplicate恢复，再完成Particle菜单。
 
-UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排队、固定script entry points、有界32KiB页，普通panel polling不导出mesh。标准/ASAN Host147289、gateway/client联动576、SFMG1资产/client373通过；作者74和旧Texture/Cloud/Birth/完整事务回归通过。Prepare工具与tracked候选helper/patch重现，无live修改；精确资产导入、完整预设IO/应用rollback、Model菜单继续。此前9a441a8 seam的完整冻结SDK八目标通过，十八安装哈希0不匹配；新Host桥仍需独立冻结构建和实际AE gate。安装60/61不变，goal保持active。
+UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排队、固定script entry points、有界32KiB页，普通panel polling不导出mesh。标准/ASAN Host147289、gateway/client联动576、SFMG1资产/client373通过；作者74和旧Texture/Cloud/Birth/完整事务回归通过。Prepare工具与tracked候选helper/patch重现，无live修改；精确资产导入、完整预设IO/应用rollback、Model菜单继续。此前9a441a8 seam的完整冻结SDK八目标通过，十八安装哈希0不匹配；新Host桥独立冻结SDK证据见上，实际AE gate仍开放。安装60/61不变，goal保持active。
 
 原生preset网格export seam实现：private SFMX/version1走Model generic selector，固定数字+借用sink/cancel回调传有界SFMG1，无项目写入。身份/修订/Source/守卫/边界一致性、render-only拒绝、取消/host错误/损坏及parked mesh导出由实际Model模块夹具覆盖，标准/ASAN各3483通过。异步Host UI idle传输与精确资产导入/整体preset回滚继续；完整SDK候选待冻结，不增加宿主资格或暴露Model菜单。
 

@@ -728,7 +728,7 @@ are separate pending work; this transport does not advertise a usable Model
 preset pipeline. Actual AE2023 UI-idle ExecuteScript/generic context and timing
 remain qualification gates. The candidate stays isolated from installed60/61.
 
-The next private write seam uses SFMW/version1, not SFMX or the Core ABI. Its
+The private write seam uses SFMW/version1, not SFMX or the Core ABI. Its
 borrowed byte span must remain alive for the synchronous Model generic call.
 It checks UUID and expected native Source/revision/guard before changing Mesh,
 six author bounds, revision and Source under guard94. Desired revisions are
@@ -742,3 +742,30 @@ This seam creates no independent undo group, publishes no graph and writes no
 pose or UUID. It must not be exposed as an independently usable preset operation
 until Host import transport and complete Add/Replace/duplicate rollback are
 connected. No persistent IDs, schemas or parameter types change.
+
+### Portable preset files, staged version3
+
+Preset version3 adds `modelAssets` entries containing the owning Model node UUID,
+exact positive revision, six derived bounds and lowercase SFMG1 hex. Existing
+versions1/2 remain readable and keep their texture layer-name resource map.
+The graph remains limited to24KiB; each mesh stays8MiB and total numeric assets
+64MiB. File text has a separate128MiB+256KiB character bound and128MiB+1MiB
+UTF-8 byte bound. Ordinary gateway request bounds do not increase.
+
+Explicit preset Save collects meshes from the immediately captured pinned
+snapshot. Source=Cube also exports a parked imported mesh. Encode/decode checks
+graph UUID/revision/bounds against every portable asset; default cubes need no
+asset. Files travel through explicit32768-character pages with fixed transfer
+IDs, exact sequence/length, expiry and cancellation, rather than one large CEP
+evalScript argument or reply. Reload preserves only bounded plain session data;
+file objects are callback-owned. No file transport runs during normal polling.
+
+The user chooses the save/import path through the existing file dialogs. Saving
+prepares a unique sibling temporary file, verifies its complete text, then uses
+renames to preserve/replace an existing destination. Failed publication restores
+the previous destination and reports any failed restoration with the retained
+backup path. Success removes only the transaction's own temporary backup.
+Preset file IO does not mutate the AE project. Until native whole-graph Model
+asset restore is connected, imported meshes must be rejected before Add/Replace
+project mutation rather than being accepted with missing geometry. Remapping
+Model UUIDs and preserving exact resource metadata belong to that next step.
