@@ -62,6 +62,7 @@ $adapterInputs = @(
     'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalCache.hpp',
     'ae_plugin\NativeTemporalUI.cpp', 'ae_plugin\NativeTemporalUI.hpp',
     'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp',
+    'ae_plugin\ModelAssetHost.hpp', 'ae_plugin\ModelAssetHost.cpp',
     'ae_plugin\StarfieldHostPiPL.r', 'ae_plugin\StarfieldHost.vcxproj',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\TransformLayout.hpp', 'ae_plugin\TransformBinding.hpp',

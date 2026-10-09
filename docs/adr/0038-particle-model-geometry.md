@@ -698,3 +698,32 @@ allocation/cancellation and immutable input. Render evidence must additionally
 cover perspective/near-plane clipping, normals/reflection/shear, pixel depth,
 transparent particle transfer modes, camera/downsample/PAR/ROI, shutter and
 resource/undo/reopen behavior. Compilation alone does not qualify AE2023.
+
+### Private Model export transport candidate
+
+The session-resident Host owns a second Window command, `Starfield Prepare Model
+Asset Export`. Its command hook only queues work. UI idle, on the entry thread
+and under the existing reentrancy guard, executes fixed script entry points;
+it does not invoke ExecuteScript from CEP's synchronous command stack. Normal
+panel polling never queues exports or executes these scripts.
+
+A single volatile version1 session carries only plain numeric/hex data, expires
+after60 seconds, and caps one SFMG1 mesh at8MiB. The request line contains a
+32-character hexadecimal transfer ID, project root/comp/layer numeric identities,
+Model UUID, native Source and revision. Host reacquires all references, checks
+the project root, exactly one main renderer and exactly one matching Model, then
+synchronously calls the existing private SFMX message. All effect/stream/AEGP
+script-result handles are disposed inside the callback; only owned numeric mesh
+bytes survive to a later idle callback.
+
+Host sends at most eight32768-byte pages per idle pass, with a25ms soft deadline
+checked between calls. Each script argument is validated hex or bounded numbers;
+no arbitrary caller text is interpolated. ExtendScript keeps at most256 hex
+pages, enforces exact ordering/length and verifies pinned target, graph revision,
+Source, mesh revision, guard and six bounds before accepting or serving data.
+Cancelled, expired, stale or failed transfers discard pages and native storage.
+This protocol performs no project writes, selection changes, file access or
+host-wide configuration. Preset mesh codecs and asset import/whole-graph rollback
+are separate pending work; this transport does not advertise a usable Model
+preset pipeline. Actual AE2023 UI-idle ExecuteScript/generic context and timing
+remain qualification gates. The candidate stays isolated from installed60/61.

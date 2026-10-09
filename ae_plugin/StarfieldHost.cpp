@@ -3,6 +3,7 @@
 #include "SPBasic.h"
 #include "NativeBootstrap.hpp"
 #include "EffectReveal.hpp"
+#include "ModelAssetHost.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -18,6 +19,7 @@ std::chrono::steady_clock::time_point next_scan{};
 A_long item_id{},layer_index{},effect_index{};
 bool running{},stopped{};
 AEGP_Command reveal_command{};
+AEGP_Command model_asset_command{};
 constexpr char reveal_name[]="Starfield Reveal Selected Effect";
 template<class T> struct Suite {
     const char* name;A_long version;const T* value{};
@@ -31,7 +33,8 @@ template<class T> struct Suite {
 bool starfield_effect(const char* match) noexcept {
     return !std::strcmp(match,"org.starfieldfx.particle") ||
         !std::strcmp(match,"org.starfieldfx.node.emitter") || !std::strcmp(match,"org.starfieldfx.node.particle") ||
-        !std::strcmp(match,"org.starfieldfx.node.force") || !std::strcmp(match,"org.starfieldfx.node.transform");
+        !std::strcmp(match,"org.starfieldfx.node.force") || !std::strcmp(match,"org.starfieldfx.node.transform") ||
+        !std::strcmp(match,"org.starfieldfx.node.model");
 }
 A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
@@ -94,14 +97,23 @@ A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
 } catch(...) {return A_Err_NONE;}
 A_Err reveal_menu(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexcept {
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
+    if(commands && model_asset_command)(void)commands->AEGP_EnableCommand(model_asset_command);
     return commands && reveal_command?commands->AEGP_EnableCommand(reveal_command):A_Err_NONE;
+}
+A_Err model_asset_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
+    AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
+    if(command!=model_asset_command)return A_Err_NONE;
+    if(handled)*handled=TRUE;
+    starfield::adapter::queue_model_asset_export();return A_Err_NONE;
 }
 A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(sleep)*sleep=std::min(*sleep,A_long{30});
     const auto now=std::chrono::steady_clock::now();
-    if(stopped || running || std::this_thread::get_id()!=main_thread || now<next_scan)return A_Err_NONE;
-    next_scan=now+std::chrono::milliseconds(500);
+    if(stopped || running || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
     running=true;struct RunningScope{~RunningScope(){running=false;}} scope;
+    if(starfield::adapter::step_model_asset_host() && sleep)*sleep=std::min(*sleep,A_long{1});
+    if(now<next_scan)return A_Err_NONE;
+    next_scan=now+std::chrono::milliseconds(500);
     Suite<AEGP_ItemSuite9> items(kAEGPItemSuite,kAEGPItemSuiteVersion9);
     Suite<AEGP_CompSuite11> comps(kAEGPCompSuite,kAEGPCompSuiteVersion11);
     Suite<AEGP_LayerSuite9> layers(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
@@ -146,11 +158,12 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(layer_index>=count)layer_index=effect_index=0;
     return A_Err_NONE;
 } catch(...) {running=false;return A_Err_NONE;}
-A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {stopped=true;return A_Err_NONE;}
+A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {stopped=true;starfield::adapter::stop_model_asset_host();return A_Err_NONE;}
 }
 extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A_long,A_long,
     AEGP_PluginID id,AEGP_GlobalRefcon* refcon) noexcept {
     basic=suites;plugin_id=id;main_thread=std::this_thread::get_id();
+    starfield::adapter::initialize_model_asset_host(suites,id);
     if(refcon)*refcon=nullptr;
     Suite<AEGP_RegisterSuite5> registrations(kAEGPRegisterSuite,kAEGPRegisterSuiteVersion5);
     if(!registrations)return A_Err_GENERIC;
@@ -166,7 +179,12 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
        !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,reveal_command,reveal_selected,nullptr) &&
        !commands->AEGP_InsertMenuCommand(reveal_command,reveal_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM)) {
         (void)commands->AEGP_EnableCommand(reveal_command);
-        (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     }
+    if(!error && commands && !commands->AEGP_GetUniqueCommand(&model_asset_command) &&
+       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_asset_command,model_asset_queue,nullptr) &&
+       !commands->AEGP_InsertMenuCommand(model_asset_command,starfield::adapter::model_asset_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
+        (void)commands->AEGP_EnableCommand(model_asset_command);
+    if(!error && commands && (reveal_command || model_asset_command))
+        (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;
 }

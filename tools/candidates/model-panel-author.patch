@@ -407,7 +407,7 @@ index 6ee9c08..5314fd2 100644
                      graphHex = codec.toHex(updated);
                      if (graphHex.length / 2 > maxBytes) {
 diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
-index 792b33f..d0767fb 100644
+index 792b33f..b0e14eb 100644
 --- a/cep_panel/jsx/starfield_gateway.jsx
 +++ b/cep_panel/jsx/starfield_gateway.jsx
 @@ -42,7 +42,8 @@
@@ -543,3 +543,153 @@ index 792b33f..d0767fb 100644
          }
          var knownTargets = nodeIds(nodes);
          knownTargets["$000000000000000000000000000000ff"] = true;
+@@ -2512,6 +2601,149 @@
+     host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
+     host.SFLD_submitGraph = SFLD_submitGraph;
+     host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;
++    // Volatile Model transport, separate from ordinary panel polling and project
++    // streams. Reloading this gateway keeps only bounded plain data, never DOM
++    // properties. The session-resident Host command queues UI-idle work.
++    var modelBridgeKey="__SFLD_modelAssetBridgeV1",modelPageHex=65536,modelByteLimit=8*1024*1024;
++    function modelSession(id) {
++        var session=host[modelBridgeKey];
++        if(!session || session.version!==1 || session.id!==id)return null;
++        if((new Date()).getTime()>session.expires) {
++            session.state="failed";session.pages=[];
++            session.error={code:"model_asset_timeout",message:"Model asset transfer expired. Retry the operation."};
++        }
++        return session;
++    }
++    function modelAuthor(session) {
++        var resolved=graphCarrierTarget({pinTarget:true,target:{token:session.token}});
++        if(resolved.error)throw new Error(resolved.error.message);
++        if(Number(resolved.properties.guard.value)!==0 || Number(resolved.properties.revision.value)!==session.graphRevision)
++            throw new Error("The graph changed during Model asset transfer.");
++        var parade=resolved.target.layer.property("ADBE Effect Parade"),effect=null;
++        if(!parade || parade.numProperties>4096)throw new Error("Invalid effect inventory.");
++        for(var i=1;i<=parade.numProperties;i++) {
++            var candidate=parade.property(i);
++            if(candidate && candidate.matchName==="org.starfieldfx.node.model" && nodeUuidValue(candidate,"Node UUID ")===session.nodeId) {
++                if(effect)throw new Error("Duplicate Model identity.");effect=candidate;
++            }
++        }
++        if(!effect || Number(nodeControlValue(effect,"Panel Sync Guard"))!==0)throw new Error("The Model author is unavailable.");
++        var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
++        if(source!==session.source || asset.revision!==session.revision)throw new Error("The Model source changed during transfer.");
++        for(var axis=0;axis<6;axis++)if(asset.bounds[axis]!==session.bounds[axis])throw new Error("The Model bounds changed during transfer.");
++        return resolved;
++    }
++    function modelTransferFailure(session,message) {
++        session.state="failed";session.pages=[];
++        session.error={code:"model_asset_transfer_failed",message:String(message)};
++    }
++    host.SFLD_beginModelAssetExport=function(requestJson) {
++        var request=parseRequest(requestJson);
++        if(!request || request.operation!=="beginModelAssetExport" || request.pinTarget!==true ||
++            !/^[0-9a-f]{32}$/.test(request.assetId || "") || !/^[0-9a-f]{32}$/.test(request.nodeId || "") ||
++            !request.baseGraphRevision || Math.floor(request.baseGraphRevision)!==request.baseGraphRevision ||
++            request.baseGraphRevision>MAX_GRAPH_REVISION)return fail("invalid_request","Invalid Model asset export request.");
++        var previous=host[modelBridgeKey];
++        if(previous && previous.version===1 && (new Date()).getTime()<=previous.expires &&
++            (previous.state==="queued" || previous.state==="receiving"))return fail("model_asset_busy","Another Model transfer is running.");
++        try {
++            var resolved=graphCarrierTarget(request);if(resolved.error)return fail(resolved.error.code,resolved.error.message);
++            if(Number(resolved.properties.revision.value)!==request.baseGraphRevision || Number(resolved.properties.guard.value)!==0)
++                return fail("stale_graph","Reload the graph before exporting Model assets.");
++            var nodes=readNativeNodes(resolved.target.layer),record=null;
++            for(var i=0;i<nodes.length;i++)if(nodes[i].id===request.nodeId) {
++                if(record)throw new Error("Duplicate Model identity.");record=nodes[i];
++            }
++            if(!record || record.type!=="org.starfieldfx.nodes.model" || !record.modelAsset || record.modelAsset.revision===0)
++                return fail("invalid_request","This Model has no imported mesh to export.");
++            var session={version:1,id:request.assetId,nodeId:request.nodeId,token:resolved.token,
++                graphRevision:request.baseGraphRevision,source:Number(nodeParameter(record,13).value)+1,
++                revision:record.modelAsset.revision,bounds:record.modelAsset.bounds.slice(),
++                state:"queued",pages:[],bytes:0,expires:(new Date()).getTime()+60000};
++            // Source is read directly: Cube may retain an imported mesh.
++            modelAuthor(session);
++            var command=app.findMenuCommandId("Starfield Prepare Model Asset Export");
++            if(!command)return fail("model_asset_unavailable","Model asset transfer requires the paired Starfield Host build.");
++            host[modelBridgeKey]=session;
++            app.executeCommand(command);
++            return reply({ok:true,assetId:session.id,state:session.state});
++        } catch(error) {
++            var failed=modelSession(request.assetId);if(failed)modelTransferFailure(failed,error.toString());
++            return fail("model_asset_transfer_failed",error.toString());
++        }
++    };
++    // Called only by the native UI-idle callback. All results are bounded ASCII.
++    host.SFLD_modelAssetHostRequest=function() {
++        var session=host[modelBridgeKey];
++        if(!session || !modelSession(session.id) || session.state!=="queued")return "0";
++        try {
++            modelAuthor(session);
++            var parts=/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(session.token);
++            if(!parts)throw new Error("Invalid pinned Model target.");
++            return [session.id,parts[1],parts[2],parts[3],session.nodeId,session.source,session.revision].join("|");
++        } catch(error){modelTransferFailure(session,error.toString());return "0";}
++    };
++    host.SFLD_modelAssetHostBegin=function(id,bytes,bounds) {
++        var session=modelSession(id);
++        if(!session || session.state!=="queued")return "0";
++        try {
++            modelAuthor(session);
++            if(typeof bytes!=="number" || Math.floor(bytes)!==bytes || bytes<=0 || bytes>modelByteLimit ||
++                !(bounds instanceof Array) || bounds.length!==6)throw new Error("Invalid native Model payload.");
++            for(var i=0;i<6;i++)if(bounds[i]!==session.bounds[i])throw new Error("Native Model bounds do not match the author.");
++            session.bytes=bytes;session.state="receiving";return "1";
++        } catch(error){modelTransferFailure(session,error.toString());return "0";}
++    };
++    host.SFLD_modelAssetHostContinue=function(id) {
++        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
++        try {modelAuthor(session);return "1";}catch(error){modelTransferFailure(session,error.toString());return "0";}
++    };
++    host.SFLD_modelAssetHostChunk=function(id,index,hex) {
++        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
++        var expected=Math.min(modelPageHex,session.bytes*2-index*modelPageHex);
++        if(typeof index!=="number" || index!==session.pages.length || expected<=0 || typeof hex!=="string" ||
++            hex.length!==expected || !/^[0-9a-f]+$/.test(hex)) {
++            modelTransferFailure(session,"Invalid or out of order native Model page.");return "0";
++        }
++        session.pages.push(hex);return "1";
++    };
++    host.SFLD_modelAssetHostFinish=function(id) {
++        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
++        try {
++            modelAuthor(session);
++            if(session.pages.length!==Math.ceil(session.bytes*2/modelPageHex))throw new Error("Incomplete Model payload.");
++            session.state="ready";return "1";
++        } catch(error){modelTransferFailure(session,error.toString());return "0";}
++    };
++    host.SFLD_modelAssetHostFail=function(id,code,hostError) {
++        var session=modelSession(id);if(!session)return "0";
++        modelTransferFailure(session,"Native Model export failed (code "+code+", host "+hostError+").");return "1";
++    };
++    host.SFLD_readModelAssetPage=function(requestJson) {
++        var request=parseRequest(requestJson);
++        if(!request || request.operation!=="readModelAssetPage" || !/^[0-9a-f]{32}$/.test(request.assetId || "") ||
++            typeof request.page!=="number" || Math.floor(request.page)!==request.page || request.page<0 || request.page>=256)
++            return fail("invalid_request","Invalid Model page request.");
++        var session=modelSession(request.assetId);
++        if(!session || request.pinTarget!==true || !request.target || request.target.token!==session.token)
++            return fail("stale_target","The Model asset transfer no longer exists.");
++        if(session.state==="failed")return fail(session.error.code,session.error.message);
++        if(session.state!=="ready")return reply({ok:true,assetId:session.id,state:session.state});
++        try {modelAuthor(session);}catch(error){modelTransferFailure(session,error.toString());return fail(session.error.code,session.error.message);}
++        if(request.page>=session.pages.length)return fail("invalid_request","Model page is outside the payload.");
++        return reply({ok:true,assetId:session.id,state:"ready",page:request.page,pageCount:session.pages.length,
++            bytes:session.bytes,nodeId:session.nodeId,source:session.source,revision:session.revision,
++            bounds:session.bounds.slice(),hex:session.pages[request.page]});
++    };
++    host.SFLD_releaseModelAsset=function(requestJson) {
++        var request=parseRequest(requestJson);
++        if(!request || request.operation!=="releaseModelAsset" || !/^[0-9a-f]{32}$/.test(request.assetId || ""))
++            return fail("invalid_request","Invalid Model release request.");
++        var session=host[modelBridgeKey];
++        if(session && session.id===request.assetId && request.pinTarget===true && request.target && request.target.token===session.token)
++            host[modelBridgeKey]=null;
++        return reply({ok:true});
++    };
+     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
+     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
+ })();

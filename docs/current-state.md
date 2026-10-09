@@ -6,6 +6,10 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+Model资源导出异步候选：Host菜单仅排队，UI idle在进入线程/重入守卫下核对project root/comp/layer/唯一renderer/Model UUID，再调用私有SFMX；每次最多八个32KiB数值页，不参与常规CEP轮询。隔离gateway保留有界plain session，核对revision/Source/guard/bounds，取消、过期和stale丢弃。标准/ASAN Host各147289检查，gateway联动576、SFMG1客户端/资源校验373通过；Model作者74、旧Texture80/Cloud49/Birth51及完整gateway事务回归通过。日志artifacts/m3-17-model-asset-host-*.log和m3-17-model-assets-tests.log。tools/candidates/model_assets.js与更新后的author patch由Prepare工具重现到artifacts/prepared/m3-17-model-assets-panel62-reproduced/cep_panel，未写live CEP。精确资产导入、完整预设文件IO/应用回滚和Model菜单继续；此Host新候选完整冻结SDK及实际AE上下文/时序尚未验收。
+
+此前导出seam源码9a441a8已git archive冻结于artifacts/prepared/m3-17-model-asset-export-9a441a8/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，±0.5默认新增警告已消除。日志artifacts/m3-17-model-asset-export-build.log，八输出/十八安装哈希m3-17-model-asset-export-{build,installed}-hashes.json；0安装不匹配，native60/CEP61和runtime选择不变。此freeze不含上段新Host传输，不用它宣称新Host构建已通过。
+
 Model数值网格导出seam接入原生Model PF_Cmd_COMPLETELY_GENERAL：private SFMX/version1、有界SFMG1 sink，校验UUID/Source/revision/guard/bounds并用模块自己的PF上下文复制网格，host值释放后调用sink。无项目写入、句柄或分配器跨模块传输；常规CEP轮询不调用它。标准/ASAN原生模块各3483项通过（含既有452控件项），日志artifacts/m3-17-model-asset-export-{tests,asan}.log；首次漏fixture plugin-id stub的链接失败及平面minZ>maxZ的错误期望已修复，失败日志保留。新源纳入node工程/fingerprint，±0.5默认改为精确float literal消除新增编译警告。完整冻结SDK/host idle及CEP异步桥、导入/回滚尚待完成，安装60/61不变。
 
 作者边界/隔离CEP阶段源码857818b已推送；git archive冻结于artifacts/prepared/m3-17-model-author-857818b/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过。实际Model101参数及导入、主资源捕获编译；日志artifacts/m3-17-model-author-build.log，八输出/十八安装哈希m3-17-model-author-{build,installed}-hashes.json、0安装不匹配。构建有default double转PF_FpShort警告（边界默认±0.5可精确表示）；不增加AE宿主资格。当前native60/CEP61及runtime选择保持，继续网格预设资产传输。

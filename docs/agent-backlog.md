@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排队、固定script entry points、有界32KiB页，普通panel polling不导出mesh。标准/ASAN Host147289、gateway/client联动576、SFMG1资产/client373通过；作者74和旧Texture/Cloud/Birth/完整事务回归通过。Prepare工具与tracked候选helper/patch重现，无live修改；精确资产导入、完整预设IO/应用rollback、Model菜单继续。此前9a441a8 seam的完整冻结SDK八目标通过，十八安装哈希0不匹配；新Host桥仍需独立冻结构建和实际AE gate。安装60/61不变，goal保持active。
+
 原生preset网格export seam实现：private SFMX/version1走Model generic selector，固定数字+借用sink/cancel回调传有界SFMG1，无项目写入。身份/修订/Source/守卫/边界一致性、render-only拒绝、取消/host错误/损坏及parked mesh导出由实际Model模块夹具覆盖，标准/ASAN各3483通过。异步Host UI idle传输与精确资产导入/整体preset回滚继续；完整SDK候选待冻结，不增加宿主资格或暴露Model菜单。
 
 源码857818b冻结完整May2023 /MT八目标通过（IncludeModelCandidate/双NoPublish），Model101/完整导入路线编译；十八安装文件哈希0不匹配，native60/CEP61与runtime不变。日志artifacts/m3-17-model-author-build.log和m3-17-model-author-{build,installed}-hashes.json。阶段实现、focused tests、推送和冻结构建属于progress；网格预设/复制/恢复与Model菜单继续，实际AE gate未关闭。

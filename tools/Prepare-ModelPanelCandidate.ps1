@@ -33,6 +33,7 @@ foreach($taskLine in [IO.File]::ReadAllLines($taskPatch)){
 }
 New-Item -ItemType Directory -Path $taskDestination -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'cep_panel') -Destination (Join-Path $taskDestination 'cep_panel') -Recurse
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_assets.js')
 foreach($taskFile in $taskBaseline.files){
     if((Get-SourceHash (Join-Path $taskDestination ('cep_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
 }
@@ -44,6 +45,7 @@ try {
     if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
 } finally {Pop-Location}
 [ordered]@{basePanel=61;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
+    modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
 Write-Host "Prepared isolated Model author candidate: $taskDestination"
