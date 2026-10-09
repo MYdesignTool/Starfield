@@ -74,4 +74,23 @@ for(const id of [89,90]) {
     record.parameters.find(p=>p.key==="31").value=id;
     reject(()=>api.write(effect,realm(record),layer),/other than its renderer/);equal(props["Panel Sync Guard"].value,0);
 }
+// Each Texture field has a separate integer range in the host gateway.
+record.parameters.find(p=>p.key==="31").value=88;
+for(const [key,max,disk] of [[33,7,235],[34,2,236],[35,1,237],[36,1,238]]) {
+    const parameter=record.parameters.find(p=>p.key===String(key));
+    for(let value=0;value<=max;value++) {
+        parameter.value=value;api.write(effect,realm(record),layer);
+        equal(props["org.starfieldfx.node.particle-"+disk].value,value+(key<=34?1:0));
+    }
+    parameter.value=max+1;
+    reject(()=>api.write(effect,realm(record),layer),new RegExp("reason=range.*max="+max));
+    equal(props["Panel Sync Guard"].value,0);parameter.value=0;
+}
+const frontParameter=record.parameters.find(p=>p.key==="31");
+for(const [type,value,reason] of [["3",88,"wire type"],[3,"88","value type"],[3,88.5,"noninteger"],
+    [3,-1,"negative"],[3,2147483648,"range"]]) {
+    frontParameter.type=type;frontParameter.value=value;
+    reject(()=>api.write(effect,realm(record),layer),new RegExp("reason="+reason+".*max=2147483647"));
+    equal(props["Panel Sync Guard"].value,0);
+}
 console.log(`texture_panel_tests: ${checks} checks passed; AE2023 qualification remains open`);

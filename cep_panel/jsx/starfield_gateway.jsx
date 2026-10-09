@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-59";
+    var GATEWAY_BUILD = "native-presets-60";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1156,8 +1156,21 @@
                         var scalars={"14":"Life Random","16":"Size Y (Pixels)","19":"Angle Random","21":"Rotation Speed Random","23":"Particle Feather","26":"Limit Angle","28":"Anchor X (Percent)","29":"Anchor Y (Percent)","22":"Limit To 2D"};
                         var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis","30":"Transfer Mode"};
                         if(Number(key)>=31 && Number(key)<=36) {
-                            if(parameter.type!==3 || typeof value!=="number" || !isFinite(value) || Math.floor(value)!==value || value<0 ||
-                                value>(Number(key)<=32?2147483647:Number(key)===33?7:Number(key)===34?2:1))throw new Error("Invalid Texture parameter: "+key+" (type="+parameter.type+", value="+String(value)+", kind="+(typeof value)+", node="+node.id+")");
+                            // Keep range selection explicit in the ExtendScript engine.
+                            // A source ID must use the layer-ID range, never an enum bound.
+                            var textureKey=Number(key),textureMaximum=1,textureProblem="";
+                            if(textureKey<=32)textureMaximum=2147483647;
+                            else if(textureKey===33)textureMaximum=7;
+                            else if(textureKey===34)textureMaximum=2;
+                            if(parameter.type!==3)textureProblem="wire type";
+                            else if(typeof value!=="number")textureProblem="value type";
+                            else if(!isFinite(value))textureProblem="nonfinite";
+                            else if(Math.floor(value)!==value)textureProblem="noninteger";
+                            else if(value<0)textureProblem="negative";
+                            else if(value>textureMaximum)textureProblem="range";
+                            if(textureProblem)throw new Error("Invalid Texture parameter: "+key+" (reason="+textureProblem+
+                                ", type="+parameter.type+", typeKind="+(typeof parameter.type)+", value="+String(value)+
+                                ", kind="+(typeof value)+", max="+textureMaximum+", node="+node.id+")");
                             if(Number(key)<=32) {
                                 var sourceIndex=layerResourceIndex(layer,value);
                                 if(sourceIndex) {

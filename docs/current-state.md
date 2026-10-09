@@ -4,6 +4,8 @@
 
 ## 源码与安装
 
+owner 已确认 native59 原生选择器可以显示；添加仍报 key31/type3/value44/kind number。该值合法，尚未确定拒绝原因。CEP60 候选使用明确分支选择图层/枚举/开关范围，保留严格校验并增加 reason/typeKind/max；不能将旧嵌套条件在 ExtendScript 中的解释假设当作确诊。CEP80检查、实机ID44完整 gateway参数重写/添加/失败回滚/纹理预设 Add/Replace与启动通过。仅 CEP 维护，native59/Core ABI7 保留。
+
 候选 native59/packed32827/CEP59：普通 PF_LAYER、PF_PUI_NONE；既有 disk233/234、streams521/522、类型/绑定/schema/ABI7 保留。AE 管理选择和显示名称，正反面均经标准 USER_CHANGED；真实 AE 行为待验收。候选基于65c7245，位于 artifacts/prepared/m3-13-native59-panel59/source；控件266、绑定7773+相机12、Core Texture4322/CEP47、完整 gateway/启动及 May2023 /MT 构建通过。完整 gateway 的已有正反面引用添加/失败回滚通过，没有复现 parameter31；保留校验并扩展诊断。Source/Masks/Effects stage 的资源镜像契约仍开放。
 
 native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递。原生7773+相机12检查、隔离 CEP 纹理47、完整事务与启动通过；May2023 /MT 构建通过。部署前 fresh process check 无 AE，七个 native/Core、十一项 CEP、runtime selector 与 exact57 配对回滚核对。候选 artifacts/prepared/m3-13-native58-panel58 保留，日志 m3-13-native58-*。
@@ -14,7 +16,7 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 | --- | --- | --- |
 | 原生版本 | build59，packed32827；普通 Texture layer widgets | native59，packed32827 |
 | Core ABI | 7 | 7 |
-| CEP | panel59 | panel59（既有 live Junction） |
+| CEP | panel60 | panel59（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |

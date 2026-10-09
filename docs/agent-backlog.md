@@ -45,6 +45,8 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 当前唯一活动卡为 M3-13。native58/CEP58 与默认方向 Core 维护已发布；owner 确认 Comp 2 可选择/显示，随后报告背面无效、选择标签空白和已有 Texture 引用时添加节点报 parameter31（无引用画布正常）。按 owner 要求，native59/CEP59 候选改为 AE 原生行内 PF_LAYER，保留 ID/类型/绑定/schema/ABI7；完整事务中的正反面引用、添加及失败回滚通过，尚未复现宿主 parameter31，保留严格校验并增加类型/值诊断。候选控件266、绑定7773+相机12、Texture4322/CEP47、完整 gateway/启动及 May2023 /MT 构建通过；不能据此宣称宿主修复完成。见 ADR0034。M3-16 与 MNT 共享改动保留并排除于候选；八种采样/持久化、正反面和 Source/Masks/Effects gate 继续。
 
 2026-10-09 08:33 +08:00 fresh no-AE 后发布cb1048d/native59/CEP59；七个 native/Core、十一项 CEP、selector 与 exact58配对备份/恢复 report 核对。收据 artifacts/m3-13-native59-deploy-{before,after}.json。等待 owner 的选择标签/背面/已有 Texture 添加实机证据，完整 goal 继续。
+
+owner 已确认选择器显示，添加仍拒绝合法 ID44/type3/kind number。CEP60 候选将图层/枚举/开关范围改成明确分支，保留严格校验并记录 reason/typeKind/max；旧嵌套表达式的引擎解释仅为假设。80项 Texture CEP、完整 ID44 事务/预设/失败回滚及启动通过；native59保持不变。实机添加及背面仍开放，本卡继续。
 拥有：Settings/ParticleTexture、Render.hpp/C ABI/快照、图求值/CPU/GPU fallback、AE texture 作者与 SmartFX checkout、CEP/资源/预设、schema/version、focused texture tests、ADR0034。
 依赖：已部署 native52/CEP52、ABI5；参考字段和八种采样菜单已核对。Freeze Frame 经 owner 明确选择为粒子出生时的图层画面。
 迁移：ADR0034 先行；Particle optional keys31..36，shape3，snapshot6/Core ABI6；新增 native/main 控件只追加，适配器布局在更改前补充 ADR。

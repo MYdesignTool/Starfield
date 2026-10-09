@@ -2,6 +2,34 @@
 
 Status: implementation in progress, 2026-10-08. Task M3-13.
 
+## Explicit Texture validation ranges, 2026-10-09
+
+The owner confirms the native59 inline selector now displays its selection,
+but adding a node still fails with `type=3, value=44, kind=number` for Particle
+key31. That is a legal layer ID under the intended signed-positive range.
+The short diagnostic does not distinguish the type's JavaScript kind or which
+predicate rejected it. It therefore does not prove a graph corruption or a
+particular ExtendScript engine defect.
+
+CEP60 selects bounds with explicit branches: keys31/32 allow0..2147483647,
+33 allows0..7, 34 allows0..2, 35/36 allow0..1. It removes the nested ternary from
+this host validation path, retaining every type/finite/integer/range check.
+Each predicate gets a named rejection reason and the message includes typeKind
+and the actual selected maximum. Engine interpretation of the old nested
+expression is a hypothesis until real-host observation distinguishes it.
+No arbitrary coercion, missing layer substitution or skipped reference write
+is introduced. Native59, IDs, schemas, numeric texture rendering and ABI7 stay
+unchanged; deploy as a CEP-only maintenance pairing through KeepNative.
+
+Focused candidate evidence: Texture CEP80 checks pass, including each enum/flag
+range and malformed type/string/fraction/negative/overflow rejection. Complete
+gateway transactions cover owner layer ID44, parameter rewrites, node add,
+injected rollback and Texture preset Add/Replace. Startup checks pass. Logs:
+artifacts/m3-13-panel60-{texture,gateway,startup}-tests.log. Candidate CEP is under
+artifacts/prepared/m3-13-native59-panel60. Native selector naming has owner
+confirmation; back selection, this add defect and all wider sampling/stage gates
+remain open until actual AE2023 verification.
+
 ## Ordinary native layer widgets, 2026-10-09
 
 The owner reports blank Layer/Dark Side labels, ineffective back-source selection,
