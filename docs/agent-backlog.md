@@ -95,6 +95,8 @@ UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排�
 作者边界追加候选：streams95..100/disks1519..1524，总101，metadata19..94和binding7 synthetic bounds19..24保持。导入十项保存/读回/逆序恢复；标准/ASAN原生模块各3040、导入事务各1559通过。隔离CEP作者74项、旧Texture80/Cloud49/Birth51及完整gateway事务通过；Model拖放/模型端口/普通参数记录/parked OBJ切换已接入候选patch。工具Prepare-ModelPanelCandidate只在artifacts复制和应用候选，不改live CEP。完整SDK冻结检查待记录；资源预设传输/复制/恢复及Particle菜单继续，未部署、实际AE gate开放。
 
 当前活动实现卡切换为M3-17；M3-16已部署并等待owner宿主验收，M3-13添加/背面报错反馈优先。完整目标不缩减。
+
+2026-10-10 owner要求阶段收尾并暂停：完整EffectGraphBackup候选和guard2库存隔离已实现，标准/ASAN helper各458562项、Host147760、实际Model7699（控件452）、隔离gateway588/作者74/预设330与旧preset断言通过。保留失败诊断，日志artifacts/m3-17-effect-graph-backup-*；Prepare可重现隔离候选，不改live CEP。尚未将helper接入整笔Host资产/图事务，本阶段完整SDK冻结和实际AE验证待续；native60/CEP61保持。下次继续Host资产导入/完整Add/Replace/duplicate、Particle Model菜单、配对构建及部署前Modal/idle与导入revision一致性gate（ADR0038，owner静态假设未复现），然后继续Particle、各节点命名/排序和Motion/Turbulence；不缩减目标。
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
 MotionBlur.hpp的Model style验证/组索引迁移/线性矩阵采样属于M3-17渲染契约，保留旧形状的快门行为；语义先行记录于ADR0038。
 首个里程碑：单位立方体、有界OBJ多边形/索引/属性、正确三角化、typed拒绝及取消。随后接入深度/裁剪/合成和完整作者链路，未实现渲染前不暴露Model菜单、不部署纯解析器候选。Face依赖OBJ发射器、Path依赖路径发射器，分别保留后续卡；Model图来源和Use Model(s)菜单待owner参考。

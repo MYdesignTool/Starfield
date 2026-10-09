@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+2026-10-10阶段收尾（owner要求暂停）：M3-17新增完整EffectGraphBackup helper，使用AEGP_DuplicateEffect保存主效果/节点的完整网格、动画、表达式与参数；guard2和临时UUID隔离备份，恢复名称/顺序/flags并最后释放主效果guard。删除、排序、身份和flags均读回核对；原生图编译、renderer定位、Model导出及隔离CEP库存排除备份。标准/ASAN helper各458562项fake-host检查，Host147760、实际Model模块7699（另控件452）、隔离gateway588/作者74/预设330与旧preset断言通过，日志artifacts/m3-17-effect-graph-backup-*；两次夹具编译错误和一次Model专用定位过滤遗漏已修正，失败日志保留。候选由Prepare工具重现到artifacts/prepared/m3-17-model-backup-panel62-fixed/cep_panel；live CEP和native60/CEP61保持。helper尚未接入整笔Host图事务，本阶段未做完整SDK冻结构建或AE宿主验证，不能视为Model预设应用已经完成。
+
+恢复工作顺序：先完成Host资产导入和整笔Add/Replace/duplicate事务，再完成Particle的Model菜单/模型选择、配对SDK构建；Model部署前须处理并验收下面的脚本/模态范围重入和导入状态一致性gate。随后继续各节点Stardust命名/排序、剩余Particle类型与选项，以及Motion首批三模式和Turbulence，完整目标保留。当前所有在途源改动及MNT-01改动均保留。
+
+2026-10-10只读部署核对：dist/StarfieldHost.aex的SHA256为8F17C43E7D2FA6658DBF2F732DF25CE069654A0249CAA4B62713B0DD84BFFFCF，与native60部署收据及90b7a2b冻结bundle完全一致；AE插件Junction仍指向dist。冻结StarfieldHost.cpp没有step_model_asset_host，该idle接入由后续3c10b5d加入，仅在未部署的Model候选中。owner提出的PresetsUI脚本模态重入、OBJ文件对话框、编辑器预设对话框及导入返回后author/revision一致性疑虑均列为Model部署前验收项（ADR0038），属于静态假设，未复现；本次仅核对和记录。
+
 隔离预设文件阶段实现version3 Model资产codec、Save Current实际网格收集及Import分页读取；v1/v2保持兼容。独立32768字符页/128MiB+256KiB文本限额不改变普通请求上限；用户选择文件后临时文件读回验证、rename发布与失败恢复，清理失败保留路径。真实候选codec/client/gateway/按钮共330项检查和未修改的旧preset断言通过，日志artifacts/m3-17-model-preset-file-tests.log；Model74/export576/Texture80/Cloud49/Birth51及完整gateway事务回归通过，m3-17-model-preset-files-*.log。新File行为全部使用内存夹具，没有实际磁盘/AE资格。候选可由Prepare重现；完整Model Add/Replace仍在项目变更前明确拒绝，原生整笔事务/duplicate和菜单继续，未部署。
 
 SFMW源码969dcf1已推送并git archive冻结于artifacts/prepared/m3-17-model-asset-write-969dcf1/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，实际ModelAssetWrite编译。日志artifacts/m3-17-model-asset-write-build.log，八输出/十八安装哈希m3-17-model-asset-write-{build,installed}-hashes.json；0安装不匹配，native60/CEP61及runtime selector保持。此freeze不包含之后的隔离预设文件改动。

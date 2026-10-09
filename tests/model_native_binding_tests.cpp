@@ -336,6 +336,13 @@ void ui_capture(PF_InData& data){
     CHECK(compiled==PF_Err_NONE&&found&&graph.nodes.size()==4&&ui_mesh_reads==0);
     if(compiled==PF_Err_NONE){CHECK(std::any_of(graph.edges.begin(),graph.edges.end(),[](const auto& e){return e.source_node==nid(4)&&e.destination_node==nid(2)&&e.destination_port==kParticleModelsIn;}));
         CHECK(graph.optional_records.size()==2&&graph.optional_records[1][2]==std::byte{7});}
+    // A disabled transaction backup is absent from the authored graph, even
+    // before its temporary UUID/mesh have been validated or read.
+    ui_values[0][94].one_d=2;ui_values[0][native_nodes::uuid_first_index(records::model)+7].one_d=0;
+    CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE&&found&&graph.nodes.size()==3&&ui_mesh_reads==0);
+    CHECK(std::none_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kModelNode;}));
+    CHECK(ui_refs==0&&ui_suites==0);
+    ui_values[0][94].one_d=0;ui_values[0][native_nodes::uuid_first_index(records::model)+7].one_d=4;
     PF_ArbitraryH imported=nullptr;CHECK(prepare_model_obj_parameter(&data,"v 10 20 30\nv 14 20 30\nv 14 28 30\nf 1 2 3\n",&imported,never)==PF_Err_NONE);
     ui_values[0][layout::source].one_d=2;ui_values[0][layout::revision].one_d=77;ui_values[0][layout::mesh].arbH=reinterpret_cast<AEGP_ArbBlockVal>(imported);
     const double bounds[]{10,20,30,14,28,30};for(int axis=0;axis<6;++axis)ui_values[0][layout::author_bounds_first+axis].one_d=bounds[axis];

@@ -1,6 +1,7 @@
 #include "ModelAssetHost.hpp"
 #include "ModelAssetMessage.hpp"
 #include "NodeRecord.hpp"
+#include "Parameters.hpp"
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -18,12 +19,13 @@ constexpr char transfer[]="0123456789abcdef0123456789abcdef",uuid[]="fedcba98765
 std::string request_line,missing_suite,received,failed;
 bool available=true,continue_ack=true,wrong_uuid{},duplicate{},multiple_renderers{},wrong_project{},wrong_comp{},wrong_layer{},
     generic_error{},unacknowledged{},bad_payload_size{},sink_overflow{},script_error{},unterminated{},big_result{},wrong_type{};
+bool backup_renderer{},backup_model{};double renderer_guard{},model_guard{};
 std::size_t payload_size=70001;
 int reject_page=-1;
 unsigned begins{},finishes{};
 struct Memory {std::string text;bool locked{};};
 struct Effect {A_long index;};
-struct Stream {A_long index;};
+struct Stream {A_long index,effect;};
 AEGP_UtilitySuite6 utility{};AEGP_MemorySuite1 memory{};AEGP_ProjSuite6 projects{};
 AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};AEGP_LayerSuite9 layers{};
 AEGP_EffectSuite4 effects{};AEGP_StreamSuite6 streams{};SPBasicSuite basic{};
@@ -38,6 +40,7 @@ void reset(){stop_model_asset_host();no_owned();initialize_model_asset_host(&bas
     missing_suite.clear();received.clear();failed.clear();payload_size=70001;reject_page=-1;
     available=continue_ack=true;wrong_uuid=duplicate=multiple_renderers=wrong_project=wrong_comp=wrong_layer=false;
     generic_error=unacknowledged=bad_payload_size=sink_overflow=script_error=unterminated=big_result=wrong_type=false;
+    backup_renderer=backup_model=false;renderer_guard=model_guard=0;
     script_calls=generic_calls=chunk_calls=begins=finishes=0;}
 void drain(){queue_model_asset_export();unsigned passes{};while(step_model_asset_host()){CHECK(++passes<300);no_owned();}no_owned();}
 void initialize(){
@@ -76,18 +79,21 @@ void initialize(){
     comps.AEGP_GetCompFromItem=[](AEGP_ItemH,AEGP_CompH* out)->A_Err{*out=opaque<AEGP_CompH>(2);return 0;};
     layers.AEGP_GetLayerFromLayerID=[](AEGP_CompH,AEGP_LayerIDVal id,AEGP_LayerH* out)->A_Err{CHECK(id==303);*out=wrong_layer?nullptr:opaque<AEGP_LayerH>(3);return 0;};
     layers.AEGP_GetLayerCurrentTime=[](AEGP_LayerH,AEGP_LTimeMode mode,A_Time* out)->A_Err{CHECK(mode==AEGP_LTimeMode_LayerTime);*out={12,24};return 0;};
-    effects.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* out)->A_Err{*out=(duplicate || multiple_renderers)?3:2;return 0;};
+    effects.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* out)->A_Err{*out=(duplicate || multiple_renderers || backup_renderer || backup_model)?3:2;return 0;};
     effects.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID id,AEGP_LayerH,A_long index,AEGP_EffectRefH* out)->A_Err{CHECK(id==7);++refs;*out=reinterpret_cast<AEGP_EffectRefH>(new Effect{index});return 0;};
     effects.AEGP_DisposeEffect=[](AEGP_EffectRefH h)->A_Err{delete reinterpret_cast<Effect*>(h);--refs;return 0;};
     effects.AEGP_GetInstalledKeyFromLayerEffect=[](AEGP_EffectRefH h,AEGP_InstalledEffectKey* out)->A_Err{*out=reinterpret_cast<Effect*>(h)->index;return 0;};
     effects.AEGP_GetEffectMatchName=[](AEGP_InstalledEffectKey key,A_char* out)->A_Err{
-        std::strcpy(out,key==0 || (key==2 && multiple_renderers)?"org.starfieldfx.particle":"org.starfieldfx.node.model");return 0;};
-    streams.AEGP_GetNewEffectStreamByIndex=[](AEGP_PluginID,AEGP_EffectRefH,A_long index,AEGP_StreamRefH* out)->A_Err{
-        ++refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Stream{index});return 0;};
+        std::strcpy(out,key==0 || (key==2 && (multiple_renderers || backup_renderer))?"org.starfieldfx.particle":"org.starfieldfx.node.model");return 0;};
+    streams.AEGP_GetNewEffectStreamByIndex=[](AEGP_PluginID,AEGP_EffectRefH effect,A_long index,AEGP_StreamRefH* out)->A_Err{
+        ++refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Stream{index,reinterpret_cast<Effect*>(effect)->index});return 0;};
     streams.AEGP_GetStreamType=[](AEGP_StreamRefH,AEGP_StreamType* out)->A_Err{*out=wrong_type?AEGP_StreamType_ARB:AEGP_StreamType_OneD;return 0;};
     streams.AEGP_GetNewStreamValue=[](AEGP_PluginID,AEGP_StreamRefH ref,AEGP_LTimeMode,const A_Time*,A_Boolean,AEGP_StreamValue2* out)->A_Err{
-        const auto index=reinterpret_cast<Stream*>(ref)->index-native_nodes::uuid_first_index(native_nodes::Kind::model);
-        CHECK(index>=0 && index<8);out->streamH=ref;out->val.one_d=std::stoul(std::string(uuid).substr(index*4,4),nullptr,16)+(wrong_uuid?1:0);++values;return 0;};
+        const auto key=*reinterpret_cast<Stream*>(ref);out->streamH=ref;
+        if(key.index==kGraphSyncGuardId)out->val.one_d=key.effect==2 && backup_renderer?2:renderer_guard;
+        else if(key.index==native_nodes::sync_guard_index(native_nodes::Kind::model))out->val.one_d=key.effect==2 && backup_model?2:model_guard;
+        else {const auto index=key.index-native_nodes::uuid_first_index(native_nodes::Kind::model);CHECK(index>=0 && index<8);
+            out->val.one_d=std::stoul(std::string(uuid).substr(index*4,4),nullptr,16)+(wrong_uuid?1:0);}++values;return 0;};
     streams.AEGP_DisposeStreamValue=[](AEGP_StreamValue2*)->A_Err{CHECK(values>0);--values;return 0;};
     streams.AEGP_DisposeStream=[](AEGP_StreamRefH ref)->A_Err{delete reinterpret_cast<Stream*>(ref);--refs;return 0;};
     effects.AEGP_EffectCallGeneric=[](AEGP_PluginID id,AEGP_EffectRefH effect,const A_Time* time,PF_Cmd command,void* extra)->A_Err{
@@ -115,6 +121,8 @@ int main(){initialize();reset();CHECK(!step_model_asset_host());CHECK(script_cal
     drain();CHECK(generic_calls==1 && begins==1 && finishes==1 && chunk_calls==3);CHECK(received.size()==payload_size*2);
     constexpr char hex[]="0123456789abcdef";for(std::size_t i=0;i<payload_size;++i){CHECK(received[i*2]==hex[(i&255)>>4]);CHECK(received[i*2+1]==hex[i&15]);}
     CHECK(!step_model_asset_host());CHECK(generic_calls==1);
+    for(unsigned which=0;which<2;++which){reset();if(which==0)backup_renderer=true;else backup_model=true;drain();CHECK(generic_calls==1 && finishes==1);}
+    for(unsigned which=0;which<2;++which){reset();if(which==0)renderer_guard=1;else model_guard=1;drain();CHECK(generic_calls==0 && finishes==0);}
     for(const char* suite:{kAEGPUtilitySuite,kAEGPMemorySuite,kAEGPProjSuite,kAEGPItemSuite,kAEGPCompSuite,kAEGPLayerSuite,kAEGPEffectSuite,kAEGPStreamSuite}){
         reset();missing_suite=suite;drain();CHECK(generic_calls==0 && finishes==0);}
     for(unsigned which=0;which<7;++which){reset();switch(which){case 0:wrong_uuid=true;break;case 1:duplicate=true;break;case 2:multiple_renderers=true;break;

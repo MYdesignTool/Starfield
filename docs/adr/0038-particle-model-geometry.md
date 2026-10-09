@@ -703,9 +703,11 @@ resource/undo/reopen behavior. Compilation alone does not qualify AE2023.
 
 The session-resident Host owns a second Window command, `Starfield Prepare Model
 Asset Export`. Its command hook only queues work. UI idle, on the entry thread
-and under the existing reentrancy guard, executes fixed script entry points;
-it does not invoke ExecuteScript from CEP's synchronous command stack. Normal
-panel polling never queues exports or executes these scripts.
+and under the existing idle-to-idle running guard, executes fixed script entry
+points; it does not invoke ExecuteScript from CEP's synchronous command stack.
+That guard and the thread check do not establish exclusion against a different
+outer ExecuteScript or modal callback on the same UI thread. Normal panel polling
+never queues exports or executes these scripts.
 
 A single volatile version1 session carries only plain numeric/hex data, expires
 after60 seconds, and caps one SFMG1 mesh at8MiB. The request line contains a
@@ -727,6 +729,40 @@ host-wide configuration. Preset mesh codecs and asset import/whole-graph rollbac
 are separate pending work; this transport does not advertise a usable Model
 preset pipeline. Actual AE2023 UI-idle ExecuteScript/generic context and timing
 remain qualification gates. The candidate stays isolated from installed60/61.
+
+#### Modal/idle acceptance gate — static review, 2026-10-10
+
+The owner raised these hypotheses; none is a reproduced AE defect. A read-only
+check confirmed that deployed native60 Host still matches its frozen90b7a2b
+bundle and receipt (SHA256
+`8F17C43E7D2FA6658DBF2F732DF25CE069654A0249CAA4B62713B0DD84BFFFCF`).
+That frozen StarfieldHost.cpp contains no Model asset step. The idle call to
+step_model_asset_host was introduced later by3c10b5d and is not deployed.
+Accordingly these are Model predeployment gates, with no immediate runtime fix
+or installation change authorized by this review.
+
+- PresetsUI.cpp:53..55 invokes app.executeCommand or alert inside
+  AEGP_ExecuteScript. If a modal message loop admits Host idle before that outer
+  call returns, queued or active Model work could invoke another ExecuteScript.
+  Verify exclusion across the outer script/modal scope, including early returns
+  and failures; the UI-thread comparison alone cannot close this gate.
+- ModelImportUI.cpp:24 uses GetOpenFileNameW; EditorPresetPicker.cpp:133 uses
+  DialogBoxIndirectParamW. Exercise queued and active Model transfers while each
+  dialog is open, cancellation and dialog return. Model script work must not be
+  admitted through a nested modal loop; deferred work must resume safely after
+  the outer operation finishes.
+- Record Model import separately: after the file chooser returns, revalidate
+  the current target identity and author state before writing guard94, Mesh3,
+  Revision4, Source1 and bounds. Current import code reads revision from live
+  streams after the dialog, but that alone does not prove that callback params,
+  target identity and the other captured state stayed consistent. The reported
+  stale-revision/intermittent-import-failure scenario remains a hypothesis.
+  Acceptance needs safe rejection or a consistent commit after any intervening
+  state change, exact rollback and no lost update.
+
+Fake-host and SDK compilation evidence do not exercise AE's modal message pump.
+These gates remain open until the candidate has explicit scope protection and
+target/state validation evidence, followed by actual AE2023 modal-path checks.
 
 The private write seam uses SFMW/version1, not SFMX or the Core ABI. Its
 borrowed byte span must remain alive for the synchronous Model generic call.
@@ -769,3 +805,41 @@ Preset file IO does not mutate the AE project. Until native whole-graph Model
 asset restore is connected, imported meshes must be rejected before Add/Replace
 project mutation rather than being accepted with missing geometry. Remapping
 Model UUIDs and preserving exact resource metadata belong to that next step.
+
+### Complete effect backup for Model graph transactions
+
+Whole-graph Model mutations need a full effect backup, including animation,
+expressions, arbitrary values and renderer resource mirrors. Recreating effects
+from the current frame's ordinary manifest is insufficient for that rollback.
+The UI transaction uses the SDK's AEGP_DuplicateEffect within its single outer
+undo group. All initial metadata/names/positions/flags and backup UUIDs are
+prepared before mutation. It backs up the unique renderer and at most63 nodes;
+third-party effects are neither copied nor removed.
+
+The existing hidden integer sync guard reserves value2 for transaction backups:
+node guard indices/disks and renderer index40/disk42 stay unchanged, as do their
+types and valid ranges. Value0 remains normal and value1 remains a write batch.
+A backup node receives a fresh temporary UUID and guard2; its Active flag is
+cleared. Native compilation and CEP inventories ignore guard2, and renderer
+search ignores renderer guard2. The temporary UUID also prevents an alias from
+matching a backup. No persistent public ID/schema or effect identity changes.
+Normal polling does not create backups. Guard2 leftovers cause a fresh backup
+request to fail with diagnostics rather than treating them as ordinary nodes.
+
+On graph failure, the transaction deletes surviving active Starfield effects,
+restores the backup UUIDs/names/flags/order and activates the saved renderer last.
+This restores the renderer's complete saved graph/mirrors and full native node
+animation without sampling it into static author values. Original layer identity
+and all non-Starfield effects stay in place. All effect/stream references are
+callback-owned and released before an ExecuteScript or structural edit.
+Successful publication discards only this transaction's backups; deletion or
+restoration failures are reported separately. SDK errors and fake-host evidence
+do not qualify actual AE duplication, undo, or expression identity behavior.
+The helper remains unpublished until the Model asset/whole-graph Host route is
+connected and the full author candidate can be deployed as one pairing.
+
+2026-10-10 checkpoint: the helper and guard2 inventory exclusions are implemented,
+with focused fake-host and ASAN evidence recorded in testing.md. The helper is
+not yet called by the whole-graph Host route. Complete SDK pairing, AE duplication
+and undo/expression identity checks, and the modal/idle gate above remain open.
+The owner requested a staged close and pause; installed native60/CEP61 is retained.

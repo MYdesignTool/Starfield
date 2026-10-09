@@ -1,6 +1,8 @@
 #include "ModelAssetHost.hpp"
 #include "ModelAssetMessage.hpp"
 #include "NodeRecord.hpp"
+#include "EffectGraphBackup.hpp"
+#include "Parameters.hpp"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -95,6 +97,16 @@ std::int32_t receive(void* context,const std::uint8_t* bytes,std::uint32_t count
     if(!bytes || count==0 || count>mesh_limit || !copy.empty())return 1;
     copy.assign(bytes,bytes+count);return 0;
 } catch(...){return 1;}
+bool read_guard(const AEGP_StreamSuite6* streams,AEGP_EffectRefH effect,const A_Time& time,A_long index,double& guard) {
+    AEGP_StreamRefH ref{};
+    const auto acquired=streams->AEGP_GetNewEffectStreamByIndex(plugin,effect,index,&ref);
+    struct Ref {const AEGP_StreamSuite6* suite;AEGP_StreamRefH ref;~Ref(){if(ref)suite->AEGP_DisposeStream(ref);}} owned{streams,ref};
+    if(acquired || !ref)return false;
+    AEGP_StreamType type{};AEGP_StreamValue2 value{};
+    if(streams->AEGP_GetStreamType(ref,&type) || type!=AEGP_StreamType_OneD ||
+       streams->AEGP_GetNewStreamValue(plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value))return false;
+    guard=value.val.one_d;return !streams->AEGP_DisposeStreamValue(&value) && std::isfinite(guard);
+}
 bool read_uuid(const AEGP_StreamSuite6* streams,AEGP_EffectRefH effect,const A_Time& time,const Target& target) {
     for(A_long part=0;part<8;++part){
         AEGP_StreamRefH ref{};
@@ -139,9 +151,13 @@ bool export_target(Target& target,std::vector<std::uint8_t>& copy) {
         struct Ref {const AEGP_EffectSuite4* suite;AEGP_EffectRefH ref;~Ref(){suite->AEGP_DisposeEffect(ref);}} owned{effects.value,effect};
         AEGP_InstalledEffectKey key{};A_char match[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
         if(effects.value->AEGP_GetInstalledKeyFromLayerEffect(effect,&key) || effects.value->AEGP_GetEffectMatchName(key,match))return false;
-        if(!std::strcmp(match,"org.starfieldfx.particle"))++renderers;
-        if(!std::strcmp(match,"org.starfieldfx.node.model") && read_uuid(streams.value,effect,time,target)){
-            if(model_index!=-1)return false;model_index=index;}
+        const bool renderer=!std::strcmp(match,"org.starfieldfx.particle"),model=!std::strcmp(match,"org.starfieldfx.node.model");
+        if(renderer || model){double guard{};
+            if(!read_guard(streams.value,effect,time,renderer?kGraphSyncGuardId:native_nodes::sync_guard_index(native_nodes::Kind::model),guard))return false;
+            if(guard==transaction_backup_guard)continue;
+            if(guard!=0)return false;
+            if(renderer)++renderers;
+            if(model && read_uuid(streams.value,effect,time,target)){if(model_index!=-1)return false;model_index=index;}}
     }
     if(renderers!=1 || model_index<0)return false;
     AEGP_EffectRefH effect{};

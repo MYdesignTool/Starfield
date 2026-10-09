@@ -12,6 +12,7 @@
 #include "TransformBinding.hpp"
 #include "ModelGeometryParameter.hpp"
 #include "ModelMirrorTransaction.hpp"
+#include "EffectGraphBackup.hpp"
 #include "SPBasic.h"
 
 #include "starfield/core/AgeCurve.hpp"
@@ -1238,6 +1239,10 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             const char* type_key = nullptr;
             std::uint16_t schema_version = 0;
             if (!decode_node_kind(match_name, kind, type_key, schema_version)) continue;
+            double transaction_guard{};
+            if(!read_one_d(suites,plugin_id,effect.value,native_nodes::sync_guard_index(kind),time,transaction_guard))
+                return PF_Err_BAD_CALLBACK_PARAM;
+            if(transaction_guard==transaction_backup_guard)continue;
             found_node_effects = true;
             if (graph.nodes.size() >= core::kMaxGraphNodes - 1u) return PF_Err_BAD_CALLBACK_PARAM;
 

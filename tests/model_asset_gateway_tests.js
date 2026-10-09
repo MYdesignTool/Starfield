@@ -22,6 +22,8 @@ const carrierNames=["Graph Revision","Panel Graph Sync Guard","Commit Graph Edit
 const carrierIndices=[39,40,41,42,87,88,89];
 const carriers={};carrierNames.forEach((name,i)=>{carriers[name]=carriers[carrierIndices[i]]={name,propertyIndex:carrierIndices[i],value:name==="Graph Revision"?11:name==="Node Effects Ready"?1:0};});
 const renderer={name:"Starfield",matchName:"org.starfieldfx.particle",property(key){return carriers[key] || null;}};
+const backupModel={name:"Model backup",matchName:model.matchName,property(key){return key==="Panel Sync Guard"?{value:2}:model.property(key);}};
+const backupRenderer={name:"Renderer backup",matchName:renderer.matchName,property(key){return key==="Panel Graph Sync Guard"?{value:2}:renderer.property(key);}};
 const parade={list:[renderer,model],get numProperties(){return this.list.length;},property(i){return this.list[i-1];}};
 const layer={id:303,width:1920,height:1080,source:{pixelAspect:1},property(name){return name==="ADBE Effect Parade"?parade:null;}};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,numLayers:1,layer(i){return i===1?layer:null;}});
@@ -69,6 +71,9 @@ reset();begin();receive(32);now+=60001;eq(call("readModelAssetPage").error.code,
 reset();begin();eq(host.SFLD_modelAssetHostFail(assetId,8,516),"1");eq(call("readModelAssetPage").ok,false);eq(session().pages.length,0);
 reset();begin();receive(8*1024*1024);finish(8*1024*1024);eq(call("readModelAssetPage",{page:255}).hex.length,65536);eq(session().pages.length,256);
 reset();properties.Source.value=2;eq(call("beginModelAssetExport").ok,true);eq(host.SFLD_modelAssetHostRequest(),assetId+"|101|202|303|"+nodeId+"|2|17");
+// Both native lookup and the pinned renderer inventory must ignore guard2.
+reset();parade.list=[backupRenderer,backupModel,renderer,model];begin();receive(32);finish(32);
+eq(call("readModelAssetPage").ok,true);eq(call("releaseModelAsset").ok,true);
 eq(writes,0);eq(arbReads,0);
 // Real client -> actual isolated gateway -> private native entry point shapes.
 // Encode the same SFMG1 numeric triangle used by Core's format contract.

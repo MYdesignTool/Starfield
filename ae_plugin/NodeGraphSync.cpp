@@ -5,6 +5,8 @@
 #include "ParticleLayout.hpp"
 #include "NodeGraphSync.hpp"
 #include "NativeGraphCommit.hpp"
+#include "EffectGraphBackup.hpp"
+#include "Parameters.hpp"
 #include "SPBasic.h"
 #include "starfield/core/Graph.hpp"
 
@@ -99,6 +101,10 @@ bool read_node_id(PF_ParamDef* params[], std::array<std::uint16_t, 8>& chunks) n
 PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH layer,
                        AEGP_EffectRefH& renderer) noexcept {
     renderer = nullptr;
+    const AEGP_StreamSuite6* streams{};
+    auto acquired=suites.basic->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
+    struct StreamSuite {SPBasicSuite* basic;const AEGP_StreamSuite6* suite;~StreamSuite(){if(suite)basic->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} stream_suite{suites.basic,streams};
+    if(acquired || !streams)return static_cast<PF_Err>(acquired?acquired:PF_Err_BAD_CALLBACK_PARAM);
     A_long effect_count = 0;
     A_Err error = suites.effect->AEGP_GetLayerNumEffects(layer, &effect_count);
     if (error) return static_cast<PF_Err>(error);
@@ -110,7 +116,12 @@ PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH la
         char match_name[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
         error = suites.effect->AEGP_GetInstalledKeyFromLayerEffect(candidate, &key);
         if (!error) error = suites.effect->AEGP_GetEffectMatchName(key, match_name);
-        const bool is_renderer = !error && std::strcmp(match_name, kRendererMatchName) == 0;
+        bool is_renderer = !error && std::strcmp(match_name, kRendererMatchName) == 0;
+        if(is_renderer){AEGP_StreamRefH guard{};error=streams->AEGP_GetNewEffectStreamByIndex(plugin_id,candidate,starfield::adapter::kGraphSyncGuardId,&guard);
+            if(!error && !guard)error=PF_Err_BAD_CALLBACK_PARAM;
+            if(!error){AEGP_StreamValue2 value{};const A_Time zero{0,1};error=streams->AEGP_GetNewStreamValue(plugin_id,guard,AEGP_LTimeMode_LayerTime,&zero,TRUE,&value);
+                if(!error){is_renderer=value.val.one_d!=starfield::adapter::transaction_backup_guard;error=streams->AEGP_DisposeStreamValue(&value);}}
+            if(guard)streams->AEGP_DisposeStream(guard);}
         if (is_renderer && renderer) {
             suites.effect->AEGP_DisposeEffect(candidate);
             suites.effect->AEGP_DisposeEffect(renderer);

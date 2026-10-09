@@ -1,5 +1,16 @@
 # 测试入口
 
+2026-10-10 M3-17备份helper：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunEffectGraphBackupTests.ps1 -Run`与追加`-Sanitize`，实际EffectGraphBackup.cpp/May2023 SDK，标准/ASAN各458562项检查、0失败（包含夹具调用/资源计数）。覆盖完整ARB/关键帧/表达式/Unicode名称、两种duplicate插入位置、第三方效果身份/顺序、精确失败恢复/RAII、已发布状态的备份清理失败、逐项元数据错误/静默写入、duplicate返回错误且带ref、静默delete/reorder拒绝、UUID冲突与Output身份排除，回调间无owned ref/value/handle/lock。日志artifacts/m3-17-effect-graph-backup-{tests,asan}.log；首次夹具与std::ref冲突修正，失败日志保留。单独Host导出147760检查、原生Model模块7699（控件452），隔离gateway588/作者74/预设330与旧preset断言通过，m3-17-effect-graph-backup-*；新增原生夹具字段名错误和Model专用定位漏过滤已修正。候选由Prepare重现。尚未接入整个Host图事务、未做本阶段完整SDK冻结构建；NodeGraphSync新renderer过滤的实机行为、完整事务/undo/表达式身份及下述模态gate仍开放。
+
+## Model 模态/idle 部署前验收项（2026-10-10，未执行）
+
+owner静态审查提出的风险尚未复现。已只读确认native60安装Host哈希匹配90b7a2b冻结bundle；step_model_asset_host的idle接入来自未部署的3c10b5d。因此这些验收项属于M3-17 Model候选，详细范围见ADR0038；本次没有运行测试或修改运行时代码。
+
+- PresetsUI.cpp:53..55：在Model导出排队/活动时分别覆盖app.executeCommand和alert的模态入口，确认第一次AEGP_ExecuteScript返回前不会从idle发起第二次脚本调用；覆盖取消、错误和延期恢复。
+- ModelImportUI.cpp:24与EditorPresetPicker.cpp:133：对话框消息循环中不得执行Model脚本；关闭/取消后安全恢复待处理工作。
+- OBJ导入单独检查：对话框返回后重新确认目标和当前UUID/Source/revision/guard及相关作者状态；旧callback params或期间的状态变化不能导致过期revision提交、丢失更新或无法定位的间歇性失败。覆盖安全拒绝/一致提交和完整失败恢复。
+- 同一UI线程与idle自身running标志只证明部分保护，不能作为上述脚本/模态范围互斥的验收证据。fake-host和SDK构建不能替代实际AE2023模态路径观察。
+
 2026-10-09 portable Model preset：Prepare生成隔离候选后，将进程STARFIELD_PANEL_ROOT设为其cep_panel，执行`node tests/model_preset_file_tests.js`，330项、0失败，并将未修改的tests/preset_tests.js断言重定向至候选依赖通过。覆盖v1/2/3、active/parked/缺失/坏mesh、图身份/修订、超过256KiB文件、页序/限额/取消/过期/重载、UTF-16边界、覆盖原文件、部分/静默文件失败与rename/恢复/清理诊断，实际preset_manager的Save Current/Import与生成evalScript也执行。所有新增文件行为为内存fixture，没有磁盘或AE资格；日志artifacts/m3-17-model-preset-file-tests.log。首次UI fixture缺window.prompt已修复，失败日志m3-17-model-preset-file-ui-fixture-failed.log保留。
 
 候选Model author74、export gateway576、Texture80、Cloud49、Birth51和完整native gateway事务通过，日志artifacts/m3-17-model-preset-files-<test>.log。tools/candidates中独立helper由Prepare复制，新增三项基线仍以规范化SHA256严格核对，live CEP保持。下一步Model整体Add/Replace/duplicate资产恢复；mesh apply当前明确拒绝，未从文件codec宣称完整预设应用。
