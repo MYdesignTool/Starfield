@@ -14,8 +14,10 @@
 #include "TransformNullUI.hpp"
 #include "MotionBlur.hpp"
 #include "ModelImportUI.hpp"
+#include "ModelAssetMessage.hpp"
 
 PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
+AEGP_PluginID node_graph_sync_plugin_id() noexcept {return 1;}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*,bool) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 namespace starfield::adapter {
 PF_Err import_model_obj(PF_InData*,PF_OutData*,PF_ParamDef*[]) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
@@ -142,6 +144,52 @@ void invalid_records(PF_InData& data){
     for(unsigned version=1;version<=7;++version){auto empty=original;empty.optional_records[0].resize(12);put(empty.optional_records[0],2,version,2);put(empty.optional_records[0],4,12,4);put(empty.optional_records[0],8,0,4);
         adapter::NativeAnimationPlan plan(empty,1920,1080,1);CHECK(plan.valid());}
 }
+void asset_export(PF_InData& data,PF_Handle imported){
+    using adapter::ModelAssetExportRequest;using adapter::ModelAssetError;
+    std::vector<std::byte> exported;
+    const auto request=[&]{ModelAssetExportRequest r;r.expected_uuid[15]=4;r.expected_source=2;r.expected_revision=77;
+        r.sink_context=&exported;r.write_bytes=[](void* context,const std::uint8_t* bytes,std::uint32_t size) noexcept ->std::int32_t {
+            CHECK(ui_refs==0&&locks==0);try{auto& out=*static_cast<std::vector<std::byte>*>(context);
+                out.assign(reinterpret_cast<const std::byte*>(bytes),reinterpret_cast<const std::byte*>(bytes)+size);return 0;}catch(...){return 1;}};
+        return r;};
+    const auto call=[&](ModelAssetExportRequest& r){PF_OutData out{};
+        CHECK(EffectMain(PF_Cmd_COMPLETELY_GENERAL,&data,&out,nullptr,nullptr,&r)==PF_Err_NONE);
+        CHECK(out.out_flags==0&&out.return_msg[0]==0&&ui_refs==0&&ui_suites==0&&locks==0&&handles.contains(imported));};
+    auto r=request();call(r);CHECK(r.acknowledged==1&&r.error==ModelAssetError::none&&r.payload_bytes==exported.size()&&exported==handles.at(imported));
+    CHECK(r.bounds[0]==10&&r.bounds[1]==20&&r.bounds[2]==30&&r.bounds[3]==14&&r.bounds[4]==28&&r.bounds[5]==30);
+    const auto mesh=take(core::decode_model_geometry(exported,never));CHECK(mesh.positions.size()==3&&mesh.triangles.size()==1);
+    for(unsigned field=0;field<4;++field){r=request();if(field==0)r.magic=0;else if(field==1)r.bytes-=1;else if(field==2)r.version=2;else r.operation=2;
+        const auto before=ui_mesh_reads;call(r);CHECK(r.payload_bytes==0&&ui_mesh_reads==before&&
+            (field<3?r.acknowledged==0:r.acknowledged==1&&r.error==ModelAssetError::invalid_request));}
+    r=request();r.expected_source=0;call(r);CHECK(r.error==ModelAssetError::invalid_request);
+    r=request();r.write_bytes=nullptr;call(r);CHECK(r.error==ModelAssetError::invalid_request);
+    r=request();std::fill(std::begin(r.expected_uuid),std::end(r.expected_uuid),std::uint8_t{0});call(r);CHECK(r.error==ModelAssetError::invalid_request);
+    r=request();r.expected_revision=2147483648u;call(r);CHECK(r.error==ModelAssetError::invalid_request);
+    for(unsigned field=0;field<3;++field){r=request();if(field==0)r.expected_source=1;else if(field==1)r.expected_revision=78;else r.expected_uuid[15]=5;
+        const auto before=ui_mesh_reads;call(r);CHECK(r.error==ModelAssetError::stale_author&&r.payload_bytes==0&&ui_mesh_reads==before);}
+    ui_values[0][adapter::native_nodes::sync_guard_index(adapter::native_nodes::Kind::model)].one_d=1;
+    r=request();call(r);CHECK(r.error==ModelAssetError::stale_author);ui_values[0][94].one_d=0;
+    for(unsigned axis=0;axis<6;++axis){ui_values[0][layout::author_bounds_first+axis].one_d+=1;
+        r=request();call(r);CHECK(r.error==(axis==2?ModelAssetError::invalid_geometry:ModelAssetError::stale_author)&&r.payload_bytes==0);
+        ui_values[0][layout::author_bounds_first+axis].one_d-=1;}
+    ui_values[0][layout::author_bounds_first].one_d=std::numeric_limits<double>::quiet_NaN();
+    r=request();call(r);CHECK(r.error==ModelAssetError::host_error&&r.host_error==PF_Err_BAD_CALLBACK_PARAM&&r.payload_bytes==0);
+    ui_values[0][layout::author_bounds_first].one_d=10;
+    bool stop=true;r=request();r.cancellation_context=&stop;r.is_cancelled=[](void* value) noexcept ->std::int32_t {return *static_cast<bool*>(value);};
+    const auto before=ui_mesh_reads;call(r);CHECK(r.error==ModelAssetError::cancelled&&r.payload_bytes==0&&ui_mesh_reads==before);
+    unsigned cancellation_calls{};r=request();r.cancellation_context=&cancellation_calls;
+    r.is_cancelled=[](void* value) noexcept ->std::int32_t {return ++*static_cast<unsigned*>(value)>=2;};
+    call(r);CHECK(r.error==ModelAssetError::cancelled&&r.payload_bytes==0&&ui_mesh_reads==before+1);
+    r=request();r.write_bytes=[](void*,const std::uint8_t*,std::uint32_t) noexcept ->std::int32_t {return 1;};call(r);CHECK(r.error==ModelAssetError::sink_rejected&&r.payload_bytes==0);
+    data.in_flags|=PF_InFlag_PROJECT_IS_RENDER_ONLY;r=request();call(r);CHECK(r.error==ModelAssetError::unavailable);data.in_flags&=~PF_InFlag_PROJECT_IS_RENDER_ONLY;
+    wrong_mesh_type=true;r=request();call(r);CHECK(r.error==ModelAssetError::host_error);wrong_mesh_type=false;
+    fail_mesh_read=true;r=request();call(r);CHECK(r.error==ModelAssetError::host_error&&r.host_error==516);fail_mesh_read=false;
+    handles.at(imported).back()^=std::byte{1};r=request();call(r);CHECK(r.error==ModelAssetError::invalid_geometry&&r.payload_bytes==0);handles.at(imported).back()^=std::byte{1};
+    ui_values[0][layout::source].one_d=1;r=request();r.expected_source=1;call(r);CHECK(r.error==ModelAssetError::none&&r.payload_bytes>0); // Parked OBJ retained.
+    ui_values[0][layout::revision].one_d=0;r=request();r.expected_source=1;r.expected_revision=0;r.write_bytes=nullptr;
+    const auto zero_before=ui_mesh_reads;call(r);CHECK(r.error==ModelAssetError::none&&r.payload_bytes==0&&ui_mesh_reads==zero_before);
+    ui_values[0][layout::source].one_d=2;ui_values[0][layout::revision].one_d=77;
+}
 void ui_capture(PF_InData& data){
     using namespace adapter;using records=adapter::native_nodes::Kind;
     CHECK(register_model_author_controls(&data)==PF_Err_NONE);
@@ -173,6 +221,7 @@ void ui_capture(PF_InData& data){
     for(int index:{p::transfer,p::texture_time,p::texture_color,p::texture_ratio})ui_values[2][index].one_d=1;
     connect(1,records::emitter,2,11);connect(2,records::particle,255,12);connect(0,records::model,2,13);
     ui_pf.AEGP_GetEffectLayer=[](PF_ProgPtr,AEGP_LayerH* out)->A_Err{*out=reinterpret_cast<AEGP_LayerH>(1);return 0;};
+    ui_pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH* out)->A_Err{*out=reinterpret_cast<AEGP_EffectRefH>(1);return 0;};
     ui_effect.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* out)->A_Err{*out=3;return 0;};
     ui_effect.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID,AEGP_LayerH,A_long index,AEGP_EffectRefH* out)->A_Err{*out=reinterpret_cast<AEGP_EffectRefH>(static_cast<std::uintptr_t>(index+1));return 0;};
     ui_effect.AEGP_GetInstalledKeyFromLayerEffect=[](AEGP_EffectRefH ref,AEGP_InstalledEffectKey* out)->A_Err{*out=static_cast<AEGP_InstalledEffectKey>(reinterpret_cast<std::uintptr_t>(ref)-1);return 0;};
@@ -224,6 +273,7 @@ void ui_capture(PF_InData& data){
     const auto model=std::find_if(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.id==nid(4);});
     CHECK(model!=graph.nodes.end()&&std::get<core::OpaqueBytes>(value(*model,kModelResource))[15]==std::byte{4}&&
         std::get<std::uint32_t>(value(*model,kModelRevision))==77);
+    asset_export(data,imported);
     for(int axis=0;axis<6;++axis){ui_values[0][layout::author_bounds_first+axis].one_d+=1;
         CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);
         ui_values[0][layout::author_bounds_first+axis].one_d=bounds[axis];}

@@ -97,7 +97,7 @@ PF_Err register_model_author_bounds(PF_InData* data) noexcept {
         def.uu.id=layout::author_bounds_disk_id(layout::author_bounds_first+axis);
         std::snprintf(def.name,sizeof(def.name),"%s",names[axis]);
         def.u.fs_d.valid_min=def.u.fs_d.slider_min=-1e9f;def.u.fs_d.valid_max=def.u.fs_d.slider_max=1e9f;
-        def.u.fs_d.value=def.u.fs_d.dephault=axis<3?-.5:.5;def.u.fs_d.precision=PF_Precision_HUNDREDTHS;
+        def.u.fs_d.value=def.u.fs_d.dephault=axis<3?-.5f:.5f;def.u.fs_d.precision=PF_Precision_HUNDREDTHS;
         const auto error=PF_ADD_PARAM(data,-1,&def);if(error)return error;}
     return PF_Err_NONE;
 }

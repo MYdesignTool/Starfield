@@ -317,6 +317,37 @@ corruption, typed rejection before writes and the actual graph coordinator.
 Texture80/Cloud49/Birth51 and the existing full gateway transaction fixture
 also pass against this candidate. These results do not qualify an AE host.
 
+### Bounded native preset mesh export seam
+
+Before connecting CEP preset assets, reserve a private synchronous Model
+PF_Cmd_COMPLETELY_GENERAL message: magic0x53464d58, version1, exact struct size,
+operation1(export), expected UUID/source/revision and a caller-owned byte sink.
+Only fixed-width fields, borrowed callback/context pointers and SFMG1 numeric
+bytes cross the native module boundary; no allocator, STL object, AE handle or
+PF callback crosses it. The module verifies constant UUID/source/revision,
+guard0 and all six bounds, copies and validates its ARB through its own PF
+context, disposes host values before encoding/calling the sink, and publishes
+no payload on failure. Revision0 has no preset asset and returns zero bytes.
+Render-only contexts are rejected. This seam is read-only and changes no graph,
+project stream, alias, mirror, undo group, public IDs or persistent schema.
+
+The eventual session-resident host caller must invoke this seam on UI idle,
+resolve the pinned project/comp/layer/effect afresh, and copy the numeric payload
+into its own bounded storage. It must not poll/export meshes in normal graph
+snapshots or invoke script execution reentrantly from a script command hook.
+The async CEP transport and exact import/rollback transaction remain separate
+work before any Model author release. Generic context availability and actual
+AE preset/undo/reopen behavior remain host gates; fake suites do not prove them.
+
+The export seam is now routed by the actual Model module and included in the
+node project and adapter fingerprint. Standard/ASAN native-module fixtures each
+pass3483 checks, including the existing452 controls. They exercise request
+rejection, source/revision/UUID/guard/bounds matching, zero and parked assets,
+owned SFMG1 bytes, cancellation before and during copying, host/read/sink errors
+and bad geometry without project changes or AE alerts. Sink storage must be
+discarded whenever the message reports an error; it is never a committed preset.
+UI idle/CEP wiring and import/rollback remain pending before publication.
+
 Import source da76183c82f9584367561e2742f0ac76c411e397, frozen at
 artifacts/prepared/m3-17-model-import-da76183/source, passes all eight May2023
 x64 Release /MT outputs with IncludeModelCandidate and both NoPublish switches.

@@ -15,7 +15,7 @@ try {
         '/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'),'tests\model_native_binding_tests.cpp',
-        'ae_plugin\ModelControls.cpp','ae_plugin\ModelGeometryParameter.cpp','ae_plugin\ModelMirrorParameter.cpp','ae_plugin\ModelMirrorTransaction.cpp','ae_plugin\NodeEffects.cpp',
+        'ae_plugin\ModelControls.cpp','ae_plugin\ModelGeometryParameter.cpp','ae_plugin\ModelMirrorParameter.cpp','ae_plugin\ModelMirrorTransaction.cpp','ae_plugin\ModelAssetExport.cpp','ae_plugin\NodeEffects.cpp',
         'ae_plugin\NativeNodeGraph.cpp','ae_plugin\NativeTemporalCache.cpp','ae_plugin\GraphParameter.cpp')+$taskSources
     $taskLinkArgs=''
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs="/link /DEBUG /PDB:$taskDir\tests.pdb"}

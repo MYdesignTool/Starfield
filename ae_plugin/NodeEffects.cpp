@@ -13,6 +13,7 @@
 #include "ModelControls.hpp"
 #include "ModelGeometryParameter.hpp"
 #include "ModelImportUI.hpp"
+#include "ModelAssetExport.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
@@ -695,6 +696,12 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 return starfield::adapter::particle_gradient_param_ui(in_data,params);
             } else return PF_Err_NONE;
+        case PF_Cmd_COMPLETELY_GENERAL:
+            if constexpr(kNodeEffectKind==NodeEffectKind::model) {
+                if(extra)return starfield::adapter::export_model_asset(in_data,
+                    *static_cast<starfield::adapter::ModelAssetExportRequest*>(extra));
+            }
+            return PF_Err_NONE;
         default:
             return PF_Err_NONE;
     }

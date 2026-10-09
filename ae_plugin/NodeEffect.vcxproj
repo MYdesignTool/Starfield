@@ -82,6 +82,7 @@
     <ClCompile Include="ModelMirrorTransaction.cpp" />
     <ClCompile Include="ModelImportTransaction.cpp" />
     <ClCompile Include="ModelImportUI.cpp" />
+    <ClCompile Include="ModelAssetExport.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />

@@ -6,6 +6,8 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+Model数值网格导出seam接入原生Model PF_Cmd_COMPLETELY_GENERAL：private SFMX/version1、有界SFMG1 sink，校验UUID/Source/revision/guard/bounds并用模块自己的PF上下文复制网格，host值释放后调用sink。无项目写入、句柄或分配器跨模块传输；常规CEP轮询不调用它。标准/ASAN原生模块各3483项通过（含既有452控件项），日志artifacts/m3-17-model-asset-export-{tests,asan}.log；首次漏fixture plugin-id stub的链接失败及平面minZ>maxZ的错误期望已修复，失败日志保留。新源纳入node工程/fingerprint，±0.5默认改为精确float literal消除新增编译警告。完整冻结SDK/host idle及CEP异步桥、导入/回滚尚待完成，安装60/61不变。
+
 作者边界/隔离CEP阶段源码857818b已推送；git archive冻结于artifacts/prepared/m3-17-model-author-857818b/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过。实际Model101参数及导入、主资源捕获编译；日志artifacts/m3-17-model-author-build.log，八输出/十八安装哈希m3-17-model-author-{build,installed}-hashes.json、0安装不匹配。构建有default double转PF_FpShort警告（边界默认±0.5可精确表示）；不增加AE宿主资格。当前native60/CEP61及runtime选择保持，继续网格预设资产传输。
 
 Model作者边界候选追加六项常量stream95..100/disk1519..1524，总101；导入与失败恢复同时处理Mesh/Revision/Source/bounds。UI编译核对SFMG1与边界，六项physical controls不写入binding7，回放仍用synthetic19..24。标准/ASAN原生模块各3040项，导入事务各1559项通过（均含复用452控件项）；日志artifacts/m3-17-model-author-bounds-{native-tests,native-asan,import-tests,import-asan}.log。首次检查发现physical95误记录为binding字段，已修复并补六项边界不一致拒绝检查；完整冻结SDK检查待下阶段记录。

@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 Model asset export：RunModelNativeBindingTests.ps1标准/ASAN各3483通过（含既有452控件项）。日志artifacts/m3-17-model-asset-export-{tests,asan}.log。实际NodeEffects generic分支验证请求版本/类型、UUID/Source/revision/guard/bounds、revision0无资产、Cube下parked OBJ、无host stream/lock进入sink、SFMG1持有副本、render-only拒绝、开始及复制时取消、坏ARB/host失败/sink拒绝、零payload错误响应。首次缺fixture plugin-id stub的链接失败日志model-asset-export-link-failed.log；flat mesh minZ变大先违反bounds再进入stale，修正fixture精确error期待，失败日志model-asset-export-{bounds-expectation-failed,asan-bounds-expectation-failed}.log保留。最后标准/ASAN编译没有新增警告；完整SDK与真实AE generic上下文、CEP桥/预设持久化待验收。
+
 2026-10-09 Model作者候选完整SDK：857818b的git archive冻结于artifacts/prepared/m3-17-model-author-857818b/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT八目标通过。实际Model101及十项导入事务编译；default double→PF_FpShort警告保留（±0.5精确表示）。日志artifacts/m3-17-model-author-build.log，八输出哈希m3-17-model-author-build-hashes.json；十八安装对照m3-17-model-author-installed-hashes.json、0不匹配，未部署。隔离CEP按下面候选命令独立验证，不从SDK编译宣称AE支持。
 
 2026-10-09 Model作者边界追加：RunModelNativeBindingTests.ps1标准/ASAN各3040项，RunModelImportTransactionTests.ps1标准/ASAN各1559项通过；日志artifacts/m3-17-model-author-bounds-{native-tests,native-asan,import-tests,import-asan}.log。物理95..100只核对导入边界，六项stale值拒绝，binding7 synthetic19..24保持。首次绑定检查因误记录95失败，修复后重新标准/ASAN通过。
