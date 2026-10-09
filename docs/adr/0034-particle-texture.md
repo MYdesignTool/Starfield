@@ -44,6 +44,26 @@ and startup checks all pass. Full May2023 /MT build passes with dist/runtime
 publication disabled. Logs: candidate source/artifacts/m3-13-native59-*.log.
 These establish source logic and compilation, not the owner's AE host gates.
 
+At2026-10-09T08:33:19.8536810+08:00 fresh process checks found no
+AfterFX/AfterFX_64. The standing authorization deployed commit
+cb1048d15ff205b9f7a541ee7931c1460070b75d as native59/CEP59/ABI7 through
+Deploy-TestBuild and the existing native/CEP Junctions. All seven native/Core,
+eleven CEP hashes, Core selector and saved exact58 files were verified; the
+paired Restore read-only report passed. No process, registry, cache, environment
+or Junction was changed. Frozen binary hashes are in the candidate native-bundle;
+the prior compiled outputs are retained separately in baseline-build-output.
+
+Receipts: artifacts/m3-13-native59-deploy-{before,after}.json,
+artifacts/m3-13-native59-deploy-wrapper.log and
+artifacts/m3-13-native59-rollback-report.log. Selector:
+StarfieldCore-37EBF72166E6B2B6.dll. The owner host check is pending, including
+the unresolved parameter31 condition. One-step undo to native58/CEP58 plus its
+orientation Core repair, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel59-native-layer-picker-20261009' -Restore
+```
+
 ## Source orientation correction, 2026-10-08
 
 Native58/CEP58 was deployed at22:33 +08:00 from7861a2b. The owner now

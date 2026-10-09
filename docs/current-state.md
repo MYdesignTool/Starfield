@@ -1,6 +1,6 @@
 # 当前工程状态
 
-核对日期：2026-10-09。当前安装为 native58 / packed32826 / Core ABI7 / CEP58 + 已发布的默认方向 Core 维护。M3-13 唯一活动：按 owner 要求采用原生行内 Layer/Dark Side 选择器，并排查已有 Texture 引用时节点添加报 parameter31（无引用画布正常）。native59/CEP59 候选已构建并通过最小测试，宿主报错尚未复现，不能宣称已修复；候选包含精确类型/值诊断。M3-16 与 MNT-01 共享改动保留并排除于维护发布。
+核对日期：2026-10-09。native59 / packed32827 / Core ABI7 / CEP59 已于08:33 +08:00成对部署，源码cb1048d15ff205b9f7a541ee7931c1460070b75d已推送。M3-13 唯一活动：按 owner 要求采用原生行内 Layer/Dark Side 选择器，并排查已有 Texture 引用时节点添加报 parameter31（无引用画布正常）。最小测试通过，宿主报错尚未复现，不能宣称已修复；本版包含精确类型/值诊断。M3-16 与 MNT-01 共享改动保留并排除于维护发布。
 
 ## 源码与安装
 
@@ -12,9 +12,9 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build59，packed32827；普通 Texture layer widgets | native58，packed32826 + Core 方向修复 |
+| 原生版本 | build59，packed32827；普通 Texture layer widgets | native59，packed32827 |
 | Core ABI | 7 | 7 |
-| CEP | panel59 | panel58（既有 live Junction） |
+| CEP | panel59 | panel59（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
@@ -37,24 +37,24 @@ optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定�
 
 ## 当前安装证据与回滚
 
-native58/CEP58 初次配对收据：artifacts/m3-13-native58-deploy-before.json、m3-13-native58-deploy-after.json。当前 Core 方向维护收据：artifacts/m3-13-texture-orientation-deploy-before.json、m3-13-texture-orientation-deploy-after.json。发布前 fresh process checks 均无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 和既有 native/CEP Junction。七个 native/Core、十一项 CEP、runtime selector、一键配对恢复 report 与旧文件全部核对。当前 runtime selector：StarfieldCore-B509D97495EEDF7B.dll.
+当前 native59/CEP59 收据：artifacts/m3-13-native59-deploy-before.json、artifacts/m3-13-native59-deploy-after.json。发布前 fresh process checks 无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 和既有 native/CEP Junction。七个 native/Core、十一项 CEP、runtime selector、配对恢复只读 report 与 exact58旧文件全部核对。冻结 source 基于65c7245加本次修复；未混入 M3-16。原构建输出也保存于候选 baseline-build-output。当前 runtime selector：StarfieldCore-37EBF72166E6B2B6.dll。历史58初次/方向维护收据与备份保留。
 
 | dist 文件 | SHA-256 |
 | --- | --- |
-| StarfieldParticle.aex | 7DE33B342FA9FE408F55E76A533EB6F8C2057F6CA9C619FACB6CF931D8E0DC53 |
-| StarfieldEmitter.aex | 15E9B7E0A72CEDDEB0BF2EDCE43298B17C1C04C3F986D783C2B5FF62A9D6CF32 |
-| StarfieldParticleNode.aex | F8E18F08498AECC1B422B334D8BC4385333AD530DF897A699FAD9B9224980613 |
-| StarfieldForce.aex | 0A7A94FE1D541B2555BD54A711B0E1E75A19F4B4B610C3C576E8F865953BE796 |
-| StarfieldTransform.aex | E1D5EE3986EA059BE7D6E06577D012E67004FD8210D7576ACBF7882E11FFA85F |
-| StarfieldHost.aex | CC45D0A1DED203420531ED7AE29B262452BD8A85DA3FEE06B3CC7FD95D3FDF75 |
-| StarfieldCore.dll | B509D97495EEDF7BF23A2AC254419CEF00B69356C78AD5838D31DAA48C58F5D5 |
+| StarfieldParticle.aex | 27FCB9E354CC6508EE2CB1DC7405C8493203B68088478861BD60F4377EF2F1AE |
+| StarfieldEmitter.aex | 8747E3AC3E6E912E12568C01486E3B36AE48EB57FCF91B329A2D9158353A1BFF |
+| StarfieldParticleNode.aex | 15A470C95A8BC11B5558344E7805503B590A48E6316719DF8935C6C3BBDB40C9 |
+| StarfieldForce.aex | CC9BB4F6FFDF6DC9B9E6ADD36EB48C97E5F24DB6CAE40A16007DC61F4A831419 |
+| StarfieldTransform.aex | F2B83F251D507499D0FD459F278862DBF7B4C56F19FF94C53E5D2E0C2049BCB5 |
+| StarfieldHost.aex | 3F358ACD0AED7D62F48F5430D5DE07DCE327F1FBEE2EE562F977BBDD5DE5B14D |
+| StarfieldCore.dll | 37EBF72166E6B2B64A4050084BF52E4CF695E0B06454C75CE79B77354BB93F7B |
 
-当前维护的 exact native58/CEP58（旧 Core7840E5B1298D129B）备份：artifacts/disabled/m3-13-native58-core-texture-orientation-20261008。既有 native57/CEP57 与历史备份保留。回滚报告：artifacts/m3-13-texture-orientation-rollback-report.log；发布日志：artifacts/m3-13-texture-orientation-deploy-wrapper.log。
+本次 exact native58/CEP58（方向修复 CoreB509）备份：artifacts/disabled/m3-13-native59-panel59-native-layer-picker-20261009。原方向维护/57及历史备份保留。回滚报告：artifacts/m3-13-native59-rollback-report.log；发布日志：artifacts/m3-13-native59-deploy-wrapper.log。
 
 AE 关闭后的单步回滚（仓库根目录）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native58-core-texture-orientation-20261008' -Restore
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel59-native-layer-picker-20261009' -Restore
 ```
 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
@@ -63,6 +63,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 - M3-16 纯核心 Shift Seed/Birth Chance 策略已提交f83e20f；独立40985检查、0失败。图求值/历史/辅助发射/预算/身份工作树保留，作者未完成，不暴露 UI、不发布到 Core；ADR0037 规定后续完整迁移。当前暂缓以处理 M3-13 方向反馈。
 
-- owner 确认 native58 Comp 2 可选择并正常显示纹理；默认镜像 Core 修复已发布，待实际方向验收。该观察不关闭八种时间采样、背面、撤销/保存重开及 Source/Masks/Effects gate。
+- owner 确认 native58 Comp 2 可选择并显示；报告背面无效、空白标签、已有 Texture 引用时添加报 parameter31。native59/CEP59 原生行内选择器及精确诊断已发布，真实选择/正反面/添加待回复。完整事务测试未复现宿主参数31，保持开放；八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。
