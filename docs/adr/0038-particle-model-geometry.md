@@ -91,13 +91,22 @@ unaccepted default mesh; accepted defaults belong to AE.
 
 The final editable graph fixture passes559 checks in standard and ASAN builds;
 resource2076/mesh arbitrary4915 regressions also pass. The actual May2023 control
-registration/capture fixture passes452 checks in standard and ASAN builds; full
-frozen build follows. It covers every registration failure, accepted default
+registration/capture fixture passes452 checks in standard and ASAN builds.
+It covers every registration failure, accepted default
 ownership, exact integer revision, native type/value rejection, editable graph
 round trip/live evaluation, imported/parked resource isolation, geometry-owned
 capture and import preparation failure. Early compilation omitted SDK constants
 and used incorrect fixture API/member names; those were corrected before the
 passing run. Numeric/SDK evidence does not establish real AE UI/undo support.
+
+Sourcec65d5f79728ae2340b3cd9dbfa37b5cbb46e2f4f is frozen under
+artifacts/prepared/m3-17-model-controls-c65d5f7/source and passes all seven
+May2023 x64 Release /MT targets with both NoPublish switches. The main AEX
+compiles ModelControls.cpp; adapter fingerprints include its source/header and
+ModelLayout.hpp. Logs/hashes: artifacts/m3-17-model-controls-native-build.log,
+m3-17-model-controls-build-hashes.json and m3-17-model-controls-installed-hashes.json.
+All18 installed native60/CEP61 files are unchanged. No Model node, kind5 binding,
+resource mirror or Particle selector is published from this helper milestone.
 
 ### Native mesh persistence boundary
 

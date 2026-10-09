@@ -6,9 +6,11 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+可编辑作者源码c65d5f79728ae2340b3cd9dbfa37b5cbb46e2f4f已推送并冻结于artifacts/prepared/m3-17-model-controls-c65d5f7/source。完整May2023 x64 Release /MT七个目标通过（双NoPublish），main AEX实际编译ModelControls.cpp；日志artifacts/m3-17-model-controls-native-build.log，输出哈希artifacts/m3-17-model-controls-build-hashes.json。构建后十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-controls-installed-hashes.json。候选Model控件注册函数没有入口调用，kind5/binding/资源镜像及CEP尚未启用，下一步接入完整原生Model节点与资源提交/捕获。
+
 ModelControls候选按ADR0038注册真实May2023控件定义，Source/Import OBJ/任意mesh/revision与偏移、角度、缩放、Flip/Center/Normalize共18项；新Model效果独立disk1501..1518已预留并纳入共享唯一性检查。控件读取转换为拥有的数值网格/pose及schema1可编辑keys4..13，不丢失作者值；OBJ可先准备新句柄，不修改原控件。Model kind5、AEX、菜单及binding迁移仍未启用；UI文件对话框/提交撤销、主效果资源镜像、SmartFX捕获和隔离CEP全链路继续。不是可用AE Model发布。
 
-Model可编辑pose采用独立的percent scale、XYZ Euler、per-axis Flip、Center/Normalize方程；标准/ASAN各559项图检查，资源2076与ARB4915回归通过。原生控件标准/ASAN各452项检查通过，覆盖实际SDK定义/失败注册句柄所有权、原生值捕获、图往返及live求值、parked mesh隔离、OBJ候选失败和损坏拒绝；完整冻结构建继续。日志artifacts/m3-17-model-author-graph-tests-current.log、m3-17-model-author-graph-asan.log、m3-17-model-controls-{tests-current,asan}.log。首次控件编译缺SDK常量头及误用fixture成员名，修正后通过；没有真实AE持久化证据。
+Model可编辑pose采用独立的percent scale、XYZ Euler、per-axis Flip、Center/Normalize方程；标准/ASAN各559项图检查，资源2076与ARB4915回归通过。原生控件标准/ASAN各452项检查通过，覆盖实际SDK定义/失败注册句柄所有权、原生值捕获、图往返及live求值、parked mesh隔离、OBJ候选失败和损坏拒绝。日志artifacts/m3-17-model-author-graph-tests-current.log、m3-17-model-author-graph-asan.log、m3-17-model-controls-{tests-current,asan}.log。首次控件编译缺SDK常量头及误用fixture成员名，修正后通过；没有真实AE持久化证据。
 
 持久化源码a1751b9b761340e07f2b0003088e83d685c9bc88冻结于artifacts/prepared/m3-17-model-parameter-a1751b9/source，完整May2023 x64 Release /MT全部目标通过（双NoPublish）。main AEX实际编译ModelGeometryParameter.cpp，未注册Model作者；日志artifacts/m3-17-model-parameter-native-build.log。十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-parameter-installed-hashes.json。下一步原生Model节点/资源捕获、Particle Shape菜单及隔离CEP完整作者。
 
@@ -87,7 +89,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-17独立Model候选不在installed60/61中。snapshot8/shape4/live图接入CPU；444项图/采样/Linear shutter标准检查及2695项CPU回归通过。原生资源/CEP作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值像素证据当作可用AE Model粒子作者。
+- M3-17独立Model候选不在installed60/61中。snapshot8/shape4/live图接入CPU；可编辑pose图559及SDK控件452项标准/ASAN检查通过，2695项CPU既有回归保留。原生Model入口/资源绑定/CEP作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值像素/SDK helper证据当作可用AE Model粒子作者。
 
 - M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 

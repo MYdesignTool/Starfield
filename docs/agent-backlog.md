@@ -99,7 +99,7 @@ snapshot/CPU源码e12517d冻结完整May2023 /MT全目标构建通过（双NoPub
 ModelGeometryParameter持久化helper标准/ASAN各4915项fake-host检查通过（artifacts/m3-17-model-parameter-{tests,asan}-current.log）；main AEX工程/fingerprint接入。SFMG1只保存数值mesh、UUID/revision归作者，全部ARB selectors在注册前实现；未注册新Model参数/菜单，作者与资源捕获继续。
 源码a1751b9冻结完整May2023 /MT全目标构建通过（双NoPublish），十八安装哈希匹配native60/CEP61；日志artifacts/m3-17-model-parameter-native-build.log。下一步原生Model/资源捕获、Particle Shape及隔离CEP完整作者；Particle优先，Motion首批三模式在其后。
 
-M3-17可编辑作者候选：可选schema1 keys4..13保存origin/rotation/percent scale/Flip/Center/Normalize/bounds/source，兼容旧matrix元数据且拒绝冲突；标准/ASAN各559图检查，资源2076/任意参数4915回归通过。ModelControls用真实May2023参数定义注册18项，独立Model disk1501..1518先行写入ADR并做共享唯一性检查；捕获只返回拥有的数值mesh/pose，OBJ准备新句柄不修改原控件。标准/ASAN各452项通过；完整冻结构建继续。Model kind5/AEX/binding/资源镜像、按钮提交撤销及隔离CEP作者尚未启用，不发布半成品菜单；现有60/61安装保持。
+M3-17可编辑作者候选：可选schema1 keys4..13保存origin/rotation/percent scale/Flip/Center/Normalize/bounds/source，兼容旧matrix元数据且拒绝冲突；标准/ASAN各559图检查，资源2076/任意参数4915回归通过。ModelControls用真实May2023参数定义注册18项，独立Model disk1501..1518先行写入ADR并做共享唯一性检查；捕获只返回拥有的数值mesh/pose，OBJ准备新句柄不修改原控件。标准/ASAN各452项通过。源码c65d5f7已推送，冻结完整May2023 /MT七目标通过（双NoPublish）；十八安装哈希匹配native60/CEP61。Model kind5/AEX/binding/资源镜像、按钮提交撤销及隔离CEP作者尚未启用，不发布半成品菜单；下一步完整原生Model节点/资源提交与捕获。
 
 ## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
 
