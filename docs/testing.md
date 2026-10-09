@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 M3-16完整构建：冻结90b7a2b源码 `artifacts/prepared/m3-16-native60-panel61/source` 中执行 `ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT通过，日志 artifacts/m3-16-native60-build.log。09:14 +08:00无AE后发布native60/CEP61，十八个安装、十八个保存文件、前后selector独立核对，Restore只读report通过。收据 artifacts/m3-16-native60-deploy-{before,after}.json，构建/部署不替代实际AE2023新控件和Texture gate。
+
 2026-10-09 M3-16 作者：`tests/RunCloudNativeSyncTests.ps1 -Run -Bindings`（8441+相机12）、同脚本 `-Run`（实际 Particle回调344）、`tests/RunTextureSelectorTests.ps1 -Run`（实际注册269）均0失败。覆盖整数seed极值/类型、chance端点/小数、原子activation/失败、绑定v1..5历史边界、动画值及独立常量chance证明。测试夹具的 CanVaryOverTime 已补充表达式资格，避免错误地把表达式声明为不能动画的流。日志 artifacts/m3-16-birth-{binding,callback,registration}-tests.log。
 
 CEP候选测试进程设置 `STARFIELD_PANEL_ROOT=artifacts/prepared/m3-16-native60-panel61/cep_panel`：Node运行 particle_birth_panel_tests.js（51）、cloud_panel_tests.js（49）、texture_panel_tests.js（80）、panel_native_node_gateway_tests.js 和 panel_startup_tests.js，全部通过。覆盖 key40 的 signed32 wire、独立Cloud/Birth激活disk、旧图无字段、不改写投影、预设Add/Replace、整笔失败回滚及既有Texture引用拓扑编辑。日志 artifacts/m3-16-<测试名>.log。构建/真实AE2023资格单独记录。

@@ -1,10 +1,12 @@
 # 当前工程状态
 
-核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 明确范围分支的实机效果待回复。当前活动卡 M3-16：图求值3348与 native/CEP 作者最小检查通过；native60/packed32828/CEP61 候选等待完整构建和闭宿主配对发布。安装仍为59/60。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。当前活动卡 M3-16：出生控制 Core/native/CEP 接入、最小检查和完整 May2023 /MT 构建通过，实际 AE gate 仍开放。CEP61包含CEP60的 Texture 明确范围分支；已有引用时添加及背面采样仍待 owner 回复。MNT-01 改动保留。
 
 ## 源码与安装
 
-owner 已确认 native59 原生选择器可以显示；添加仍报 key31/type3/value44/kind number。该值合法，尚未确定拒绝原因。CEP60 候选使用明确分支选择图层/枚举/开关范围，保留严格校验并增加 reason/typeKind/max；不能将旧嵌套条件在 ExtendScript 中的解释假设当作确诊。CEP80检查、实机ID44完整 gateway参数重写/添加/失败回滚/纹理预设 Add/Replace与启动通过。仅 CEP 维护，native59/Core ABI7 保留。
+owner 已确认 native59 原生选择器可以显示；添加仍报 key31/type3/value44/kind number。该值合法，尚未确定拒绝原因。CEP60维护使用明确分支选择范围，保留严格校验并增加 reason/typeKind/max；CEP61保留该修正，真实宿主效果待回复，不能将旧嵌套条件的解释假设当作确诊。最小检查包括 ID44完整 gateway参数重写/添加/失败回滚及纹理预设。
+
+native60/CEP61实现 Shift Seed/Birth Chance，streams534/535/536、disk243/244/245、binding6，Particle total537；graph7/envelope1/snapshot7/Core ABI7保留。原生激活默认0保存旧分支，明确出生编辑才启用；新CEP节点写显式defaults0/100。完整源码冻结于 artifacts/prepared/m3-16-native60-panel61/source，CEP候选隔离至发布。必要检查：图求值3348；绑定8441+相机12、回调344、注册269；Birth51/Cloud49/Texture80、完整gateway/启动全部通过。日志 artifacts/m3-16-*。
 
 候选 native59/packed32827/CEP59：普通 PF_LAYER、PF_PUI_NONE；既有 disk233/234、streams521/522、类型/绑定/schema/ABI7 保留。AE 管理选择和显示名称，正反面均经标准 USER_CHANGED；真实 AE 行为待验收。候选基于65c7245，位于 artifacts/prepared/m3-13-native59-panel59/source；控件266、绑定7773+相机12、Core Texture4322/CEP47、完整 gateway/启动及 May2023 /MT 构建通过。完整 gateway 的已有正反面引用添加/失败回滚通过，没有复现 parameter31；保留校验并扩展诊断。Source/Masks/Effects stage 的资源镜像契约仍开放。
 
@@ -14,10 +16,10 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build59，packed32827；普通 Texture layer widgets | native59，packed32827 |
+| 原生版本 | build60，packed32828；出生控制追加 | native60，packed32828 |
 | Core ABI | 7 | 7 |
-| CEP | panel60 | panel60（既有 live Junction） |
-| Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
+| CEP | panel61 | panel61（既有 live Junction） |
+| Particle | total537；Birth 追加534..536；binding6 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
 
@@ -39,32 +41,32 @@ optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定�
 
 ## 当前安装证据与回滚
 
-当前 native59/CEP60 收据：artifacts/m3-13-panel60-deploy-before.json、artifacts/m3-13-panel60-deploy-after.json。发布前 fresh process checks 无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 -KeepNative 和既有 native/CEP Junction。七个 native/Core 及 selector 不变，十一项 CEP、配对恢复只读 report 与 exact native59/CEP59旧文件全部核对。native59 初次收据与冻结构建保留，未混入 M3-16。当前 runtime selector：StarfieldCore-37EBF72166E6B2B6.dll。历史58初次/方向维护收据与备份保留。
+当前 native60/CEP61 收据：artifacts/m3-16-native60-deploy-before.json、artifacts/m3-16-native60-deploy-after.json；发布时刻2026-10-09T09:14:44.7668774+08:00。fresh无AE后经 tools/Deploy-TestBuild.ps1 与既有Junction发布完整配对；七个native/Core、十一项CEP、runtime selector和exact59/60回滚全部独立核对。冻结候选七项与CEP十一项哈希位于 native-bundle/candidate.json；adapter指纹来自同一冻结构建。当前 selector：StarfieldCore-777AC32B51AF471B.dll。历史58/59/CEP60收据、候选及所有备份保留。
 
 | dist 文件 | SHA-256 |
 | --- | --- |
-| StarfieldParticle.aex | 27FCB9E354CC6508EE2CB1DC7405C8493203B68088478861BD60F4377EF2F1AE |
-| StarfieldEmitter.aex | 8747E3AC3E6E912E12568C01486E3B36AE48EB57FCF91B329A2D9158353A1BFF |
-| StarfieldParticleNode.aex | 15A470C95A8BC11B5558344E7805503B590A48E6316719DF8935C6C3BBDB40C9 |
-| StarfieldForce.aex | CC9BB4F6FFDF6DC9B9E6ADD36EB48C97E5F24DB6CAE40A16007DC61F4A831419 |
-| StarfieldTransform.aex | F2B83F251D507499D0FD459F278862DBF7B4C56F19FF94C53E5D2E0C2049BCB5 |
-| StarfieldHost.aex | 3F358ACD0AED7D62F48F5430D5DE07DCE327F1FBEE2EE562F977BBDD5DE5B14D |
-| StarfieldCore.dll | 37EBF72166E6B2B64A4050084BF52E4CF695E0B06454C75CE79B77354BB93F7B |
+| StarfieldParticle.aex | E2FF723FD7DFF36BB27D435B88E4C455C151CF051C30157C449AD9B535CC0544 |
+| StarfieldEmitter.aex | 3D8FFF07EACF8AAACC83022D65BFCB3287D04C50ABE1BC1D4683D2FCB937CAD0 |
+| StarfieldParticleNode.aex | 706E7D4DA880B99C6DED08819EAAF070E243B4940F0E11D24A5F5C49C5515E96 |
+| StarfieldForce.aex | D21ADF248C77F7C3951458C8580E1D059C353C8BD9C7B500B44E83F6F7166677 |
+| StarfieldTransform.aex | 760517FB20C50AE8A340C6FE0801E1F2EA9B83DB70827F68005F29CB4047E281 |
+| StarfieldHost.aex | 8F17C43E7D2FA6658DBF2F732DF25CE069654A0249CAA4B62713B0DD84BFFFCF |
+| StarfieldCore.dll | 777AC32B51AF471B3DC22246B0C24D45AAC299327E44D19BE32A01AECB4D71AB |
 
-本次 exact native59/CEP59 备份：artifacts/disabled/m3-13-native59-panel60-texture-validation-20261009。此前59发布的 exact58/CEP58（方向修复 CoreB509）与所有历史备份保留。回滚报告：artifacts/m3-13-panel60-rollback-report.log；发布日志：artifacts/m3-13-panel60-deploy-wrapper.log。
+本次 exact native59/CEP60 备份：artifacts/disabled/m3-16-native60-panel61-birth-controls-20261009。回滚报告：artifacts/m3-16-native60-rollback-report.log；发布日志：artifacts/m3-16-native60-deploy-wrapper.log。
 
 AE 关闭后的单步回滚（仓库根目录）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel60-texture-validation-20261009' -Restore
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-16-native60-panel61-birth-controls-20261009' -Restore
 ```
 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
 
 ## 开放 gate
 
-- M3-16 纯策略40985、图求值3348已通过。native60作者：绑定8441+相机12、实际回调344、注册269，0失败；CEP61候选 Birth51/Cloud49/Texture80、完整 gateway事务/失败回滚/预设与启动通过。候选位于 artifacts/prepared/m3-16-native60-panel61；仍需完整 native/Core 构建及实际 AE2023。ADR0037 保留旧激活0、signed32和概率按出生采样契约。M3-13 实机反馈到达时优先处理。
+- M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 
-- owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59 添加仍拒绝合法 ID44。CEP60 明确范围分支及精确原因已发布，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
+- owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59添加曾拒绝合法 ID44。CEP61已包含CEP60明确范围分支及精确原因，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
-- Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。
+- Face/Model、Path/Shadow、Texture Source/Masks/Effects stage等剩余 Particle行为仍开放；出生控制实现的host gate保留，PTF按owner决定等待Physics。

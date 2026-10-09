@@ -1,6 +1,19 @@
 # ADR 0037 — Particle seed shift and birth probability
 
-Status: staged implementation, 2026-10-08. Task M3-16.
+Status: implemented and deployed; real AE2023 qualification open, 2026-10-09. Task M3-16.
+
+## Paired deployment, 2026-10-09
+
+Frozen90b7a2bfe982eab1c11d3592a928ca84e12ab1ec completes the May2023 x64
+Release /MT build with NoDistPublish/NoRuntimePublish. At09:14 +08:00 a fresh
+no-AE check permits tools/Deploy-TestBuild through the existing Junctions.
+Native60/packed32828/ABI7 and CEP61 are installed; eighteen installed and eighteen
+saved files plus both selectors are independently checked. The saved native59/
+CEP60 pair is artifacts/disabled/m3-16-native60-panel61-birth-controls-20261009.
+Receipt/rollback paths and the one-step Restore command are in current-state.md.
+No process, registry, cache, environment or Junction change was made. CEP61
+retains the separate Texture bounds repair; owner adding/back-source feedback
+and all new birth-control host gates remain open.
 
 ## Native and CEP authoring milestone, 2026-10-09
 
@@ -99,7 +112,7 @@ Keep emitter_id and old graph identities unchanged. Auxiliary parent identities
 remain distinct across branches. Topology reordering or chance/shift changes
 must not rename a surviving source ordinal in an unchanged branch.
 
-Future native append: streams534 Shift Seed,535 Birth Chance,536 hidden constant
+Native build60 append: streams534 Shift Seed,535 Birth Chance,536 hidden constant
 activation; disk243/244/245, binding6. Binding1..5 limits retain their old layouts.
 Fresh authoring writes explicit defaults; old effects activation0 preserve their
 old graph. An explicit edit activates the controls transactionally. CEP's current
@@ -107,10 +120,10 @@ virtual cloudControl(40) activation helper must be separated before real graph
 key40 is used. Public native seed bounds require reference evidence; no bound is
 claimed as Stardust parity from the pure signed32-bit numeric representation.
 
-No Render.hpp/C ABI/snapshot wire change is planned. Shared evaluator/header
-changes require a future complete native/Core build; do not hot publish these
-changes over native57 or the frozen native58 candidate. Installed58 remains the
-separate maintenance source7861a2b, not this work in progress.
+No Render.hpp/C ABI/snapshot wire change is made. Shared evaluator/header
+changes require a complete native/Core build, performed for native60; this
+implementation was not hot published over native57/58/59. Older maintenance
+sources and paired backups remain independent preserved evidence.
 
 ## Evidence required
 

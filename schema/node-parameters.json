@@ -529,7 +529,7 @@
     "types": {"seedShift": "int32", "birthChance": "float64"},
     "defaults": {"seedShift": 0, "birthChance": 100},
     "ranges": {"seedShift": [-2147483648,2147483647], "birthChance": [0,100]},
-    "nativeAuthoring": "Unpublished append streams534/535/536, disk243/244/245, total537. Shift Seed uses an integer Slider; chance is float percent; hidden constant activation defaults0. Binding6 preserves old v1..5 layouts; v5 ends at533. Native59/CEP60 stays installed until complete native/Core/CEP candidate passes its gates.",
+    "nativeAuthoring": "Build60 appends streams534/535/536, disk243/244/245, total537. Shift Seed uses an integer Slider; chance is float percent; hidden constant activation defaults0. Binding6 preserves old v1..5 layouts; v5 ends at533. Native60/CEP61 was deployed after complete May2023 /MT build; real AE2023 qualification remains open.",
     "migration": "Missing keys and activation0 keep legacy emitter partitioning. Explicit author controls use full source streams per Particle, preserve source ordinals and assign branch-scoped output identities. Render ABI7/snapshot7 unchanged.",
     "rangeEvidence": "Independent numeric limits; reference seed bounds and multi-branch behavior remain owner qualification gates."
   },
