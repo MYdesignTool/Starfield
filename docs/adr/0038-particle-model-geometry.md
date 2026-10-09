@@ -2,6 +2,23 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Triangle milestone evidence
+
+tests/RunModelSceneTests.ps1 -Run passes6406 checks,0 failures with MSVC /MT;
+log artifacts/m3-17-model-scene-tests-current.log. Cube shared edges/solid-depth
+coverage, reversed winding, reflection/shear, coincident faces, downsample and
+explicit PAR matrix pass. ROI tiles match full-frame coverage/depth. Analytic
+perspective depth/UV, near-plane crossings, principal-branch horizon clipping,
+homography sign/scale, work preflight, allocation failure and cancellation pass.
+Four transfer modes include HDR signed Screen and Stencil on existing pixels.
+Composition validates only touched pixels and rejects bad inputs before mutation;
+mid-composition cancellation requires discarding the caller staging buffer.
+The fixture first used the wrong near_clip member path and then a cancellation
+threshold beyond the small cube's actual poll count; both fixture failures were
+repaired before the passing result. Geometry4141 checks were rerun successfully.
+CMake/Core vcxproj compile the numeric sources. This is a numeric staging API,
+not graph/Particle/resource/native authoring, wire migration or AE qualification.
+
 ## Geometry milestone evidence
 
 tests/RunModelGeometryTests.ps1 -Run passes4141 checks,0 failures with MSVC /MT;
@@ -69,6 +86,45 @@ numeric metadata. This parser does not reinterpret rational curve weights as
 Cartesian division. Curve/surface statements remain explicitly unsupported.
 
 ## Future render and migration boundary
+
+### Numeric triangle milestone
+
+ModelScene.hpp stages a single mesh using an explicit affine row-vector
+model-to-layer-pixel matrix and the existing FrameSpec/Camera values. This
+avoids guessing Particle Model menu/size semantics while reference menus are
+pending. It adds no field to RenderRequest, ParticleInstance, C ABI or snapshots.
+Layer pixels have downward-positive Y; the eventual Particle pose adapter must
+convert canonical upward-positive Y exactly once. Matrix coefficients and
+camera scalars are bounded at1e12. The camera layer-to-view matrix is affine.
+
+Triangles clip against view Z>=near_clip, the positive homogeneous image-to-layer
+branch containing the principal point, and ROI boundaries before division.
+The image homography is normalized at the principal point; a horizon through
+that point rejects explicitly. Perspective-correct depth and UV payloads survive
+clipping. Normals/material/light evaluation remain a subsequent contract.
+Both windings render; reflection/shear must not discard a whole mesh.
+
+The first raster surface is unlit coverage/depth: four fixed quarter-pixel
+samples, a top-left edge rule, and nearest view depth per sample within one
+logical mesh. A mesh is treated as a solid surface, so internal/back faces do
+not multiply its opacity. This is not multi-layer transparent material support.
+Separate logical particles still composite in caller order, matching the
+existing particle transfer contract; intersecting transparent meshes need an
+explicit later ordering contract. Color/opacity are applied once to coverage.
+Normal/Add/Screen/Stencil use the existing premultiplied equations, including
+HDR Screen behavior. The stage does not add lighting or expose a Model selector.
+
+Bounds: at most131072 projected triangles,4194304 surface pixels and64000000
+sample visits per mesh; caller limits may only lower these hard caps. A clipped
+surface uses its ROI-intersected bounding rectangle. Cancellation is checked
+per input triangle/raster row; failed work publishes no partial surface. The
+composition helper validates source pixels and touched destination pixels
+before mutation, without rescanning the full destination frame per mesh. It may return
+cancelled with a partially changed caller-owned staging buffer, which the
+caller must discard on failure, as with the existing CPU accumulation.
+Its touched HDR destination channels must be finite with absolute value<=1e30;
+alpha remains0..1. Untouched destination storage belongs to the caller.
+Homogeneous division uses a1e-200 positive-W numerical floor.
 
 Render.hpp belongs to M3-17 for later numeric mesh staging; it is unchanged in
 the geometry milestone. Before authoring is exposed, append new graph shape and

@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-09 M3-17三角形：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelSceneTests.ps1 -Run`，MSVC /MT，6406检查、0失败；日志 artifacts/m3-17-model-scene-tests-current.log。覆盖透视深度/UV、近面/齐次horizon/ROI、每模型四采样去重/遮挡、反射/shear/downsample/PAR显式矩阵、四种transfer/HDR、预算预检、取消/分配失败/坏输入、仅触及目标像素及取消时丢弃部分staging。首次fixture误用了near_clip成员路径，随后取消阈值超过小cube实际轮询数；修正fixture后才记录通过。几何4141复查通过，日志 artifacts/m3-17-model-geometry-current-tests.log。纯数值API未接入粒子pose/资源/作者或wire，不能声明Model可在AE使用。
+
+2026-10-09 Texture owner确认当前部署节点添加已修复。当前live CEP61运行texture_panel_tests.js（80）及panel_native_node_gateway_tests.js通过，日志 artifacts/m3-13-panel61-{texture,gateway}-recheck.log；七native与十一CEP安装哈希符合native60/CEP61收据。该owner反馈只关闭添加gate；背面及其他采样/阶段/持久化继续。
+
 2026-10-09 M3-17几何：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGeometryTests.ps1 -Run`，MSVC /MT，4141检查、0失败，日志 artifacts/m3-17-model-geometry-tests.log。覆盖cube闭合/绕序、OBJ四种角点索引/负索引、权重和UVW、凹多边形两种绕序/面积/稳定角点属性、引用边界、退化/相交/非平面拒绝、各项预算、取消和注入分配失败；平移与次正规有限尺度也通过。首次cube聚合初始化不符合MSVC，修正后才记录通过。测试只构建独立新几何代码，不修改安装或证明3D渲染/AE资格。
 
 2026-10-09 M3-16完整构建：冻结90b7a2b源码 `artifacts/prepared/m3-16-native60-panel61/source` 中执行 `ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT通过，日志 artifacts/m3-16-native60-build.log。09:14 +08:00无AE后发布native60/CEP61，十八个安装、十八个保存文件、前后selector独立核对，Restore只读report通过。收据 artifacts/m3-16-native60-deploy-{before,after}.json，构建/部署不替代实际AE2023新控件和Texture gate。

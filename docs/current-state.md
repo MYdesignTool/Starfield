@@ -1,10 +1,10 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：单位cube与有界OBJ几何4141检查通过，继续三角形渲染/资源/作者，未暴露菜单或部署。CEP61包含CEP60的 Texture 明确范围分支；已有引用时添加及背面采样仍待 owner 回复。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：几何4141及三角形投影/栅格/合成6406检查通过，继续资源/粒子/作者接入，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
 
 ## 源码与安装
 
-owner 已确认 native59 原生选择器可以显示；添加仍报 key31/type3/value44/kind number。该值合法，尚未确定拒绝原因。CEP60维护使用明确分支选择范围，保留严格校验并增加 reason/typeKind/max；CEP61保留该修正，真实宿主效果待回复，不能将旧嵌套条件的解释假设当作确诊。最小检查包括 ID44完整 gateway参数重写/添加/失败回滚及纹理预设。
+owner 已确认 native59 原生选择器可以显示；旧CEP59添加曾报 key31/type3/value44/kind number。CEP60维护使用明确范围分支，CEP61保留严格校验及 reason/typeKind/max诊断。2026-10-09 owner确认当前版本“无法添加节点”已修复；关闭该添加gate，背面/八种时间采样/阶段/持久化仍开放。不能将旧嵌套条件的引擎解释假设当作已确诊的根因。当前18项安装哈希与收据一致；ID44完整gateway/Texture80复查通过。
 
 native60/CEP61实现 Shift Seed/Birth Chance，streams534/535/536、disk243/244/245、binding6，Particle total537；graph7/envelope1/snapshot7/Core ABI7保留。原生激活默认0保存旧分支，明确出生编辑才启用；新CEP节点写显式defaults0/100。完整源码冻结于 artifacts/prepared/m3-16-native60-panel61/source，CEP候选隔离至发布。必要检查：图求值3348；绑定8441+相机12、回调344、注册269；Birth51/Cloud49/Texture80、完整gateway/启动全部通过。日志 artifacts/m3-16-*。
 
@@ -65,10 +65,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-17新几何源为独立Model候选，不在installed60/61中；Settings新增纯数值几何类型但既有字段/ABI未改。完整Model渲染/资源/作者与Shape、Use Model(s)参考菜单仍开放。接入前修订ADR0038的确切graph/native/wire迁移；不能将解析器数值证据当作可用Model类型。
+- M3-17独立Model候选不在installed60/61中。ModelScene通过显式model-to-layer矩阵，处理近面/齐次图像/ROI裁剪、透视正确深度/UV、每模型四采样遮挡、一次覆盖率与四种叠加/HDR合成；6406检查通过。矩阵粒子pose、资源/C ABI/快照/作者、材质/法线/透明网格交叉排序尚未接入；完整Model与Shape、Use Model(s)参考菜单仍开放。未更改RenderRequest/ParticleInstance既有字段或ABI7；不能将纯数值栅格证据当作可用Model粒子类型。
 
 - M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 
-- owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59添加曾拒绝合法 ID44。CEP61已包含CEP60明确范围分支及精确原因，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
+- owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；旧CEP59添加曾拒绝合法 ID44。CEP61包含CEP60明确范围分支；当前节点添加已由owner实机确认修复。背面、八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Texture Source/Masks/Effects stage等剩余 Particle行为仍开放；出生控制实现的host gate保留，PTF按owner决定等待Physics。

@@ -39,6 +39,8 @@
     <ClCompile Include="..\src\core\CpuRenderer.cpp" />
     <ClCompile Include="..\src\core\SpriteScene.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
+    <ClCompile Include="..\src\core\ModelGeometry.cpp" />
+    <ClCompile Include="..\src\core\ModelScene.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />

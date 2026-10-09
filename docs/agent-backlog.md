@@ -42,6 +42,8 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 
 ## M3-13 — Particle Texture / Layer 采样（2026-10-08）
 
+2026-10-09 owner确认当前版本节点添加已修复，关闭合法Texture引用画布的添加gate；当前配对为native60/CEP61，十八安装哈希复查与收据一致。背面及采样/阶段/持久化gate仍开放；M3-17继续活动实现。
+
 M3-13 修复已发布并等待 owner 对 CEP60 添加/背面实机反馈；不再同时修改本卡实现。当前活动卡切换至 M3-16。native58/CEP58 与默认方向 Core 维护已发布；owner 确认 Comp 2 可选择/显示，随后报告背面无效、选择标签空白和已有 Texture 引用时添加节点报 parameter31（无引用画布正常）。native59 改为原生行内 PF_LAYER，显示已由 owner 确认；CEP60 明确范围分支与细化诊断已发布。该维护未混入 M3-16 与 MNT，编译/最小测试不关闭宿主添加、正反面、八种采样/持久化及 Source/Masks/Effects gate。见 ADR0034。
 
 2026-10-09 08:33 +08:00 fresh no-AE 后发布cb1048d/native59/CEP59；七个 native/Core、十一项 CEP、selector 与 exact58配对备份/恢复 report 核对。收据 artifacts/m3-13-native59-deploy-{before,after}.json。等待 owner 的选择标签/背面/已有 Texture 添加实机证据，完整 goal 继续。
@@ -84,4 +86,5 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
 首个里程碑：单位立方体、有界OBJ多边形/索引/属性、正确三角化、typed拒绝及取消。随后接入深度/裁剪/合成和完整作者链路，未实现渲染前不暴露Model菜单、不部署纯解析器候选。Face依赖OBJ发射器、Path依赖路径发射器，分别保留后续卡；Model图来源和Use Model(s)菜单待owner参考。
 2026-10-09几何里程碑：Settings数值类型、ModelGeometry操作及有界OBJ、单位cube已实现；独立MSVC /MT fixture4141检查、0失败，日志 artifacts/m3-17-model-geometry-tests.log。继续投影/近裁剪/深度/合成与资源、作者接入；现有安装60/61不变。
+2026-10-09三角形里程碑：ModelScene显式矩阵投影、近面/正W/ROI裁剪、透视深度/UV、每模型四采样遮挡与一次覆盖合成，四种transfer/HDR通过6406项MSVC /MT检查。ROI/反射/shear/downsample、horizon/预算/取消/分配失败均覆盖；合成只扫描触及像素。CMake与Core vcxproj接入数值源；粒子pose/资源、wire迁移、作者仍未实现，不暴露菜单或部署此独立里程碑。
 完成条件：默认cube和Model资源能作为粒子显示，3D旋转/缩放/反射/近裁剪/深度/叠加/相机/快照/预算/shutter有效；原生/CEP/预设、配对构建/发布和真实AE2023持久化验收。
