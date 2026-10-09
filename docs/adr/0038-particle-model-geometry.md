@@ -153,6 +153,15 @@ omitted Particle's Random Limit default1, failing at stream303; the corrected
 fixture passes. Logs: artifacts/m3-17-model-native-binding-{tests,asan}.log.
 Actual AE UI/undo/persistence and complete resource authoring remain open.
 
+Frozen source7f5c7d8 at artifacts/prepared/m3-17-model-native-7f5c7d8/source
+passes all eight May2023 x64 Release /MT outputs, including the actual Model
+AEX/PiPL, using IncludeModelCandidate and both NoPublish switches. Initial
+SDK-path setup and a missing ParticleTransform.cpp link dependency were fixed
+before refreezing and success. The old binding8441/camera12 regression passes;
+all18 installed native60/CEP61 files remain unchanged. Logs/reports:
+artifacts/m3-17-model-native-build.log, m3-17-model-legacy-binding-regression.log,
+m3-17-model-native-build-hashes.json and m3-17-model-native-installed-hashes.json.
+
 ### Native mesh persistence boundary
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE

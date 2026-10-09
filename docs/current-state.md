@@ -6,6 +6,8 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+原生模块/binding7源码7f5c7d8已冻结于artifacts/prepared/m3-17-model-native-7f5c7d8/source。`BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`完成May2023 x64 Release /MT八个目标，包含实际StarfieldModel.aex；日志artifacts/m3-17-model-native-build.log，八输出哈希artifacts/m3-17-model-native-build-hashes.json。初次SDK路径与随后漏链接ParticleTransform.cpp均已修正后重新冻结；失败日志保留。旧绑定8441及相机12回归通过（artifacts/m3-17-model-legacy-binding-regression.log，独立artifacts脚本追加mesh helper，不改共享runner）。十八安装哈希仍符合native60/CEP61，报告artifacts/m3-17-model-native-installed-hashes.json。没有Model部署；继续OBJ导入/资源镜像及SmartFX、完整CEP。
+
 最新候选接入独立Model AEX（kind5、matchName org.starfieldfx.node.model），实际注册18项作者控件及metadata，总参数95。private binding7只为含Model的图写入；14路pose动画别名及六项数值bounds、Source/revision常量保持宿主安全的回放。UI编译在AEGP值有效期复制/解码OBJ，Model输出映射Particle input3。标准/ASAN各2809检查通过，包含实际Model模块注册/ARB回调、绑定版本/坏字段拒绝、数值动画checkout/checkin、UI句柄所有权及parked mesh隔离。日志artifacts/m3-17-model-native-binding-{tests,asan}.log。此候选仅显式IncludeModelCandidate双NoPublish构建；Import按钮事务、主mesh镜像/SmartFX捕获及完整CEP尚未接入，当前安装60/61保持。
 
 可编辑作者源码c65d5f79728ae2340b3cd9dbfa37b5cbb46e2f4f已推送并冻结于artifacts/prepared/m3-17-model-controls-c65d5f7/source。完整May2023 x64 Release /MT七个目标通过（双NoPublish），main AEX实际编译ModelControls.cpp；日志artifacts/m3-17-model-controls-native-build.log，输出哈希artifacts/m3-17-model-controls-build-hashes.json。构建后十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-controls-installed-hashes.json。候选Model控件注册函数没有入口调用，kind5/binding/资源镜像及CEP尚未启用，下一步接入完整原生Model节点与资源提交/捕获。

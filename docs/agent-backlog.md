@@ -103,6 +103,8 @@ M3-17可编辑作者候选：可选schema1 keys4..13保存origin/rotation/percen
 
 M3-17原生模块/binding7候选：独立kind5 Model AEX注册18项作者控件/metadata，总95；UI复制/解码mesh并记录bounds，Model -> Particle input3，渲染回放只读14路pose别名及Source/revision/bounds常量。binding7仅含Model时写入，旧v1..6保持；标准/ASAN各2809项检查通过，日志artifacts/m3-17-model-native-binding-{tests,asan}.log。IncludeModelCandidate强制双NoPublish/full build，默认部署列表保持。Import提交撤销、主mesh镜像/SmartFX与完整CEP仍待接入，不发布无效菜单。
 
+源码7f5c7d8冻结完整May2023 /MT八目标（含Model AEX/PiPL、显式IncludeModelCandidate/双NoPublish）通过；初次SDK路径与ModelResources缺ParticleTransform链接修正后重冻。旧绑定8441/相机12回归通过，十八安装哈希仍匹配native60/CEP61。日志artifacts/m3-17-model-native-build.log与m3-17-model-legacy-binding-regression.log。继续资源镜像/导入事务/SmartFX及完整CEP；未部署候选。
+
 ## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
 
 2026-10-09 owner截图限定Light Path、Circle、Look At，复杂Motion按阶段执行；参考清单docs/reference-motion-phases.md。拥有：独立Motion数值类型/采样与粒子路径/朝向、graph/history/资源/渲染的明确契约、独立原生节点及CEP/预设/schema/build/focused tests/新ADR。只追加自有身份/IDs；不复用Transform或Force身份，不注册无实际行为的选项。动画/Light资源采样边界和Circle半径/Look At目标语义先记录证据与独立方程，再接入作者。完成条件：三模式实际行为、共享曲线编辑/持久化、配对构建/发布及AE2023验收。
