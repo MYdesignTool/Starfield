@@ -5,6 +5,7 @@
 
 #include "ParticleLayout.hpp"
 #include "TransformLayout.hpp"
+#include "ModelLayout.hpp"
 #include <array>
 #include <iterator>
 
@@ -189,9 +190,10 @@ enum : A_long {
         kSizeCurveCountId, kOpacityCurveCountId, kSizeCurveInterpolationId, kOpacityCurveInterpolationId,
         kRotationCurveInterpolationId, kColorGradientInterpolationId, kWindSpinCurveInterpolationId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
+    for(A_long index=1;index<=model_layout::last;++index)ids[count++]=model_layout::disk_id(index);
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
         for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
             ids[count++] = connection_uuid_id(slot, chunk);

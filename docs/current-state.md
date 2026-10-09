@@ -1,10 +1,14 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：live图/当前帧采样/Linear shutter接入，444项标准检查通过，继续原生/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：可编辑pose及原生控件捕获候选，图559项及控件ASAN452项通过，继续资源绑定/原生节点/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+ModelControls候选按ADR0038注册真实May2023控件定义，Source/Import OBJ/任意mesh/revision与偏移、角度、缩放、Flip/Center/Normalize共18项；新Model效果独立disk1501..1518已预留并纳入共享唯一性检查。控件读取转换为拥有的数值网格/pose及schema1可编辑keys4..13，不丢失作者值；OBJ可先准备新句柄，不修改原控件。Model kind5、AEX、菜单及binding迁移仍未启用；UI文件对话框/提交撤销、主效果资源镜像、SmartFX捕获和隔离CEP全链路继续。不是可用AE Model发布。
+
+Model可编辑pose采用独立的percent scale、XYZ Euler、per-axis Flip、Center/Normalize方程；标准/ASAN各559项图检查，资源2076与ARB4915回归通过。原生控件标准/ASAN各452项检查通过，覆盖实际SDK定义/失败注册句柄所有权、原生值捕获、图往返及live求值、parked mesh隔离、OBJ候选失败和损坏拒绝；完整冻结构建继续。日志artifacts/m3-17-model-author-graph-tests-current.log、m3-17-model-author-graph-asan.log、m3-17-model-controls-{tests-current,asan}.log。首次控件编译缺SDK常量头及误用fixture成员名，修正后通过；没有真实AE持久化证据。
 
 持久化源码a1751b9b761340e07f2b0003088e83d685c9bc88冻结于artifacts/prepared/m3-17-model-parameter-a1751b9/source，完整May2023 x64 Release /MT全部目标通过（双NoPublish）。main AEX实际编译ModelGeometryParameter.cpp，未注册Model作者；日志artifacts/m3-17-model-parameter-native-build.log。十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-parameter-installed-hashes.json。下一步原生Model节点/资源捕获、Particle Shape菜单及隔离CEP完整作者。
 

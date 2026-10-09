@@ -115,6 +115,10 @@ struct ParticleModelInstance {
     std::array<double,16> model_to_particle{kIdentityModelMatrix};
 };
 struct ParticleModelStyle { std::vector<ParticleModelInstance> instances; };
+struct ModelLocalSettings {
+    Vec3 origin{},rotation_degrees{},scale_percent{100,100,100};
+    bool flip_x{},flip_y{},flip_z{},center{},normalize{};
+};
 
 // Transform node values use the same canonical world frame as particles.
 // The adapter converts AE pixels/signs and captures any inherited motion before

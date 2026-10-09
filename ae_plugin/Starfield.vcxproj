@@ -54,6 +54,7 @@
     <ClCompile Include="NativeTemporalUI.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="ModelGeometryParameter.cpp" />
+    <ClCompile Include="ModelControls.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />
     <ClCompile Include="TextureResources.cpp" />

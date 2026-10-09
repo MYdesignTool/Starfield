@@ -34,6 +34,71 @@ adapter fingerprints. All18 installed files still match native60/CEP61; report
 artifacts/m3-17-model-graph-installed-hashes.json. No Model author/selector has
 been published; native persistence/resource capture remains the next milestone.
 
+### Editable Model author parameters
+
+Before native authoring, schema1 appends optional keys4 origin(vector3 model
+units),5 rotation(vector3 degrees),6 scale(vector3 percent,default100),7/8/9
+Flip X/Y/Z(uint32 bool),10 Center(uint32 bool),11 Normalize(uint32 bool),12
+mesh bounds(opaque48: minimumXYZ/maximumXYZ little-endian doubles),13 Source
+(uint32,0 cube/1 OBJ). Existing metadata keys1..3 remain valid. An authored pose
+uses keys4..11 and excludes the old explicit matrix key3; no lossy matrix
+decomposition invents saved control values. Bounds/source alone do not replace
+an explicit matrix. Source0 with a nonzero resource is rejected; Source1 with
+zero resource displays the default cube until a mesh is imported. Missing
+Source preserves existing numeric resource behavior.
+
+The independent pose contract follows Particle's X-negative/Y-positive/Z-positive
+Euler convention, applying per-axis scale/flip, optional normalization by the
+largest bounding-box extent, optional centering, then rotation and origin.
+Bounds/default cube are numeric, never queried from a host during graph
+evaluation. These equations are our explicit author contract, not proven
+reference numeric parity. The matrix must remain bounded affine. Native resource
+capture will validate stored bounds/mesh identity; no filepath reaches Core.
+This unreleased schema1 extension changes no existing native disk ID, snapshot8
+or ABI8 layout. Earlier Model-only numeric candidates reject new keys rather
+than silently reinterpret them. A full paired build remains required.
+
+### Native Model author layout reservation
+
+The unpublished Model author reserves native kind5 and match name
+`org.starfieldfx.node.model`. Its first18 physical streams are Source1,
+Import OBJ2, Mesh3, Mesh Revision4, Offset X/Y/Z5..7, Angle X/Y/Z8..10,
+Scale X/Y/Z11..13, Flip X/Y/Z14..16, Center17 and Normalize18. Disk IDs
+1501..1518 correspond one-to-one to those streams; these are new IDs in
+the new Model effect, never replacements for released controls. Source uses
+native choices1 Cube/2 OBJ, graph choices0/1. The mesh is an invisible
+arbitrary parameter with PF_ParamFlag_NONE (the SDK arbitrary selectors
+provide discrete interpolation); Source/Revision are supervised constants,
+Import is a supervised button, and the pose controls can animate. Revision
+is an exact integer0..2147483647, with zero meaning no imported resource.
+
+The shared node record will append existing metadata after18: layout19/20,
+connections21..85, UUID86..93, sync guard94 and total95 including input0.
+Kind5 is not admitted by the existing binding6 reader/writer until a separate
+binding migration is implemented. No Model AEX, palette or Particle menu is
+published from this control-registration milestone. Main mesh mirrors and
+import transaction/resource binding IDs remain unallocated at this point.
+The packed native version stays60 until the complete paired author release.
+
+ModelControls registers actual May2023 parameter definitions, captures checked
+native values into owned numeric mesh/pose data and encodes editable Model
+graph parameters. It does not retain parameter pointers or handles in Core.
+An OBJ import can prepare a validated new handle without changing live controls;
+the later UI transaction owns committing or disposing that handle. File-dialog,
+sync/undo transaction, immutable render capture and CEP integration remain
+required before exposing this author. A failed registration disposes an
+unaccepted default mesh; accepted defaults belong to AE.
+
+The final editable graph fixture passes559 checks in standard and ASAN builds;
+resource2076/mesh arbitrary4915 regressions also pass. The actual May2023 control
+registration/capture fixture passes452 checks in standard and ASAN builds; full
+frozen build follows. It covers every registration failure, accepted default
+ownership, exact integer revision, native type/value rejection, editable graph
+round trip/live evaluation, imported/parked resource isolation, geometry-owned
+capture and import preparation failure. Early compilation omitted SDK constants
+and used incorrect fixture API/member names; those were corrected before the
+passing run. Numeric/SDK evidence does not establish real AE UI/undo support.
+
 ### Native mesh persistence boundary
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE

@@ -661,7 +661,14 @@ NodeRegistry make_particle_node_registry() {
     model.ports={PortDescriptor{kModelGeometryOut,PortDirection::output,kModelStream,false,0}};
     model.parameters={ParameterDescriptor{kModelResource,ParameterKind::opaque_bytes,false},
         ParameterDescriptor{kModelRevision,ParameterKind::uint32,false},
-        ParameterDescriptor{kModelLocalMatrix,ParameterKind::opaque_bytes,false}};
+        ParameterDescriptor{kModelLocalMatrix,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kModelOrigin,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kModelRotation,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kModelScale,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kModelFlipX,ParameterKind::uint32,false},ParameterDescriptor{kModelFlipY,ParameterKind::uint32,false},
+        ParameterDescriptor{kModelFlipZ,ParameterKind::uint32,false},ParameterDescriptor{kModelCenter,ParameterKind::uint32,false},
+        ParameterDescriptor{kModelNormalize,ParameterKind::uint32,false},ParameterDescriptor{kModelBounds,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kModelSource,ParameterKind::uint32,false}};
     registry.types.push_back(std::move(model));
     return registry;
 }

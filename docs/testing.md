@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-09 Model可编辑作者：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGraphTests.ps1 -Run`以及追加`-Sanitize`均559项；标准最终复查artifacts/m3-17-model-author-graph-tests-current.log，ASAN日志artifacts/m3-17-model-author-graph-asan.log。Model资源2076与任意参数4915回归通过，日志artifacts/m3-17-model-author-{resource,parameter}-regression.log。新增pose保留Origin/Rotation/Scale/Flip/Center/Normalize，冲突matrix/坏bounds/source严格拒绝；数值方程仍需外观比对。
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelControlsTests.ps1 -Run`及追加`-Sanitize`各通过452项、0失败，日志artifacts/m3-17-model-controls-{tests-current,asan}.log。local May2023 SDK实际PF定义、18项注册/每步失败清理、精确int32 revision、原生pose捕获、图往返/live Model求值、导入候选不修改原控件、损坏/取消/分配失败及parked mesh隔离均覆盖。第一次编译缺Param_Utils常量头和fixture误用graph API/Model组成员名，修正后通过；447项是扩展前计数，全目标冻结构建继续。Helper在main AEX编译，不注册Model模块、资源binding或发布Particle菜单；fake host不等于AE2023持久化验收。
+
 2026-10-09 Model持久化完整构建：a1751b9的git archive冻结于artifacts/prepared/m3-17-model-parameter-a1751b9/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过。main AEX编译ModelGeometryParameter；日志artifacts/m3-17-model-parameter-native-build.log。十八安装哈希仍匹配native60/CEP61（artifacts/m3-17-model-parameter-installed-hashes.json）；未注册/部署Model作者，不关闭AE gate。
 
 2026-10-09 Model原生持久化helper：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGeometryParameterTests.ps1 -Run`，及追加`-Sanitize`，各4915项、0失败。local May2023 SDK、fake handle callbacks；日志artifacts/m3-17-model-parameter-{tests,asan}-current.log。默认cube/导入OBJ的SFMG1句柄、全部ARB selectors、每字节损坏/截断拒绝、深复制、锁失败释放、解锁后取消、host/C++分配失败均覆盖。初次fixture误用ModelPosition.x；边界fixture给一个字符却声明允许的最大跨度，ASAN发现该夹具错误，修正为真正超上限长度并更正前缀长度9后通过。没有注册新Model控件或执行真实AE save/undo/reopen；不能关闭宿主gate。

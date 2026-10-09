@@ -3,6 +3,7 @@
 #include <bit>
 #include <cmath>
 #include <new>
+#include <numeric>
 
 namespace starfield::core {
 namespace {
@@ -34,6 +35,26 @@ Vec3 rotate(Vec3 v,Vec3 angles) noexcept {
 }
 bool valid_model_instance(const ParticleModelInstance& instance) noexcept {
     return affine(instance.model_to_particle,kMaxModelLocalMatrixCoefficient);
+}
+Result<std::array<double,16>> model_local_matrix(const ModelLocalSettings& s,const ModelBounds& bounds) noexcept {
+    using R=Result<std::array<double,16>>;
+    const auto bounded=[](Vec3 v,double maximum){return finite(v)&&std::abs(v.x)<=maximum&&std::abs(v.y)<=maximum&&std::abs(v.z)<=maximum;};
+    if(!bounded(s.origin,kMaxModelCoordinate)||!bounded(s.rotation_degrees,1e9)||!bounded(s.scale_percent,100000)||
+        !bounded(bounds.minimum,kMaxModelCoordinate)||!bounded(bounds.maximum,kMaxModelCoordinate)||
+        bounds.minimum.x>bounds.maximum.x||bounds.minimum.y>bounds.maximum.y||bounds.minimum.z>bounds.maximum.z)
+        return R::failure(ErrorCode::invalid_request,"invalid Model author pose/bounds");
+    const double extent=std::max({bounds.maximum.x-bounds.minimum.x,bounds.maximum.y-bounds.minimum.y,bounds.maximum.z-bounds.minimum.z});
+    if(s.normalize&&extent<=0)return R::failure(ErrorCode::invalid_request,"cannot normalize empty Model bounds");
+    const auto by=[&](double value,bool flip){return (flip?-value:value)/100/(s.normalize?extent:1);};
+    const Vec3 scale{by(s.scale_percent.x,s.flip_x),by(s.scale_percent.y,s.flip_y),by(s.scale_percent.z,s.flip_z)};
+    const auto x=rotate({scale.x,0,0},s.rotation_degrees),y=rotate({0,scale.y,0},s.rotation_degrees),z=rotate({0,0,scale.z},s.rotation_degrees);
+    Vec3 origin=s.origin;
+    if(s.center){const Vec3 center{std::midpoint(bounds.minimum.x,bounds.maximum.x),std::midpoint(bounds.minimum.y,bounds.maximum.y),std::midpoint(bounds.minimum.z,bounds.maximum.z)};
+        const auto shifted=rotate({center.x*scale.x,center.y*scale.y,center.z*scale.z},s.rotation_degrees);
+        origin={origin.x-shifted.x,origin.y-shifted.y,origin.z-shifted.z};}
+    const std::array<double,16> result{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,origin.x,origin.y,origin.z,1};
+    if(!affine(result,kMaxModelLocalMatrixCoefficient))return R::failure(ErrorCode::invalid_request,"Model author matrix exceeds finite affine bounds");
+    return R::success(result);
 }
 Result<std::size_t> model_geometry_encoded_size(const ModelGeometry& geometry) noexcept {
     using R=Result<std::size_t>;

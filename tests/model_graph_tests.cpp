@@ -42,7 +42,7 @@ void same_motion(const EvaluatedGraph& a,const EvaluatedGraph& b){check(a.partic
         check(p.position.x==q.position.x&&p.position.y==q.position.y&&p.position.z==q.position.z,"mesh offset does not move logical centers");
         check(p.size_pixels==q.size_pixels&&p.opacity==q.opacity,"Model input retains logical size/opacity");}}
 struct Sampler:TemporalGraphSampler {
-    Graph graph;bool animate_matrix{},animate_shape{},bad_kind{},bad_identity{},duplicate{},fail_model{};
+    Graph graph;bool animate_matrix{},animate_pose{},animate_shape{},bad_kind{},bad_identity{},duplicate{},fail_model{};
     std::vector<std::pair<NodeId,double>> model_samples;
     explicit Sampler(Graph g):graph(std::move(g)){}
     Result<GraphNode> node(NodeId id,double seconds)override {
@@ -50,6 +50,7 @@ struct Sampler:TemporalGraphSampler {
             if(n.type_key==kModelNode){model_samples.emplace_back(id,seconds);
                 if(fail_model)return Result<GraphNode>::failure(ErrorCode::allocation_failed,"fixture model sampling fails");
                 if(animate_matrix){auto m=kIdentityModelMatrix;m[12]=seconds;set(copy,kModelLocalMatrix,matrix_bytes(m));}
+                if(animate_pose)set(copy,kModelOrigin,Vec3{seconds,0,0});
                 if(bad_kind)set(copy,kModelResource,std::uint32_t{1});
                 if(bad_identity)copy.id=nid(900);
                 if(duplicate)copy.parameters.push_back(copy.parameters.front());
@@ -217,5 +218,61 @@ void linear_shutter() {
     auto crowded_last=crowded;crowded_last.particles.back().model_style_index=2;
     rejected(interpolate_motion_particles(crowded,crowded_last,1,1,.5,8192,never),ErrorCode::work_limit_exceeded,"Linear Model group pair cap rejects before excessive staging");
 }
+void author_pose() {
+    const auto near=[](double a,double b){return std::abs(a-b)<1e-8;};
+    const auto point=[](const std::array<double,16>& m,Vec3 p){return Vec3{m[0]*p.x+m[4]*p.y+m[8]*p.z+m[12],m[1]*p.x+m[5]*p.y+m[9]*p.z+m[13],m[2]*p.x+m[6]*p.y+m[10]*p.z+m[14]};};
+    ModelLocalSettings pose;check(take(model_local_matrix(pose))==kIdentityModelMatrix,"Model author defaults retain identity");
+    pose.origin={2,-3,4};auto m=take(model_local_matrix(pose));check(m[12]==2&&m[13]==-3&&m[14]==4,"Model origin is local offset");
+    pose={};pose.scale_percent={200,50,-100};pose.flip_y=true;m=take(model_local_matrix(pose));check(m[0]==2&&m[5]==-.5&&m[10]==-1,"Model per-axis percent and flips compose");
+    for(unsigned bits=0;bits<8;++bits){pose={};pose.flip_x=bits&1;pose.flip_y=bits&2;pose.flip_z=bits&4;m=take(model_local_matrix(pose));
+        check(m[0]==(pose.flip_x?-1:1)&&m[5]==(pose.flip_y?-1:1)&&m[10]==(pose.flip_z?-1:1),"every Model flip combination has stable reflection");}
+    pose={};pose.rotation_degrees.z=90;m=take(model_local_matrix(pose));check(near(m[0],0)&&near(m[1],1)&&near(m[4],-1),"Model Z rotation follows Particle convention");
+    pose={};pose.rotation_degrees.x=90;m=take(model_local_matrix(pose));check(near(m[5],0)&&near(m[6],-1)&&near(m[9],1),"Model X rotation follows Particle convention");
+    pose={};pose.rotation_degrees.y=90;m=take(model_local_matrix(pose));check(near(m[0],0)&&near(m[2],-1)&&near(m[8],1),"Model Y rotation follows Particle convention");
+    const ModelBounds bounds{{10,20,30},{14,28,32}};pose={};pose.center=true;pose.normalize=true;pose.origin={1,2,3};m=take(model_local_matrix(pose,bounds));
+    auto center=point(m,{12,24,31});check(near(center.x,1)&&near(center.y,2)&&near(center.z,3)&&m[0]==.125&&m[5]==.125,"Model centers and normalizes largest extent before origin");
+    for(unsigned a=0;a<4;++a)for(unsigned bits=0;bits<8;++bits){pose.rotation_degrees={a*17.,a*23.,a*41.};pose.flip_x=bits&1;pose.flip_y=bits&2;pose.flip_z=bits&4;m=take(model_local_matrix(pose,bounds));center=point(m,{12,24,31});
+        check(near(center.x,1)&&near(center.y,2)&&near(center.z,3),"centering survives all rotations and flips");}
+    auto g=base();attach(g,10,2,3);node(g,10).parameters={{kModelSource,std::uint32_t{0}},{kModelOrigin,Vec3{}},{kModelRotation,Vec3{}},{kModelScale,Vec3{100,100,100}},
+        {kModelFlipX,std::uint32_t{0}},{kModelFlipY,std::uint32_t{0}},{kModelFlipZ,std::uint32_t{0}},{kModelCenter,std::uint32_t{0}},{kModelNormalize,std::uint32_t{0}}};
+    auto authored=evaluate(g);check(authored.model_styles[0].instances[0].model_to_particle==kIdentityModelMatrix,"live authored defaults generate canonical matrix");
+    const auto wire=take(serialize_graph(g,particle_node_registry()));check(take(serialize_graph(take(deserialize_graph(wire,particle_node_registry())),particle_node_registry()))==wire,"editable Model controls survive graph roundtrip");
+    Sampler sampler(g);sampler.animate_pose=true;auto animated=take(evaluate_temporal_particle_graph(g,{1,1},never,{},sampler));
+    check(sampler.model_samples.size()==1&&animated.model_styles[0].instances[0].model_to_particle[12]==1,"Model origin animation samples current frame once");
+    same_motion(authored,animated);
+    set(node(g,10),kModelOrigin,Vec3{1,0,0});auto shifted=take(CpuParticleRenderer{}.render(request(g),never));
+    check(pixel(shifted,16,16)[3]==0&&pixel(shifted,24,16)[3]>.49,"editable Model origin changes actual pixels");
+    auto before=evaluate(g);set(node(g,10),kModelScale,Vec3{0,0,0});auto collapsed=evaluate(g);same_motion(before,collapsed);
+    check(take(CpuParticleRenderer{}.render(request(g),never)).pixels==std::vector<std::byte>(32*32*16),"zero Model author scale produces transparent pixels without changing population");
+    auto template_graph=g;set(node(template_graph,10),kModelScale,Vec3{100,100,100});
+    auto bounds_bytes=matrix_bytes({10,20,30,14,28,32});bounds_bytes.resize(48);
+    set(node(template_graph,10),kModelBounds,bounds_bytes);set(node(template_graph,10),kModelCenter,std::uint32_t{1});set(node(template_graph,10),kModelNormalize,std::uint32_t{1});
+    auto centered=evaluate(template_graph);check(centered.model_styles[0].instances[0].model_to_particle[0]==.125,"stored mesh bounds drive normalization");
+    for(unsigned variant=0;variant<10;++variant){auto invalid=template_graph;
+        if(variant==0)set(node(invalid,10),kModelLocalMatrix,matrix_bytes(kIdentityModelMatrix));
+        if(variant==1)set(node(invalid,10),kModelOrigin,1.);
+        if(variant==2)set(node(invalid,10),kModelScale,Vec3{100001,100,100});
+        if(variant==3)set(node(invalid,10),kModelFlipX,std::uint32_t{2});
+        if(variant==4)set(node(invalid,10),kModelNormalize,0.);
+        if(variant==5)set(node(invalid,10),kModelBounds,OpaqueBytes(47));
+        if(variant==6)set(node(invalid,10),kModelSource,std::uint32_t{2});
+        if(variant==7)set(node(invalid,10),kModelResource,resource_bytes(1));
+        if(variant==8)set(node(invalid,10),kModelRotation,Vec3{0,std::numeric_limits<double>::infinity(),0});
+        if(variant==9)set(node(invalid,10),kModelBounds,OpaqueBytes(48));
+        rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"invalid/conflicting author fields reject");}
+    auto file=template_graph;set(node(file,10),kModelSource,std::uint32_t{1});set(node(file,10),kModelResource,resource_bytes(1));
+    check(evaluate(file).model_styles[0].instances[0].resource[0]==1,"OBJ author source retains numeric resource identity");
+    set(node(file,10),kModelResource,resource_bytes(0));check(evaluate(file).model_styles[0].instances[0].resource==ModelResourceId{},"unimported OBJ source retains default cube");
+    for(unsigned variant=0;variant<7;++variant){ModelLocalSettings invalid;ModelBounds bad_bounds{{-.5,-.5,-.5},{.5,.5,.5}};
+        if(variant==0)invalid.origin.x=std::numeric_limits<double>::quiet_NaN();
+        if(variant==1)invalid.rotation_degrees.x=1e9+1;
+        if(variant==2)invalid.scale_percent.x=-100001;
+        if(variant==3)bad_bounds.maximum.x=-1;
+        if(variant==4)bad_bounds.maximum.z=1e9+1;
+        if(variant==5){invalid.normalize=true;bad_bounds={{0,0,0},{0,0,0}};}
+        if(variant==6){invalid.normalize=true;bad_bounds={{0,0,0},{1e-15,0,0}};}
+        rejected(model_local_matrix(invalid,bad_bounds),ErrorCode::invalid_request,"invalid author matrix input rejects without nonfinite output");}
+    pose={};pose.scale_percent={0,0,0};pose.normalize=true;check(model_local_matrix(pose,bounds).has_value(),"collapsed Model author scale remains legal with normalization");
 }
-int main(){try{topology();temporal_sampling();auxiliary();bounds_and_rendering();transport();force_transform();linear_shutter();std::printf("Model graph: %u checks passed\n",checks);return 0;}catch(const std::exception& e){std::printf("FAILED at check %u: %s\n",checks,e.what());return 1;}}
+}
+int main(){try{topology();temporal_sampling();auxiliary();bounds_and_rendering();transport();force_transform();linear_shutter();author_pose();std::printf("Model graph: %u checks passed\n",checks);return 0;}catch(const std::exception& e){std::printf("FAILED at check %u: %s\n",checks,e.what());return 1;}}

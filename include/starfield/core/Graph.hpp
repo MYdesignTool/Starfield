@@ -201,6 +201,9 @@ inline constexpr PortKey kParticleParticlesIn{1};
 inline constexpr PortKey kParticleParticlesOut{2};
 inline constexpr PortKey kParticleModelsIn{3},kModelGeometryOut{1};
 inline constexpr ParameterKey kModelResource{1},kModelRevision{2},kModelLocalMatrix{3};
+inline constexpr ParameterKey kModelOrigin{4},kModelRotation{5},kModelScale{6},
+    kModelFlipX{7},kModelFlipY{8},kModelFlipZ{9},kModelCenter{10},kModelNormalize{11},
+    kModelBounds{12},kModelSource{13};
 inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
 inline constexpr PortKey kTransformParticlesIn{1},kTransformParticlesOut{2};

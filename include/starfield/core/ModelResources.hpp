@@ -7,6 +7,8 @@
 
 namespace starfield::core {
 [[nodiscard]] bool valid_model_instance(const ParticleModelInstance&) noexcept;
+[[nodiscard]] Result<std::array<double,16>> model_local_matrix(const ModelLocalSettings&,
+    const ModelBounds& = {{-.5,-.5,-.5},{.5,.5,.5}}) noexcept;
 [[nodiscard]] Result<std::size_t> model_geometry_encoded_size(const ModelGeometry&) noexcept;
 [[nodiscard]] Result<std::vector<std::byte>> encode_model_geometry(const ModelGeometry&,
     const Cancellation&) noexcept;
