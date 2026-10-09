@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | M3-13 Texture | native59 原生选择器显示已确认；CEP60 明确范围分支已发布，等待合法 ID44 添加报错及背面实机反馈 | 正反面选择、节点编辑、真实方向/时间采样/阶段依赖与撤销/重开 |
 | M3-15 Cloud | native57/CEP57 作者已部署，等待参考外观与范围确认 | Circles/Aspect/Density 外观、动画、预算与宿主持久化 |
-| M3-16 Birth controls | 纯核心策略已提交；图/历史/Auxiliary 源码保留，待 M3-13 方向维护完成后继续作者接入 | seed影响完整发射源、概率筛选/身份/预算、配对发布与实际 AE 验收 |
+| M3-16 Birth controls | 当前活动卡；纯策略与图/历史/Auxiliary/Force/Transform/shutter 已通过最小数值检查，继续原生/CEP作者 | seed影响完整发射源、概率筛选/身份/预算、配对发布与实际 AE 验收 |
 | M3-11 Transform | 原生/CEP 实现与 native54/panel54 配对部署已完成 | 原生/CEP 往返、带动画的 Null、不同图路径、几何、撤销/重开与 shutter 在 AE2023 验收 |
 | P-02L 节点 palette | 验收 panel54 的拖入、坐标、取消与交互 | owner 的实际 AE 外观/拖动/撤销证据 |
 | P-02K 性能 | 量测 idle、seek、多发射器及 Add/Replace | 宿主延迟/光标观察与正确性；源码调用减少不能替代计时 |

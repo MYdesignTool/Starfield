@@ -35,6 +35,9 @@ public:
     // and holds exclusive access for its lifetime; missing cache changes no result.
     [[nodiscard]] virtual std::shared_ptr<EmissionTimeline> emission_timeline(NodeId,unsigned) {return {};}
     [[nodiscard]] virtual std::optional<double> lifetime_upper_bound(NodeId) {return {};}
+    // Metadata proof, never inferred from one/equal frame samples. A constant
+    // zero probability permits skipping an otherwise huge historical clock.
+    [[nodiscard]] virtual std::optional<double> constant_birth_chance(NodeId) {return {};}
     [[nodiscard]] virtual Result<double> lifetime(NodeId id, double seconds) {
         auto sampled=node(id,seconds);
         if(!sampled.has_value()) return Result<double>::failure(sampled.error());

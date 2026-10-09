@@ -2,6 +2,7 @@
 #include "starfield/core/AgeCurve.hpp"
 #include "starfield/core/ColorGradient.hpp"
 #include "starfield/core/Random.hpp"
+#include "starfield/core/ParticleBirth.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -60,7 +61,25 @@ struct ParticleValues {
     ParticleCloudStyle cloud;
     bool configurable_cloud{};
     std::uint32_t cloud_style_index{};
+    ParticleBirthControls birth;
+    bool authored_birth{};
 };
+
+std::uint64_t scoped_birth_identity(std::uint64_t identity,NodeId scope) noexcept {
+    for(auto byte:scope.value.bytes)identity=mix64(identity^byte);
+    return identity;
+}
+std::uint64_t branch_birth_identity(std::uint64_t identity,NodeId particle) noexcept {
+    return scoped_birth_identity(mix64(identity^0x424952544842524eull),particle);
+}
+bool allow_particle_birth(const ParticleValues& appearance,std::uint32_t effective_seed,
+    std::uint64_t identity,NodeId emitter) noexcept {
+    if(appearance.birth.chance_percent==100)return true;
+    if(appearance.birth.chance_percent==0)return false;
+    // effective_seed already includes the shift (and Auxiliary child mixing).
+    return particle_birth_allowed({0,appearance.birth.chance_percent},effective_seed,
+        scoped_birth_identity(identity,emitter));
+}
 
 using CloudStyleMap = std::map<std::tuple<std::uint32_t,double,double>,std::uint32_t>;
 Result<std::uint32_t> retain_cloud_style(EvaluatedGraph& graph,CloudStyleMap& indices,ParticleValues& values) {
@@ -286,6 +305,11 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
+        result.authored_birth=find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance);
+        if(const auto* value=find_value(node,kParticleSeedShift))result.birth.seed_shift=std::get<std::int32_t>(*value);
+        if(const auto* value=find_value(node,kParticleBirthChance))result.birth.chance_percent=std::get<double>(*value);
+        if(!valid_particle_birth_controls(result.birth))
+            return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle Birth Chance outside 0..100");
         result.configurable_cloud=find_value(node,kCloudCircles) || find_value(node,kCloudAspect) || find_value(node,kCloudDensity);
         if(!enumeration(kCloudCircles,kMaxCloudCircles,result.cloud.circles) ||
            !scalar(kCloudAspect,1000,result.cloud.aspect) || !scalar(kCloudDensity,1000,result.cloud.density) ||
@@ -685,19 +709,23 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     auto validated_settings = validate_settings(settings);
                     if (!validated_settings.notices.empty()) return R::failure(ErrorCode::invalid_request, "auxiliary force values outside bounds");
                     if(tf_plan)map_transform_forces(validated_settings.value,*tf_plan,force_ids,emitters[emitter]->value.gravity);
-                    if (now < 0 || settings.particle_lifetime_seconds <= 0) continue;
+                    settings.seed=shifted_particle_seed(validated_settings.value.seed,appearance.birth.seed_shift);
+                    validated_settings.value.seed=settings.seed;
+                    if (now < 0 || settings.particle_lifetime_seconds <= 0 || settings.birth_rate<=0 || appearance.birth.chance_percent==0) continue;
                     // Count clocks, not children: low chance or an empty parent
                     // interval must not prematurely truncate the candidate window.
                     const double last_tick = std::floor(now * settings.birth_rate);
                     const double first_tick = std::max(0.0, std::floor((now-settings.particle_lifetime_seconds)*settings.birth_rate)+1.0);
                     if (!std::isfinite(last_tick) || last_tick > 9e15) return R::failure(ErrorCode::invalid_time,"auxiliary clock exceeds exact slot range");
-                    const auto stride = static_cast<std::uint64_t>(children.size());
+                    const auto stride = appearance.authored_birth?1:static_cast<std::uint64_t>(children.size());
+                    const auto partition=appearance.authored_birth?0:branch;
                     const auto first = static_cast<std::uint64_t>(first_tick);
                     const auto last = static_cast<std::uint64_t>(last_tick);
-                    const auto aligned_first = first + (branch + stride - first % stride) % stride;
+                    const auto aligned_first = first + (partition + stride - first % stride) % stride;
                     const auto clock_count = aligned_first <= last ? (last-aligned_first)/stride+1 : 0;
                     for (std::uint64_t remaining = clock_count; remaining > 0; --remaining) {
                         if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "auxiliary emission cancelled");
+                        if(++budget.work>20'000'000)return R::failure(ErrorCode::work_limit_exceeded,"auxiliary birth candidate limit exceeded");
                         const auto slot = aligned_first + (remaining - 1) * stride;
                         const double birth = double(slot) / settings.birth_rate;
                         if (kept.size() == output_particle_count && birth < kept.top().birth) break;
@@ -715,13 +743,18 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             const auto child_id = mix64(parent_key ^ mix64(slot));
                             auto child_settings = validated_settings;
                             child_settings.value.seed = static_cast<std::uint32_t>(mix64(child_id ^ settings.seed));
+                            if(!allow_particle_birth(appearance,child_settings.value.seed,child_id,nodes[emitter]->id))continue;
                             // Translate after the kernel; world positions are not
                             // clamped to the authored Origin slider's UI bounds.
                             child_settings.value.emitter_origin = {};
                             ParticleInstance instance;
                             const ParticleSlotTarget target{0, 0};
-                            const auto simulated = simulate_selected_particles_into(child_settings, now - birth, {&target, 1}, {&instance, 1}, cancellation, dimension_context,tf);
-                            if (!simulated.has_value()) return R::failure(simulated.error());
+                            if(appearance.authored_birth)
+                                instance=simulate_particle_at_age(child_settings.value,now-birth,child_id,dimension_context,tf);
+                            else {
+                                const auto simulated = simulate_selected_particles_into(child_settings, now - birth, {&target, 1}, {&instance, 1}, cancellation, dimension_context,tf);
+                                if (!simulated.has_value()) return R::failure(simulated.error());
+                            }
                             instance.id = child_id; instance.emitter_id = nodes[emitter]->id;
                             auto inherited = appearance;
                             const auto blend = [](double own, double source, double amount) { return own + (source - own) * amount; };
@@ -754,6 +787,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
+                            if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
                     }
@@ -899,10 +933,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 }
                 if(tf_plan)map_transform_forces(bounded.value,*tf_plan,force_ids,emitters[emitter]->value.gravity);
 
-                const auto slots = live_particle_branch_slots(bounded, time_seconds, emitter_branch_counts[emitter],
-                                                              emitter_branch_indices[emitter]++);
+                const auto& appearance=*particles[particle_index];
+                const auto partition=emitter_branch_indices[emitter]++;
+                const auto slots = live_particle_branch_slots(bounded, time_seconds,
+                    appearance.authored_birth?1:emitter_branch_counts[emitter],appearance.authored_birth?0:partition,
+                    appearance.birth.chance_percent==100);
                 if (!slots.has_value()) return R::failure(slots.error());
-                branches.push_back({std::move(bounded), slots.value(), emitter,
+                bounded.value.seed=shifted_particle_seed(bounded.value.seed,appearance.birth.seed_shift);
+                auto sequence=slots.value();if(appearance.birth.chance_percent==0)sequence.count=0;
+                branches.push_back({std::move(bounded), sequence, emitter,
                                     particle_index,tf_plan});
             }
         }
@@ -914,9 +953,16 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             std::uint64_t slot{0};
             std::uint64_t remaining{0};
         };
-        const auto older = [](const SlotCursor& left, const SlotCursor& right) {
+        const auto older = [&](const SlotCursor& left, const SlotCursor& right) {
             if (left.birth_time != right.birth_time) return left.birth_time < right.birth_time;
             if (left.emitter != right.emitter) return left.emitter < right.emitter;
+            const auto output_id=[&](const SlotCursor& cursor) {
+                const auto particle=branches[cursor.branch].particle;
+                return particles[particle]->authored_birth?branch_birth_identity(cursor.slot,nodes[particle]->id):cursor.slot;
+            };
+            const auto left_id=output_id(left),right_id=output_id(right);
+            if(left_id!=right_id)return left_id<right_id;
+            if(left.branch!=right.branch)return left.branch<right.branch;
             return left.slot < right.slot;
         };
         // Merge newest live births first, so Output's cap is shared across all
@@ -929,6 +975,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::uint64_t candidate_count = 0;
         for (std::size_t branch = 0; branch < branch_count; ++branch) {
             const auto& plan = branches[branch];
+            if(plan.slots.count>UINT64_MAX-candidate_count)
+                return R::failure(ErrorCode::work_limit_exceeded,"particle candidate count overflow");
             candidate_count += plan.slots.count;
             if (plan.slots.count == 0) continue;
             const auto last = plan.slots.first_slot + (plan.slots.count - 1) * plan.slots.stride;
@@ -940,13 +988,17 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         selected.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(output_particle_count, candidate_count)));
         std::vector<std::size_t> target_counts(branch_count, 0);
         while (!newest.empty() && selected.size() < output_particle_count) {
-            if ((selected.size() % 4096) == 0 && cancellation.is_cancelled()) {
+            if ((budget.work % 4096) == 0 && cancellation.is_cancelled()) {
                 return R::failure(ErrorCode::cancelled, "particle output merge cancelled");
             }
+            if(++budget.work>20'000'000)return R::failure(ErrorCode::work_limit_exceeded,"particle birth candidate limit exceeded");
             auto cursor = newest.top();
             newest.pop();
-            selected.push_back({cursor.branch, cursor.slot});
-            ++target_counts[cursor.branch];
+            const auto& plan=branches[cursor.branch];
+            if(allow_particle_birth(*particles[plan.particle],plan.settings.value.seed,cursor.slot,nodes[plan.emitter]->id)) {
+                selected.push_back({cursor.branch, cursor.slot});
+                ++target_counts[cursor.branch];
+            }
             if (--cursor.remaining > 0) {
                 cursor.slot -= branches[cursor.branch].slots.stride;
                 cursor.birth_time = static_cast<double>(cursor.slot) / branches[cursor.branch].settings.value.birth_rate;
@@ -1002,6 +1054,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
+                if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }
         budget.work += result.particles.size();
@@ -1079,6 +1132,13 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 if(!value.has_value()) return Result<std::optional<EmissionRateProfile>>::failure(value.error());
                 EmissionRateProfile profile;profile.constant=value.value();
                 return Result<std::optional<EmissionRateProfile>>::success(std::move(profile));
+            }
+            std::optional<double> constant_birth_chance(NodeId id) override {
+                for(const auto& node:graph_.nodes)if(node.id==id) {
+                    if(const auto* value=find_value(node,kParticleBirthChance))return std::get<double>(*value);
+                    return 100;
+                }
+                return {};
             }
         } sampler(graph,origin_sampler);
         return evaluate_temporal_particle_graph(graph,time,cancellation,dimension_context,sampler);

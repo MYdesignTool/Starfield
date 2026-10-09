@@ -71,7 +71,7 @@ struct ParticleSlotTarget {
 // The graph merges these sequences and applies Output's single population cap.
 [[nodiscard]] Result<ParticleSlotSequence> live_particle_branch_slots(
     const ValidatedSettings& settings, double time_seconds, std::uint32_t partition_count,
-    std::uint32_t partition_index);
+    std::uint32_t partition_index, bool cap_candidates = true);
 
 // Evaluate only slots selected by the graph's global cap into their final
 // positions. Caller supplies distinct destination indices; no allocation/sort.

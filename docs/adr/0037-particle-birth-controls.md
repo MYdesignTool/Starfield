@@ -2,6 +2,31 @@
 
 Status: staged implementation, 2026-10-08. Task M3-16.
 
+## Graph integration milestone, 2026-10-09
+
+The preserved graph/static/history/Auxiliary implementation is now exercised by
+tests/RunParticleBirthGraphTests.ps1 -Run:3348 checks pass,0 failures. New
+Force/Transform tests had incorrect key names; those fixture names were repaired
+before recording this result. Motion interpolation is provided by the existing
+MotionBlur header; no nonexistent source file is added to the runner.
+
+Coverage includes source movement, random color/lifetime/size/opacity/rotation,
+texture/Cloud random keys, signed seed extremes, nested chance subsets, full
+authored sibling streams versus legacy partitioning, birth-time samples,
+Auxiliary parents, low-chance cap filling, constant-zero proof, cancellation/
+typed work limit, Force/Transform, shutter identities and snapshot/graph codecs.
+It is Core evidence; native/CEP authors and real AE2023 remain open. Log:
+artifacts/m3-16-birth-graph-current-tests.log. Current native59/CEP60 is unchanged.
+
+The next authoring milestone uses a PF_Param_SLIDER for Shift Seed, with exact
+signed32 valid bounds and a practical drag range -100..100. Unlike floating
+slider bounds, this avoids rounding INT32_MAX upward. Birth Chance is a float
+slider0..100/default100. The signed range is an independent supported numeric
+contract, not a claim about reference slider bounds. Append only disk243/244/245
+and streams534/535/536; activation0 preserves old branches. Binding6 reads old
+v1..5 with their own historical limits, including v5 ending at533. Shared native
+inputs require a full future build, not a Core-only replacement.
+
 ## Reference and ownership
 
 Owner inventory artifacts/reference/stardust_effect_parameters.txt lists Shift

@@ -47,6 +47,7 @@ if (-not $CoreOnly) {
 # sources linked only into the DLL (CpuRenderer and PluginApi.cpp) are absent.
 # Historical graph/simulation sources also feed the AEX and must be fingerprinted.
 $adapterInputs = @(
+    'include\starfield\core\ParticleBirth.hpp',
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
     'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
     'ae_plugin\MotionBlur.cpp', 'ae_plugin\MotionBlur.hpp', 'include\starfield\core\MotionBlur.hpp',

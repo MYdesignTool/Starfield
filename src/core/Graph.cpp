@@ -591,6 +591,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kCloudCircles, ParameterKind::uint32, false},
         ParameterDescriptor{kCloudAspect, ParameterKind::float64, false},
         ParameterDescriptor{kCloudDensity, ParameterKind::float64, false},
+        ParameterDescriptor{kParticleSeedShift, ParameterKind::int32, false},
+        ParameterDescriptor{kParticleBirthChance, ParameterKind::float64, false},
 
     };
 

@@ -55,6 +55,7 @@ class TemporalEvaluator {
         const GraphNode* particle{};
         std::vector<const GraphNode*> forces;
         std::uint64_t partition{}, stride{};
+        bool authored_birth{};
         std::shared_ptr<const TransformBranchPlan> transform;
         std::vector<const CompiledParticleTransform*> force_spaces;
     };
@@ -172,6 +173,9 @@ public:
         const GraphNode* output=nullptr;
         for(const auto& node:graph.nodes) {
             nodes[node.id]=&node;
+            if(node.type_key==kParticleNode && (find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance))) {
+                auto authored=read_particle(node);if(!authored.has_value())return R::failure(authored.error());
+            }
             if(node.type_key==kOutputNode) {if(output) return R::failure(ErrorCode::invalid_request,"multiple Outputs");output=&node;}
         }
         if(!output) return R::failure(ErrorCode::invalid_request,"missing Output");
@@ -237,6 +241,7 @@ public:
         std::map<NodeId,std::uint64_t> partitions;
         for(const auto& [id,node]:nodes) if(active[id] && node->type_key==kParticleNode) {
             Branch base; base.particle=node;bool terminal=false;
+            base.authored_birth=find_value(*node,kParticleSeedShift) || find_value(*node,kParticleBirthChance);
             std::map<NodeId,bool> visited;stack={id};
             while(!stack.empty()) {
                 auto next=stack.back();stack.pop_back();if(visited[next]) continue;visited[next]=true;
@@ -270,7 +275,10 @@ public:
                 branches.push_back(std::move(branch));
             }
         }
-        for(auto& branch:branches) branch.stride=partitions[branch.emitter->id];
+        for(auto& branch:branches) {
+            branch.stride=branch.authored_birth?1:partitions[branch.emitter->id];
+            if(branch.authored_birth)branch.partition=0;
+        }
         struct Candidate {double birth;ParticleInstance particle;};
         const auto older=[](const Candidate& a,const Candidate& b) {
             if(a.birth!=b.birth) return a.birth>b.birth;
@@ -280,6 +288,14 @@ public:
         std::vector<Candidate> storage;storage.reserve(std::min<std::uint32_t>(cap,4096));
         std::priority_queue<Candidate,std::vector<Candidate>,decltype(older)> kept(older,std::move(storage));
         for(const auto& branch:branches) {
+            if(const auto chance=sampler.constant_birth_chance(branch.particle->id);chance) {
+                if(!std::isfinite(*chance) || *chance<0 || *chance>100)
+                    return R::failure(ErrorCode::invalid_request,"invalid certified Birth Chance");
+                if(*chance==0) {
+                    auto source=read_emitter(*branch.emitter);if(!source.has_value())return R::failure(source.error());
+                    continue;
+                }
+            }
             auto& clock=clocks[branch.emitter->id];
             const auto* timing=find_value(*branch.emitter,kEmittingMode);
             if(timing && std::get<std::uint32_t>(*timing)>3)
@@ -339,6 +355,8 @@ public:
                 auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
                 auto sampled_particle=read_particle(particle_node.value());if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
                 auto particle_values=sampled_particle.take_value();
+                if(particle_values.authored_birth!=branch.authored_birth)
+                    return R::failure(ErrorCode::invalid_request,"historical birth control membership changed");
                 auto cloud=retain_cloud_style(result,cloud_indices,particle_values);
                 if(!cloud.has_value())return R::failure(cloud.error());
                 auto retained = retain_texture_style(result, texture_indices, particle_values);
@@ -347,6 +365,7 @@ public:
                 if(age<life) {
                     auto appearance=particle_values;
                     Settings settings=emitter.value().value;settings.particle_lifetime_seconds=life;
+                    settings.seed=shifted_particle_seed(settings.seed,particle_values.birth.seed_shift);
                     const auto percent=[&](ParameterKey key,double fallback) {const auto* v=find_value(emitter_node.value(),key);return v?std::get<double>(*v)/100:fallback;};
                     const auto* mode=find_value(emitter_node.value(),kAuxiliarySource);
                     const bool auxiliary=mode && std::get<std::uint32_t>(*mode)==1;
@@ -388,6 +407,7 @@ public:
                                 color={blend(color.x,parent.color.x,inherit),blend(color.y,parent.color.y,inherit),blend(color.z,parent.color.z,inherit)};
                             }
                         }
+                        if(!allow_particle_birth(particle_values,own.seed,identity,branch.emitter->id))continue;
                         const double actual_life=birth_lifetime(particle_values,own.seed,identity);
                         if(age>=actual_life) continue;
                         own.particle_lifetime_seconds=actual_life;
@@ -406,6 +426,7 @@ public:
                         apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);
+                        if(particle_values.authored_birth)instance.id=branch_birth_identity(identity,branch.particle->id);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));
                         else if(older(candidate,kept.top())) {kept.pop();kept.push(std::move(candidate));}

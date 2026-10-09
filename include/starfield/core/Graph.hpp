@@ -278,6 +278,7 @@ inline constexpr ParameterKey kParticleTransferMode{30};
 inline constexpr ParameterKey kTextureFront{31}, kTextureBack{32}, kTextureTimeMode{33}, kTextureColorUse{34};
 inline constexpr ParameterKey kTextureUseRatio{35}, kTextureIgnorePerspective{36};
 inline constexpr ParameterKey kCloudCircles{37}, kCloudAspect{38}, kCloudDensity{39};
+inline constexpr ParameterKey kParticleSeedShift{40}, kParticleBirthChance{41};
 inline constexpr ParameterKey kEmitterOrient{32}; // Emitter direction, distinct from shape angles.
 inline constexpr ParameterKey kAcceleration{6}; // Output: 0 GPU / 1 CPU
 inline constexpr ParameterKey kTimeSamplingHz{7};

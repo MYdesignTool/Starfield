@@ -42,7 +42,7 @@ owner 要求：Normal/Add/Screen/Stencil 粒子间叠加；点击 CEP 节点后�
 
 ## M3-13 — Particle Texture / Layer 采样（2026-10-08）
 
-当前唯一活动卡为 M3-13。native58/CEP58 与默认方向 Core 维护已发布；owner 确认 Comp 2 可选择/显示，随后报告背面无效、选择标签空白和已有 Texture 引用时添加节点报 parameter31（无引用画布正常）。按 owner 要求，native59/CEP59 候选改为 AE 原生行内 PF_LAYER，保留 ID/类型/绑定/schema/ABI7；完整事务中的正反面引用、添加及失败回滚通过，尚未复现宿主 parameter31，保留严格校验并增加类型/值诊断。候选控件266、绑定7773+相机12、Texture4322/CEP47、完整 gateway/启动及 May2023 /MT 构建通过；不能据此宣称宿主修复完成。见 ADR0034。M3-16 与 MNT 共享改动保留并排除于候选；八种采样/持久化、正反面和 Source/Masks/Effects gate 继续。
+M3-13 修复已发布并等待 owner 对 CEP60 添加/背面实机反馈；不再同时修改本卡实现。当前活动卡切换至 M3-16。native58/CEP58 与默认方向 Core 维护已发布；owner 确认 Comp 2 可选择/显示，随后报告背面无效、选择标签空白和已有 Texture 引用时添加节点报 parameter31（无引用画布正常）。native59 改为原生行内 PF_LAYER，显示已由 owner 确认；CEP60 明确范围分支与细化诊断已发布。该维护未混入 M3-16 与 MNT，编译/最小测试不关闭宿主添加、正反面、八种采样/持久化及 Source/Masks/Effects gate。见 ADR0034。
 
 2026-10-09 08:33 +08:00 fresh no-AE 后发布cb1048d/native59/CEP59；七个 native/Core、十一项 CEP、selector 与 exact58配对备份/恢复 report 核对。收据 artifacts/m3-13-native59-deploy-{before,after}.json。等待 owner 的选择标签/背面/已有 Texture 添加实机证据，完整 goal 继续。
 
@@ -72,7 +72,7 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-16 — Particle Shift Seed / Birth Chance（2026-10-08）
 
-M3-13 native58/CEP58 已部署，选择/显示由 owner 确认。M3-16 纯核心策略已提交；图求值/历史/辅助发射/预算改动在工作树中保留，作者尚未接入。当前因 owner Texture 方向反馈暂缓此卡，仅推进 M3-13；其冻结维护包不包含本卡改动。
+2026-10-09 当前活动卡为 M3-16：M3-13 native59/CEP60 维护已发布并等待 owner 实机回复，期间继续出生控制。纯核心策略已提交；图求值/历史/辅助发射/预算改动在工作树中保留，先核对新增 Force/Transform/shutter 测试，再接入 native/CEP 作者。现有安装与此前冻结维护包不包含未完成的图求值改动。
 拥有：Settings/ParticleBirth/Random、graph optional keys/registry/construction/evaluation/history、候选扫描预算和 branch identity、native Particle 控件/记录/绑定、CEP inspector/gateway/presets、node schema、构建/version、focused birth tests、ADR0037 与未来配对发布。Render.hpp、ABI7 与 snapshot7 计划保持；需要变更时先修订 ADR。
 参考：owner 参数库存默认 Shift Seed0/Birth Chance100；官方指南要求偏移同一发射源的 seed、按出生概率筛选其粒子。范围边界与精确 RNG 仍需参考确认。先完成纯核心确定性策略，随后接入静态/历史/Auxiliary 求值及 native/CEP 作者；未接入前不暴露控件、不声明完成。
 迁移：optional keys40/41；缺字段保留旧分支行为，明确作者字段启用完整发射源分支。新 native 控件追加且通过独立 hidden activation 保留旧工程。已有 purpose1..20/IDs 不重用，出生筛选新增 purpose21。

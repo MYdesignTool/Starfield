@@ -1,6 +1,6 @@
 # 当前工程状态
 
-核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 改为明确范围分支，保留严格校验并增加 reason/typeKind/max；实机拒绝原因及修复效果尚待确认。M3-13 唯一活动，M3-16 与 MNT-01 共享改动保留并排除于维护发布。
+核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 明确范围分支的实机效果待回复。当前活动卡切换至 M3-16：出生控制图求值3348检查通过，继续 native/CEP 作者；未完成作者不暴露或部署。MNT-01 改动保留。
 
 ## 源码与安装
 
@@ -63,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-16 纯核心 Shift Seed/Birth Chance 策略已提交f83e20f；独立40985检查、0失败。图求值/历史/辅助发射/预算/身份工作树保留，作者未完成，不暴露 UI、不发布到 Core；ADR0037 规定后续完整迁移。当前暂缓以处理 M3-13 方向反馈。
+- M3-16 纯核心策略已提交f83e20f，40985检查、0失败；本次图/历史/Auxiliary/预算/身份、Force/Transform/shutter/随机外观与快照3348检查通过。继续原生/CEP作者接入，未完成部分不暴露 UI、不发布到 Core；ADR0037 规定完整迁移。M3-13 实机反馈到达时优先处理。
 
 - owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59 添加仍拒绝合法 ID44。CEP60 明确范围分支及精确原因已发布，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。

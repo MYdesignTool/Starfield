@@ -495,7 +495,7 @@ Result<ParticleSlotRange> live_particle_slot_range(const ValidatedSettings& sett
 
 Result<ParticleSlotSequence> live_particle_branch_slots(const ValidatedSettings& settings, double time_seconds,
                                                        std::uint32_t partition_count,
-                                                       std::uint32_t partition_index) {
+                                                       std::uint32_t partition_index,bool cap_candidates) {
     using R = Result<ParticleSlotSequence>;
     if (partition_count == 0 || partition_index >= partition_count) {
         return R::failure(ErrorCode::invalid_request, "invalid particle slot partition");
@@ -516,7 +516,7 @@ Result<ParticleSlotSequence> live_particle_branch_slots(const ValidatedSettings&
         --assigned.count;
     }
     const auto cap = settings.value.particle_count;
-    if (assigned.count > cap) {
+    if (cap_candidates && assigned.count > cap) {
         assigned.first_slot += (assigned.count - cap) * partition_count;
         assigned.count = cap;
     }
