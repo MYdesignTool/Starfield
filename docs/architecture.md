@@ -46,6 +46,8 @@ M3-17 Model候选的纯数值几何类型由Settings.hpp拥有，ModelGeometry�
 
 ## 渲染、资源与线程
 
+ModelGeometryParameter候选在ae_plugin内管理有界SFMG1任意参数句柄；保存数值网格，UUID/revision由未来Model作者管理。复制拥有独立存储，读取先复制并解锁，再解码/取消。所有ARB selectors已有独立fake-host覆盖；未注册Model参数或增加宿主资格。
+
 SmartFX 构造不可变图/历史、几何和 Core lease；相同 generation 保持到对应 render/result 释放。内容身份参与 cache GUID。渲染输出为透明背景上的粒子 RGBA，不合成输入像素。
 Core 验证时间、尺寸、格式、图、数值和工作预算；adapter 尊重 rowbytes、PAR、downsample、ROI、AE 16-bpc 的32768刻度和8/16/32-bpc 输出。内部积累为 premultiplied，编码 alpha 由请求决定；32-bpc 可以保留 HDR RGB。
 

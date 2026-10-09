@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 Model原生持久化helper：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGeometryParameterTests.ps1 -Run`，及追加`-Sanitize`，各4915项、0失败。local May2023 SDK、fake handle callbacks；日志artifacts/m3-17-model-parameter-{tests,asan}-current.log。默认cube/导入OBJ的SFMG1句柄、全部ARB selectors、每字节损坏/截断拒绝、深复制、锁失败释放、解锁后取消、host/C++分配失败均覆盖。初次fixture误用ModelPosition.x；边界fixture给一个字符却声明允许的最大跨度，ASAN发现该夹具错误，修正为真正超上限长度并更正前缀长度9后通过。没有注册新Model控件或执行真实AE save/undo/reopen；不能关闭宿主gate。
+
 2026-10-09 live Model完整构建：67fc063的git archive冻结于artifacts/prepared/m3-17-model-graph-67fc063/source，运行`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过。日志artifacts/m3-17-model-graph-native-build.log；构建后十八安装哈希匹配native60/CEP61，报告artifacts/m3-17-model-graph-installed-hashes.json。没有发布候选、改写runtime selector或增加宿主资格。
 
 2026-10-09 M3-17 live Model图：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGraphTests.ps1 -Run`通过444项，日志artifacts/m3-17-model-graph-tests-current.log。覆盖多Model共享组/确定顺序、出生身份、当前帧/出生shape动画、parked/负时间/零cap、Auxiliary资源域、Force/Transform、C ABI实际像素、Linear shutter矩阵/索引/默认cube/资源变化/组预算及typed拒绝。新增fixture首次误用PortId和不存在的RenderRequest成员，修正后才通过。原生/CEP作者未接入，不从纯数值测试关闭Model宿主gate。

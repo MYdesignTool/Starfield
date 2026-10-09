@@ -34,6 +34,35 @@ adapter fingerprints. All18 installed files still match native60/CEP61; report
 artifacts/m3-17-model-graph-installed-hashes.json. No Model author/selector has
 been published; native persistence/resource capture remains the next milestone.
 
+### Native mesh persistence boundary
+
+ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
+arbitrary handle. It owns no graph identity, filenames or external file lookup;
+resource UUID/revision belong to the future Model author and immutable capture.
+The future registered parameter is constant/discrete, holding its left mesh for
+interpolation fractions below1. All arbitrary selectors are implemented before
+registration: default cube, copy/dispose, flat size/flatten/unflatten, compare,
+interpolate and bounded SFMODEL1 hexadecimal print/scan. Read/create/callback
+errors publish no handle; copies own independent host storage. Handle bytes are
+copied and unlocked before numeric decode/cancellation. Corrupted payloads are
+rejected on reads and serialization, not passed to Core or saved as valid meshes.
+Disk ID selection and native bindings remain a separate explicit migration before
+Model registration; this helper takes the caller's expected disk ID. No new
+parameter, selector flag or Model effect is registered in this persistence step.
+
+RunModelGeometryParameterTests.ps1 -Run and -Run -Sanitize each pass4915
+checks using the local May2023 SDK/fake handle callbacks. Cube/imported OBJ
+mesh round trips, every truncated/corrupted byte, all arbitrary selectors,
+independent copies, unlock-before-cancellation, host/C++ allocation failures,
+failed lock disposal and bounded scan preflight pass. Logs
+artifacts/m3-17-model-parameter-{tests,asan}-current.log. The first fixture used
+ModelPosition.x instead of value.x; the subsequent boundary fixture incorrectly
+claimed an allowed maximum span while supplying a one-character buffer. ASAN
+found that fixture error; the count was corrected to one-over-limit and the
+text prefix length to9 before recording passing evidence. No AE save/undo/reopen
+behavior or registered author is inferred. Main AEX/fingerprint include the
+helper; no existing native IDs, schemas or packed version are changed here.
+
 ## Particle snapshot and CPU milestone evidence
 
 Snapshot8 now retains Model groups and the explicit200-byte particle stride;
