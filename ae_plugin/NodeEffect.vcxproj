@@ -87,6 +87,7 @@
     <ClCompile Include="..\src\core\Time.cpp" />
     <ClCompile Include="..\src\core\ModelGeometry.cpp" />
     <ClCompile Include="..\src\core\ModelResources.cpp" />
+    <ClCompile Include="..\src\core\ParticleTransform.cpp" />
     <CustomBuild Include="$(NodePiPL)">
       <Message>Generating $(NodeKind) node PiPL resource</Message>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName $(NodeOutFlags) -OutFlags2Name $(NodeOutFlags2)</Command>
