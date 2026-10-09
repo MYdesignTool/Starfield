@@ -169,10 +169,14 @@ public:
         if(!validation) return R::failure(ErrorCode::invalid_request,"invalid temporal graph");
         if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"temporal graph cancelled");
         std::map<NodeId,const GraphNode*> nodes;
-        std::map<NodeId,std::vector<NodeId>> incoming,outgoing;
+        std::map<NodeId,std::vector<NodeId>> incoming,outgoing,dependencies,dependents;
+        ModelValues models;
         const GraphNode* output=nullptr;
         for(const auto& node:graph.nodes) {
             nodes[node.id]=&node;
+            if(node.type_key==kModelNode) {
+                auto value=read_model(node);if(!value.has_value())return R::failure(value.error());models.emplace(node.id,value.take_value());
+            }
             if(node.type_key==kParticleNode && (find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance))) {
                 auto authored=read_particle(node);if(!authored.has_value())return R::failure(authored.error());
             }
@@ -180,15 +184,19 @@ public:
         }
         if(!output) return R::failure(ErrorCode::invalid_request,"missing Output");
         for(const auto& edge:graph.edges) {
-            if(!is_particle_graph_edge(*nodes.at(edge.source_node),*nodes.at(edge.destination_node)))
+            const auto model_edge=is_model_graph_edge(edge,*nodes.at(edge.source_node),*nodes.at(edge.destination_node));
+            if(!model_edge && !is_particle_graph_edge(*nodes.at(edge.source_node),*nodes.at(edge.destination_node)))
                 return R::failure(ErrorCode::invalid_request,"unsupported temporal edge");
-            incoming[edge.destination_node].push_back(edge.source_node);
-            outgoing[edge.source_node].push_back(edge.destination_node);
+            dependencies[edge.destination_node].push_back(edge.source_node);dependents[edge.source_node].push_back(edge.destination_node);
+            if(!model_edge) {
+                incoming[edge.destination_node].push_back(edge.source_node);
+                outgoing[edge.source_node].push_back(edge.destination_node);
+            }
         }
         std::map<NodeId,bool> active;
         std::vector<NodeId> stack{output->id};
         while(!stack.empty()) {const auto id=stack.back();stack.pop_back();if(active[id]) continue;active[id]=true;
-            for(auto source:incoming[id]) stack.push_back(source);}
+            for(auto source:dependencies[id]) stack.push_back(source);}
         const auto* cap_value=find_value(*output,kParticleCount);
         const std::uint32_t cap=cap_value?std::get<std::uint32_t>(*cap_value):0;
         if(cap>kMaxParticleCount) return R::failure(ErrorCode::invalid_request,"Output cap outside bounds");
@@ -201,7 +209,23 @@ public:
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
         CloudStyleMap cloud_indices;
-        for(const auto& [id,node]:nodes) if(active[id]) result.evaluated_nodes.push_back(id);
+        std::map<NodeId,std::size_t> dependency_degrees;
+        std::priority_queue<NodeId,std::vector<NodeId>,std::greater<>> dependency_ready;
+        std::size_t active_nodes=0;
+        for(const auto& [id,node]:nodes)if(active[id]) {
+            ++active_nodes;dependency_degrees[id]=dependencies[id].size();if(!dependency_degrees[id])dependency_ready.push(id);
+            if(node->type_key==kModelNode && now>=0 && cap) {
+                auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
+                auto value=read_model(sampled.value());if(!value.has_value())return R::failure(value.error());models.at(id)=value.take_value();
+            }
+        }
+        while(!dependency_ready.empty()) {
+            if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Model temporal dependency planning cancelled");
+            const auto id=dependency_ready.top();dependency_ready.pop();result.evaluated_nodes.push_back(id);
+            for(auto destination:dependents[id])if(active[destination] && --dependency_degrees[destination]==0)dependency_ready.push(destination);
+        }
+        if(result.evaluated_nodes.size()!=active_nodes)return R::failure(ErrorCode::invalid_request,"temporal graph dependency order failed");
+        auto model_indices=retain_model_styles(graph,models,result,cancel);if(!model_indices.has_value())return R::failure(model_indices.error());
         const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
         std::vector<const GraphNode*> plan_nodes;
         std::map<NodeId,std::size_t> plan_indices;
@@ -355,6 +379,7 @@ public:
                 auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
                 auto sampled_particle=read_particle(particle_node.value());if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
                 auto particle_values=sampled_particle.take_value();
+                if(const auto found=model_indices.value().find(branch.particle->id);found!=model_indices.value().end())particle_values.model_style_index=found->second;
                 if(particle_values.authored_birth!=branch.authored_birth)
                     return R::failure(ErrorCode::invalid_request,"historical birth control membership changed");
                 auto cloud=retain_cloud_style(result,cloud_indices,particle_values);

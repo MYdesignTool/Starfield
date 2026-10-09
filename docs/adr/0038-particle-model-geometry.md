@@ -2,6 +2,30 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Live graph and shutter milestone evidence
+
+Model schema1 metadata and Particle port3 now participate in full dependency
+planning while emission/Force/Transform/Auxiliary use separate particle-flow
+adjacency. Groups are ordered by Particle/Model UUID; adding metadata cannot
+reorder legacy birth partitions. Temporal sampling captures active Model metadata
+once at the current time, including remapping/subframes, with no negative-time
+or zero-cap captures. Parked and physics-only parent groups need no mesh capture.
+Linear shutter validates/remaps Model tables and interpolates matching affine
+groups, retaining discrete geometry when resources/member counts change.
+
+The standard RunModelGraphTests.ps1 -Run fixture passes444 checks, including
+live cube/imported pixels via CPU/C ABI, Auxiliary groups, Force/Transform,
+animated birth shape, metadata sampling, graph/snapshot round trips, endpoint
+birth/death/implicit cube/resource changes and bounded Model shutter group pairs.
+Existing Texture4322, Birth3348 and Model CPU2695 regressions pass. The expanded
+fixture initially used an incorrect PortId name and a nonexistent RenderRequest
+member; these were repaired before passing. Numeric integration is not native
+resource capture or AE authoring; no Model selector/binary has been published.
+
+The same final fixture passes444 checks with MSVC AddressSanitizer; log
+artifacts/m3-17-model-graph-asan-current.log. Intermediate371/440 runs do not
+describe the final candidate.
+
 ## Particle snapshot and CPU milestone evidence
 
 Snapshot8 now retains Model groups and the explicit200-byte particle stride;
@@ -183,6 +207,31 @@ uint32 resource revision, key3 optional opaque128-byte affine local transform.
 Meshes are not embedded in these graph parameters. Existing graphs/parameters,
 envelope1 and node disk IDs remain unchanged; older readers reject the new
 node/port/shape rather than interpreting them as another primitive.
+
+Graph planning distinguishes full dependencies (including Model inputs) from
+particle-flow edges used by emission partitioning/Force/Transform/Auxiliary.
+Model nodes must never become emitter branches.
+Particle branch partitions use Particle UUID order independently of metadata
+dependency readiness, retaining particle identities when a Model is connected.
+Model groups are catalogued by all connected Particle UUIDs, including parked
+ones, so the root-only Auxiliary
+copy retains group indices. Resource presence is checked only for groups used by
+evaluated Model particles; a parked group does not require a captured mesh.
+Auxiliary parent-prefix simulation uses logical particle centers/size/color and
+does not request mesh assets at historical births. Child geometry comes from its
+own Model inputs. Temporal Model metadata is sampled once per active Model node
+at the current evaluation time, with no host sampling on negative/zero-cap frames;
+animated Particle shape at birth selects the already captured current-frame group.
+Temporal evaluated_nodes uses full dependency order with UUID ties.
+
+The Model render contract also owns MotionBlur.hpp's shared style transport.
+Linear shutter interpolation validates and remaps Model group indices. Matching
+member counts/resource IDs interpolate affine coefficients; implicit cube is a
+single identity instance. Changed resources/member counts retain the selected
+endpoint's discrete geometry (the first endpoint when that particle exists),
+consistent with other discrete appearance values. Model matrices are never
+copied per particle; group-pair results are shared. Subframe sampling evaluates
+the current Model metadata independently at each shutter time.
 
 Model groups are shared by EvaluatedGraph and referenced by a new in-memory
 ParticleInstance model_style_index. Snapshot8 retains the explicit200-byte

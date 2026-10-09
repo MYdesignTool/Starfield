@@ -97,6 +97,7 @@ $adapterInputs = @(
     'src\core\Geometry.cpp', 'src\core\Graph.cpp',
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
     'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
+    'src\core\ModelEvaluation.hpp',
     'src\core\ParticleSimulation.cpp', 'src\core\ParticleTransform.cpp', 'src\core\Random.cpp',
     'src\core\ParticleTexture.cpp', 'include\starfield\core\ParticleTexture.hpp',
     'src\core\ModelGeometry.cpp', 'include\starfield\core\ModelGeometry.hpp',

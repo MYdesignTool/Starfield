@@ -182,7 +182,9 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
             auto mesh=make_unit_cube();if(!mesh.has_value())return OutputResult::failure(mesh.error());cube_geometry=mesh.take_value();
             const auto lease=compile_model_geometry(*cube_geometry,cancellation);if(!lease.has_value())return OutputResult::failure(lease.error());cube=lease.value();
             std::uint64_t model_style_work=0;
-            for(const auto& style:evaluated.value().model_styles)for(const auto& instance:style.instances) {
+            std::vector<bool> used_model_styles(evaluated.value().model_styles.size());
+            for(const auto& p:particles)if(p.shape==4 && p.model_style_index)used_model_styles[p.model_style_index-1]=true;
+            for(std::size_t i=0;i<used_model_styles.size();++i)if(used_model_styles[i])for(const auto& instance:evaluated.value().model_styles[i].instances) {
                 if(model_style_work++%64==0 && cancellation.is_cancelled())return OutputResult::failure(ErrorCode::cancelled,"Model group validation cancelled");
                 if(!valid_model_instance(instance))return OutputResult::failure(ErrorCode::invalid_request,"invalid Model group transform");
                 if(instance.resource!=ModelResourceId{} && !model_sources.contains(instance.resource))

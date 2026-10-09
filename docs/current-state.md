@@ -1,8 +1,12 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：资源/pose2076、三角形6406、snapshot8/CPU像素2695及ABI8传输30（含ASAN）通过，继续live图/原生/CEP作者接入，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：live图/当前帧采样/Linear shutter接入，444项标准检查通过，继续原生/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+
+owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+Model live图支持默认cube、多Model共享组、稳定Particle分区、Auxiliary独立组、当前帧动画元数据、Force/Transform路径及Linear/Subframe采样。标准及ASAN各444项检查通过；旧Texture4322、Birth3348及Model CPU2695回归通过。此前新增fixture误用PortId和不存在的RenderRequest成员，修正后才执行通过。原生Model资源捕获与原生/CEP/预设作者仍未接入，不发布纯数值候选；现有native60/CEP61保持。
 
 snapshot/CPU源码e12517d99a1545694a02c99182fde7e893b0f736冻结于 artifacts/prepared/m3-17-model-particles-e12517d/source，完整May2023 x64 Release /MT全部目标通过（双NoPublish），日志 artifacts/m3-17-model-particles-native-build.log。main AEX接入snapshot数值验证的ModelGeometry/Resources，adapter fingerprint同步纳入。构建后十八安装哈希仍匹配native60/CEP61，报告 artifacts/m3-17-model-particles-installed-hashes.json。该数值候选未部署；下一步为live Model图/采样和完整作者。
 
@@ -73,7 +77,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-17独立Model候选不在installed60/61中。snapshot8/shape4经显式evaluated记录接入CPU；cube/资源网格、pose/覆盖/深度/四种transfer/ROI/PAR/near/预算的实际像素通过2695项标准及ASAN检查。live Model图/采样和原生/CEP作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值像素证据当作可用AE Model粒子作者。
+- M3-17独立Model候选不在installed60/61中。snapshot8/shape4/live图接入CPU；444项图/采样/Linear shutter标准检查及2695项CPU回归通过。原生资源/CEP作者、材质/法线/透明网格交叉排序仍开放。完整Model与Shape、Use Model(s)参考菜单待参考；不能将数值像素证据当作可用AE Model粒子作者。
 
 - M3-16 已完成配对构建/部署。Shift Seed对整个源运动/随机外观的影响、Chance0/100/动画、多分支、Auxiliary、undo/reopen仍需AE2023 owner验收；源码数值证据不关闭宿主gate。M3-13反馈到达时优先处理。
 

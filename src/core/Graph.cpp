@@ -550,6 +550,7 @@ NodeRegistry make_particle_node_registry() {
     particle.ports = {
         PortDescriptor{kParticleParticlesIn, PortDirection::input, kParticleStream, true, 0},
         PortDescriptor{kParticleParticlesOut, PortDirection::output, kParticleStream, false, 0},
+        PortDescriptor{kParticleModelsIn, PortDirection::input, kModelStream, false, static_cast<std::uint32_t>(kMaxModelsPerStyle)},
     };
     particle.parameters = {
         ParameterDescriptor{kColorStart, ParameterKind::vector3_float64, true},
@@ -655,6 +656,13 @@ NodeRegistry make_particle_node_registry() {
     registry.types.push_back(std::move(force));
     registry.types.push_back(std::move(output));
     registry.types.push_back(std::move(transform));
+    NodeTypeDescriptor model;
+    model.type_key=kModelNode;model.schema_version=1;
+    model.ports={PortDescriptor{kModelGeometryOut,PortDirection::output,kModelStream,false,0}};
+    model.parameters={ParameterDescriptor{kModelResource,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kModelRevision,ParameterKind::uint32,false},
+        ParameterDescriptor{kModelLocalMatrix,ParameterKind::opaque_bytes,false}};
+    registry.types.push_back(std::move(model));
     return registry;
 }
 

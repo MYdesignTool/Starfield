@@ -1,5 +1,6 @@
 #pragma once
 #include "starfield/core/GraphEvaluation.hpp"
+#include "starfield/core/ModelResources.hpp"
 #include <algorithm>
 #include <map>
 #include <cmath>
@@ -18,11 +19,26 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
        first.particles.size()>kMaxParticleCount || last.particles.size()>kMaxParticleCount ||
        first.sprite_bases.size()>kMaxParticleSpriteBases || last.sprite_bases.size()>kMaxParticleSpriteBases ||
        first.texture_styles.size()>kMaxTextureStyles || last.texture_styles.size()>kMaxTextureStyles ||
-       first.cloud_styles.size()>kMaxCloudStyles || last.cloud_styles.size()>kMaxCloudStyles)
+       first.cloud_styles.size()>kMaxCloudStyles || last.cloud_styles.size()>kMaxCloudStyles ||
+       first.model_styles.size()>kMaxModelStyles || last.model_styles.size()>kMaxModelStyles)
         return R::failure(ErrorCode::invalid_request,"invalid motion interpolation input");
     for(const auto* endpoint:{&first,&last})for(const auto& basis:endpoint->sprite_bases)
         if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid motion sprite basis");
+    std::size_t model_members=0;
     for(const auto* endpoint:{&first,&last}) {
+        for(const auto& style:endpoint->model_styles) {
+            if(style.instances.empty() || style.instances.size()>kMaxModelsPerStyle)
+                return R::failure(ErrorCode::invalid_request,"invalid motion Model group");
+            for(const auto& instance:style.instances) {
+                if((model_members++&63)==0 && cancel.is_cancelled())
+                    return R::failure(ErrorCode::cancelled,"motion interpolation cancelled");
+                if(!valid_model_instance(instance))
+                    return R::failure(ErrorCode::invalid_request,"invalid motion Model instance");
+            }
+        }
+        for(const auto& p:endpoint->particles)
+            if(p.model_style_index>endpoint->model_styles.size() || (p.shape!=4 && p.model_style_index))
+                return R::failure(ErrorCode::invalid_request,"missing motion Model group");
         for(const auto& style:endpoint->cloud_styles)if(!valid_cloud_style(style))
             return R::failure(ErrorCode::invalid_request,"invalid motion Cloud style");
         for(const auto& p:endpoint->particles)if(p.cloud_style_index>endpoint->cloud_styles.size() ||
@@ -60,10 +76,16 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
     std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> basis_pairs;
     std::map<std::pair<bool,std::uint32_t>,std::uint32_t> texture_indices;
     std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> cloud_pairs;
+    std::map<std::pair<std::uint32_t,std::uint32_t>,std::uint32_t> model_pairs;
     constexpr auto absent=std::numeric_limits<std::uint32_t>::max();
     constexpr ParticleSpriteBasis identity_basis{1,0,0,0,1,0,0,0,1};
     const auto basis_at=[&](const EvaluatedGraph& graph,std::uint32_t at)->const ParticleSpriteBasis& {
         return at?graph.sprite_bases[at-1]:identity_basis;
+    };
+    const ParticleModelInstance implicit_cube{};
+    const auto models_at=[&](const EvaluatedGraph& graph,std::uint32_t at)->std::span<const ParticleModelInstance> {
+        return at?std::span<const ParticleModelInstance>{graph.model_styles[at-1].instances}:
+            std::span<const ParticleModelInstance>{&implicit_cube,1};
     };
     std::size_t index=0;
     for(const auto& [identity,pair]:pairs) {
@@ -86,6 +108,38 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
             p.position.x+=p.velocity.x*dt;p.position.y+=p.velocity.y*dt;p.position.z+=p.velocity.z*dt;
         }
         if(p.age_seconds>=0 && p.age_seconds<p.lifetime_seconds) {
+            if(p.shape==4) {
+                const auto key=std::pair{a&&a->shape==4?a->model_style_index:absent,
+                    b&&b->shape==4?b->model_style_index:absent};
+                auto found=model_pairs.find(key);
+                if(found==model_pairs.end()) {
+                    const auto chosen=models_at(a?first:last,p.model_style_index);
+                    bool compatible=a&&b&&a->shape==4&&b->shape==4;
+                    const auto other=compatible?models_at(last,b->model_style_index):std::span<const ParticleModelInstance>{};
+                    compatible=compatible&&chosen.size()==other.size();
+                    if(compatible)for(std::size_t j=0;j<chosen.size();++j)
+                        if(chosen[j].resource!=other[j].resource){compatible=false;break;}
+                    std::uint32_t retained_index=0;
+                    if(p.model_style_index || (compatible && b->model_style_index)) {
+                        if(output.model_styles.size()==kMaxModelStyles)
+                            return R::failure(ErrorCode::work_limit_exceeded,"motion Model groups exceed budget");
+                        ParticleModelStyle style;style.instances.assign(chosen.begin(),chosen.end());
+                        if(compatible)for(std::size_t j=0;j<style.instances.size();++j) {
+                            if((model_members++&63)==0 && cancel.is_cancelled())
+                                return R::failure(ErrorCode::cancelled,"motion interpolation cancelled");
+                            auto& instance=style.instances[j];
+                            for(std::size_t k=0;k<instance.model_to_particle.size();++k)
+                                instance.model_to_particle[k]=std::lerp(instance.model_to_particle[k],other[j].model_to_particle[k],amount);
+                            if(!valid_model_instance(instance))
+                                return R::failure(ErrorCode::invalid_request,"invalid interpolated Model instance");
+                        }
+                        output.model_styles.push_back(std::move(style));
+                        retained_index=static_cast<std::uint32_t>(output.model_styles.size());
+                    }
+                    found=model_pairs.emplace(key,retained_index).first;
+                }
+                p.model_style_index=found->second;
+            }
             if(p.cloud_style_index) {
                 const auto key=std::pair{a?a->cloud_style_index:absent,b?b->cloud_style_index:absent};
                 auto found=cloud_pairs.find(key);

@@ -3,6 +3,7 @@
 #include "starfield/core/ColorGradient.hpp"
 #include "starfield/core/Random.hpp"
 #include "starfield/core/ParticleBirth.hpp"
+#include "starfield/core/ModelResources.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -61,6 +62,7 @@ struct ParticleValues {
     ParticleCloudStyle cloud;
     bool configurable_cloud{};
     std::uint32_t cloud_style_index{};
+    std::uint32_t model_style_index{};
     ParticleBirthControls birth;
     bool authored_birth{};
 };
@@ -301,7 +303,7 @@ Result<ParticleValues> read_particle(const GraphNode& node) {
         std::uint32_t limit=0;
         if(!scalar(kLifeRandom,100,result.life_random_percent) || !scalar(kSizeY,100000,result.size_y) ||
            !scalar(kParticleFeather,100,result.feather_percent) || !scalar(kAngleRandom,100,result.angle_random_percent) ||
-           !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,3,result.shape) ||
+           !scalar(kRotationSpeedRandom,100,result.speed_random_percent) || !enumeration(kParticleShape,4,result.shape) ||
            !enumeration(kOrientTo,2,result.orient_to) || !enumeration(kUpAxis,2,result.up_axis) || !enumeration(kLimitTo2D,1,limit))
             return Result<ParticleValues>::failure(ErrorCode::invalid_request,"Particle property outside bounds");
         result.limit_to_2d=limit!=0;
@@ -349,6 +351,7 @@ void apply_particle_properties(ParticleInstance& particle,const ParticleValues& 
     std::uint32_t seed,Vec3 birth_position,const CompiledParticleTransform* transform = nullptr) noexcept {
     particle.shape=values.shape;particle.up_axis=values.up_axis;particle.limit_to_2d=values.limit_to_2d;
     particle.transfer_mode=static_cast<ParticleTransferMode>(values.transfer_mode);
+    particle.model_style_index=values.shape==4?values.model_style_index:0;
     particle.cloud_style_index=values.cloud_style_index;
     if(values.cloud_style_index) {
         auto identity=particle.id;
@@ -413,6 +416,7 @@ void apply_particle_style(ParticleInstance& particle, const ParticleValues& appe
 }
 
 #include "TransformEvaluation.hpp"
+#include "ModelEvaluation.hpp"
 
 bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
     const auto& from = source.type_key;
@@ -470,6 +474,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::vector<std::optional<ForceValues>> forces(count);
         std::vector<std::optional<ParticleValues>> particles(count);
         std::vector<std::optional<CompiledParticleTransform>> transforms(count);
+        ModelValues models;
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -518,22 +523,30 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             } else if(node.type_key==kTransformNode) {
                 auto value=read_transform(node);if(!value.has_value())return R::failure(value.error());
                 transforms[i]=value.take_value();
+            } else if(node.type_key==kModelNode) {
+                auto value=read_model(node);if(!value.has_value())return R::failure(value.error());
+                models.emplace(node.id,value.take_value());
             } else {
                 return R::failure(ErrorCode::invalid_request, "node has no evaluation kernel");
             }
         }
         if (output == count) return R::failure(ErrorCode::invalid_request, "graph requires exactly one output");
 
-        std::vector<std::vector<std::size_t>> incoming(count), outgoing(count);
+        std::vector<std::vector<std::size_t>> incoming(count), outgoing(count),dependencies(count),dependents(count);
         for (const auto& edge : graph.edges) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph planning cancelled");
             const auto source = index_of(edge.source_node);
             const auto destination = index_of(edge.destination_node);
-            incoming[destination].push_back(source);
-            outgoing[source].push_back(destination);
+            dependencies[destination].push_back(source);dependents[source].push_back(destination);
+            if(!is_model_graph_edge(edge,*nodes[source],*nodes[destination])) {
+                incoming[destination].push_back(source);
+                outgoing[source].push_back(destination);
+            }
         }
         for (auto& list : incoming) std::sort(list.begin(), list.end());
         for (auto& list : outgoing) std::sort(list.begin(), list.end());
+        for(auto& list:dependencies)std::sort(list.begin(),list.end());
+        for(auto& list:dependents)std::sort(list.begin(),list.end());
         std::vector<bool> active(count, false);
         std::vector<std::size_t> pending{output};
         active[output] = true;
@@ -541,7 +554,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph reachability cancelled");
             const auto index = pending.back();
             pending.pop_back();
-            for (const auto source : incoming[index]) {
+            for (const auto source : dependencies[index]) {
                 if (!active[source]) { active[source] = true; pending.push_back(source); }
             }
         }
@@ -552,7 +565,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         for (std::size_t i = 0; i < count; ++i) {
             if (!active[i]) continue;
             ++active_count;
-            degrees[i] = incoming[i].size();
+            degrees[i] = dependencies[i].size();
             if (degrees[i] == 0) ready.push(i);
         }
 
@@ -571,17 +584,22 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             } else if (node.type_key == kParticleNode) {
                 active_particles.push_back(index);
             }
-            for (const auto destination : outgoing[index]) {
+            for (const auto destination : dependents[index]) {
                 if (active[destination] && --degrees[destination] == 0) ready.push(destination);
             }
         }
         if (topological_order.size() != active_count) {
             return R::failure(ErrorCode::invalid_request, "graph cannot be evaluated in dependency order");
         }
+        // Metadata readiness must not reorder the emitter's Particle partitions.
+        std::sort(active_particles.begin(),active_particles.end());
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
         CloudStyleMap cloud_indices;
+        auto model_indices=retain_model_styles(graph,models,result,cancellation);
+        if(!model_indices.has_value())return R::failure(model_indices.error());
         for (auto index : active_particles) {
+            if(const auto found=model_indices.value().find(nodes[index]->id);found!=model_indices.value().end())particles[index]->model_style_index=found->second;
             auto cloud=retain_cloud_style(result,cloud_indices,*particles[index]);
             if(!cloud.has_value())return R::failure(cloud.error());
             auto retained = retain_texture_style(result, texture_indices, *particles[index]);
@@ -616,7 +634,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             const std::size_t source = index_of(edge.source_node);
             const std::size_t destination = index_of(edge.destination_node);
             if (active[source] && active[destination] &&
-                !is_particle_graph_edge(*nodes[source], *nodes[destination])) {
+                !is_particle_graph_edge(*nodes[source], *nodes[destination]) && !is_model_graph_edge(edge,*nodes[source],*nodes[destination])) {
                 return R::failure(ErrorCode::invalid_request, "invalid active Particle graph connection");
             }
         }

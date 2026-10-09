@@ -84,6 +84,7 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 当前活动实现卡切换为M3-17；M3-16已部署并等待owner宿主验收，M3-13添加/背面报错反馈优先。完整目标不缩减。
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
+MotionBlur.hpp的Model style验证/组索引迁移/线性矩阵采样属于M3-17渲染契约，保留旧形状的快门行为；语义先行记录于ADR0038。
 首个里程碑：单位立方体、有界OBJ多边形/索引/属性、正确三角化、typed拒绝及取消。随后接入深度/裁剪/合成和完整作者链路，未实现渲染前不暴露Model菜单、不部署纯解析器候选。Face依赖OBJ发射器、Path依赖路径发射器，分别保留后续卡；Model图来源和Use Model(s)菜单待owner参考。
 2026-10-09几何里程碑：Settings数值类型、ModelGeometry操作及有界OBJ、单位cube已实现；独立MSVC /MT fixture4141检查、0失败，日志 artifacts/m3-17-model-geometry-tests.log。继续投影/近裁剪/深度/合成与资源、作者接入；现有安装60/61不变。
 2026-10-09三角形里程碑：ModelScene显式矩阵投影、近面/正W/ROI裁剪、透视深度/UV、每模型四采样遮挡与一次覆盖合成，四种transfer/HDR通过6406项MSVC /MT检查。ROI/反射/shear/downsample、horizon/预算/取消/分配失败均覆盖；合成只扫描触及像素。CMake与Core vcxproj接入数值源；粒子pose/资源、wire迁移、作者仍未实现，不暴露菜单或部署此独立里程碑。
@@ -93,3 +94,12 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 资源源码8220f25已推送并冻结完整May2023 /MT构建通过（双NoPublish），十八安装哈希保持native60/CEP61。
 2026-10-09粒子数值里程碑：shared Model groups/shape4/snapshot8/CPU真实像素通过2695项标准及ASAN；mesh lease一次验证复用，同组一次opacity、帧输入tri/sample预算和typed GPU CPU-fallback。旧snapshot3..7保持；Texture4322、资源2076、三角形6406及ABI前缀ASAN30复查通过。live图/采样与原生/CEP作者仍待接入，不暴露菜单，不部署此数值里程碑；所有实际Model AE gate继续。
 snapshot/CPU源码e12517d冻结完整May2023 /MT全目标构建通过（双NoPublish），main AEX网格/资源依赖与adapter fingerprint同步；十八安装哈希保持native60/CEP61，日志 artifacts/m3-17-model-particles-native-build.log。继续live Model图/采样与完整作者，goal保持active。
+2026-10-09 live数值里程碑：Model schema1/metadata端口、多源共享组、完整依赖与粒子流分离、稳定Particle UUID分区、Auxiliary组/资源域、当前帧采样及Linear shutter组迁移/矩阵插值接入。标准/ASAN各444项检查，旧Texture4322/Birth3348/Model CPU2695回归通过；原生/CEP/预设作者仍待完成，现有安装60/61不变。
+
+## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
+
+2026-10-09 owner截图限定Light Path、Circle、Look At，复杂Motion按阶段执行；参考清单docs/reference-motion-phases.md。拥有：独立Motion数值类型/采样与粒子路径/朝向、graph/history/资源/渲染的明确契约、独立原生节点及CEP/预设/schema/build/focused tests/新ADR。只追加自有身份/IDs；不复用Transform或Force身份，不注册无实际行为的选项。动画/Light资源采样边界和Circle半径/Look At目标语义先记录证据与独立方程，再接入作者。完成条件：三模式实际行为、共享曲线编辑/持久化、配对构建/发布及AE2023验收。
+
+## M3-19 — Turbulence（待Motion首批后执行）
+
+owner目标包含独立湍流节点；参考dump的标签/默认值可用，但未列完整枚举。拥有：独立噪声数值、影响属性及坐标/时间/随机性契约、graph/history、原生/CEP/预设/schema/build/focused tests/新ADR。不把普通Force的Gravity/Wind模块冒充Turbulence，不复制旧实现。完成条件：确定性有界噪声/实际属性变化、动画/曲线/多路径、完整作者/持久化与AE2023验收。

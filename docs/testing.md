@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-09 M3-17 live Model图：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGraphTests.ps1 -Run`通过444项，日志artifacts/m3-17-model-graph-tests-current.log。覆盖多Model共享组/确定顺序、出生身份、当前帧/出生shape动画、parked/负时间/零cap、Auxiliary资源域、Force/Transform、C ABI实际像素、Linear shutter矩阵/索引/默认cube/资源变化/组预算及typed拒绝。新增fixture首次误用PortId和不存在的RenderRequest成员，修正后才通过。原生/CEP作者未接入，不从纯数值测试关闭Model宿主gate。
+
+现有Texture4322（artifacts/m3-17-texture-live-model-regression.log）、Birth3348（artifacts/m3-17-birth-model-shutter-regression.log）及Model CPU2695（artifacts/m3-17-model-particle-live-graph-regression.log）回归通过。首次误写Birth runner名称未执行测试，随后使用正确的RunParticleBirthGraphTests.ps1执行并通过；失败日志已由实际运行日志替代。
+
+同一Model图fixture追加`-Sanitize`执行MSVC AddressSanitizer，也通过444项；日志artifacts/m3-17-model-graph-asan-current.log。首次371/扩展440中间检查不作为最终候选计数。
+
 2026-10-09 M3-17 snapshot/CPU完整构建：e12517d的git archive冻结于 artifacts/prepared/m3-17-model-particles-e12517d/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过。main AEX ModelGeometry/Resources与fingerprint接入；日志 artifacts/m3-17-model-particles-native-build.log。构建后十八安装哈希匹配native60/CEP61，报告 artifacts/m3-17-model-particles-installed-hashes.json。未接入live Model图/作者或部署；编译不关闭AE gate。
 
 2026-10-09 M3-17 snapshot8/CPU：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelParticleTests.ps1 -Run`，及追加 `-Sanitize`，均2695项、0失败；日志 artifacts/m3-17-model-particle-{tests,asan}-current.log。默认cube/导入多边形真实像素、组内一次透明度、近面中心后方/ROI/PAR/downsample/Transform/primitive排序/四种transfer/8及16bpc/C ABI均覆盖。Model变长表全部截断、坏count/length/matrix/index、旧3..7、混合Cloud/Texture、资源缺失、取消/分配及全帧共享预算通过。首个fixture缺SequenceResult helper，首次数值fixture选边界像素作内部断言及漏填近裁剪相机identity homography；修正后才记录通过。ASAN linker/debug参数已移出响应文件，避免MSVC忽略PDB参数。
