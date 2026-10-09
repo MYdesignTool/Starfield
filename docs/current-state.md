@@ -1,6 +1,6 @@
 # 当前工程状态
 
-核对日期：2026-10-09。native59 / packed32827 / Core ABI7 / CEP59 已于08:33 +08:00成对部署，源码cb1048d15ff205b9f7a541ee7931c1460070b75d已推送。M3-13 唯一活动：按 owner 要求采用原生行内 Layer/Dark Side 选择器，并排查已有 Texture 引用时节点添加报 parameter31（无引用画布正常）。最小测试通过，宿主报错尚未复现，不能宣称已修复；本版包含精确类型/值诊断。M3-16 与 MNT-01 共享改动保留并排除于维护发布。
+核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 改为明确范围分支，保留严格校验并增加 reason/typeKind/max；实机拒绝原因及修复效果尚待确认。M3-13 唯一活动，M3-16 与 MNT-01 共享改动保留并排除于维护发布。
 
 ## 源码与安装
 
@@ -16,7 +16,7 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 | --- | --- | --- |
 | 原生版本 | build59，packed32827；普通 Texture layer widgets | native59，packed32827 |
 | Core ABI | 7 | 7 |
-| CEP | panel60 | panel59（既有 live Junction） |
+| CEP | panel60 | panel60（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |
@@ -39,7 +39,7 @@ optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定�
 
 ## 当前安装证据与回滚
 
-当前 native59/CEP59 收据：artifacts/m3-13-native59-deploy-before.json、artifacts/m3-13-native59-deploy-after.json。发布前 fresh process checks 无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 和既有 native/CEP Junction。七个 native/Core、十一项 CEP、runtime selector、配对恢复只读 report 与 exact58旧文件全部核对。冻结 source 基于65c7245加本次修复；未混入 M3-16。原构建输出也保存于候选 baseline-build-output。当前 runtime selector：StarfieldCore-37EBF72166E6B2B6.dll。历史58初次/方向维护收据与备份保留。
+当前 native59/CEP60 收据：artifacts/m3-13-panel60-deploy-before.json、artifacts/m3-13-panel60-deploy-after.json。发布前 fresh process checks 无 AfterFX/AfterFX_64；使用 tools/Deploy-TestBuild.ps1 -KeepNative 和既有 native/CEP Junction。七个 native/Core 及 selector 不变，十一项 CEP、配对恢复只读 report 与 exact native59/CEP59旧文件全部核对。native59 初次收据与冻结构建保留，未混入 M3-16。当前 runtime selector：StarfieldCore-37EBF72166E6B2B6.dll。历史58初次/方向维护收据与备份保留。
 
 | dist 文件 | SHA-256 |
 | --- | --- |
@@ -51,12 +51,12 @@ optional keys37..39、snapshot7/ABI7；旧图缺少 Cloud keys 时保留固定�
 | StarfieldHost.aex | 3F358ACD0AED7D62F48F5430D5DE07DCE327F1FBEE2EE562F977BBDD5DE5B14D |
 | StarfieldCore.dll | 37EBF72166E6B2B64A4050084BF52E4CF695E0B06454C75CE79B77354BB93F7B |
 
-本次 exact native58/CEP58（方向修复 CoreB509）备份：artifacts/disabled/m3-13-native59-panel59-native-layer-picker-20261009。原方向维护/57及历史备份保留。回滚报告：artifacts/m3-13-native59-rollback-report.log；发布日志：artifacts/m3-13-native59-deploy-wrapper.log。
+本次 exact native59/CEP59 备份：artifacts/disabled/m3-13-native59-panel60-texture-validation-20261009。此前59发布的 exact58/CEP58（方向修复 CoreB509）与所有历史备份保留。回滚报告：artifacts/m3-13-panel60-rollback-report.log；发布日志：artifacts/m3-13-panel60-deploy-wrapper.log。
 
 AE 关闭后的单步回滚（仓库根目录）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel59-native-layer-picker-20261009' -Restore
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel60-texture-validation-20261009' -Restore
 ```
 
 未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
@@ -65,6 +65,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 - M3-16 纯核心 Shift Seed/Birth Chance 策略已提交f83e20f；独立40985检查、0失败。图求值/历史/辅助发射/预算/身份工作树保留，作者未完成，不暴露 UI、不发布到 Core；ADR0037 规定后续完整迁移。当前暂缓以处理 M3-13 方向反馈。
 
-- owner 确认 native58 Comp 2 可选择并显示；报告背面无效、空白标签、已有 Texture 引用时添加报 parameter31。native59/CEP59 原生行内选择器及精确诊断已发布，真实选择/正反面/添加待回复。完整事务测试未复现宿主参数31，保持开放；八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
+- owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59 添加仍拒绝合法 ID44。CEP60 明确范围分支及精确原因已发布，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Shift Seed/Birth Chance、Texture Source/Masks/Effects stage 等剩余 Particle 行为仍开放；PTF 按 owner 决定等待 Physics。

@@ -30,6 +30,22 @@ artifacts/prepared/m3-13-native59-panel60. Native selector naming has owner
 confirmation; back selection, this add defect and all wider sampling/stage gates
 remain open until actual AE2023 verification.
 
+At2026-10-09T08:40:30.9646377+08:00 fresh no-AE checks authorized deployment
+of CEP60 commit6f7b1bc78939c13fc41ae215398d020c57c937a3 through
+Deploy-TestBuild -KeepNative. Seven native59/Core hashes and selector are
+unchanged; all eleven CEP, saved seven native/eleven CEP, selector and the
+paired Restore report were checked. Native source remains cb1048d. Existing
+Junctions were retained. No host process, registry, cache or environment changes.
+Receipts: artifacts/m3-13-panel60-deploy-{before,after}.json, deployment log
+artifacts/m3-13-panel60-deploy-wrapper.log, rollback report
+artifacts/m3-13-panel60-rollback-report.log. Actual host add/back check is pending.
+
+One-step undo to native59/CEP59, with AE closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-13-native59-panel60-texture-validation-20261009' -Restore
+```
+
 ## Ordinary native layer widgets, 2026-10-09
 
 The owner reports blank Layer/Dark Side labels, ineffective back-source selection,
