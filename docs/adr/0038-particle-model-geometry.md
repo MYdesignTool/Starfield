@@ -237,8 +237,6 @@ evidence, not AE2023 UI/undo/reopen qualification. Full frozen SDK build remains
 required; OBJ import/complete author publication are still pending. Installed
 native60/ABI7/CEP61 is unchanged.
 
-### Earlier native mesh persistence milestone
-
 The resource-bridge source eae10aecb11f0a50dae8d1a3605d6750dc6eccaa,
 frozen at artifacts/prepared/m3-17-model-resource-bridge-eae10ae/source,
 passes all eight May2023 x64 Release /MT targets with IncludeModelCandidate
@@ -247,6 +245,37 @@ entry points are compiled. Log: artifacts/m3-17-model-resource-bridge-build.log;
 build and installed hash reports: m3-17-model-resource-bridge-{build,installed}-hashes.json.
 All18 installed native60/CEP61 files remain unchanged. OBJ/complete author
 publication and real AE qualification remain pending.
+
+### OBJ import author transaction
+
+The unpublished Import OBJ button uses a Windows file chooser owned by AE's
+main window, with OFN_NOCHANGEDIR. It reads only the selected file, bounds the
+text to8MiB and rejects unreadable, empty, growing or invalid OBJ input before
+changing any author stream. No filepath is saved; only SFMG1 numeric geometry
+is persisted. Cancelled selection performs no author/graph write.
+
+After successful preparation, one UI undo group retains exact Mesh/Revision/
+Source/guard values. Under the Model guard94 it sets Mesh3, increments exact
+Revision4 (rejecting exhaustion at2147483647), sets Source1 to native OBJ2,
+verifies each readback, releases the guard and publishes through the existing
+native Source edit. Renderer mirrors/graph publication retain their own verified
+rollback. Import failure restores author values and verifies them, reporting
+rollback failure distinctly. Old borrowed values outlive their stream references;
+the temporary prepared handle is disposed after host copies are complete.
+This changes no disk ID, native95 layout, binding7, ABI8 or graph schema.
+File dialog and actual AE undo/save/reopen remain host qualification gates.
+
+RunModelImportTransactionTests.ps1 -Run and -Run -Sanitize each pass1019
+checks (including reused452 controls), using actual AEGP transaction functions
+and a graph-publication test callback. Every author write partial failure,
+silent setter, publication failure, rollback failure reporting, revision
+exhaustion, guard rejection and value/stream/handle ownership is exercised.
+Native module/binding2809 checks also pass. Logs:
+artifacts/m3-17-model-import-transaction-{tests,asan}.log and
+m3-17-model-import-native-binding-tests.log. The UI file chooser is not driven
+by this fixture; full SDK compilation and actual AE qualification remain open.
+
+### Earlier native mesh persistence milestone
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
 arbitrary handle. It owns no graph identity, filenames or external file lookup;

@@ -12,6 +12,7 @@
 #include "TransformNullUI.hpp"
 #include "ModelControls.hpp"
 #include "ModelGeometryParameter.hpp"
+#include "ModelImportUI.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
@@ -677,6 +678,11 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             return smart_render_passthrough(in_data, static_cast<PF_SmartRenderExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
+            if constexpr(kNodeEffectKind==NodeEffectKind::model) {
+                const auto* changed=static_cast<const PF_UserChangedParamExtra*>(extra);
+                if(changed&&changed->param_index==starfield::adapter::native_nodes::model_layout::import_obj)
+                    return starfield::adapter::import_model_obj(in_data,out_data,params);
+            }
             return sync_node_graph_parameter(in_data, out_data, params,
                 static_cast<const PF_UserChangedParamExtra*>(extra));
         case PF_Cmd_ARBITRARY_CALLBACK:

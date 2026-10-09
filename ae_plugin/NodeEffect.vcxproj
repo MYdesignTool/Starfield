@@ -61,7 +61,7 @@
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
-    <Link><AdditionalDependencies>user32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><TargetMachine>MachineX64</TargetMachine></Link>
+    <Link><AdditionalDependencies>user32.lib;gdi32.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><TargetMachine>MachineX64</TargetMachine></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="NodeEffectMain.cpp" />
@@ -80,6 +80,8 @@
     <ClCompile Include="ModelGeometryParameter.cpp" />
     <ClCompile Include="ModelMirrorParameter.cpp" />
     <ClCompile Include="ModelMirrorTransaction.cpp" />
+    <ClCompile Include="ModelImportTransaction.cpp" />
+    <ClCompile Include="ModelImportUI.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />

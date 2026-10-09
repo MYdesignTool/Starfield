@@ -13,10 +13,12 @@
 #include "ParticleGradientUI.hpp"
 #include "TransformNullUI.hpp"
 #include "MotionBlur.hpp"
+#include "ModelImportUI.hpp"
 
 PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*,bool) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 namespace starfield::adapter {
+PF_Err import_model_obj(PF_InData*,PF_OutData*,PF_ParamDef*[]) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 PF_Err gpu_device_setup(PF_InData*,PF_OutData*,PF_GPUDeviceSetupExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 PF_Err gpu_device_setdown(PF_InData*,PF_GPUDeviceSetdownExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 bool gpu_device_matches(const void*,PF_GPU_Framework,A_u_long) noexcept{return false;}
