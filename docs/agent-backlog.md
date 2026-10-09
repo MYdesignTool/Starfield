@@ -97,6 +97,7 @@ snapshot/CPU源码e12517d冻结完整May2023 /MT全目标构建通过（双NoPub
 2026-10-09 live数值里程碑：Model schema1/metadata端口、多源共享组、完整依赖与粒子流分离、稳定Particle UUID分区、Auxiliary组/资源域、当前帧采样及Linear shutter组迁移/矩阵插值接入。标准/ASAN各444项检查，旧Texture4322/Birth3348/Model CPU2695回归通过；原生/CEP/预设作者仍待完成，现有安装60/61不变。
 源码67fc063冻结完整May2023 /MT全目标构建通过（双NoPublish），十八安装哈希匹配native60/CEP61；日志artifacts/m3-17-model-graph-native-build.log。下一步原生网格持久化/资源捕获和作者。
 ModelGeometryParameter持久化helper标准/ASAN各4915项fake-host检查通过（artifacts/m3-17-model-parameter-{tests,asan}-current.log）；main AEX工程/fingerprint接入。SFMG1只保存数值mesh、UUID/revision归作者，全部ARB selectors在注册前实现；未注册新Model参数/菜单，作者与资源捕获继续。
+源码a1751b9冻结完整May2023 /MT全目标构建通过（双NoPublish），十八安装哈希匹配native60/CEP61；日志artifacts/m3-17-model-parameter-native-build.log。下一步原生Model/资源捕获、Particle Shape及隔离CEP完整作者；Particle优先，Motion首批三模式在其后。
 
 ## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
 

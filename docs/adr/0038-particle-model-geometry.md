@@ -63,6 +63,14 @@ text prefix length to9 before recording passing evidence. No AE save/undo/reopen
 behavior or registered author is inferred. Main AEX/fingerprint include the
 helper; no existing native IDs, schemas or packed version are changed here.
 
+Frozen persistence sourcea1751b9b761340e07f2b0003088e83d685c9bc88 at
+artifacts/prepared/m3-17-model-parameter-a1751b9/source passes all May2023
+x64 Release /MT targets with both NoPublish switches; main AEX compiles the
+helper. Log artifacts/m3-17-model-parameter-native-build.log. All18 installed
+native60/CEP61 hashes remain unchanged; report
+artifacts/m3-17-model-parameter-installed-hashes.json. Native Model registration,
+resource capture, Particle selector and isolated CEP authoring remain pending.
+
 ## Particle snapshot and CPU milestone evidence
 
 Snapshot8 now retains Model groups and the explicit200-byte particle stride;

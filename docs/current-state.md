@@ -6,6 +6,8 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+持久化源码a1751b9b761340e07f2b0003088e83d685c9bc88冻结于artifacts/prepared/m3-17-model-parameter-a1751b9/source，完整May2023 x64 Release /MT全部目标通过（双NoPublish）。main AEX实际编译ModelGeometryParameter.cpp，未注册Model作者；日志artifacts/m3-17-model-parameter-native-build.log。十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-parameter-installed-hashes.json。下一步原生Model节点/资源捕获、Particle Shape菜单及隔离CEP完整作者。
+
 Model网格原生持久化helper已实现：SFMG1有界ARB、独立句柄复制、保存/恢复、比较、离散插值、文本往返、取消/分配/损坏拒绝；标准及ASAN各4915项fake-host检查通过。句柄解锁后才解码与轮询取消。main AEX工程及adapter fingerprint纳入ModelGeometryParameter；未分配/注册Model控件IDs或效果，资源捕获/原生/CEP完整作者仍待接入。
 
 live图源码67fc06376729c45991a40122dc8130506d5e4806冻结于artifacts/prepared/m3-17-model-graph-67fc063/source，完整May2023 x64 Release /MT全目标构建通过（双NoPublish），日志artifacts/m3-17-model-graph-native-build.log。adapter fingerprint纳入ModelEvaluation.hpp；十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-graph-installed-hashes.json。候选未部署，下一步Model网格原生持久化与完整作者。
