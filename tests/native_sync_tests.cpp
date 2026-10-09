@@ -71,6 +71,7 @@ struct Fixture {
 std::array<Fixture, 5> fixtures;
 bool transform_present{};
 bool cloud_animation_test{};
+bool birth_animation_test{};
 using Matrix=transform_binding::Matrix;
 Matrix null_world{1,0,0,910,0,1,0,490,0,0,1,0,0,0,0,1};
 Matrix owner_world{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
@@ -90,7 +91,7 @@ AEGP_UtilitySuite6 utility{};
 AEGP_MemorySuite1 memory{};
 PF_ParamUtilsSuite3 param_utils{};
 AEGP_KeyframeSuite5 keyframes{};
-bool temporal_metadata_enabled{}, metadata_rate_keys{}, metadata_life_keys{}, metadata_bezier{}, metadata_life_expression{};unsigned metadata_epoch{};
+bool temporal_metadata_enabled{}, metadata_rate_keys{}, metadata_life_keys{}, metadata_bezier{}, metadata_life_expression{}, metadata_chance_expression{};unsigned metadata_epoch{};
 std::array<std::u16string, kNativeBindingCapacity> expressions;
 std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 bool lazy_dependencies{};
@@ -207,6 +208,8 @@ double evaluated_binding(A_long index, A_long time) {
     }
     if(cloud_animation_test && id==2 && source>=records::particle_layout::cloud_circles && source<=records::particle_layout::cloud_density)
         return value.one_d+time/24.0;
+    if(birth_animation_test && id==2 && source==records::particle_layout::seed_shift)return value.one_d+time/24.0;
+    if(birth_animation_test && id==2 && source==records::particle_layout::birth_chance)return value.one_d+time;
     return (id==2 && source==5) || (id==3 && source==1) ? value.one_d+time :
         (id==2 && source==8) ? 100.0-time : (id==2 && source==2) ? 2.0+time/24.0 : value.one_d;
 }
@@ -247,6 +250,7 @@ int main() {
     particle.values[records::particle_layout::cloud_circles].one_d=10;
     particle.values[records::particle_layout::cloud_aspect].one_d=150;
     particle.values[records::particle_layout::cloud_density].one_d=66;
+    particle.values[records::particle_layout::birth_chance].one_d=100;
     particle.values[records::particle_layout::transfer].one_d=1;
     particle.values[records::particle_layout::texture_time].one_d=1;
     particle.values[records::particle_layout::texture_color].one_d=1;
@@ -450,6 +454,26 @@ int main() {
         check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&cloud_changed)==0 && sets==before,
               "actual Particle CEP guard suppresses implicit Cloud activation publication");
         check(live_refs==0 && acquisitions==0,"actual Cloud callbacks release every acquired host reference");
+        particle.params[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=0;
+        particle.params[layout::seed_shift].param_type=PF_Param_SLIDER;
+        particle.params[layout::seed_shift].u.sd.value=-19;
+        particle.params[layout::birth_chance].u.fs_d.value=100;
+        PF_UserChangedParamExtra birth_changed{};birth_changed.param_index=layout::seed_shift;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&birth_changed)==0 &&
+              particle.params[layout::birth_enabled].u.fs_d.value==1 &&
+              (particle.params[layout::birth_enabled].uu.change_flags&PF_ChangeFlag_CHANGED_VALUE) &&
+              std::get<std::int32_t>(parameter(saved_graph(),kParticleNode,kParticleSeedShift))==-19 &&
+              std::get<double>(parameter(saved_graph(),kParticleNode,kParticleBirthChance))==100,
+              "integer Shift Seed USER_CHANGED activates and persists both birth controls atomically");
+        particle.params[layout::birth_enabled].u.fs_d.value=0;particle.params[layout::birth_enabled].uu.change_flags=0;
+        fail_set=kGraphParameterId;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&birth_changed)!=0 &&
+              particle.params[layout::birth_enabled].u.fs_d.value==0 && particle.params[layout::birth_enabled].uu.change_flags==0,
+              "failed Birth callback retains the prior activation without marking a successful change");
+        birth_changed.param_index=layout::birth_chance;particle.params[layout::birth_chance].u.fs_d.value=101;
+        check(sync_node_graph_parameter(&particle_data,&cloud_out,pp.data(),&birth_changed)!=0 &&
+              particle.params[layout::birth_enabled].u.fs_d.value==0,"invalid chance cannot activate the appended controls");
+        check(live_refs==0 && acquisitions==0,"Birth callbacks release all host references");
         dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
         for(auto& p:main.params)if(p.param_type==PF_Param_ARBITRARY_DATA) {
             if(handles.contains(p.u.arb_d.value))dispose(p.u.arb_d.value);
@@ -950,10 +974,13 @@ int main() {
         std::memcpy(reinterpret_cast<char*>(state)+sizeof(metadata_epoch),&generation,sizeof(generation));return 0;
     };
     param_utils.PF_AreStatesIdentical=[](PF_ProgPtr,const PF_State* a,const PF_State* b,A_Boolean* same)->PF_Err {*same=std::memcmp(a,b,sizeof(*a))==0;return 0;};
-    stream.AEGP_CanVaryOverTime=[](AEGP_StreamRefH ref,A_Boolean* vary)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*vary=(metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2);return 0;};
+    stream.AEGP_CanVaryOverTime=[](AEGP_StreamRefH ref,A_Boolean* vary)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*vary=(metadata_rate_keys && r->effect==1 && r->index==3) ||
+        ((metadata_life_keys || metadata_life_expression) && r->effect==2 && r->index==2) ||
+        (metadata_chance_expression && r->effect==2 && r->index==records::particle_layout::birth_chance);return 0;};
     stream.AEGP_GetExpressionState=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean* enabled)->A_Err {
         auto* r=reinterpret_cast<Ref*>(ref);
-        *enabled=!r->effect?expression_enabled[r->index-kNativeBindingFirstIndex]:metadata_life_expression && r->effect==2 && r->index==2;return 0;
+        *enabled=!r->effect?expression_enabled[r->index-kNativeBindingFirstIndex]:r->effect==2 &&
+            ((metadata_life_expression && r->index==2) || (metadata_chance_expression && r->index==records::particle_layout::birth_chance));return 0;
     };
     keyframes.AEGP_GetStreamNumKFs=[](AEGP_StreamRefH ref,A_long* count)->A_Err {auto* r=reinterpret_cast<Ref*>(ref);*count=((metadata_rate_keys && r->effect==1 && r->index==3) || (metadata_life_keys && r->effect==2 && r->index==2))?2:0;return 0;};
     keyframes.AEGP_GetKeyframeTime=[](AEGP_StreamRefH,AEGP_KeyframeIndex k,AEGP_LTimeMode,A_Time* t)->A_Err {*t={k*10,1};return 0;};
@@ -1352,6 +1379,11 @@ int main() {
                 for(const auto& p:n.parameters)if(p.key==kCloudCircles || p.key==kCloudAspect || p.key==kCloudDensity)return true;
             return false;
         };
+        const auto has_birth=[](const core::Graph& g) {
+            for(const auto& n:g.nodes)if(n.type_key==kParticleNode)
+                for(const auto& p:n.parameters)if(p.key==kParticleSeedShift || p.key==kParticleBirthChance)return true;
+            return false;
+        };
         connection(2,records::Kind::particle,4,12);
         connection(3,records::Kind::force,255,13);
         particle.values[layout::shape].one_d=3;
@@ -1370,7 +1402,7 @@ int main() {
         check(legacy_error==0 && !has_cloud(saved_graph()),"appended defaults preserve old native Cloud on unrelated edits");
         const auto legacy=saved_graph();
         // Rebuild the real private record at each historical Particle field bound.
-        for(unsigned version=1;version<=4;++version) {
+        for(unsigned version=1;version<=5;++version) {
             auto old=legacy;
             for(auto& bytes:old.optional_records)if(bytes.size()>12 && bytes[0]==std::byte{2} && bytes[1]==std::byte{0x80}) {
                 const auto get16=[&](std::size_t at){return std::to_integer<unsigned>(bytes[at])|(std::to_integer<unsigned>(bytes[at+1])<<8);};
@@ -1383,7 +1415,7 @@ int main() {
                     if(at+32*count>bytes.size()){check(false,"binding fixture scalar records bounded");return 1;}
                     unsigned kept=0;
                     for(unsigned f=0;f<count;++f,at+=32) {
-                        const auto limit=kind==1?(version<3?442u:version==3?519u:526u):533u;
+                        const auto limit=kind==1?(version<3?442u:version==3?519u:version==4?526u:533u):533u;
                         if(get16(at)<=limit) {trimmed.insert(trimmed.end(),bytes.begin()+at,bytes.begin()+at+32);++kept;}
                     }
                     trimmed[start+18]=std::byte(kept&255);trimmed[start+19]=std::byte(kept>>8);
@@ -1392,12 +1424,14 @@ int main() {
                 bytes=std::move(trimmed);
             }
             NativeAnimationPlan old_plan(old,1920,1080,1);
-            check(old_plan.valid() && sample_native_node_animation(&renderer_data,old,1920,1080)==0 && !has_cloud(old),
-                  "historical binding versions retain legacy Cloud and their original field limits");
+            check(old_plan.valid() && sample_native_node_animation(&renderer_data,old,1920,1080)==0 && !has_cloud(old) && !has_birth(old),
+                  "historical binding versions retain legacy Cloud/birth semantics and their original field limits");
         }
         auto bad_old=legacy;
         for(auto& r:bad_old.optional_records)if(r.size()>12 && r[0]==std::byte{2} && r[1]==std::byte{0x80})r[2]=std::byte{4};
         check(!NativeAnimationPlan(bad_old,1920,1080,1).valid(),"v4 rejects an appended activation field without migration");
+        for(auto& r:bad_old.optional_records)if(r.size()>12 && r[0]==std::byte{2} && r[1]==std::byte{0x80})r[2]=std::byte{5};
+        check(!NativeAnimationPlan(bad_old,1920,1080,1).valid(),"v5 rejects appended birth fields without migration");
         auto activate=edit(1,layout::cloud_density,1000);
         activate.additional_fields[activate.additional_count++]={layout::cloud_enabled,node_sync::ValueKind::scalar,{1,0,0,0}};
         const auto activation_error=direct_edit(activate);
@@ -1429,6 +1463,56 @@ int main() {
               std::get<double>(parameter(animated,kParticleNode,kCloudAspect))==150.25 &&
               std::get<double>(parameter(animated,kParticleNode,kCloudDensity))==66.25,"Cloud aliases sample all three controls at render time and round Circles");
         cloud_animation_test=false;renderer_data.current_time=0;
+        check(!has_birth(saved_graph()),"Cloud authoring does not activate appended birth defaults");
+        NativeAnimationPlan legacy_birth(saved_graph(),1920,1080,1);
+        check(legacy_birth.constant_birth_chance(particle_id)==100,"missing legacy chance is intrinsically constant100");
+        auto birth=edit(1,layout::seed_shift,-19);
+        birth.additional_fields[birth.additional_count++]={layout::birth_enabled,node_sync::ValueKind::scalar,{1,0,0,0}};
+        check(node_sync::valid_edit(birth) && direct_edit(birth)==0 && birth.accepted,"signed seed and birth activation commit atomically");
+        auto born=saved_graph();
+        check(std::get<std::int32_t>(parameter(born,kParticleNode,kParticleSeedShift))==-19 &&
+              std::get<double>(parameter(born,kParticleNode,kParticleBirthChance))==100,"native birth graph preserves int32 seed and default100 chance");
+        particle.values[layout::birth_enabled].one_d=1;particle.values[layout::seed_shift].one_d=-19;
+        forged=birth;forged.parameter_index=layout::size;
+        check(!node_sync::valid_edit(forged),"unrelated controls cannot inject birth activation");
+        forged=birth;forged.additional_fields[0].value[0]=0;
+        check(!node_sync::valid_edit(forged),"birth activation accepts only constant1");
+        for(double value:{-2147483648.0,2147483647.0}) {
+            auto edge=edit(1,layout::seed_shift,value);
+            check(node_sync::valid_edit(edge) && direct_edit(edge)==0 &&
+                  std::get<std::int32_t>(parameter(saved_graph(),kParticleNode,kParticleSeedShift))==value,"exact signed32 seed bounds round-trip through native graph");
+        }
+        for(double value:{-2147483649.0,2147483648.0,0.5}) {
+            auto invalid=edit(1,layout::seed_shift,value);check(!node_sync::valid_edit(invalid),"invalid signed seed rejects before native mutation");
+        }
+        for(double value:{0.0,25.5,100.0}) {
+            auto chance=edit(1,layout::birth_chance,value);
+            check(direct_edit(chance)==0 && std::get<double>(parameter(saved_graph(),kParticleNode,kParticleBirthChance))==value,"native birth chance endpoints and fraction round-trip");
+        }
+        for(double value:{-1.0,101.0}) {
+            auto invalid=edit(1,layout::birth_chance,value);check(!node_sync::valid_edit(invalid),"invalid chance rejects before native mutation");
+        }
+        particle.values[layout::birth_chance].one_d=25;
+        auto sampling=edit(1,layout::seed_shift,-19);check(direct_edit(sampling)==0,"birth aliases prepare for time sampling");
+        born=saved_graph();birth_animation_test=true;renderer_data.current_time=6;
+        check(sample_native_node_animation(&renderer_data,born,1920,1080)==0 &&
+              std::get<std::int32_t>(parameter(born,kParticleNode,kParticleSeedShift))==-19 &&
+              std::get<double>(parameter(born,kParticleNode,kParticleBirthChance))==31,"birth aliases sample animated chance and rounded integer seed at requested time");
+        birth_animation_test=false;renderer_data.current_time=0;
+        particle.values[layout::birth_chance].one_d=0;
+        auto zero_edit=edit(1,layout::birth_chance,0);check(direct_edit(zero_edit)==0,"zero chance graph commits");
+        auto zero=saved_graph();NativeAnimationPlan unproven_zero(zero,1920,1080,1);
+        check(!unproven_zero.constant_birth_chance(particle_id),"current zero value alone cannot certify all-time zero chance");
+        temporal_metadata_enabled=true;metadata_life_expression=true;++metadata_epoch;
+        capture_native_temporal_metadata(&renderer_data,zero,1);
+        NativeAnimationPlan proved_zero(zero,1920,1080,1);proved_zero.prepare_constants(&renderer_data);
+        check(!proved_zero.constant_node(particle_id) && proved_zero.constant_birth_chance(particle_id)==0,
+              "constant chance alone is certified even when Life prevents whole-node hoisting");
+        metadata_chance_expression=true;++metadata_epoch;capture_native_temporal_metadata(&renderer_data,zero,1);
+        NativeAnimationPlan expression_zero(zero,1920,1080,1);expression_zero.prepare_constants(&renderer_data);
+        check(!expression_zero.constant_birth_chance(particle_id),"expression chance at zero cannot certify a skipped source stream");
+        metadata_chance_expression=metadata_life_expression=temporal_metadata_enabled=false;
+        remember_native_control_proofs(&renderer_data,{});
         check(live_refs==0 && acquisitions==0,"Cloud conversion and compatibility sampling release all host references");
     }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));

@@ -130,6 +130,7 @@ bool capture_edit(PF_InData& data, const PF_ParamDef& param,
         return value.num > 0 && value.den > 0 ? static_cast<double>(value.den) / value.num : 1.0;
     };
     switch (param.param_type) {
+        case PF_Param_SLIDER: edit.value[0] = param.u.sd.value; break;
         case PF_Param_FLOAT_SLIDER: edit.value[0] = param.u.fs_d.value; break;
         case PF_Param_POPUP: edit.value[0] = param.u.pd.value; break;
         case PF_Param_CHECKBOX: edit.value[0] = param.u.bd.value; break;
@@ -303,6 +304,14 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
             auto& field=edit.additional_fields[edit.additional_count++];
             field.index=layout::cloud_enabled;field.value[0]=1;
         }
+        const bool activate_birth=kNodeKind==1 &&
+            (extra->param_index==layout::seed_shift || extra->param_index==layout::birth_chance);
+        if(activate_birth) {
+            if(!params[layout::birth_enabled] || params[layout::birth_enabled]->param_type!=PF_Param_FLOAT_SLIDER)
+                return PF_Err_BAD_CALLBACK_PARAM;
+            auto& field=edit.additional_fields[edit.additional_count++];
+            field.index=layout::birth_enabled;field.value[0]=1;
+        }
 
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
         if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
@@ -336,6 +345,10 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         if(!error && activate_cloud) {
             params[layout::cloud_enabled]->u.fs_d.value=1;
             params[layout::cloud_enabled]->uu.change_flags|=PF_ChangeFlag_CHANGED_VALUE;
+        }
+        if(!error && activate_birth) {
+            params[layout::birth_enabled]->u.fs_d.value=1;
+            params[layout::birth_enabled]->uu.change_flags|=PF_ChangeFlag_CHANGED_VALUE;
         }
         if (out_data) {
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;

@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 59: ordinary AE Texture layer widgets; ABI7 and disk IDs unchanged.
-#define STARFIELD_VERSION_BUILD 59
-#define STARFIELD_VERSION_PACKED 32827 /* 0x803b */
+// Build 60: appended birth controls and binding6; graph7/snapshot7/Core ABI7.
+#define STARFIELD_VERSION_BUILD 60
+#define STARFIELD_VERSION_PACKED 32828 /* 0x803c */

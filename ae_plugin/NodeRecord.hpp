@@ -31,12 +31,13 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
 }
 [[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
     return kind==Kind::transform?transform_layout::compensation_last:
-        kind==Kind::particle?particle_layout::cloud_enabled:base_parameter_count(kind);
+        kind==Kind::particle?particle_layout::birth_enabled:base_parameter_count(kind);
 }
 [[nodiscard]] constexpr bool authored_parameter(Kind kind,A_long index) noexcept {
     return index>0 && (index<=base_parameter_count(kind) || (kind==Kind::particle &&
         (index==particle_layout::transfer || (index>=particle_layout::texture_front && index<=particle_layout::texture_perspective) ||
-         (index>=particle_layout::cloud_circles && index<=particle_layout::cloud_density) || index==particle_layout::cloud_enabled)));
+         (index>=particle_layout::cloud_circles && index<=particle_layout::cloud_density) || index==particle_layout::cloud_enabled ||
+         (index>=particle_layout::seed_shift && index<=particle_layout::birth_enabled))));
 }
 
 [[nodiscard]] constexpr A_long layout_x_index(Kind kind) noexcept { return base_parameter_count(kind) + 1; }
@@ -48,7 +49,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
 }
 [[nodiscard]] constexpr A_long sync_guard_index(Kind kind) noexcept { return uuid_first_index(kind) + 8; }
 [[nodiscard]] constexpr A_long last_parameter_index(Kind kind) noexcept {
-    return kind==Kind::particle?particle_layout::cloud_enabled:sync_guard_index(kind);
+    return kind==Kind::particle?particle_layout::birth_enabled:sync_guard_index(kind);
 }
 static_assert(sync_guard_index(Kind::particle)+1==particle_layout::transfer);
 // PF_OutData::num_params includes parameter 0 (the input layer), while registered
@@ -82,6 +83,7 @@ enum : A_long {
     kTextureFrontId=233,kTextureBackId=234,kTextureTimeId=235,kTextureColorId=236,
     kTextureRatioId=237,kTexturePerspectiveId=238,kTextureTopicId=2920,kTextureEndId=2921,
     kCloudCirclesId=239,kCloudAspectId=240,kCloudDensityId=241,kCloudEnabledId=242,
+    kParticleSeedShiftId=243,kParticleBirthChanceId=244,kParticleBirthEnabledId=245,
     kCloudTopicId=2922,kCloudEndId=2923,
     kRotationCurveCountId=960,kRotationCurveAgeFirstId=970,kRotationCurveValueFirstId=980,
     kEmitterOrientXId=137,kEmitterOrientYId=138,kEmitterOrientZId=139,
@@ -177,6 +179,7 @@ enum : A_long {
         kTextureFrontId,kTextureBackId,kTextureTimeId,kTextureColorId,kTextureRatioId,kTexturePerspectiveId,
         kTextureTopicId,kTextureEndId,
         kCloudCirclesId,kCloudAspectId,kCloudDensityId,kCloudEnabledId,kCloudTopicId,kCloudEndId,
+        kParticleSeedShiftId,kParticleBirthChanceId,kParticleBirthEnabledId,
         kParticlePropertiesId, kParticlePropertiesEndId, kParticleOverLifeId,
         kParticleOverLifeEndId, kParticleRotationId, kParticleRotationEndId,
         kGravityId, kDragId, kForceGravityId, kAirDensityId, kGravityRandomId,

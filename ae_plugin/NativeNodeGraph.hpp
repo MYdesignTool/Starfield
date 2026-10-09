@@ -2,6 +2,7 @@
 
 #include "AE_Effect.h"
 #include <memory>
+#include <optional>
 #include "AE_GeneralPlug.h"
 #include "starfield/core/Graph.hpp"
 
@@ -24,6 +25,7 @@ public:
     [[nodiscard]] bool valid() const noexcept;
     void prepare_constants(PF_InData*, bool allow_static_bypass = false) noexcept;
     [[nodiscard]] const core::GraphNode* constant_node(core::NodeId) const noexcept;
+    [[nodiscard]] std::optional<double> constant_birth_chance(core::NodeId) const noexcept;
     [[nodiscard]] bool fully_constant() const noexcept;
     [[nodiscard]] std::size_t input_count() const noexcept;
     [[nodiscard]] std::size_t constant_count() const noexcept;

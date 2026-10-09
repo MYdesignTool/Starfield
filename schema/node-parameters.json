@@ -6,6 +6,7 @@
   "animation": "PPS integrates over time; birth controls, including Life Random and rotation speeds, sample at birth. Emitting and Auxiliary Source are independent constant structure. Curve/gradient knot banks remain constant. ADRs 0025/0026.",
   "angleUiDefaults": "All native PF_Param_ANGLE controls start collapsed (PF_ParamFlag_START_COLLAPSED), including Emitter Angle/Orient, Particle Angle/Speed and Limit Angle. This changes the initial UI state only, preserves user expansion, and keeps keyframes/IDs/schemas unchanged. Build38 / ADR0028.",
   "fixed": {
+    "particle_seed_shift": 243, "particle_birth_chance": 244, "particle_birth_enabled": 245,
     "cloud_circles": 239, "cloud_aspect": 240, "cloud_density": 241, "cloud_enabled": 242,
     "cloud_topic": 2922, "cloud_end": 2923,
     "texture_front": 233, "texture_back": 234, "texture_time": 235, "texture_color": 236,
@@ -521,6 +522,16 @@
     "rangeEvidence": "Density maximum1000 is owner-confirmed. Circles and Aspect ranges are provisional independent limits awaiting reference evidence.",
     "nativeAuthoring": "Append topic528, Circles529/239, Aspect530/240, Density531/241, end532, hidden constant activation533/242; total534. Existing metadata and IDs retained. Binding5 aliases public sliders only; v1..4 keep historical bounds. Missing graph style/activation0 preserves legacy five-circle Cloud. Explicit native Cloud selection/slider edits or CEP authored style activate the configurable group.",
     "backend": "CPU/CUDA/OpenCL union of precomputed stable member circles, one logical particle and group opacity. Zero Density collapses to a round circle. Actual AE2023 appearance/persistence gates remain open."
+  },
+  "particleBirth": {
+    "adr": "0037-particle-birth-controls",
+    "optionalGraphKeys": {"seedShift": 40, "birthChance": 41},
+    "types": {"seedShift": "int32", "birthChance": "float64"},
+    "defaults": {"seedShift": 0, "birthChance": 100},
+    "ranges": {"seedShift": [-2147483648,2147483647], "birthChance": [0,100]},
+    "nativeAuthoring": "Unpublished append streams534/535/536, disk243/244/245, total537. Shift Seed uses an integer Slider; chance is float percent; hidden constant activation defaults0. Binding6 preserves old v1..5 layouts; v5 ends at533. Native59/CEP60 stays installed until complete native/Core/CEP candidate passes its gates.",
+    "migration": "Missing keys and activation0 keep legacy emitter partitioning. Explicit author controls use full source streams per Particle, preserve source ordinals and assign branch-scoped output identities. Render ABI7/snapshot7 unchanged.",
+    "rangeEvidence": "Independent numeric limits; reference seed bounds and multi-branch behavior remain owner qualification gates."
   },
   "editorCatalog": "schema/editor-presets.json: 20 independently authored curve profiles, 19 gradient palettes; native modal chooser at each editor Presets button, no vendor folder structure.",
   "transformBinding": {

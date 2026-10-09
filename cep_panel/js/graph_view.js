@@ -90,7 +90,9 @@
             "36": {label:"Ignore Perspective",kind:"popup",values:[0,1],choices:["Off","On"]},
             "37": {label:"Circles",kind:"slider",decimals:0,step:1,min:1,max:1000},
             "38": {label:"Aspect",kind:"slider",decimals:2,step:1,min:1,max:1000},
-            "39": {label:"Density",kind:"slider",decimals:2,step:1,min:0,max:1000}
+            "39": {label:"Density",kind:"slider",decimals:2,step:1,min:0,max:1000},
+            "40": {label:"Shift Seed",kind:"slider",decimals:0,step:1,min:-2147483648,max:2147483647},
+            "41": {label:"Birth Chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
         },
         force: {
             "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
@@ -393,6 +395,9 @@
             if(kind==="particle")[10,150,66].forEach(function(value,i){
                 if(!findParameter(source,String(37+i)))displayParameters.push({key:String(37+i),type:i===0?3:4,value:value});
             });
+            if(kind==="particle")[0,100].forEach(function(value,i){
+                if(!findParameter(source,String(40+i)))displayParameters.push({key:String(40+i),type:i===0?2:4,value:value});
+            });
             for (var p = 0; p < displayParameters.length; p++) {
                 var graphParameter = displayParameters[p];
                 var spec = specs[graphParameter.key];
@@ -549,7 +554,7 @@
             if (kind === "particle") {
                 var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
                     "12":8,"1":9,"2":10,"23":11,"30":12,"24":13,"4":14,"6":15,"17":16,"18":17,"19":18,
-                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31,"37":32,"38":33,"39":34};
+                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31,"37":32,"38":33,"39":34,"40":35,"41":36};
                 node.params.sort(function (left, right) {
                     return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
                 });

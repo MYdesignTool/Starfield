@@ -2,6 +2,30 @@
 
 Status: staged implementation, 2026-10-08. Task M3-16.
 
+## Native and CEP authoring milestone, 2026-10-09
+
+Source candidate native60/packed32828/CEP61 appends the controls described below.
+Actual USER_CHANGED handling captures the integer slider and enables the hidden
+flag only after a successful graph commit. Unrelated edits and old presets retain
+activation0. Binding6 encodes the appended aliases; readers1..5 retain their exact
+historical field bounds. Metadata can certify chance independently of other
+animated Particle controls, but a current zero sample or expression cannot prove
+constant-zero probability.
+
+CEP uses separate fixed-disk helpers for Cloud activation242 and Birth
+activation245; key40 now maps solely to signed seed243. Fresh nodes write keys40/41;
+an explicit edit on an older node adds the other default in the same transaction.
+Inspector projections show defaults without modifying an older graph. Presets,
+signed wire types and failure rollback retain the distinction between absent
+controls and authored defaults. The panel candidate stays under artifacts/prepared
+until a complete paired build and no-AE deployment.
+
+Focused evidence: native bindings8441 plus camera12, callbacks344 and actual
+registration269, all0 failures; Birth CEP51, Cloud49, Texture80, complete gateway
+and startup pass. The proof fixture was corrected to report expression-bearing
+controls as time-varying before recording the passing result. Logs use
+artifacts/m3-16-*; full build and real AE2023 gates remain open.
+
 ## Graph integration milestone, 2026-10-09
 
 The preserved graph/static/history/Auxiliary implementation is now exercised by

@@ -12,18 +12,18 @@ equal([37,38,39].map(k=>value(particle(fresh),k)),[10,150,66]);
 let graph=change(fresh,15,2);graph=change(graph,39,1000);graph=change(graph,37,33);graph=change(graph,38,225.5);
 equal(edits.nativeRecordSchema(particle(graph)),7);
 let projected=view.project(graph,null,{height:1080,width:1920,pixelAspect:1}).nodes.find(n=>n.id===particle(graph).id);
-equal(projected.params.filter(p=>Number(p.graphKey)>=37).map(p=>[p.label,p.value,p.min,p.max]),
+equal(projected.params.filter(p=>Number(p.graphKey)>=37 && Number(p.graphKey)<=39).map(p=>[p.label,p.value,p.min,p.max]),
     [["Circles",33,1,1000],["Aspect",225.5,1,1000],["Density",1000,0,1000]]);
 ok(!projected.params.some(p=>p.graphKey==="16" || (Number(p.graphKey)>=31 && Number(p.graphKey)<=36)));
 for(const shape of [0,1,3])equal(view.project(change(graph,15,shape),null,{height:1080,width:1920,pixelAspect:1}).nodes
-    .find(n=>n.id===particle(graph).id).params.filter(p=>Number(p.graphKey)>=37).length,0);
+    .find(n=>n.id===particle(graph).id).params.filter(p=>Number(p.graphKey)>=37 && Number(p.graphKey)<=39).length,0);
 for(const [key,v,type] of [[37,0,3],[37,1001,3],[37,2.2,3],[37,3,4],[38,0,4],[38,1001,4],[39,-1,4],[39,1001,4],[39,1,3],[39,NaN,4],[39,Infinity,4]])
     reject(()=>change(graph,key,v,type),/Invalid Cloud|finite|unsupported/i);
 const old=codec.fromHex(codec.toHex(graph));particle(old).parameters=particle(old).parameters.filter(p=>Number(p.key)<37);
 equal(edits.nativeRecordSchema(particle(old)),7);
 const oldText=codec.toHex(old);
 projected=view.project(old,null,{height:1080,width:1920,pixelAspect:1}).nodes.find(n=>n.id===particle(old).id);
-equal(projected.params.filter(p=>Number(p.graphKey)>=37).map(p=>p.value),[10,150,66]);equal(codec.toHex(old),oldText);
+equal(projected.params.filter(p=>Number(p.graphKey)>=37 && Number(p.graphKey)<=39).map(p=>p.value),[10,150,66]);equal(codec.toHex(old),oldText);
 equal(particle(change(old,3,20)).parameters.filter(p=>Number(p.key)>=37).length,0);
 equal([37,38,39].map(k=>value(particle(change(old,15,2)),k)),[10,150,66]);
 equal(value(particle(change(old,39,0)),39),0);

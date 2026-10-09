@@ -53,7 +53,7 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, particle_layout::cloud_enabled+1> fields{};
+    std::array<RawField, particle_layout::birth_enabled+1> fields{};
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -489,8 +489,8 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     std::sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
-    const bool transfers=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, transfers?5:attachments?2:1); append_u32(bytes, 0);
+    const bool births=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, births?6:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -537,7 +537,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 5) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 6) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
@@ -554,7 +554,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 transform_layout::matrix_last : node.kind==Kind::particle && version<3 ?
                 particle_layout::last : node.kind==Kind::particle && version==3 ?
                 particle_layout::transfer : node.kind==Kind::particle && version==4 ?
-                particle_layout::texture_perspective : native_nodes::binding_field_count(node.kind);
+                particle_layout::texture_perspective : node.kind==Kind::particle && version==5 ?
+                particle_layout::cloud_enabled : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -858,6 +859,21 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
                 return suites.fail(particle_layout::cloud_density);
             add_value(node,kCloudCircles,circles);add_value(node,kCloudAspect,aspect);add_value(node,kCloudDensity,density);
         }
+        integer=0;
+        if(!suites.playback || suites.playback->fields[particle_layout::birth_enabled].present)
+            if(!read_uint(suites,plugin_id,effect,particle_layout::birth_enabled,time,integer) || integer>1)
+                return suites.fail(particle_layout::birth_enabled);
+        if(integer) {
+            double shift{},chance{};
+            if(!read_one_d(suites,plugin_id,effect,particle_layout::seed_shift,time,shift) ||
+               shift<double((std::numeric_limits<std::int32_t>::min)()) || shift>double((std::numeric_limits<std::int32_t>::max)()))
+                return suites.fail(particle_layout::seed_shift);
+            shift=std::round(shift);
+            if(!read_one_d(suites,plugin_id,effect,particle_layout::birth_chance,time,chance) || chance<0 || chance>100)
+                return suites.fail(particle_layout::birth_chance);
+            add_value(node,kParticleSeedShift,static_cast<std::int32_t>(shift));
+            add_value(node,kParticleBirthChance,chance);
+        }
         if(!read_uint(suites,plugin_id,effect,particle_layout::limit_2d,time,integer) || integer>1)return false;
         add_value(node,kLimitTo2D,integer);
         for(auto [first,key]:{std::pair{particle_layout::angle,kParticleAngles},std::pair{particle_layout::speed,kRotationSpeed}}) {
@@ -963,6 +979,24 @@ const core::GraphNode* NativeAnimationPlan::constant_node(core::NodeId id) const
     if(!valid())return nullptr;
     const auto found=impl_->constant_nodes.find(id);
     return found==impl_->constant_nodes.end()?nullptr:&found->second;
+}
+std::optional<double> NativeAnimationPlan::constant_birth_chance(core::NodeId id) const noexcept {
+    if(!valid())return {};
+    const auto authored=impl_->templates.find(id);
+    if(authored==impl_->templates.end() || authored->second.type_key!=core::graph_keys::kParticleNode)return {};
+    const auto chance=std::find_if(authored->second.parameters.begin(),authored->second.parameters.end(),
+        [](const auto& parameter){return parameter.key==core::graph_keys::kParticleBirthChance;});
+    if(chance==authored->second.parameters.end())return 100;
+    if(const auto* value=constant_node(id)) {
+        for(const auto& parameter:value->parameters)if(parameter.key==core::graph_keys::kParticleBirthChance)
+            if(const auto* scalar=std::get_if<double>(&parameter.value))return *scalar;
+        return {};
+    }
+    const auto raw=std::find_if(impl_->nodes.begin(),impl_->nodes.end(),[&](const auto& node){return node.id==id;});
+    if(raw==impl_->nodes.end())return {};
+    const auto& field=raw->fields[particle_layout::birth_chance];
+    if(field.present && (field.slot<0 || field.constant[0]))return field.value[0];
+    return {};
 }
 void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_bypass) noexcept try {
     if(!valid() || !data) return;

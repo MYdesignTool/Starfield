@@ -75,6 +75,11 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
     if(edit.node_kind==4 && (edit.parameter_index>14 || edit.additional_count ||
         edit.value_kind!=(edit.parameter_index==2?ValueKind::point2:ValueKind::scalar)))return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
+    if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::seed_shift &&
+        (edit.value_kind!=ValueKind::scalar || std::floor(edit.value[0])!=edit.value[0] ||
+         edit.value[0]<-2147483648.0 || edit.value[0]>2147483647.0))return false;
+    if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::birth_chance &&
+        (edit.value_kind!=ValueKind::scalar || edit.value[0]<0 || edit.value[0]>100))return false;
     for(unsigned i=0;i<edit.additional_count;++i) {
         const auto& field=edit.additional_fields[i];
         namespace layout=native_nodes::particle_layout;
@@ -82,7 +87,10 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
             field.kind==ValueKind::scalar && field.value==std::array<double,4>{1,0,0,0} &&
             ((edit.parameter_index>=layout::cloud_circles && edit.parameter_index<=layout::cloud_density) ||
              (edit.parameter_index==layout::shape && edit.value_kind==ValueKind::scalar && edit.value[0]==3));
-        if(field.index<1 || (field.index>layout::last && !cloud_activation) || static_cast<unsigned>(field.kind)>3)return false;
+        const bool birth_activation=edit.node_kind==1 && field.index==layout::birth_enabled &&
+            field.kind==ValueKind::scalar && field.value==std::array<double,4>{1,0,0,0} &&
+            (edit.parameter_index==layout::seed_shift || edit.parameter_index==layout::birth_chance);
+        if(field.index<1 || (field.index>layout::last && !cloud_activation && !birth_activation) || static_cast<unsigned>(field.kind)>3)return false;
         for(double value:field.value)if(!std::isfinite(value))return false;
         for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
     }

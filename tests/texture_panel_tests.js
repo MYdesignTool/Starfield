@@ -11,7 +11,7 @@ set(15,3);set(31,55);set(32,66);set(33,7);set(34,2);set(35,0);set(36,1);
 const resources=[{id:55,name:"Front",sourceName:"Clip A",texture:true},{id:66,name:"Back",sourceName:"Clip B",texture:true},
     {id:77,name:"Null",sourceName:"",texture:false}];
 let projected=view.project(graph,null,{height:1080,width:1920,pixelAspect:1},resources).nodes.find(n=>n.id===particle.id);
-const fields=projected.params.filter(p=>Number(p.graphKey)>=31);
+const fields=projected.params.filter(p=>Number(p.graphKey)>=31 && Number(p.graphKey)<=36);
 equal(fields.map(p=>p.label),["Texture Layer","Dark Side","Texture Time Sample","Texture Color Use","Use Texture Ratio","Ignore Perspective"]);
 equal(fields[0].enumValues,[0,55,66]);equal(fields[0].value,2);equal(view.parameterToGraphValue(fields[1],2),55);
 equal(fields[2].choices.length,8);equal(fields[2].value,8);equal(fields[3].value,3);

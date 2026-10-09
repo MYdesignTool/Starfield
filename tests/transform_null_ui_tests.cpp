@@ -78,7 +78,7 @@ PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData* out,PF_ParamDef* params[
 int main(){
     SPBasicSuite basic{};basic.AcquireSuite=acquire;basic.ReleaseSuite=release;
     PF_InData data{};data.pica_basicP=&basic;data.effect_ref=reinterpret_cast<PF_ProgPtr>(1);data.time_scale=24;
-    PF_OutData out{};std::array<PF_ParamDef,534> params{};std::array<PF_ParamDef*,534> pointers{};
+    PF_OutData out{};std::array<PF_ParamDef,537> params{};std::array<PF_ParamDef*,537> pointers{};
     for(unsigned i=0;i<params.size();++i)pointers[i]=&params[i];
     params[1].param_type=PF_Param_LAYER;params[guard_index].param_type=PF_Param_FLOAT_SLIDER;
     pf.AEGP_GetEffectLayer=[](PF_ProgPtr,AEGP_LayerH* v)->A_Err{*v=layer(1);return 0;};
@@ -245,7 +245,7 @@ int main(){
         check(ui->events==PF_CustomEFlag_EFFECT,"actual Particle registers effect-window custom events");return 0;};
     PF_OutData registered_out{};
     check(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&registered_out,nullptr,nullptr,nullptr)==0 &&
-          registered_out.num_params==534 && registered_native.size()==533,
+          registered_out.num_params==537 && registered_native.size()==536,
           "actual Particle registration preserves the complete physical parameter count");
     for(const auto index:{529,530,531}) {
         const auto& def=registered_native[index-1];
@@ -259,6 +259,18 @@ int main(){
     check(activation.uu.id==242 && activation.u.fs_d.value==0 &&
           (activation.flags&PF_ParamFlag_CANNOT_TIME_VARY) && (activation.ui_flags&PF_PUI_INVISIBLE),
           "constant hidden activation defaults to legacy without shifting prior controls");
+    const auto& seed=registered_native[533];const auto& chance=registered_native[534];
+    const auto& birth_activation=registered_native[535];
+    check(seed.param_type==PF_Param_SLIDER && seed.uu.id==243 && seed.u.sd.value==0 &&
+          seed.u.sd.valid_min==(-2147483647-1) && seed.u.sd.valid_max==2147483647 &&
+          seed.u.sd.slider_min==-100 && seed.u.sd.slider_max==100 && (seed.flags&PF_ParamFlag_SUPERVISE),
+          "integer Shift Seed appends exact signed32 bounds with a practical drag range");
+    check(chance.param_type==PF_Param_FLOAT_SLIDER && chance.uu.id==244 && chance.u.fs_d.value==100 &&
+          chance.u.fs_d.valid_min==0 && chance.u.fs_d.valid_max==100 && (chance.flags&PF_ParamFlag_SUPERVISE),
+          "Birth Chance appends supervised percent defaults");
+    check(birth_activation.uu.id==245 && birth_activation.u.fs_d.value==0 &&
+          (birth_activation.flags&PF_ParamFlag_CANNOT_TIME_VARY) && (birth_activation.ui_flags&PF_PUI_INVISIBLE),
+          "hidden birth activation preserves legacy branches until explicitly authored");
     for(const auto index:{521,522}) {
         const auto& def=registered_native[index-1];
         check(def.param_type==PF_Param_LAYER && def.uu.id==(index==521?233:234) &&

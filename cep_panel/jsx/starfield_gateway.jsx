@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-60";
+    var GATEWAY_BUILD = "native-presets-61";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -728,9 +728,14 @@
     }
 
     function cloudControl(key) {
-        var names={"37":"Circles","38":"Aspect","39":"Density","40":"Cloud Style Enabled"};
+        var names={"37":"Circles","38":"Aspect","39":"Density"};
         return {name:names[String(key)],diskId:202+Number(key)};
     }
+    function cloudEnabledControl() { return {name:"Cloud Style Enabled",diskId:242}; }
+    function birthControl(key) {
+        return {name:Number(key)===40?"Shift Seed":"Birth Chance",diskId:203+Number(key)};
+    }
+    function birthEnabledControl() { return {name:"Birth Controls Enabled",diskId:245}; }
 
     function textureSourceLayer(source,renderer) {
         if(!source || source===renderer || (renderer && source.id===renderer.id) || !source.source || source.nullLayer)return false;
@@ -951,9 +956,14 @@
                     scalar(tk,textureControl(tk),3);
                     if(tk<=34)node.parameters[node.parameters.length-1].value--;
                 }
-                var cloudEnabled=Number(nodeControlValue(effect,cloudControl(40)));
+                var cloudEnabled=Number(nodeControlValue(effect,cloudEnabledControl()));
                 if(cloudEnabled!==0 && cloudEnabled!==1)throw new Error("Invalid Cloud activation flag.");
                 if(cloudEnabled)for(var ck=37;ck<=39;ck++)scalar(ck,cloudControl(ck),ck===37?3:4);
+                var birthEnabled=Number(nodeControlValue(effect,birthEnabledControl()));
+                if(birthEnabled!==0 && birthEnabled!==1)throw new Error("Invalid Birth activation flag.");
+                if(birthEnabled) {
+                    scalar(40,birthControl(40),2);scalar(41,birthControl(41),4);
+                }
                 for(var group=0;group<2;group++) {
                     var label=group?"Speed":"Angle";
                     node.parameters.push({key:group?"20":"18",type:5,value:[Number(nodeControlValue(effect,label+" X")),
@@ -1078,9 +1088,13 @@
                 if(!hasTransfer)setNodeControl(effect,"Transfer Mode",1);
                 var cloudEnabled=false;
                 for(var ck=37;ck<=39;ck++)if(nodeParameter(node,ck))cloudEnabled=true;
-                setNodeControl(effect,cloudControl(40),cloudEnabled?1:0);
+                setNodeControl(effect,cloudEnabledControl(),cloudEnabled?1:0);
                 if(cloudEnabled)for(var ck=37;ck<=39;ck++)if(!nodeParameter(node,ck))
                     setNodeControl(effect,cloudControl(ck),[10,150,66][ck-37]);
+                var birthEnabled=!!(nodeParameter(node,40) || nodeParameter(node,41));
+                setNodeControl(effect,birthEnabledControl(),birthEnabled?1:0);
+                if(birthEnabled)for(var bk=40;bk<=41;bk++)if(!nodeParameter(node,bk))
+                    setNodeControl(effect,birthControl(bk),bk===40?0:100);
                 for(var tk=31;tk<=36;tk++)if(!nodeParameter(node,tk))
                     setNodeControl(effect,textureControl(tk),tk===33 || tk===34 || tk===35?1:0);
             }
@@ -1187,6 +1201,13 @@
                                 value<(ck===39?0:1) || value>1000 || (ck===37 && Math.floor(value)!==value))
                                 throw new Error("Invalid Cloud parameter: "+key);
                             setNodeControl(effect,cloudControl(ck),value);
+                        }
+                        else if(key==="40" || key==="41") {
+                            var seed=key==="40";
+                            if(parameter.type!==(seed?2:4) || typeof value!=="number" || !isFinite(value) ||
+                                value<(seed?-2147483648:0) || value>(seed?2147483647:100) || (seed && Math.floor(value)!==value))
+                                throw new Error("Invalid Birth parameter: "+key);
+                            setNodeControl(effect,birthControl(key),value);
                         }
                         else if(scalars[key]) setNodeControl(effect,scalars[key],value);
                         else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);

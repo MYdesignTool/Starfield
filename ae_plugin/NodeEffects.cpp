@@ -14,6 +14,7 @@
 #include "SPBasic.h"
 
 #include <cstdio>
+#include <limits>
 #include <utility>
 
 namespace {
@@ -466,6 +467,15 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     // Older effects acquire appended defaults when reopened. A separate constant
     // flag preserves their fixed five-circle shape until explicitly authored.
     error=add_slider(in_data,"Cloud Style Enabled",kCloudEnabledId,0,1,0,PF_Precision_INTEGER,
+        kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
+    PF_ParamDef shift{};shift.param_type=PF_Param_SLIDER;shift.flags=kNodeEditableFlags;
+    shift.uu.id=kParticleSeedShiftId;std::snprintf(shift.name,sizeof(shift.name),"Shift Seed");
+    shift.u.sd.valid_min=(std::numeric_limits<A_long>::min)();
+    shift.u.sd.valid_max=(std::numeric_limits<A_long>::max)();
+    shift.u.sd.slider_min=-100;shift.u.sd.slider_max=100;shift.u.sd.value=shift.u.sd.dephault=0;
+    error=add_checked_parameter(in_data,shift);if(error)return error;
+    error=add_slider(in_data,"Birth Chance",kParticleBirthChanceId,0,100,100);if(error)return error;
+    error=add_slider(in_data,"Birth Controls Enabled",kParticleBirthEnabledId,0,1,0,PF_Precision_INTEGER,
         kNodeConstantFlags,PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE);if(error)return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::particle);

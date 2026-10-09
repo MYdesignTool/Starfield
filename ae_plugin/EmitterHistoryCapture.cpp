@@ -81,6 +81,9 @@ public:
         for(const auto& p:plan.proofs()) if(p.node==id && p.life_bound)return p.life_bound;
         return {};
     }
+    std::optional<double> constant_birth_chance(core::NodeId id) override {
+        return plan.constant_birth_chance(id);
+    }
     std::shared_ptr<core::EmissionTimeline> emission_timeline(core::NodeId id,unsigned hz) override {
         for(const auto& b:bindings)if(b.emitter==id)return native_emission_timeline(data,id,b.rate,hz);
         return {};

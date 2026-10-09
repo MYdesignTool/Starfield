@@ -60,7 +60,8 @@
             {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}, {key:"30",type:3,value:0},
             {key:"31",type:3,value:0},{key:"32",type:3,value:0},{key:"33",type:3,value:0},
             {key:"34",type:3,value:0},{key:"35",type:3,value:1},{key:"36",type:3,value:0},
-            {key:"37",type:3,value:10},{key:"38",type:4,value:150},{key:"39",type:4,value:66}
+            {key:"37",type:3,value:10},{key:"38",type:4,value:150},{key:"39",type:4,value:66},
+            {key:"40",type:2,value:0},{key:"41",type:4,value:100}
         ],
         force: [
             { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },
@@ -113,7 +114,7 @@
             fail("invalid_native_node_record", "The host returned an unsupported " + kind + " record version.");
         }
         DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
-        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4};
+        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4};
         if (kind === "force") optional = {"9":7};
         if (kind === "transform") optional = {"7":7,"8":3};
         Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
@@ -457,6 +458,18 @@
                 continue;
             }
             var value = copyValue(change.value);
+            if(node.type===TYPES.particle && (change.parameterKey==="40" || change.parameterKey==="41")) {
+                var seed=change.parameterKey==="40";
+                if(change.valueType!==(seed?2:4) || typeof value!=="number" || !Number.isFinite(value) ||
+                    value<(seed?-2147483648:0) || value>(seed?2147483647:100) || (seed && !Number.isInteger(value)))
+                    fail("invalid_parameter","Invalid Birth parameter.");
+                [0,100].forEach(function(defaultValue,index) {
+                    var birthKey=String(40+index);
+                    if(birthKey!==change.parameterKey && !node.parameters.some(function(p){return p.key===birthKey;}))
+                        node.parameters.push({key:birthKey,type:index===0?2:4,value:defaultValue});
+                });
+                if(found<0) {node.parameters.push({key:change.parameterKey,type:change.valueType,value:value});continue;}
+            }
             if(node.type===TYPES.particle && Number(change.parameterKey)>=30 && Number(change.parameterKey)<=36 && found<0) {
                 var max=Number(change.parameterKey)<=32 && Number(change.parameterKey)>=31?2147483647:
                     change.parameterKey==="30"?3:change.parameterKey==="33"?7:change.parameterKey==="34"?2:1;

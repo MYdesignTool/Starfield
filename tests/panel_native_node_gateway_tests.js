@@ -90,7 +90,9 @@ function graphFromEffects() {
             }
             scalar([[33,"Texture Time Sample",1,-1],[34,"Texture Color Use",1,-1],[35,"Use Texture Ratio"],[36,"Ignore Perspective"]]);
             if(v("Cloud Style Enabled"))scalar([[37,"Circles"],[38,"Aspect"],[39,"Density"]]);
-            else node.parameters=node.parameters.filter(p=>Number(p.key)<37);
+            else node.parameters=node.parameters.filter(p=>Number(p.key)<37 || Number(p.key)>39);
+            if(v("Birth Controls Enabled"))scalar([[40,"Shift Seed"],[41,"Birth Chance"]]);
+            else node.parameters=node.parameters.filter(p=>Number(p.key)<40);
             set(1,v("Color").slice(0,3));set(18,[v("Angle X"),v("Angle Y"),v("Angle Z")]);set(20,[v("Speed X"),v("Speed Y"),v("Speed Z")]);
             scalar([[3,"Size (Pixels)"],[4,"Size Over Life"],[5,"Opacity",.01],[6,"Opacity Over Life"],
                 [9,"Size Random"],[10,"Opacity Random"],[11,"Life (Seconds)"],[12,"Particle Color",1,-1],
@@ -335,5 +337,26 @@ for(const mode of ["add","replace"]) {
         assert.equal(n.parameters.find(p=>p.key==="32").value,66);
     }
 }
+const birthId=codec.fromHex(snapshot().graphHex).nodes.find(n=>n.type===edits.types.particle).id;
+const birthValues=g=>g.nodes.filter(n=>n.type===edits.types.particle).map(n=>n.parameters.filter(p=>p.key==="40" || p.key==="41").map(p=>[p.key,p.type,p.value]));
+const birthResult=apply({type:"setParameters",changes:[
+    {nodeId:birthId,parameterKey:"40",valueType:2,value:-43},{nodeId:birthId,parameterKey:"41",valueType:4,value:25.5}]});
+assert.equal(birthResult.ok,true,"birth controls commit through complete gateway: "+JSON.stringify(birthResult));
+const birthSource=codec.fromHex(snapshot().graphHex),birthBeforeFailure=snapshot().graphHex;
+assert.deepEqual(birthValues(birthSource),[[["40",2,-43],["41",4,25.5]]]);
+rejectNext=true;
+assert.equal(apply({type:"setParameters",changes:[{nodeId:birthId,parameterKey:"41",valueType:4,value:0}]}).ok,false);
+assert.equal(snapshot().graphHex,birthBeforeFailure,"failed birth commit restores signed values, chance and activation");
+for(const mode of ["add","replace"]) {
+    const result=apply({type:"applyPreset",presetGraph:birthSource,mode,applyRenderSettings:true});
+    assert.equal(result.ok,true,"birth preset "+mode+" commits: "+JSON.stringify(result));
+    assert.ok(birthValues(codec.fromHex(snapshot().graphHex)).every(v=>JSON.stringify(v)===JSON.stringify([["40",2,-43],["41",4,25.5]])));
+}
+const legacyBirth=codec.fromHex(snapshot().graphHex);
+legacyBirth.nodes.filter(n=>n.type===edits.types.particle).forEach(n=>n.parameters=n.parameters.filter(p=>Number(p.key)<40));
+assert.equal(apply({type:"applyPreset",presetGraph:legacyBirth,mode:"replace",applyRenderSettings:true}).ok,true);
+assert.deepEqual(birthValues(codec.fromHex(snapshot().graphHex)),[[]],"legacy preset remains without explicit birth semantics");
+assert.equal(apply({type:"addNode",nodeType:"force"}).ok,true);
+assert.deepEqual(birthValues(codec.fromHex(snapshot().graphHex)),[[]],"unrelated topology edit preserves legacy activation0");
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

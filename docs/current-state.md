@@ -1,6 +1,6 @@
 # 当前工程状态
 
-核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 明确范围分支的实机效果待回复。当前活动卡切换至 M3-16：出生控制图求值3348检查通过，继续 native/CEP 作者；未完成作者不暴露或部署。MNT-01 改动保留。
+核对日期：2026-10-09。当前配对 native59 / packed32827 / Core ABI7 / CEP60；08:40 +08:00使用 KeepNative 发布 CEP60，源码6f7b1bc78939c13fc41ae215398d020c57c937a3已推送。native59 原生选择器显示已由 owner 确认；其节点添加仍拒绝合法 ID44/type3/kind number。CEP60 明确范围分支的实机效果待回复。当前活动卡 M3-16：图求值3348与 native/CEP 作者最小检查通过；native60/packed32828/CEP61 候选等待完整构建和闭宿主配对发布。安装仍为59/60。MNT-01 改动保留。
 
 ## 源码与安装
 
@@ -63,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 
 ## 开放 gate
 
-- M3-16 纯核心策略已提交f83e20f，40985检查、0失败；本次图/历史/Auxiliary/预算/身份、Force/Transform/shutter/随机外观与快照3348检查通过。继续原生/CEP作者接入，未完成部分不暴露 UI、不发布到 Core；ADR0037 规定完整迁移。M3-13 实机反馈到达时优先处理。
+- M3-16 纯策略40985、图求值3348已通过。native60作者：绑定8441+相机12、实际回调344、注册269，0失败；CEP61候选 Birth51/Cloud49/Texture80、完整 gateway事务/失败回滚/预设与启动通过。候选位于 artifacts/prepared/m3-16-native60-panel61；仍需完整 native/Core 构建及实际 AE2023。ADR0037 保留旧激活0、signed32和概率按出生采样契约。M3-13 实机反馈到达时优先处理。
 
 - owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；native59 添加仍拒绝合法 ID44。CEP60 明确范围分支及精确原因已发布，正反面/添加待回复；最小测试不关闭宿主报错。八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。

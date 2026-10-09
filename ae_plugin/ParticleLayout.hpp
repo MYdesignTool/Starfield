@@ -24,13 +24,14 @@ inline constexpr A_long texture=520, texture_front=521, texture_back=522,
     texture_end=527;
 inline constexpr A_long cloud=528, cloud_circles=529, cloud_aspect=530,
     cloud_density=531, cloud_end=532, cloud_enabled=533;
+inline constexpr A_long seed_shift=534, birth_chance=535, birth_enabled=536;
 constexpr A_long curve_base(A_long index) noexcept {
     for(auto base:{size_curve,opacity_curve,rotation_curve})
         if(index>=base && index<base+curve_span)return base;
     return 0;
 }
 constexpr bool animated(A_long index) noexcept {
-    return index==transfer || (index>=texture_time && index<=texture_perspective) ||
+    return index==seed_shift || index==birth_chance || index==transfer || (index>=texture_time && index<=texture_perspective) ||
         (index>=cloud_circles && index<=cloud_density) ||
         (index>=shape && index<=life_random) || (index>=size && index<=color) ||
         (index>=feather && index<=up_axis) || (index>=size_over_life && index<=opacity_over_life) ||
