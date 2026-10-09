@@ -87,4 +87,5 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 首个里程碑：单位立方体、有界OBJ多边形/索引/属性、正确三角化、typed拒绝及取消。随后接入深度/裁剪/合成和完整作者链路，未实现渲染前不暴露Model菜单、不部署纯解析器候选。Face依赖OBJ发射器、Path依赖路径发射器，分别保留后续卡；Model图来源和Use Model(s)菜单待owner参考。
 2026-10-09几何里程碑：Settings数值类型、ModelGeometry操作及有界OBJ、单位cube已实现；独立MSVC /MT fixture4141检查、0失败，日志 artifacts/m3-17-model-geometry-tests.log。继续投影/近裁剪/深度/合成与资源、作者接入；现有安装60/61不变。
 2026-10-09三角形里程碑：ModelScene显式矩阵投影、近面/正W/ROI裁剪、透视深度/UV、每模型四采样遮挡与一次覆盖合成，四种transfer/HDR通过6406项MSVC /MT检查。ROI/反射/shear/downsample、horizon/预算/取消/分配失败均覆盖；合成只扫描触及像素。CMake与Core vcxproj接入数值源；粒子pose/资源、wire迁移、作者仍未实现，不暴露菜单或部署此独立里程碑。
+源码5d17802已推送，并在 artifacts/prepared/m3-17-triangle-5d17802/source 冻结后完整May2023 /MT构建通过（双NoPublish）；日志 artifacts/m3-17-triangle-native-build.log。安装18项保持native60/CEP61收据一致。下一步：明确Model资源/pose/wire迁移后接入粒子、CPU与作者；完整goal仍active，菜单参考与实际AE gate开放。
 完成条件：默认cube和Model资源能作为粒子显示，3D旋转/缩放/反射/近裁剪/深度/叠加/相机/快照/预算/shutter有效；原生/CEP/预设、配对构建/发布和真实AE2023持久化验收。

@@ -19,6 +19,13 @@ repaired before the passing result. Geometry4141 checks were rerun successfully.
 CMake/Core vcxproj compile the numeric sources. This is a numeric staging API,
 not graph/Particle/resource/native authoring, wire migration or AE qualification.
 
+Frozen source5d178022aaf239e65426192b8d757103f2e01cd8 at
+artifacts/prepared/m3-17-triangle-5d17802/source passes the complete May2023
+x64 Release /MT build with -NoDistPublish -NoRuntimePublish. Log:
+artifacts/m3-17-triangle-native-build.log. Both new numeric sources compile in
+the Core target. All18 installed native60/CEP61 hashes still match its receipt
+after the build; no candidate publication or host support claim follows.
+
 ## Geometry milestone evidence
 
 tests/RunModelGeometryTests.ps1 -Run passes4141 checks,0 failures with MSVC /MT;

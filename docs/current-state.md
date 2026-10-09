@@ -4,6 +4,8 @@
 
 ## 源码与安装
 
+M3-17三角形源码里程碑5d178022aaf239e65426192b8d757103f2e01cd8已推送；其完整git archive冻结于 artifacts/prepared/m3-17-triangle-5d17802/source。May2023 x64 Release /MT全目标构建通过，包含ModelGeometry.cpp/ModelScene.cpp；命令使用-NoDistPublish -NoRuntimePublish，日志 artifacts/m3-17-triangle-native-build.log。构建后安装18项哈希再次符合native60/CEP61收据。该候选未接入资源/粒子作者，不发布纯数值Model里程碑，不从编译关闭AE gate。
+
 owner 已确认 native59 原生选择器可以显示；旧CEP59添加曾报 key31/type3/value44/kind number。CEP60维护使用明确范围分支，CEP61保留严格校验及 reason/typeKind/max诊断。2026-10-09 owner确认当前版本“无法添加节点”已修复；关闭该添加gate，背面/八种时间采样/阶段/持久化仍开放。不能将旧嵌套条件的引擎解释假设当作已确诊的根因。当前18项安装哈希与收据一致；ID44完整gateway/Texture80复查通过。
 
 native60/CEP61实现 Shift Seed/Birth Chance，streams534/535/536、disk243/244/245、binding6，Particle total537；graph7/envelope1/snapshot7/Core ABI7保留。原生激活默认0保存旧分支，明确出生编辑才启用；新CEP节点写显式defaults0/100。完整源码冻结于 artifacts/prepared/m3-16-native60-panel61/source，CEP候选隔离至发布。必要检查：图求值3348；绑定8441+相机12、回调344、注册269；Birth51/Cloud49/Texture80、完整gateway/启动全部通过。日志 artifacts/m3-16-*。

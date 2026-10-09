@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 M3-17完整构建：源码5d17802的git archive冻结于 artifacts/prepared/m3-17-triangle-5d17802/source，执行 `powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过，包含新ModelGeometry/ModelScene。日志 artifacts/m3-17-triangle-native-build.log。构建后十八安装哈希仍符合native60/CEP61；本数值里程碑未发布或接入完整Model粒子/资源/作者，不从构建推断宿主资格。
+
 2026-10-09 M3-17三角形：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelSceneTests.ps1 -Run`，MSVC /MT，6406检查、0失败；日志 artifacts/m3-17-model-scene-tests-current.log。覆盖透视深度/UV、近面/齐次horizon/ROI、每模型四采样去重/遮挡、反射/shear/downsample/PAR显式矩阵、四种transfer/HDR、预算预检、取消/分配失败/坏输入、仅触及目标像素及取消时丢弃部分staging。首次fixture误用了near_clip成员路径，随后取消阈值超过小cube实际轮询数；修正fixture后才记录通过。几何4141复查通过，日志 artifacts/m3-17-model-geometry-current-tests.log。纯数值API未接入粒子pose/资源/作者或wire，不能声明Model可在AE使用。
 
 2026-10-09 Texture owner确认当前部署节点添加已修复。当前live CEP61运行texture_panel_tests.js（80）及panel_native_node_gateway_tests.js通过，日志 artifacts/m3-13-panel61-{texture,gateway}-recheck.log；七native与十一CEP安装哈希符合native60/CEP61收据。该owner反馈只关闭添加gate；背面及其他采样/阶段/持久化继续。
