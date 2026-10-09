@@ -104,6 +104,7 @@ $adapterInputs = @(
     'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
     'src\core\ModelEvaluation.hpp',
     'ae_plugin\ModelGeometryParameter.cpp', 'ae_plugin\ModelGeometryParameter.hpp',
+    'ae_plugin\ModelMirrorParameter.cpp', 'ae_plugin\ModelMirrorParameter.hpp',
     'ae_plugin\ModelControls.cpp', 'ae_plugin\ModelControls.hpp', 'ae_plugin\ModelLayout.hpp',
     'src\core\ParticleSimulation.cpp', 'src\core\ParticleTransform.cpp', 'src\core\Random.cpp',
     'src\core\ParticleTexture.cpp', 'include\starfield\core\ParticleTexture.hpp',

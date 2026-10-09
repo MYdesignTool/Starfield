@@ -162,6 +162,44 @@ all18 installed native60/CEP61 files remain unchanged. Logs/reports:
 artifacts/m3-17-model-native-build.log, m3-17-model-legacy-binding-regression.log,
 m3-17-model-native-build-hashes.json and m3-17-model-native-installed-hashes.json.
 
+### Renderer mesh mirrors and immutable capture plan
+
+The next unpublished main manifest30 appends256 hidden arbitrary mesh mirrors
+at streams755..1010/disk1900..2155 and exact integer count1011/disk2200;
+main num_params becomes1012. Existing0..754/IDs/defaults remain fixed. Model
+node controls and binding7, graph schemas/envelope1, snapshot8 and ABI8 stay
+unchanged. The complete author release must increment the packed native build
+and pair every adapter/Core/panel; these candidate controls are not deployed alone.
+
+SFMR1 wraps SFMG1 in a64-byte little-endian header: magic SFMR, version1(u16),
+header64(u16), total bytes(u32), CRC32 of bytes16..end(u32), resource UUID16,
+revision(u32), then28 zero reserved bytes. Empty slots have zero UUID/revision
+and no mesh. Imported entries require nonzero UUID/revision1..2147483647 and
+one bounded SFMG1 payload; total at most8MiB+64. CRC covers identity/revision
+and mesh. The mirror arbitrary selectors implement independent copies,
+discrete interpolation, flatten/restore/compare and bounded text before registration.
+
+UI installation sorts imported Model UUIDs and copies their validated meshes
+into corresponding renderer mirrors as part of the same graph/alias transaction.
+It retains exact previous values for rollback and clears only the former occupied
+tail. The renderer captures only resources requested by evaluated Model particles
+across the current frame/shutter samples. PF parameter checkout/checkin owns each
+borrowed mirror; identity/revision/bounds are verified against compiled graph
+metadata before producing owned C ABI numeric arrays. No sibling AEGP scan,
+file read or host handle reaches Smart Render/Core. Empty, parked, negative-time
+and zero-cap paths must not decode unused mirrors. Mesh numeric bytes and
+identity participate in SmartFX GUID mixing. Actual AE undo/reopen remains a gate.
+
+ModelMirrorParameter implements SFMR1 persistence and the reserved registration
+helper, compiling in main/node candidate projects. Standard and ASAN fixtures
+pass8021 checks (including the reused452 controls): empty/imported values,
+every byte mutation/truncation, revision bounds, all arbitrary selectors,
+deep copies/discrete interpolation/text, accepted-default ownership/registration
+failures and cancellation after unlocking. Logs:
+artifacts/m3-17-model-mirror-{tests,asan}.log. Main manifest29/755 parameters
+remain registered; the new helper is not called until mirror transactions and
+immutable capture are implemented. This foundation is not a deployed author.
+
 ### Native mesh persistence boundary
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
