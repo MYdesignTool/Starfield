@@ -444,7 +444,9 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     for(const auto& control:{std::pair{"Layer",kTextureFrontId},std::pair{"Dark Side",kTextureBackId}}) {
         PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;
         layer.flags=kNodeEditableFlags|kNodeConstantFlags;layer.uu.id=control.second;
-        layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=240;layer.ui_height=26;
+        // Let AE own the inline selector and its selected-layer label. A custom
+        // control replaces the native widget and bypasses its selection lifecycle.
+        layer.ui_flags=PF_PUI_NONE;
         layer.u.ld.dephault=PF_LayerDefault_NONE;std::snprintf(layer.name,sizeof(layer.name),"%s",control.first);
         error=add_checked_parameter(in_data,layer);if(error)return error;
     }
@@ -631,7 +633,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 const auto* event=static_cast<PF_EventExtra*>(extra);
                 if(event && (event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_front ||
                              event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_back))
-                    return starfield::adapter::texture_layer_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+                    return PF_Err_NONE; // AE owns these ordinary PF_LAYER widgets.
                 if(event && starfield::adapter::native_nodes::particle_layout::curve_base(event->effect_win.index))
                     return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));

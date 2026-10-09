@@ -50,7 +50,11 @@ function parade() {
 const layer={id:29,name:"Particle Layer",selected:true,width:3840,height:2160,source:{pixelAspect:1},
     property(name){return name==="ADBE Effect Parade"?parade():null;} };
 function CompItem() {}
-const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",time:0,numLayers:1,layer:()=>layer});
+const textureLayers=[55,66].map((id,i)=>({id,name:i?"Back texture":"Front texture",hasVideo:true,nullLayer:false,
+    source:{name:i?"Back clip":"Front clip"},property(name){return name==="ADBE Transform Group"?{property:()=>({})}:
+        name==="ADBE Effect Parade"?{numProperties:0,property:()=>null}:null;}}));
+const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",time:0,numLayers:3,layer:index=>[layer,...textureLayers][index-1]});
+layer.containingComp=comp;textureLayers.forEach(l=>l.containingComp=comp);
 const exported={};
 vm.runInNewContext("JSON.stringify = wireStringify;\n"+source,{CompItem,wireStringify:value=>JSON.stringify(value,
     (_,item)=>roundWireNumbers&&typeof item==="number"?Number(item.toPrecision(12)):item),
@@ -81,6 +85,10 @@ function graphFromEffects() {
             set(5,v("Spin")/2160);
             scalar([[2,"Air Density"],[3,"Gravity random"],[6,"Spin Frequency"],[7,"Spin resist"],[8,"Spin Delay (Seconds)"]]);
         } else {
+            for(const [key,name] of [[31,"Layer"],[32,"Dark Side"]]) {
+                const index=v("org.starfieldfx.node.particle-"+(202+key));set(key,index?comp.layer(index).id:0);
+            }
+            scalar([[33,"Texture Time Sample",1,-1],[34,"Texture Color Use",1,-1],[35,"Use Texture Ratio"],[36,"Ignore Perspective"]]);
             if(v("Cloud Style Enabled"))scalar([[37,"Circles"],[38,"Aspect"],[39,"Density"]]);
             else node.parameters=node.parameters.filter(p=>Number(p.key)<37);
             set(1,v("Color").slice(0,3));set(18,[v("Angle X"),v("Angle Y"),v("Angle Z")]);set(20,[v("Speed X"),v("Speed Y"),v("Speed Z")]);
@@ -302,5 +310,18 @@ for(const mode of ["add","replace"]) {
     assert.ok(cloudValues(applied).every(v=>v[0]===34 && v[1]===230 && v[2]===1000));
     assert.equal(cloudValues(applied).length,mode==="add"?2:1);
 }
+const textureParticle=codec.fromHex(snapshot().graphHex).nodes.find(n=>n.type===edits.types.particle).id;
+let textureResult=apply({type:"setParameters",changes:[
+    {nodeId:textureParticle,parameterKey:"15",valueType:3,value:3},
+    {nodeId:textureParticle,parameterKey:"31",valueType:3,value:55},
+    {nodeId:textureParticle,parameterKey:"32",valueType:3,value:66}]});
+assert.equal(textureResult.ok,true,"bind distinct front/back textures through the complete gateway: "+JSON.stringify(textureResult));
+const textureIds=()=>codec.fromHex(snapshot().graphHex).nodes.find(n=>n.id===textureParticle).parameters.filter(p=>p.key==="31"||p.key==="32").map(p=>[p.key,p.type,p.value]);
+assert.deepEqual(textureIds(),[["31",3,55],["32",3,66]]);
+textureResult=apply({type:"addNode",nodeType:"force"});
+assert.equal(textureResult.ok,true,"add with existing Texture resources: "+JSON.stringify(textureResult));
+assert.deepEqual(textureIds(),[["31",3,55],["32",3,66]],"topology edits retain both texture IDs");
+rejectNext=true;textureResult=apply({type:"addNode",nodeType:"emitter"});
+assert.equal(textureResult.ok,false);assert.deepEqual(textureIds(),[["31",3,55],["32",3,66]],"failed add restores both texture resources");
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

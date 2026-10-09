@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 native59/CEP59 行内 Texture 选择器：冻结候选 `artifacts/prepared/m3-13-native59-panel59/source` 中运行 `tests/RunTextureSelectorTests.ps1 -Run`（实际注册/EVENT/USER_CHANGED266，0失败）、`tests/RunCloudNativeSyncTests.ps1 -Run -Bindings`（7773+相机12，0失败）、`tests/RunParticleTextureTests.ps1 -Run`（4322通过）；Node 运行 texture_panel_tests.js（47）、panel_native_node_gateway_tests.js 和 panel_startup_tests.js 均通过。完整 gateway 覆盖不同正反面视频源引用后添加节点及失败回滚；尚未复现 owner 仅在已有 Texture 引用画布上的 parameter31 错误。候选保留严格校验并增加实际类型/值诊断。`ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish` May2023 /MT 构建通过。日志在该候选 source/artifacts/m3-13-native59-*.log。AE2023 选择标签/背面/节点添加与阶段行为仍需真实宿主证据。
+
 2026-10-08 Texture 默认方向维护：在冻结7861a2b候选 artifacts/prepared/m3-13-native58-texture-orientation/source 中运行 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunParticleTextureTests.ps1 -Run`（4322项，0失败）和 `tests/RunParticleCloudTests.ps1 -Run`（2441项，0失败）。四角贴图新增断言在修复前于第114项复现相机镜像；修复后覆盖行列方向、Z旋转、背面、Transform反射与锚点。该目录内 `ae_plugin/BuildWindows.ps1 -CoreOnly -NoDistPublish -NoRuntimePublish` 构建通过，全部 adapter 输入与 native58 原构建指纹精确匹配。日志为候选 artifacts/m3-13-texture-orientation-{before,after,cloud-regression,core-build}.log（before 在仓库 artifacts）。实际 AE2023 默认方向与其他采样/持久化仍需 owner 验收。
 
 从仓库根目录运行。测试源码和夹具是行为覆盖，不按年龄删除；变更契约时同步断言，保留 malformed、rollback、identity、bounds 等保护。

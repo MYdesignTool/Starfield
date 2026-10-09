@@ -2,6 +2,48 @@
 
 Status: implementation in progress, 2026-10-08. Task M3-13.
 
+## Ordinary native layer widgets, 2026-10-09
+
+The owner reports blank Layer/Dark Side labels, ineffective back-source selection,
+and `Invalid Texture parameter: 31` when adding nodes to a canvas that already
+references a Texture layer. A canvas without Texture references does not show
+that error. The owner requests AE's compact inline Layer Control form.
+
+Native59/CEP59 returns Particle streams521/522 (disk233/234) to ordinary
+PF_LAYER widgets: PF_PUI_NONE, no custom dimensions, and no custom EVENT menu
+handler. AE owns selection, displayed layer names and the normal supervised
+USER_CHANGED callback. Transform's custom Null control is unchanged. Existing
+disk IDs, PF_LAYER types, bindings, main manifest29/count755, Particle count534,
+graph schema7, snapshot7 and Core ABI7 remain unchanged. The development build
+increments to59/packed32827; no project migration or parameter reinterpretation
+is needed.
+
+The old custom label reader requests an explicit layer name, which may be empty
+for a source-named layer. This is a hypothesis about the blank label, not a
+confirmed host diagnosis. The native widget removes that custom draw/selection
+path; back-source behavior still requires AE2023 observation.
+
+The complete fake-host gateway now selects distinct front/back video layers,
+adds a node, and restores both references after an injected commit failure.
+Those transactions pass and do not reproduce the owner's parameter31 error.
+The strict Texture validator is retained; its message now includes wire type,
+value, JavaScript kind and node ID. Do not call the real-host add defect repaired
+until the owner verifies it or that diagnostic establishes a cause. Tests use
+project layer IDs, not effect-local layer indices, throughout the graph.
+
+AE may display a Source/Masks/Effects selector with its native layer widget.
+The May2023 adapter currently mirrors the source layer ID only. Stage selection
+and corresponding hidden renderer dependencies remain an explicit open contract;
+the UI change does not establish stage support or newer-host qualification.
+
+Frozen candidate: artifacts/prepared/m3-13-native59-panel59/source, based on
+65c7245 plus this repair; unfinished M3-16 and shared MNT edits are excluded.
+Focused evidence: actual registration/EVENT/USER_CHANGED266, native bindings7773
+plus camera12, Core Texture4322, CEP Texture47, complete gateway transactions
+and startup checks all pass. Full May2023 /MT build passes with dist/runtime
+publication disabled. Logs: candidate source/artifacts/m3-13-native59-*.log.
+These establish source logic and compilation, not the owner's AE host gates.
+
 ## Source orientation correction, 2026-10-08
 
 Native58/CEP58 was deployed at22:33 +08:00 from7861a2b. The owner now

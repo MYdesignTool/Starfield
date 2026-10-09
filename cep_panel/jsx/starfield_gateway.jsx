@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-58";
+    var GATEWAY_BUILD = "native-presets-59";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1157,7 +1157,7 @@
                         var enums={"15":"Shape","17":"Orient To","25":"Random Limit","24":"Up Axis","30":"Transfer Mode"};
                         if(Number(key)>=31 && Number(key)<=36) {
                             if(parameter.type!==3 || typeof value!=="number" || !isFinite(value) || Math.floor(value)!==value || value<0 ||
-                                value>(Number(key)<=32?2147483647:Number(key)===33?7:Number(key)===34?2:1))throw new Error("Invalid Texture parameter: "+key);
+                                value>(Number(key)<=32?2147483647:Number(key)===33?7:Number(key)===34?2:1))throw new Error("Invalid Texture parameter: "+key+" (type="+parameter.type+", value="+String(value)+", kind="+(typeof value)+", node="+node.id+")");
                             if(Number(key)<=32) {
                                 var sourceIndex=layerResourceIndex(layer,value);
                                 if(sourceIndex) {

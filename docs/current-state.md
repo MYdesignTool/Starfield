@@ -1,8 +1,10 @@
 # 当前工程状态
 
-核对日期：2026-10-08。native58 / packed32826 / Core ABI7 / CEP58 已成对部署，源码7861a2ba63cff245a0840539a3933da10b8077c0已推送。发布时间2026-10-08T22:33:57.4339046+08:00。owner 确认 Comp 2 选择及纹理显示正常，发现默认镜像；当前 M3-13 优先修复方向。M3-16 图求值工作树与 MNT-01 共享改动保留，排除于维护发布。
+核对日期：2026-10-09。当前安装为 native58 / packed32826 / Core ABI7 / CEP58 + 已发布的默认方向 Core 维护。M3-13 唯一活动：按 owner 要求采用原生行内 Layer/Dark Side 选择器，并排查已有 Texture 引用时节点添加报 parameter31（无引用画布正常）。native59/CEP59 候选已构建并通过最小测试，宿主报错尚未复现，不能宣称已修复；候选包含精确类型/值诊断。M3-16 与 MNT-01 共享改动保留并排除于维护发布。
 
 ## 源码与安装
+
+候选 native59/packed32827/CEP59：普通 PF_LAYER、PF_PUI_NONE；既有 disk233/234、streams521/522、类型/绑定/schema/ABI7 保留。AE 管理选择和显示名称，正反面均经标准 USER_CHANGED；真实 AE 行为待验收。候选基于65c7245，位于 artifacts/prepared/m3-13-native59-panel59/source；控件266、绑定7773+相机12、Core Texture4322/CEP47、完整 gateway/启动及 May2023 /MT 构建通过。完整 gateway 的已有正反面引用添加/失败回滚通过，没有复现 parameter31；保留校验并扩展诊断。Source/Masks/Effects stage 的资源镜像契约仍开放。
 
 native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递。原生7773+相机12检查、隔离 CEP 纹理47、完整事务与启动通过；May2023 /MT 构建通过。部署前 fresh process check 无 AE，七个 native/Core、十一项 CEP、runtime selector 与 exact57 配对回滚核对。候选 artifacts/prepared/m3-13-native58-panel58 保留，日志 m3-13-native58-*。
 
@@ -10,9 +12,9 @@ native58 修复原生提交临时 PF 上下文缺失 effect_ref 的 owner 传递
 
 | 项目 | 源码候选 | 当前安装 |
 | --- | --- | --- |
-| 原生版本 | build58，packed32826；Core 方向维护 | native58，packed32826 + Core 方向修复 |
+| 原生版本 | build59，packed32827；普通 Texture layer widgets | native58，packed32826 + Core 方向修复 |
 | Core ABI | 7 | 7 |
-| CEP | panel58 | panel58（既有 live Junction） |
+| CEP | panel59 | panel58（既有 live Junction） |
 | Particle | total534；Cloud 追加528..533；binding5 | 同契约 |
 | 主效果 | manifest29，count755；命名/排序 ADR0035 | 同契约 |
 | 节点 | Emitter、Auxiliary、Particle、Force、Transform、固定 Output | 同节点族 |

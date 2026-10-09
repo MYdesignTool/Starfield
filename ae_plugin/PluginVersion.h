@@ -6,6 +6,6 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 58: validated owner context for native texture selection; ABI7 unchanged.
-#define STARFIELD_VERSION_BUILD 58
-#define STARFIELD_VERSION_PACKED 32826 /* 0x803a */
+// Build 59: ordinary AE Texture layer widgets; ABI7 and disk IDs unchanged.
+#define STARFIELD_VERSION_BUILD 59
+#define STARFIELD_VERSION_PACKED 32827 /* 0x803b */

@@ -28,6 +28,7 @@ namespace {
 int checks{},failures{},suites{},refs{},undo_start{},undo_end{},created{},deleted{},published{};
 int fail{},layer_count=2,names{},item_flag_reads{};double guard{};AEGP_LayerIDVal selection=77;bool three_d{},cancel_menu=true,texture_inventory{};
 int script_calls{},script_handles{},script_locks{};std::string script_result,script_capture;
+bool native_texture_change{};
 constexpr std::intptr_t result_handle=999,error_handle=998;
 AEGP_LayerIDVal expected_selection=101,menu_selection=101;
 std::u16string name;constexpr int guard_index=starfield::adapter::native_nodes::sync_guard_index(starfield::adapter::native_nodes::Kind::transform);
@@ -64,6 +65,11 @@ bool choose_transform_layer(PF_InData*,const std::vector<TransformLayerChoice>& 
 }
 }
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData* out,PF_ParamDef* params[],const PF_UserChangedParamExtra* changed,bool) noexcept {
+    if(native_texture_change) {
+        ++published;check(changed && (changed->param_index==521 || changed->param_index==522) &&
+            params[changed->param_index]->param_type==PF_Param_LAYER,
+            "ordinary AE front/back selector changes reach graph synchronization");return 0;
+    }
     ++published;check(changed->param_index==1 && selection==expected_selection && (!created || three_d) && guard==0 && params[guard_index]->u.fs_d.value==0,
         "graph publication sees the new 3D resource after guard restoration");
     if(fail==8){std::snprintf(out->return_msg,sizeof(out->return_msg),"detailed native binding failure");return 516;}
@@ -72,7 +78,7 @@ PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData* out,PF_ParamDef* params[
 int main(){
     SPBasicSuite basic{};basic.AcquireSuite=acquire;basic.ReleaseSuite=release;
     PF_InData data{};data.pica_basicP=&basic;data.effect_ref=reinterpret_cast<PF_ProgPtr>(1);data.time_scale=24;
-    PF_OutData out{};std::array<PF_ParamDef,528> params{};std::array<PF_ParamDef*,528> pointers{};
+    PF_OutData out{};std::array<PF_ParamDef,534> params{};std::array<PF_ParamDef*,534> pointers{};
     for(unsigned i=0;i<params.size();++i)pointers[i]=&params[i];
     params[1].param_type=PF_Param_LAYER;params[guard_index].param_type=PF_Param_FLOAT_SLIDER;
     pf.AEGP_GetEffectLayer=[](PF_ProgPtr,AEGP_LayerH* v)->A_Err{*v=layer(1);return 0;};
@@ -256,12 +262,18 @@ int main(){
     for(const auto index:{521,522}) {
         const auto& def=registered_native[index-1];
         check(def.param_type==PF_Param_LAYER && def.uu.id==(index==521?233:234) &&
-              (def.ui_flags&PF_PUI_CONTROL) && def.ui_width==240 && def.ui_height==26,
-              "registered Layer/Dark Side disk IDs and physical custom-control streams match dispatch");
+              def.ui_flags==PF_PUI_NONE && def.ui_width==0 && def.ui_height==0 &&
+              (def.flags&PF_ParamFlag_SUPERVISE),
+              "Layer/Dark Side retain disk IDs and delegate inline labels and selection to AE");
         const auto before=script_calls;event.effect_win.index=index;event.evt_out_flags=0;
         check(EffectMain(PF_Cmd_EVENT,&data,&out,pointers.data(),nullptr,&event)==0 &&
-              (event.evt_out_flags&PF_EO_HANDLED_EVENT) && script_calls==before+1 && !published,
-              "actual Particle EffectMain dispatch opens the owner-pinned Texture menu without editing on cancel");
+              !event.evt_out_flags && script_calls==before && !published,
+              "ordinary Layer widgets do not run custom menus or consume host events");
+        params[index].param_type=PF_Param_LAYER;PF_UserChangedParamExtra changed{};changed.param_index=index;
+        native_texture_change=true;
+        check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&out,pointers.data(),nullptr,&changed)==0 && published==1,
+              "actual Particle USER_CHANGED handles the selected front/back Layer stream");
+        native_texture_change=false;published=0;
     }
 #endif
     for(const auto phase:{12,13,14,15,16,18,19}) {
