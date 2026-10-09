@@ -92,3 +92,4 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 2026-10-09资源里程碑：SFMG1有界网格codec和粒子pose通过2076项；RenderRequest数值资源/C ABI8尾部传输通过30项标准及ASAN检查，保留精确ABI7前缀。三角形6406复查通过。追加源列表/CMake/Core工程；未接入图/shape4/snapshot8/原生/CEP，未发布或关闭Model gate。迁移方案先行写入ADR0038；现有安装ABI7不变。
 资源源码8220f25已推送并冻结完整May2023 /MT构建通过（双NoPublish），十八安装哈希保持native60/CEP61。
 2026-10-09粒子数值里程碑：shared Model groups/shape4/snapshot8/CPU真实像素通过2695项标准及ASAN；mesh lease一次验证复用，同组一次opacity、帧输入tri/sample预算和typed GPU CPU-fallback。旧snapshot3..7保持；Texture4322、资源2076、三角形6406及ABI前缀ASAN30复查通过。live图/采样与原生/CEP作者仍待接入，不暴露菜单，不部署此数值里程碑；所有实际Model AE gate继续。
+snapshot/CPU源码e12517d冻结完整May2023 /MT全目标构建通过（双NoPublish），main AEX网格/资源依赖与adapter fingerprint同步；十八安装哈希保持native60/CEP61，日志 artifacts/m3-17-model-particles-native-build.log。继续live Model图/采样与完整作者，goal保持active。

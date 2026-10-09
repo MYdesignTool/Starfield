@@ -4,6 +4,8 @@
 
 ## 源码与安装
 
+snapshot/CPU源码e12517d99a1545694a02c99182fde7e893b0f736冻结于 artifacts/prepared/m3-17-model-particles-e12517d/source，完整May2023 x64 Release /MT全部目标通过（双NoPublish），日志 artifacts/m3-17-model-particles-native-build.log。main AEX接入snapshot数值验证的ModelGeometry/Resources，adapter fingerprint同步纳入。构建后十八安装哈希仍匹配native60/CEP61，报告 artifacts/m3-17-model-particles-installed-hashes.json。该数值候选未部署；下一步为live Model图/采样和完整作者。
+
 当前Model候选在显式evaluated snapshot中支持shape4、snapshot8模型组和CPU实际像素；默认cube/导入多边形、三维pose、近裁剪、ROI/PAR/downsample、四种transfer及primitive共同排序均通过2695项标准与ASAN检查。一次验证的数值mesh lease供各粒子复用；同组成员先合并覆盖再应用一次opacity，frame共享输入三角形/采样预算。live图/原生/CEP作者未接入，未发布菜单或安装。现有Texture4322与资源2076/三角形6406回归通过；ABI8精确ABI7前缀ASAN30也通过。
 
 资源源码8220f25d1cc95b1aa5700fb962b8e137d8adf418已推送，冻结于 artifacts/prepared/m3-17-resources-8220f25/source，完整May2023 /MT全目标构建通过（双NoPublish），日志 artifacts/m3-17-resources-native-build.log。构建后十八安装哈希匹配native60/CEP61，报告 artifacts/m3-17-resources-installed-hashes.json。本freeze早于snapshot/CPU里程碑；共享ABI与ParticleInstance变化均要求完整配对构建。

@@ -31,6 +31,15 @@ The live graph's Model node/input/shape sampling and all native/CEP authoring
 remain pending. No new menu/selector or installed binary is published. This is
 render evidence from explicit evaluated snapshots, not a usable AE Model author.
 
+Frozen snapshot/CPU sourcee12517d99a1545694a02c99182fde7e893b0f736 at
+artifacts/prepared/m3-17-model-particles-e12517d/source passes the full May2023
+x64 Release /MT build with -NoDistPublish -NoRuntimePublish; log
+artifacts/m3-17-model-particles-native-build.log. The main AEX now compiles the
+mesh/resource dependencies used by snapshot validation, and the adapter-input
+fingerprint includes them. All18 installed native60/CEP61 files still match the
+deployment receipt (artifacts/m3-17-model-particles-installed-hashes.json).
+No Model publication or AE2023 qualification follows from this build.
+
 ## Resource and transport milestone evidence
 
 ModelResources implements the SFMG1 numeric mesh codec and particle pose below.
