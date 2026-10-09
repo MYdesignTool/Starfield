@@ -26,6 +26,14 @@ The same final fixture passes444 checks with MSVC AddressSanitizer; log
 artifacts/m3-17-model-graph-asan-current.log. Intermediate371/440 runs do not
 describe the final candidate.
 
+Frozen live-graph source67fc06376729c45991a40122dc8130506d5e4806 at
+artifacts/prepared/m3-17-model-graph-67fc063/source passes all May2023 x64
+Release /MT targets with both NoPublish switches; log
+artifacts/m3-17-model-graph-native-build.log. ModelEvaluation.hpp is included in
+adapter fingerprints. All18 installed files still match native60/CEP61; report
+artifacts/m3-17-model-graph-installed-hashes.json. No Model author/selector has
+been published; native persistence/resource capture remains the next milestone.
+
 ## Particle snapshot and CPU milestone evidence
 
 Snapshot8 now retains Model groups and the explicit200-byte particle stride;

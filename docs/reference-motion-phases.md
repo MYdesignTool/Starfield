@@ -13,3 +13,5 @@
 本地参考库存artifacts/reference/stardust_effect_parameters.txt的Motion节提供完整标签与观测默认值，但只记录菜单当前数值；未列出下拉全部选项。三模式首批不需要注册其他模式。Starting With目标筛选、Light Path光源轨迹、Circle半径来源/速度单位、Look At目标/方向须在契约中区分观察与实现选择；公开指南和实机案例用于补充。
 
 共用Motion Over Life采用项目已有Linear/Hold/Bezier/Draw曲线编辑与保存契约。实际执行须维持乱序帧、出生身份、Force/Transform/Auxiliary路径、快门采样及资源预算。实现和配对构建完成后，实际AE2023行为/撤销/保存重开单独验收。
+
+[官方指南的Motion Node段落](https://superluminal.tv/user-guide)说明圆周运动与沿光源路径运动/朝向；2026-10-09复查未找到三种模式完整菜单、Circle半径或Look At方程。Particle自身的Orient To段落不能当作Motion Look At的精确语义证据。

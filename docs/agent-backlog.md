@@ -95,6 +95,7 @@ MotionBlur.hpp的Model style验证/组索引迁移/线性矩阵采样属于M3-17
 2026-10-09粒子数值里程碑：shared Model groups/shape4/snapshot8/CPU真实像素通过2695项标准及ASAN；mesh lease一次验证复用，同组一次opacity、帧输入tri/sample预算和typed GPU CPU-fallback。旧snapshot3..7保持；Texture4322、资源2076、三角形6406及ABI前缀ASAN30复查通过。live图/采样与原生/CEP作者仍待接入，不暴露菜单，不部署此数值里程碑；所有实际Model AE gate继续。
 snapshot/CPU源码e12517d冻结完整May2023 /MT全目标构建通过（双NoPublish），main AEX网格/资源依赖与adapter fingerprint同步；十八安装哈希保持native60/CEP61，日志 artifacts/m3-17-model-particles-native-build.log。继续live Model图/采样与完整作者，goal保持active。
 2026-10-09 live数值里程碑：Model schema1/metadata端口、多源共享组、完整依赖与粒子流分离、稳定Particle UUID分区、Auxiliary组/资源域、当前帧采样及Linear shutter组迁移/矩阵插值接入。标准/ASAN各444项检查，旧Texture4322/Birth3348/Model CPU2695回归通过；原生/CEP/预设作者仍待完成，现有安装60/61不变。
+源码67fc063冻结完整May2023 /MT全目标构建通过（双NoPublish），十八安装哈希匹配native60/CEP61；日志artifacts/m3-17-model-graph-native-build.log。下一步原生网格持久化/资源捕获和作者。
 
 ## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
 

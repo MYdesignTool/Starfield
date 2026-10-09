@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 live Model完整构建：67fc063的git archive冻结于artifacts/prepared/m3-17-model-graph-67fc063/source，运行`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT全部目标通过。日志artifacts/m3-17-model-graph-native-build.log；构建后十八安装哈希匹配native60/CEP61，报告artifacts/m3-17-model-graph-installed-hashes.json。没有发布候选、改写runtime selector或增加宿主资格。
+
 2026-10-09 M3-17 live Model图：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGraphTests.ps1 -Run`通过444项，日志artifacts/m3-17-model-graph-tests-current.log。覆盖多Model共享组/确定顺序、出生身份、当前帧/出生shape动画、parked/负时间/零cap、Auxiliary资源域、Force/Transform、C ABI实际像素、Linear shutter矩阵/索引/默认cube/资源变化/组预算及typed拒绝。新增fixture首次误用PortId和不存在的RenderRequest成员，修正后才通过。原生/CEP作者未接入，不从纯数值测试关闭Model宿主gate。
 
 现有Texture4322（artifacts/m3-17-texture-live-model-regression.log）、Birth3348（artifacts/m3-17-birth-model-shutter-regression.log）及Model CPU2695（artifacts/m3-17-model-particle-live-graph-regression.log）回归通过。首次误写Birth runner名称未执行测试，随后使用正确的RunParticleBirthGraphTests.ps1执行并通过；失败日志已由实际运行日志替代。
