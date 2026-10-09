@@ -11,6 +11,7 @@
 #include "MotionBlur.hpp"
 #include "TransformBinding.hpp"
 #include "ModelGeometryParameter.hpp"
+#include "ModelMirrorTransaction.hpp"
 #include "SPBasic.h"
 
 #include "starfield/core/AgeCurve.hpp"
@@ -1366,10 +1367,12 @@ struct NativeBindingTransaction::Impl {
     std::vector<Change> changes;
     struct ResourceChange {AEGP_StreamRefH ref{};AEGP_LayerIDVal previous{};bool count{},changed{};};
     std::vector<ResourceChange> resources;
+    std::unique_ptr<ModelMirrorTransaction> models;
     bool accepted{};
     Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r, AEGP_LayerH owner)
         : data(d), id(i), renderer(r), owner_layer(owner), suites(d) {}
     ~Impl() {
+        models.reset();
         for(auto& change:resources) {
             if(!accepted && change.changed) {
                 AEGP_StreamValue2 value{};value.streamH=change.ref;
@@ -1398,7 +1401,10 @@ NativeBindingTransaction::NativeBindingTransaction(PF_InData* data, AEGP_PluginI
     AEGP_EffectRefH renderer, AEGP_LayerH owner_layer)
     : impl_(std::make_unique<Impl>(data, id, renderer, owner_layer)) {}
 NativeBindingTransaction::~NativeBindingTransaction() = default;
-void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; }
+void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; if(impl_->models)impl_->models->accept(); }
+PF_Err NativeBindingTransaction::rollback_model_resources() noexcept {
+    return impl_->models?impl_->models->rollback():PF_Err_NONE;
+}
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
                                         const char** failed_stage, A_long* failed_parameter) noexcept {
@@ -1482,6 +1488,8 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         for(A_long slot=0;slot<std::max<A_long>(old_count,static_cast<A_long>(resource_ids.size()));++slot)
             if(auto result=set_resource(kTextureResourceFirstIndex+slot,false,
                 slot<static_cast<A_long>(resource_ids.size())?resource_ids[slot]:0);result)return result;
+        tx.models=std::make_unique<ModelMirrorTransaction>(tx.data,tx.id,tx.renderer,tx.owner_layer);
+        if(const auto result=tx.models->install(graph,failed_stream,failed_stage);result)return result;
         tx.changes.reserve(kNativeBindingCapacity);
         for (const auto& node : nodes) for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
             const auto& field = node.fields[index]; if (!field.present || field.slot < 0) continue;

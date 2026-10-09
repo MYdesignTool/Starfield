@@ -52,6 +52,7 @@ public:
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
                    const char** failed_stage = nullptr, A_long* failed_parameter = nullptr) noexcept;
     void accept() noexcept;
+    [[nodiscard]] PF_Err rollback_model_resources() noexcept;
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -794,6 +794,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     def.ui_flags=PF_PUI_NO_ECW_UI|PF_PUI_INVISIBLE;
     PF_ADD_FLOAT_SLIDERX("Texture Resource Count",0,kTextureResourceCapacity,0,kTextureResourceCapacity,0,
         PF_Precision_INTEGER,0,0,1828);
+    if(const auto model_error=register_model_mirror_parameters(in_data);model_error)return model_error;
     out_data->num_params = static_cast<A_long>(kTotalEffectParameterCount) + 1;
     return PF_Err_NONE;
 }

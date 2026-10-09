@@ -109,6 +109,8 @@ Model renderer mirror helper实现SFMR1 UUID/revision/CRC+SFMG1，以及全部AR
 
 镜像持久化源码0d868eb冻结完整May2023 /MT八目标通过（显式IncludeModelCandidate/双NoPublish），ModelMirrorParameter实际进入main/node候选；十八安装哈希保持native60/CEP61。日志artifacts/m3-17-model-mirror-build.log；继续主资源事务/回滚与SmartFX捕获，未调用注册helper、未部署。
 
+Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、NativeBindingTransaction资源提交/验证/回滚、SmartFX活动资源及快门去重捕获。标准/ASAN夹具各922项、原生绑定2809、旧绑定8697/相机12通过；日志artifacts/m3-17-model-resource-bridge-{tests,asan}.log和m3-17-model-resource-{native-binding-tests,legacy-regression}.log。OBJ导入事务、Particle类型/隔离CEP完整作者仍待接入，当前安装60/61保持。下一步冻结完整SDK构建后继续作者，不发布资源桥独立候选。
+
 ## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
 
 2026-10-09 owner截图限定Light Path、Circle、Look At，复杂Motion按阶段执行；参考清单docs/reference-motion-phases.md。拥有：独立Motion数值类型/采样与粒子路径/朝向、graph/history/资源/渲染的明确契约、独立原生节点及CEP/预设/schema/build/focused tests/新ADR。只追加自有身份/IDs；不复用Transform或Force身份，不注册无实际行为的选项。动画/Light资源采样边界和Circle半径/Look At目标语义先记录证据与独立方程，再接入作者。完成条件：三模式实际行为、共享曲线编辑/持久化、配对构建/发布及AE2023验收。

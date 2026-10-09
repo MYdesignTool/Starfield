@@ -118,6 +118,12 @@ PF_Err dispatch(PF_Cmd cmd,
         case PF_Cmd_SMART_RENDER:
             return starfield::adapter::smart_render(in_data, out_data, static_cast<PF_SmartRenderExtra*>(extra));
         case PF_Cmd_ARBITRARY_CALLBACK:
+            if(extra) {
+                const auto* arbitrary=static_cast<PF_ArbParamsExtra*>(extra);
+                if(arbitrary->id>=starfield::adapter::kModelMirrorFirstDiskId &&
+                   arbitrary->id<starfield::adapter::kModelMirrorFirstDiskId+starfield::adapter::kModelMirrorCapacity)
+                    return starfield::adapter::model_mirror_arbitrary_callback(in_data,static_cast<PF_ArbParamsExtra*>(extra));
+            }
             return starfield::adapter::graph_arbitrary_callback(in_data, static_cast<PF_ArbParamsExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
             if (const PF_Err carrier_error = starfield::adapter::commit_graph_request(

@@ -55,6 +55,8 @@
     <ClCompile Include="GraphParameter.cpp" />
     <ClCompile Include="ModelGeometryParameter.cpp" />
     <ClCompile Include="ModelMirrorParameter.cpp" />
+    <ClCompile Include="ModelMirrorTransaction.cpp" />
+    <ClCompile Include="ModelRenderResources.cpp" />
     <ClCompile Include="ModelControls.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="SmartRender.cpp" />

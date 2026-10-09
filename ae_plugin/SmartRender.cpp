@@ -10,6 +10,7 @@
 #include "MotionBlur.hpp"
 #include "WorldBridge.hpp"
 #include "TextureResources.hpp"
+#include "ModelRenderResources.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -180,6 +181,7 @@ struct PreRenderState {
     SfCoreGpuSceneResult gpu_scene{};
     MotionExposure motion;MotionGpuStorage motion_gpu;
     TexturePreparation textures;
+    ModelRenderResources models;
     A_long gpu_world_width{},gpu_world_height{};
     ~PreRenderState() { if(generation && gpu_scene.struct_size==sizeof(gpu_scene)) generation->api().release_gpu_scene(&gpu_scene); }
     std::shared_ptr<const CoreGeneration> generation;
@@ -295,6 +297,8 @@ PF_Err make_request(PF_InData* in_data,PF_OutData* out_data,HostBitDepth depth,c
     request.graph_byte_count = state.graph_bytes.size();
     request.texture_source_count=static_cast<std::uint32_t>(state.textures.abi_sources.size());
     request.texture_sources=state.textures.abi_sources.data();
+    request.model_source_count=static_cast<std::uint32_t>(state.models.sources.size());
+    request.model_sources=state.models.sources.data();
     const PF_Err camera_error = capture_camera(in_data, request);
     if (camera_error) {
         std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
@@ -479,6 +483,8 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     if (cache_err != PF_Err_NONE) return cache_err;
     if(const auto error=prepare_texture_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
         double(state->par.num)/state->par.den,history_cancel,state->textures);error)return error;
+    if(const auto error=prepare_model_render_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
+        double(state->par.num)/state->par.den,history_cancel,state->models);error)return error;
     const double exposure_key[2]{state->motion.enabled?1.0:0.0,state->motion.gain};
     if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(exposure_key),exposure_key);error)return error;
     for(const auto& sample:state->motion.samples) {

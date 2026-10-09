@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 29,
-  "schemaVersion": 29,
-  "revisionNote": "M3-14 build54 reorders only main streams610..625 by fixed disk IDs. Permanent logical parameter IDs stay unchanged; index overrides moved positions. ABI6, aliases98..609/resources626..754 stay fixed. ADR0035.",
+  "manifestVersion": 30,
+  "schemaVersion": 30,
+  "revisionNote": "Unpublished M3-17 appends main Model mirrors755..1010 and count1011 by new disk1900..2155/2200. Existing streams0..754/IDs/defaults stay fixed. Complete paired author release required; ADR0038.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -1456,6 +1456,12 @@
     "hidden": true,
     "policy": "Sorted unique nonzero project layer IDs; UI transaction mirrors and rolls back selectors. ADR0034."
   },
+  "modelResources": {
+    "firstIndex": 755, "count": 256, "firstDiskId": 1900, "countIndex": 1011,
+    "countDiskId": 2200, "type": "arbitrary", "countType": "integer_slider", "hidden": true,
+    "format": "SFMR1 UUID/revision/CRC32 wrapper around SFMG1",
+    "policy": "Sorted imported Model UUIDs; supervised UI mirrors/rolls back independently owned values. SmartFX captures only evaluated resources and verifies identity/revision/bounds. Unpublished manifest30 candidate; ADR0038."
+  },
   "nativeRenderBindings": {
     "firstIndex": 98,
     "count": 512,
@@ -1469,7 +1475,7 @@
   },
   "compatibility": {
     "idPolicy": "Released numeric IDs are permanent; never renumber or reuse. IDs are still being shaped until the first shared release.",
-    "migrationPolicy": "Manifest29 permutes streams610..625 by fixed disk IDs: Motion Blur610..619, Simulation620..622, GPU623..625. Parameter id is permanent logical identity; index defaults to id and overrides moved rows. Existing saved values restore by disk ID. Other stream bounds/defaults/types/sequence/ABI6 stay fixed. Numeric-index expressions and saved AE2023 projects require host verification. ADR0035.",
+    "migrationPolicy": "Manifest29 permutes streams610..625 by fixed disk IDs: Motion Blur610..619, Simulation620..622, GPU623..625 (ADR0035). Unpublished manifest30 appends Model mirrors755..1010/disk1900..2155 and integer count1011/disk2200 (ADR0038), total1012. Parameter IDs are permanent; existing0..754 IDs/defaults/types remain fixed. Existing saved values restore by disk ID. Full ABI8 paired author publication and AE2023 saved-project/undo verification are required.",
     "hostInputIndex": 0,
     "topicGroups": "Native node effects remain flat. Main has functional Time Remapping and Render Settings sections; no redundant outer Output topic.",
     "controlSupervision": "CEP writes ordinary streams on separate node effects under per-node guards and writes Output cap/position under main guard index 40. Supervised numeric index 41 compiles these records, validates them and updates the renderer-owned arbitrary graph plus revision/checksum receipts at indices 39/88/89. Index 87 distinguishes bootstrap from an intentionally empty graph. Authored expressions stay on native effects; derived UUID bindings on main inputs are installed only on the UI commit path (ADR 0023). Hidden flat controls are bootstrap inputs only; native direct-edit callback/cache/undo behavior still needs AE qualification."

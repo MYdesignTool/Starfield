@@ -208,7 +208,36 @@ artifacts/m3-17-model-mirror-build.log, m3-17-model-mirror-build-hashes.json and
 m3-17-model-mirror-installed-hashes.json. All18 installed files still match
 native60/CEP61. No registration call, publication or new host qualification.
 
-### Native mesh persistence boundary
+### Renderer resource transaction and immutable capture implementation
+
+The unpublished main now calls the manifest30 registration helper (1012
+parameters) and routes disk1900..2155 arbitrary selectors to SFMR1. Native
+graph commits install sorted UUID mirrors before graph publication. Old values
+and stream references remain owned through readback verification and exact
+rollback. Count is written last; unchanged UUID/revision/bounds skip author
+mesh reads and writes. Failed partial setters and silent writes are detected.
+Model transaction disposal precedes renderer-reference disposal. Borrowed AEGP
+values are disposed before their stream references, including source mesh reads.
+
+SmartFX captures only evaluated imported Model resources, deduplicated across
+shutter samples. Every successful PF checkout is checked in on decode/type/error
+paths. The captured geometry is copied into typed, owned ABI8 arrays; no AE
+handle survives into Core. UUID/revision/counts and numeric mesh arrays mix into
+the cache GUID. Corruption, identity/revision/bounds mismatch and cancellation
+publish no resource set. Parked, zero-cap and negative-time frames skip checkout.
+
+Standard and ASAN resource-bridge fixtures each pass922 checks, including the
+reused452 controls, transaction failure/rollback, capture ownership/shutter
+deduplication and actual ABI8 pixels after all fake host handles are released.
+Native binding2809 and legacy binding8697/camera12 checks pass. Logs:
+artifacts/m3-17-model-resource-bridge-{tests,asan}.log,
+m3-17-model-resource-native-binding-tests.log and
+m3-17-model-resource-legacy-regression.log. These are SDK fake-host/numeric
+evidence, not AE2023 UI/undo/reopen qualification. Full frozen SDK build remains
+required; OBJ import/complete author publication are still pending. Installed
+native60/ABI7/CEP61 is unchanged.
+
+### Earlier native mesh persistence milestone
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
 arbitrary handle. It owns no graph identity, filenames or external file lookup;

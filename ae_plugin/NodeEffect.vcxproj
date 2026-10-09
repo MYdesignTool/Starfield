@@ -79,6 +79,7 @@
     <ClCompile Include="ModelControls.cpp" />
     <ClCompile Include="ModelGeometryParameter.cpp" />
     <ClCompile Include="ModelMirrorParameter.cpp" />
+    <ClCompile Include="ModelMirrorTransaction.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />

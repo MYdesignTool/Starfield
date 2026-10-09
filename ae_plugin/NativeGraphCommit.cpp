@@ -249,7 +249,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
             }
         }
         if (ae_error) {
-            bool rollback_failed = false;
+            bool rollback_failed = bindings.rollback_model_resources()!=PF_Err_NONE;
             while (written > 0) {
                 --written;
                 if (publish.streams->AEGP_SetStreamValue(plugin_id, publish.refs[written], &publish.old[written]) != 0) {

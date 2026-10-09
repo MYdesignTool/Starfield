@@ -1,10 +1,12 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：原生模块与binding7候选，标准/ASAN各2809项检查通过，继续导入事务/资源捕获/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：原生模块/binding7、资源提交/回滚及SmartFX捕获候选已接入，继续导入事务/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+当前未部署资源桥候选已接入manifest30主效果注册1012参数和SFMR1回调路由。NativeBindingTransaction安装、读回校验与失败回滚Model镜像；SmartFX只捕获实际Model粒子及快门样本使用的资源，复制为自有ABI8数值数组并混入GUID。标准/ASAN资源桥夹具各922项通过（含复用452控件检查），原生绑定2809、旧绑定8697及相机12通过。日志artifacts/m3-17-model-resource-bridge-{tests,asan}.log、m3-17-model-resource-native-binding-tests.log、m3-17-model-resource-legacy-regression.log。完整SDK构建待当前源码冻结后执行；OBJ按钮/Particle菜单/隔离CEP作者仍待接入，安装native60/CEP61保持。以下helper构建叙述为之前阶段证据。
 
 镜像持久化源码0d868eb35fa00ba50619460722cc9b9f504cd1bb冻结于artifacts/prepared/m3-17-model-mirror-0d868eb/source；显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，main及五种node模块实际编译ModelMirrorParameter。日志artifacts/m3-17-model-mirror-build.log，八输出哈希artifacts/m3-17-model-mirror-build-hashes.json；十八安装哈希仍符合native60/CEP61，报告artifacts/m3-17-model-mirror-installed-hashes.json。注册helper未调用、未部署；下一步NativeBindingTransaction资源提交/回滚与SmartFX捕获，随后OBJ按钮/完整CEP作者。
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "ModelGeometryParameter.hpp"
+#include "starfield/core/Graph.hpp"
 
 namespace starfield::adapter {
 inline constexpr A_long kModelMirrorFirstIndex=755, kModelMirrorCapacity=256;
@@ -10,6 +11,8 @@ struct ModelMirrorValue {
     std::uint32_t revision{};
     core::ModelGeometry geometry;
 };
+struct ModelMirrorRecipe { core::NodeId node; std::uint32_t revision{}; core::ModelBounds bounds; };
+[[nodiscard]] core::Result<std::vector<ModelMirrorRecipe>> model_mirror_recipes(const core::Graph&) noexcept;
 [[nodiscard]] core::Result<ModelMirrorValue> read_model_mirror_parameter(
     PF_InData*,PF_ArbitraryH,const core::Cancellation&) noexcept;
 [[nodiscard]] PF_Err create_model_mirror_parameter(PF_InData*,const ModelMirrorValue&,

@@ -2,6 +2,7 @@
 #include "AE_EffectCB.h"
 #include "Param_Utils.h"
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -227,4 +228,48 @@ PF_Err register_model_mirror_parameters(PF_InData* data) noexcept {
     std::snprintf(def.name,sizeof(def.name),"Model Resource Count");def.u.sd.valid_max=def.u.sd.slider_max=kModelMirrorCapacity;
     return PF_ADD_PARAM(data,-1,&def);
 }
+core::Result<std::vector<ModelMirrorRecipe>> model_mirror_recipes(const core::Graph& graph) noexcept try {
+    using R=core::Result<std::vector<ModelMirrorRecipe>>;using namespace core::graph_keys;
+    std::vector<ModelMirrorRecipe> recipes;
+    for(const auto& node:graph.nodes)if(node.type_key==kModelNode) {
+        if(node.schema_version!=1)return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror node schema");
+        core::ModelResourceId resource{};std::uint32_t source{},revision{};bool seen[4]{};
+        const core::OpaqueBytes* encoded_bounds{};
+        for(const auto& p:node.parameters) {
+            const int field=p.key==kModelResource?0:p.key==kModelRevision?1:p.key==kModelSource?2:p.key==kModelBounds?3:-1;
+            if(field<0)continue;
+            if(seen[field])return invalid<std::vector<ModelMirrorRecipe>>("duplicate Model mirror metadata");seen[field]=true;
+            if(field==0){const auto* bytes=std::get_if<core::OpaqueBytes>(&p.value);
+                if(!bytes||bytes->size()!=16)return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror identity");
+                for(unsigned i=0;i<16;++i)resource[i]=std::to_integer<std::uint8_t>((*bytes)[i]);}
+            else if(field==3){encoded_bounds=std::get_if<core::OpaqueBytes>(&p.value);
+                if(!encoded_bounds||encoded_bounds->size()!=48)return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror bounds");}
+            else {const auto* value=std::get_if<std::uint32_t>(&p.value);
+                if(!value)return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror source/revision kind");
+                if(field==1)revision=*value;else source=*value;}
+        }
+        if(source>1||revision>2147483647u)return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror source/revision");
+        if(resource==core::ModelResourceId{}) {
+            if(revision)return invalid<std::vector<ModelMirrorRecipe>>("Model mirror revision has no resource");continue;
+        }
+        if(source!=1||!revision||resource!=node.id.value.bytes||!encoded_bounds)
+            return invalid<std::vector<ModelMirrorRecipe>>("Model mirror metadata does not match its author");
+        ModelMirrorRecipe recipe{node.id,revision,{}};
+        double* bounds[]{&recipe.bounds.minimum.x,&recipe.bounds.minimum.y,&recipe.bounds.minimum.z,
+            &recipe.bounds.maximum.x,&recipe.bounds.maximum.y,&recipe.bounds.maximum.z};
+        for(unsigned i=0;i<6;++i){std::uint64_t bits{};for(unsigned b=0;b<8;++b)bits|=std::to_integer<std::uint64_t>((*encoded_bounds)[8*i+b])<<(8*b);
+            *bounds[i]=std::bit_cast<double>(bits);
+            if(!std::isfinite(*bounds[i])||std::abs(*bounds[i])>core::kMaxModelCoordinate)
+                return invalid<std::vector<ModelMirrorRecipe>>("invalid Model mirror bounds value");}
+        if(recipe.bounds.minimum.x>recipe.bounds.maximum.x||recipe.bounds.minimum.y>recipe.bounds.maximum.y||recipe.bounds.minimum.z>recipe.bounds.maximum.z)
+            return invalid<std::vector<ModelMirrorRecipe>>("inverted Model mirror bounds");
+        recipes.push_back(recipe);
+        if(recipes.size()>core::kMaxModelSources)return R::failure(core::ErrorCode::work_limit_exceeded,"Model mirror source budget exceeded");
+    }
+    std::sort(recipes.begin(),recipes.end(),[](const auto& a,const auto& b){return a.node<b.node;});
+    for(std::size_t i=1;i<recipes.size();++i)if(recipes[i-1].node==recipes[i].node)
+        return invalid<std::vector<ModelMirrorRecipe>>("duplicate Model mirror author identity");
+    return R::success(std::move(recipes));
+} catch(const std::bad_alloc&){return core::Result<std::vector<ModelMirrorRecipe>>::failure(core::ErrorCode::allocation_failed,"Model mirror recipe allocation failed");}
+catch(...){return core::Result<std::vector<ModelMirrorRecipe>>::failure(core::ErrorCode::invalid_request,"Model mirror recipe failed");}
 }
