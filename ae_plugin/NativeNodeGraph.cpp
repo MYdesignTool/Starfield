@@ -10,6 +10,7 @@
 #include "Parameters.hpp"
 #include "MotionBlur.hpp"
 #include "TransformBinding.hpp"
+#include "ModelGeometryParameter.hpp"
 #include "SPBasic.h"
 
 #include "starfield/core/AgeCurve.hpp"
@@ -36,12 +37,14 @@ namespace core = starfield::core;
 using native_nodes::Kind;
 namespace particle_layout=native_nodes::particle_layout;
 namespace transform_layout=native_nodes::transform_layout;
+namespace model_layout=native_nodes::model_layout;
 
 constexpr char kRendererMatchName[] = "org.starfieldfx.particle";
 constexpr char kEmitterMatchName[] = "org.starfieldfx.node.emitter";
 constexpr char kParticleMatchName[] = "org.starfieldfx.node.particle";
 constexpr char kForceMatchName[] = "org.starfieldfx.node.force";
 constexpr char kTransformMatchName[] = "org.starfieldfx.node.transform";
+constexpr char kModelMatchName[] = "org.starfieldfx.node.model";
 
 struct RawField {
     bool present{};
@@ -62,6 +65,7 @@ constexpr A_long component_count(node_sync::ValueKind type) noexcept {
 constexpr bool animated_index(Kind kind,A_long index) noexcept {
     if(kind==Kind::particle) return native_nodes::particle_layout::animated(index);
     if(kind==Kind::transform) return transform_layout::animated(index);
+    if(kind==Kind::model) return model_layout::animated(index);
     return index>=1 && index<=(kind==Kind::emitter?33:10);
 }
 
@@ -490,7 +494,8 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
     const bool births=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, births?6:attachments?2:1); append_u32(bytes, 0);
+    const bool models=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::model;});
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, models?7:births?6:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     A_long slot = 0;
     for (auto& node : nodes) {
@@ -537,14 +542,14 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 6) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 7) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || (kind > 4 || kind == 2) || !read(2, fields)) return false;
+            if (!read(2, kind) || (kind > 5 || kind == 2 || (kind==5 && version<7)) || !read(2, fields)) return false;
             node.kind = static_cast<Kind>(kind);
             // Dense Draw banks have 64 age/value pairs. Their constant fields
             // belong in the record but do not consume animation alias slots.
@@ -569,6 +574,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 field.type = static_cast<node_sync::ValueKind>(type);
                 if(node.kind==Kind::transform && field.type!=(index==transform_layout::anchor_xy ?
                     node_sync::ValueKind::point2 : node_sync::ValueKind::scalar))return false;
+                if(node.kind==Kind::model && (!model_layout::binding_field(static_cast<A_long>(index)) ||
+                    field.type!=node_sync::ValueKind::scalar))return false;
                 field.slot = slot == 0xffffu ? -1 : static_cast<A_long>(slot);
                 if (field.slot >= 0) {
                     if (!animated_index(node.kind,static_cast<A_long>(index)) ||
@@ -587,6 +594,11 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             if(node.kind==Kind::transform && version>=2) {
                 transform_binding::PixelAffine offset{};
                 if(!attachment_fields(node,offset))return false;
+            }
+            if(node.kind==Kind::model) {
+                for(A_long index=1;index<=model_layout::bounds_last;++index)
+                    if(model_layout::binding_field(index) && (!node.fields[index].present ||
+                        node.fields[index].value[1]!=0 || node.fields[index].value[2]!=0))return false;
             }
             nodes.push_back(std::move(node));
         }
@@ -641,6 +653,9 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
     if (std::strcmp(match_name, kTransformMatchName) == 0) {
         kind = Kind::transform; type_key = core::graph_keys::kTransformNode; schema = 1; return true;
     }
+    if (std::strcmp(match_name,kModelMatchName)==0) {
+        kind=Kind::model;type_key=core::graph_keys::kModelNode;schema=1;return true;
+    }
     return false;
 }
 
@@ -650,6 +665,63 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     double scalar = 0.0;
     std::uint32_t integer = 0;
     core::Vec3 vector{};
+    if(kind==Kind::model) {
+        std::uint32_t source{},revision{};
+        if(!read_uint(suites,plugin_id,effect,model_layout::source,time,source) || source<1 || source>2)
+            return suites.fail(model_layout::source);
+        if(!read_uint(suites,plugin_id,effect,model_layout::revision,time,revision) || revision>2147483647u)
+            return suites.fail(model_layout::revision);
+        core::ModelLocalSettings pose;
+        const auto read_vector=[&](A_long first,core::Vec3& value) {
+            return read_one_d(suites,plugin_id,effect,first,time,value.x) &&
+                read_one_d(suites,plugin_id,effect,first+1,time,value.y) &&
+                read_one_d(suites,plugin_id,effect,first+2,time,value.z);
+        };
+        if(!read_vector(model_layout::origin,pose.origin) || !read_vector(model_layout::rotation,pose.rotation_degrees) ||
+            !read_vector(model_layout::scale,pose.scale_percent))return false;
+        bool* flags[]{&pose.flip_x,&pose.flip_y,&pose.flip_z,&pose.center,&pose.normalize};
+        for(A_long b=0;b<5;++b) {
+            if(!read_uint(suites,plugin_id,effect,model_layout::flip_x+b,time,integer) || integer>1)
+                return suites.fail(model_layout::flip_x+b);
+            *flags[b]=integer!=0;
+        }
+        const bool imported=source==2 && revision!=0;
+        core::ModelBounds bounds{{-.5,-.5,-.5},{.5,.5,.5}};
+        double* fields[]{&bounds.minimum.x,&bounds.minimum.y,&bounds.minimum.z,
+            &bounds.maximum.x,&bounds.maximum.y,&bounds.maximum.z};
+        if(suites.playback) {
+            for(A_long b=0;b<6;++b)if(!read_one_d(suites,plugin_id,effect,model_layout::bounds_first+b,time,*fields[b]))return false;
+        } else {
+            if(imported) {
+                AEGP_StreamRefH raw{};
+                if(suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id,effect,model_layout::mesh,&raw) || !raw)
+                    return suites.fail(model_layout::mesh);
+                StreamRef stream(suites.stream,raw);AEGP_StreamType type{};
+                if(!suites.stream->AEGP_GetStreamType || suites.stream->AEGP_GetStreamType(raw,&type) || type!=AEGP_StreamType_ARB)
+                    return suites.fail(model_layout::mesh);
+                AEGP_StreamValue2 value{};
+                if(suites.stream->AEGP_GetNewStreamValue(plugin_id,raw,AEGP_LTimeMode_LayerTime,&time,TRUE,&value))
+                    return suites.fail(model_layout::mesh);
+                core::NeverCancelled never;
+                auto mesh=read_model_geometry_parameter(suites.data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH),never);
+                const auto released=suites.stream->AEGP_DisposeStreamValue(&value);
+                if(!mesh.has_value() || released)return suites.fail(model_layout::mesh);
+                bounds=mesh.value().bounds;
+            }
+            for(A_long b=0;b<6;++b)
+                if(!record_value(suites,model_layout::bounds_first+b,node_sync::ValueKind::scalar,{*fields[b],0,0}))return false;
+        }
+        auto matrix=core::model_local_matrix(pose,bounds);if(!matrix.has_value())return suites.fail(model_layout::origin);
+        core::OpaqueBytes resource(16),encoded_bounds;
+        if(imported)for(unsigned b=0;b<16;++b)resource[b]=static_cast<std::byte>(node.id.value.bytes[b]);
+        for(const auto* field:fields)append_u64(encoded_bounds,std::bit_cast<std::uint64_t>(*field));
+        add_value(node,kModelResource,std::move(resource));add_value(node,kModelRevision,imported?revision:std::uint32_t{0});
+        add_value(node,kModelOrigin,pose.origin);add_value(node,kModelRotation,pose.rotation_degrees);add_value(node,kModelScale,pose.scale_percent);
+        constexpr core::ParameterKey keys[]{kModelFlipX,kModelFlipY,kModelFlipZ,kModelCenter,kModelNormalize};
+        for(unsigned b=0;b<5;++b)add_value(node,keys[b],std::uint32_t(*flags[b]));
+        add_value(node,kModelBounds,std::move(encoded_bounds));add_value(node,kModelSource,source-1);
+        return true;
+    }
     if (kind == Kind::emitter) {
         if (!read_one_d(suites, plugin_id, effect, 3, time, scalar)) return false;
         add_value(node, kBirthRate, scalar);
@@ -933,6 +1005,7 @@ core::PortKey source_port(Kind kind) noexcept {
         case Kind::particle: return kParticleParticlesOut;
         case Kind::force: return kForceParticlesOut;
         case Kind::transform: return kTransformParticlesOut;
+        case Kind::model: return kModelGeometryOut;
     }
     return {};
 }
@@ -944,6 +1017,7 @@ core::PortKey destination_port(Kind kind) noexcept {
         case Kind::particle: return kParticleParticlesIn;
         case Kind::force: return kForceParticlesIn;
         case Kind::transform: return kTransformParticlesIn;
+        case Kind::model: return {}; // Model has no particle input.
     }
     return {};
 }
@@ -1087,7 +1161,8 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
         }
         const auto expected=raw.kind==Kind::emitter?core::graph_keys::kEmitterNode:
             raw.kind==Kind::particle?core::graph_keys::kParticleNode:
-            raw.kind==Kind::transform?core::graph_keys::kTransformNode:core::graph_keys::kForceNode;
+            raw.kind==Kind::transform?core::graph_keys::kTransformNode:
+            raw.kind==Kind::model?core::graph_keys::kModelNode:core::graph_keys::kForceNode;
         if(output.type_key!=expected) return PF_Err_BAD_CALLBACK_PARAM;
         SuiteSet reader(nullptr);
         reader.playback=&raw;
@@ -1246,12 +1321,14 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     if (node.type_key == core::graph_keys::kParticleNode) destination_kind = Kind::particle;
                     else if (node.type_key == core::graph_keys::kForceNode) destination_kind = Kind::force;
                     else if (node.type_key == core::graph_keys::kTransformNode) destination_kind = Kind::transform;
+                    else if (node.type_key == core::graph_keys::kModelNode) destination_kind = Kind::model;
                     break;
                 }
             }
             graph.edges.push_back(core::GraphEdge{connection.edge, connection.source,
                 source_port(connection.source_kind), connection.destination,
-                found_destination ? destination_port(destination_kind) : core::PortKey{1}});
+                found_destination ? (connection.source_kind==Kind::model && destination_kind==Kind::particle ?
+                    core::graph_keys::kParticleModelsIn : destination_port(destination_kind)) : core::PortKey{1}});
         }
 
         const auto validation = core::validate_graph(graph, core::particle_node_registry());
@@ -1571,7 +1648,8 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             if (node == graph.nodes.end()) return PF_Err_BAD_CALLBACK_PARAM;
             const auto expected = raw.kind == Kind::emitter ? core::graph_keys::kEmitterNode :
                 raw.kind == Kind::particle ? core::graph_keys::kParticleNode :
-                raw.kind==Kind::transform?core::graph_keys::kTransformNode:core::graph_keys::kForceNode;
+                raw.kind==Kind::transform?core::graph_keys::kTransformNode:
+                raw.kind==Kind::model?core::graph_keys::kModelNode:core::graph_keys::kForceNode;
             stage("node type");
             if (node->type_key != expected) return PF_Err_BAD_CALLBACK_PARAM;
             node->parameters.clear(); reader.playback = &raw;

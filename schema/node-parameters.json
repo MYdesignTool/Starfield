@@ -535,7 +535,7 @@
   },
   "particleModelCandidate": {
     "adr": "0038-particle-model-geometry",
-    "status": "Unpublished Model numerical/author contract; native controls and resource capture pending.",
+    "status": "Unpublished Model module and binding7 candidate; import transaction, resource capture and complete author release pending.",
     "shape": 4, "coreAbi": 8, "snapshotVersion": 8, "nodeSchema": 1,
     "graphKeys": {"resource": 1, "revision": 2, "matrix": 3, "origin": 4, "rotation": 5, "scale": 6,
       "flipX": 7, "flipY": 8, "flipZ": 9, "center": 10, "normalize": 11, "bounds": 12, "source": 13},
@@ -546,7 +546,8 @@
       "streams": {"source": 1, "importObj": 2, "mesh": 3, "revision": 4, "originFirst": 5,
         "rotationFirst": 8, "scaleFirst": 11, "flipX": 14, "flipY": 15, "flipZ": 16, "center": 17, "normalize": 18},
       "revisionType": "int32 nonnegative", "metadataFirst": 19, "expectedTotal": 95,
-      "state": "Actual SDK controls/capture helpers are isolated and not called by any released node module. Binding6 still rejects kind5; resource mirror/import transaction and full author release pending."},
+      "bindingVersion": 7, "bindingBoundsFirst": 19, "bindingBoundsLast": 24, "poseAliasCount": 14,
+      "state": "Actual Model module registers controls/metadata and compiles Model -> Particle input3. Private binding7 admits kind5 with22 required scalar fields; pose5..18 uses14 aliases, Source/revision/bounds are constants. Synthetic bounds19..24 are not native parameter indices. Explicit IncludeModelCandidate builds only with both NoPublish switches; resource mirror/import transaction and full author release pending."},
     "policy": "Optional pose keys preserve editable values; pose and explicit legacy matrix are exclusive. Bounds are six little-endian doubles. Missing Source retains numeric metadata behavior; explicit Cube requires zero resource. ADR0038 reserves Model-only native IDs1501..1518; no existing installed IDs/layouts change."
   },
   "editorCatalog": "schema/editor-presets.json: 20 independently authored curve profiles, 19 gradient palettes; native modal chooser at each editor Presets button, no vendor folder structure.",

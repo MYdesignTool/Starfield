@@ -19,7 +19,7 @@ inline constexpr A_long kMaxOutgoingEdges = 4;
 inline constexpr A_long kConnectionUuidChunks = 8;
 inline constexpr A_long kConnectionRecordChunks = 16; // destination UUID + edge UUID
 
-enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 is not a node kind.
+enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5 }; // 2 is not a node kind.
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
@@ -27,14 +27,17 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
         case Kind::particle: return particle_layout::last;
         case Kind::force: return 11+particle_layout::curve_span-1;
         case Kind::transform: return transform_layout::last;
+        case Kind::model: return model_layout::last;
     }
     return 0;
 }
 [[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
     return kind==Kind::transform?transform_layout::compensation_last:
+        kind==Kind::model?model_layout::bounds_last:
         kind==Kind::particle?particle_layout::birth_enabled:base_parameter_count(kind);
 }
 [[nodiscard]] constexpr bool authored_parameter(Kind kind,A_long index) noexcept {
+    if(kind==Kind::model)return index==model_layout::source || index==model_layout::revision || model_layout::animated(index);
     return index>0 && (index<=base_parameter_count(kind) || (kind==Kind::particle &&
         (index==particle_layout::transfer || (index>=particle_layout::texture_front && index<=particle_layout::texture_perspective) ||
          (index>=particle_layout::cloud_circles && index<=particle_layout::cloud_density) || index==particle_layout::cloud_enabled ||
@@ -53,6 +56,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4 }; // 2 i
     return kind==Kind::particle?particle_layout::birth_enabled:sync_guard_index(kind);
 }
 static_assert(sync_guard_index(Kind::particle)+1==particle_layout::transfer);
+static_assert(layout_x_index(Kind::model)==19 && uuid_first_index(Kind::model)==86 && sync_guard_index(Kind::model)==94);
 // PF_OutData::num_params includes parameter 0 (the input layer), while registered
 // node controls occupy indices 1..last_parameter_index.
 [[nodiscard]] constexpr A_long parameter_count(Kind kind) noexcept { return last_parameter_index(kind) + 1; }

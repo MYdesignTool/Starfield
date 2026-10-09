@@ -108,6 +108,51 @@ m3-17-model-controls-build-hashes.json and m3-17-model-controls-installed-hashes
 All18 installed native60/CEP61 files are unchanged. No Model node, kind5 binding,
 resource mirror or Particle selector is published from this helper milestone.
 
+### Native Model module and binding7 migration
+
+The next unpublished author candidate implements kind5 and the reserved Model
+effect. Physical controls/metadata remain1..94 (num_params95); no existing kind
+or physical stream is shifted. Synthetic binding fields19..24 contain six
+numeric mesh bounds, independently of physical metadata at those same indices.
+They are constants in the private binding record and never expression aliases.
+Model bindings include exactly scalar fields1 Source,4 revision and5..24
+pose/bounds; fields2 button and3 mesh are not numeric bindings. Pose5..18 alone
+consumes14 animation aliases, reusing the existing bounded512-slot bank.
+
+Private tag0x8002 writes version7 only when a Model node is present, retaining
+version1/2/6 selection for graphs without Model. Readers accept1..7; kind5 is
+rejected in versions1..6. Model fields must be scalar, all22 required fields
+must exist, buttons/ARB must be absent, and constant bounds/Source/revision
+cannot consume alias slots. Unknown kinds, missing fields, duplicate aliases
+and invalid source/revision/pose/bounds remain typed errors. Graph envelope1,
+Model schema1, existing node schemas, snapshot8 and ABI8 stay fixed.
+
+UI compile validates an imported SFMG1 mesh through its Model arbitrary stream,
+copies it while the borrowed AEGP stream value is live, and records numeric
+bounds; render playback reads the constant record/pose aliases only, acquiring
+no AEGP mesh stream and executing no file access. Source Cube or unimported OBJ
+needs no parked asset. Resource identity is the Model UUID for an imported OBJ;
+default cube identity/revision are zero. The next resource-mirror transaction
+must carry the actual mesh to SmartFX before this candidate is published.
+
+Model's metadata output maps to Particle input3. Particle-flow input1 and all
+existing connections retain their meanings; invalid destinations are rejected
+by typed graph validation. The new Model PiPL uses the existing node pass-through
+selector implementations/flags and the reserved match name. Candidate build
+uses explicit IncludeModelCandidate with both NoPublish switches; default
+deployment lists are unchanged until full resource/CEP authoring and the new
+paired version/rollback plan are complete. No new AE host qualification follows
+from this module/binding milestone.
+
+The final Model module/binding fixture passes2809 checks in both standard and
+MSVC AddressSanitizer builds, plus the reused452 control fixture. It compiles
+the actual Model NodeEffects branch and tests95 registered parameters/ARB
+callbacks,14 alias checkout/checkin paths, versions1..7, invalid records and
+UI graph compilation/mesh ownership/typed Model output. Its initial UI fixture
+omitted Particle's Random Limit default1, failing at stream303; the corrected
+fixture passes. Logs: artifacts/m3-17-model-native-binding-{tests,asan}.log.
+Actual AE UI/undo/persistence and complete resource authoring remain open.
+
 ### Native mesh persistence boundary
 
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE

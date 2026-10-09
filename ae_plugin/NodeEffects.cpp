@@ -10,6 +10,8 @@
 #include "NodeRecord.hpp"
 #include "ParticleGradientUI.hpp"
 #include "TransformNullUI.hpp"
+#include "ModelControls.hpp"
+#include "ModelGeometryParameter.hpp"
 #include "PluginVersion.h"
 #include "SPBasic.h"
 
@@ -28,7 +30,7 @@ static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag
 static_assert(STARFIELD_TRANSFORM_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
-enum class NodeEffectKind { emitter, particle, force, transform };
+enum class NodeEffectKind { emitter, particle, force, transform, model };
 
 // Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
 // Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
@@ -43,6 +45,8 @@ constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::particle;
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::force;
 #elif defined(STARFIELD_NODE_KIND_TRANSFORM)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::transform;
+#elif defined(STARFIELD_NODE_KIND_MODEL)
+constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::model;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
@@ -483,6 +487,14 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return in_data->inter.register_ui?PF_REGISTER_UI(in_data,&ui):PF_Err_NONE;
 }
 
+PF_Err setup_model(PF_InData* data,PF_OutData* output) noexcept {
+    auto error=starfield::adapter::register_model_author_controls(data);if(error)return error;
+    error=add_node_record(data,Kind::model);if(error)return error;
+    error=add_node_identity(data);if(error)return error;
+    output->num_params=parameter_count(Kind::model);
+    return PF_Err_NONE;
+}
+
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
     PF_Err error = add_slider(in_data, "Gravity", kForceGravityId, -100000, 100000, 0, PF_Precision_TENTHS);
     if (error != PF_Err_NONE) return error;
@@ -625,6 +637,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
 
             } else if constexpr(kNodeEffectKind==NodeEffectKind::transform) {
                 return setup_transform(in_data,out_data);
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::model) {
+                return setup_model(in_data,out_data);
             } else {
                 return setup_force(in_data, out_data);
             }
@@ -665,6 +679,11 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
             return sync_node_graph_parameter(in_data, out_data, params,
                 static_cast<const PF_UserChangedParamExtra*>(extra));
+        case PF_Cmd_ARBITRARY_CALLBACK:
+            if constexpr(kNodeEffectKind==NodeEffectKind::model)
+                return starfield::adapter::model_geometry_arbitrary_callback(in_data,static_cast<PF_ArbParamsExtra*>(extra),
+                    starfield::adapter::native_nodes::model_layout::disk_id(starfield::adapter::native_nodes::model_layout::mesh));
+            else return PF_Err_NONE;
         case PF_Cmd_UPDATE_PARAMS_UI:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 return starfield::adapter::particle_gradient_param_ui(in_data,params);

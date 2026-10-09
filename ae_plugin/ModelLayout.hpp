@@ -6,6 +6,11 @@ inline constexpr int source=1,import_obj=2,mesh=3,revision=4;
 inline constexpr int origin=5,rotation=8,scale=11;
 inline constexpr int flip_x=14,flip_y=15,flip_z=16,center=17,normalize=18,last=18;
 inline constexpr int disk_first=1501;
+// Numeric constants in binding7 only; not native parameter indices.
+inline constexpr int bounds_first=19,bounds_last=24;
+[[nodiscard]] constexpr bool binding_field(int index) noexcept {
+    return index==source || index==revision || (index>=origin && index<=bounds_last);
+}
 [[nodiscard]] constexpr int disk_id(int index) noexcept {
     return index>=source && index<=last ? disk_first+index-1 : 0;
 }

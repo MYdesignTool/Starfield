@@ -44,8 +44,12 @@
     <NodeOutFlags>STARFIELD_TRANSFORM_OUT_FLAGS</NodeOutFlags>
     <NodeKindDefine>STARFIELD_NODE_KIND_TRANSFORM</NodeKindDefine>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Model'">
+    <TargetName>StarfieldModel</TargetName><NodePiPL>NodeModelPiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_MODEL</NodeKindDefine>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(NodePiPL)'==''">
-    <NodeKindError>NodeKind must be Emitter, Particle, Force, or Transform.</NodeKindError>
+    <NodeKindError>NodeKind must be Emitter, Particle, Force, Transform, or Model.</NodeKindError>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -72,6 +76,8 @@
     <ClCompile Include="NativeNodeGraph.cpp" />
     <ClCompile Include="NativeTemporalCache.cpp" />
     <ClCompile Include="GraphParameter.cpp" />
+    <ClCompile Include="ModelControls.cpp" />
+    <ClCompile Include="ModelGeometryParameter.cpp" />
     <ClCompile Include="..\src\core\Geometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
@@ -79,6 +85,8 @@
     <ClCompile Include="..\src\core\SequenceCodec.cpp" />
     <ClCompile Include="..\src\core\Settings.cpp" />
     <ClCompile Include="..\src\core\Time.cpp" />
+    <ClCompile Include="..\src\core\ModelGeometry.cpp" />
+    <ClCompile Include="..\src\core\ModelResources.cpp" />
     <CustomBuild Include="$(NodePiPL)">
       <Message>Generating $(NodeKind) node PiPL resource</Message>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\$(NodePiPL)" -FlagHeaderPath "$(MSBuildProjectDirectory)\NodeEffectFlags.h" -OutFlagsName $(NodeOutFlags) -OutFlags2Name $(NodeOutFlags2)</Command>

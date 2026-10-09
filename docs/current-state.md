@@ -1,10 +1,12 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：可编辑pose及原生控件捕获候选，图559项及控件ASAN452项通过，继续资源绑定/原生节点/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：原生模块与binding7候选，标准/ASAN各2809项检查通过，继续导入事务/资源捕获/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+最新候选接入独立Model AEX（kind5、matchName org.starfieldfx.node.model），实际注册18项作者控件及metadata，总参数95。private binding7只为含Model的图写入；14路pose动画别名及六项数值bounds、Source/revision常量保持宿主安全的回放。UI编译在AEGP值有效期复制/解码OBJ，Model输出映射Particle input3。标准/ASAN各2809检查通过，包含实际Model模块注册/ARB回调、绑定版本/坏字段拒绝、数值动画checkout/checkin、UI句柄所有权及parked mesh隔离。日志artifacts/m3-17-model-native-binding-{tests,asan}.log。此候选仅显式IncludeModelCandidate双NoPublish构建；Import按钮事务、主mesh镜像/SmartFX捕获及完整CEP尚未接入，当前安装60/61保持。
 
 可编辑作者源码c65d5f79728ae2340b3cd9dbfa37b5cbb46e2f4f已推送并冻结于artifacts/prepared/m3-17-model-controls-c65d5f7/source。完整May2023 x64 Release /MT七个目标通过（双NoPublish），main AEX实际编译ModelControls.cpp；日志artifacts/m3-17-model-controls-native-build.log，输出哈希artifacts/m3-17-model-controls-build-hashes.json。构建后十八安装文件哈希仍匹配native60/CEP61，报告artifacts/m3-17-model-controls-installed-hashes.json。候选Model控件注册函数没有入口调用，kind5/binding/资源镜像及CEP尚未启用，下一步接入完整原生Model节点与资源提交/捕获。
 

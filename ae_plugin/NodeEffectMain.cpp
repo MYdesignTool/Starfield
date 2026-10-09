@@ -16,6 +16,9 @@
 #elif defined(STARFIELD_NODE_KIND_TRANSFORM)
 #define STARFIELD_NODE_NAME "Starfield Transform"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.transform"
+#elif defined(STARFIELD_NODE_KIND_MODEL)
+#define STARFIELD_NODE_NAME "Starfield Model"
+#define STARFIELD_NODE_MATCH "org.starfieldfx.node.model"
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

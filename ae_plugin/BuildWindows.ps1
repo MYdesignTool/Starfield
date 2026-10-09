@@ -6,12 +6,16 @@ param(
     [switch]$CoreOnly,
     [switch]$NoRuntimePublish,
     [switch]$NoDistPublish,
+    [switch]$IncludeModelCandidate,
     [string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'),
     [string]$NvrtcPath = 'artifacts\gpu-build\nvrtc-12.4.127\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll',
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 )
 
 $ErrorActionPreference = 'Stop'
+if($IncludeModelCandidate -and (-not $NoDistPublish -or -not $NoRuntimePublish -or $CoreOnly)) {
+    throw 'IncludeModelCandidate requires a full unpublished build with -NoDistPublish -NoRuntimePublish.'
+}
 function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string]$Architecture,[string]$BuildConfiguration) {
     # The artifact fingerprint proves which AEX was BUILT, not which AEX is
     # installed. An unpublished full build must not enable an incompatible hot
@@ -80,6 +84,7 @@ $adapterInputs = @(
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\EffectReveal.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',
+    'ae_plugin\NodeModelPiPL.r',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
@@ -156,7 +161,9 @@ try {
     & $MSBuildPath @arguments
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
 
-    foreach ($nodeKind in @('Emitter', 'Particle', 'Force', 'Transform')) {
+    $taskNodeKinds=@('Emitter', 'Particle', 'Force', 'Transform')
+    if($IncludeModelCandidate){$taskNodeKinds+='Model'}
+    foreach ($nodeKind in $taskNodeKinds) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"
         $nodeArguments = @(
