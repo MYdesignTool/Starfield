@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 Model作者候选完整SDK：857818b的git archive冻结于artifacts/prepared/m3-17-model-author-857818b/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT八目标通过。实际Model101及十项导入事务编译；default double→PF_FpShort警告保留（±0.5精确表示）。日志artifacts/m3-17-model-author-build.log，八输出哈希m3-17-model-author-build-hashes.json；十八安装对照m3-17-model-author-installed-hashes.json、0不匹配，未部署。隔离CEP按下面候选命令独立验证，不从SDK编译宣称AE支持。
+
 2026-10-09 Model作者边界追加：RunModelNativeBindingTests.ps1标准/ASAN各3040项，RunModelImportTransactionTests.ps1标准/ASAN各1559项通过；日志artifacts/m3-17-model-author-bounds-{native-tests,native-asan,import-tests,import-asan}.log。物理95..100只核对导入边界，六项stale值拒绝，binding7 synthetic19..24保持。首次绑定检查因误记录95失败，修复后重新标准/ASAN通过。
 
 隔离CEP候选最小命令：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Prepare-ModelPanelCandidate.ps1 -Prepare -DestinationName m3-17-model-panel62-reproduced`；目录已存在则选择新名字，不覆写。将进程内`STARFIELD_PANEL_ROOT`设为该目录下cep_panel，再运行`node tests/model_panel_author_tests.js`（74检查）。候选patch及基线哈希保存在tools/candidates，不写安装面板。Texture80、Cloud49、particle_birth_panel51与panel_native_node_gateway_tests的完整事务夹具也通过该候选；日志artifacts/m3-17-model-author-<test-file>.log。首次误写birth_panel_tests.js文件名导致MODULE_NOT_FOUND，按实际particle_birth_panel_tests.js重跑通过；这不是被跳过的实现失败。网格预设传输、完整菜单和实际AE gate仍待完成。
