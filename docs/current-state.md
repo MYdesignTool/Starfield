@@ -6,7 +6,9 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
-原生OBJ导入候选接入Import OBJ按钮：AE所属Windows对话框、有界文件读入、网格准备、guard94下Mesh/Revision/Source写入与读回、图提交和失败恢复。标准/ASAN导入事务夹具各1019项通过（含复用452控件项），包括每项部分写失败、silent setter、图提交失败和恢复失败诊断；原生模块/binding2809复查通过。日志artifacts/m3-17-model-import-transaction-{tests,asan}.log和m3-17-model-import-native-binding-tests.log。文件对话框/实际撤销和重开尚未在AE验收；当前导入源码完整SDK构建待冻结后执行。下一步Particle Model菜单、隔离CEP/预设作者；安装native60/CEP61保持。
+导入源码da76183c82f9584367561e2742f0ac76c411e397冻结于artifacts/prepared/m3-17-model-import-da76183/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过，包含ModelImportUI的Windows对话框与实际NodeEffects按钮路由。日志artifacts/m3-17-model-import-build.log，八输出/十八安装哈希m3-17-model-import-{build,installed}-hashes.json，安装native60/CEP61、0不匹配。此候选未部署，继续Particle Model菜单/隔离CEP和预设。
+
+原生OBJ导入候选接入Import OBJ按钮：AE所属Windows对话框、有界文件读入、网格准备、guard94下Mesh/Revision/Source写入与读回、图提交和失败恢复。标准/ASAN导入事务夹具各1019项通过（含复用452控件项），包括每项部分写失败、silent setter、图提交失败和恢复失败诊断；原生模块/binding2809复查通过。日志artifacts/m3-17-model-import-transaction-{tests,asan}.log和m3-17-model-import-native-binding-tests.log。完整SDK证据见上条；文件对话框/实际撤销和重开尚未在AE验收。下一步Particle Model菜单、隔离CEP/预设作者；安装native60/CEP61保持。
 
 资源桥源码eae10aecb11f0a50dae8d1a3605d6750dc6eccaa冻结于artifacts/prepared/m3-17-model-resource-bridge-eae10ae/source，显式IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标通过。日志artifacts/m3-17-model-resource-bridge-build.log，八输出哈希m3-17-model-resource-bridge-build-hashes.json；十八安装哈希保持native60/CEP61、0不匹配（m3-17-model-resource-bridge-installed-hashes.json）。主1012参数/SFMR1路由/SmartFX入口实际编译，OBJ按钮及完整CEP作者继续，未部署Model候选。
 

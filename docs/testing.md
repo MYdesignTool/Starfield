@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-09 Model原生OBJ完整SDK构建：源码da76183c82f9584367561e2742f0ac76c411e397冻结于artifacts/prepared/m3-17-model-import-da76183/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT八目标通过。ModelImportUI Windows对话框和实际NodeEffects路由编译；日志artifacts/m3-17-model-import-build.log，八输出/十八安装哈希m3-17-model-import-{build,installed}-hashes.json。当前native60/CEP61未变；菜单/完整CEP/预设及实际AE资格仍开放。
+
 2026-10-09 Model原生OBJ导入：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelImportTransactionTests.ps1 -Run`及追加`-Sanitize`，各1019项、0失败（含复用452控件项）。日志artifacts/m3-17-model-import-transaction-{tests,asan}.log。实际AEGP事务/host deep copies覆盖解析/取消前无写入、单组undo记录、递增revision/Source自动OBJ、Mesh/Revision/Source/guard逐项部分失败恢复、silent setter拒绝、图提交失败以及恢复失败独立诊断、修订号耗尽与守卫拒绝、句柄/值/流/suite释放。图提交使用fixture回调；UI文件对话框不由fixture驱动，仍需完整SDK编译和真实AE验收。原生模块/binding2809复查通过（m3-17-model-import-native-binding-tests.log）。首次编译误用SDK compare结构聚合赋值（首字段refcon），改为具名字段后通过；最终计数不沿用之前962项。
 
 2026-10-09 Model资源桥完整SDK构建：源码eae10aecb11f0a50dae8d1a3605d6750dc6eccaa的git archive冻结于artifacts/prepared/m3-17-model-resource-bridge-eae10ae/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`，May2023 x64 Release /MT八目标通过。Main1012参数、SFMR1路由及SmartFX入口实际编译；日志artifacts/m3-17-model-resource-bridge-build.log，八输出/十八安装哈希分别m3-17-model-resource-bridge-{build,installed}-hashes.json。当前安装native60/CEP61未变；不从编译关闭AE资格或发布完整Model作者。

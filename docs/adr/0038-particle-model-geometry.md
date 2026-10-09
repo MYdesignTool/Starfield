@@ -277,6 +277,15 @@ by this fixture; full SDK compilation and actual AE qualification remain open.
 
 ### Earlier native mesh persistence milestone
 
+Import source da76183c82f9584367561e2742f0ac76c411e397, frozen at
+artifacts/prepared/m3-17-model-import-da76183/source, passes all eight May2023
+x64 Release /MT outputs with IncludeModelCandidate and both NoPublish switches.
+The Windows chooser and actual NodeEffects button route are compiled. Log:
+artifacts/m3-17-model-import-build.log; build/installed reports:
+m3-17-model-import-{build,installed}-hashes.json. All18 installed native60/CEP61
+files remain unchanged; Particle selector/complete CEP/presets and real AE
+qualification remain open. No Model candidate is deployed.
+
 ModelGeometryParameter stores only a bounded, validated SFMG1 mesh in an AE
 arbitrary handle. It owns no graph identity, filenames or external file lookup;
 resource UUID/revision belong to the future Model author and immutable capture.
