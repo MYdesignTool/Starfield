@@ -32,7 +32,7 @@ const app={project:{rootFolder:{id:101},numItems:1,item(i){return i===1?comp:nul
 const host={},context=vm.createContext({$:{global:host},app,CompItem,Date:function(){this.getTime=()=>now;}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const load=()=>vm.runInContext(source,context);load();
-function request(operation,extra){return JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",
+function request(operation,extra){return JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",
     operation,pinTarget:true,target:{token},assetId,nodeId,baseGraphRevision:11,page:0},extra));}
 const call=(op,extra)=>JSON.parse(host["SFLD_"+op](request(op,extra)));
 const session=()=>host.__SFLD_modelAssetBridgeV1;

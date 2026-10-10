@@ -4,11 +4,13 @@ param(
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName = 'p02d-build4-single-folder-20261001',
     [switch]$Install,
     [switch]$Rollback,
-    [switch]$KeepNative
+    [switch]$KeepNative,
+    [switch]$IncludeModel
 )
 $ErrorActionPreference = 'Stop'
 if ($Install -and $Rollback) { throw 'Choose one action.' }
 if ($KeepNative -and $Rollback) { throw 'KeepNative belongs to a panel-only installation, not rollback.' }
+if ($IncludeModel -and $KeepNative) { throw 'Model requires a full native/Core/panel paired installation.' }
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $destination = (Resolve-Path -LiteralPath $PluginDir).Path
 $bundle = Join-Path $repo 'dist'
@@ -21,6 +23,17 @@ $backup = Join-Path $repo "artifacts\disabled\$BackupName"
 $recordPath = Join-Path $backup 'deployment.json'
 $names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNode.aex',
            'StarfieldForce.aex', 'StarfieldTransform.aex', 'StarfieldHost.aex', 'StarfieldCore.dll')
+# Rollback derives the optional module from this exact saved deployment, so the
+# paired Restore tool needs no extra switch and never reinterprets old records.
+if ($Rollback -and (Test-Path -LiteralPath $recordPath)) {
+    $taskRollbackRecord=Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+    if($taskRollbackRecord.modelCandidate){$IncludeModel=$true}
+}
+if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldModel.aex'))){$IncludeModel=$true}
+if(-not $Rollback -and -not $KeepNative -and -not $IncludeModel -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldModel.aex'))){
+    throw 'Installed Model requires a full -IncludeModel pair; refusing a partial replacement.'
+}
+if($IncludeModel){$names += 'StarfieldModel.aex'}
 # Preserve CEP-only rollback support for the installed pre-Transform bundle.
 if ($KeepNative -and -not (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTransform.aex'))) {
     $names = @($names | Where-Object { $_ -ne 'StarfieldTransform.aex' })
@@ -124,7 +137,7 @@ if ($KeepNative) {
 }
 New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
-    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName=''}
+    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel}
 if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
 foreach ($name in $allowedNames) {
     $target = Join-Path $bundle $name

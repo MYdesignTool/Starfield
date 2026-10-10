@@ -20,7 +20,9 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
     # The artifact fingerprint proves which AEX was BUILT, not which AEX is
     # installed. An unpublished full build must not enable an incompatible hot
     # Core update. Verify the complete native pair before touching the selector.
-    foreach ($taskModule in @('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')) {
+    $taskModules=@('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')
+    if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldModel.aex')){$taskModules+='StarfieldModel'}
+    foreach ($taskModule in $taskModules) {
         $taskBuiltNative = Join-Path $RepositoryRoot "artifacts\plugin\$Label\$Architecture\$BuildConfiguration\$taskModule.aex"
         $taskInstalledNative = Join-Path $RepositoryRoot "dist\$taskModule.aex"
         if (-not (Test-Path -LiteralPath $taskBuiltNative) -or -not (Test-Path -LiteralPath $taskInstalledNative) -or

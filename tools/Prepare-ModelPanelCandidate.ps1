@@ -49,6 +49,14 @@ try {
     & git apply --directory=$taskRelative $taskPatch
     if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
 } finally {Pop-Location}
+$taskManifest=Join-Path $taskDestination 'cep_panel/CSXS/manifest.xml'
+$taskManifestText=[IO.File]::ReadAllText($taskManifest).Replace('0.1.0.61','0.1.0.62').Replace('Version="0.1.61"','Version="0.1.62"')
+[IO.File]::WriteAllText($taskManifest,$taskManifestText,[Text.UTF8Encoding]::new($false))
+foreach($taskPage in @('index.html','presets.html')){
+    $taskPagePath=Join-Path $taskDestination ('cep_panel/'+$taskPage)
+    $taskPageText=[regex]::Replace([IO.File]::ReadAllText($taskPagePath),'\?v=\d+','?v=62')
+    [IO.File]::WriteAllText($taskPagePath,$taskPageText,[Text.UTF8Encoding]::new($false))
+}
 [ordered]@{basePanel=61;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
     modelGraphTransactionsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Algorithm SHA256).Hash;

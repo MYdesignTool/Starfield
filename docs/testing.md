@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-10 owner确认额度恢复并要求测试版，准备native61/CEP62完整配对。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/model_deployment_tests.ps1 -Run`：60检查通过，实际Deploy-ModelTestBuild/Deploy-TestBuild/Restore-TestBuild在artifacts/deploy-test的dummy binaries/CEP与模拟Junction执行；覆盖read-only report、缺Model拒绝且无安装副作用、八native/十八CEP安装hash、已安装Model拒绝partial替换、缺失未复制新helper时paired rollback、旧七native/十三原有CEP还原、新Model/五helper消失和旧selector。日志artifacts/m3-17-native61-deployment-tests.log；首次预期失败被PowerShell Stop处理的夹具问题修复，首个fixture日志保留。没有对真实Adobe路径做测试写入。
+
+STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native61-panel62-test/cep_panel：gatewayBuild统一native-presets-62；Shape92/作者74/graph transport271/DOM35/文件583/export588/Texture80/Cloud49/Birth51全部通过，m3-17-native61-*-tests.log。完整SDK冻结构建继续，不把既有native60构建或fake部署当作实际AE资格。
+
+源码dae9621已提交推送，但其后冻结命令因automatic approval review用量上限未执行（提示13:30）；后续完整SDK构建调用也未执行。没有新build session/退出码/产物，不把e5bf287历史构建当作新模块验证。下面的Host/chooser最小测试证据有效，完整May2023八目标仍待冻结编译；额度恢复后继续，不绕过审批。
+
 2026-10-10 M3-17原生预设文件窗口候选：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunPresetFileHostTests.ps1 -Run`及`-Sanitize`各1596；actual Host、fake SDK/chooser与同线程message-only Windows pump，验证script不重入/SDK引用在窗口前全释放、ID claim/关闭后验证、suite/script/memory失败、stop/worker/重入、UTF16路径和丢失完成ack不重放。`tests/RunPresetFileChooserTests.ps1 -Run`及`-Sanitize`各242：actual Win32 wrapper替换系统API，验证NOCHANGEDIR、类型/单选/default extension、后缀/覆盖/取消/路径错误；未显示真实文件窗口或进行磁盘IO。日志artifacts/m3-17-native-preset-{host,chooser}-{tests,asan}.log；首轮夹具类型/unsigned/全局命名和UTF16源编码诊断修复。
 
 `STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native-preset-modal-panel62-v2/cep_panel`执行`node tests/model_preset_file_tests.js`：583 actual codec/client/gateway/UI检查通过，FS/native选择器均fake；脚本File dialogs/confirm一旦调用就失败，验证队列/claim/poll/retained terminal、迟到或丢失ack、release/expiry/identity变动无IO、原临时文件验证/备份/rename及rollback。Shape92、作者74/transport271/DOM35/export588/Texture80/Cloud49/Birth51回归通过；日志m3-17-native-preset-*-tests.log，tracked patch重现隔离CEP且live保持。初次UI夹具固定ID造成无界等待的PID30420按AGENTS停止授权仍待owner；后续drain最多1000步。完整新SDK冻结及实际AE2023模态/文件系统/整笔Model资源资格待验收，不能由这些检查关闭gate。

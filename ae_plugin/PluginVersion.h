@@ -6,6 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 60: appended birth controls and binding6; graph7/snapshot7/Core ABI7.
-#define STARFIELD_VERSION_BUILD 60
-#define STARFIELD_VERSION_PACKED 32828 /* 0x803c */
+// Build 61 test candidate: Model geometry/author/asset transport and modal guards;
+// graph7, binding7, snapshot8, manifest30 and fully paired Core ABI8 / CEP62.
+#define STARFIELD_VERSION_BUILD 61
+#define STARFIELD_VERSION_PACKED 32829 /* 0x803d */

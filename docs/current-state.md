@@ -6,7 +6,15 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### Owner要求准备测试版（2026-10-10）
+
+owner确认审批额度恢复，并明确“可以出一版测试”。继续M3-17完整native61/packed32829/CoreABI8/CEP62配对；现有Model合同使用binding7/snapshot8/manifest30，六Shape顺序保持，Face禁用且不推测Use Model(s)菜单。短gateway generation升级native-presets-62并刷新候选页面cache tags/CEP manifest；Prepare重现m3-17-native61-panel62-test，Shape92/作者74/transport271/DOM35/文件583/export588/Texture80/Cloud49/Birth51回归通过。
+
+新增Deploy-ModelTestBuild默认report，仅接受冻结八native/Core和十八CEP源配对及buildExit0/版本/哈希证据；使用既有Deploy-TestBuild的显式IncludeModel和单Junction，保留旧native60/CEP61/selector/新Model不存在状态。Rollback从自身记录推导Model，Restore支持部分发布时尚未出现的新helper；已安装Model拒绝普通partial native替换，Core热更新同时核对Model AEX。dummy文件/模拟Junction下实际deploy/restore工具60检查通过，artifacts/m3-17-native61-deployment-tests.log；真实Adobe路径未改变。只读检查AE进程0；完整冻结SDK构建及之后的fresh check/发布继续，实际AE资格保持开放。旧额度阻碍已解除；测试PID30420停止的单独授权尚未回复。
+
 ### 原生预设文件窗口候选（2026-10-10）
+
+本阶段18文件源码已提交并推送dae9621（Queue native preset file dialogs outside script modal roots）。随后源码冻结命令被automatic approval review因用量上限拒绝执行，提示13:30可重试；这是审核服务失败，不是操作被判定不安全。冻结脚本创建/执行均未发生，后续完整SDK构建调用也未执行，没有新的build session、冻结目录、构建退出码或产物证据。已单独告知owner并请求额度恢复后继续；不得将旧e5bf287构建视为新Host模块已编译。本文后续“构建继续”指待执行工作。安装native60/CEP61保持；初次测试PID30420停止授权仍待owner，未擅自结束。完整目标active，不记完成或自行暂停。
 
 M3-17新增resident Host文件命令：只排队，idle读取/claim plain transfer ID后释放全部SDK引用，再打开原生Win32文件窗口；关闭后重新验证ID/stage/expiry，固定脚本入口只接收有界UTF16 hex路径。CEP helper移除File.openDialog/saveDialog/confirm，保留UTF8临时写入/验证/备份/rename与失败恢复，terminal receipt保留至release；丢失队列回复只读回、不重放。五分钟modal deadline不随poll延长；取消/过期/替换请求不写文件。取得ID前SDK失败由客户端期限/release处理，不猜测其他请求身份。
 

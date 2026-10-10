@@ -44,7 +44,7 @@ const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:c
 api.ensure(layer,realm([record(g.nodes[0])]),true,realm([]),false);eq(arbReads,0);
 const bounds=[-2,-3,-4,2,3,4],raw=Buffer.alloc(48);bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
 let transaction=500;
-function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",operation,requestId:"test",pinTarget:true,
+function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",operation,requestId:"test",pinTarget:true,
     target:{token},transactionId:uuid(transaction),changes:[],...fields});}
 function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});const before=copy(api.snapshot(resolved));
     const desired=copy(before.nativeNodes[0]);desired.id=uuid(++transaction);desired.position={x:160,y:90};

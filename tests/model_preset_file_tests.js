@@ -59,7 +59,7 @@ const app={findMenuCommandId:name=>name==="Starfield Choose Preset File"?77:0,ex
 const host={},context=vm.createContext({$:{global:host},File,app,confirm:()=>{throw new Error("Script confirm must not run.");},Date:function(){this.getTime=()=>now;}});
 function reload(){vm.runInContext(load("jsx/starfield_gateway.jsx"),context);vm.runInContext(load("jsx/preset_file_transport.jsx"),context);}
 reload();
-function rawCall(op,extra,target=host){return JSON.parse(target["SFLD_"+op](JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",operation:op,transferId,...extra})));}
+function rawCall(op,extra,target=host){return JSON.parse(target["SFLD_"+op](JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",operation:op,transferId,...extra})));}
 function hexPath(path){return Array.from({length:path.length},(_,i)=>path.charCodeAt(i).toString(16).padStart(4,"0")).join("");}
 function nativeModal(target=host){const descriptor=target.SFLD_presetFileHostRequest();if(descriptor==="0")return;
     const id=descriptor.slice(0,32);ok(/^[a-f0-9]{32}$/.test(id));const save=descriptor.endsWith("|2");let path=save?saveDialog:openDialog;
@@ -156,7 +156,7 @@ function ui(capturedGraph,meshFailure=false){
     const hostContext=vm.createContext(browserHost);
     browserHost.$.evalFile=function(file){loads++;vm.runInContext(load(file.fsName.split("cep_panel/")[1]),hostContext);};
     vm.runInContext(load("jsx/starfield_gateway.jsx"),hostContext);
-    function reply(payload){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",...payload});}
+    function reply(payload){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",...payload});}
     const captured=fixture.receipt({ok:true,target:{token:"target"},snapshot:{initialized:true,revision:11,checksum:"00000000",recordStamp:"stamp",
         graphHex:codec.toHex(capturedGraph),geometry:{width:1920,height:1080,pixelAspect:1},layerResources:[]}});
     const model=captured.snapshot.nativeNodes.find(n=>n.id===modelId);if(model)model.modelAsset={revision:17,bounds};

@@ -308,9 +308,18 @@ index ae027f9..aa25e6a 100644
          var palette=options.root, items=options.items, toggle=options.toggle;
          var viewport=options.viewport, doc=options.document || document, win=options.window || window;
 diff --git a/cep_panel/js/panel.js b/cep_panel/js/panel.js
-index 5e5c6fa..f4fa516 100644
+index 5e5c6fa..2ae85fb 100644
 --- a/cep_panel/js/panel.js
 +++ b/cep_panel/js/panel.js
+@@ -7,7 +7,7 @@
+     "use strict";
+
+     var REQUEST_TIMEOUT_MS = 8000;
+-    var GATEWAY_BUILD = "native-presets-61";
++    var GATEWAY_BUILD = "native-presets-62";
+     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
+     var openPresetsButton=document.getElementById("openPresets");
+     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
 @@ -165,12 +165,15 @@
              if (Object.prototype.hasOwnProperty.call(extra,key)) envelope[key]=extra[key];
          }
@@ -558,9 +567,18 @@ index 6ee9c08..e791ae6 100644
              }
              // Reuse only the immediate planning receipt. The host independently
 diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
-index 792b33f..d96d07d 100644
+index 792b33f..b8cd087 100644
 --- a/cep_panel/jsx/starfield_gateway.jsx
 +++ b/cep_panel/jsx/starfield_gateway.jsx
+@@ -18,7 +18,7 @@
+ (function () {
+     var PROTOCOL = "org.starfieldfx.panel";
+     var VERSION = 1;
+-    var GATEWAY_BUILD = "native-presets-61";
++    var GATEWAY_BUILD = "native-presets-62";
+     var MATCH_NAME = "org.starfieldfx.particle";
+     var MAX_CHANGES = 40;
+     var MAX_REQUEST_BYTES = 262144;
 @@ -42,7 +42,8 @@
          "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
          "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
@@ -1090,7 +1108,7 @@ index 68bbcc5..9bc4b4c 100644
      return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
  }));
 diff --git a/cep_panel/js/preset_manager.js b/cep_panel/js/preset_manager.js
-index ebc4b13..d30029a 100644
+index ebc4b13..ab42ec1 100644
 --- a/cep_panel/js/preset_manager.js
 +++ b/cep_panel/js/preset_manager.js
 @@ -4,9 +4,9 @@
@@ -1101,7 +1119,7 @@ index ebc4b13..d30029a 100644
 +    var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions","StarfieldModelAssets","StarfieldPresetFiles"].filter(function(name){return !window[name];});
      if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
 -    var cep=window.__adobe_cep__,gatewayBuild="native-presets-58",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
-+    var cep=window.__adobe_cep__,gatewayBuild="native-presets-61",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
++    var cep=window.__adobe_cep__,gatewayBuild="native-presets-62",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
      function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
      function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
      function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}

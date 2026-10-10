@@ -82,6 +82,10 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10 owner额度恢复并要求测试版：准备native61/packed32829/CoreABI8/CEP62完整八native/Core+十八CEP，gateway62及cache/manifest升级；隔离Model/Particle/Texture/Cloud/Birth回归通过。默认report的Model配对发布工具、IncludeModel/记录推导rollback/部分未复制helper恢复及热Core的Model匹配核对接入；实际工具dummy模拟60检查通过。准备冻结完整SDK后fresh AE check再按授权发布，保留配对60/61回滚与实际AE gate；不扩充Shape或Use Model(s)。
+
+2026-10-10本阶段已提交推送dae9621；其后冻结命令因automatic approval review用量上限未执行（提示13:30）。完整SDK构建也没有启动，不存在新session或冻结产物证据；不能沿用旧构建证明新模块。owner已获告知并有继续问题待回复；未绕过审核、部署或停止PID30420。完整目标active，恢复后先冻结/双NoPublish八目标构建及配对记录，再继续Model作者/实际AE gate。
+
 2026-10-10预设文件模态候选接入resident Host排队/claim/原生chooser/关闭后ID-stage-expiry重验和UTF16 hex路径。CEP仅短evalScript、显式有界poll，terminal receipt retained，cancel/expiry不写文件、丢失回复不重放。Host标准/ASAN各1596、chooser各242、实际隔离文件583及Shape/Model/Texture/Cloud/Birth回归通过；Prepare重现native-preset-modal-panel62-v2。完整冻结SDK构建继续，未部署或增加AE资格；初次测试PID30420停止授权等待owner，其他实现继续。Use Model(s)独立参考/全Model配对/实际AE gate开放，完整目标active。
 
 2026-10-10 e5bf287 Shape入口已推送/冻结，完整May2023 /MT八目标双NoPublish实际exit0，11:21十八安装文件/selector/Core匹配60/61，证据m3-17-model-shape-{build,installed}-hashes.json及build-exit.txt。下一实现项为CEP预设文件窗口的resident Host排队/原生chooser/关闭后plain ID重验与UTF16路径传递（ADR0038 proposed）；保持原文件发布/rollback语义，补cancel/expiry/SDK时序fixture再冻结构建。Use Model(s)完整菜单单独请求owner。未部署，完整目标active。

@@ -62,7 +62,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
     failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
     for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
-function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
+function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
 function call(operation,fields,callback){
     if(operation==="beginModelAssetExport" || operation==="releaseModelAsset"){callback({ok:true,assetId:fields.assetId});return;}
     if(operation==="readModelAssetPage"){const n=nodes.find(n=>n.id===modelId),asset=nativeMeshes[modelId] || meshAsset;

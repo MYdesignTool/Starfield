@@ -24,15 +24,18 @@ foreach ($taskEntry in $taskRecord.files) {
     if (-not $taskTarget.StartsWith($taskPanelRoot,[StringComparison]::OrdinalIgnoreCase) -or
         -not $taskSaved.StartsWith($taskSavedRoot,[StringComparison]::OrdinalIgnoreCase) -or
         -not $taskRetained.StartsWith($taskCandidateRoot,[StringComparison]::OrdinalIgnoreCase)) { throw 'Paired panel path escapes its root.' }
-    if ((Get-FileHash -LiteralPath $taskTarget -Algorithm SHA256).Hash -ne $taskEntry.installedHash) {
-        throw "Panel source changed after deployment; refusing to overwrite: $taskTarget"
-    }
     # Old records predate the existed field and always have a saved source.
     $taskExisted = -not ($taskEntry.PSObject.Properties.Name -contains 'existed') -or [bool]$taskEntry.existed
+    $taskPresent=Test-Path -LiteralPath $taskTarget
+    if($taskPresent){
+        if ((Get-FileHash -LiteralPath $taskTarget -Algorithm SHA256).Hash -ne $taskEntry.installedHash) {
+            throw "Panel source changed after deployment; refusing to overwrite: $taskTarget"
+        }
+    }elseif($taskEntry.installedHash -or $taskExisted){throw 'Expected paired panel source is missing.'}
     if ($taskExisted) {
         if ((Get-FileHash -LiteralPath $taskSaved -Algorithm SHA256).Hash -ne $taskEntry.oldHash) { throw "Saved panel hash mismatch: $taskSaved" }
     } elseif ($taskEntry.oldHash -or (Test-Path -LiteralPath $taskSaved)) { throw 'Unexpected pre-deployment source for a newly added panel file.' }
-    $taskEntries += [pscustomobject]@{target=$taskTarget;saved=$taskSaved;retained=$taskRetained;oldHash=$taskEntry.oldHash;existed=$taskExisted}
+    $taskEntries += [pscustomobject]@{target=$taskTarget;saved=$taskSaved;retained=$taskRetained;oldHash=$taskEntry.oldHash;existed=$taskExisted;present=$taskPresent}
 }
 if (-not $taskEntries.Count) { throw 'Paired panel snapshot is empty.' }
 Write-Host "Restore previous bundle through Deploy-TestBuild.ps1 and $($taskEntries.Count) verified CEP source files."
@@ -44,6 +47,7 @@ foreach ($taskEntry in $taskEntries) {
     if (Test-Path -LiteralPath $taskEntry.retained) { throw "Candidate retention path already exists: $($taskEntry.retained)" }
 }
 foreach ($taskEntry in $taskEntries) {
+    if(-not $taskEntry.present){continue}
     New-Item -ItemType Directory -Path (Split-Path -Parent $taskEntry.retained) -Force | Out-Null
     Copy-Item -LiteralPath $taskEntry.target -Destination $taskEntry.retained
 }
@@ -54,7 +58,7 @@ foreach ($taskEntry in $taskEntries) {
         if ((Get-FileHash -LiteralPath $taskEntry.target -Algorithm SHA256).Hash -ne $taskEntry.oldHash) { throw 'Restored panel hash mismatch.' }
     } else {
         # Exact validated checkout file; candidate bytes were retained above.
-        Remove-Item -LiteralPath $taskEntry.target
+        if(Test-Path -LiteralPath $taskEntry.target){Remove-Item -LiteralPath $taskEntry.target}
         if (Test-Path -LiteralPath $taskEntry.target) { throw 'New panel source remains after rollback.' }
     }
 }

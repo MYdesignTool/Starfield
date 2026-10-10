@@ -2,6 +2,23 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Owner-authorized test release — 2026-10-10
+
+After review access returned the owner requested a test version. The full pair
+will use native61 / packed32829, CEP62 and Core ABI8, including seven AEX modules
+and Core. Existing parameter IDs and first four Shape values remain unchanged;
+Model kind5/schema1, binding7, snapshot8 and manifest30 are the appended contracts
+documented below. Old graph/binding/snapshot records retain their readers. The
+released bundle must include all Model asset/author/renderer/Host modules and
+isolated CEP resources together, with preflight/backup/hash-verified rollback.
+No Core-only or standalone Model publication is authorized by this milestone.
+
+Shape remains exactly the six owner-confirmed labels; Face is unavailable until
+implemented. Use Model(s) choices remain unconfirmed and are not invented in the
+test version. Its existing connected-model instancing and default cube are the
+implemented geometry path. Test release is not AE2023 qualification; OBJ import,
+preset Add/Replace/duplicate, undo/reopen and native modal timing remain host gates.
+
 ## Owner-confirmed Shape scope — 2026-10-10
 
 The complete reference Shape menu is Circle, Rectangle, Cloud, Texture, Face,
