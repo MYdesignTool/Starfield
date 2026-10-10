@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Released native63/Core ABI8/CEP65 Model Host receipt correction; fixed empty diagnostic strings and queued transaction claim/progress. Actual AE2023 Model qualification open; Face unavailable.",
-  "basePanel": 65,
+  "status": "Released native64/Core ABI8/CEP66 primitive Model terminal receipts and retained notification retries. Actual AE2023 qualification open; Face unavailable.",
+  "basePanel": 66,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "5AD3133EAA04F2DCFAD9648553A9A876E62B30670A2CF6073B6AA860B49F4D6A"
+      "normalizedSha256": "171EB40ECD068E110D66E672BE8DC7907BDAE9D21F0467838D1CC1F98C51FBDF"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "21E0CA44E0CBF6458C9B8055C900D7D847B1FC20B17446732E1B476675D56E18"
+      "normalizedSha256": "3ADB4CD6B34106E45C7CD234FB558F3B37CF5FC84CE24897CE7FAC73537B1D35"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "45B18BD2B904280F6C38331BC472A3476859A81BF648E2704190E0FAF26DDC4F"
+      "normalizedSha256": "4DF585B9A959DE4479407D6195552D871C488C4B92FAD5C51970B82BE0FA1E5D"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "3DFA292444278D3B15E1B35A7DE375AC55AEF0D311497FC35431E275A3D98A7F"
+      "normalizedSha256": "E8E1E90DFAAB05928FD73E26BE4C9A413BDB2391BBB6442ABC6C9209379015A1"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "E42112158B98024ED88C4B5D3454926B5D652CF6DC2CA4153479173F0625E062"
+      "normalizedSha256": "485F7B6F62CA756339509C5CBEE6207F6735C9E380CA65BB27B9AF18552F3137"
     }
   ]
 }

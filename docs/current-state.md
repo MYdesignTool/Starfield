@@ -1,5 +1,19 @@
 # 当前工程状态
 
+## 当前安装：native64 / CEP66（2026-10-11 01:12+08）
+
+owner反馈63/65仍state=executing后，M3-17修正版已从冻结源码32be53f61b98ee7bdcb3b5938be02638fac727b1发布。native64/packed32832/CoreABI8/CEP66，May2023 x64 Release /MT完整八目标会话26145 actual terminal exit0，fresh AE process0后安装；26hash、selector/selected runtime、paired rollback report通过。只修Model完成通知的Array原型依赖和一次发送后丢结果：primitive ASCII九整数、执行/回滚/undo后保留数字终态、250ms只重发通知、幂等完成/已释放ID回执，不能重跑executor或覆盖在途事务。忙碌/超时报错直接显示已有阶段错误和通知诊断。actual JSX双VM复现旧数组拒收，但仍不认定实际AE根因或Model添加已通过。
+
+标准/ASAN actual Host9593769/9593869（含逐字节/切片调用）、actual backup/executor636209、CEP554/DOM41/export588/author74/三JSX ES3 18/只读报告27、新63/65→64/66 dummy配对61通过。日志artifacts/m3-17-result-receipt-*、m3-17-native64-{deploy-before,deploy-after,installed-hashes}.json与live回归保留；首次错拼作者测试入口未运行，正确model_panel_author_tests74随后通过。无registry/cache或AE启停。Motion/MNT保持；按owner既有要求交接后暂停验收，完整目标未完成。
+
+新备份m3-17-native64-panel66-result-receipt-20261011可恢复native63/CEP65，较早备份保留。一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native64-panel66-result-receipt-20261011' -Restore
+```
+
+## native64候选与native63部署记录
+
 2026-10-11 owner反馈native63/CEP65仍失败，忙碌阶段推进到executing。M3-17恢复修复：完成通知的Array instanceof依赖和一次发送后丢弃结果均为已核对代码缺口；两个独立VM执行实际已部署JSX复现数组拒收/保持executing，候选primitive ASCII收据转complete，不认定AE根因已复现。native64/packed32832/CEP66候选保留完整数字终态，250ms仅重发通知，绝不重跑executor；同ID完成收据幂等、已释放/换ID不写新事务。失败/回滚/undo诊断可传回，executing/applying仍不因超时被覆盖。扩充手动只读报告供owner检查message/result/diagnostics；完整冻结SDK/配对部署待完成。
 
 核对日期：2026-10-11。当前安装 **native63 / packed32831 / Core ABI8 / CEP65**，完整冻结源码498862759b1ec39ff56dda8c36422911fb09c570。00:28+08 fresh AE process0后发布Model事务停滞修正；八native/Core与十八CEP安装hash、selector/selected runtime及配对rollback report通过，artifacts/m3-17-native63-deploy-{before,after}.json和m3-17-native63-installed-hashes.json记录实际状态。备份m3-17-native63-panel65-host-receipt-20261011可恢复native62/CEP64，较早配对备份保留。owner要求本次成果部署后暂停验收，Motion及MNT在途保持，不记完整目标完成。

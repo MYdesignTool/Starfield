@@ -1,6 +1,14 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native62/CEP64 root-ID fix deployed 2026-10-10; AE2023 qualification open. Task M3-17.
+Status: native64/CEP66 terminal-receipt fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+
+At01:12+08 native64/packed32832/CoreABI8/CEP66 was published from frozen
+32be53f61b98ee7bdcb3b5938be02638fac727b1; complete May2023 /MT eight-target
+session26145 actual terminal exit0, fresh AE process0,26 installed hashes,
+selector/runtime and paired Restore report passed. Backup
+m3-17-native64-panel66-result-receipt-20261011 restores63/65. The owner reports
+63/65 still stalled in executing. Primitive receipts and notification-only
+retries address verified code defects, with actual AE behavior still open.
 
 At21:43+08 native62/packed32830/CoreABI8/CEP64 was published from frozen
 7fda058b2bd4717288d3e2fad43e94daa7bb13e0, complete May2023 /MT eight-target

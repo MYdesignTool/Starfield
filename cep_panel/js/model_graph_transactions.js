@@ -10,7 +10,7 @@
         function apply(transaction,meshes,callback){
             if(typeof callback!=="function")throw new Error("Model transaction callback is required.");
             var id=idFactory(),token=transaction && transaction.target && transaction.target.token,descriptors=[],finished=false,started=false,queued=false,
-                index=0,page=0,deadline=clock()+5*60*1000,published=null;
+                index=0,page=0,deadline=clock()+5*60*1000,published=null,lastState="uploading",lastMessage="";
             function fields(extra){var value={transactionId:id,pinTarget:true,target:{token:token}};
                 Object.keys(extra || {}).forEach(function(key){value[key]=extra[key];});return value;}
             function end(response){if(finished)return;finished=true;
@@ -45,7 +45,7 @@
             function expired(){if(clock()<=deadline)return false;
                 if(published){published.diagnostics=published.diagnostics || {};published.diagnostics.notificationPending=true;}
                 end(published || failure(queued?"model_transaction_outcome_unknown":"model_transaction_timeout",
-                    queued?"Model transaction did not return its final result. Refresh the graph before retrying.":"Model transaction upload timed out."));return true;}
+                    queued?"Model transaction did not return its final result (state="+lastState+"). "+lastMessage+" Refresh the graph before retrying.":"Model transaction upload timed out."));return true;}
             function upload(){if(finished || expired())return;
                 if(index===meshes.length){
                     // A lost queue acknowledgement cannot be treated as a safe
@@ -61,6 +61,7 @@
                 options.call("readModelGraphTransaction",fields(),function(response){
                     if(finished)return;if(!response || !response.ok || response.transactionId!==id){
                         error(response && response.error?response:failure("model_transaction_outcome_unknown","No final Model graph response. Refresh before retrying."));return;}
+                    lastState=response.state;lastMessage=response.message || response.notificationError || "";
                     if(response.state==="complete"){end(response.result || failure("model_transaction_outcome_unknown","The completed transaction has no result."));return;}
                     if(response.state==="published"){
                         if(!response.result || response.result.committed!==true){error(failure("model_transaction_outcome_unknown","Invalid published Model result."));return;}

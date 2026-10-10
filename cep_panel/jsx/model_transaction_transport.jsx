@@ -84,7 +84,9 @@
         var request=parse(text,"beginModelGraphTransaction"),old=host[KEY];
         if(old && old.version===1){old=session(old.id);
             if(old.state==="executing" || old.state==="applying" || old.state!=="complete" && old.state!=="failed" && now()<=old.expires)
-                return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+").");}
+                return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+")."+
+                    (old.message?" Last error: "+String(old.message).substr(0,1000):"")+
+                    (old.notificationError?" Notification: "+String(old.notificationError).substr(0,1000):""));}
         if(!integer(request.baseGraphRevision,1,16777215) || typeof request.baseRecordStamp!=="string" || request.baseRecordStamp.length>256*1024 ||
             typeof request.graphHex!=="string" || request.graphHex.length<64 || request.graphHex.length>api.maxGraphBytes*2 || request.graphHex.length%2 ||
             !/^[0-9a-f]+$/.test(request.graphHex))throw new Error("Invalid Model graph planning receipt.");
@@ -156,17 +158,24 @@
             s.result={ok:true,committed:true,operation:"submitGraph",target:{token:fresh.token},snapshot:updated,nonce:receipt.nonce};
             s.state="published";s.assets=[];return "1";
         }catch(error){s.message=error.toString();return "0";}};
-    host.SFLD_modelTransactionHostResult=function(id,numbers){var s=session(id);if(!s || !(numbers instanceof Array) || numbers.length!==9)return "0";
-        for(var i=0;i<numbers.length;i++)if(!integer(numbers[i],-2147483648,2147483647))return "0";
+    host.SFLD_modelTransactionHostResult=function(id,wire){var s=session(id);if(!s)return "2";
+        if(typeof wire!=="string" || wire.length>128 || !/^-?[0-9]+(\|-?[0-9]+){8}$/.test(wire)){
+            s.notificationError="Invalid native Model result encoding (kind="+typeof wire+").";return "0";}
+        var fields=wire.split("|"),numbers=[];
+        for(var i=0;i<fields.length;i++){var number=Number(fields[i]);if(!integer(number,-2147483648,2147483647)){
+            s.notificationError="Native Model result integer is out of range.";return "0";}numbers.push(number);}
+        if((numbers[0]!==0 && numbers[0]!==1) || !integer(numbers[1],0,7) || !integer(numbers[7],0,8) || !integer(numbers[8],-1,62)){
+            s.notificationError="Invalid native Model result fields.";return "0";}
+        if(s.state==="complete")return s.nativeOutcome===wire?"1":"0";
         var committed=numbers[0]===1;
         if(committed && (!s.result || !s.result.committed))return "0";
         s.diagnostics={stage:numbers[1],error:numbers[2],rollbackError:numbers[3],assetRollbackError:numbers[4],cleanupError:numbers[5],undoError:numbers[6],assetError:numbers[7],assetIndex:numbers[8]};
         if(!committed)s.result={ok:false,committed:false,error:{code:"graph_commit_failed",message:(s.message || "Native Model graph transaction failed.")+" (stage "+numbers[1]+", error "+numbers[2]+", rollback "+numbers[3]+", asset rollback "+numbers[4]+")"}};
-        s.result.diagnostics=s.diagnostics;s.state="complete";s.assets=[];return "1";};
+        s.result.diagnostics=s.diagnostics;s.nativeOutcome=wire;s.notificationError="";s.state="complete";s.assets=[];return "1";};
     host.SFLD_readModelGraphTransaction=function(text){try{var s=matching(text,"readModelGraphTransaction").s;
         if(s.state==="complete" || s.state==="published")return api.reply({ok:true,transactionId:s.id,state:s.state,result:s.result});
         if(s.state==="failed")return api.fail(s.failureCode || "model_transaction_failed",s.message);
-        return api.reply({ok:true,transactionId:s.id,state:s.state});
+        return api.reply({ok:true,transactionId:s.id,state:s.state,message:s.message || "",notificationError:s.notificationError || ""});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
     host.SFLD_releaseModelGraphTransaction=function(text){try{var s=matching(text,"releaseModelGraphTransaction").s;
         if(s.state==="executing" || s.state==="applying")s.cancelled=true;else host[KEY]=null;return api.reply({ok:true});

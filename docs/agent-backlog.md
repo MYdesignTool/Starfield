@@ -1,5 +1,7 @@
 # 当前任务卡
 
+2026-10-11 01:12+08 M3-17修正版native64/packed32832/CoreABI8/CEP66已部署，冻结32be53f/完整May2023八目标会话26145 actual exit0，fresh AE process0、26hash/selector/runtime/paired rollback report通过。保留执行器后数字终态，primitive完成通知及无重放重试，面板直接显示阶段错误；backup m3-17-native64-panel66-result-receipt-20261011恢复63/65。actual JSX跨VM拒收复现不认定AE原因；等待owner默认Model添加/OBJ/预设/undo/reopen验收并按既有要求暂停，Motion/MNT保持。下文候选段落为本次实现经过。
+
 2026-10-11 当前活动卡重新为M3-17：owner反馈63/65仍state=executing。64/66候选消除完成通知Array原型依赖，保留执行/回滚后的数字终态，250ms仅重发同一收据；不丢失失败/cleanup/undo信息，不覆盖在途写入或重跑executor。actual JSX双VM复现旧拒收、新字符串完成，但实机根因仍假设。仅修Model，Motion/MNT保持，完整冻结构建及新配对待发布。
 
 旧任务卡和精确历史所有权见 [归档](history/2026-10-07/agent-backlog.md)；产品进度见 [路线图](roadmap.md)。
