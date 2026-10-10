@@ -330,9 +330,14 @@ allocation failure, unchanged source graph and concurrent requests are covered.
 Circle1772, Look At1372, travel1216, Transform594, Model graph559 and Model
 particle2695 regressions pass; actual exit0 logs are in artifacts/m3-18-path-graph-*
 and motion-path-graph-{tests,asan}.log/exit.txt. Counts include new graph scratch
-allocations in the neighbouring Motion failure scans. Full frozen SDK proof is
-still required; installed61/63 remains untouched. These numeric tests do not
-qualify reference controls, AE callbacks or GPU hardware.
+allocations in the neighbouring Motion failure scans. Sourcecf64261 is pushed
+and git-archive frozen; the full May2023 x64 Release /MT eight-target build passes
+at actual terminal exit0 (session18162), explicitly using both NoPublish switches.
+Main/Core compile the new geometry/travel shared inputs. The new eight hashes,
+terminal result and unchanged26 installed61/63 hashes/selector/runtime are in
+motion-path-graph-sdk-* and motion-path-graph-installed-hashes.json. These numeric
+tests and compilation do not qualify reference controls, AE callbacks or GPU
+hardware; the three-mode author and full ordered/resource contract remain open.
 
 ### Point resource capture seam
 

@@ -43,7 +43,7 @@ CoreOnly 的 adapter-input 指纹会检查共享输入，runtime 发布还核对
 
 Transform 分别合成中心与精灵基底，保留 shear/reflection；Force 使用下游 Transform suffix。共享基底表最多4096项，snapshot4 保留200字节的显式粒子记录，仍能读取 snapshot3；内存对象 sizeof 不定义 wire stride。Null 作者选择与数值采样契约见 ADR0032。
 
-M3-18未发布Core候选新增Motion schema1的Circle与数字Look At实际graph求值：Circle显式角速度及Over Life积分、历史值与metadata proof、有界数字lease及轨道瞬时速度；Look At当前goal/明确forward和加权最短弧。逐粒子单位四元数在Euler/共享仿射之后施加于CPU/GPU场景准备/Model，保留剪切和镜像；snapshot9显式72B header/232B记录，单位朝向仍保留旧3..8格式，Linear shutter用SLERP。C ABI8/sequence1/AE IDs不变，共享adapter/Core输入须完整成对构建。当前支持Force/Transform前置、Circle→Look At及各自串联，反序/后置frame及不同链合并明确拒绝；三模式作者、Light Path/完整frame/动画轴原点导数及公开参考政策仍未完成，见ADR0039。该Core能力没有对应已部署原生/CEP入口，不能由registry条目宣称首批Motion交付。
+M3-18未发布Core候选新增Motion schema1的Circle与数字Look At实际graph求值：Circle显式角速度及Over Life积分、历史值与metadata proof、有界数字lease及轨道瞬时速度；Look At当前goal/明确forward和加权最短弧。逐粒子单位四元数在Euler/共享仿射之后施加于CPU/GPU场景准备/Model，保留剪切和镜像；snapshot9显式72B header/232B记录，单位朝向仍保留旧3..8格式，Linear shutter用SLERP。C ABI8/sequence1/AE IDs不变，共享adapter/Core输入须完整成对构建。当前支持Force/Transform前置、Circle→Look At及各自串联，反序/后置frame及不同链合并明确拒绝；三模式作者、外部Light资源/完整frame/动画轴原点导数及公开参考政策仍未完成，见ADR0039。该Core能力没有对应已部署原生/CEP入口，不能由registry条目宣称首批Motion交付。
 
 Light Path的数字候选已接入mode0普通/历史graph和Auxiliary：SFMP1有界点包、本地key9..12、实际age曲线及出生时delay、动画speed/random的绝对midpoint或显式metadata常量积分。当前几何按node/time不可变lease缓存，历史clock缓存4096项；20M全请求work含自适应编译/曲线，32MiB累计capacity路径预算跨Auxiliary共用，不因淘汰退款。位移/速度在style前，切线朝向在Euler/共享affine后；保留发射分布与剪切镜像，snapshot9已有pose契约不变。外部光源依赖/GUID、完整有序frame与作者尚未接入，clamp及明确数字delay不认定参考末端/Max Delay/Delay Random，公开控件前必须确认。
 

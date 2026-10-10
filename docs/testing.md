@@ -1,5 +1,7 @@
 # 测试入口
 
+Light Path graph源码cf64261ae13ec20895a4f31aca8a620431bd31c8已推送/git archive冻结于artifacts/prepared/m3-18-motion-path-graph-cf64261/source；显式IncludeModelCandidate及双NoPublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0。Main/Core均编译新geometry/travel共享输入；artifacts/m3-18-motion-path-graph-sdk-build.log/exit.txt/build-hashes.json及sdk-terminal.json记录八个新SHA256和实际终态。构建后motion-path-graph-installed-hashes.json复查26安装hash/selector/runtime匹配61/63。没有Motion作者或部署，不由编译推断参考、AE或GPU硬件资格。
+
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPathGraphTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准/ASAN各8288、实际exit0，artifacts/m3-18-motion-path-graph-{tests,asan}.log及exit.txt。实际mode0普通/历史graph/Auxiliary、SFMP1/6160B最大点包/every truncation/非法header/数字先验证再分配、动画speed/random/出生delay、四curve及metadata、30/60/120Hz partial interval、4096 clock cache淘汰后的lease、最终Euler/affine/reflection切线及串联Path/下游Look At、实际CPU像素/GPU准备/Linear与subframe、普通和历史32MiB累计capacity与20M曲线工作量边界、逐取消/全部分配失败和并发。候选明确数字单位/delay/clamp，不认定Reference作者、AE2023回调或GPU硬件。
 
 相邻必要回归：MotionCircleGraph1772、MotionLookAtGraph1372、MotionPathTravel1216、RunCoreTests -TransformGraph594、ModelGraph559及ModelParticle2695，均实际exit0；artifacts/m3-18-path-graph-*-regression.log和各exit.txt。GraphEvaluation新CPP依赖已补到直接编译运行器，RunCoreTests原MNT内容保留，仅两条Motion source行归本卡。完整冻结SDK与部署前后证据仍分别记录，安装61/63保持。

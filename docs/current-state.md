@@ -8,11 +8,13 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ### Light Path 普通/历史图候选（未部署）
 
+源码cf64261ae13ec20895a4f31aca8a620431bd31c8已推送并git archive冻结于artifacts/prepared/m3-18-motion-path-graph-cf64261/source；显式IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0。Main/Core均编译MotionGeometry/MotionPathTravel共享输入；sdk-build.log/exit.txt/build-hashes.json和sdk-terminal.json保留八新产物与真实終态，motion-path-graph-installed-hashes.json确认26安装hash/selector/runtime仍匹配native61/CEP63。无Motion作者部署，完整目标active。
+
 mode0已接入实际Core graph/history/Auxiliary：SFMP1数字点包及本地key9..12、当前几何lease/独立历史clock、birth delay及动画speed/random/Over Life积分、最终Euler/affine后的切线pose。保留原发射分布，32MiB累计capacity路径预算与20M工作量跨Auxiliary共用，缓存淘汰不退款或放宽曲线；路径在style前移动，朝向与下游Look At按顺序合成。串联Path/Circle→Path→Look At支持；反序、后置Force/Transform与不同链合并仍typed reject，完整有序frame仍需完成。
 
 聚焦标准/ASAN各8288、Circle1772/Look At1372/travel1216/Transform594/Model graph559/Model particle2695回归实际exit0，日志motion-path-graph-{tests,asan}.log及path-graph-*-regression.log/exit.txt。验证所有packet截断/非法header/numeric、三档历史lattice/partial delay/缓存淘汰、出生延迟与动画速度、最终基底朝向、实际CPU/GPU场景准备/shutter/Auxiliary、两条求值路径总存储/work及取消/全部分配失败/并发。GraphEvaluation新增CPP链接输入同步相关运行器；RunCore仅追加两行，MNT原diff文本核对保持、独立暂存。
 
-当前等待这批新共享源码的提交冻结/完整May2023 SDK证据，没有复用旧travel SDK报告或部署Motion。外部Light资源依赖/GUID、完整frame/动画几何导数、公开速度/延迟/末端/目标政策及三模式原生/CEP作者仍是本卡要求，安装native61/CEP63保持，完整目标active。
+这批新共享源码已完成提交冻结/完整May2023 SDK，不复用旧travel SDK报告。下一步仍是外部Light资源依赖/GUID、完整frame/动画几何导数、公开速度/延迟/末端/目标政策及三模式原生/CEP作者；安装native61/CEP63保持，完整目标active。
 
 ### Light Path 数值 travel 候选（未部署）
 

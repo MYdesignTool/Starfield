@@ -161,6 +161,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 mode0源码cf64261已推送/git archive冻结；双NoPublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0，新Main/Core路径CPP及八hash/terminal证据记录于motion-path-graph-sdk-*。构建后26安装hash/selector/runtime匹配61/63，motion-path-graph-installed-hashes.json。下阶段外部Light依赖/GUID、完整有序frame/动画几何导数与参考单位/延迟/目标政策，随后三模式作者/配对发布/AE2023，完整目标active。
+
 2026-10-10 mode0普通/历史Core graph/Auxiliary候选完成SFMP1数字点、delay捕获于birth、动画speed/curve随机积分及最终基底切线pose；32MiB累计capacity及20M工作量请求预算跨Auxiliary，当前几何/历史clock lease及4096淘汰验证。标准/ASAN8288、Circle1772/Look At1372/travel1216/Transform594/Model559/Model粒子2695均实际exit0，motion-path-graph-*及path-graph-*-regression日志保留。新共享源码提交/冻结完整SDK继续；外部依赖/GUID、完整有序frame/动画几何导数与公开参考政策及三模式作者仍需完成，不发布数学入口或关闭完整目标。
 
 Light Path接入GraphEvaluation后，既有直接编译该CPP的测试运行器需要追加MotionGeometry/MotionPathTravel链接输入。M3-18仅拥有这些依赖行，保留MNT-01的其余夹具/运行器改动；RunCoreTests的两行追加独立入索引，不提交其他在途diff。当前没有另一live agent的文件分配。
