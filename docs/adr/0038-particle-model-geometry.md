@@ -973,3 +973,28 @@ and rollback. First compile diagnostics were repaired and retained. This is
 preventive handling of the owner's unreplicated static hypothesis. Complete SDK
 pairing, actual AE2023 native/script/file-modal timing, pending preset operations,
 undo and reopen still require the full author candidate's deployment acceptance.
+
+### Proposed queued native preset file chooser
+
+Read-only inspection confirms the isolated preset file helper currently opens
+File.openDialog/saveDialog/confirm from a CEP evalScript root. Those calls are
+outside the native exclusion ranges above. The owner's script/modal concern is
+still an unreplicated hypothesis; this path remains a full Model deployment gate.
+
+Proposed implementation: an explicit session-resident Host command queues one
+file operation. Idle owns UI exclusion, reads bounded numeric/ASCII job metadata,
+releases SDK references, and opens the Win32 chooser directly. When it closes,
+the Host reacquires and validates the same plain transfer ID/state before calling
+a fixed script entry point with a bounded UTF16-hex selected path. Native cancel
+and dialog/SDK failure become terminal session results. No SDK object is retained
+over the window and no plug-in ExecuteScript is active inside the chooser.
+
+The existing owned text/pages and validated preset codec remain the file payload.
+Selected-file read or temp-write/readback/backup/rename publication happens after
+the chooser under the same exclusion range. Import/save does not write the AE
+project; applying the imported graph continues through the existing pinned graph
+transaction. Released, expired or changed jobs must perform no file write, and a
+published file result must survive a lost reply without repeating publication.
+Cancel/expiry/failure cleanup and pending-job/modal fixtures are required before
+the full pair's actual AE2023 qualification. This is a proposal, not implemented
+or advertised functionality, and adds no persistent parameter ID/schema/Core ABI.

@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-10 e5bf28759dc4744d67e66cc7f2f1e2a4cd69d4a5的git archive冻结源码完整May2023 x64 Release /MT八目标实际exit0，命令`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`；artifacts/m3-17-model-shape-build.log、build-exit.txt和build-hashes.json。实际编译新的Shape UI/picker到五种node AEX，并编译Main的显式数值转换；此证据不代替实际Win32菜单/Drawbot/AE拖动资格。11:21 +08:00十八安装文件、selector及所选Core与native60/CEP61收据全部匹配，m3-17-model-shape-installed-hashes.json。没有发布候选。
+
 2026-10-10 Particle Shape候选：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunParticleShapeUiTests.ps1 -Run`及`-Sanitize`各112检查通过；实际NodeEffects Particle参数注册/EffectMain事件及ParticleShapeUI/转换/NativeEdit校验，独立resident token DLL，picker与publication为fake。覆盖六项顺序/Face禁用数据、Model6-Core4双向映射、invalid/fractional/Face拒绝、没有Host/占用/guard/取消/相同选择、不在DO_CLICK写入、DRAG只发布一次、过期值/失败完整参数恢复。没有显示真实Win32菜单或Drawbot/AE窗口。日志artifacts/m3-17-particle-shape-ui-{tests,asan}.log；首次PF矩形成员顺序、disk_ids命名空间及GPU stub缺失修复，失败日志保留。
 
 `tests/RunModelNativeBindingTests.ps1 -Run`及ASAN：实际NativeNodeGraph/Model模块各9245、复用ModelControls452通过，加入native1/2/3/4/6到Core0/1/2/3/4、native0/5/7拒绝和所有SDK引用释放。日志artifacts/m3-17-particle-shape-native-{tests,asan}.log。

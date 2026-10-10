@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### Shape 候选冻结构建与下一步（2026-10-10）
+
+源码e5bf28759dc4744d67e66cc7f2f1e2a4cd69d4a5已推送，git archive冻结于artifacts/prepared/m3-17-model-shape-e5bf287/source。IncludeModelCandidate/NoDistPublish/NoRuntimePublish的May2023 x64 Release /MT八目标以实际exit0完成，日志artifacts/m3-17-model-shape-build.log及退出码m3-17-model-shape-build-exit.txt，八产物m3-17-model-shape-build-hashes.json。11:21 +08:00十八安装文件、selector及所选Core仍匹配native60/CEP61，m3-17-model-shape-installed-hashes.json；候选未部署。
+
+下一步继续M3-17文件模态范围：已只读核对preset_file_transport.jsx的File.openDialog/saveDialog/confirm与preset_manager独立evalScript调用。原生已有范围没有覆盖这些CEP根调用；这仍是未复现静态假设的部署前验收项。拟由resident Host排队，在独占UI范围内打开Win32原生文件窗口，全部SDK引用在窗口前释放；窗口关闭后重新核对plain transfer ID，再把有界UTF16 hex路径交给既有读写脚本。因此选择窗口内没有本插件的活动ExecuteScript，已有文件临时写入/验证/备份/rename行为保持。协议/取消/错误测试及完整SDK配对继续；Use Model(s)独立菜单已单独请求owner，不增加Shape模式。
+
 ### Particle Model 选择入口候选（2026-10-10）
 
 候选Shape实际注册六项（disk213及旧1..4不变），原生6/Core4显式映射同时用于UI编译和数值回放，Face5明确拒绝。ECP Drawbot/Windows菜单和隔离CEP只使用owner确认的六个标签，Face禁用；Timeline/script访问仍可能请求Face5并被拒绝，不代表Face已实现。原生点击只记录数值并请求DRAG，后者发布且失败还原参数；两回调持有Host UI exclusion，菜单前释放Utility suite。Model模式隐藏未使用的Size Y。
