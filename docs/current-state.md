@@ -10,7 +10,9 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 Circle从几何工具接入实际Core graph/普通与历史粒子求值。新Motion类型及本地key见ADR0039：显式弧度速度、现有曲线精确积分/历史midpoint累积、稳定速度随机流22、瞬时轨道速度；原出生/样式/精灵基底及snapshot3..8保持。串联Circle按图顺序；Force/Transform在Circle前可用，后置及同一Particle不同Motion链合并暂时typed reject。这是首批三模式的Circle子阶段，Light Path/Look At、完整有序frame及公开Speed/Origin政策仍未完成，不能发布作者入口。Origin/axis动画导数、资源cache/ABI和AE gate仍需后续契约。
 
-标准和ASAN各1764聚焦检查通过，实际graph/history/codec/CPU绘制、速度/Auxiliary、Linear chord/Subframe arc、取消/全分配失败和并发；现有Transform594、Model graph559回归通过。artifacts/m3-18-motion-circle-graph-{tests,asan}.log、m3-18-circle-{transform,model}-regression.log；历史图验证现在保留allocation_failed而非误报无效图。源码冻结/完整May2023构建继续；安装仍native61/CEP63，无Motion作者/AE parameter/ABI发布，不凭数值测试认定宿主通过。所有MNT/其他在途改动保留。
+标准和ASAN各1764聚焦检查通过，实际graph/history/codec/CPU绘制、速度/Auxiliary、Linear chord/Subframe arc、取消/全分配失败和并发；现有Transform594、Model graph559回归通过。artifacts/m3-18-motion-circle-graph-{tests,asan}.log、m3-18-circle-{transform,model}-regression.log；历史图验证现在保留allocation_failed而非误报无效图。所有MNT/其他在途改动保留。
+
+源码05c37e202b667a532c4a79e32457b5c559960754已推送并git archive冻结于artifacts/prepared/m3-18-motion-circle-05c37e2/source；显式IncludeModelCandidate/NoDistPublish/NoRuntimePublish的May2023 x64 Release /MT完整八目标实际exit0。artifacts/m3-18-motion-circle-sdk-build.log/exit.txt/build-hashes.json记录实际构建和八输出，m3-18-motion-circle-installed-hashes.json确认26安装hash、Core selector/runtime保持native61/CEP63。本子阶段没有Motion作者/AE parameter/ABI发布；构建通过不认定公开参考行为或AE资格。下一步仍是三模式共用有序frame/资源、Light Path/Look At及参考单位/作者接入，完整目标active。
 
 ### 图层点只读采样候选
 

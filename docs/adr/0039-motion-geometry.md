@@ -137,7 +137,11 @@ success. A temporal validation allocation was previously collapsed to
 invalid_request; the evaluator now retains the typed allocation/internal error.
 Initial fixture Result boolean and Force schema assumptions were corrected;
 diagnostics remain under artifacts. This does not qualify AE or unknown public
-reference behavior. Full frozen May2023 build evidence follows separately.
+reference behavior. Source05c37e2 is pushed and git-archive frozen; the full
+eight-target May2023 x64 Release /MT build passes with actual exit0 and both
+NoPublish switches. The build log/exit/eight hashes and retained26 installed
+native61/CEP63 hashes/Core selector are under artifacts/m3-18-motion-circle-*.
+There is no author entry and no deployment of this unfinished Motion substage.
 
 ### Point resource capture seam
 
