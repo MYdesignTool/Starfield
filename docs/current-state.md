@@ -1,10 +1,18 @@
 # 当前工程状态
 
-## M3-17 native65/CEP67 在途修正（2026-10-11，未部署）
+## 当前安装：native65 / CEP67（2026-10-11 01:44+08）
 
-owner新增截图为脚本404行的native node compile/parameter1/stream-1/error516；触发动作和具体SDK失败点尚未确认。实际Model Source回调fixture复现现存守卫缺口：params[] guard0而live renderer guard1仍会独立提交，live Model guard1/2也未阻止旧delivery。修正先读源节点和主渲染器的实时常量guard，再读取UUID/编译；guard2备份排除、guard1事务负责最终发布，正常原生Source编辑保持。Model/Emitter/Particle回归与完整冻结SDK/配对部署进行中；这不是实机根因或修复完成声明。native64/CEP66安装保持，Motion/MNT保留。编译诊断增加本地阶段/效果索引，不改IDs/schema/ABI8。
+owner新增截图为脚本404行的native node compile/parameter1/stream-1/error516；触发动作和具体SDK失败点尚未确认。实际Model Source回调fixture复现守卫缺口：params[] guard0而live renderer guard1仍会独立提交，live Model guard1/2也未阻止旧delivery。修正先读源节点和主渲染器的实时常量guard，再读取UUID/编译；guard2备份排除、guard1事务负责最终发布，正常原生Source编辑保持。编译诊断增加本地阶段/效果索引，不改IDs/schema/ABI8。不是实机根因或修复完成声明，owner应直接复验原触发步骤，不再要求重复运行只读报告。
 
-## 当前安装：native64 / CEP66（2026-10-11 01:12+08）
+冻结本地提交9200c6bec7cf54a9e34c82b061ddd3e0bf82909d、native65/packed32833/CoreABI8/CEP67，May2023 x64 Release /MT完整八目标会话78547 actual terminal exit0。fresh AE process0后经既有Deploy-ModelTestBuild→Deploy-TestBuild安装；26hash、selector/selected runtime及paired Restore report通过，日志artifacts/m3-17-live-guard-*及native65-*.json/.log。标准/ASAN守卫各40、Model binding9433/controls452、Emitter sync8697/camera12、Particle callback600、CEP transport554/DOM41/ES3 18及dummy配对61通过；fixtures不能代替AE验收。Motion/MNT保持，部署后按owner既有要求暂停等待验收。
+
+Git源码已本地提交；本轮两次推送被自动审批拒绝，第二次不接受goal工具返回的既有owner仓库授权。当前对话中的明确推送确认请求待答复，origin暂时仍3ae0157；没有绕过拒绝。新备份m3-17-native65-panel67-live-guard-20261011可整套恢复native64/CEP66，较早备份保留。一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native65-panel67-live-guard-20261011' -Restore
+```
+
+## native64 / CEP66 部署记录（2026-10-11 01:12+08）
 
 owner反馈63/65仍state=executing后，M3-17修正版已从冻结源码32be53f61b98ee7bdcb3b5938be02638fac727b1发布。native64/packed32832/CoreABI8/CEP66，May2023 x64 Release /MT完整八目标会话26145 actual terminal exit0，fresh AE process0后安装；26hash、selector/selected runtime、paired rollback report通过。只修Model完成通知的Array原型依赖和一次发送后丢结果：primitive ASCII九整数、执行/回滚/undo后保留数字终态、250ms只重发通知、幂等完成/已释放ID回执，不能重跑executor或覆盖在途事务。忙碌/超时报错直接显示已有阶段错误和通知诊断。actual JSX双VM复现旧数组拒收，但仍不认定实际AE根因或Model添加已通过。
 

@@ -88,6 +88,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 01:44+08 native65/packed32833/CoreABI8/CEP67已从本地提交9200c6b冻结完整May2023 /MT八目标会话78547 actual exit0部署；fresh AE0、26hash/selector/runtime、paired Restore report通过，备份65/67→64/66。实时节点和renderer guards阻止监督期间的独立Source编译；原报错动作/SDK失败点仍待owner实机复验，不关闭Model gate。标准/ASAN guard40、binding9433/controls452、Emitter8697/camera12、Particle600、CEP554/DOM41/ES3 18/dummy部署61通过。两次Git push被自动审批拒绝，工具中的旧owner授权未被接受，等待本轮明确确认；本地提交及冻结证据保留。按owner既有要求部署后暂停，完整目标未完成。
+
 2026-10-11 owner新增native node compile/parameter1/stream-1/error516截图。当前M3-17修正候选native65/CEP67：actual Model Source callback复现live renderer1/Model1或2与stale delivered0时独立编译的守卫缺口。先读live constant guards、排除备份2、在capture UUID前跳过监督事务；正常原生Source仍发布。新增阶段/效果索引诊断只在本地NativeEdit，IDs/schema/ABI8保持；完整冻结SDK与配对部署待完成，实际截图触发动作/根因及AE验收仍开放。保留Motion和MNT在途改动，不恢复暂停的其他功能。
 
 2026-10-10 Model receiving停滞：owner只读实机报告确认p0-c1-l29/AE23.5x52/main、command5061、Host entry function、receiving且余270秒。空诊断句柄fixture复现丢弃SDK成功回复；原生三个通道读取字符串、Model只读Request/Claim及executor前Begin保护整个backup/rollback，十五秒无进展恢复仅限未写入阶段，忙碌显示state、poll250ms。native63/packed32831/CoreABI8/CEP65候选完整构建/部署继续；不改变持久ID/ABI/schema/Shape六项，不推进暂停的Motion。模拟回归不认定此实机问题已修复。

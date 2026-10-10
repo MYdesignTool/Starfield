@@ -1,6 +1,15 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native64/CEP66 terminal-receipt fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+Status: native65/CEP67 live-guard fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+
+At01:44+08 native65/packed32833/CoreABI8/CEP67 was installed from frozen local
+9200c6bec7cf54a9e34c82b061ddd3e0bf82909d. Complete May2023 /MT eight-target
+session78547 actual terminal exit0, fresh AE process0,26 installed hashes,
+selector/runtime and paired Restore report passed. Backup
+m3-17-native65-panel67-live-guard-20261011 restores64/66. The native supervision
+gap below is fixed in the candidate; actual owner error516 remains a host gate.
+Git push is blocked by automatic approval pending explicit in-chat confirmation;
+local committed source and frozen hashes remain traceable.
 
 2026-10-11 candidate native65/CEP67 addresses a confirmed native supervision
 gap after the owner supplied node compile/parameter1/stream-1/error516. That
@@ -12,8 +21,9 @@ capture, exclude backup renderer2, and preserve real unguarded native edits.
 These checks run only on the UI edit path, with local scoped suite/refs. No
 parameter IDs, persistent schemas, ABI8 or Shape options change. Compilation
 diagnostics gain static local stage/effect-index fields, never persisted or
-transported. A new complete frozen SDK pairing and AE2023 owner qualification
-are required; fixture success alone does not prove this dialog is fixed.
+transported. The complete frozen SDK pairing is installed at65/67; AE2023
+owner qualification remains required. Fixture success alone does not prove
+this dialog is fixed.
 
 At01:12+08 native64/packed32832/CoreABI8/CEP66 was published from frozen
 32be53f61b98ee7bdcb3b5938be02638fac727b1; complete May2023 /MT eight-target
