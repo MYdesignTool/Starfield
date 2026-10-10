@@ -1,12 +1,20 @@
 # 当前工程状态
 
-核对日期：2026-10-09。09:14 +08:00已部署 native60 / packed32828 / Core ABI7 / CEP61，冻结源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec已推送。M3-16作者/构建/部署完成，实际AE gate开放；当前活动实现卡M3-17 Model：原生模块/binding7、资源提交/回滚及SmartFX捕获候选已接入，继续导入事务/CEP作者，未暴露菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。MNT-01 改动保留。
+核对日期：2026-10-10。按owner“今天下班，阶段性收尾”的要求暂停完整目标。当前安装 native60 / packed32828 / Core ABI7 / CEP61，冻结部署源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec；M3-16作者/构建/部署完成，实际AE gate开放。M3-17 Model候选源码已提交推送至10a1b6e，完整冻结SDK构建通过，尚未接通整笔Host/CEP资产应用入口、暴露Particle Model菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
 
-2026-10-10恢复M3-17：原生ModelGraphTransaction执行器已接入Host工程输入，先核对全部UUID/修订/边界/单mesh8MiB与总64MiB，再解码全部SFMG1，完成预检后才开始单个SDK undo组。完整备份覆盖prepare、逐Model UUID重新定位/私有SFMW和commit；任一阶段失败/取消/回调异常恢复整笔备份。资产自身rollback、整笔rollback、提交后cleanup和EndUndoGroup错误独立记录，后两者保留committed=true避免重复应用。标准/ASAN各636209项检查通过（含共用备份夹具/调用资源计数），共用备份458562回归通过，日志artifacts/m3-17-model-graph-transaction-*.log。prepare/commit和generic为fake callbacks，实际executor/backup/SFMG1参与测试；首轮夹具固定时间假设已修正，诊断保留。Host上传/排队、CEP prepare/commit回调和Model菜单仍待接通，本执行器没有独立用户入口；本阶段完整SDK冻结构建待记录，未部署，安装60/61保持。
+### 最新收尾交接（2026-10-10）
+
+- 源码：10a1b6ee2cfb585d1e675c278a95bbca00fa461f已推送；完整备份与ModelGraphTransaction执行器、精确SFMW写入、隔离预设文件候选保留。标准/ASAN执行器各636209检查、共用备份458562检查通过；callbacks/generic为夹具，不代表真实AE应用成功。
+- 构建：上述提交git archive冻结于artifacts/prepared/m3-17-model-graph-transaction-10a1b6e/source；IncludeModelCandidate、NoDistPublish、NoRuntimePublish的May2023 x64 Release /MT八目标全部产出，日志终止于NoRuntimePublish标记。日志artifacts/m3-17-model-graph-transaction-build.log，八输出哈希artifacts/m3-17-model-graph-transaction-build-hashes.json；未部署候选。
+- 安装：2026-10-10 08:50 +08:00重新核对七native/Core、十一CEP，共十八项均匹配native60/CEP61收据，runtime selector及所选Core哈希匹配；报告artifacts/m3-17-model-graph-transaction-installed-hashes.json。下方既有备份和单步回滚保留。
+- 风险：step_model_asset_host未包含在已部署native60中；PresetsUI、ModelImportUI、EditorPresetPicker的Modal/idle重入与导入后revision一致性为未复现的静态假设，按owner要求保留为Model部署前验收项，详见ADR0038和testing.md。
+- 下次接续：Host有界资产上传/排队及真实CEP prepare/commit，完成Model Add/Replace/duplicate整笔事务与资源UUID映射；再完成Particle Model菜单、完整配对验证及上述部署前验收。随后继续Particle剩余选项、节点命名/排序、Motion的Light Path/Circle/Look At和Turbulence。当前暂停不缩减完整目标。
+
+2026-10-10恢复M3-17：原生ModelGraphTransaction执行器已接入Host工程输入，先核对全部UUID/修订/边界/单mesh8MiB与总64MiB，再解码全部SFMG1，完成预检后才开始单个SDK undo组。完整备份覆盖prepare、逐Model UUID重新定位/私有SFMW和commit；任一阶段失败/取消/回调异常恢复整笔备份。资产自身rollback、整笔rollback、提交后cleanup和EndUndoGroup错误独立记录，后两者保留committed=true避免重复应用。标准/ASAN各636209项检查通过（含共用备份夹具/调用资源计数），共用备份458562回归通过，日志artifacts/m3-17-model-graph-transaction-*.log。prepare/commit和generic为fake callbacks，实际executor/backup/SFMG1参与测试；首轮夹具固定时间假设已修正，诊断保留。Host上传/排队、CEP prepare/commit回调和Model菜单仍待接通，本执行器没有独立用户入口；本阶段完整SDK冻结构建证据见上方最新收尾交接，未部署，安装60/61保持。
 
 2026-10-10阶段收尾（owner要求暂停）：M3-17新增完整EffectGraphBackup helper，使用AEGP_DuplicateEffect保存主效果/节点的完整网格、动画、表达式与参数；guard2和临时UUID隔离备份，恢复名称/顺序/flags并最后释放主效果guard。删除、排序、身份和flags均读回核对；原生图编译、renderer定位、Model导出及隔离CEP库存排除备份。标准/ASAN helper各458562项fake-host检查，Host147760、实际Model模块7699（另控件452）、隔离gateway588/作者74/预设330与旧preset断言通过，日志artifacts/m3-17-effect-graph-backup-*；两次夹具编译错误和一次Model专用定位过滤遗漏已修正，失败日志保留。候选由Prepare工具重现到artifacts/prepared/m3-17-model-backup-panel62-fixed/cep_panel；live CEP和native60/CEP61保持。helper尚未接入整笔Host图事务，本阶段未做完整SDK冻结构建或AE宿主验证，不能视为Model预设应用已经完成。
 
@@ -129,7 +137,7 @@ AE 关闭后的单步回滚（仓库根目录）：
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-16-native60-panel61-birth-controls-20261009' -Restore
 ```
 
-未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标继续 active；未从源码/驱动测试声明新增 AE 宿主资格。
+未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标按owner最新要求暂停；未从源码/驱动测试声明新增 AE 宿主资格。
 
 ## 开放 gate
 

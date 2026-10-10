@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10最新收尾：按owner要求暂停，保留完整目标及所有在途改动。源码10a1b6e已推送并冻结完整May2023 x64 Release /MT八目标构建通过（IncludeModelCandidate、双NoPublish），实际Host编译完整备份/事务执行器；标准/ASAN各636209、共用备份458562证据保留。日志及八输出/十八安装哈希artifacts/m3-17-model-graph-transaction-*，08:50 +08:00安装0不匹配，native60/CEP61、selector不变。执行器尚无真实Host/CEP调用入口，未部署或关闭AE gate。下次接续有界Host上传/排队、真实CEP prepare/commit及Add/Replace/duplicate资源UUID映射，然后Particle Model菜单、配对验证、Modal/idle与导入revision一致性部署前验收；之后继续Particle、节点命名/排序、Motion三模式和Turbulence。详见current-state.md最新交接。
+
 隔离preset version3保存/导入：实际Save Current采集有界SFMG1，codec核对owner UUID/revision/bounds及parked mesh，显式32768字符分页文件传输与rename失败恢复；330项实际候选codec/client/gateway/UI检查和旧preset断言通过，Model/Texture/Cloud/Birth/完整gateway回归通过。新的文件IO使用内存fixture；原生整笔Model Add/Replace/duplicate待接入，当前明确拒绝mesh apply，未部署。SFMW源码969dcf1冻结完整May2023 /MT八目标通过，十八安装哈希0不匹配，安装60/61保持；不是Model发布或AE资格。
 
 SFMW精确资产写入seam已接入Model generic入口，UUID/Source/revision/guard前置核对，十项Mesh/bounds/revision/Source/guard读回与失败恢复；标准/ASAN原生模块各7535通过，另控件452。调用者负责outer undo和整笔graph/mirror事务，尚未接入完整Host导入/预设应用，未暴露菜单。3c10b5d UI-idle导出桥完整冻结May2023 /MT八目标通过；十八安装哈希0不匹配，60/61保持。下一步有界预设保存/导入与整体Add/Replace/duplicate恢复，再完成Particle菜单。
@@ -96,7 +98,7 @@ UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排�
 
 当前活动实现卡切换为M3-17；M3-16已部署并等待owner宿主验收，M3-13添加/背面报错反馈优先。完整目标不缩减。
 
-2026-10-10恢复进展：ModelGraphTransaction完整原生执行器在一个SDK undo组内组合备份、prepare、私有SFMW和commit；全部数值资产预检先于项目变更，失败/取消/回调异常整笔恢复，发布后的cleanup/undo独立诊断。标准/ASAN各636209、共用Backup458562检查通过，m3-17-model-graph-transaction-*.log；callbacks/generic是fake，不关闭Host/CEP/AE gate。接入Host工程/fingerprint，完整冻结SDK待记录；下一步Host资产上传/排队与真实CEP prepare/commit、Model菜单及配对验证，安装60/61保持。
+2026-10-10恢复进展：ModelGraphTransaction完整原生执行器在一个SDK undo组内组合备份、prepare、私有SFMW和commit；全部数值资产预检先于项目变更，失败/取消/回调异常整笔恢复，发布后的cleanup/undo独立诊断。标准/ASAN各636209、共用Backup458562检查通过，m3-17-model-graph-transaction-*.log；callbacks/generic是fake，不关闭Host/CEP/AE gate。接入Host工程/fingerprint，完整冻结SDK证据见本卡最新收尾；下一步Host资产上传/排队与真实CEP prepare/commit、Model菜单及配对验证，安装60/61保持。
 
 2026-10-10 owner要求阶段收尾并暂停：完整EffectGraphBackup候选和guard2库存隔离已实现，标准/ASAN helper各458562项、Host147760、实际Model7699（控件452）、隔离gateway588/作者74/预设330与旧preset断言通过。保留失败诊断，日志artifacts/m3-17-effect-graph-backup-*；Prepare可重现隔离候选，不改live CEP。尚未将helper接入整笔Host资产/图事务，本阶段完整SDK冻结和实际AE验证待续；native60/CEP61保持。下次继续Host资产导入/完整Add/Replace/duplicate、Particle Model菜单、配对构建及部署前Modal/idle与导入revision一致性gate（ADR0038，owner静态假设未复现），然后继续Particle、各节点命名/排序和Motion/Turbulence；不缩减目标。
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
