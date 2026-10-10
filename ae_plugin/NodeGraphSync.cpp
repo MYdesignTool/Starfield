@@ -67,6 +67,7 @@ struct SuiteSet {
     explicit SuiteSet(PF_InData* data) : basic(data ? data->pica_basicP : nullptr) {}
     ~SuiteSet() {
         if (!basic) return;
+        if (stream) basic->ReleaseSuite(kAEGPStreamSuite, kAEGPStreamSuiteVersion6);
         if (effect) basic->ReleaseSuite(kAEGPEffectSuite, kAEGPEffectSuiteVersion4);
         if (pf_interface) basic->ReleaseSuite(kAEGPPFInterfaceSuite, kAEGPPFInterfaceSuiteVersion1);
     }
@@ -76,12 +77,43 @@ struct SuiteSet {
                                           reinterpret_cast<const void**>(&pf_interface));
         if (!error) error = basic->AcquireSuite(kAEGPEffectSuite, kAEGPEffectSuiteVersion4,
                                                  reinterpret_cast<const void**>(&effect));
+        if (!error) error = basic->AcquireSuite(kAEGPStreamSuite, kAEGPStreamSuiteVersion6,
+                                                 reinterpret_cast<const void**>(&stream));
         return static_cast<PF_Err>(error);
     }
     SPBasicSuite* basic{};
     const AEGP_PFInterfaceSuite1* pf_interface{};
     const AEGP_EffectSuite4* effect{};
+    const AEGP_StreamSuite6* stream{};
 };
+
+PF_Err read_sync_guard(SuiteSet& suites, AEGP_PluginID plugin_id,
+                       AEGP_EffectRefH effect, A_long index, double& output) noexcept {
+    AEGP_StreamRefH guard{};
+    auto error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &guard);
+    if (!error && !guard) error = PF_Err_BAD_CALLBACK_PARAM;
+    if (!error) {
+        AEGP_StreamType type{};
+        error = suites.stream->AEGP_GetStreamType(guard, &type);
+        if (!error && type != AEGP_StreamType_OneD) error = PF_Err_BAD_CALLBACK_PARAM;
+    }
+    if (!error) {
+        AEGP_StreamValue2 value{}; const A_Time zero{0, 1};
+        error = suites.stream->AEGP_GetNewStreamValue(plugin_id, guard,
+            AEGP_LTimeMode_LayerTime, &zero, TRUE, &value);
+        if (!error) {
+            output = value.val.one_d;
+            error = suites.stream->AEGP_DisposeStreamValue(&value);
+            if (!error && output != 0 && output != 1 &&
+                output != starfield::adapter::transaction_backup_guard) error = PF_Err_BAD_CALLBACK_PARAM;
+        }
+    }
+    if (guard) {
+        const auto disposed = suites.stream->AEGP_DisposeStream(guard);
+        if (!error) error = disposed;
+    }
+    return static_cast<PF_Err>(error);
+}
 
 bool read_node_id(PF_ParamDef* params[], std::array<std::uint16_t, 8>& chunks) noexcept {
     bool nonzero = false;
@@ -99,12 +131,9 @@ bool read_node_id(PF_ParamDef* params[], std::array<std::uint16_t, 8>& chunks) n
 }
 
 PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH layer,
-                       AEGP_EffectRefH& renderer) noexcept {
+                       AEGP_EffectRefH& renderer, bool& transaction_active) noexcept {
     renderer = nullptr;
-    const AEGP_StreamSuite6* streams{};
-    auto acquired=suites.basic->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
-    struct StreamSuite {SPBasicSuite* basic;const AEGP_StreamSuite6* suite;~StreamSuite(){if(suite)basic->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} stream_suite{suites.basic,streams};
-    if(acquired || !streams)return static_cast<PF_Err>(acquired?acquired:PF_Err_BAD_CALLBACK_PARAM);
+    transaction_active = false;
     A_long effect_count = 0;
     A_Err error = suites.effect->AEGP_GetLayerNumEffects(layer, &effect_count);
     if (error) return static_cast<PF_Err>(error);
@@ -117,11 +146,13 @@ PF_Err locate_renderer(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_LayerH la
         error = suites.effect->AEGP_GetInstalledKeyFromLayerEffect(candidate, &key);
         if (!error) error = suites.effect->AEGP_GetEffectMatchName(key, match_name);
         bool is_renderer = !error && std::strcmp(match_name, kRendererMatchName) == 0;
-        if(is_renderer){AEGP_StreamRefH guard{};error=streams->AEGP_GetNewEffectStreamByIndex(plugin_id,candidate,starfield::adapter::kGraphSyncGuardId,&guard);
-            if(!error && !guard)error=PF_Err_BAD_CALLBACK_PARAM;
-            if(!error){AEGP_StreamValue2 value{};const A_Time zero{0,1};error=streams->AEGP_GetNewStreamValue(plugin_id,guard,AEGP_LTimeMode_LayerTime,&zero,TRUE,&value);
-                if(!error){is_renderer=value.val.one_d!=starfield::adapter::transaction_backup_guard;error=streams->AEGP_DisposeStreamValue(&value);}}
-            if(guard)streams->AEGP_DisposeStream(guard);}
+        if (is_renderer) {
+            double guard{};
+            error = read_sync_guard(suites, plugin_id, candidate,
+                starfield::adapter::kGraphSyncGuardId, guard);
+            is_renderer = !error && guard != starfield::adapter::transaction_backup_guard;
+            if (is_renderer && guard == 1) transaction_active = true;
+        }
         if (is_renderer && renderer) {
             suites.effect->AEGP_DisposeEffect(candidate);
             suites.effect->AEGP_DisposeEffect(renderer);
@@ -298,6 +329,38 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         // Node records follow the authored parameters in the runtime layout.
         constexpr auto kind = static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind);
         if (!starfield::adapter::native_nodes::authored_parameter(kind,extra->param_index)) return PF_Err_NONE;
+        const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
+        if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
+        SuiteSet suites(in_data);
+        PF_Err error = suites.acquire();
+        if (error != PF_Err_NONE) return error;
+
+        // A scripted/native batch can invoke USER_CHANGED_PARAM with an older
+        // params[] delivery. Inspect the saved guards before reading its UUID or
+        // compiling any siblings; the supervising transaction owns publication.
+        AEGP_EffectRefH source{};
+        error = static_cast<PF_Err>(suites.pf_interface->AEGP_GetNewEffectForEffect(
+            plugin_id, in_data->effect_ref, &source));
+        if (!error && !source) error = PF_Err_BAD_CALLBACK_PARAM;
+        double live_guard{};
+        if (!error) error = read_sync_guard(suites, plugin_id, source, kSyncGuardIndex, live_guard);
+        if (source) suites.effect->AEGP_DisposeEffect(source);
+        if (error) return error;
+        if (live_guard != 0) return PF_Err_NONE;
+
+        AEGP_LayerH layer = nullptr;
+        error = static_cast<PF_Err>(suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref, &layer));
+        if (error || !layer) return error ? error : PF_Err_BAD_CALLBACK_PARAM;
+        AEGP_EffectRefH renderer = nullptr;
+        bool transaction_active{};
+        error = locate_renderer(suites, plugin_id, layer, renderer, transaction_active);
+        if (error != PF_Err_NONE) return error;
+        struct RendererRef {
+            const AEGP_EffectSuite4* effects; AEGP_EffectRefH value;
+            ~RendererRef() { if (value) effects->AEGP_DisposeEffect(value); }
+        } renderer_ref{suites.effect, renderer};
+        if (!renderer || transaction_active) return PF_Err_NONE;
+
         std::array<std::uint16_t, 8> node_id{};
         if (!read_node_id(params, node_id)) return PF_Err_BAD_CALLBACK_PARAM;
         starfield::adapter::node_sync::NativeEdit edit;
@@ -329,20 +392,6 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
             field.index=layout::birth_enabled;field.value[0]=1;
         }
 
-        const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
-        if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
-        SuiteSet suites(in_data);
-        PF_Err error = suites.acquire();
-        if (error != PF_Err_NONE) return error;
-
-        AEGP_LayerH layer = nullptr;
-        error = static_cast<PF_Err>(suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref, &layer));
-        if (error || !layer) return error ? error : PF_Err_BAD_CALLBACK_PARAM;
-
-        AEGP_EffectRefH renderer = nullptr;
-        error = locate_renderer(suites, plugin_id, layer, renderer);
-        if (error != PF_Err_NONE) return error;
-        if (!renderer) return PF_Err_NONE;
         edit.renderer = renderer; edit.layer = layer;
         edit.handles = in_data->utils; edit.basic = in_data->pica_basicP;
         edit.width = in_data->width; edit.height = in_data->height;
@@ -355,7 +404,6 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         else {
             error = starfield::adapter::commit_native_graph_edit(&edit, plugin_id, out_data);
         }
-        suites.effect->AEGP_DisposeEffect(renderer);
         if (!error) error = edit.accepted && edit.revision > 0 ? edit.status :
             (edit.status ? edit.status : PF_Err_BAD_CALLBACK_PARAM);
         if(!error && activate_cloud) {
@@ -368,6 +416,11 @@ PF_Err sync_node_graph_parameter(PF_InData* in_data, PF_OutData* out_data, PF_Pa
         }
         if (out_data) {
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
+            else if(edit.stage==starfield::adapter::node_sync::Stage::compile && edit.compile_stage)
+                std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
+                    "Starfield native edit failed: node compile: %s (parameter %ld, effect %ld, stream %ld, error %d).",
+                    edit.compile_stage,static_cast<long>(extra->param_index),static_cast<long>(edit.compile_effect_index),
+                    static_cast<long>(edit.stream_index),static_cast<int>(error));
             else if(edit.stage==starfield::adapter::node_sync::Stage::animation_bindings && edit.binding_stage)
                 std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
                     "Starfield native edit failed: animation binding: %s (parameter %ld, binding %ld, stream %ld, error %d).",

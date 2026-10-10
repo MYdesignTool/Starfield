@@ -1192,17 +1192,22 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
     if (edit && !node_sync::valid_edit(*edit)) return PF_Err_BAD_CALLBACK_PARAM;
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
 
+    const auto stage = [&](const char* name) noexcept { if(edit)edit->compile_stage=name; };
+    if(edit)edit->compile_effect_index=-1;
     try {
+        stage("acquire suites");
         SuiteSet suites(in_data);
         suites.edit = edit;
         PF_Err error = suites.acquire();
         if (error != PF_Err_NONE) return error;
         AEGP_LayerH layer = edit ? edit->layer : nullptr;
+        stage("owner layer");
         A_Err ae_error = layer ? 0 : suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref, &layer);
         if (ae_error || !layer) return static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);
         suites.owner_layer=layer;
 
         A_long effect_count = 0;
+        stage("effect inventory");
         ae_error = suites.effect->AEGP_GetLayerNumEffects(layer, &effect_count);
         if (ae_error) return static_cast<PF_Err>(ae_error);
         const A_Time time{in_data->current_time, in_data->time_scale};
@@ -1214,6 +1219,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                         static_cast<double>(in_data->pixel_aspect_ratio.num) / in_data->pixel_aspect_ratio.den : 1.0};
         std::vector<RawNode> raw_nodes;
         std::vector<RawNode> previous_nodes;
+        stage("saved binding record");
         if(params[kGraphParameterId] && params[kGraphParameterId]->param_type==PF_Param_ARBITRARY_DATA &&
            params[kGraphParameterId]->u.arb_d.value) {
             auto saved=read_graph_parameter(in_data,params[kGraphParameterId]->u.arb_d.value);
@@ -1226,6 +1232,8 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
         layout_entries.reserve(static_cast<std::size_t>(effect_count) + 1u);
 
         for (A_long effect_index = 0; effect_index < effect_count; ++effect_index) {
+            if(edit) { edit->compile_effect_index=effect_index; edit->stream_index=-1; }
+            stage("effect lookup");
             suites.edited_effect = nullptr; // EffectRef handles may be reused after disposal.
             AEGP_EffectRefH raw_effect = nullptr;
             ae_error = suites.effect->AEGP_GetLayerEffectByIndex(plugin_id, layer, effect_index, &raw_effect);
@@ -1234,6 +1242,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             EffectRef effect(suites.effect, raw_effect);
             AEGP_InstalledEffectKey installed_key = AEGP_InstalledEffectKey_NONE;
             char match_name[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+            stage("effect match name");
             ae_error = suites.effect->AEGP_GetInstalledKeyFromLayerEffect(effect.value, &installed_key);
             if (!ae_error) ae_error = suites.effect->AEGP_GetEffectMatchName(installed_key, match_name);
             if (ae_error) return static_cast<PF_Err>(ae_error);
@@ -1243,6 +1252,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             const char* type_key = nullptr;
             std::uint16_t schema_version = 0;
             if (!decode_node_kind(match_name, kind, type_key, schema_version)) continue;
+            stage("node guard");
             double transaction_guard{};
             if(!read_one_d(suites,plugin_id,effect.value,native_nodes::sync_guard_index(kind),time,transaction_guard))
                 return PF_Err_BAD_CALLBACK_PARAM;
@@ -1251,6 +1261,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             if (graph.nodes.size() >= core::kMaxGraphNodes - 1u) return PF_Err_BAD_CALLBACK_PARAM;
 
             core::Uuid128 uuid{};
+            stage("node identity");
             if (!read_uuid(suites, plugin_id, effect.value, native_nodes::uuid_first_index(kind), time, uuid))
                 return PF_Err_BAD_CALLBACK_PARAM;
             if (edit && static_cast<std::uint32_t>(kind) == edit->node_kind) {
@@ -1270,21 +1281,26 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             for(const auto& old:previous_nodes)if(old.id==raw.id && old.kind==raw.kind){suites.previous_node=&old;break;}
             suites.recording = &raw;
             core::GraphNode node{core::NodeId{uuid}, type_key, schema_version, {}};
+            stage("node parameters");
             if (!read_node_parameters(suites, plugin_id, effect.value, kind, time, units, node))
                 return PF_Err_BAD_CALLBACK_PARAM;
             suites.recording = nullptr; raw_nodes.push_back(std::move(raw));
             double layout_x = 0.0;
             double layout_y = 0.0;
+            stage("node layout");
             if (!read_one_d(suites, plugin_id, effect.value, native_nodes::layout_x_index(kind), time, layout_x) ||
                 !read_one_d(suites, plugin_id, effect.value, native_nodes::layout_y_index(kind), time, layout_y) ||
                 std::abs(layout_x) > 1000000000.0 || std::abs(layout_y) > 1000000000.0)
                 return PF_Err_BAD_CALLBACK_PARAM;
             layout_entries.push_back(LayoutEntry{core::NodeId{uuid}, layout_x, layout_y});
+            stage("node connections");
             if (!read_connections(suites, plugin_id, effect.value, kind, time, node.id, connections))
                 return PF_Err_BAD_CALLBACK_PARAM;
             graph.nodes.push_back(std::move(node));
         }
 
+        if(edit)edit->compile_effect_index=-1;
+        stage("output controls");
         if (edit && !suites.edit_applied) return PF_Err_BAD_CALLBACK_PARAM;
         if (!params[kMaxParticlesId] || params[kMaxParticlesId]->param_type != PF_Param_FLOAT_SLIDER ||
             !std::isfinite(params[kMaxParticlesId]->u.fs_d.value) || params[kMaxParticlesId]->u.fs_d.value < 0.0 ||
@@ -1322,6 +1338,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             add_value(output, binding.second, double(params[binding.first]->u.fs_d.value));
         }
 
+        stage("graph connections");
         for (const auto& connection : connections) {
             Kind destination_kind = Kind::emitter;
             bool found_destination = false;
@@ -1346,13 +1363,17 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     core::graph_keys::kParticleModelsIn : destination_port(destination_kind)) : core::PortKey{1}});
         }
 
+        stage("graph validation");
         const auto validation = core::validate_graph(graph, core::particle_node_registry());
         if (validation.ok()) {
+            stage("layout record");
             graph.optional_records.push_back(make_layout_record(layout_entries));
+            stage("binding record");
             auto bindings = make_binding_record(raw_nodes);
             if (bindings.empty() && !raw_nodes.empty()) return PF_Err_BAD_CALLBACK_PARAM;
             if (!bindings.empty()) graph.optional_records.push_back(std::move(bindings));
         }
+        if(validation.ok())stage("complete");
         return validation.ok() ? PF_Err_NONE : PF_Err_BAD_CALLBACK_PARAM;
     } catch (const std::bad_alloc&) {
         return PF_Err_OUT_OF_MEMORY;

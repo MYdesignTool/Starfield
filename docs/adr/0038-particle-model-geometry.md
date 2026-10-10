@@ -2,6 +2,19 @@
 
 Status: native64/CEP66 terminal-receipt fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
+2026-10-11 candidate native65/CEP67 addresses a confirmed native supervision
+gap after the owner supplied node compile/parameter1/stream-1/error516. That
+dialog does not establish the exact triggering operation or SDK failure. The
+actual Model Source callback fixture reproduces publication while the saved
+renderer guard is1 and the delivered node guard is stale0; saved node guard1/2
+must likewise block compilation. Read both constant live guards before UUID
+capture, exclude backup renderer2, and preserve real unguarded native edits.
+These checks run only on the UI edit path, with local scoped suite/refs. No
+parameter IDs, persistent schemas, ABI8 or Shape options change. Compilation
+diagnostics gain static local stage/effect-index fields, never persisted or
+transported. A new complete frozen SDK pairing and AE2023 owner qualification
+are required; fixture success alone does not prove this dialog is fixed.
+
 At01:12+08 native64/packed32832/CoreABI8/CEP66 was published from frozen
 32be53f61b98ee7bdcb3b5938be02638fac727b1; complete May2023 /MT eight-target
 session26145 actual terminal exit0, fresh AE process0,26 installed hashes,

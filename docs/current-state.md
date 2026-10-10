@@ -1,5 +1,9 @@
 # 当前工程状态
 
+## M3-17 native65/CEP67 在途修正（2026-10-11，未部署）
+
+owner新增截图为脚本404行的native node compile/parameter1/stream-1/error516；触发动作和具体SDK失败点尚未确认。实际Model Source回调fixture复现现存守卫缺口：params[] guard0而live renderer guard1仍会独立提交，live Model guard1/2也未阻止旧delivery。修正先读源节点和主渲染器的实时常量guard，再读取UUID/编译；guard2备份排除、guard1事务负责最终发布，正常原生Source编辑保持。Model/Emitter/Particle回归与完整冻结SDK/配对部署进行中；这不是实机根因或修复完成声明。native64/CEP66安装保持，Motion/MNT保留。编译诊断增加本地阶段/效果索引，不改IDs/schema/ABI8。
+
 ## 当前安装：native64 / CEP66（2026-10-11 01:12+08）
 
 owner反馈63/65仍state=executing后，M3-17修正版已从冻结源码32be53f61b98ee7bdcb3b5938be02638fac727b1发布。native64/packed32832/CoreABI8/CEP66，May2023 x64 Release /MT完整八目标会话26145 actual terminal exit0，fresh AE process0后安装；26hash、selector/selected runtime、paired rollback report通过。只修Model完成通知的Array原型依赖和一次发送后丢结果：primitive ASCII九整数、执行/回滚/undo后保留数字终态、250ms只重发通知、幂等完成/已释放ID回执，不能重跑executor或覆盖在途事务。忙碌/超时报错直接显示已有阶段错误和通知诊断。actual JSX双VM复现旧数组拒收，但仍不认定实际AE根因或Model添加已通过。

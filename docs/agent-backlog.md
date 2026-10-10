@@ -88,6 +88,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 owner新增native node compile/parameter1/stream-1/error516截图。当前M3-17修正候选native65/CEP67：actual Model Source callback复现live renderer1/Model1或2与stale delivered0时独立编译的守卫缺口。先读live constant guards、排除备份2、在capture UUID前跳过监督事务；正常原生Source仍发布。新增阶段/效果索引诊断只在本地NativeEdit，IDs/schema/ABI8保持；完整冻结SDK与配对部署待完成，实际截图触发动作/根因及AE验收仍开放。保留Motion和MNT在途改动，不恢复暂停的其他功能。
+
 2026-10-10 Model receiving停滞：owner只读实机报告确认p0-c1-l29/AE23.5x52/main、command5061、Host entry function、receiving且余270秒。空诊断句柄fixture复现丢弃SDK成功回复；原生三个通道读取字符串、Model只读Request/Claim及executor前Begin保护整个backup/rollback，十五秒无进展恢复仅限未写入阶段，忙碌显示state、poll250ms。native63/packed32831/CoreABI8/CEP65候选完整构建/部署继续；不改变持久ID/ABI/schema/Shape六项，不推进暂停的Motion。模拟回归不认定此实机问题已修复。
 
 2026-10-10 21:43+08修复发布：7fda058冻结完整May2023 /MT八目标实际exit0，fresh AE count0后部署native62/packed32830/CoreABI8/CEP64；26安装hash、selector/runtime、实际paired rollback report通过，备份m3-17-native62-panel64-root-id-20261010恢复61/63。owner已确认CEP63加载、p0-c1-l29身份，root0修正版真实AE添加/OBJ/资源预设/undo/reopen待验收。owner要求今日部署后暂停目标，完整目标不记complete；Motion今后按可操作阶段分批交付，不要求三个作者一起发布，数值层无作者入口不作为可验收模式。

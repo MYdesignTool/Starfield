@@ -334,6 +334,16 @@ void ui_capture(PF_InData& data){
     const auto compiled=compile_native_node_graph(&data,pointers.data(),graph,found,1);
     if(compiled)std::printf("UI compile error %d, last effect %u stream %ld, nodes %zu edges %zu\n",compiled,ui_last_effect,long(ui_last_index),graph.nodes.size(),graph.edges.size());
     CHECK(compiled==PF_Err_NONE&&found&&graph.nodes.size()==4&&ui_mesh_reads==0);
+    node_sync::NativeEdit source_edit;source_edit.node_kind=5;source_edit.parameter_index=layout::source;
+    source_edit.uuid[7]=4;source_edit.value[0]=2;
+    CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1,&source_edit)==PF_Err_NONE &&
+        !std::strcmp(source_edit.compile_stage,"complete") && source_edit.compile_effect_index==-1);
+    const auto match_reader=ui_effect.AEGP_GetEffectMatchName;
+    ui_effect.AEGP_GetEffectMatchName=[](AEGP_InstalledEffectKey,A_char*)->A_Err{return 516;};
+    CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1,&source_edit)==516 &&
+        !std::strcmp(source_edit.compile_stage,"effect match name") && source_edit.compile_effect_index==0 && source_edit.stream_index==-1);
+    CHECK(ui_refs==0 && ui_suites==0);
+    ui_effect.AEGP_GetEffectMatchName=match_reader;
     for(const auto native:{1,2,3,4,6}) {
         ui_values[2][p::shape].one_d=native;
         CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE);

@@ -291,7 +291,9 @@ int main() {
         *source=id==1?reinterpret_cast<AEGP_LayerH>(1):id>=77 && id<=79?reinterpret_cast<AEGP_LayerH>(id):nullptr;
         return 0;
     };
-    pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(0); return 0; };
+    pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr source, AEGP_EffectRefH* ref)->A_Err {
+        *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
+    };
     effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
