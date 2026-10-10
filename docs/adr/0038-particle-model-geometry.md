@@ -870,3 +870,28 @@ This private executor adds no persistent IDs, schema or Core ABI. Its callbacks
 still require the modal/script exclusion and target revalidation gates above.
 It remains unpublished until the Host request/asset transport, CEP preparation
 and verified commit callbacks are connected as the complete author pairing.
+
+### Explicit Model graph transport
+
+The candidate uses a separate queued Host command for graph mutation. CEP stages
+one pinned graph request and numeric asset descriptors, then exact ordered32KiB
+hex pages in a volatile ExtendScript session. Upload and Host download perform no
+project writes. Single mesh8MiB, total64MiB,63 assets and64 desired IDs are checked
+before mutation. The Host pulls bounded ASCII metadata/pages during idle and owns
+all byte buffers for the synchronous executor. There is no file path, arbitrary
+script text, host object or allocator in the protocol, and no transfer in polling.
+
+The session's prepare/commit callbacks revalidate the pinned target and author
+stamp. Prepare materializes identity/layout/link records while deferring Model
+author controls until SFMW has restored the requested assets. Commit writes those
+controls and publishes through the existing native graph receipt, then verifies
+the resulting native author records. The native executor owns the only undo group
+and full rollback. Cancellation/expiry before publication restores the backup;
+published results are retained as committed even if cleanup, undo or notification
+fails. A caller must surface those diagnostics without replaying the mutation.
+
+The Host rechecks numeric project/comp/layer identity before both callbacks.
+Cancellation during native asset validation/writes is numeric-only; it never
+executes another script while an effect reference is owned. Modal/script exclusion
+and actual AE timing remain the deployment gates above. No persistent ID, Core
+ABI or installed pairing changes in this transport stage.

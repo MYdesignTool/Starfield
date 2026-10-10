@@ -4,6 +4,7 @@
 #include "NativeBootstrap.hpp"
 #include "EffectReveal.hpp"
 #include "ModelAssetHost.hpp"
+#include "ModelTransactionHost.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -20,6 +21,7 @@ A_long item_id{},layer_index{},effect_index{};
 bool running{},stopped{};
 AEGP_Command reveal_command{};
 AEGP_Command model_asset_command{};
+AEGP_Command model_transaction_command{};
 constexpr char reveal_name[]="Starfield Reveal Selected Effect";
 template<class T> struct Suite {
     const char* name;A_long version;const T* value{};
@@ -98,6 +100,7 @@ A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
 A_Err reveal_menu(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexcept {
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
     if(commands && model_asset_command)(void)commands->AEGP_EnableCommand(model_asset_command);
+    if(commands && model_transaction_command)(void)commands->AEGP_EnableCommand(model_transaction_command);
     return commands && reveal_command?commands->AEGP_EnableCommand(reveal_command):A_Err_NONE;
 }
 A_Err model_asset_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
@@ -112,6 +115,7 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(stopped || running || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
     running=true;struct RunningScope{~RunningScope(){running=false;}} scope;
     if(starfield::adapter::step_model_asset_host() && sleep)*sleep=std::min(*sleep,A_long{1});
+    if(starfield::adapter::step_model_transaction_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(now<next_scan)return A_Err_NONE;
     next_scan=now+std::chrono::milliseconds(500);
     Suite<AEGP_ItemSuite9> items(kAEGPItemSuite,kAEGPItemSuiteVersion9);
@@ -158,12 +162,21 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(layer_index>=count)layer_index=effect_index=0;
     return A_Err_NONE;
 } catch(...) {running=false;return A_Err_NONE;}
-A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {stopped=true;starfield::adapter::stop_model_asset_host();return A_Err_NONE;}
+A_Err model_transaction_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
+    AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
+    if(command!=model_transaction_command)return A_Err_NONE;
+    if(handled)*handled=TRUE;
+    starfield::adapter::queue_model_graph_transaction();return A_Err_NONE;
+}
+A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {
+    stopped=true;starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();return A_Err_NONE;
+}
 }
 extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A_long,A_long,
     AEGP_PluginID id,AEGP_GlobalRefcon* refcon) noexcept {
     basic=suites;plugin_id=id;main_thread=std::this_thread::get_id();
     starfield::adapter::initialize_model_asset_host(suites,id);
+    starfield::adapter::initialize_model_transaction_host(suites,id);
     if(refcon)*refcon=nullptr;
     Suite<AEGP_RegisterSuite5> registrations(kAEGPRegisterSuite,kAEGPRegisterSuiteVersion5);
     if(!registrations)return A_Err_GENERIC;
@@ -184,7 +197,11 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
        !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_asset_command,model_asset_queue,nullptr) &&
        !commands->AEGP_InsertMenuCommand(model_asset_command,starfield::adapter::model_asset_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
         (void)commands->AEGP_EnableCommand(model_asset_command);
-    if(!error && commands && (reveal_command || model_asset_command))
+    if(!error && commands && !commands->AEGP_GetUniqueCommand(&model_transaction_command) &&
+       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_transaction_command,model_transaction_queue,nullptr) &&
+       !commands->AEGP_InsertMenuCommand(model_transaction_command,starfield::adapter::model_transaction_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
+        (void)commands->AEGP_EnableCommand(model_transaction_command);
+    if(!error && commands && (reveal_command || model_asset_command || model_transaction_command))
         (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;
 }

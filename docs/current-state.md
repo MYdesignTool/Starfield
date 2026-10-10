@@ -1,10 +1,18 @@
 # 当前工程状态
 
-核对日期：2026-10-10。按owner“今天下班，阶段性收尾”的要求暂停完整目标。当前安装 native60 / packed32828 / Core ABI7 / CEP61，冻结部署源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec；M3-16作者/构建/部署完成，实际AE gate开放。M3-17 Model候选源码已提交推送至10a1b6e，完整冻结SDK构建通过，尚未接通整笔Host/CEP资产应用入口、暴露Particle Model菜单或部署。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
+核对日期：2026-10-10。owner要求开始新的工作，完整目标恢复active。当前安装 native60 / packed32828 / Core ABI7 / CEP61，冻结部署源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec；M3-16作者/构建/部署完成，实际AE gate开放。当前M3-17已接入候选Host分块资产上传/排队与隔离CEP整笔prepare/commit；Particle Model菜单和部署前Modal/idle验收继续，未部署候选。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+### 恢复开发：Model整笔传输候选（2026-10-10）
+
+独立Host命令只排队，idle以最多八项工作/25ms slice拉取plain ASCII描述和32KiB网格页；全部描述符、UUID及总64MiB预检先于payload读取，随后调用已有ModelGraphTransaction完整备份/单undo/SFMW执行器。Host在prepare/commit前重新定位project/comp/layer；取消检查是纯数值，不在拥有effect ref时执行脚本。标准及ASAN传输夹具通过（逐字节与调用计数分别8885968/8886148，0失败；executor为fake），artifacts/m3-17-model-transaction-host-{tests,asan}.log；首轮夹具SDK时间类型错误已修正并保留诊断。
+
+隔离CEP接入有界upload/queue/read/release和真实gateway回调：网格恢复前只物化Model身份/layout/link，commit再写作者参数、验证原生图收据和作者记录；失败由原生整笔恢复，提交后cleanup/undo/通知问题保留committed并显示完成问题，不自动重放。预设Add/Replace重写Model资源UUID并携带停放网格；复制仅在需要新mesh时显式收集源资产。实际候选protocol/planner271检查、真实gateway DOM回调35检查通过（SFMW/外层native为模拟），日志m3-17-model-graph-{transport,gateway-dom}-tests.log。Model作者74、预设文件332、export588、Texture80/Cloud49/Birth51及完整gateway回归通过，m3-17-model-transaction-*.log；三项测试夹具API/typed array/异步队列问题已修正，失败诊断保留。
+
+候选由Prepare工具重现于artifacts/prepared/m3-17-model-transactions-panel62-v2/cep_panel，新增tracked私有client/transport helpers及author patch，live CEP保持。此阶段冻结SDK构建待记录；此前10a1b6e的构建不代表新Host传输已经编译。后续完成Particle Model菜单/模型选择和Model部署前脚本/模态范围互斥、OBJ导入返回后的目标/作者/revision一致性验收，再完整配对发布。真实AE撤销/表达式身份/重开及传输时序仍开放；完整目标保持。
 
 ### 最新收尾交接（2026-10-10）
 
@@ -137,7 +145,7 @@ AE 关闭后的单步回滚（仓库根目录）：
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-16-native60-panel61-birth-controls-20261009' -Restore
 ```
 
-未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标按owner最新要求暂停；未从源码/驱动测试声明新增 AE 宿主资格。
+未更改进程起停、注册表、Adobe 缓存、环境开关或 Junction。完整目标按owner最新要求恢复active；未从源码/驱动测试声明新增 AE 宿主资格。
 
 ## 开放 gate
 

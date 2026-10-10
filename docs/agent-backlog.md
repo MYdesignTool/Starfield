@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10 owner恢复任务：候选ModelTransactionHost接入独立菜单排队/有界idle拉取/整笔执行器；全部metadata及64MiB预检先于payload页，UI目标在两个回调前重新定位。标准/ASAN传输检查通过（计数8885968/8886148含逐字节和调用，executor为fake）。隔离CEP上传/queue/result和真实prepare/commit回调、preset Add/Replace资源UUID重写/停放mesh及复制显式导出已接入；protocol/planner271、真实gateway DOM35、作者74/预设332/export588及旧Texture/Cloud/Birth/完整gateway回归通过。tracked候选helper与patch由Prepare重现到m3-17-model-transactions-panel62-v2；live CEP不变，完整新SDK冻结待记录。当前目标active；接下来Particle Model菜单及Modal/idle/OBJ导入状态一致性部署前验收、完整配对发布，实际AE gate开放。
+
 2026-10-10最新收尾：按owner要求暂停，保留完整目标及所有在途改动。源码10a1b6e已推送并冻结完整May2023 x64 Release /MT八目标构建通过（IncludeModelCandidate、双NoPublish），实际Host编译完整备份/事务执行器；标准/ASAN各636209、共用备份458562证据保留。日志及八输出/十八安装哈希artifacts/m3-17-model-graph-transaction-*，08:50 +08:00安装0不匹配，native60/CEP61、selector不变。执行器尚无真实Host/CEP调用入口，未部署或关闭AE gate。下次接续有界Host上传/排队、真实CEP prepare/commit及Add/Replace/duplicate资源UUID映射，然后Particle Model菜单、配对验证、Modal/idle与导入revision一致性部署前验收；之后继续Particle、节点命名/排序、Motion三模式和Turbulence。详见current-state.md最新交接。
 
 隔离preset version3保存/导入：实际Save Current采集有界SFMG1，codec核对owner UUID/revision/bounds及parked mesh，显式32768字符分页文件传输与rename失败恢复；330项实际候选codec/client/gateway/UI检查和旧preset断言通过，Model/Texture/Cloud/Birth/完整gateway回归通过。新的文件IO使用内存fixture；原生整笔Model Add/Replace/duplicate待接入，当前明确拒绝mesh apply，未部署。SFMW源码969dcf1冻结完整May2023 /MT八目标通过，十八安装哈希0不匹配，安装60/61保持；不是Model发布或AE资格。

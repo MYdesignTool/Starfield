@@ -91,9 +91,8 @@ function response(){return {ok:true,target:{token:"pinned"},snapshot:{initialize
 const normalized=snapshots.normalize(response());equal(normalized.ok,true);
 const snapshotGraph=codec.fromHex(normalized.snapshot.graphHex);equal(snapshotGraph.edges.find(e=>e.sourceNode===model.id).destinationPort,"3");
 let submitted=0,result;
-const client=transactions.create({codec,edits,idFactory:next,call(operation,request,callback){
-    equal(operation,"submitGraph");submitted++;api.write(effect,realm(request.nodeManifest.find(n=>n.id===model.id)),layer);serial++;callback(response());
-}});
+const client=transactions.create({codec,edits,idFactory:next,call(){throw new Error("Model edits must use the complete transaction route");},
+    modelTransactions:{apply(request,assets,callback){equal(assets,[]);submitted++;api.write(effect,realm(request.nodeManifest.find(n=>n.id===model.id)),layer);serial++;callback(response());}}});
 client.apply({type:"setParameters",changes:[{nodeId:model.id,parameterKey:"13",valueType:3,value:1}]},r=>{result=r;},"pinned",serial,response());
 equal(submitted,1);equal(result.ok,true);equal(value(copy(api.read(effect,layer)),2),17);equal(arbReads,0);
 const deleted=edits.apply(graph,{type:"deleteNodes",nodeIds:[model.id]});equal(deleted.edges.length,2);ok(deleted.nodes.every(n=>n.id!==model.id));

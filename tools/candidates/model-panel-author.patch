@@ -1,5 +1,5 @@
 diff --git a/cep_panel/index.html b/cep_panel/index.html
-index 8fa4cfa..e2ff06f 100644
+index 8fa4cfa..052ca1d 100644
 --- a/cep_panel/index.html
 +++ b/cep_panel/index.html
 @@ -48,6 +48,9 @@
@@ -20,6 +20,15 @@ index 8fa4cfa..e2ff06f 100644
      <div class="context-menu-separator"></div>
      <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
      <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected <span>Del / Backspace</span></button>
+@@ -111,6 +115,8 @@
+   <script src="js/graph_layout.js?v=49"></script>
+   <script src="js/graph_edits.js?v=49"></script>
+   <script src="js/native_graph_snapshot.js?v=49"></script>
++  <script src="js/model_assets.js?v=62"></script>
++  <script src="js/model_graph_transactions.js?v=62"></script>
+   <script src="js/graph_transactions.js?v=49"></script>
+   <script src="js/graph_view.js?v=49"></script>
+     <script src="js/editor_presets.js?v=49"></script>
 diff --git a/cep_panel/css/panel.css b/cep_panel/css/panel.css
 index 8e92a9a..c00e5fb 100644
 --- a/cep_panel/css/panel.css
@@ -34,7 +43,7 @@ index 8e92a9a..c00e5fb 100644
  .graph-node.selected {
    border-color: var(--node-color);
 diff --git a/cep_panel/js/graph_edits.js b/cep_panel/js/graph_edits.js
-index 309f1c5..612ced0 100644
+index 309f1c5..93ae495 100644
 --- a/cep_panel/js/graph_edits.js
 +++ b/cep_panel/js/graph_edits.js
 @@ -14,14 +14,16 @@
@@ -115,7 +124,19 @@ index 309f1c5..612ced0 100644
          validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
          for (var i = 0; i < graph.edges.length; i++) {
              var existing = graph.edges[i];
-@@ -444,6 +465,32 @@
+@@ -394,6 +415,11 @@
+                              return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                          }) };
+             graph.nodes.push(copy);
++            if(copy.type===TYPES.model){
++                var resource=copy.parameters.filter(function(p){return String(p.key)==="1";})[0];
++                if(resource.value.some(function(byte){return byte!==0;}))resource.value=copy.id.match(/../g).map(function(byte){return parseInt(byte,16);});
++                (edit.modelResourceCopies || (edit.modelResourceCopies=[])).push({sourceId:originals[n].id,nodeId:copy.id});
++            }
+             ids["$" + originals[n].id] = copy.id;
+             var originalPosition = positions[originals[n].id];
+             var offset = edit.offset || { x: 28, y: 28 };
+@@ -444,6 +470,32 @@
              if (!node) fail("missing_node", "cannot edit a node absent from the graph");
              if (node.type === TYPES.transform && change.parameterKey === "7")
                  fail("invalid_parameter", "Inherited motion is sampled by After Effects.");
@@ -245,10 +266,27 @@ index ae027f9..aa25e6a 100644
          var palette=options.root, items=options.items, toggle=options.toggle;
          var viewport=options.viewport, doc=options.document || document, win=options.window || window;
 diff --git a/cep_panel/js/panel.js b/cep_panel/js/panel.js
-index 5e5c6fa..a43c51c 100644
+index 5e5c6fa..cca41cf 100644
 --- a/cep_panel/js/panel.js
 +++ b/cep_panel/js/panel.js
-@@ -230,11 +230,11 @@
+@@ -165,12 +165,15 @@
+             if (Object.prototype.hasOwnProperty.call(extra,key)) envelope[key]=extra[key];
+         }
+         envelope.gatewayBuild=GATEWAY_BUILD;
++        var modelOperation=operation.indexOf("ModelGraph")>=0;
+         var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot" ||
+-            operation==="getPanelState" || operation==="getPanelPulse";
++            operation==="getPanelState" || operation==="getPanelPulse" || modelOperation || operation.indexOf("ModelAsset")>=0;
+         var script="(function(){try{"+
+             "if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+
++            (modelOperation?" || typeof __SFLD_modelTransactionAPI==='undefined'":"")+
+             "){$.evalFile(new File("+quote(root+"/jsx/starfield_gateway.jsx")+"));}"+
+             "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+")throw new Error('Gateway generation mismatch.');"+
++            (modelOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+quote(root+"/jsx/model_transaction_transport.jsx")+"));}":"")+
+             "return SFLD_"+operation+"("+quote(JSON.stringify(envelope))+");"+
+             "}catch(error){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+quote(GATEWAY_BUILD)+
+             ",ok:false,error:{code:'gateway_load_failed',message:error.toString()}});}}())";
+@@ -230,11 +233,11 @@
      }
  
      var NODE_TYPES = {
@@ -262,7 +300,7 @@ index 5e5c6fa..a43c51c 100644
      };
  
      function positionFor(node, index) {
-@@ -360,7 +360,7 @@
+@@ -360,7 +363,7 @@
          var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
          var bounds = { left: viewportLeft, top: viewportTop,
                         right: viewportRight, bottom: viewportBottom };
@@ -271,7 +309,7 @@ index 5e5c6fa..a43c51c 100644
                         output: "#83c9b1" };
          for (var i = 0; i < state.nodes.length; i++) {
              if (!isSupportedNode(state.nodes[i])) continue;
-@@ -530,22 +530,24 @@
+@@ -530,22 +533,24 @@
          if (!position) return null;
          var display = displayPosition(position);
          if (side === "bottom") return { x: display.x + NODE_WIDTH / 2, y: display.y + NODE_HEIGHT };
@@ -298,7 +336,7 @@ index 5e5c6fa..a43c51c 100644
          port.style.left = "calc(50% - 5px)";
          port.style.top = side === "top" ? "-6px" : side === "bottom" ? (NODE_HEIGHT - 4) + "px" : "calc(50% - 5px)";
      }
-@@ -582,6 +584,7 @@
+@@ -582,6 +587,7 @@
                     " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
          }
          if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
@@ -306,7 +344,7 @@ index 5e5c6fa..a43c51c 100644
          var status = state.frameStatus;
          if (status && status.available === false) return "Live count unavailable";
          var maxParticles = status ? status.maxParticles :
-@@ -704,6 +707,14 @@
+@@ -704,6 +710,14 @@
              card.appendChild(input);
              portElements.input = input;
          }
@@ -321,7 +359,7 @@ index 5e5c6fa..a43c51c 100644
          if (node.outputPort !== null && node.outputPort !== undefined ? node.outputPort !== false : nodeKind(node) !== "output") {
              var output = document.createElement("span");
              output.className = "port port-out";
-@@ -727,6 +738,7 @@
+@@ -727,6 +741,7 @@
              if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
              var nodeSides = sides[nodeId] || { input: "top", output: "bottom" };
              placePort(graphNodeElements[nodeId].input, nodeSides.input);
@@ -329,7 +367,7 @@ index 5e5c6fa..a43c51c 100644
              placePort(graphNodeElements[nodeId].output, nodeSides.output);
          }
          for (var i = 0; i < state.edges.length; i++) {
-@@ -773,7 +785,8 @@
+@@ -773,7 +788,8 @@
          if (connectionState) {
              var currentSides = computePortSides();
              var side = currentSides[connectionState.nodeId] || {};
@@ -339,7 +377,7 @@ index 5e5c6fa..a43c51c 100644
              var fixedPoint = portPoint(connectionState.nodeId, fixedSide ||
                  (connectionState.direction === "out" ? "bottom" : "top"));
              if (fixedPoint) {
-@@ -782,8 +795,10 @@
+@@ -782,8 +798,10 @@
                  var bend = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
                  var c1x = start.x;
                  var c1y = start.y + bend;
@@ -352,7 +390,18 @@ index 5e5c6fa..a43c51c 100644
                  var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
                  preview.setAttribute("class", "edge-preview");
                  preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
-@@ -1008,7 +1023,7 @@
+@@ -882,7 +900,9 @@
+                     refresh(false, false);
+                     return;
+                 }
+-                clearBanner(true);
++                var completion=result.diagnostics,completionWarning=completion && (completion.cleanupError || completion.undoError || completion.notificationPending);
++                if(completionWarning)showError("graph_applied_with_warning","The graph was applied, but After Effects reported a completion issue. Refresh before continuing.",true);
++                else clearBanner(true);
+                 refresh(false, false);
+             });
+         }
+@@ -1008,7 +1028,7 @@
          var sides = computePortSides();
          for (var i = 0; i < state.edges.length; i++) {
              var edge = state.edges[i];
@@ -361,7 +410,7 @@ index 5e5c6fa..a43c51c 100644
              var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "bottom");
              var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "top");
              if (!start || !end) continue;
-@@ -1873,7 +1888,10 @@
+@@ -1873,7 +1893,10 @@
          var distanceSquared = 22 * 22;
          for (var nodeId in graphNodeElements) {
              if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId) || nodeId === connectionState.nodeId) continue;
@@ -373,7 +422,7 @@ index 5e5c6fa..a43c51c 100644
              if (!port) continue;
              var bounds = port.getBoundingClientRect();
              var dx = event.clientX - (bounds.left + bounds.width / 2);
-@@ -1887,6 +1905,7 @@
+@@ -1887,6 +1910,7 @@
              if (!window.StarfieldGraphEdits.canConnect(state.graph, from, to, outputPort, inputPort)) continue;
              nearest = port;
              distanceSquared = distance;
@@ -381,7 +430,7 @@ index 5e5c6fa..a43c51c 100644
          }
          return nearest;
      }
-@@ -1900,7 +1919,7 @@
+@@ -1900,7 +1924,7 @@
          if (port) {
              port.classList.add("connection-snap");
              connectionState.point = portPoint(port.getAttribute("data-node-id"),
@@ -391,10 +440,25 @@ index 5e5c6fa..a43c51c 100644
              connectionState.point = canvasPoint(event.clientX, event.clientY);
          }
 diff --git a/cep_panel/js/graph_transactions.js b/cep_panel/js/graph_transactions.js
-index 6ee9c08..5314fd2 100644
+index 6ee9c08..e791ae6 100644
 --- a/cep_panel/js/graph_transactions.js
 +++ b/cep_panel/js/graph_transactions.js
-@@ -209,6 +209,11 @@
+@@ -6,10 +6,12 @@
+         ? require("./graph_layout.js") : root.StarfieldGraphLayout;
+     var snapshots = typeof module === "object" && module.exports
+         ? require("./native_graph_snapshot.js") : root.StarfieldNativeGraphSnapshot;
+-    var api = factory(layout, snapshots);
++    var modelAssets = typeof module === "object" && module.exports ? require("./model_assets.js") : root.StarfieldModelAssets;
++    var modelTransactions = typeof module === "object" && module.exports ? require("./model_graph_transactions.js") : root.StarfieldModelGraphTransactions;
++    var api = factory(layout, snapshots, modelAssets, modelTransactions);
+     if (typeof module === "object" && module.exports) module.exports = api;
+     else root.StarfieldGraphTransactions = api;
+-}(typeof window !== "undefined" ? window : this, function (layout, snapshots) {
++}(typeof window !== "undefined" ? window : this, function (layout, snapshots, modelAssets, modelTransactions) {
+     "use strict";
+ 
+     var DEFAULT_MAX_BYTES = 24 * 1024;
+@@ -209,6 +211,11 @@
                      Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
                      authoredEdit.layerHeightPixels = base.geometry ? Number(base.geometry.height) : 1;
                      authoredEdit.layerResources=base.layerResources || [];
@@ -406,8 +470,45 @@ index 6ee9c08..5314fd2 100644
                      var updated = edits.apply(graph, authoredEdit, idFactory);
                      graphHex = codec.toHex(updated);
                      if (graphHex.length / 2 > maxBytes) {
+@@ -232,7 +239,8 @@
+                     baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated),
+                     baseRendererManifest: rendererManifest(graph), rendererManifest: rendererManifest(updated) };
+                 if (targetToken) transaction.target = { token: targetToken };
+-                call("submitGraph", transaction, function (committed) {
++                function confirmed(committed) {
++                    committed=snapshots.normalize(committed);
+                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
+                     var saved = committed.snapshot;
+                     try {
+@@ -250,7 +258,25 @@
+                         return;
+                     }
+                     callback({ ok: true, operation: "submitGraph", target: committed.target,
+-                               snapshot: saved, graphHex: saved.graphHex });
++                               snapshot: saved, graphHex: saved.graphHex,committed:committed.committed,diagnostics:committed.diagnostics });
++                }
++                var needsModelTransaction=graph.nodes.concat(updated.nodes).some(function(node){return node.type==="org.starfieldfx.nodes.model";});
++                if(!needsModelTransaction){call("submitGraph",transaction,confirmed);return;}
++                if(!modelTransactions || !modelAssets){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}
++                transaction.target={token:targetToken || response.target && response.target.token};
++                var restore=(authoredEdit.modelAssetsToRestore || []).slice(),copies=authoredEdit.modelResourceCopies || [];
++                var needed=copies.filter(function(copy){var node=(base.nativeNodes || []).filter(function(n){return n.id===copy.sourceId;})[0];
++                    return node && node.modelAsset && node.modelAsset.revision>0;});
++                function submitModel(){(options.modelTransactions || modelTransactions.create({call:options.call,idFactory:idFactory})).apply(transaction,restore,confirmed);}
++                if(!needed.length){submitModel();return;}
++                modelAssets.create({call:options.call,idFactory:idFactory}).collect(base,transaction.target.token,function(exported){
++                    if(!exported || !exported.ok){callback(exported || failure("model_asset_transfer_failed","No Model copy assets."));return;}
++                    try{needed.forEach(function(copy){var asset=exported.assets.filter(function(a){return a.nodeId===copy.sourceId;})[0],
++                            node=updated.nodes.filter(function(n){return n.id===copy.nodeId;})[0];
++                        if(!asset || !node)throw new Error("The duplicated Model mesh is missing.");
++                        restore.push({nodeId:copy.nodeId,source:node.parameters.filter(function(p){return String(p.key)==="13";})[0].value+1,
++                            revision:asset.revision,bounds:asset.bounds.slice(),meshHex:asset.meshHex});});submitModel();
++                    }catch(error){callback(failure("invalid_model_transaction",error.message || String(error)));}
+                 });
+             }
+             // Reuse only the immediate planning receipt. The host independently
 diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
-index 792b33f..60ac8f7 100644
+index 792b33f..c2c42a1 100644
 --- a/cep_panel/jsx/starfield_gateway.jsx
 +++ b/cep_panel/jsx/starfield_gateway.jsx
 @@ -42,7 +42,8 @@
@@ -590,7 +691,54 @@ index 792b33f..60ac8f7 100644
          }
          var knownTargets = nodeIds(nodes);
          knownTargets["$000000000000000000000000000000ff"] = true;
-@@ -2512,6 +2606,152 @@
+@@ -1300,7 +1394,7 @@
+         return nodes;
+     }
+ 
+-    function addNativeNode(layer, node) {
++    function addNativeNode(layer, node, deferModel) {
+         var spec = nativeNodeType(node.type);
+         var parade = layer.property("ADBE Effect Parade");
+         if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
+@@ -1316,7 +1410,8 @@
+             stage = "write node identity";
+             setNodeIdentity(effect, node.id);
+             stage = "write node record and parameters";
+-            setNodeParameters(effect, node, layer);
++            if(deferModel && node.type==="org.starfieldfx.nodes.model")writeNodeRecord(effect,node);
++            else setNodeParameters(effect, node, layer);
+         } catch (error) {
+             var detail = spec.label + " (" + spec.matchName + "), " + stage + ": " + error.toString();
+             if (!effect) {
+@@ -1364,7 +1459,7 @@
+         }
+         return true;
+     }
+-    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes) {
++    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes, deferModel) {
+         validateNodeManifest(nodes);
+         var previous={};
+         if (previousNodes) for(var p=0;p<previousNodes.length;p++) previous["$"+previousNodes[p].id]=previousNodes[p];
+@@ -1378,7 +1473,7 @@
+                 if (!effect || nodeIdentity(effect) !== node.id) throw new Error("The node identity changed while applying the graph.");
+             }
+             if (!effect) {
+-                addNativeNode(layer, node);
++                addNativeNode(layer, node, deferModel);
+                 // addProperty appends. Indexed-group references are invalidated,
+                 // but earlier numeric slots remain valid and are reacquired.
+                 var parade = layer.property("ADBE Effect Parade"), last = parade.numProperties;
+@@ -1390,7 +1485,8 @@
+                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
+                 if (writeExisting) {
+                     var before = previous["$"+node.id];
+-                    if (!sameNodeParameters(before,node)) setNodeParameters(effect, node, layer);
++                    if(deferModel && node.type==="org.starfieldfx.nodes.model")writeNodeRecord(effect,node);
++                    else if (!sameNodeParameters(before,node)) setNodeParameters(effect, node, layer);
+                     else if (before.position.x !== node.position.x || before.position.y !== node.position.y ||
+                         JSON.stringify(before.outgoing) !== JSON.stringify(node.outgoing)) writeNodeRecord(effect,node);
+                 }
+@@ -2512,6 +2608,157 @@
      host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
      host.SFLD_submitGraph = SFLD_submitGraph;
      host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;
@@ -740,11 +888,16 @@ index 792b33f..60ac8f7 100644
 +    // File transport is loaded only by explicit preset file actions. Its sessions
 +    // contain bounded plain data; these closures carry no host object references.
 +    host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
++    host.__SFLD_modelTransactionAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
++        resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
++        validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
++        remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,
++        trigger:triggerGraphCarrier,float64:readGraphFloat64};
      // Readiness probe for the panel's self-loading path: cheap, side-effect free.
      host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
  })();
 diff --git a/cep_panel/presets.html b/cep_panel/presets.html
-index 71d3e49..66226a3 100644
+index 71d3e49..6c43977 100644
 --- a/cep_panel/presets.html
 +++ b/cep_panel/presets.html
 @@ -7,5 +7,5 @@
@@ -752,10 +905,10 @@ index 71d3e49..66226a3 100644
    <div id="status" role="status" aria-live="polite">Loading library…</div>
    <footer><label><input id="render-settings" type="checkbox" checked>Apply Render Settings</label><span id="note">Your current effect stays pinned until Refresh Target.</span><button id="cancel">Cancel</button><button id="replace" disabled>Replace</button><button id="add" class="primary" disabled>Add</button></footer>
 -  <script src="js/graph_codec.js?v=49"></script><script src="js/graph_layout.js?v=49"></script><script src="js/graph_edits.js?v=49"></script><script src="js/graph_view.js?v=49"></script><script src="js/native_graph_snapshot.js?v=49"></script><script src="js/graph_transactions.js?v=49"></script><script src="js/presets.js?v=49"></script><script src="js/preset_manager.js?v=49"></script>
-+  <script src="js/graph_codec.js?v=49"></script><script src="js/graph_layout.js?v=49"></script><script src="js/graph_edits.js?v=49"></script><script src="js/graph_view.js?v=49"></script><script src="js/native_graph_snapshot.js?v=49"></script><script src="js/graph_transactions.js?v=49"></script><script src="js/model_assets.js?v=62"></script><script src="js/preset_files.js?v=62"></script><script src="js/presets.js?v=49"></script><script src="js/preset_manager.js?v=49"></script>
++  <script src="js/graph_codec.js?v=49"></script><script src="js/graph_layout.js?v=49"></script><script src="js/graph_edits.js?v=49"></script><script src="js/graph_view.js?v=49"></script><script src="js/native_graph_snapshot.js?v=49"></script><script src="js/model_assets.js?v=62"></script><script src="js/model_graph_transactions.js?v=62"></script><script src="js/graph_transactions.js?v=49"></script><script src="js/preset_files.js?v=62"></script><script src="js/presets.js?v=49"></script><script src="js/preset_manager.js?v=49"></script>
  </body></html>
 diff --git a/cep_panel/js/presets.js b/cep_panel/js/presets.js
-index 68bbcc5..c2b00d6 100644
+index 68bbcc5..9bc4b4c 100644
 --- a/cep_panel/js/presets.js
 +++ b/cep_panel/js/presets.js
 @@ -4,9 +4,10 @@
@@ -771,18 +924,30 @@ index 68bbcc5..c2b00d6 100644
      "use strict";
      var OUTPUT="000000000000000000000000000000ff",MAX_BYTES=24*1024;
      var categories=["All presets","Backgrounds","Effects","Graphic Elements","Physical","Nodes","My Presets"];
-@@ -112,7 +113,10 @@
-     }
+@@ -113,6 +114,7 @@
      function apply(base,edit,idFactory){
          if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
-+        // Whole-graph native restoration is required before exposing mesh apply.
-+        if((edit.presetModelAssets || []).length)fail("Model preset application needs the complete native asset transaction.");
          var selected=clone(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels));
 +        modelAssets.validate(selected,edit.presetModelAssets || []);
          var bindings=edit.presetResources || [];
          validateResourceBindings(selected,bindings);
          bindings.forEach(function(binding){
-@@ -146,7 +150,7 @@
+@@ -133,6 +135,14 @@
+         var offset=edit.mode==="add"?Math.max.apply(null,[0].concat(Object.keys(positions).map(function(id){return positions[id].y;})))+180:0;
+         preset.nodes.forEach(function(n){if(n.id===incomingOutput.id)return;var id=next();map[n.id]=id;current.nodes.push({id:id,type:n.type,schemaVersion:n.schemaVersion,parameters:n.parameters});positions[id]={x:sourcePositions[n.id].x,y:sourcePositions[n.id].y+offset};});
+         preset.edges.forEach(function(e){current.edges.push({id:next(),sourceNode:map[e.sourceNode],sourcePort:e.sourcePort,destinationNode:map[e.destinationNode],destinationPort:e.destinationPort});});
++        current.nodes.forEach(function(node){if(node.type!=="org.starfieldfx.nodes.model")return;
++            var source=node.parameters.filter(function(p){return String(p.key)==="13";})[0];
++            if(source.value===1 && node.parameters.filter(function(p){return String(p.key)==="2";})[0].value>0)
++                node.parameters.filter(function(p){return String(p.key)==="1";})[0].value=node.id.match(/../g).map(function(byte){return parseInt(byte,16);});
++        });
++        edit.modelAssetsToRestore=(edit.presetModelAssets || []).map(function(asset){var node=current.nodes.filter(function(n){return n.id===map[asset.nodeId];})[0];
++            return {nodeId:node.id,source:node.parameters.filter(function(p){return String(p.key)==="13";})[0].value+1,
++                revision:asset.revision,bounds:asset.bounds.slice(),meshHex:asset.meshHex};});
+         current=layout.set(current,positions);validate(current,"Updated project");return current;
+     }
+     function validateResourceBindings(graph,bindings) {
+@@ -146,7 +156,7 @@
              seen[binding.nodeId+":"+binding.key]=true;
          });
      }
@@ -791,7 +956,7 @@ index 68bbcc5..c2b00d6 100644
          if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");
          var clean=motionDefaults(clone(graph)),bindings=[];
          clean.nodes.forEach(function(node){if(node.type!==edits.types.particle)return;
-@@ -157,19 +161,27 @@
+@@ -157,19 +167,27 @@
              });
          });
          validateResourceBindings(clean,bindings);
@@ -827,7 +992,7 @@ index 68bbcc5..c2b00d6 100644
      return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
  }));
 diff --git a/cep_panel/js/preset_manager.js b/cep_panel/js/preset_manager.js
-index ebc4b13..f85e991 100644
+index ebc4b13..6fb22db 100644
 --- a/cep_panel/js/preset_manager.js
 +++ b/cep_panel/js/preset_manager.js
 @@ -4,9 +4,9 @@
@@ -842,23 +1007,24 @@ index ebc4b13..f85e991 100644
      function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
      function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
      function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
-@@ -18,16 +18,21 @@
+@@ -18,16 +18,22 @@
              Object.keys(fields||{}).forEach(function(key){request[key]=fields[key];});
              request.gatewayBuild=gatewayBuild;
              // Native file dialogs are user controlled; render/graph calls time out.
 -            var settled=false,timer=operation.indexOf("PresetFile")>=0?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
-+            var fileOperation=operation.indexOf("PresetFile")>=0;
++            var fileOperation=operation.indexOf("PresetFile")>=0,modelOperation=operation.indexOf("ModelGraph")>=0;
 +            var settled=false,timer=operation==="beginPresetFileRead" || operation==="finishPresetFileWrite"?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
              // Reads check readiness in this host turn; writes always reload and
              // invoke atomically, preserving the cross-page generation guard.
 -            var readOnly=operation==="getState" || operation==="getGraphSnapshot";
 -            var script="(function(){try{if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+"){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));}"+
-+            var readOnly=operation==="getState" || operation==="getGraphSnapshot" || operation.indexOf("ModelAsset")>=0 || fileOperation;
++            var readOnly=operation==="getState" || operation==="getGraphSnapshot" || operation.indexOf("ModelAsset")>=0 || fileOperation || modelOperation;
 +            var script="(function(){try{if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+
-+                (fileOperation?" || typeof __SFLD_presetFileAPI==='undefined'":" || typeof SFLD_"+operation+"!=='function'")+
++                (fileOperation?" || typeof __SFLD_presetFileAPI==='undefined'":modelOperation?" || typeof __SFLD_modelTransactionAPI==='undefined'":" || typeof SFLD_"+operation+"!=='function'")+
 +                "){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/starfield_gateway.jsx")+"));}"+
                  "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+literal(readyToken)+")throw new Error('Gateway generation mismatch.');"+
 +                (fileOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/preset_file_transport.jsx")+"));}":"")+
++                (modelOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/model_transaction_transport.jsx")+"));}":"")+
                  "return SFLD_"+operation+"("+literal(JSON.stringify(request))+");}catch(e){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+literal(gatewayBuild)+",ok:false,error:{code:'gateway_load_failed',message:e.toString()}});}}())";
              host(script,function(raw){if(settled)return;settled=true;if(timer)clearTimeout(timer);try{var response=JSON.parse(raw);if(!response || response.protocol!=="org.starfieldfx.panel" || response.version!==1 || response.gatewayBuild!==gatewayBuild)throw new Error("Unsupported host response or gateway generation.");callback(response);}catch(error){callback({ok:false,error:{code:"bad_response",message:"Invalid reply from After Effects: "+error.message}});}});
      }
@@ -867,16 +1033,21 @@ index ebc4b13..f85e991 100644
      function failure(response){status(response && response.error?response.error.code+": "+response.error.message:"The host did not return a usable response.",true);pending(false);}
      function refresh(){
          if(busy)return;pending(true);targetToken=null;revision=null;graph=null;status("Finding the selected Starfield effect…");
-@@ -49,7 +54,7 @@
+@@ -49,8 +55,11 @@
          if(busy || !selected || !targetToken)return;pending(true);status("Applying "+selected.name+"…");
          var choice=selected,settings=el["render-settings"].checked;
          initialize(function(response){if(!response.ok){failure(response);return;}
 -            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,presetResources:choice.resources || [],mode:mode,applyRenderSettings:settings},function(committed){
+-                if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+" Undo in After Effects restores the previous graph.");pending(false);
 +            client.apply({type:"applyPreset",presetId:choice.graph?null:choice.id,presetGraph:choice.graph,presetResources:choice.resources || [],presetModelAssets:choice.modelAssets || [],mode:mode,applyRenderSettings:settings},function(committed){
-                 if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+" Undo in After Effects restores the previous graph.");pending(false);
++                if(!committed.ok){failure(committed);return;}revision=committed.snapshot.revision;graph=codec.fromHex(committed.snapshot.graphHex);
++                var completion=committed.diagnostics,warning=completion && (completion.cleanupError || completion.undoError || completion.notificationPending);
++                status(choice.name+(mode==="add"?" added.":" replaced the current setup.")+
++                    (warning?" After Effects reported a completion issue. Refresh before continuing.":" Undo in After Effects restores the previous graph."),!!warning);pending(false);
              },targetToken,revision,response);
          });
-@@ -81,10 +86,13 @@
+     }
+@@ -81,10 +90,13 @@
      el.search.addEventListener("input",render);el.home.addEventListener("click",function(){browse(null);});el.up.addEventListener("click",function(){browse(null);});el.all.addEventListener("click",function(){browse("All presets");});
      el.refresh.addEventListener("click",refresh);el.add.addEventListener("click",function(){apply("add");});el.replace.addEventListener("click",function(){apply("replace");});
      el.cancel.addEventListener("click",function(){if(busy)return;if(cep && cep.closeExtension)cep.closeExtension();else window.close();});

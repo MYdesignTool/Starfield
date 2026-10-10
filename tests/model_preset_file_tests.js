@@ -26,7 +26,10 @@ reject(()=>presets.decode(JSON.stringify({...JSON.parse(encoded),modelAssets:[]}
 reject(()=>presets.decode(JSON.stringify({...JSON.parse(encoded),modelAssets:[{...asset,revision:18}]})));
 reject(()=>presets.decode(JSON.stringify({...JSON.parse(encoded),modelAssets:[{...asset,nodeId:"1".repeat(32)}]})));
 reject(()=>presets.decode(JSON.stringify({...JSON.parse(encoded),modelAssets:[{...asset,meshHex:asset.meshHex.slice(0,-2)+"00"}]})));
-reject(()=>presets.apply(presets.build("sparks",1080),{type:"applyPreset",presetGraph:entry.graph,presetModelAssets:entry.modelAssets,mode:"replace"},edits.randomId));
+const restoredEdit={type:"applyPreset",presetGraph:entry.graph,presetModelAssets:entry.modelAssets,mode:"replace"};
+const restoredGraph=presets.apply(presets.build("sparks",1080),restoredEdit,edits.randomId),restoredId=restoredEdit.modelAssetsToRestore[0].nodeId;
+ok(restoredId!==modelId);eq(restoredEdit.modelAssetsToRestore[0],{...asset,nodeId:restoredId,source:2});
+eq(restoredGraph.nodes.find(n=>n.id===restoredId).parameters.find(p=>p.key==="1").value,Array.from(Buffer.from(restoredId,"hex")));
 const parked=presets.decode(presets.encode(graph(false),"Parked","My Presets",[],[asset]));eq(parked.modelAssets,[asset]);
 eq(parked.graph.nodes.find(n=>n.id===modelId).parameters.find(p=>p.key==="13").value,0);
 const legacy=presets.encode(presets.build("sparks",1080),"Legacy","My Presets",[]);

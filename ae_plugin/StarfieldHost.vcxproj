@@ -39,6 +39,7 @@
     <ClCompile Include="ModelAssetHost.cpp" />
     <ClCompile Include="EffectGraphBackup.cpp" />
     <ClCompile Include="ModelGraphTransaction.cpp" />
+    <ClCompile Include="ModelTransactionHost.cpp" />
     <ClCompile Include="..\src\core\ModelResources.cpp" />
     <ClCompile Include="..\src\core\ModelGeometry.cpp" />
     <ClCompile Include="..\src\core\ModelScene.cpp" />

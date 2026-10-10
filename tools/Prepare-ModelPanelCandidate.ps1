@@ -35,8 +35,10 @@ foreach($taskLine in [IO.File]::ReadAllLines($taskPatch)){
 New-Item -ItemType Directory -Path $taskDestination -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'cep_panel') -Destination (Join-Path $taskDestination 'cep_panel') -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_assets.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_graph_transactions.js')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Destination (Join-Path $taskDestination 'cep_panel/js/preset_files.js')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Destination (Join-Path $taskDestination 'cep_panel/jsx/preset_file_transport.jsx')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_transport.jsx') -Destination (Join-Path $taskDestination 'cep_panel/jsx/model_transaction_transport.jsx')
 foreach($taskFile in $taskBaseline.files){
     if((Get-SourceHash (Join-Path $taskDestination ('cep_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
 }
@@ -49,8 +51,10 @@ try {
 } finally {Pop-Location}
 [ordered]@{basePanel=61;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
+    modelGraphTransactionsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Algorithm SHA256).Hash;
     presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;
     presetFileTransportSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Algorithm SHA256).Hash;
+    modelTransactionTransportSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_transport.jsx') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
 Write-Host "Prepared isolated Model author candidate: $taskDestination"
