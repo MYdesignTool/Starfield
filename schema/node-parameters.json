@@ -535,7 +535,14 @@
   },
   "particleModelCandidate": {
     "adr": "0038-particle-model-geometry",
-    "status": "Unpublished Model module, binding7, mirror/SmartFX, OBJ import, constant author bounds, isolated CEP author and native numeric asset-export seam; async preset asset transfer/import/rollback, Particle selector and complete author release pending.",
+    "status": "Unpublished Model module, binding7, mirror/SmartFX, OBJ import checkpoints, native modal exclusion, isolated CEP author and bounded whole-graph asset transactions; Particle selector, complete author release and AE2023 qualification pending.",
+    "shapeMenuReference": {
+      "confirmedByOwner": "2026-10-10",
+      "screenshot": "codex-clipboard-44477b7b-d030-4009-94c2-83afa9bd282f.png",
+      "choices": ["Circle", "Rectangle", "Cloud", "Texture", "Face", "Model"],
+      "nativeAuthorPlan": {"legacyValues": [1, 2, 3, 4], "faceReservedValue": 5, "modelValue": 6, "modelCoreValue": 4},
+      "policy": "Exactly these six Shape modes in this order; no inferred additions. Native Model6 -> Core4 mapping is planned, not released. Face depends on OBJ face emission; do not expose an unsupported fallback. Use Model(s) is a separate control."
+    },
     "shape": 4, "coreAbi": 8, "snapshotVersion": 8, "nodeSchema": 1,
     "graphKeys": {"resource": 1, "revision": 2, "matrix": 3, "origin": 4, "rotation": 5, "scale": 6,
       "flipX": 7, "flipY": 8, "flipZ": 9, "center": 10, "normalize": 11, "bounds": 12, "source": 13},

@@ -16,6 +16,12 @@ This is a planning index distilled from the existing Stardust binary-analysis re
 
 ## Feature order
 
+Particle Shape is restricted by the owner's complete 2026-10-10 menu screenshot:
+Circle, Rectangle, Cloud, Texture, Face, Model, in that order. This explicit
+user-visible inventory takes precedence over inferred type lists in static
+reports. No additional Particle Shape mode is in scope. See
+[the menu record](reference-texture-transfer-transform.md#particle-shape--owner-confirmed-complete-menu-2026-10-10).
+
 1. Finish graph schemas, bounded persistence, and evaluation parity for the current deterministic emitter.
 2. Add particle appearance and common behavior as graph nodes: size/opacity/color over life, gravity, drag, and common forces.
 3. Add texture/layer sources, presets, and migration through repeatable AE cases.

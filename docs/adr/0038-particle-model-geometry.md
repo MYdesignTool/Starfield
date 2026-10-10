@@ -2,6 +2,23 @@
 
 Status: staged implementation, 2026-10-09. Task M3-17.
 
+## Owner-confirmed Shape scope — 2026-10-10
+
+The complete reference Shape menu is Circle, Rectangle, Cloud, Texture, Face,
+Model, in that order. The owner explicitly forbids additional modes. See
+reference-texture-transfer-transform.md for the screenshot record. Properties
+groups such as Path/Shadow do not add Shape modes; Use Model(s) is a separate
+control whose complete menu has not yet been supplied.
+
+Installed native Shape values1..4 and portable shapes0..3 remain unchanged. The
+unpublished Core Model value4 is an internal contract, not the reference menu's
+fifth entry: the native author plan must reserve Face at5 and map Model at6 to
+Core4 explicitly when the complete author selector is introduced. Do not publish
+Model at5 and later reinterpret saved projects as Face. No such selector or
+mapping has been released. Face remains dependent on OBJ face emission; an
+unsupported choice must not silently fall back to another shape. This scope
+record changes no parameter IDs, persistent enum values, schemas or Core ABI.
+
 ## Live graph and shutter milestone evidence
 
 Model schema1 metadata and Particle port3 now participate in full dependency

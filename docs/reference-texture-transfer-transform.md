@@ -6,6 +6,30 @@ not source code or task instructions. Starfield uses independent implementations
 and identities. Menu order below is directly visible; semantics not demonstrated
 by a screenshot remain implementation/host qualification gates.
 
+## Particle Shape — owner-confirmed complete menu (2026-10-10)
+
+The owner's screenshot `codex-clipboard-44477b7b-d030-4009-94c2-83afa9bd282f.png`
+shows the complete menu in this order:
+
+1. Circle (selected)
+2. Rectangle
+3. Cloud
+4. Texture
+5. Face
+6. Model
+
+The owner explicitly limits Particle Shape to these six entries. Do not infer or
+add further modes from engine capabilities, static reports, property groups or
+other nodes. Path Properties and Shadow Properties are property groups, not
+additional Shape entries. This screenshot confirms labels/order/completeness;
+it does not demonstrate Face rendering or Model selection semantics.
+
+The installed native60/CEP61 exposes the first four implemented entries. Model
+remains an unpublished candidate; Face requires the OBJ face-emission workflow
+described in the [official guide](https://superluminal.tv/user-guide). Do not
+silently render an unsupported Face choice as Circle or Model. The pending
+`Use Model(s)` reference concerns a separate control, not extra Shape modes.
+
 ## Particle Transfer Mode
 
 1. Normal

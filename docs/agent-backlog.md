@@ -82,7 +82,9 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
-2026-10-10继续：2cbc74a已推送/冻结完整八目标双NoPublish SDK build通过，十八安装哈希及selector保持60/61。后续源码接入resident Host独占UI token与已加载effect client，覆盖已知原生脚本/模态范围和两个idle通道；独立DLL/Windows消息泵标准/ASAN470、实际导出148867及事务8886869/8887089回归通过。OBJ数字/完整网格自有快照在chooser后及提交前重新验证，导入/快照各20284通过，真实AE时序/撤销仍开放，新SDK冻结待记录。Particle Shape/Use Model(s)下拉参考等待owner，参数dump未列枚举。完整目标active，继续Model完整作者/配对验收，未部署。
+2026-10-10 owner限定完整Shape仅Circle、Rectangle、Cloud、Texture、Face、Model，顺序固定；禁止推断其他模式。参考与ADR0038/schema已更新；Path/Shadow是Properties。native Face5/Model6为未发布作者计划，内部Model4保持，禁止日后重释保存值。Use Model(s)仍待参考。d1fa6e4冻结May2023 /MT八目标及NoRuntimePublish末尾标记已记录，原会话退出码无法恢复，报告null；10:46十八安装哈希/selector/Core匹配60/61。没有部署候选或关闭AE gate；下一步完整Particle Model作者选择映射及配对验收。
+
+2026-10-10继续：2cbc74a已推送/冻结完整八目标双NoPublish SDK build通过，十八安装哈希及selector保持60/61。后续源码接入resident Host独占UI token与已加载effect client，覆盖已知原生脚本/模态范围和两个idle通道；独立DLL/Windows消息泵标准/ASAN470、实际导出148867及事务8886869/8887089回归通过。OBJ数字/完整网格自有快照在chooser后及提交前重新验证，导入/快照各20284通过，真实AE时序/撤销仍开放，SDK冻结证据见上方记录。Particle Shape六种顺序已由owner确认，Use Model(s)仍待参考。完整目标active，继续Model完整作者/配对验收，未部署。
 
 2026-10-10 owner恢复任务：候选ModelTransactionHost接入独立菜单排队/有界idle拉取/整笔执行器；全部metadata及64MiB预检先于payload页，UI目标在两个回调前重新定位。标准/ASAN传输检查通过（计数8885968/8886148含逐字节和调用，executor为fake）。隔离CEP上传/queue/result和真实prepare/commit回调、preset Add/Replace资源UUID重写/停放mesh及复制显式导出已接入；protocol/planner271、真实gateway DOM35、作者74/预设332/export588及旧Texture/Cloud/Birth/完整gateway回归通过。tracked候选helper与patch由Prepare重现到m3-17-model-transactions-panel62-v2；live CEP不变，完整新SDK冻结待记录。当前目标active；接下来Particle Model菜单及Modal/idle/OBJ导入状态一致性部署前验收、完整配对发布，实际AE gate开放。
 
