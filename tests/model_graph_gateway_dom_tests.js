@@ -78,12 +78,12 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
 let pair=begin(true),copies=stage(pair);eq(host.SFLD_modelTransactionHostCommit(pair.id),"1");eq(commits,1);eq(arbReads,0);eq(undo,0);
 eq(copies.effect.properties["Angle Y"].value,45);eq(copies.effect.properties["Panel Sync Guard"].value,0);
 eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,1);
-eq(host.SFLD_modelTransactionHostResult(pair.id,realm([1,7,0,0,0,0,0,0,-1])),"1");
+eq(host.SFLD_modelTransactionHostResult(pair.id,"1|7|0|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.committed,true);
 eq(JSON.parse(host.SFLD_releaseModelGraphTransaction(request("releaseModelGraphTransaction"))).ok,true);
 items.splice(items.indexOf(copies.backupMain),1);items.splice(items.indexOf(copies.backupNode),1);epoch++;
 api.resolve({pinTarget:true,target:{token}}).properties.guard.setValue(0);commands=0;
 pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,0);eq(arbReads,0);
-eq(host.SFLD_modelTransactionHostResult(pair.id,realm([0,5,512,0,0,0,0,0,-1])),"1");
+eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
 console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; actual gateway callbacks with stale indexed refs/guard2; native writes simulated, no AE qualification`);

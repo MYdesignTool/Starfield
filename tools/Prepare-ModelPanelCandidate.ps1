@@ -1,5 +1,5 @@
-param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel65',
-    [ValidateRange(62,9999)][int]$PanelGeneration=65)
+param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel66',
+    [ValidateRange(62,9999)][int]$PanelGeneration=66)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskRecipe=Join-Path $PSScriptRoot 'candidates/model-panel-author-baseline.json'

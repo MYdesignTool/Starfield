@@ -10,7 +10,7 @@ function run(projectId,selection=true,session){
     const layer=readonly({id:303,name:"Starfield target"}),comp=new CompItem();
     comp.id=202;comp.selectedLayers=selection?[layer]:[];
     const project=projectId===null?null:readonly({rootFolder:readonly({id:projectId}),activeItem:readonly(comp)});
-    const messages=[],host=readonly({__SFLD_modelGraphTransactionV1:session,SFLD_modelTransactionHostRequest:function(){}});
+    const messages=[],host=readonly({__SFLD_modelGraphTransactionV1:session,SFLD_modelTransactionHostRequest:function(){},SFLD_modelTransactionHostResult:function(){}});
     vm.runInNewContext(source,{app:readonly({project,version:"23.6",findMenuCommandId:name=>{
         assert.equal(name,"Starfield Apply Model Graph Transaction");checks++;return 55;
     }}),$:readonly({global:host,engineName:"main"}),CompItem,alert:text=>messages.push(text)});
@@ -22,4 +22,6 @@ for(const message of [run(null),run(101,false)]){assert.ok(message.includes("Sel
 const idle=run(0);assert.ok(idle.includes("Model state=none"));checks++;
 const receiving=run(0,true,readonly({state:"receiving",expires:Date.now()+300000}));
 for(const text of ["Model state=receiving","engine=main","Host command=55; Host request entry=function"]){assert.ok(receiving.includes(text));checks++;}
+const executing=run(0,true,readonly({state:"executing",expires:Date.now()+300000,message:"The renderer is busy or its guard changed."}));
+for(const text of ["Model state=executing","Model message=The renderer is busy or its guard changed.","Result=none; diagnostics=none","Host result entry=function"]){assert.ok(executing.includes(text));checks++;}
 console.log(`model_target_report_tests: ${checks} checks passed; ES3/read-only fake host, no AE execution`);

@@ -3,6 +3,7 @@
 #include "ModelGraphTransaction.hpp"
 #include "ScriptDiagnostic.hpp"
 #include <cstdlib>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -20,6 +21,7 @@ std::vector<std::size_t> lengths;
 bool available{},continue_ok{},prepare_ok{},commit_ok{},script_error{},unterminated{},oversize{},reenter{},
     bad_project{},bad_comp{},bad_layer{},change_after_prepare{},bad_hex{},short_page{},stop_in_prepare{},committed_warning{},unique_assets{},lost_request{},lost_claim{},lost_begin{};
 unsigned script_depth{};
+unsigned result_losses{},result_rejections{};bool result_absent{};
 struct Memory {std::string text;bool locked{};};
 AEGP_UtilitySuite6 utility{};AEGP_MemorySuite1 memory{};AEGP_ProjSuite6 projects{};
 AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};AEGP_LayerSuite9 layers{};SPBasicSuite basic{};
@@ -34,7 +36,8 @@ void reset(){stop_model_transaction_host();clean();initialize_ui_exclusion();ini
     root_id=101;lengths={70001};descriptor_line.clear();result_line.clear();missing_suite.clear();
     available=continue_ok=prepare_ok=commit_ok=true;
     script_error=unterminated=oversize=reenter=bad_project=bad_comp=bad_layer=change_after_prepare=bad_hex=short_page=stop_in_prepare=committed_warning=unique_assets=false;
-    lost_request=lost_claim=lost_begin=false;script_calls=executor_calls=prepares=commits=results=pages=claims=requests=0;}
+    lost_request=lost_claim=lost_begin=false;script_calls=executor_calls=prepares=commits=results=pages=claims=requests=0;
+    result_losses=result_rejections=0;result_absent=false;}
 void drain(){queue_model_graph_transaction();unsigned passes{};while(step_model_transaction_host()){CHECK(++passes<300);clean();}clean();}
 void initialize(){
     utility.AEGP_IsScriptingAvailable=[](A_Boolean* out)->A_Err{*out=available;return 0;};
@@ -61,7 +64,9 @@ void initialize(){
         } else if(text.find("SFLD_modelTransactionHostPrepare")!=std::string::npos){++prepares;reply=prepare_ok?"1":"0";
             if(change_after_prepare)bad_project=true;if(stop_in_prepare)stop_model_transaction_host();
         } else if(text.find("SFLD_modelTransactionHostCommit")!=std::string::npos){++commits;reply=commit_ok?"1":"0";
-        } else if(text.find("SFLD_modelTransactionHostResult")!=std::string::npos){++results;result_line=arguments(text,"SFLD_modelTransactionHostResult");}
+        } else if(text.find("SFLD_modelTransactionHostResult")!=std::string::npos){++results;result_line=arguments(text,"SFLD_modelTransactionHostResult");
+            CHECK(result_line.find(",'0|")!=std::string::npos || result_line.find(",'1|")!=std::string::npos);
+            if(result_losses){--result_losses;fault=true;}else if(result_rejections){--result_rejections;reply="0";}else if(result_absent)reply="2";}
         else CHECK(false);
         if(oversize)reply=std::string(65537,'x');
         if(!unterminated)reply.push_back(0);
@@ -111,7 +116,7 @@ int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(scri
         memory.AEGP_FreeMemHandle(handle);clean();}
     {HostUiExclusion modal;CHECK(modal);queue_model_graph_transaction();
         CHECK(step_model_transaction_host());CHECK(script_calls==0 && executor_calls==0);}
-    drain();CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && pages==3);CHECK(result_line.find(",[1,7,0,0,0,0,0,0,-1]")!=std::string::npos);
+    drain();CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && pages==3);CHECK(result_line.find(",'1|7|0|0|0|0|0|0|-1'")!=std::string::npos);
     CHECK(claims==1 && requests==1);
     reset();root_id=0;lengths.clear();request_line=std::string(transfer)+"|0|202|303|0|"+node+",000000000000000000000000000000ff";
     drain();CHECK(executor_calls==1 && claims==1 && prepares==1 && commits==1 && results==1 && pages==0);
@@ -123,8 +128,26 @@ int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(scri
     reset();root_id=0;request_line=std::string(transfer)+"|0|202|303|1|"+node+",000000000000000000000000000000ff";
     change_after_prepare=true;drain();CHECK(prepares==1&&commits==0&&results==1);
     reset();reenter=true;drain();CHECK(executor_calls==1 && commits==1);
-    reset();committed_warning=true;drain();CHECK(result_line.find(",[1,7,0,0,0,516,0,0,-1]")!=std::string::npos);
-    for(auto which:{0,1}){reset();if(which==0)prepare_ok=false;else commit_ok=false;drain();CHECK(executor_calls==1);CHECK(result_line.find(",[0,")!=std::string::npos);}
+    reset();committed_warning=true;drain();CHECK(result_line.find(",'1|7|0|0|0|516|0|0|-1'")!=std::string::npos);
+    for(auto which:{0,1}){reset();if(which==0)prepare_ok=false;else commit_ok=false;drain();CHECK(executor_calls==1);CHECK(result_line.find(",'0|")!=std::string::npos);}
+    for(auto which:{0,1,2}){reset();if(which==0)result_losses=1;else if(which==1)result_rejections=1;else {result_losses=1;prepare_ok=false;}
+        drain();CHECK(executor_calls==1 && results==1);const auto receipt=result_line;const auto calls=script_calls;
+        CHECK(!step_model_transaction_host());CHECK(script_calls==calls);clean();
+        std::this_thread::sleep_for(std::chrono::milliseconds(260));
+        {HostUiExclusion modal;CHECK(modal);CHECK(step_model_transaction_host());CHECK(script_calls==calls);}
+        CHECK(!step_model_transaction_host());clean();CHECK(results==2 && executor_calls==1 && result_line==receipt);
+        const auto delivered=script_calls;CHECK(!step_model_transaction_host());CHECK(script_calls==delivered);
+    }
+    reset();result_losses=1;drain();CHECK(executor_calls==1 && results==1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(260));result_absent=true;
+    CHECK(!step_model_transaction_host());clean();CHECK(executor_calls==1 && results==2);
+    CHECK(!step_model_transaction_host());result_absent=false;drain();CHECK(executor_calls==2 && results==3);
+    reset();result_losses=2;drain();queue_model_graph_transaction();const auto pending_calls=script_calls;
+    CHECK(!step_model_transaction_host());CHECK(script_calls==pending_calls);clean();
+    std::this_thread::sleep_for(std::chrono::milliseconds(260));CHECK(!step_model_transaction_host());
+    clean();CHECK(results==2 && executor_calls==1); // A queued command cannot make receipt retries spin.
+    std::this_thread::sleep_for(std::chrono::milliseconds(260));CHECK(step_model_transaction_host());clean();
+    CHECK(results==3 && executor_calls==1);CHECK(!step_model_transaction_host());clean();CHECK(executor_calls==2);
     reset();change_after_prepare=true;drain();CHECK(prepares==1 && commits==0 && results==1);
     reset();stop_in_prepare=true;drain();CHECK(prepares==1 && commits==0 && results==1);
     for(auto which:{0,1,2,3,4,5,6}){reset();if(which==0)bad_project=true;if(which==1)bad_comp=true;if(which==2)bad_layer=true;

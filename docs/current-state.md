@@ -1,5 +1,7 @@
 # 当前工程状态
 
+2026-10-11 owner反馈native63/CEP65仍失败，忙碌阶段推进到executing。M3-17恢复修复：完成通知的Array instanceof依赖和一次发送后丢弃结果均为已核对代码缺口；两个独立VM执行实际已部署JSX复现数组拒收/保持executing，候选primitive ASCII收据转complete，不认定AE根因已复现。native64/packed32832/CEP66候选保留完整数字终态，250ms仅重发通知，绝不重跑executor；同ID完成收据幂等、已释放/换ID不写新事务。失败/回滚/undo诊断可传回，executing/applying仍不因超时被覆盖。扩充手动只读报告供owner检查message/result/diagnostics；完整冻结SDK/配对部署待完成。
+
 核对日期：2026-10-11。当前安装 **native63 / packed32831 / Core ABI8 / CEP65**，完整冻结源码498862759b1ec39ff56dda8c36422911fb09c570。00:28+08 fresh AE process0后发布Model事务停滞修正；八native/Core与十八CEP安装hash、selector/selected runtime及配对rollback report通过，artifacts/m3-17-native63-deploy-{before,after}.json和m3-17-native63-installed-hashes.json记录实际状态。备份m3-17-native63-panel65-host-receipt-20261011可恢复native62/CEP64，较早配对备份保留。owner要求本次成果部署后暂停验收，Motion及MNT在途保持，不记完整目标完成。
 
 owner确认native62/CEP64首加无反馈、面板重开后busy；只读实机报告AE23.5x52/p0-c1-l29/main，state=receiving、剩270秒、command5061和request function存在。三个Host把任何error handle当失败；空诊断句柄fixture复现首请求返回被丢弃，符合实机阶段但尚不认定宿主根因已验收。native63读取诊断字符串，Model先只读Request后Claim；executor前Begin保护backup/rollback全程，executing/applying不因过期被替换。pre-ID三次有界读取，十五秒无进展只终止未写入阶段，busy包含state，poll250ms。默认cube/OBJ/资源预设/undo/reopen与modal时序仍待AE验收。

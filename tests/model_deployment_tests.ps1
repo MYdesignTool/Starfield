@@ -1,4 +1,4 @@
-param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62)][int]$InstalledModelBuild=61)
+param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63)][int]$InstalledModelBuild=61)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: simulated complete native61/CEP62 deployment and paired rollback under artifacts; add -Run.';exit 0}

@@ -1007,6 +1007,25 @@ and verified commit callbacks are connected as the complete author pairing.
 
 ### Explicit Model graph transport
 
+2026-10-11 terminal receipt correction (native64/CEP66 candidate): the owner
+reports that63/65 still stalls in executing. Independently evaluated script
+contexts must not share an Array prototype contract: the result entry now takes
+one primitive ASCII string containing exactly nine bounded integer fields. Two
+VM contexts running the actual deployed JSX reproduce Array rejection and a
+retained executing state; this does not establish AE's actual failure cause.
+Malformed receipts fail without replacing a completed outcome, and the read-only
+report includes the stored preparation message and notification diagnostic.
+
+The Host retains the numeric result after the executor, rollback and undo scope
+return. A failed notification or acknowledgement retries only that same receipt,
+at most once per250ms with normal idle cadence; no executor or project write is
+replayed. The result entry acknowledges an identical completed receipt without
+changing it. A missing/replaced ID returns a distinct acknowledgement without
+touching the new session, so a client which already consumed/released an outcome
+cannot strand the native sender. In-flight executing/applying sessions remain
+protected from expiry/replacement. The protocol is volatile and requires the full
+paired update; saved IDs, schemas, effect identities and Core ABI8 are unchanged.
+
 2026-10-10 receipt correction (native63/CEP65 candidate): ExecuteScript's error
 output is a string handle, not a Boolean failure flag. Null, zero-size and
 allocated empty diagnostics permit a bounded valid result; nonempty/malformed

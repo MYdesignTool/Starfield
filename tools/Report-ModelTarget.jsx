@@ -19,6 +19,11 @@
         "\nAE=" + app.version + "\nlayer=" + layers[0].name +
         "\nengine=" + (typeof $ !== "undefined" ? String($.engineName) : "unknown") +
         "\nModel state=" + status + "; remaining seconds=" + remaining +
+        "\nModel message=" + (session && session.message ? String(session.message).substr(0,1000) : "none") +
+        "\nResult=" + (session && session.result ? "present" : "none") + "; diagnostics=" +
+        (session && session.diagnostics ? JSON.stringify(session.diagnostics) : "none") +
+        "\nNotification=" + (session && session.notificationError ? String(session.notificationError).substr(0,1000) : "none") +
         "\nHost command=" + command + "; Host request entry=" +
-        typeof host.SFLD_modelTransactionHostRequest);
+        typeof host.SFLD_modelTransactionHostRequest + "; Host result entry=" +
+        typeof host.SFLD_modelTransactionHostResult);
 }());

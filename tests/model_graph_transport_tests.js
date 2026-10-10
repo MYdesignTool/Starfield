@@ -57,7 +57,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
         const hex=pages.join("");eq(hex.length/2,length);bytesRead+=length;assets.push({nodeId:fields[0],source:Number(fields[1]),revision:Number(fields[2]),bounds:fields.slice(4).map(Number),meshHex:hex});}
     // Native preflight validates all geometry before backup/prepare, as the
     // separately tested actual C++ executor does.
-    try{for(const a of assets)if(a.revision)eq(assetAPI.validateMesh(a.meshHex).bounds,a.bounds);}catch(error){host.SFLD_modelTransactionHostResult(id,realm([0,0,512,0,0,0,0,5,0]));return;}
+    try{for(const a of assets)if(a.revision)eq(assetAPI.validateMesh(a.meshHex).bounds,a.bounds);}catch(error){host.SFLD_modelTransactionHostResult(id,"0|0|512|0|0|0|0|5|0");return;}
     eq(host.SFLD_modelTransactionHostBegin(id),"1");eq(host.__SFLD_modelGraphTransactionV1.state,"executing");
     guard=1;let success=host.SFLD_modelTransactionHostPrepare(id)==="1";
     if(success){for(const a of assets){nativeMeshes[a.nodeId]=copy(a);const n=nodes.find(n=>n.id===a.nodeId),raw=Buffer.alloc(48);a.bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
@@ -65,7 +65,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
             [12,a.source===2?Array.from(raw):manifest(cube).find(n=>n.type===edits.types.model).parameters.find(p=>p.key==="12").value],[13,a.source-1]])n.parameters.find(p=>p.key===String(key)).value=value;}
         success=host.SFLD_modelTransactionHostCommit(id)==="1";}
     if(!success){nodes=before.nodes;renderer=before.renderer;revision=before.revision;restores++;}
-    guard=0;if(!loseResult)eq(host.SFLD_modelTransactionHostResult(id,realm([success?1:0,success?7:5,success?0:512,0,0,cleanupError,undoError,0,-1])),"1");
+    guard=0;if(!loseResult)eq(host.SFLD_modelTransactionHostResult(id,[success?1:0,success?7:5,success?0:512,0,0,cleanupError,undoError,0,-1].join("|")),"1");
 }
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
     failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=throwQueue=skipNative=stopAfterClaim=loseRequestAck=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
@@ -170,4 +170,18 @@ const lateCancel=delayed.apply(plan(),[meshAsset],r=>{result=r;});lateCancel.can
 lateBegin();eq(host.__SFLD_modelGraphTransactionV1,null);eq(hostRuns,0);eq(writes,0);
 reset();call("beginModelGraphTransaction",{...plan(),assets:[]},r=>eq(r.ok,true));const saved=host.__SFLD_modelGraphTransactionV1;
 vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);eq(host.__SFLD_modelGraphTransactionV1,saved);eq(writes,0);
+// AEGP and CEP independently evaluated scripts can have different Array
+// prototypes. A primitive result string must cross that boundary unchanged.
+saved.state="executing";
+const otherContext=vm.createContext({resultEntry:host.SFLD_modelTransactionHostResult,id:transactionId});
+eq(vm.runInContext('resultEntry(id,"0|2|512|0|0|0|0|0|-1")',otherContext),"1");
+eq(saved.state,"complete");eq(saved.result.error.code,"graph_commit_failed");eq(saved.diagnostics.stage,2);
+eq(vm.runInContext('resultEntry(id,"0|2|512|0|0|0|0|0|-1")',otherContext),"1");
+eq(saved.state,"complete");eq(writes,0);
+eq(host.SFLD_modelTransactionHostResult(uuid(999),"0|2|512|0|0|0|0|0|-1"),"2");eq(host.__SFLD_modelGraphTransactionV1,saved);
+eq(host.SFLD_modelTransactionHostResult(transactionId,"0|3|516|0|0|0|0|0|-1"),"0");eq(saved.diagnostics.stage,2);
+for(const invalid of [[0,2,512,0,0,0,0,0,-1],null,"0|2|512", "0|2|2147483648|0|0|0|0|0|-1",
+    "2|2|512|0|0|0|0|0|-1","0|8|512|0|0|0|0|0|-1","0|2|512|0|0|0|0|9|-1","0|2|512|0|0|0|0|0|63"]){
+    eq(host.SFLD_modelTransactionHostResult(transactionId,invalid),"0");eq(saved.state,"complete");eq(saved.diagnostics.stage,2);
+}
 console.log(`model_graph_transport_tests: ${checks} checks passed; actual candidate protocol/planner, simulated DOM/native writes; AE qualification open`);

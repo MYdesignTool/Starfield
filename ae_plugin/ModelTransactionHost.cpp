@@ -25,6 +25,9 @@ struct Session {
     std::vector<ModelTransactionId> desired;std::vector<Asset> assets;
     std::size_t index{},metadata{},total{};
     std::chrono::steady_clock::time_point expires{};
+    ModelGraphTransactionResult outcome;
+    bool outcome_ready{};
+    std::chrono::steady_clock::time_point notify_after{};
 };
 Session session;
 template<class T> struct Suite {
@@ -141,14 +144,26 @@ A_Err invoke(const char* name) {
 }
 A_Err prepare(void*){return invoke("SFLD_modelTransactionHostPrepare");}
 A_Err commit(void*){return invoke("SFLD_modelTransactionHostCommit");}
+void notify_result() {
+    session.notify_after=std::chrono::steady_clock::now()+std::chrono::milliseconds(250);
+    const auto& result=session.outcome;
+    const auto wire=std::to_string(result.committed?1:0)+"|"+std::to_string(static_cast<unsigned>(result.stage))+"|"+
+        std::to_string(result.error)+"|"+std::to_string(result.rollback_error)+"|"+std::to_string(result.asset_rollback_error)+"|"+
+        std::to_string(result.cleanup_error)+"|"+std::to_string(result.undo_error)+"|"+
+        std::to_string(static_cast<unsigned>(result.asset_error))+"|"+std::to_string(result.asset_index);
+    std::string ack;
+    // Only deliver the retained receipt. The executor and rollback have already
+    // returned, so neither a lost acknowledgement nor a retry repeats a write.
+    // 2 means this exact ID was already released/replaced by the script client.
+    if(call("SFLD_modelTransactionHostResult",quoted_id()+",'"+wire+"'",ack) && (ack=="1" || ack=="2"))session=Session{};
+}
 void finish(const ModelGraphTransactionResult& result) {
-    if(!session.id.empty()){std::string ack;
-        const auto numbers="["+std::to_string(result.committed?1:0)+","+std::to_string(static_cast<unsigned>(result.stage))+","+
-            std::to_string(result.error)+","+std::to_string(result.rollback_error)+","+std::to_string(result.asset_rollback_error)+","+
-            std::to_string(result.cleanup_error)+","+std::to_string(result.undo_error)+","+
-            std::to_string(static_cast<unsigned>(result.asset_error))+","+std::to_string(result.asset_index)+"]";
-        (void)call("SFLD_modelTransactionHostResult",quoted_id()+","+numbers,ack);}
-    session=Session{};
+    if(session.id.empty()){session=Session{};return;}
+    // Primitive ASCII avoids an Array prototype dependency between independently
+    // evaluated CEP and AEGP scripts. All nine fields are bounded integers.
+    session.outcome=result;session.outcome_ready=true;
+    session.assets.clear();session.desired.clear();session.target=nullptr;
+    notify_result();
 }
 void failed(A_Err error) {ModelGraphTransactionResult result;result.error=error;finish(result);}
 void apply() {
@@ -173,6 +188,10 @@ bool step_model_transaction_host() noexcept {
     HostUiExclusion exclusion;if(!exclusion)return true;
     try {
     running=true;struct Running {~Running(){running=false;}} scope;
+    if(session.outcome_ready){
+        if(std::chrono::steady_clock::now()>=session.notify_after)notify_result();
+        return !session.outcome_ready && queued; // Pending receipt never spins, even with another command queued.
+    }
     std::string text;
     if(session.id.empty()){
         // Request is read-only. A failed SDK result must not consume a staged
@@ -207,6 +226,11 @@ bool step_model_transaction_host() noexcept {
     }
     if(session.index==session.assets.size()){apply();return queued;}
     return true;
-    } catch(...){try{failed(PF_Err_OUT_OF_MEMORY);}catch(...){session=Session{};}running=false;return queued;}
+    } catch(...){
+        // Allocation/SDK notification failures cannot replace a committed receipt
+        // with a new failure or cause another executor pass.
+        if(!session.outcome_ready)try{failed(PF_Err_OUT_OF_MEMORY);}catch(...){if(!session.outcome_ready)session=Session{};}
+        running=false;return queued;
+    }
 }
 }
