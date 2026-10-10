@@ -9,8 +9,8 @@
 | M3-13 Texture | owner已确认CEP61节点添加修复；继续背面及采样/持久化gate | 正反面、真实方向/时间采样/阶段依赖与撤销/重开 |
 | M3-15 Cloud | native57/CEP57 作者已部署，等待参考外观与范围确认 | Circles/Aspect/Density 外观、动画、预算与宿主持久化 |
 | M3-16 Birth controls | native60/CEP61构建/配对部署完成；继续AE2023出生控制、动画与持久化验收 | seed影响完整发射源、概率筛选/身份/预算及实际 AE 验收 |
-| M3-17 Model | native61/CoreABI8/CEP62完整测试版已部署；实际默认cube/OBJ/资源预设/撤销重开与modal timing待验收；Shape六项固定，Face禁用、Use Model(s)待参考 | 默认及资源模型完整作者、材质/持久化与AE2023验收 |
-| M3-18 Motion 首批 | owner要求Particle优先；随后实现Light Path、Circle、Look At，见reference-motion-phases.md | 三种模式有实际运动/朝向，动画/曲线/原生/CEP/预设/撤销重开与AE2023验收 |
+| M3-17 Model | native61/CoreABI8/CEP63测试版已部署；CEP加载、默认cube/OBJ/资源预设/撤销重开与modal timing待验收；Shape六项固定，Face禁用、Use Model(s)待参考 | 默认及资源模型完整作者、材质/持久化与AE2023验收 |
+| M3-18 Motion 首批 | Particle Model达到测试版部署里程碑；独立路径/圆周/朝向数学通过最小测试。确认参考资源/单位后接入Light Path、Circle、Look At作者，见reference-motion-phases.md及ADR0039 | 三种模式有实际运动/朝向，动画/曲线/原生/CEP/预设/撤销重开与AE2023验收 |
 | M3-19 Turbulence | Motion首批后推进；参考dump提供标签/默认值，枚举和轨迹语义仍需公开指南及实机证据 | 有界独立噪声/影响属性/路径语义、完整作者与AE2023验收 |
 | M3-11 Transform | 原生/CEP 实现与 native54/panel54 配对部署已完成 | 原生/CEP 往返、带动画的 Null、不同图路径、几何、撤销/重开与 shutter 在 AE2023 验收 |
 | P-02L 节点 palette | 验收 panel54 的拖入、坐标、取消与交互 | owner 的实际 AE 外观/拖动/撤销证据 |

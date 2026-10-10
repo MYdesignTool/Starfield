@@ -4,6 +4,12 @@
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
+## M3-18 独立计算阶段（2026-10-10）
+
+Model测试发布里程碑达到后，当前只处理M3-18计算层：MotionGeometry包含显式弧度圆周旋转、有界不可变B-spline距离/切线查询，以及保持零权重/重合目标原状态的最短弧朝向。路径用局部坐标减小大坐标舍入，Bernstein控制多边形限定弧长/参数插值误差；不会静默放宽预算。标准及ASAN各4759检查通过，含解析长度、重复点/转折、取消/全部分配失败、无分配乱序查询和四线程只读。日志artifacts/m3-18-motion-geometry-{tests,asan}.log；ADR0039定义边界，完整SDK构建待续。
+
+这是共用数学里程碑，尚无Motion参数/graph/资源/作者入口，无ID/schema/ABI变更，没有发布新的native。Circle速度单位/半径、Origin Type菜单、Light Path精确构造及Look At目标政策保留参考gate；已向owner请求Circle对照。现有native61/CEP63及全部配对回滚保持，实际CEP63加载/Model/Texture等宿主gate仍开放。未修改MNT等在途文件，完整目标active。
+
 ## 源码与安装
 
 ### native61／CEP63 补丁已部署（2026-10-10 14:27 +08）

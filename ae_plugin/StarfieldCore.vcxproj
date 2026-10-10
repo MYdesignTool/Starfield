@@ -42,6 +42,7 @@
     <ClCompile Include="..\src\core\ModelGeometry.cpp" />
     <ClCompile Include="..\src\core\ModelResources.cpp" />
     <ClCompile Include="..\src\core\ModelScene.cpp" />
+    <ClCompile Include="..\src\core\MotionGeometry.cpp" />
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />

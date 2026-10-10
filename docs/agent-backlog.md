@@ -2,6 +2,8 @@
 
 旧任务卡和精确历史所有权见 [归档](history/2026-10-07/agent-backlog.md)；产品进度见 [路线图](roadmap.md)。
 
+2026-10-10 当前活动实现卡：M3-18 的独立计算层。M3-17已达到Model测试版部署里程碑，CEP63加载与Model实机gate仍开放；保留其作者/资源实现，不在本阶段同时改动。Circle参考单位/半径及Origin Type菜单仍待owner，不凭计算层推断公开控件。
+
 ## MNT-01 — 工作区整理（2026-10-07）
 
 owner 授权：清理过时文件、文档、测试与编译产物，修正文档错误，暂不修改项目主要代码。
@@ -157,7 +159,9 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 导入源码da76183冻结完整May2023 /MT八目标通过（显式IncludeModelCandidate/双NoPublish），实际Windows对话框/按钮路由编译；日志artifacts/m3-17-model-import-build.log。十八安装哈希保持native60/CEP61，未部署Model；继续Particle菜单/隔离CEP和预设完整作者，Motion首批在粒子阶段之后。
 
-## M3-18 — Motion 首批（待M3-17粒子优先阶段后执行）
+## M3-18 — Motion 首批（计算层开发中）
+
+2026-10-10 独立MotionGeometry实现有界圆周旋转、不可变B-spline距离/切线查询和加权最短弧朝向；ADR0039区分数学定义与尚未确认的参考策略。单独MSVC /MT标准及ASAN各4759检查通过，日志artifacts/m3-18-motion-geometry-{tests,asan}.log，含极小向量、大坐标下小路径、解析弧长、重复/转折/端点、全部路径分配失败、取消、无分配乱序查询及四线程读取。初次夹具nan命名冲突和ASAN运行器环境/链接选项诊断已修正，不修改用户环境。Core工程及CMake纳入源码；尚无Motion graph/作者入口、资源或ABI迁移，不部署无入口计算层。完整SDK构建证据待续，实际AE/Light Path路径构造、Circle单位/半径、Look At目标筛选仍开放。
 
 2026-10-09 owner截图限定Light Path、Circle、Look At，复杂Motion按阶段执行；参考清单docs/reference-motion-phases.md。拥有：独立Motion数值类型/采样与粒子路径/朝向、graph/history/资源/渲染的明确契约、独立原生节点及CEP/预设/schema/build/focused tests/新ADR。只追加自有身份/IDs；不复用Transform或Force身份，不注册无实际行为的选项。动画/Light资源采样边界和Circle半径/Look At目标语义先记录证据与独立方程，再接入作者。完成条件：三模式实际行为、共享曲线编辑/持久化、配对构建/发布及AE2023验收。
 

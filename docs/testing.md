@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-10 M3-18：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionGeometryTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各4759检查通过，日志artifacts/m3-18-motion-geometry-{tests,asan}.log。实际MotionGeometry参与，覆盖零角/轴/正反旋转、极小多分量方向/正交矩阵、二次解析长度/三次独立Simpson长度、多knot span、重复点/静止切线、端点、1e9平移、数值边界、预算、取消、每次路径分配失败、1000乱序无分配查询及四线程只读。仅数值几何，未接入或验证Motion控件、灯光资源、Circle Speed单位、参考轨迹或AE。初次夹具quiet_nan命名冲突诊断保留于initial-tests.log；ASAN首次测试exit -1073741515源于离开vcvars子进程后找不到运行库，改在同一build子进程运行，未写用户PATH；/link多行响应文件选项警告修正为同一行，原诊断asan-runner-warning.log保留。完整SDK构建证据待续；安装native61/CEP63保持。
+
 CEP63安装后复查：live `node --expose-internals tests/extendscript_syntax_tests.js`18、实际gateway旧入口90通过，m3-17-panel63-installed-{es3,legacy}-tests.log；Prepare empty delta从base63重现postrelease-panel63。发布工具增加nativeSourceCommit独立字段后，dummy配对发布/回滚再跑63检查通过，m3-17-panel63-deployment-final-tests.log；该额外字段只补来源身份，不改变实际已部署的26字节哈希。最终源码与安装对照见m3-17-panel63-postcommit-hashes.json。
 
 2026-10-10 14:27+08 CEP63已部署：owner已关闭，fresh process0记录m3-17-panel63-predeploy-processes.json。Deploy-PanelTestBuild实际调用Deploy-TestBuild KeepNative，八native/Core/selector保持；26hash和十八CEP paired Restore默认report通过，m3-17-panel63-deploy-wrapper.log及m3-17-native61-panel63-es3-20261010-{before,after}.json。native冻结8d9b50e与CEP修正0e5cbc5分别记录，不重构建native、不调用AE、registry或cache操作。一步撤回61/62见current-state最新记录。live CEP语法与最终源码哈希复查另记；真实AE63加载/Model/OBJ/预设/撤销资格仍开放。
