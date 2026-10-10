@@ -64,6 +64,7 @@ $adapterInputs = @(
     'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp',
     'ae_plugin\ModelAssetHost.hpp', 'ae_plugin\ModelAssetHost.cpp',
     'ae_plugin\EffectGraphBackup.hpp', 'ae_plugin\EffectGraphBackup.cpp',
+    'ae_plugin\ModelGraphTransaction.hpp', 'ae_plugin\ModelGraphTransaction.cpp',
     'ae_plugin\StarfieldHostPiPL.r', 'ae_plugin\StarfieldHost.vcxproj',
     'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
     'ae_plugin\TransformLayout.hpp', 'ae_plugin\TransformBinding.hpp',

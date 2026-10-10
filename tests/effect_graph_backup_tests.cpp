@@ -1,13 +1,19 @@
 #include "EffectGraphBackup.hpp"
 #include "NodeRecord.hpp"
 #include "Parameters.hpp"
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+#include "ModelGraphTransaction.hpp"
+#include "starfield/core/ModelResources.hpp"
+#endif
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 using namespace starfield::adapter;
@@ -32,6 +38,9 @@ std::string failure,missing_suite;unsigned failure_at=1,seen{};bool silent{},dup
 std::map<std::string,unsigned> calls;
 std::vector<std::pair<int,A_long>> releases;
 AEGP_EffectSuite4 effects{};AEGP_StreamSuite6 streams{};AEGP_DynamicStreamSuite4 dynamic{};AEGP_MemorySuite1 memory{};SPBasicSuite basic{};
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+AEGP_UtilitySuite6 utility{};
+#endif
 using UUID=std::array<std::uint8_t,16>;
 const UUID operation{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
 AEGP_LayerH layer(){return reinterpret_cast<AEGP_LayerH>(1);}
@@ -51,7 +60,9 @@ std::vector<Effect> snapshot(){std::vector<Effect> result;for(const auto& p:para
 void equals(const std::vector<Effect>& saved){CHECK(parade.size()==saved.size());for(std::size_t i=0;i<saved.size();++i)CHECK(*parade[i]==saved[i]);}
 Ptr make(int kind,unsigned id){auto p=std::make_shared<Effect>();p->kind=kind;p->name=u"Node \u6a21\u578b ";p->name+=static_cast<char16_t>('A'+id);
     if(kind>=-1){p->numbers[guard(kind)]=0;if(kind>=0){UUID identity{};for(std::size_t i=0;i<identity.size();++i)identity[i]=static_cast<std::uint8_t>(31+id+i);uuid(*p,identity);}}
-    p->numbers[1]=id+0.25;p->animation[2]={{0,12.25},{0.125,-23.5},{70,999.9}};
+    p->numbers[1]=kind==5?1:id+0.25;
+    if(kind==5){p->numbers[4]=0;for(A_long axis=0;axis<6;++axis)p->numbers[95+axis]=axis<3?-.5:.5;}
+    p->animation[2]={{0,12.25},{0.125,-23.5},{70,999.9}};
     p->expressions[3]="thisComp.layer(1).effect('Node')(2) + time";
     p->arbitrary[4]={0,1,2,3,255,254,253,0};p->arbitrary[5]=std::vector<std::uint8_t>(257,static_cast<std::uint8_t>(id));return p;}
 void reset(){no_owned();parade.clear();failure.clear();missing_suite.clear();calls.clear();releases.clear();seen=0;failure_at=1;silent=duplicate_at_end=duplicate_error_with_ref=duplicate_wrong_kind=wrong_type=false;
@@ -84,7 +95,11 @@ void initialize(){
         CHECK(id==7);if(fault("param-ref")==1)return injected;CHECK(effect(h)->numbers.contains(index));*out=ref(0,effect(h),index);return 0;};
     streams.AEGP_GetStreamType=[](AEGP_StreamRefH h,AEGP_StreamType* out)->A_Err{CHECK(stream(h).type==0);if(fault("param-type")==1)return injected;*out=wrong_type?AEGP_StreamType_ARB:AEGP_StreamType_OneD;return 0;};
     streams.AEGP_GetNewStreamValue=[](AEGP_PluginID id,AEGP_StreamRefH h,AEGP_LTimeMode mode,const A_Time* time,A_Boolean pre,AEGP_StreamValue2* out)->A_Err{
-        CHECK(id==7 && mode==AEGP_LTimeMode_LayerTime && time->value==0 && time->scale==1 && pre==TRUE);if(fault("scalar-read")==1)return injected;
+        bool metadata_time=time->value==0 && time->scale==1;
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+        metadata_time=metadata_time || (time->value==12 && time->scale==24);
+#endif
+        CHECK(id==7 && mode==AEGP_LTimeMode_LayerTime && metadata_time && pre==TRUE);if(fault("scalar-read")==1)return injected;
         auto& s=stream(h);out->streamH=h;out->val.one_d=s.effect->numbers.at(s.index);++values;return 0;};
     streams.AEGP_DisposeStreamValue=[](AEGP_StreamValue2* v)->A_Err{CHECK(v->streamH && values>0);--values;v->streamH=nullptr;return 0;};
     streams.AEGP_SetStreamValue=[](AEGP_PluginID id,AEGP_StreamRefH h,AEGP_StreamValue2* v)->A_Err{
@@ -108,7 +123,11 @@ void initialize(){
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle h)->A_Err{auto* m=reinterpret_cast<Memory*>(h);CHECK(!m->locked);delete m;CHECK(handles>0);--handles;return 0;};
     basic.AcquireSuite=[](const char* name,int32 version,const void** out)->A_Err{
         if(missing_suite==name){*out=nullptr;return injected;}
-        const std::map<std::string,std::pair<int32,const void*>> table{{kAEGPEffectSuite,{kAEGPEffectSuiteVersion4,&effects}},{kAEGPStreamSuite,{kAEGPStreamSuiteVersion6,&streams}},
+        const std::map<std::string,std::pair<int32,const void*>> table{
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+            {kAEGPUtilitySuite,{kAEGPUtilitySuiteVersion6,&utility}},
+#endif
+            {kAEGPEffectSuite,{kAEGPEffectSuiteVersion4,&effects}},{kAEGPStreamSuite,{kAEGPStreamSuiteVersion6,&streams}},
             {kAEGPDynamicStreamSuite,{kAEGPDynamicStreamSuiteVersion4,&dynamic}},{kAEGPMemorySuite,{kAEGPMemorySuiteVersion1,&memory}}};
         const auto found=table.find(name);CHECK(found!=table.end() && found->second.first==version);*out=found->second.second;++suites;return 0;};
     basic.ReleaseSuite=[](const char*,int32)->A_Err{CHECK(suites>0);--suites;return 0;};
@@ -175,6 +194,86 @@ void restore_failure_tests(){
         CHECK(backup.discard()!=0);CHECK(parade[1]->arbitrary.contains(99));CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==0);
         CHECK(std::count_if(parade.begin(),parade.end(),[](const Ptr& p){return p->kind>=-1 && p->numbers.at(guard(p->kind))==2;})==1);no_refs();}no_owned();}
 }
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+struct Transaction {
+    std::vector<std::uint8_t> bytes;
+    std::vector<ModelAssetRestore> assets;
+    std::vector<UUID> ids;
+    unsigned starts{},ends{},depth{},prepares{},commits{},generics{},written{};
+    unsigned cancel_phase{},generic_fail_at{};
+    bool start_fail{},end_fail{},prepare_fail{},commit_fail{},prepare_throw{},commit_throw{},unacknowledged{},local_failure{},
+        wrong_target{},duplicate_target{},busy_target{},silent_revision{};
+    ModelGraphTransactionPlan plan() {ModelGraphTransactionPlan p;p.basic=&basic;p.plugin=7;p.layer=layer();p.time={12,24};p.id=operation;p.desired_ids=ids;p.assets=assets;p.context=this;
+        p.prepare=[](void* context)->A_Err{auto& t=*static_cast<Transaction*>(context);++t.prepares;CHECK(t.depth==1);no_refs();
+            // The actual gateway callback will do these structural/ordinary edits.
+            // This fixture exercises its executor contract without claiming AE script qualification.
+            parade.erase(std::remove_if(parade.begin(),parade.end(),[](const Ptr& e){return e->kind>=0 && e->numbers.at(guard(e->kind))!=2;}),parade.end());
+            for(const auto& asset:t.assets){auto p=make(5,61);auto target=asset.node_id;if(t.wrong_target)target[0]^=1;uuid(*p,target);if(t.busy_target)p->numbers[94]=1;parade.push_back(p);
+                if(t.duplicate_target)parade.push_back(std::make_shared<Effect>(*p));}
+            if(t.prepare_throw)throw std::bad_alloc();return t.prepare_fail?injected:0;};
+        p.commit=[](void* context)->A_Err{auto& t=*static_cast<Transaction*>(context);++t.commits;CHECK(t.depth==1);no_refs();
+            if(t.commit_throw)throw std::runtime_error("commit exception");return t.commit_fail?injected:0;};
+        p.is_cancelled=[](void* context) noexcept->std::int32_t{const auto& t=*static_cast<Transaction*>(context);
+            return t.cancel_phase==1 || (t.cancel_phase==2 && t.prepares) || (t.cancel_phase==3 && t.written>=1) || (t.cancel_phase==4 && t.written==t.assets.size());};return p;}
+};
+Transaction* transaction{};
+Transaction make_transaction(unsigned assets=2){reset();Transaction t;
+    starfield::core::NeverCancelled never;auto cube=starfield::core::make_unit_cube();CHECK(cube.has_value());
+    auto encoded=starfield::core::encode_model_geometry(cube.value(),never);CHECK(encoded.has_value());
+    for(auto b:encoded.value())t.bytes.push_back(std::to_integer<std::uint8_t>(b));
+    for(unsigned i=0;i<assets;++i){UUID id{};id.back()=static_cast<std::uint8_t>(100+i);t.ids.push_back(id);t.assets.push_back({id,2,27+i,{},{-.5,-.5,-.5,.5,.5,.5}});}return t;}
+ModelGraphTransactionResult run(Transaction& t){transaction=&t;for(auto& asset:t.assets)if(asset.revision)asset.mesh=t.bytes;const auto result=apply_model_graph_transaction(t.plan());no_owned();CHECK(t.depth==0 && t.starts==t.ends);return result;}
+void transaction_tests(){
+    utility.AEGP_StartUndoGroup=[](const A_char* name)->A_Err{CHECK(!std::strcmp(name,"Starfield: apply graph and Model assets"));auto& t=*transaction;no_refs();CHECK(t.depth==0);
+        if(t.start_fail)return injected;++t.starts;++t.depth;return 0;};
+    utility.AEGP_EndUndoGroup=[]()->A_Err{auto& t=*transaction;no_refs();CHECK(t.depth==1);--t.depth;++t.ends;return t.end_fail?injected:0;};
+    effects.AEGP_EffectCallGeneric=[](AEGP_PluginID plugin,AEGP_EffectRefH h,const A_Time* time,PF_Cmd command,void* extra)->A_Err{
+        auto& t=*transaction;++t.generics;CHECK(plugin==7 && time->value==12 && time->scale==24 && command==PF_Cmd_COMPLETELY_GENERAL && t.depth==1);
+        auto& r=*static_cast<ModelAssetWriteRequest*>(extra);CHECK(r.magic==0x53464d57 && r.version==1 && r.bytes==sizeof(r) && r.operation==1);
+        auto p=effect(h);CHECK(p->kind==5 && p->numbers.at(94)==0 && effect_refs==1 && stream_refs==0 && values==0 && handles==0 && locks==0);
+        UUID expected{};std::copy(std::begin(r.expected_uuid),std::end(r.expected_uuid),expected.begin());CHECK(uuid(*p)==expected);
+        CHECK(r.expected_source==p->numbers.at(1) && r.expected_revision==p->numbers.at(4));CHECK(!r.is_cancelled(r.cancellation_context));
+        if(t.generic_fail_at==t.generics)return injected;
+        if(t.unacknowledged)return 0;r.acknowledged=1;
+        p->arbitrary[3]=r.mesh_length?std::vector<std::uint8_t>(r.mesh_bytes,r.mesh_bytes+r.mesh_length):std::vector<std::uint8_t>{};
+        p->numbers[1]=r.desired_source;if(!t.silent_revision)p->numbers[4]=r.desired_revision;
+        for(unsigned i=0;i<6;++i)p->numbers[95+i]=r.desired_bounds[i];
+        if(t.local_failure){r.error=ModelAssetError::host_error;r.host_error=injected;r.rollback_error=512;return 0;}
+        r.error=ModelAssetError::none;++t.written;return 0;};
+    {auto t=make_transaction();auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==0 && r.undo_error==0 && r.rollback_error==0 &&
+        r.stage==ModelTransactionStage::complete && t.prepares==1 && t.commits==1 && t.generics==2);
+        CHECK(parade.size()==5);for(const auto& a:t.assets){const auto p=std::find_if(parade.begin(),parade.end(),[&](const Ptr& e){return e->kind==5 && uuid(*e)==a.node_id;});
+            CHECK(p!=parade.end() && (*p)->arbitrary.at(3)==t.bytes && (*p)->numbers.at(1)==2 && (*p)->numbers.at(4)==a.revision);}}
+    {auto t=make_transaction(1);t.assets[0].source=1;t.assets[0].revision=0;t.bytes.clear();auto r=run(t);CHECK(r.committed && t.generics==1);}
+    for(unsigned which=0;which<12;++which){auto t=make_transaction();const auto before=snapshot();
+        switch(which){case 0:t.prepare_fail=true;break;case 1:t.commit_fail=true;break;case 2:t.prepare_throw=true;break;case 3:t.commit_throw=true;break;
+            case 4:t.generic_fail_at=1;break;case 5:t.generic_fail_at=2;break;case 6:t.unacknowledged=true;break;case 7:t.wrong_target=true;break;
+            case 8:t.duplicate_target=true;break;case 9:t.busy_target=true;break;case 10:t.silent_revision=true;break;case 11:t.local_failure=true;break;}
+        const auto r=run(t);CHECK(!r.committed && r.error!=0 && r.rollback_error==0);equals(before);CHECK(t.starts==1 && t.ends==1);
+        if(which==11)CHECK(r.asset_rollback_error==512);}
+    for(unsigned phase=1;phase<=4;++phase){auto t=make_transaction();const auto before=snapshot();t.cancel_phase=phase;const auto r=run(t);
+        CHECK(!r.committed && r.error==PF_Interrupt_CANCEL && r.rollback_error==0);equals(before);if(phase==1)CHECK(t.starts==0);}
+    for(unsigned which=0;which<9;++which){auto t=make_transaction();const auto before=snapshot();
+        switch(which){case 0:t.assets[1].node_id=t.assets[0].node_id;break;case 1:t.assets[1].source=3;break;case 2:t.assets[1].revision=2147483648u;break;
+            case 3:t.assets[1].bounds[0]=-2;break;case 4:t.bytes[0]=0;break;case 5:t.assets[1].node_id={};break;
+            case 6:t.ids[1]=t.ids[0];break;case 7:t.assets[1].bounds[2]=std::numeric_limits<double>::infinity();break;case 8:t.assets[1].node_id.back()=99;break;}
+        const auto r=run(t);CHECK(!r.committed && r.error!=0 && t.starts==0 && t.prepares==0 && t.generics==0);equals(before);}
+    {auto t=make_transaction(9);transaction=&t;const auto before=snapshot();for(auto& asset:t.assets)asset.mesh={reinterpret_cast<const std::uint8_t*>(1),8*1024*1024};
+        auto r=apply_model_graph_transaction(t.plan());CHECK(r.error!=0 && t.starts==0);equals(before);no_owned();}
+    {auto t=make_transaction();t.start_fail=true;const auto before=snapshot();const auto r=run(t);CHECK(r.error==injected && t.prepares==0);equals(before);}
+    {auto t=make_transaction();missing_suite=kAEGPUtilitySuite;const auto before=snapshot();const auto r=run(t);CHECK(r.error!=0 && t.starts==0);equals(before);}
+    {auto t=make_transaction();inject("duplicate",2);const auto before=snapshot();const auto r=run(t);CHECK(r.error==injected && t.prepares==0 && r.rollback_error==0);equals(before);}
+    {auto t=make_transaction();t.commit_fail=true;inject("delete",1);const auto r=run(t);CHECK(!r.committed && r.error==injected && r.rollback_error==injected);}
+    {auto t=make_transaction();inject("delete",1);const auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==injected && t.commits==1);}
+    {auto t=make_transaction();t.end_fail=true;const auto r=run(t);CHECK(r.committed && r.error==0 && r.undo_error==injected);}
+    transaction=nullptr;
+}
+#endif
 }
 int main(){initialize();success_tests();preflight_tests();prepare_failure_tests();restore_failure_tests();
-    std::cout<<"Complete effect graph backup: "<<checks<<" checks, 0 failures (May2023 SDK/fake host)\n";return 0;}
+#ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
+    transaction_tests();std::cout<<"Model whole-graph transaction: "<<checks<<" checks, 0 failures (actual backup/SFMG1, fake May2023 callbacks)\n";
+#else
+    std::cout<<"Complete effect graph backup: "<<checks<<" checks, 0 failures (May2023 SDK/fake host)\n";
+#endif
+    return 0;}

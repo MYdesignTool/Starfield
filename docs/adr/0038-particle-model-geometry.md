@@ -843,3 +843,30 @@ with focused fake-host and ASAN evidence recorded in testing.md. The helper is
 not yet called by the whole-graph Host route. Complete SDK pairing, AE duplication
 and undo/expression identity checks, and the modal/idle gate above remain open.
 The owner requested a staged close and pause; installed native60/CEP61 is retained.
+
+### Whole-graph Model transaction executor
+
+The UI Host route will supply one callback-owned plan: transaction UUID, desired
+node UUIDs, layer/time, numeric Model assets and prepare/commit callbacks. All
+SFMG1 bytes, derived bounds, revisions, UUID uniqueness and the64MiB total are
+validated before the undo group or any project write. The borrowed spans remain
+alive and unchanged until the synchronous executor returns; no host objects or
+allocator ownership cross the private generic message boundary.
+
+One balanced SDK undo group encloses complete effect backup, structural/ordinary
+author preparation, private SFMW writes and verified graph publication. Model
+targets are reacquired by UUID after structural edits, guard2 backups are excluded,
+and every asset write captures its expected current Source/revision/guard. No
+effect, stream, value or handle is held across either script callback. The commit
+callback must validate the native graph acknowledgement before returning success.
+Failures, cancellation and callback exceptions restore the complete effect backup,
+including earlier successful asset writes. Restore errors are reported separately.
+After publication, backup cleanup or EndUndoGroup errors retain committed=true
+and have separate diagnostics; a caller must not retry a committed mutation as if
+it had failed before publication. The executor does not schedule work or select
+layers. Only the session-resident Host's admitted UI route may invoke it.
+
+This private executor adds no persistent IDs, schema or Core ABI. Its callbacks
+still require the modal/script exclusion and target revalidation gates above.
+It remains unpublished until the Host request/asset transport, CEP preparation
+and verified commit callbacks are connected as the complete author pairing.

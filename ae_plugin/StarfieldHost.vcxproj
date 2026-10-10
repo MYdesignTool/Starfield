@@ -38,6 +38,13 @@
     <ClCompile Include="StarfieldHost.cpp" />
     <ClCompile Include="ModelAssetHost.cpp" />
     <ClCompile Include="EffectGraphBackup.cpp" />
+    <ClCompile Include="ModelGraphTransaction.cpp" />
+    <ClCompile Include="..\src\core\ModelResources.cpp" />
+    <ClCompile Include="..\src\core\ModelGeometry.cpp" />
+    <ClCompile Include="..\src\core\ModelScene.cpp" />
+    <ClCompile Include="..\src\core\ParticleTransform.cpp" />
+    <ClCompile Include="..\src\core\Render.cpp" />
+    <ClCompile Include="..\src\core\Time.cpp" />
     <CustomBuild Include="StarfieldHostPiPL.r">
       <Message>Generating Starfield General AEGP PiPL resource</Message>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\BuildPiPL.ps1" -SdkRoot "$(STARFIELD_AE_SDK_ROOT)" -IntermediateDir "$(IntDir)." -ResourceSource "$(MSBuildProjectDirectory)\StarfieldHostPiPL.r" -GeneralPlugin</Command>

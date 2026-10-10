@@ -96,6 +96,8 @@ UI-idle导出传输候选接入Host会话模块和隔离gateway：命令仅排�
 
 当前活动实现卡切换为M3-17；M3-16已部署并等待owner宿主验收，M3-13添加/背面报错反馈优先。完整目标不缩减。
 
+2026-10-10恢复进展：ModelGraphTransaction完整原生执行器在一个SDK undo组内组合备份、prepare、私有SFMW和commit；全部数值资产预检先于项目变更，失败/取消/回调异常整笔恢复，发布后的cleanup/undo独立诊断。标准/ASAN各636209、共用Backup458562检查通过，m3-17-model-graph-transaction-*.log；callbacks/generic是fake，不关闭Host/CEP/AE gate。接入Host工程/fingerprint，完整冻结SDK待记录；下一步Host资产上传/排队与真实CEP prepare/commit、Model菜单及配对验证，安装60/61保持。
+
 2026-10-10 owner要求阶段收尾并暂停：完整EffectGraphBackup候选和guard2库存隔离已实现，标准/ASAN helper各458562项、Host147760、实际Model7699（控件452）、隔离gateway588/作者74/预设330与旧preset断言通过。保留失败诊断，日志artifacts/m3-17-effect-graph-backup-*；Prepare可重现隔离候选，不改live CEP。尚未将helper接入整笔Host资产/图事务，本阶段完整SDK冻结和实际AE验证待续；native60/CEP61保持。下次继续Host资产导入/完整Add/Replace/duplicate、Particle Model菜单、配对构建及部署前Modal/idle与导入revision一致性gate（ADR0038，owner静态假设未复现），然后继续Particle、各节点命名/排序和Motion/Turbulence；不缩减目标。
 拥有：ModelGeometry/OBJ数值输入、三角形场景与CPU渲染、Settings/Render/graph/history/snapshot/C ABI的明确迁移、原生Model资源作者/Particle类型、CEP/预设、schema/version/build、focused mesh tests、ADR0038。不能重用既有shape0..3、diskID或matchName；外部资源读入在AE/UI适配器，Core只有数值。
 MotionBlur.hpp的Model style验证/组索引迁移/线性矩阵采样属于M3-17渲染契约，保留旧形状的快门行为；语义先行记录于ADR0038。

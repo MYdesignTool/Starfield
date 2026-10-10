@@ -1,5 +1,7 @@
 # 测试入口
 
+2026-10-10 M3-17整笔Model执行器：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelGraphTransactionTests.ps1 -Run`及追加`-Sanitize`，MSVC /MT/May2023，标准/ASAN各636209检查、0失败（包含共用备份夹具和资源调用计数）。实际ModelGraphTransaction/EffectGraphBackup/SFMG1执行，prepare/commit/generic为fake callbacks，不能证明CEP或实际AE路由；覆盖多资产提交、default Cube reset、各阶段错误/异常/取消、第二资产失败恢复第一资产、精确动画/网格恢复、guard2/UUID重新定位、重复/不匹配/忙目标、预检坏CRC/修订/边界/身份、总64MiB拒绝在解引用前、silent revision、局部/全局恢复错误区分、发布后的cleanup/undo错误保留committed=true及undo/ref平衡。日志artifacts/m3-17-model-graph-transaction-{tests,asan}.log；首次fixture只允许时间0/1修正为同时接受事务图层时间12/24，失败日志保留。共用Backup单独458562检查回归通过。Host transport/CEP回调、完整SDK冻结和实际AE模态/undo/持久化验收待续。
+
 2026-10-10 M3-17备份helper：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunEffectGraphBackupTests.ps1 -Run`与追加`-Sanitize`，实际EffectGraphBackup.cpp/May2023 SDK，标准/ASAN各458562项检查、0失败（包含夹具调用/资源计数）。覆盖完整ARB/关键帧/表达式/Unicode名称、两种duplicate插入位置、第三方效果身份/顺序、精确失败恢复/RAII、已发布状态的备份清理失败、逐项元数据错误/静默写入、duplicate返回错误且带ref、静默delete/reorder拒绝、UUID冲突与Output身份排除，回调间无owned ref/value/handle/lock。日志artifacts/m3-17-effect-graph-backup-{tests,asan}.log；首次夹具与std::ref冲突修正，失败日志保留。单独Host导出147760检查、原生Model模块7699（控件452），隔离gateway588/作者74/预设330与旧preset断言通过，m3-17-effect-graph-backup-*；新增原生夹具字段名错误和Model专用定位漏过滤已修正。候选由Prepare重现。尚未接入整个Host图事务、未做本阶段完整SDK冻结构建；NodeGraphSync新renderer过滤的实机行为、完整事务/undo/表达式身份及下述模态gate仍开放。
 
 ## Model 模态/idle 部署前验收项（2026-10-10，未执行）
