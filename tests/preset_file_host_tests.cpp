@@ -44,7 +44,7 @@ void initialize(){
         else CHECK(false);
         --depth;if(script_fault==stage || stage==3 && lost_ack){*error=mem("error");*result=mem("ignored");return 512;}
         if(memory_fault==1)reply=std::string(129,'x');
-        if(memory_fault!=2)reply+='\0';*result=mem(reply);return 0;
+        if(memory_fault!=2)reply+='\0';*result=mem(reply);*error=mem(std::string(1,'\0'));return 0;
     };
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle handle)->A_Err{delete reinterpret_cast<Memory*>(handle);CHECK(handles>0);--handles;return 0;};
     memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle handle,AEGP_MemSize* out)->A_Err{*out=static_cast<AEGP_MemSize>(reinterpret_cast<Memory*>(handle)->text.size());return memory_fault==3?512:0;};

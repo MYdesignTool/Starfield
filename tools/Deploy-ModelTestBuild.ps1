@@ -18,7 +18,8 @@ $taskBaselineBuild=if($taskBaseline.nativeBuild){[int]$taskBaseline.nativeBuild}
 $taskBaselinePanel=if($taskBaseline.panelGeneration){[int]$taskBaseline.panelGeneration}else{61}
 $taskBaselineAbi=if($taskBaseline.coreAbi){[int]$taskBaseline.coreAbi}else{7}
 $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneration -eq 62 -and $taskBaselineBuild -eq 60 -and $taskBaselinePanel -eq 61) -or
-    ($taskFrozen.nativeBuild -eq 62 -and $taskFrozen.panelGeneration -eq 64 -and $taskBaselineBuild -eq 61 -and $taskBaselinePanel -eq 63)
+    ($taskFrozen.nativeBuild -eq 62 -and $taskFrozen.panelGeneration -eq 64 -and $taskBaselineBuild -eq 61 -and $taskBaselinePanel -eq 63) -or
+    ($taskFrozen.nativeBuild -eq 63 -and $taskFrozen.panelGeneration -eq 65 -and $taskBaselineBuild -eq 62 -and $taskBaselinePanel -eq 64)
 if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne 8 -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild
 $taskExpected=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
@@ -37,7 +38,7 @@ $taskCepLink=Assert-ModelJunction $CepJunction $taskPanelRoot
 if(@(Get-ChildItem -LiteralPath $taskPluginDir -Force | Where-Object Name -like 'Starfield*').Count -ne 1){throw 'Unexpected host Starfield entries.'}
 foreach($taskEntry in $taskBaseline.native){if((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash -ne $taskEntry.hash){throw 'Installed native baseline differs.'}}
 if($taskBaselineBuild -eq 60 -and (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldModel.aex'))){throw 'Unexpected installed Model before full promotion.'}
-if($taskBaselineBuild -eq 61 -and (@($taskBaseline.native).Count -ne 8 -or @($taskBaseline.panel.files).Count -ne 18 -or
+if($taskBaselineBuild -ge 61 -and (@($taskBaseline.native).Count -ne 8 -or @($taskBaseline.panel.files).Count -ne 18 -or
     'StarfieldModel.aex' -notin @($taskBaseline.native.name))){throw 'Incomplete installed Model pair.'}
 foreach($taskEntry in $taskBaseline.panel.files){if((Get-FileHash -LiteralPath (Join-Path $taskRepo $taskEntry.path)).Hash -ne $taskEntry.installedHash){throw 'Installed CEP baseline differs.'}}
 $taskSelector=(Get-Content -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime/current.txt') -Raw).Trim()

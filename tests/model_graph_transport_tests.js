@@ -25,12 +25,14 @@ function manifest(g){const positions=layout.resolve(g);return g.nodes.filter(n=>
 function render(g){const n=g.nodes.find(n=>n.type===edits.types.output),r={id:n.id,position:layout.resolve(g)[n.id]};
     ["maxParticles","timeRemapEnabled","timeRemapSeconds","previewEnabled","previewChance","acceleration","timeSamplingHz","motionBlur","shutterAngle","shutterPhase","motionBlurType","motionBlurLevels","linearAccuracy","opacityBoost","motionBlurDisregard"].forEach((name,i)=>{
         const p=n.parameters.find(p=>String(p.key)===String(i+1));r[name]=p?p.value:[1000000,0,0,0,100,0,30,1,360,0,0,8,70,0,0][i];});return r;}
-const sandbox={$:{global:{}},app:{findMenuCommandId:()=>55,executeCommand:()=>{hostRuns++;tasks.push(nativeRun);}}};
+const sandbox={$:{global:{}},Date:class extends Date{constructor(...args){super(args.length?args[0]:now);}},
+    app:{findMenuCommandId:()=>55,executeCommand:()=>{if(throwQueue)throw new Error("queue command failed");hostRuns++;if(!skipNative)tasks.push(nativeRun);}}};
 const context=vm.createContext(sandbox),host=sandbox.$.global,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"),context);
 const api=host.__SFLD_modelTransactionAPI;
 let nodes=[],renderer={},revision=11,guard=0,stamp="stamp",tasks=[],hostRuns=0,prepares=0,commits=0,restores=0,writes=0,bytesRead=0,
-    failedPrepare=false,failedCommit=false,badSaved=false,cleanupError=0,undoError=0,loseQueueAck=false,loseResult=false,now=1000,sequence=2000;
+    failedPrepare=false,failedCommit=false,badSaved=false,cleanupError=0,undoError=0,loseQueueAck=false,loseResult=false,now=1000,sequence=2000,
+    throwQueue=false,skipNative=false,stopAfterClaim=false,loseRequestAck=false;
 const nativeMeshes={};
 function snapshot(){const current=copy(nodes);for(const n of current)if(n.type===edits.types.model){const asset=nativeMeshes[n.id],raw=n.parameters.find(p=>p.key==="12").value;
     n.modelAsset=asset?{revision:asset.revision,bounds:asset.bounds}: {revision:n.parameters.find(p=>p.key==="2").value,bounds:Array.from({length:6},(_,i)=>Buffer.from(raw).readDoubleLE(i*8))};}
@@ -44,7 +46,10 @@ api.ensure=(layer,desired,writeExisting,previous,defer)=>{writes++;if(defer){pre
 api.remove=()=>{};api.writeRenderer=(resolved,r)=>{renderer=copy(r);};api.nonce=()=>66;
 api.trigger=()=>{revision++;if(badSaved)nodes[0].position.x+=10;return realm({ok:true,nonce:66});};
 function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line==="0")return;
+    eq(host.__SFLD_modelGraphTransactionV1.state,"queued");
+    if(loseRequestAck){loseRequestAck=false;tasks.push(nativeRun);return;}
     eq(guard,0);const parts=line.split("|"),id=parts[0],count=Number(parts[4]),before={nodes:copy(nodes),renderer:copy(renderer),revision};
+    eq(host.SFLD_modelTransactionHostClaim(id),"1");if(stopAfterClaim)return;
     eq(parts.slice(1,4),/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(token).slice(1));eq(host.SFLD_modelTransactionHostContinue(id),"1");
     const assets=[];
     for(let i=0;i<count;i++){const fields=host.SFLD_modelTransactionHostAsset(id,i).split("|"),length=Number(fields[3]),pages=[];
@@ -53,6 +58,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
     // Native preflight validates all geometry before backup/prepare, as the
     // separately tested actual C++ executor does.
     try{for(const a of assets)if(a.revision)eq(assetAPI.validateMesh(a.meshHex).bounds,a.bounds);}catch(error){host.SFLD_modelTransactionHostResult(id,realm([0,0,512,0,0,0,0,5,0]));return;}
+    eq(host.SFLD_modelTransactionHostBegin(id),"1");eq(host.__SFLD_modelGraphTransactionV1.state,"executing");
     guard=1;let success=host.SFLD_modelTransactionHostPrepare(id)==="1";
     if(success){for(const a of assets){nativeMeshes[a.nodeId]=copy(a);const n=nodes.find(n=>n.id===a.nodeId),raw=Buffer.alloc(48);a.bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
         for(const [key,value] of [[1,a.source===2?Array.from(Buffer.from(a.nodeId,"hex")):Array(16).fill(0)],[2,a.source===2?a.revision:0],
@@ -62,7 +68,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
     guard=0;if(!loseResult)eq(host.SFLD_modelTransactionHostResult(id,realm([success?1:0,success?7:5,success?0:512,0,0,cleanupError,undoError,0,-1])),"1");
 }
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
-    failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
+    failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=throwQueue=skipNative=stopAfterClaim=loseRequestAck=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
     for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
 function call(operation,fields,callback){
@@ -110,6 +116,24 @@ for(const key of ["failedPrepare","failedCommit","badSaved"]){reset();if(key==="
     client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(result.committed,false);eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);}
 reset();cleanupError=516;undoError=512;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(result.diagnostics.cleanupError,516);eq(result.diagnostics.undoError,512);eq(hostRuns,1);
 reset();loseQueueAck=true;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(hostRuns,1);
+reset();loseRequestAck=true;client().apply(plan(cube),[],r=>{result=r;});drain();eq(result.ok,true);eq(hostRuns,1);eq(prepares,1);
+reset();throwQueue=true;client().apply(plan(cube),[],r=>{result=r;});drain();eq(result.ok,false);eq(writes,0);eq(hostRuns,0);eq(host.__SFLD_modelGraphTransactionV1,null);
+for(const phase of ["queued","receiving"]){reset();skipNative=phase==="queued";stopAfterClaim=phase==="receiving";
+    client().apply(plan(cube),[],r=>{result=r;});for(let step=0;step<6&&tasks.length;step++)tasks.shift()();
+    eq(host.__SFLD_modelGraphTransactionV1.state,phase);now+=15001;drain();eq(result.ok,false);
+    eq(result.error.code,phase==="queued"?"model_host_not_started":"model_host_transfer_stalled");
+    ok(result.error.message.includes("state="+phase));eq(writes,0);eq(host.__SFLD_modelGraphTransactionV1,null);
+    skipNative=stopAfterClaim=false;client().apply(plan(cube),[],r=>{result=r;});drain();eq(result.ok,true);eq(prepares,1);
+}
+// Reloading a page can safely recover a stalled pre-mutation job, but never
+// replace an applying job whose native rollback/publication may be in progress.
+reset();call("beginModelGraphTransaction",{...plan(cube),assets:[]},r=>eq(r.ok,true));
+now+=15001;call("beginModelGraphTransaction",{...plan(cube),assets:[]},r=>eq(r.ok,true));eq(writes,0);
+const active=host.__SFLD_modelGraphTransactionV1;now+=5*60*1000+1;
+for(const phase of ["executing","applying"]){active.state=phase;
+    call("beginModelGraphTransaction",{...plan(cube),assets:[]},r=>{eq(r.error.code,"model_transaction_busy");ok(r.error.message.includes("state="+phase));});
+    eq(host.__SFLD_modelGraphTransactionV1,active);eq(writes,0);
+    call("releaseModelGraphTransaction",{},r=>eq(r.ok,true));eq(host.__SFLD_modelGraphTransactionV1,active);eq(active.cancelled,true);}
 reset();const edit={type:"applyPreset",presetGraph:imported,presetModelAssets:[{nodeId:modelId,revision:17,bounds,meshHex}],mode:"add"};
 const updated=presets.apply(cube,edit,()=>uuid(++sequence));ok(edit.modelAssetsToRestore[0].nodeId!==modelId);eq(edit.modelAssetsToRestore[0].source,2);
 const tx=graphTransactions.create({codec,edits:{apply:presets.apply},call,modelTransactions:client(),idFactory:()=>uuid(++sequence)});

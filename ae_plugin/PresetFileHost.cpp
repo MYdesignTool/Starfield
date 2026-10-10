@@ -1,5 +1,6 @@
 #include "PresetFileHost.hpp"
 #include "UiExclusionHost.hpp"
+#include "ScriptDiagnostic.hpp"
 #include <algorithm>
 #include <cstring>
 #include <string_view>
@@ -25,7 +26,8 @@ bool script(const char* name,const std::string& arguments,std::string& output) {
     struct Handles {const AEGP_MemorySuite1* suite;AEGP_MemHandle& result;AEGP_MemHandle& error;
         ~Handles(){if(error)suite->AEGP_FreeMemHandle(error);if(result)suite->AEGP_FreeMemHandle(result);}} handles{memory.value,result,error};
     const auto body="(typeof "+std::string(name)+"==='function'?"+name+"("+arguments+"): '0')";
-    if(utility.value->AEGP_ExecuteScript(plugin,body.c_str(),FALSE,&result,&error) || error || !result)return false;
+    if(utility.value->AEGP_ExecuteScript(plugin,body.c_str(),FALSE,&result,&error) ||
+       !script_diagnostic_empty(memory.value,error) || !result)return false;
     AEGP_MemSize size{};
     if(memory.value->AEGP_GetMemHandleSize(result,&size) || !size || size>128)return false;
     void* data{};if(memory.value->AEGP_LockMemHandle(result,&data) || !data)return false;

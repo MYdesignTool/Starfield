@@ -1,5 +1,7 @@
 # 当前工程状态
 
+2026-10-10 M3-17 Model停滞修复进行中：owner确认native62/CEP64首加无反馈、面板重开后busy；只读实机报告AE23.5x52/p0-c1-l29/main，state=receiving、剩270秒、command5061和request function存在。三个Host脚本通道将任何error handle当失败；空诊断句柄fixture在旧代码复现首请求返回被丢弃。native63/packed32831/CEP65候选改为读取诊断内容、Model先只读Request后Claim、pre-ID三次有界读取、十五秒无进展只终止尚未写入阶段、applying不可被过期begin覆盖、busy包含阶段，轮询250ms。完整冻结SDK/配对部署待完成；实机根因仍待新版本验收。当前只修M3-17，不推进已暂停的Motion。
+
 核对日期：2026-10-10。当前安装 native62 / packed32830 / Core ABI8 / CEP64，完整冻结源码7fda058b2bd4717288d3e2fad43e94daa7bb13e0。21:43+08 fresh AE process0后发布Model root ID0修正；八native/Core及十八CEP安装hash/selector/runtime和配对rollback报告通过。owner已确认CEP63可加载，Model修正版实际AE gate仍开放。备份m3-17-native62-panel64-root-id-20261010可恢复native61/CEP63，较早回滚继续保留。所有Motion及MNT在途改动保留。owner要求本次修复部署后暂停目标，交接完成后执行paused。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。

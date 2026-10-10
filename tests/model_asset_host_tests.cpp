@@ -67,7 +67,7 @@ void initialize(){
         else CHECK(false);
         if(big_result)reply=std::string(2048,'x');
         if(!unterminated)reply.push_back(0);
-        *out=mem(reply);return 0;
+        *out=mem(reply);*error=mem(std::string(1,'\0'));return 0;
     };
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle h)->A_Err{auto* m=reinterpret_cast<Memory*>(h);CHECK(!m->locked);delete m;CHECK(handles>0);--handles;return 0;};
     memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle h,AEGP_MemSize* out)->A_Err{*out=static_cast<AEGP_MemSize>(reinterpret_cast<Memory*>(h)->text.size());return 0;};

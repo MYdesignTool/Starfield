@@ -1,5 +1,6 @@
 #include "ModelAssetHost.hpp"
 #include "UiExclusionHost.hpp"
+#include "ScriptDiagnostic.hpp"
 #include "ModelAssetMessage.hpp"
 #include "NodeRecord.hpp"
 #include "EffectGraphBackup.hpp"
@@ -48,7 +49,7 @@ bool script(const std::string& body,std::string& output) {
     struct Handles {const AEGP_MemorySuite1* suite;AEGP_MemHandle& result;AEGP_MemHandle& error;
         ~Handles(){if(error)suite->AEGP_FreeMemHandle(error);if(result)suite->AEGP_FreeMemHandle(result);}} handles{memory.value,result,error};
     const auto code=utility.value->AEGP_ExecuteScript(plugin,body.c_str(),FALSE,&result,&error);
-    if(code || error || !result)return false;
+    if(code || !script_diagnostic_empty(memory.value,error) || !result)return false;
     AEGP_MemSize size{};
     if(memory.value->AEGP_GetMemHandleSize(result,&size) || size==0 || size>2048)return false;
     void* data{};

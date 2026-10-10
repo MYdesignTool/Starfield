@@ -1007,6 +1007,24 @@ and verified commit callbacks are connected as the complete author pairing.
 
 ### Explicit Model graph transport
 
+2026-10-10 receipt correction (native63/CEP65 candidate): ExecuteScript's error
+output is a string handle, not a Boolean failure flag. Null, zero-size and
+allocated empty diagnostics permit a bounded valid result; nonempty/malformed
+diagnostics and SDK failures reject it. Result/error ownership and every lock
+remain callback-local. The same rule covers Model export and preset-file Host.
+The queued graph request is read-only until the Host has validated its ID and
+metadata; a separate fixed claim changes it to receiving. Lost pre-ID replies
+may be read again without replaying a project edit; post-ID failures receive a
+terminal result. Queued/uploading/receiving jobs with no progress for 15 seconds
+fail before project mutation. A fixed HostBegin marks executing before calling
+the executor, fencing backup writes that precede prepare; executing/applying is
+never abandoned or replaced merely because its deadline passed. Release only
+requests cancellation in either stage. Busy errors include the active phase.
+These volatile protocol changes require the full paired Host/CEP update. Saved
+parameter IDs, schema, match names and Core ABI8 remain unchanged. Empty-error
+fake suites reproduce the old Host stall; the owner's actual AE cause remains
+a hypothesis pending the phase report and new build's acceptance.
+
 The candidate uses a separate queued Host command for graph mutation. CEP stages
 one pinned graph request and numeric asset descriptors, then exact ordered32KiB
 hex pages in a volatile ExtendScript session. Upload and Host download perform no

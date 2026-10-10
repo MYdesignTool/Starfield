@@ -57,6 +57,8 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
 function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelGraphAssetPage(request("writeModelGraphAssetPage",{asset:0,page:0,hex:"ab".repeat(32)}))).ok,true);
     eq(JSON.parse(host.SFLD_queueModelGraphTransaction(request("queueModelGraphTransaction"))).ok,true);eq(commands,1);
     ok(host.SFLD_modelTransactionHostRequest().startsWith(id+"|0|202|303|1|"));
+    eq(host.__SFLD_modelGraphTransactionV1.state,"queued");eq(host.SFLD_modelTransactionHostClaim(id),"1");
+    eq(host.SFLD_modelTransactionHostBegin(id),"1");
     // Simulate the native complete backup: a disabled guard2 renderer and node
     // remain in the parade while the live renderer is held at guard1.
     const backupMain={...renderer,properties:copy(renderer.properties)},backupNode={...items[1],properties:copy(items[1].properties)};

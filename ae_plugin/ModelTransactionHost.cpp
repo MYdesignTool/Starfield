@@ -1,6 +1,7 @@
 #include "ModelTransactionHost.hpp"
 #include "ModelGraphTransaction.hpp"
 #include "UiExclusionHost.hpp"
+#include "ScriptDiagnostic.hpp"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -17,6 +18,7 @@ namespace {
 constexpr std::size_t page_bytes=32768,mesh_limit=8*1024*1024,total_limit=64*1024*1024;
 SPBasicSuite* basic{};AEGP_PluginID plugin{};std::thread::id ui_thread;
 bool stopped{},queued{},running{};
+unsigned request_failures{};
 struct Asset {ModelAssetRestore restore;std::vector<std::uint8_t> bytes;std::size_t length{};};
 struct Session {
     std::string id;A_long project{},comp{},layer{};AEGP_LayerH target{};
@@ -39,7 +41,8 @@ bool call(const char* name,const std::string& args,std::string& output,std::size
     AEGP_MemHandle result{},error{};
     struct Handles {const AEGP_MemorySuite1* suite;AEGP_MemHandle& result;AEGP_MemHandle& error;
         ~Handles(){if(error)suite->AEGP_FreeMemHandle(error);if(result)suite->AEGP_FreeMemHandle(result);}} handles{memory.value,result,error};
-    if(utility.value->AEGP_ExecuteScript(plugin,script.c_str(),FALSE,&result,&error) || error || !result)return false;
+    if(utility.value->AEGP_ExecuteScript(plugin,script.c_str(),FALSE,&result,&error) ||
+       !script_diagnostic_empty(memory.value,error) || !result)return false;
     AEGP_MemSize size{};if(memory.value->AEGP_GetMemHandleSize(result,&size) || !size || size>limit+1)return false;
     void* data{};if(memory.value->AEGP_LockMemHandle(result,&data) || !data)return false;
     struct Lock {const AEGP_MemorySuite1* suite;AEGP_MemHandle value;~Lock(){suite->AEGP_UnlockMemHandle(value);}} lock{memory.value,result};
@@ -154,13 +157,16 @@ void apply() {
     session.target=plan.layer;std::vector<ModelAssetRestore> assets;assets.reserve(session.assets.size());
     for(auto& asset:session.assets){asset.restore.mesh=asset.bytes;assets.push_back(asset.restore);}
     plan.desired_ids=session.desired;plan.assets=assets;plan.prepare=prepare;plan.commit=commit;plan.is_cancelled=cancelled;
+    // Fence the entire executor, including its backup writes before prepare.
+    // Polling/reloading must never discard a session while rollback is possible.
+    if(invoke("SFLD_modelTransactionHostBegin")){failed(PF_Err_BAD_CALLBACK_PARAM);return;}
     finish(apply_model_graph_transaction(plan));
 }
 }
 void initialize_model_transaction_host(SPBasicSuite* suites,AEGP_PluginID id) noexcept {
-    basic=suites;plugin=id;ui_thread=std::this_thread::get_id();stopped=queued=running=false;session=Session{};
+    basic=suites;plugin=id;ui_thread=std::this_thread::get_id();stopped=queued=running=false;request_failures=0;session=Session{};
 }
-void queue_model_graph_transaction() noexcept {if(!stopped && std::this_thread::get_id()==ui_thread)queued=true;}
+void queue_model_graph_transaction() noexcept {if(!stopped && std::this_thread::get_id()==ui_thread){if(!queued)request_failures=0;queued=true;}}
 void stop_model_transaction_host() noexcept {stopped=true;queued=false;if(!running)session=Session{};}
 bool step_model_transaction_host() noexcept {
     if(stopped || running || std::this_thread::get_id()!=ui_thread || (!queued && session.id.empty()))return false;
@@ -168,9 +174,17 @@ bool step_model_transaction_host() noexcept {
     try {
     running=true;struct Running {~Running(){running=false;}} scope;
     std::string text;
-    if(session.id.empty()){queued=false;
-        if(!call("SFLD_modelTransactionHostRequest","",text) || text=="0" || text.empty())return false;
-        if(!request(text)){failed(PF_Err_BAD_CALLBACK_PARAM);return queued;}}
+    if(session.id.empty()){
+        // Request is read-only. A failed SDK result must not consume a staged
+        // job whose identity we never received; its script deadline bounds retry.
+        if(!call("SFLD_modelTransactionHostRequest","",text))return queued=++request_failures<3;
+        queued=false;
+        if(text=="0" || text.empty())return false;
+        if(!request(text)){failed(PF_Err_BAD_CALLBACK_PARAM);return queued;}
+        // From here onward the ID is owned, so even a lost claim acknowledgement
+        // can receive a terminal failure without guessing another job's ID.
+        if(!call("SFLD_modelTransactionHostClaim",quoted_id(),text) || text!="1"){
+            failed(PF_Err_BAD_CALLBACK_PARAM);return queued;}}
     if(cancelled(nullptr) || !call("SFLD_modelTransactionHostContinue",quoted_id(),text) || text!="1"){
         failed(PF_Interrupt_CANCEL);return queued;}
     const auto started=std::chrono::steady_clock::now();

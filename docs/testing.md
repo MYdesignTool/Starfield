@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-10 M3-17 receiving停滞候选：空错误字符串句柄的旧Host失败日志`artifacts/m3-17-host-receipt-before-fix.log`保留。实际ModelTransactionHost/ModelAssetHost/PresetFileHost使用分配的空诊断句柄而非只有null的fake SDK；标准与ASAN覆盖默认零资产、pre-ID失回复重新只读、claim/begin失回复不执行写入、全部资源预算、锁/句柄平衡和UI排他。最终计数以`m3-17-host-receipt-{tests,asan,assets-tests,assets-asan,files-tests,files-asan}.log`为准，实际执行器仍fake，不能代替AE验收。
+
+`STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native63-panel65-host-receipt/cep_panel`下Model transport实际client/JSX/planner及DOM回归通过；覆盖只读Request/显式Claim/整个executor前Begin、queued/receiving十五秒失进展及重试、executing/applying跨过期不能覆盖且release只请求取消、丢失队列/最终回执仍不重放。asset588、author74、preset files583、三个完整JSX ES3 18、只读报告21通过。默认Model之前缺少实际Host零资产与分配空诊断夹具；现在补齐。DOM夹具遗漏Claim及错拼preset测试入口的初次诊断保留并已修正。`model_deployment_tests.ps1 -Run -UpgradeInstalledModel -InstalledModelBuild 62`真实部署/回滚工具的artifacts dummy配对61检查通过，目标62/64→63/65。完整冻结SDK与真实部署证据另记，不以这些fixture关闭宿主gate。
+
 Model修正版部署后再次复查：`powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/Check-RootIdInstalledPair.ps1`核对native62/CEP64当前26hash与selector/selected runtime；m3-17-native62-precommit-hashes.json保留。Prepare从发布后basePanel64重现十八安装CEP原始hash；m3-17-panel64-postdeploy-repro/candidate.json保存。sdk-terminal.json记录会话71399实际exit0，与exit.txt及八输出hash报告一致。历史Check-MotionInstalledPair.ps1固定61/63，不能用于62/64验收。
 
 2026-10-10 21:43+08 native62/CEP64已部署：7fda058b2bd4717288d3e2fad43e94daa7bb13e0 git archive冻结于artifacts/prepared/m3-17-native62-panel64-root-id/source，冻结源码重现精确CEP64，356事务/18ES3再检通过。IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 /MT八目标会话71399 terminal actual exit0，m3-17-root-id-sdk-build.log/exit.txt/build-hashes.json记录八新输出。Deploy-ModelTestBuild的61/63→62/64默认report、fresh AE count0和实际Install均exit0；八native/Core+十八CEP安装哈希、runtime selector和paired Restore report通过，before/after、部署/回滚log保留。一键恢复native61/CEP63的命令见current-state.md；未从编译或dummy通过关闭AE Model gate。

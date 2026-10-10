@@ -2,7 +2,7 @@
 
 旧任务卡和精确历史所有权见 [归档](history/2026-10-07/agent-backlog.md)；产品进度见 [路线图](roadmap.md)。
 
-2026-10-10 当前活动实现卡：M3-18 的独立计算层。M3-17已达到Model测试版部署里程碑，CEP63加载与Model实机gate仍开放；保留其作者/资源实现，不在本阶段同时改动。Circle参考单位/半径及Origin Type菜单仍待owner，不凭计算层推断公开控件。
+2026-10-10 当前活动修复卡：M3-17。owner报告native62/CEP64默认Model首加无反馈、重开busy；只读实机state=receiving。修正三个Host的空错误字符串句柄处理及Model只读Request/Claim、写入前无进展恢复与applying保留，准备native63/CEP65完整配对。此前整体目标按owner要求暂停，Motion及MNT在途保持。
 
 ## MNT-01 — 工作区整理（2026-10-07）
 
@@ -83,6 +83,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 完成条件：偏移影响发射运动和全部随机属性；概率0/100/中间值、动画按出生采样、父子发射、共享 cap/work/cancel、稳定身份与 shutter 匹配；focused tests、AE2023 构建、闭宿主发布、回滚、owner 可见行为和 undo/reopen gate。完整目标仍 active。
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
+
+2026-10-10 Model receiving停滞：owner只读实机报告确认p0-c1-l29/AE23.5x52/main、command5061、Host entry function、receiving且余270秒。空诊断句柄fixture复现丢弃SDK成功回复；原生三个通道读取字符串、Model只读Request/Claim及executor前Begin保护整个backup/rollback，十五秒无进展恢复仅限未写入阶段，忙碌显示state、poll250ms。native63/packed32831/CoreABI8/CEP65候选完整构建/部署继续；不改变持久ID/ABI/schema/Shape六项，不推进暂停的Motion。模拟回归不认定此实机问题已修复。
 
 2026-10-10 21:43+08修复发布：7fda058冻结完整May2023 /MT八目标实际exit0，fresh AE count0后部署native62/packed32830/CoreABI8/CEP64；26安装hash、selector/runtime、实际paired rollback report通过，备份m3-17-native62-panel64-root-id-20261010恢复61/63。owner已确认CEP63加载、p0-c1-l29身份，root0修正版真实AE添加/OBJ/资源预设/undo/reopen待验收。owner要求今日部署后暂停目标，完整目标不记complete；Motion今后按可操作阶段分批交付，不要求三个作者一起发布，数值层无作者入口不作为可验收模式。
 
