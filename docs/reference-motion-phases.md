@@ -15,3 +15,5 @@
 共用Motion Over Life采用项目已有Linear/Hold/Bezier/Draw曲线编辑与保存契约。实际执行须维持乱序帧、出生身份、Force/Transform/Auxiliary路径、快门采样及资源预算。实现和配对构建完成后，实际AE2023行为/撤销/保存重开单独验收。
 
 [官方指南的Motion Node段落](https://superluminal.tv/user-guide)说明圆周运动与沿光源路径运动/朝向；2026-10-09复查未找到三种模式完整菜单、Circle半径或Look At方程。Particle自身的Orient To段落不能当作Motion Look At的精确语义证据。
+
+2026-10-10补充：[官方Staff的Orbit Sphere答复](https://superluminal.tv/question/orbit-sphere)给出零发射速度粒子配合Circle绕球旋转的使用案例。它支持“在已有发射分布上增加旋转”的实现假设，但没有定义半径方程、默认轴、角度时钟或Speed单位；这几项仍不能视为实测一致。已向owner请求Speed0/100对照及Origin Type完整菜单；该请求仍待回复。

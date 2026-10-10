@@ -19,6 +19,12 @@ selection. The owner's screenshots establish control labels and defaults only.
 Circle calibration and its Origin Type menu have been requested; do not invent
 additional modes, menu choices or public unit claims.
 
+An [official Staff reply](https://superluminal.tv/question/orbit-sphere), checked
+2026-10-10, describes orbiting particles around a sphere with zero emitter speed
+and Circle. This supports preserving the emitted distribution while adding
+rotation; that is an inference, not a measurement of the exact radius rule,
+axis, angle clock or Speed units. The requested owner calibration remains open.
+
 ## Numeric geometry layer
 
 `MotionGeometry` accepts only owned numbers; AE objects, light inventory,
@@ -93,6 +99,18 @@ layer edits, host-global caches or idle hooks are added. This seam is compiled
 into the main candidate and included in its adapter fingerprint, but is not
 invoked by an advertised Motion node or sent across Core ABI yet. Selector/thread
 qualification and actual parented/animated AE2023 behavior remain open.
+
+Point capture source 4c9c50c is frozen and passes the full unpublished May2023
+eight-target SDK build. Standard and ASAN fake-callback tests each pass 2365
+checks. Native61/CEP63's 26 installed hashes and Core selector remain unchanged.
+
+Before actual Light/Null integration, establish AE invalidation dependencies and
+mix all sampled source identities/points/times into immutable pre-render state
+and the cache GUID. Current main declares camera use, not 3D light use; new light
+flags must be implemented and paired in PiPL/runtime before advertising them.
+Graph revision alone cannot certify that animated external points are constant.
+This is an integration requirement, not a reproduced cache defect in the unused
+capture seam. Binding/metadata/ABI changes need their append-only migration plan.
 
 Confirm reference resource/units/Origin Type/Starting With policies before
 publishing controls. Then define explicit append-only Motion identity, author

@@ -8,7 +8,9 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ### 图层点只读采样候选
 
-MotionPointCapture接入main工程与adapter fingerprint：按调用方指定的稳定layer ID、局部像素点及PF时间，转换comp时间并验证身份/所属comp；保留完整parent/shear/reflection矩阵，同源一次采样，映射到效果层及既有canonical/PAR/Z坐标。仅返回自有数字，不做名称筛选、anchor/模式策略或项目写入。May2023真实helper/fake SDK标准和ASAN各2365检查通过，日志artifacts/m3-18-motion-point-capture-{tests,asan}.log，覆盖逐SDK错误、suite空指针/函数缺失/释放错误、单位/矩阵/身份边界、取消、分配失败、256点上限和乱序时间。尚未接入Motion graph/作者/ABI，未部署；此源码完整冻结SDK构建待续。当前只处理M3-18，Model与MNT在途代码保持。
+MotionPointCapture接入main工程与adapter fingerprint：按调用方指定的稳定layer ID、局部像素点及PF时间，转换comp时间并验证身份/所属comp；保留完整parent/shear/reflection矩阵，同源一次采样，映射到效果层及既有canonical/PAR/Z坐标。仅返回自有数字，不做名称筛选、anchor/模式策略或项目写入。May2023真实helper/fake SDK标准和ASAN各2365检查通过，日志artifacts/m3-18-motion-point-capture-{tests,asan}.log，覆盖逐SDK错误、suite空指针/函数缺失/释放错误、单位/矩阵/身份边界、取消、分配失败、256点上限和乱序时间。尚未接入Motion graph/作者/ABI，未部署。源码4c9c50c781cb1b053320088c186e21193822e5ef已推送/git archive冻结，双NoPublish完整May2023 /MT八目标实际exit0，m3-18-motion-points-sdk-build.log/exit.txt/hash报告保留；26安装hash/selector/Core仍匹配61/63。当前只处理M3-18，Model与MNT在途代码保持。
+
+官方Staff的Orbit Sphere案例补充到reference-motion-phases.md，仅支持旋转既有分布的假设，不确定Speed单位/半径/默认轴。下一步定义Motion值/graph/采样历史与外部资源快照/cache/ABI迁移再接入求值；Light/Null依赖须有AE失效通知及完整数值GUID，不能用graph revision代替资源变化。当前main尚未声明light use，该flag不得在行为未接入前增加。Circle对照、Look At目标规则及实际AE gate仍待参考/验收，完整目标active。
 
 Model测试发布里程碑达到后，当前只处理M3-18计算层：MotionGeometry包含显式弧度圆周旋转、有界不可变B-spline距离/切线查询，以及保持零权重/重合目标原状态的最短弧朝向。路径用局部坐标减小大坐标舍入，Bernstein控制多边形限定弧长/参数插值误差；不会静默放宽预算。标准及ASAN各4759检查通过，含解析长度、重复点/转折、取消/全部分配及复制赋值失败、无分配乱序查询和四线程只读。日志artifacts/m3-18-motion-geometry-{tests,asan}.log；ADR0039定义边界。
 
