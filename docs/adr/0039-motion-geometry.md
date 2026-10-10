@@ -388,8 +388,12 @@ GPU prepared axes, Model Q*A*B, snapshot3..10 byte round trips/all10 truncations
 bad headers/numbers/Model preflight, Linear approximation versus actual subframe,
 Auxiliary birth inheritance, cancellation/allocation failures and concurrent
 requests. Adjacent Circle1842/Look At1377/Path8432, Transform594, Model graph559
-and Model particle2695 pass. Frozen complete SDK evidence must accompany this
-new shared-input stage; previous Light Path SDK evidence does not cover it.
+and Model particle2695 pass. Source8bd5a5c is pushed and git-archive frozen;
+the full unpublished May2023 x64 Release /MT eight-target build finishes with
+actual terminal exit0(session81513). New eight-output SHA256 and terminal receipts
+are under artifacts/m3-18-motion-frame-sdk-*; frozen Circle/Look At/Path regression
+also passes. The installed26-file61/63 pairing/selector/runtime hashes remain
+unchanged. This is new shared-input evidence, not the previous Light Path build.
 No Motion author, released ID/schema/ABI change or deployed pairing is claimed.
 
 ### Point resource capture seam

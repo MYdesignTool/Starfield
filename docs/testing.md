@@ -1,5 +1,7 @@
 # 测试入口
 
+有序frame源码8bd5a5ce10b274da9f7240ea7705e3e2303d262d已推送/git archive冻结于artifacts/prepared/m3-18-motion-frame-8bd5a5c/source；IncludeModelCandidate和双NoPublish完整May2023 x64 Release /MT八目标会话81513实际terminal exit0，artifacts/m3-18-motion-frame-sdk-build.log/exit.txt/build-hashes.json与sdk-terminal.json保存真实终态和八个新SHA256。冻结快照Circle1842/Look At1377/Path8432再检actual exit0；构建后motion-frame-installed-hashes.json确认26安装hash/selector/runtime保持native61/CEP63。没有Motion原生/CEP作者部署，不能由编译关闭参考、AE或GPU资格。
+
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionFrameTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各4141，实际exit0；artifacts/m3-18-motion-frame-{tests,asan}.log及各exit.txt。实际普通/历史/Auxiliary有序Motion/Transform与snapshot10：独立L*Q*A运算/剪切/镜像/退化、identity精确保留/失败原子性/无分配、前置/后置/串联/反序、动画Transform/三档lattice/partial/乱序/Path alignment、5001个独立帧、实际CPU像素/GPU准备轴/Model矩阵、3..9旧字节及所有表迁移10、每个10截断/header/非法数字/Model预检、Linear affine近似与实际Subframe、出生父状态继承、全取消/分配失败和并发。早期夹具错误PortId和GPU粒子数期望已修正；GPU准备不认定硬件资格，数值Null矩阵不認定AE回调。
 
 相关最小回归均actual exit0：MotionCircleGraph1842、MotionLookAtGraph1377、MotionPathGraph8432、RunCoreTests -TransformGraph594、RunModelGraphTests559、RunModelParticleTests2695，日志artifacts/m3-18-motion-frame-*-regression.log及exit.txt。新header加入adapter fingerprint，CMake/独立runner接入。共享输入变化须新提交冻结的完整May2023八目标，上一阶段SDK不覆盖本候选；安装native61/CEP63保持，没有Motion作者部署。
