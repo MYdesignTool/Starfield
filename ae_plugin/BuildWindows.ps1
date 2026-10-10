@@ -62,6 +62,7 @@ $adapterInputs = @(
     'include\starfield\core\ParticleBirth.hpp',
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
     'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
+    'ae_plugin\MotionPointCapture.cpp', 'ae_plugin\MotionPointCapture.hpp',
     'ae_plugin\MotionBlur.cpp', 'ae_plugin\MotionBlur.hpp', 'include\starfield\core\MotionBlur.hpp',
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
     'ae_plugin\EffectMain.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\GraphCarrier.hpp',

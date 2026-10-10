@@ -71,6 +71,29 @@ qualify the mathematical helpers, not reference Motion behavior or AE execution.
 
 ## Remaining integration
 
+### Point resource capture seam
+
+`MotionPointCapture` is read-only AE adapter infrastructure. A caller supplies
+up to 256 composition-local stable layer IDs and explicit local pixel points;
+it decides which layers/anchors and which PF time to request. The helper does
+not assume Light/Null target rules, Starting With filtering or path ordering.
+It converts the supplied effect time to composition time through PFInterface1,
+resolves IDs inside the owner's composition, verifies identity/parent comp,
+and samples LayerSuite9 layer-to-world matrices once per unique source. SDK row
+matrices are transposed for the existing affine inverse helper; source points
+are mapped into the owner's layer frame, then into the existing canonical
+coordinate system, including PAR and its Z origin.
+
+Only owned numeric points leave the callback; no SDK handle/cache persists.
+Malformed IDs/points, missing layers, nonaffine/singular or ill-conditioned owner matrices, invalid
+units and nonfinite/out-of-bound results reject. Capture, suite-release or
+cancellation failures preserve output. The bounded per-call numeric cache avoids
+repeating source matrix sampling for multiple points on one layer. No scripts,
+layer edits, host-global caches or idle hooks are added. This seam is compiled
+into the main candidate and included in its adapter fingerprint, but is not
+invoked by an advertised Motion node or sent across Core ABI yet. Selector/thread
+qualification and actual parented/animated AE2023 behavior remain open.
+
 Confirm reference resource/units/Origin Type/Starting With policies before
 publishing controls. Then define explicit append-only Motion identity, author
 values, curve/history/resource/graph and shutter contracts in this ADR; implement

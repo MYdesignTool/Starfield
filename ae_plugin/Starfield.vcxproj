@@ -44,6 +44,7 @@
     <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="CoreLoader.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="MotionPointCapture.cpp" />
     <ClCompile Include="MotionBlur.cpp" />
     <ClCompile Include="EffectMain.cpp" />
     <ClCompile Include="PresetsUI.cpp" />

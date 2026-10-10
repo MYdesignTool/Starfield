@@ -6,6 +6,10 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## M3-18 独立计算阶段（2026-10-10）
 
+### 图层点只读采样候选
+
+MotionPointCapture接入main工程与adapter fingerprint：按调用方指定的稳定layer ID、局部像素点及PF时间，转换comp时间并验证身份/所属comp；保留完整parent/shear/reflection矩阵，同源一次采样，映射到效果层及既有canonical/PAR/Z坐标。仅返回自有数字，不做名称筛选、anchor/模式策略或项目写入。May2023真实helper/fake SDK标准和ASAN各2365检查通过，日志artifacts/m3-18-motion-point-capture-{tests,asan}.log，覆盖逐SDK错误、suite空指针/函数缺失/释放错误、单位/矩阵/身份边界、取消、分配失败、256点上限和乱序时间。尚未接入Motion graph/作者/ABI，未部署；此源码完整冻结SDK构建待续。当前只处理M3-18，Model与MNT在途代码保持。
+
 Model测试发布里程碑达到后，当前只处理M3-18计算层：MotionGeometry包含显式弧度圆周旋转、有界不可变B-spline距离/切线查询，以及保持零权重/重合目标原状态的最短弧朝向。路径用局部坐标减小大坐标舍入，Bernstein控制多边形限定弧长/参数插值误差；不会静默放宽预算。标准及ASAN各4759检查通过，含解析长度、重复点/转折、取消/全部分配及复制赋值失败、无分配乱序查询和四线程只读。日志artifacts/m3-18-motion-geometry-{tests,asan}.log；ADR0039定义边界。
 
 源码3d6d71898011732be648924b013cad427865ec8c已推送，git archive冻结于artifacts/prepared/m3-18-motion-geometry-3d6d718/source；显式IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 x64 Release /MT八目标实际exit0。日志artifacts/m3-18-motion-geometry-sdk-build.log、退出码及八输出build-hashes.json保留。构建后26安装哈希、Core selector及所选runtime再次匹配native61/CEP63，m3-18-motion-geometry-installed-hashes.json；未部署此无入口计算里程碑，不能由SDK通过认定Motion/AE行为通过。
