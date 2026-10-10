@@ -5,6 +5,7 @@
 #include "EffectReveal.hpp"
 #include "ModelAssetHost.hpp"
 #include "ModelTransactionHost.hpp"
+#include "PresetFileHost.hpp"
 #include "UiExclusionHost.hpp"
 #include <algorithm>
 #include <chrono>
@@ -23,6 +24,7 @@ bool running{},stopped{};
 AEGP_Command reveal_command{};
 AEGP_Command model_asset_command{};
 AEGP_Command model_transaction_command{};
+AEGP_Command preset_file_command{};
 constexpr char reveal_name[]="Starfield Reveal Selected Effect";
 template<class T> struct Suite {
     const char* name;A_long version;const T* value{};
@@ -102,6 +104,7 @@ A_Err reveal_menu(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexc
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
     if(commands && model_asset_command)(void)commands->AEGP_EnableCommand(model_asset_command);
     if(commands && model_transaction_command)(void)commands->AEGP_EnableCommand(model_transaction_command);
+    if(commands && preset_file_command)(void)commands->AEGP_EnableCommand(preset_file_command);
     return commands && reveal_command?commands->AEGP_EnableCommand(reveal_command):A_Err_NONE;
 }
 A_Err model_asset_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
@@ -116,6 +119,7 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(stopped || running || std::this_thread::get_id()!=main_thread ||
        !starfield::adapter::ui_exclusion_available())return A_Err_NONE;
     running=true;struct RunningScope{~RunningScope(){running=false;}} scope;
+    if(starfield::adapter::step_preset_file_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_model_asset_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_model_transaction_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     starfield::adapter::HostUiExclusion idle_scope;if(!idle_scope)return A_Err_NONE;
@@ -173,7 +177,14 @@ A_Err model_transaction_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command 
 }
 A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {
     stopped=true;starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();
+    starfield::adapter::stop_preset_file_host();
     starfield::adapter::stop_ui_exclusion();return A_Err_NONE;
+}
+A_Err preset_file_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
+    AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
+    if(command!=preset_file_command)return A_Err_NONE;
+    if(handled)*handled=TRUE;
+    starfield::adapter::queue_preset_file_dialog();return A_Err_NONE;
 }
 }
 extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A_long,A_long,
@@ -182,6 +193,7 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
     starfield::adapter::initialize_ui_exclusion();
     starfield::adapter::initialize_model_asset_host(suites,id);
     starfield::adapter::initialize_model_transaction_host(suites,id);
+    starfield::adapter::initialize_preset_file_host(suites,id);
     if(refcon)*refcon=nullptr;
     Suite<AEGP_RegisterSuite5> registrations(kAEGPRegisterSuite,kAEGPRegisterSuiteVersion5);
     if(!registrations)return A_Err_GENERIC;
@@ -206,7 +218,11 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
        !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_transaction_command,model_transaction_queue,nullptr) &&
        !commands->AEGP_InsertMenuCommand(model_transaction_command,starfield::adapter::model_transaction_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
         (void)commands->AEGP_EnableCommand(model_transaction_command);
-    if(!error && commands && (reveal_command || model_asset_command || model_transaction_command))
+    if(!error && commands && !commands->AEGP_GetUniqueCommand(&preset_file_command) &&
+       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,preset_file_command,preset_file_queue,nullptr) &&
+       !commands->AEGP_InsertMenuCommand(preset_file_command,starfield::adapter::preset_file_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
+        (void)commands->AEGP_EnableCommand(preset_file_command);
+    if(!error && commands && (reveal_command || model_asset_command || model_transaction_command || preset_file_command))
         (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;
 }

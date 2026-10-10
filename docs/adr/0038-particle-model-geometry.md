@@ -974,16 +974,16 @@ preventive handling of the owner's unreplicated static hypothesis. Complete SDK
 pairing, actual AE2023 native/script/file-modal timing, pending preset operations,
 undo and reopen still require the full author candidate's deployment acceptance.
 
-### Proposed queued native preset file chooser
+### Queued native preset file chooser candidate
 
 Read-only inspection confirms the isolated preset file helper currently opens
 File.openDialog/saveDialog/confirm from a CEP evalScript root. Those calls are
 outside the native exclusion ranges above. The owner's script/modal concern is
 still an unreplicated hypothesis; this path remains a full Model deployment gate.
 
-Proposed implementation: an explicit session-resident Host command queues one
+Candidate implementation: an explicit session-resident Host command queues one
 file operation. Idle owns UI exclusion, reads bounded numeric/ASCII job metadata,
-releases SDK references, and opens the Win32 chooser directly. When it closes,
+claims the same plain ID, releases SDK references, and opens the Win32 chooser directly. When it closes,
 the Host reacquires and validates the same plain transfer ID/state before calling
 a fixed script entry point with a bounded UTF16-hex selected path. Native cancel
 and dialog/SDK failure become terminal session results. No SDK object is retained
@@ -995,6 +995,19 @@ the chooser under the same exclusion range. Import/save does not write the AE
 project; applying the imported graph continues through the existing pinned graph
 transaction. Released, expired or changed jobs must perform no file write, and a
 published file result must survive a lost reply without repeating publication.
-Cancel/expiry/failure cleanup and pending-job/modal fixtures are required before
-the full pair's actual AE2023 qualification. This is a proposal, not implemented
-or advertised functionality, and adds no persistent parameter ID/schema/Core ABI.
+The short metadata request is read-only; a separate claim makes lost SDK result
+handling safe once identity is known. Before identity is known an SDK failure
+does not blindly fail another job: the client deadline/release bounds that case.
+The retained terminal result is read without replaying queue or publication,
+including an ambiguous initial acknowledgement. The modal poll does not extend
+the five-minute chooser deadline. File pages/results remain explicit operations,
+never normal panel polling. Native overwrite prompts cover the appended suffix.
+
+Standard/ASAN actual Host fixtures each pass 1596 checks, with fake AE suites and
+chooser plus a real same-thread Windows message-only pump. Actual chooser code
+with replaced Windows dialog/file APIs passes 242 each. Isolated codec/client/
+gateway/UI file regression passes 583, including release/expiry/changed identity,
+late queue acknowledgement and retained terminal receipts. These fixtures do not
+qualify actual AE2023 modal timing or filesystem semantics. Full paired frozen
+SDK build and AE qualification remain required. This is unpublished candidate
+functionality and adds no persistent parameter ID/schema/Core ABI.

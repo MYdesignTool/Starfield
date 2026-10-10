@@ -32,11 +32,13 @@
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <ResourceCompile><PreprocessorDefinitions>MSWindows;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
-    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><TargetMachine>MachineX64</TargetMachine></Link>
+    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><TargetMachine>MachineX64</TargetMachine><AdditionalDependencies>Comdlg32.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="StarfieldHost.cpp" />
     <ClCompile Include="UiExclusionHost.cpp" />
+    <ClCompile Include="PresetFileHost.cpp" />
+    <ClCompile Include="PresetFileChooser.cpp" />
     <ClCompile Include="ModelAssetHost.cpp" />
     <ClCompile Include="EffectGraphBackup.cpp" />
     <ClCompile Include="ModelGraphTransaction.cpp" />

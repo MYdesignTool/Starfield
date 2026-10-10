@@ -1090,7 +1090,7 @@ index 68bbcc5..9bc4b4c 100644
      return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
  }));
 diff --git a/cep_panel/js/preset_manager.js b/cep_panel/js/preset_manager.js
-index ebc4b13..6fb22db 100644
+index ebc4b13..d30029a 100644
 --- a/cep_panel/js/preset_manager.js
 +++ b/cep_panel/js/preset_manager.js
 @@ -4,9 +4,9 @@
@@ -1105,13 +1105,15 @@ index ebc4b13..6fb22db 100644
      function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
      function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
      function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
-@@ -18,16 +18,22 @@
+@@ -17,17 +17,23 @@
+             var request={protocol:"org.starfieldfx.panel",version:1,operation:operation,requestId:"presets-"+(++serial),changes:[],target:targetToken?{token:targetToken}:{},pinTarget:!!targetToken};
              Object.keys(fields||{}).forEach(function(key){request[key]=fields[key];});
              request.gatewayBuild=gatewayBuild;
-             // Native file dialogs are user controlled; render/graph calls time out.
+-            // Native file dialogs are user controlled; render/graph calls time out.
 -            var settled=false,timer=operation.indexOf("PresetFile")>=0?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
++            // File operations now return quickly; the client polls the queued native modal.
 +            var fileOperation=operation.indexOf("PresetFile")>=0,modelOperation=operation.indexOf("ModelGraph")>=0;
-+            var settled=false,timer=operation==="beginPresetFileRead" || operation==="finishPresetFileWrite"?null:setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
++            var settled=false,timer=setTimeout(function(){if(!settled){settled=true;callback({ok:false,error:{code:"host_timeout",message:"After Effects has not answered. Refresh before retrying."}});}},15000);
              // Reads check readiness in this host turn; writes always reload and
              // invoke atomically, preserving the cross-page generation guard.
 -            var readOnly=operation==="getState" || operation==="getGraphSnapshot";

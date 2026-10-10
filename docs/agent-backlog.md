@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10预设文件模态候选接入resident Host排队/claim/原生chooser/关闭后ID-stage-expiry重验和UTF16 hex路径。CEP仅短evalScript、显式有界poll，terminal receipt retained，cancel/expiry不写文件、丢失回复不重放。Host标准/ASAN各1596、chooser各242、实际隔离文件583及Shape/Model/Texture/Cloud/Birth回归通过；Prepare重现native-preset-modal-panel62-v2。完整冻结SDK构建继续，未部署或增加AE资格；初次测试PID30420停止授权等待owner，其他实现继续。Use Model(s)独立参考/全Model配对/实际AE gate开放，完整目标active。
+
 2026-10-10 e5bf287 Shape入口已推送/冻结，完整May2023 /MT八目标双NoPublish实际exit0，11:21十八安装文件/selector/Core匹配60/61，证据m3-17-model-shape-{build,installed}-hashes.json及build-exit.txt。下一实现项为CEP预设文件窗口的resident Host排队/原生chooser/关闭后plain ID重验与UTF16路径传递（ADR0038 proposed）；保持原文件发布/rollback语义，补cancel/expiry/SDK时序fixture再冻结构建。Use Model(s)完整菜单单独请求owner。未部署，完整目标active。
 
 2026-10-10 Shape入口实现候选：原生disk213六项/Model6-Core4映射与数值回放接通；ECP/隔离CEP Face禁用，native5拒绝，旧四值保持。实际注册/事件标准及ASAN112、实际图编译/Model标准及ASAN9245（另控件452）、CEP选择/gateway/默认cube Add/Replace92及共享作者/资源/Texture/Cloud/Birth回归通过。Prepare重现m3-17-model-shapes-panel62-v3，不改live CEP；完整SDK冻结继续。Face、Use Model(s)参考、真实ECP drag/动画/撤销重开及全Model配对仍开放，完整目标active。

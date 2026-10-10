@@ -44,7 +44,7 @@ ok(Buffer.byteLength(large)>256*1024);eq(presets.decode(large).modelAssets,[larg
 let disk={},now=1000,operations=[],openDialog="D:/user/import.sfldpreset",saveDialog="D:/user/输出.sfldpreset",confirmed=true,fault={};
 function File(name){this.fsName=name;this.error="";this.opened=false;}
 Object.defineProperties(File.prototype,{name:{get(){return this.fsName.slice(this.fsName.lastIndexOf("/")+1);}},exists:{get(){return this.fsName in disk;}},length:{get(){return Buffer.byteLength(disk[this.fsName] || "");}}});
-File.openDialog=()=>openDialog?new File(openDialog):null;File.saveDialog=()=>saveDialog?new File(saveDialog):null;
+File.openDialog=File.saveDialog=()=>{throw new Error("Script modal chooser must not run.");};
 File.prototype.open=function(mode){operations.push(["open",this.fsName,mode]);if(fault.open){this.error="open failed";return false;}this.opened=true;this.mode=mode;if(mode==="w")disk[this.fsName]="";return true;};
 File.prototype.read=function(){if(fault.read){this.error="read failed";return "";}return disk[this.fsName];};
 File.prototype.write=function(text){disk[this.fsName]=fault.silentWrite?"corrupt":text;if(fault.write){disk[this.fsName]="partial";this.error="write failed";return false;}return true;};
@@ -54,11 +54,22 @@ File.prototype.rename=function(name){operations.push(["rename",this.fsName,name]
     const dest=this.fsName.slice(0,this.fsName.lastIndexOf("/")+1)+name;if(dest in disk)return false;disk[dest]=disk[this.fsName];delete disk[this.fsName];this.fsName=dest;return true;};
 File.prototype.remove=function(){operations.push(["remove",this.fsName]);if(fault.removeBackupThrows && this.fsName.endsWith(".bak"))throw new Error("cleanup failed");
     if(fault.removeBackup && this.fsName.endsWith(".bak") || fault.removeTemporary && this.fsName.endsWith(".tmp"))return false;delete disk[this.fsName];return true;};
-const host={},context=vm.createContext({$:{global:host},File,confirm:()=>confirmed,Date:function(){this.getTime=()=>now;}});
+let queuedCommands=0;
+const app={findMenuCommandId:name=>name==="Starfield Choose Preset File"?77:0,executeCommand:id=>{eq(id,77);queuedCommands++;}};
+const host={},context=vm.createContext({$:{global:host},File,app,confirm:()=>{throw new Error("Script confirm must not run.");},Date:function(){this.getTime=()=>now;}});
 function reload(){vm.runInContext(load("jsx/starfield_gateway.jsx"),context);vm.runInContext(load("jsx/preset_file_transport.jsx"),context);}
 reload();
-function call(op,extra){return JSON.parse(host["SFLD_"+op](JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",operation:op,transferId,...extra})));}
-function reset(){disk={};now=1000;operations=[];fault={};openDialog="D:/user/import.sfldpreset";saveDialog="D:/user/输出.sfldpreset";confirmed=true;host.__SFLD_presetFileSessionV1=null;}
+function rawCall(op,extra,target=host){return JSON.parse(target["SFLD_"+op](JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-61",operation:op,transferId,...extra})));}
+function hexPath(path){return Array.from({length:path.length},(_,i)=>path.charCodeAt(i).toString(16).padStart(4,"0")).join("");}
+function nativeModal(target=host){const descriptor=target.SFLD_presetFileHostRequest();if(descriptor==="0")return;
+    const id=descriptor.slice(0,32);ok(/^[a-f0-9]{32}$/.test(id));const save=descriptor.endsWith("|2");let path=save?saveDialog:openDialog;
+    eq(target.SFLD_presetFileHostBegin(id),"1");
+    if(save && path && !/\.sfldpreset$/i.test(path))path+=".sfldpreset";
+    const cancelled=!path || save && path in disk && !confirmed;
+    eq(target.SFLD_presetFileHostValidate(id),"1");eq(target.SFLD_presetFileHostComplete(id,cancelled?"":hexPath(path),cancelled?1:0),"1");}
+function call(op,extra){let response=rawCall(op,extra);if(response.state==="queued" && (op==="beginPresetFileRead" || op==="finishPresetFileWrite")){
+    nativeModal();response=rawCall("readPresetFileModal");if(op==="finishPresetFileWrite")rawCall("releasePresetFile");}return response;}
+function reset(){disk={};now=1000;operations=[];fault={};queuedCommands=0;openDialog="D:/user/import.sfldpreset";saveDialog="D:/user/输出.sfldpreset";confirmed=true;host.__SFLD_presetFileSessionV1=null;}
 const temporary=()=>saveDialog+".starfield-"+transferId+".tmp",backup=()=>saveDialog+".starfield-"+transferId+".bak";
 function upload(text){eq(call("beginPresetFileWrite",{characters:text.length}).ok,true);
     for(let page=0,start=0;start<text.length;page++){let end=Math.min(text.length,start+32768);if(end<text.length && text.charCodeAt(end-1)>=0xd800 && text.charCodeAt(end-1)<=0xdbff)end--;
@@ -88,8 +99,8 @@ eq(pages.join(""),large);eq(call("readPresetFilePage",{page:pages.length}).ok,fa
 // Real client -> gateway with one small request per page and yields between calls.
 reset();disk[openDialog]=large;let tasks=[],completed=[];
 const client=files.create({idFactory:()=>transferId,now:()=>now,schedule:fn=>tasks.push(fn),call(op,fields,callback){
-    ok(JSON.stringify(fields).length<262144);callback(call(op,fields));}});
-function drain(){while(tasks.length)tasks.shift()();}
+    ok(JSON.stringify(fields).length<262144);if(op==="readPresetFileModal")nativeModal();callback(rawCall(op,fields));}});
+function drain(){let steps=0;while(tasks.length){if(++steps>1000)throw new Error("Fixture queue did not settle: "+JSON.stringify(host.__SFLD_presetFileSessionV1, (k,v)=>k==="text"?"<payload>":v));tasks.shift()();}}
 client.load(r=>completed.push(r));drain();eq(completed.length,1);eq(completed[0].text,large);eq(host.__SFLD_presetFileSessionV1,null);
 completed=[];client.save(large,r=>completed.push(r));drain();eq(completed.length,1);eq(completed[0].ok,true);eq(disk[saveDialog],large);
 completed=[];const cancelled=client.save(large,r=>completed.push(r));ok(tasks.length>0);cancelled.cancel();drain();eq(completed.length,1);eq(completed[0].error.code,"cancelled");eq(host.__SFLD_presetFileSessionV1,null);
@@ -100,6 +111,38 @@ completed=[];client.save(unicode,r=>completed.push(r));drain();eq(completed[0].o
 disk[openDialog]=unicode;completed=[];client.load(r=>completed.push(r));drain();eq(completed[0].text,unicode);
 eq(operations.filter(o=>o[0]==="open" && o[2]==="w" && !o[1].endsWith(".tmp")).length,0);
 
+// Native modal protocol has no script-owned window or IO before completion.
+reset();disk[openDialog]=encoded;response=rawCall("beginPresetFileRead");eq(response.state,"queued");eq(queuedCommands,1);eq(operations.length,0);
+eq(rawCall("beginPresetFileRead").ok,false);eq(host.__SFLD_presetFileSessionV1.stage,"queued");eq(rawCall("readPresetFilePage",{page:0}).ok,false);
+eq(host.SFLD_presetFileHostRequest(),transferId+"|1");eq(host.SFLD_presetFileHostRequest(),transferId+"|1");eq(host.SFLD_presetFileHostBegin(transferId),"1");
+eq(host.SFLD_presetFileHostBegin(transferId),"0");eq(rawCall("readPresetFileModal").state,"choosing");eq(operations.length,0);
+eq(host.SFLD_presetFileHostComplete(transferId,hexPath(openDialog),0),"1");response=rawCall("readPresetFileModal");eq(response.characters,encoded.length);
+const completedOps=operations.length;eq(host.SFLD_presetFileHostComplete(transferId,hexPath(openDialog),0),"0");eq(rawCall("readPresetFileModal"),response);eq(operations.length,completedOps);
+rawCall("releasePresetFile");eq(host.SFLD_presetFileHostValidate(transferId),"0");
+for(const abort of ["release","expire","replace"]){reset();eq(rawCall("beginPresetFileWrite",{characters:encoded.length}).ok,true);
+    rawCall("writePresetFilePage",{page:0,text:encoded});eq(rawCall("finishPresetFileWrite").state,"queued");eq(host.SFLD_presetFileHostBegin(transferId),"1");
+    if(abort==="release")rawCall("releasePresetFile");else if(abort==="expire")now+=300001;else host.__SFLD_presetFileSessionV1.id="1".repeat(32);
+    eq(host.SFLD_presetFileHostValidate(transferId),"0");eq(host.SFLD_presetFileHostComplete(transferId,hexPath(saveDialog),0),"0");eq(operations.length,0);eq(disk[saveDialog],undefined);}
+for(const path of ["relative", "D:/nul\0.sfldpreset", "D:/bad\ud800.sfldpreset", "D:/bad\udc00.sfldpreset", "D:/other.json"]){reset();
+    rawCall("beginPresetFileWrite",{characters:encoded.length});rawCall("writePresetFilePage",{page:0,text:encoded});rawCall("finishPresetFileWrite");host.SFLD_presetFileHostBegin(transferId);
+    eq(host.SFLD_presetFileHostComplete(transferId,hexPath(path),0),"1");eq(rawCall("readPresetFileModal").ok,false);eq(operations.length,0);}
+reset();rawCall("beginPresetFileRead");host.SFLD_presetFileHostBegin(transferId);eq(host.SFLD_presetFileHostComplete(transferId,"",2),"1");eq(rawCall("readPresetFileModal").error.code,"preset_file_error");eq(operations.length,0);
+// An ambiguous queue acknowledgement is recovered by reading, never replayed.
+for(const mode of ["save","load"]){reset();disk[openDialog]=encoded;tasks=[];completed=[];let queues=0;
+    const uncertain=files.create({idFactory:()=>transferId,now:()=>now,schedule:fn=>tasks.push(fn),call(op,fields,callback){
+        const result=rawCall(op,fields);if(op==="beginPresetFileRead" || op==="finishPresetFileWrite"){queues++;callback({ok:false,error:{code:"host_timeout",message:"lost ack"}});return;}
+        if(op==="readPresetFileModal"){nativeModal();callback(rawCall(op,fields));return;}callback(result);}});
+    if(mode==="save")uncertain.save(encoded,r=>completed.push(r));else uncertain.load(r=>completed.push(r));drain();eq(queues,1);eq(completed.length,1);eq(completed[0].ok,true);
+    eq(operations.filter(o=>o[0]==="open" && o[2]==="w").length,mode==="save"?1:0);}
+reset();tasks=[];completed=[];const delays=[];
+const pending=files.create({idFactory:()=>transferId,now:()=>now,schedule:(fn,delay)=>{tasks.push(fn);delays.push(delay);},call(op,fields,callback){callback(rawCall(op,fields));}});
+pending.load(r=>completed.push(r));eq(queuedCommands,1);eq(tasks.length,1);eq(delays[0],50);now+=300001;drain();eq(completed[0].error.code,"preset_file_timeout");eq(operations.length,0);eq(host.__SFLD_presetFileSessionV1,null);
+// Cancel/release wins over a late queue acknowledgement, with one user result.
+reset();completed=[];let deferred=null,releases=0;
+const late=files.create({idFactory:()=>transferId,call(op,fields,callback){if(op==="beginPresetFileRead"){deferred=()=>callback(rawCall(op,fields));return;}
+    if(op==="releasePresetFile")releases++;callback(rawCall(op,fields));}});
+const abandoned=late.load(r=>completed.push(r));abandoned.cancel();eq(completed.length,1);deferred();eq(releases,2);eq(host.__SFLD_presetFileSessionV1,null);eq(operations.length,0);
+
 // Execute the actual Save Current/Import event handlers and generated evalScript.
 const snapshots=require(path.join(root,"js/native_graph_snapshot.js")),transactions=require(path.join(root,"js/graph_transactions.js")),
     assets=require(path.join(root,"js/model_assets.js")),fixture=require("./native_snapshot_fixture.js");
@@ -109,7 +152,7 @@ class Element{constructor(){this.children=[];this.listeners={};this.value="";thi
     getContext(){return new Proxy({},{get:()=>()=>{}});}}
 function ui(capturedGraph,meshFailure=false){
     reset();tasks=[];const elements={},calls=[],timers=new Map();let timer=0,loads=0;
-    const browserHost={File,Date,$:{global:null}};browserHost.$.global=browserHost;
+    const browserHost={File,Date,app,$:{global:null}};browserHost.$.global=browserHost;
     const hostContext=vm.createContext(browserHost);
     browserHost.$.evalFile=function(file){loads++;vm.runInContext(load(file.fsName.split("cep_panel/")[1]),hostContext);};
     vm.runInContext(load("jsx/starfield_gateway.jsx"),hostContext);
@@ -127,7 +170,7 @@ function ui(capturedGraph,meshFailure=false){
     browserHost.SFLD_releaseModelAsset=()=>{calls.push("releaseModelAsset");return reply({ok:true});};
     const window={prompt:()=>"UI mesh",StarfieldPresets:presets,StarfieldGraphCodec:codec,StarfieldGraphTransactions:transactions,StarfieldNativeGraphSnapshot:snapshots,
         StarfieldModelAssets:assets,StarfieldPresetFiles:{create:options=>files.create({...options,schedule:fn=>tasks.push(fn)})},close(){},
-        __adobe_cep__:{getSystemPath:()=>"C:/test/cep_panel",evalScript(script,callback){callback(vm.runInContext(script,hostContext));}}};
+        __adobe_cep__:{getSystemPath:()=>"C:/test/cep_panel",evalScript(script,callback){if(script.includes("return SFLD_readPresetFileModal("))nativeModal(browserHost);callback(vm.runInContext(script,hostContext));}}};
     const uiContext=vm.createContext({window,document:{getElementById:id=>elements[id] || (elements[id]=new Element()),createElement:()=>new Element()},
         prompt:()=>"UI mesh",setTimeout(fn,delay){timers.set(++timer,{fn,delay});return timer;},clearTimeout:id=>timers.delete(id),console,Date,JSON,Math});
     vm.runInContext(load("js/preset_manager.js"),uiContext);

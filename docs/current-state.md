@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### 原生预设文件窗口候选（2026-10-10）
+
+M3-17新增resident Host文件命令：只排队，idle读取/claim plain transfer ID后释放全部SDK引用，再打开原生Win32文件窗口；关闭后重新验证ID/stage/expiry，固定脚本入口只接收有界UTF16 hex路径。CEP helper移除File.openDialog/saveDialog/confirm，保留UTF8临时写入/验证/备份/rename与失败恢复，terminal receipt保留至release；丢失队列回复只读回、不重放。五分钟modal deadline不随poll延长；取消/过期/替换请求不写文件。取得ID前SDK失败由客户端期限/release处理，不猜测其他请求身份。
+
+实际Host fake SDK/chooser及同线程Windows消息循环标准/ASAN各1596，实际chooser替换Win32 API各242；隔离实际codec/client/gateway/UI文件583、Shape92、作者74/transport271/DOM35/export588/Texture80/Cloud49/Birth51通过。Prepare重现于artifacts/prepared/m3-17-native-preset-modal-panel62-v2，tracked候选patch/helpers保留，live CEP未写入；日志m3-17-native-preset-*.log。夹具签名/名称/编码假设及无界等待已修正，诊断保留。初次内存测试PID30420进入等待，按AGENTS已单独请求owner授权停止；未擅自结束进程。完整冻结SDK构建继续；实际AE2023时序/文件系统、全Model配对和Use Model(s)参考仍开放，安装60/61保持。
+
 ### Shape 候选冻结构建与下一步（2026-10-10）
 
 源码e5bf28759dc4744d67e66cc7f2f1e2a4cd69d4a5已推送，git archive冻结于artifacts/prepared/m3-17-model-shape-e5bf287/source。IncludeModelCandidate/NoDistPublish/NoRuntimePublish的May2023 x64 Release /MT八目标以实际exit0完成，日志artifacts/m3-17-model-shape-build.log及退出码m3-17-model-shape-build-exit.txt，八产物m3-17-model-shape-build-hashes.json。11:21 +08:00十八安装文件、selector及所选Core仍匹配native60/CEP61，m3-17-model-shape-installed-hashes.json；候选未部署。
