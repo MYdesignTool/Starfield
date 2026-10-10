@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-61";
+    var GATEWAY_BUILD = "native-presets-62";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -165,12 +165,15 @@
             if (Object.prototype.hasOwnProperty.call(extra,key)) envelope[key]=extra[key];
         }
         envelope.gatewayBuild=GATEWAY_BUILD;
+        var modelOperation=operation.indexOf("ModelGraph")>=0;
         var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot" ||
-            operation==="getPanelState" || operation==="getPanelPulse";
+            operation==="getPanelState" || operation==="getPanelPulse" || modelOperation || operation.indexOf("ModelAsset")>=0;
         var script="(function(){try{"+
             "if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+
+            (modelOperation?" || typeof __SFLD_modelTransactionAPI==='undefined'":"")+
             "){$.evalFile(new File("+quote(root+"/jsx/starfield_gateway.jsx")+"));}"+
             "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+")throw new Error('Gateway generation mismatch.');"+
+            (modelOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+quote(root+"/jsx/model_transaction_transport.jsx")+"));}":"")+
             "return SFLD_"+operation+"("+quote(JSON.stringify(envelope))+");"+
             "}catch(error){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+quote(GATEWAY_BUILD)+
             ",ok:false,error:{code:'gateway_load_failed',message:error.toString()}});}}())";
@@ -230,11 +233,11 @@
     }
 
     var NODE_TYPES = {
-        emitter: true, particle: true, force: true, transform: true, output: true
+        emitter: true, particle: true, force: true, transform: true, model: true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
-        force: { x: 235, y: 178 }, transform: {x:235,y:220}, output: { x: 235, y: 256 }
+        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, output: { x: 235, y: 256 }
     };
 
     function positionFor(node, index) {
@@ -360,7 +363,7 @@
         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd",
+        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd", model:"#8fc4a5",
                        output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
             if (!isSupportedNode(state.nodes[i])) continue;
@@ -530,22 +533,24 @@
         if (!position) return null;
         var display = displayPosition(position);
         if (side === "bottom") return { x: display.x + NODE_WIDTH / 2, y: display.y + NODE_HEIGHT };
+        if (side === "model") return {x:display.x,y:display.y+NODE_HEIGHT/2};
         return { x: display.x + NODE_WIDTH / 2, y: display.y };
     }
 
     function edgePath(edge, sides) {
         var startSide = sides[edge[0]] ? sides[edge[0]].output : "bottom";
-        var endSide = sides[edge[1]] ? sides[edge[1]].input : "top";
+        var endSide = edge.inputPort === "3" ? "model" : sides[edge[1]] ? sides[edge[1]].input : "top";
         var start = portPoint(edge[0], startSide);
         var end = portPoint(edge[1], endSide);
         if (!start || !end) return null;
         var distance = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
         return "M" + start.x + " " + start.y + " C" + start.x + " " + (start.y + distance) + " " +
-               end.x + " " + (end.y - distance) + " " + end.x + " " + end.y;
+               (endSide==="model"?end.x-distance:end.x) + " " + (endSide==="model"?end.y:end.y-distance) + " " + end.x + " " + end.y;
     }
 
     function placePort(port, side) {
         if (!port) return;
+        if(side==="model") {port.style.left="-6px";port.style.top="calc(50% - 5px)";return;}
         port.style.left = "calc(50% - 5px)";
         port.style.top = side === "top" ? "-6px" : side === "bottom" ? (NODE_HEIGHT - 4) + "px" : "calc(50% - 5px)";
     }
@@ -582,6 +587,7 @@
                    " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
         }
         if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
+        if(kind==="model")return graphParameterValue(node,13)===1?"OBJ":"Cube";
         var status = state.frameStatus;
         if (status && status.available === false) return "Live count unavailable";
         var maxParticles = status ? status.maxParticles :
@@ -704,6 +710,14 @@
             card.appendChild(input);
             portElements.input = input;
         }
+        if(node.modelInputPort) {
+            var modelInput=document.createElement("span");
+            modelInput.className="port port-in port-model";modelInput.title="Model input";
+            modelInput.setAttribute("data-node-id",node.id);modelInput.setAttribute("data-port-direction","in");
+            modelInput.setAttribute("data-port-key",node.modelInputPort);
+            modelInput.addEventListener("pointerdown",function(event){beginPortDrag(node.id,"in",event);});
+            card.appendChild(modelInput);portElements.modelInput=modelInput;
+        }
         if (node.outputPort !== null && node.outputPort !== undefined ? node.outputPort !== false : nodeKind(node) !== "output") {
             var output = document.createElement("span");
             output.className = "port port-out";
@@ -727,6 +741,7 @@
             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId)) continue;
             var nodeSides = sides[nodeId] || { input: "top", output: "bottom" };
             placePort(graphNodeElements[nodeId].input, nodeSides.input);
+            placePort(graphNodeElements[nodeId].modelInput,"model");
             placePort(graphNodeElements[nodeId].output, nodeSides.output);
         }
         for (var i = 0; i < state.edges.length; i++) {
@@ -773,7 +788,8 @@
         if (connectionState) {
             var currentSides = computePortSides();
             var side = currentSides[connectionState.nodeId] || {};
-            var fixedSide = connectionState.direction === "out" ? side.output : side.input;
+            var fixedSide = connectionState.direction === "in" && connectionState.portKey==="3" ? "model" :
+                connectionState.direction === "out" ? side.output : side.input;
             var fixedPoint = portPoint(connectionState.nodeId, fixedSide ||
                 (connectionState.direction === "out" ? "bottom" : "top"));
             if (fixedPoint) {
@@ -782,8 +798,10 @@
                 var bend = Math.max(12, Math.min(80, Math.abs(end.y - start.y) * 0.45));
                 var c1x = start.x;
                 var c1y = start.y + bend;
-                var c2x = end.x;
-                var c2y = end.y - bend;
+                var modelEnd=connectionState.direction === "in" ? connectionState.portKey==="3" :
+                    connectionState.snapPort && connectionState.snapPort.getAttribute("data-port-key")==="3";
+                var c2x = modelEnd ? end.x-bend : end.x;
+                var c2y = modelEnd ? end.y : end.y-bend;
                 var preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 preview.setAttribute("class", "edge-preview");
                 preview.setAttribute("d", "M" + start.x + " " + start.y + " C" + c1x + " " + c1y + " " +
@@ -882,7 +900,9 @@
                     refresh(false, false);
                     return;
                 }
-                clearBanner(true);
+                var completion=result.diagnostics,completionWarning=completion && (completion.cleanupError || completion.undoError || completion.notificationPending);
+                if(completionWarning)showError("graph_applied_with_warning","The graph was applied, but After Effects reported a completion issue. Refresh before continuing.",true);
+                else clearBanner(true);
                 refresh(false, false);
             });
         }
@@ -1008,7 +1028,7 @@
         var sides = computePortSides();
         for (var i = 0; i < state.edges.length; i++) {
             var edge = state.edges[i];
-            if (!edge || edge.length !== 2 || edge[0] === nodeId || edge[1] === nodeId) continue;
+            if (!edge || edge.length !== 2 || edge.inputPort==="3" || edge[0] === nodeId || edge[1] === nodeId) continue;
             var start = portPoint(edge[0], sides[edge[0]] ? sides[edge[0]].output : "bottom");
             var end = portPoint(edge[1], sides[edge[1]] ? sides[edge[1]].input : "top");
             if (!start || !end) continue;
@@ -1873,7 +1893,10 @@
         var distanceSquared = 22 * 22;
         for (var nodeId in graphNodeElements) {
             if (!Object.prototype.hasOwnProperty.call(graphNodeElements, nodeId) || nodeId === connectionState.nodeId) continue;
-            var port = connectionState.direction === "out" ? graphNodeElements[nodeId].input : graphNodeElements[nodeId].output;
+            var candidates=connectionState.direction === "out" ?
+                [graphNodeElements[nodeId].input,graphNodeElements[nodeId].modelInput] : [graphNodeElements[nodeId].output];
+            for(var candidateIndex=0;candidateIndex<candidates.length;candidateIndex++) {
+            var port=candidates[candidateIndex];
             if (!port) continue;
             var bounds = port.getBoundingClientRect();
             var dx = event.clientX - (bounds.left + bounds.width / 2);
@@ -1887,6 +1910,7 @@
             if (!window.StarfieldGraphEdits.canConnect(state.graph, from, to, outputPort, inputPort)) continue;
             nearest = port;
             distanceSquared = distance;
+            }
         }
         return nearest;
     }
@@ -1900,7 +1924,7 @@
         if (port) {
             port.classList.add("connection-snap");
             connectionState.point = portPoint(port.getAttribute("data-node-id"),
-                                              connectionState.direction === "out" ? "top" : "bottom");
+                                              connectionState.direction === "out" ? (port.getAttribute("data-port-key")==="3"?"model":"top") : "bottom");
         } else {
             connectionState.point = canvasPoint(event.clientX, event.clientY);
         }
@@ -2290,6 +2314,7 @@
             var option = document.createElement("option");
             option.value = String(i + 1);
             option.textContent = choices[i];
+            option.disabled=parameter.disabledChoices && parameter.disabledChoices.indexOf(i)>=0;
             select.appendChild(option);
         }
         select.value = String(parameter.value);

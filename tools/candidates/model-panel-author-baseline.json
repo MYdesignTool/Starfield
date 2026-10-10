@@ -1,55 +1,55 @@
 {
   "schema": 1,
-  "status": "Unpublished Model author with portable asset transactions and exact six-choice Particle Shape; Face disabled pending OBJ face emission. Complete paired publication and AE2023 qualification pending.",
-  "basePanel": 61,
+  "status": "Released native61/Core ABI8/CEP62 Model test baseline; actual AE2023 qualification remains open. Six reference Shape labels, Face unavailable. Future candidates preserve this complete baseline.",
+  "basePanel": 62,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "2627895EB5BFFD70BF6743677FFDE6B5396C28A2C8BF9CD768239CAF50A5A40C"
+      "normalizedSha256": "38DBCFA04A9898317D2299E31851F3F57CDD99DB52A33F252CE603B9A50FAF46"
     },
     {
       "path": "css/panel.css",
-      "normalizedSha256": "2CC3633C239727324B1A4E1CE35202A2C05B1C4D1EEFC4B919FB044A14F6552D"
+      "normalizedSha256": "5633144A3D98C24C511DEDEF3754AFA2D92D5F26C97B0A6A60C12F0A773BA3D4"
     },
     {
       "path": "js/graph_edits.js",
-      "normalizedSha256": "8649C2A7A17B4FDA659F7D85E253A93FE6B09C41915938A4AE340EE40AB55A0A"
+      "normalizedSha256": "838526A5DF64DCF0632491DB81438D06667635CDA798BD5F5FA9097B1B59372B"
     },
     {
       "path": "js/native_graph_snapshot.js",
-      "normalizedSha256": "C62CAEC11B865A01E9E053D0B278AFBDA73295CEDB31DC22F67F32C93DED2D19"
+      "normalizedSha256": "98BA0C54F75444154D8B57222F521911E33FDF64E8AC1B1A2DE51D471BFB9BF3"
     },
     {
       "path": "js/graph_view.js",
-      "normalizedSha256": "16CCD21B6226C171340097E373F68637742500EB948B044DAB1E9617644B8330"
+      "normalizedSha256": "765C39C7EFCDD9470A47EA521305BC860E4207706105EA8CBD5262A7CAAB2168"
     },
     {
       "path": "js/node_palette.js",
-      "normalizedSha256": "12C25EE07FBA3810ED37586ED0FC30B3075E5B854A62B0D5DAF954E11117524F"
+      "normalizedSha256": "E0949C0B793E5E581BB5B952357B8B216C6EDB34ED1D621514E064277CB3BAC3"
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "CE33E8D2124A9BC7D9ACDF90A92792AAB73C54DE061FC7CF025265CCC5A15336"
+      "normalizedSha256": "B23028782F9A744F6CA542BFCC3B28A1AEFD9D3F54A8B0EA597A8E22A89359A4"
     },
     {
       "path": "js/graph_transactions.js",
-      "normalizedSha256": "8478106C8D9FB872A8F0601A319A4BC8F2CC07320C9EE77C6A5D57DB986FCBA7"
+      "normalizedSha256": "3F580275A404037D5B747E56B88ED4BCFB088359C28D194323949E75A2784386"
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "1226DD4907B0DD4693698F7B927EE5DB7D110705E996016179B6C8CC800E7C7B"
+      "normalizedSha256": "7A5AE3F2BF1217307D6A2777DDAC7CEFEC9D717605F60EC446446911FD6F15BF"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "8BBCE4EB7E33423A1A103A5BA9824ED98A81CDF92B3B33D2C09DBEF5D04957ED"
+      "normalizedSha256": "B52E77648ABCE8C43D96DA6BFFF6688237B8A2CDED4D0645556DD1ED13CCAE80"
     },
     {
       "path": "js/presets.js",
-      "normalizedSha256": "8246E543630F9BC1A9BC077E72608D17806EA3A78148A87D0348E67290E176F5"
+      "normalizedSha256": "A99A32889A0087FC250E629EF868058BBCF0EED87751A81DB3C24D63B6392E9E"
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "B2301EF0E66A30658D7F0DD165BCF6A35A4C542A01A22ADEA0639E0EEF94861D"
+      "normalizedSha256": "EBD73C7ED7B822EF6759381EDCC58F3477FAA9F95A8DD678606B83CE0291655D"
     }
   ]
 }

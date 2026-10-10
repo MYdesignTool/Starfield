@@ -4,9 +4,10 @@
     var api=factory(node?require("./graph_edits.js"):root.StarfieldGraphEdits,
         node?require("./graph_layout.js"):root.StarfieldGraphLayout,
         node?require("./graph_codec.js"):root.StarfieldGraphCodec,
-        node?require("./graph_view.js"):root.StarfieldGraphView);
+        node?require("./graph_view.js"):root.StarfieldGraphView,
+        node?require("./model_assets.js"):root.StarfieldModelAssets);
     if(node)module.exports=api;else root.StarfieldPresets=api;
-}(typeof window!=="undefined"?window:this,function(edits,layout,codec,view){
+}(typeof window!=="undefined"?window:this,function(edits,layout,codec,view,modelAssets){
     "use strict";
     var OUTPUT="000000000000000000000000000000ff",MAX_BYTES=24*1024;
     var categories=["All presets","Backgrounds","Effects","Graphic Elements","Physical","Nodes","My Presets"];
@@ -113,6 +114,7 @@
     function apply(base,edit,idFactory){
         if(edit.type!=="applyPreset")return edits.apply(base,edit,idFactory);
         var selected=clone(edit.presetGraph || build(edit.presetId,edit.layerHeightPixels));
+        modelAssets.validate(selected,edit.presetModelAssets || []);
         var bindings=edit.presetResources || [];
         validateResourceBindings(selected,bindings);
         bindings.forEach(function(binding){
@@ -133,6 +135,14 @@
         var offset=edit.mode==="add"?Math.max.apply(null,[0].concat(Object.keys(positions).map(function(id){return positions[id].y;})))+180:0;
         preset.nodes.forEach(function(n){if(n.id===incomingOutput.id)return;var id=next();map[n.id]=id;current.nodes.push({id:id,type:n.type,schemaVersion:n.schemaVersion,parameters:n.parameters});positions[id]={x:sourcePositions[n.id].x,y:sourcePositions[n.id].y+offset};});
         preset.edges.forEach(function(e){current.edges.push({id:next(),sourceNode:map[e.sourceNode],sourcePort:e.sourcePort,destinationNode:map[e.destinationNode],destinationPort:e.destinationPort});});
+        current.nodes.forEach(function(node){if(node.type!=="org.starfieldfx.nodes.model")return;
+            var source=node.parameters.filter(function(p){return String(p.key)==="13";})[0];
+            if(source.value===1 && node.parameters.filter(function(p){return String(p.key)==="2";})[0].value>0)
+                node.parameters.filter(function(p){return String(p.key)==="1";})[0].value=node.id.match(/../g).map(function(byte){return parseInt(byte,16);});
+        });
+        edit.modelAssetsToRestore=(edit.presetModelAssets || []).map(function(asset){var node=current.nodes.filter(function(n){return n.id===map[asset.nodeId];})[0];
+            return {nodeId:node.id,source:node.parameters.filter(function(p){return String(p.key)==="13";})[0].value+1,
+                revision:asset.revision,bounds:asset.bounds.slice(),meshHex:asset.meshHex};});
         current=layout.set(current,positions);validate(current,"Updated project");return current;
     }
     function validateResourceBindings(graph,bindings) {
@@ -146,7 +156,7 @@
             seen[binding.nodeId+":"+binding.key]=true;
         });
     }
-    function encode(graph,name,category,resources){
+    function encode(graph,name,category,resources,meshes){
         if(typeof name!=="string" || !name.trim() || name.length>120)fail("Enter a preset name up to 120 characters.");
         var clean=motionDefaults(clone(graph)),bindings=[];
         clean.nodes.forEach(function(node){if(node.type!==edits.types.particle)return;
@@ -157,19 +167,27 @@
             });
         });
         validateResourceBindings(clean,bindings);
-        var text=JSON.stringify({format:"org.starfieldfx.preset",version:bindings.length?2:1,name:name.trim(),
-            category:category||"My Presets",graphHex:codec.toHex(authoring(clean)),resources:bindings},null,2);
-        if(text.length>MAX_BYTES*2+128*1024 || unescape(encodeURIComponent(text)).length>256*1024 ||
+        clean=authoring(clean);
+        if(!modelAssets)fail("Model asset library did not load.");
+        var portable=modelAssets.validate(clean,meshes || []),version=portable.length?3:bindings.length?2:1;
+        var data={format:"org.starfieldfx.preset",version:version,name:name.trim(),
+            category:category||"My Presets",graphHex:codec.toHex(clean),resources:bindings};
+        if(version===3)data.modelAssets=portable;
+        var text=JSON.stringify(data,null,2);
+        if(version===3?text.length>128*1024*1024+256*1024:text.length>MAX_BYTES*2+128*1024 || unescape(encodeURIComponent(text)).length>256*1024 ||
             JSON.stringify(text).length>252*1024)fail("Preset resource metadata exceeds the file limit.");
         return text;
     }
     function decode(text){
-        if(typeof text!=="string" || text.length>MAX_BYTES*2+128*1024)fail("Preset file is too large.");var data=JSON.parse(text);
-        if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2) || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");
-        var graph=authoring(codec.fromHex(data.graphHex)),bindings=data.version===2?data.resources:[];
+        if(typeof text!=="string" || text.length>128*1024*1024+256*1024)fail("Preset file is too large.");var data=JSON.parse(text);
+        if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2 && data.version!==3) || typeof data.name!=="string" || !data.name.trim() || data.name.length>120 || typeof data.graphHex!=="string" || data.graphHex.length>MAX_BYTES*2)fail("This is not a supported Starfield preset.");
+        if(data.version!==3 && text.length>MAX_BYTES*2+128*1024)fail("Legacy preset file is too large.");
+        var graph=authoring(codec.fromHex(data.graphHex)),bindings=data.version>=2?data.resources:[];
         validateResourceBindings(graph,bindings);
+        if(!modelAssets)fail("Model asset library did not load.");
+        var meshes=modelAssets.validate(graph,data.version===3?data.modelAssets:[]);
         return {id:"imported-"+edits.randomId(),name:data.name,category:"My Presets",description:"Imported Starfield preset",
-            color:"#91bde0",graph:graph,resources:bindings};
+            color:"#91bde0",graph:graph,resources:bindings,modelAssets:meshes};
     }
     return {catalog:catalog,categories:categories,build:build,apply:apply,encode:encode,decode:decode,authoring:authoring,validate:validate};
 }));

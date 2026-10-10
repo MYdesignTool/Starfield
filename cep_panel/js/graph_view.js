@@ -13,6 +13,7 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
     var SPECS = {
@@ -65,7 +66,8 @@
             "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
             "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" },
             "14": {label:"Life Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
-            "15": {label:"Shape",kind:"popup",min:1,max:4,displayOffset:1,choices:["Circle","Rectangle","Cloud","Texture"]},
+            "15": {label:"Shape",kind:"popup",min:1,max:6,values:[0,1,2,3,null,4],disabledChoices:[4],
+                choices:["Circle","Rectangle","Cloud","Texture","Face","Model"]},
             "16": {label:"Size Y (Pixels)",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
             "17": {label:"Orient To",kind:"popup",min:1,max:3,displayOffset:1,choices:["Nothing","Motion(particle)","Emitter"]},
             "18": {label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
@@ -115,6 +117,18 @@
             "7": {hidden:true},
             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
         },
+        model: {
+            "1": {hidden:true}, "2": {hidden:true}, "3": {hidden:true}, "12": {hidden:true},
+            "13": {label:"Source",kind:"popup",choices:["Cube","OBJ"],values:[0,1]},
+            "4": {label:"Offset",kind:"point3d",decimals:2,step:.1,min:-1e9,max:1e9},
+            "5": {label:"Angle",kind:"point3d",decimals:2,step:1,min:-32768,max:32767.99998,unit:"°"},
+            "6": {label:"Scale",kind:"point3d",decimals:2,step:1,min:-100000,max:100000,unit:"%"},
+            "7": {label:"Flip X",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "8": {label:"Flip Y",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "9": {label:"Flip Z",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "10": {label:"Center",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "11": {label:"Normalize",kind:"popup",choices:["Off","On"],values:[0,1]}
+        },
         output: {
             "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
             "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
@@ -125,7 +139,7 @@
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",
                    output: "Output" };
 
     function fail(code, message) {
@@ -271,6 +285,7 @@
             max: spec && typeof spec.max === "number" ? spec.max : undefined,
             choices: spec && spec.choices ? spec.choices.slice() : undefined,
             enumValues: spec && spec.values ? spec.values.slice() : undefined,
+            disabledChoices: spec && spec.disabledChoices ? spec.disabledChoices.slice() : undefined,
             unit: spec && spec.unit ? spec.unit : undefined,
             legacyKey: spec ? spec.legacyKey : undefined,
             legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
@@ -373,8 +388,9 @@
             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
             var shape = findParameter(source,"5");
             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
-                         inputPort: kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
-                         outputPort: kind === "output" ? null : (kind === "emitter" ? "1" : "2"),
+                         inputPort: kind === "model" ? null : kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+                         modelInputPort: kind === "particle" ? "3" : null,
+                         outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,
                          curveParameterKeys: kind === "particle"
                             ? { size: "7", opacity: "8", rotation:"27", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
@@ -405,7 +421,7 @@
                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
                     if(Number(graphParameter.key)>=37 && Number(graphParameter.key)<=39 &&
                         Number((findParameter(source,"15") || {}).value)!==2)continue;
-                    if(graphParameter.key==="16" && Number((findParameter(source,"15") || {}).value)===2)continue;
+                    if(graphParameter.key==="16" && [2,4].indexOf(Number((findParameter(source,"15") || {}).value))>=0)continue;
                     if(Number(graphParameter.key)>=31 && Number(graphParameter.key)<=36 &&
                         Number((findParameter(source,"15") || {}).value)!==3)continue;
                 }
@@ -430,6 +446,15 @@
                     if(textureSelected<0) {parameter.choices.push("Unavailable layer ("+graphParameter.value+")");
                         parameter.enumValues.push(graphParameter.value);textureSelected=parameter.enumValues.length-1;}
                     parameter.value=textureSelected+1;node.params.push(parameter);continue;
+                }
+                if(kind==="model" && ["4","5","6"].indexOf(graphParameter.key)>=0) {
+                    [0,1,2].forEach(function(axis){
+                        var component=viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider";component.key+=":"+axis;
+                        component.label=spec.label+" "+["X","Y","Z"][axis];
+                        component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=1;component.value=graphParameter.value[axis];node.params.push(component);
+                    });continue;
                 }
                 if (kind === "transform") {
                     var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
@@ -664,7 +689,13 @@
                      } else origin[2] = Number(displayValue) / height;
                      return origin;
                  }
-                 if (parameter.kind === "popup") return parameter.enumValues ? parameter.enumValues[Number(displayValue)-1] : Number(displayValue) - parameter.displayOffset;
+                 if (parameter.kind === "popup") {
+                     var index=Number(displayValue)-1;
+                     if(parameter.disabledChoices && (Math.floor(index)!==index || index<0 ||
+                        index>=parameter.choices.length || parameter.disabledChoices.indexOf(index)>=0))
+                         throw new Error("This Shape requires the OBJ face-emission workflow.");
+                     return parameter.enumValues ? parameter.enumValues[index] : Number(displayValue) - parameter.displayOffset;
+                 }
                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
                  return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
              } };

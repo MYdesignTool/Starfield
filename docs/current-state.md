@@ -1,10 +1,20 @@
 # 当前工程状态
 
-核对日期：2026-10-10。owner要求开始新的工作，完整目标恢复active。当前安装 native60 / packed32828 / Core ABI7 / CEP61，冻结部署源码90b7a2bfe982eab1c11d3592a928ca84e12ab1ec；M3-16作者/构建/部署完成，实际AE gate开放。当前M3-17已接入候选Host分块资产上传/排队与隔离CEP整笔prepare/commit；Particle Model菜单和部署前Modal/idle验收继续，未部署候选。owner已确认当前版本节点添加问题修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
+核对日期：2026-10-10。owner要求开始新的工作并授权出一版测试，完整目标active。当前安装 native61 / packed32829 / Core ABI8 / CEP62，冻结部署源码8d9b50e43b75562cfe4eda7501b9eb566c9f9744；M3-17完整Model测试配对已发布，实际AE gate开放。native60/CEP61的配对回滚保留。owner已确认此前CEP61节点添加修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+### native61／CEP62 测试版已部署（2026-10-10 13:59 +08）
+
+8d9b50e源码git archive冻结于artifacts/prepared/m3-17-native61-model-8d9b50e/source。May2023 x64 Release /MT、IncludeModelCandidate及双NoPublish完整八目标实际exit0，日志artifacts/m3-17-native61-model-build.log及build-exit.txt；包含实际新Host文件窗口代码。native-bundle/candidate.json记录八输出与十八CEP源hash、adapter fingerprint、CoreABI8及CEP62；发布前后fresh check均AE进程0。
+
+按owner测试版授权，通过tools/Deploy-ModelTestBuild.ps1调用既有Deploy-TestBuild -IncludeModel，在既有native及CEP Junction下发布完整七AEX+Core与十八CEP源。26文件hash、Core selector/versioned runtime与配对rollback默认report通过，记录artifacts/m3-17-native61-deploy-{before,after}.json、deploy-wrapper.log、rollback-report.log。此次是测试发布，未启动AE或声称实际AE2023通过。Shape严格六项顺序，Face禁用；Model默认cube/连接模型、OBJ、预设/复制/资源持久化和modal/idle实际行为待owner验收，Use Model(s)不推测。
+
+备份artifacts/disabled/m3-17-native61-panel62-model-20261010保留旧native60/CoreABI7/CEP61及Model原本不存在状态。单步撤回（先自行关闭AE）：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native61-panel62-model-20261010' -Restore`。新Model/五helper会移走或留存至candidate备份，不污染旧配对。
+
+后续Prepare基线更新为已部署CEP62，empty delta可重现m3-17-postrelease-panel62。BuildWindows full Model不再直接写dist，完整构建自动包含Model，发布经完整配对工具；CoreOnly既有fingerprint/installed pair要求保留。此前测试PID30420于13:57:30只读确认不存在，artifacts/m3-17-native-preset-test-process-check.json；无需停止授权，没有执行Stop-Process。上方新记录替代历史未部署/额度阻碍/待停止状态。完整目标继续Particle/节点排序及Motion三模式/Turbulence，未缩减或标记完成。
 
 ### Owner要求准备测试版（2026-10-10）
 

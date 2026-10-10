@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-61";
+    var GATEWAY_BUILD = "native-presets-62";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -42,7 +42,8 @@
         "org.starfieldfx.nodes.emitter": { kind: "emitter", label: "Emitter", matchName: "org.starfieldfx.node.emitter" },
         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
-        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" }
+        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
+        "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"}
     };
 
     // One row per bound effect parameter. `index` is the registered parameter index
@@ -235,13 +236,18 @@
         return findTarget();
     }
 
+    function transactionBackup(effect) {
+        if(!effect)return false;
+        var guard=effect.property(effect.matchName===MATCH_NAME?"Panel Graph Sync Guard":"Panel Sync Guard");
+        return !!guard && Number(guard.value)===2;
+    }
     function effectCount(layer) {
         if (!layer) return 0;
         var parade = layer.property("ADBE Effect Parade");
         if (!parade) return 0;
         var total = 0;
         for (var i = 1; i <= parade.numProperties; i++) {
-            if (parade.property(i) && parade.property(i).matchName === MATCH_NAME) total++;
+            if (parade.property(i) && parade.property(i).matchName === MATCH_NAME && !transactionBackup(parade.property(i))) total++;
         }
         return total;
     }
@@ -250,7 +256,7 @@
         var parade = layer.property("ADBE Effect Parade");
         for (var i = 1; i <= parade.numProperties; i++) {
             var effect = parade.property(i);
-            if (effect && effect.matchName === MATCH_NAME) return effect;
+            if (effect && effect.matchName === MATCH_NAME && !transactionBackup(effect)) return effect;
         }
         return null;
     }
@@ -543,7 +549,7 @@
         if (!parade) return matches;
         for (var i = 1; i <= parade.numProperties; i++) {
             var effect = parade.property(i);
-            if (!effect || !nativeNodeTypeByMatch(effect.matchName)) continue;
+            if (!effect || !nativeNodeTypeByMatch(effect.matchName) || transactionBackup(effect)) continue;
             if (nodeIdentity(effect) === id) matches.push(effect);
         }
         return matches;
@@ -721,6 +727,62 @@
             "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
     }
 
+    function modelControl(index) {
+        var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
+            "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
+        return {name:index>=95 ? ["Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"][index-95] : names[index-1],
+            diskId:index>=95?1519+index-95:1500+index};
+    }
+
+    function modelAssetDescriptor(effect) {
+        var revision=Number(nodeControlValue(effect,modelControl(4))),bounds=[];
+        if(!isFinite(revision) || Math.floor(revision)!==revision || revision<0 || revision>2147483647)
+            throw new Error("Invalid Model mesh revision.");
+        for(var axis=0;axis<6;axis++) {
+            var bound=Number(nodeControlValue(effect,modelControl(95+axis)));
+            if(!isFinite(bound) || Math.abs(bound)>1e9 || (axis>=3 && bound<bounds[axis-3]))
+                throw new Error("Invalid Model mesh bounds.");
+            bounds.push(bound);
+        }
+        return {revision:revision,bounds:bounds};
+    }
+
+    function validateModelRecord(node) {
+        if(node.schemaVersion!==1)throw new Error("Unsupported Model schema.");
+        var fields={},types={"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3};
+        for(var i=0;i<node.parameters.length;i++) {
+            var p=node.parameters[i],key=String(p.key),v=p.value;
+            if(!Object.prototype.hasOwnProperty.call(types,key) || fields[key] || p.type!==types[key])throw new Error("Invalid Model field: "+key);
+            fields[key]=p;
+            if(p.type===5) {
+                var limit=key==="4"?1e9:key==="5"?32768:100000;
+                if(!(v instanceof Array) || v.length!==3)throw new Error("Invalid Model vector: "+key);
+                for(var axis=0;axis<3;axis++)if(typeof v[axis]!=="number" || !isFinite(v[axis]) || Math.abs(v[axis])>limit ||
+                    (key==="5" && v[axis]>=32768))throw new Error("Invalid Model vector: "+key);
+            } else if(p.type===3) {
+                if(typeof v!=="number" || !isFinite(v) || Math.floor(v)!==v || v<0 || v>(key==="2"?2147483647:1))
+                    throw new Error("Invalid Model scalar: "+key);
+            } else {
+                if(!(v instanceof Array) || v.length!==(key==="1"?16:48))throw new Error("Invalid Model metadata: "+key);
+                for(var byte=0;byte<v.length;byte++)if(typeof v[byte]!=="number" || v[byte]<0 || v[byte]>255 || Math.floor(v[byte])!==v[byte])
+                    throw new Error("Invalid Model metadata byte: "+key);
+            }
+        }
+        for(var key in types)if(Object.prototype.hasOwnProperty.call(types,key) && !fields[key])throw new Error("Missing Model field: "+key);
+        var imported=fields["13"].value===1 && fields["2"].value>0;
+        for(var byte=0;byte<16;byte++)if(fields["1"].value[byte]!== (imported?parseInt(node.id.substr(byte*2,2),16):0))
+            throw new Error("Model resource identity differs from its node.");
+        if(!imported && fields["2"].value!==0)throw new Error("Cube cannot reference an imported Model revision.");
+        var bounds=[];
+        for(var axis=0;axis<6;axis++) {
+            var bound=readGraphFloat64(fields["12"].value,axis*8);
+            if(Math.abs(bound)>1e9 || (axis>=3 && bound<bounds[axis-3]) || (!imported && bound!==(axis<3?-.5:.5)))
+                throw new Error("Invalid Model bounds.");
+            bounds.push(bound);
+        }
+        return {imported:imported,revision:fields["2"].value,bounds:bounds};
+    }
+
     function textureControl(key) {
         var names={"31":"Layer","32":"Dark Side","33":"Texture Time Sample","34":"Texture Color Use",
             "35":"Use Texture Ratio","36":"Ignore Perspective"};
@@ -835,6 +897,16 @@
         }
     }
 
+    function particleShapeToNative(value) {
+        if(typeof value!=="number" || !isFinite(value) || Math.floor(value)!==value || value<0 || value>4)
+            throw new Error("Invalid Particle Shape value.");
+        return value===4?6:value+1;
+    }
+    function particleShapeFromNative(value) {
+        if(value===6)return 4;
+        if(value>=1 && value<=4 && Math.floor(value)===value)return value-1;
+        throw new Error("Unsupported Particle Shape; Face requires OBJ face emission.");
+    }
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
@@ -879,6 +951,21 @@
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
+        } else if(type === "org.starfieldfx.nodes.model") {
+            var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
+            if(source!==1 && source!==2)throw new Error("Invalid Model Source.");
+            var imported=source===2 && asset.revision>0,resource=[],bounds=[];
+            for(var byte=0;byte<16;byte++)resource.push(imported?parseInt(node.id.substr(byte*2,2),16):0);
+            for(var axis=0;axis<6;axis++)appendFloat64(bounds,imported?asset.bounds[axis]:axis<3?-.5:.5);
+            node.parameters.push({key:"1",type:7,value:resource},{key:"2",type:3,value:imported?asset.revision:0});
+            for(var group=0;group<3;group++) {
+                var components=[];
+                for(var axis=0;axis<3;axis++)components.push(Number(nodeControlValue(effect,modelControl(5+3*group+axis))));
+                node.parameters.push({key:String(4+group),type:5,value:components});
+            }
+            for(var flag=0;flag<5;flag++)scalar(7+flag,modelControl(14+flag),3);
+            node.parameters.push({key:"12",type:7,value:bounds},{key:"13",type:3,value:source-1});
+            node.modelAsset=asset;validateModelRecord(node);
         } else if (type === "org.starfieldfx.nodes.transform") {
             var tg=transformGeometry(layer),anchor=nodeControlValue(effect,transformControl(2));
             node.parameters.push({key:"1",type:5,value:[(Number(anchor[0])-tg.width/2)*tg.aspect/tg.height,
@@ -948,7 +1035,9 @@
                 scalar(26,"Limit Angle");scalar(28,"Anchor X (Percent)");scalar(29,"Anchor Y (Percent)");scalar(22,"Limit To 2D",3);
                 var enums=[[15,"Shape"],[17,"Orient To"],[25,"Random Limit"],[24,"Up Axis"],[30,"Transfer Mode"]];
                 for(var ei=0;ei<enums.length;ei++) {
-                    scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
+                    scalar(enums[ei][0],enums[ei][1],3);
+                    var enumParameter=node.parameters[node.parameters.length-1];
+                    enumParameter.value=enums[ei][0]===15?particleShapeFromNative(enumParameter.value):enumParameter.value-1;
                 }
                 node.parameters.push({key:"31",type:3,value:readTextureLayer(effect,layer,31)});
                 node.parameters.push({key:"32",type:3,value:readTextureLayer(effect,layer,32)});
@@ -998,7 +1087,7 @@
         var nodes = [], parade = layer.property("ADBE Effect Parade");
         for (var i = 1; parade && i <= parade.numProperties; i++) {
             var effect = parade.property(i);
-            if (effect && nativeNodeTypeByMatch(effect.matchName)) nodes.push(readNativeNode(effect, layer));
+            if (effect && nativeNodeTypeByMatch(effect.matchName) && !transactionBackup(effect)) nodes.push(readNativeNode(effect, layer));
         }
         return nodes;
     }
@@ -1080,6 +1169,15 @@
         if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
             throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
         }
+        if(node.type==="org.starfieldfx.nodes.model") {
+            var requestedModel=validateModelRecord(node),storedAsset=modelAssetDescriptor(effect);
+            if(requestedModel.imported) {
+                var boundsMatch=true;
+                for(var axis=0;axis<6;axis++)if(storedAsset.bounds[axis]!==requestedModel.bounds[axis])boundsMatch=false;
+                if(storedAsset.revision!==requestedModel.revision || !boundsMatch)
+                    throw new Error("The imported Model resource must be restored before authoring its controls.");
+            }
+        }
         setNodeControl(effect, "Panel Sync Guard", 1);
         try {
             if(node.type === "org.starfieldfx.nodes.particle") {
@@ -1140,6 +1238,13 @@
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+                } else if(type === "org.starfieldfx.nodes.model") {
+                    if(key==="1" || key==="2" || key==="12")continue; // Native mesh transaction owns derived metadata.
+                    if(key==="13")setNodeControl(effect,modelControl(1),value+1);
+                    else if(Number(key)>=4 && Number(key)<=6)for(var axis=0;axis<3;axis++)
+                        setNodeControl(effect,modelControl(5+3*(Number(key)-4)+axis),value[axis]);
+                    else if(Number(key)>=7 && Number(key)<=11)setNodeControl(effect,modelControl(14+Number(key)-7),value);
+                    else throw new Error("Model graph parameter is not mapped: "+key);
                 } else if (type === "org.starfieldfx.nodes.transform") {
                     var geometry=transformGeometry(layer);
                     if(key==="1") {
@@ -1210,7 +1315,7 @@
                             setNodeControl(effect,birthControl(key),value);
                         }
                         else if(scalars[key]) setNodeControl(effect,scalars[key],value);
-                        else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
+                        else if(enums[key]) setNodeControl(effect,enums[key],key==="15"?particleShapeToNative(value):Number(value)+1);
                         else if(key==="27") writeNodeCurve(effect,"Rotation",value);
                         else if(key==="18" || key==="20") {
                             var group=key==="18"?"Angle":"Speed";
@@ -1274,6 +1379,10 @@
                     throw new Error("node manifest contains an invalid or duplicate parameter key.");
                 }
                 keys["$" + parameter.key] = true;
+                if(node.type==="org.starfieldfx.nodes.particle" && parameter.key==="15") {
+                    if(parameter.type!==3)throw new Error("Invalid Particle Shape wire type.");
+                    particleShapeToNative(parameter.value);
+                }
             }
             for (var e = 0; e < node.outgoing.length; e++) {
                 var connection = node.outgoing[e];
@@ -1287,6 +1396,7 @@
                 edgeIds["$" + connection.id] = true;
             }
             if(node.type==="org.starfieldfx.nodes.transform")validateTransformRecord(node);
+            if(node.type==="org.starfieldfx.nodes.model")validateModelRecord(node);
         }
         var knownTargets = nodeIds(nodes);
         knownTargets["$000000000000000000000000000000ff"] = true;
@@ -1300,7 +1410,7 @@
         return nodes;
     }
 
-    function addNativeNode(layer, node) {
+    function addNativeNode(layer, node, deferModel) {
         var spec = nativeNodeType(node.type);
         var parade = layer.property("ADBE Effect Parade");
         if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
@@ -1316,7 +1426,8 @@
             stage = "write node identity";
             setNodeIdentity(effect, node.id);
             stage = "write node record and parameters";
-            setNodeParameters(effect, node, layer);
+            if(deferModel && node.type==="org.starfieldfx.nodes.model")writeNodeRecord(effect,node);
+            else setNodeParameters(effect, node, layer);
         } catch (error) {
             var detail = spec.label + " (" + spec.matchName + "), " + stage + ": " + error.toString();
             if (!effect) {
@@ -1364,7 +1475,7 @@
         }
         return true;
     }
-    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes) {
+    function ensureNativeNodeEffects(layer, nodes, writeExisting, previousNodes, deferModel) {
         validateNodeManifest(nodes);
         var previous={};
         if (previousNodes) for(var p=0;p<previousNodes.length;p++) previous["$"+previousNodes[p].id]=previousNodes[p];
@@ -1378,7 +1489,7 @@
                 if (!effect || nodeIdentity(effect) !== node.id) throw new Error("The node identity changed while applying the graph.");
             }
             if (!effect) {
-                addNativeNode(layer, node);
+                addNativeNode(layer, node, deferModel);
                 // addProperty appends. Indexed-group references are invalidated,
                 // but earlier numeric slots remain valid and are reacquired.
                 var parade = layer.property("ADBE Effect Parade"), last = parade.numProperties;
@@ -1390,7 +1501,8 @@
                 if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
                 if (writeExisting) {
                     var before = previous["$"+node.id];
-                    if (!sameNodeParameters(before,node)) setNodeParameters(effect, node, layer);
+                    if(deferModel && node.type==="org.starfieldfx.nodes.model")writeNodeRecord(effect,node);
+                    else if (!sameNodeParameters(before,node)) setNodeParameters(effect, node, layer);
                     else if (before.position.x !== node.position.x || before.position.y !== node.position.y ||
                         JSON.stringify(before.outgoing) !== JSON.stringify(node.outgoing)) writeNodeRecord(effect,node);
                 }
@@ -2512,6 +2624,157 @@
     host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
     host.SFLD_submitGraph = SFLD_submitGraph;
     host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;
+    // Volatile Model transport, separate from ordinary panel polling and project
+    // streams. Reloading this gateway keeps only bounded plain data, never DOM
+    // properties. The session-resident Host command queues UI-idle work.
+    var modelBridgeKey="__SFLD_modelAssetBridgeV1",modelPageHex=65536,modelByteLimit=8*1024*1024;
+    function modelSession(id) {
+        var session=host[modelBridgeKey];
+        if(!session || session.version!==1 || session.id!==id)return null;
+        if((new Date()).getTime()>session.expires) {
+            session.state="failed";session.pages=[];
+            session.error={code:"model_asset_timeout",message:"Model asset transfer expired. Retry the operation."};
+        }
+        return session;
+    }
+    function modelAuthor(session) {
+        var resolved=graphCarrierTarget({pinTarget:true,target:{token:session.token}});
+        if(resolved.error)throw new Error(resolved.error.message);
+        if(Number(resolved.properties.guard.value)!==0 || Number(resolved.properties.revision.value)!==session.graphRevision)
+            throw new Error("The graph changed during Model asset transfer.");
+        var parade=resolved.target.layer.property("ADBE Effect Parade"),effect=null;
+        if(!parade || parade.numProperties>4096)throw new Error("Invalid effect inventory.");
+        for(var i=1;i<=parade.numProperties;i++) {
+            var candidate=parade.property(i);
+            if(candidate && candidate.matchName==="org.starfieldfx.node.model" && !transactionBackup(candidate) && nodeUuidValue(candidate,"Node UUID ")===session.nodeId) {
+                if(effect)throw new Error("Duplicate Model identity.");effect=candidate;
+            }
+        }
+        if(!effect || Number(nodeControlValue(effect,"Panel Sync Guard"))!==0)throw new Error("The Model author is unavailable.");
+        var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
+        if(source!==session.source || asset.revision!==session.revision)throw new Error("The Model source changed during transfer.");
+        for(var axis=0;axis<6;axis++)if(asset.bounds[axis]!==session.bounds[axis])throw new Error("The Model bounds changed during transfer.");
+        return resolved;
+    }
+    function modelTransferFailure(session,message) {
+        session.state="failed";session.pages=[];
+        session.error={code:"model_asset_transfer_failed",message:String(message)};
+    }
+    host.SFLD_beginModelAssetExport=function(requestJson) {
+        var request=parseRequest(requestJson);
+        if(!request || request.operation!=="beginModelAssetExport" || request.pinTarget!==true ||
+            !/^[0-9a-f]{32}$/.test(request.assetId || "") || !/^[0-9a-f]{32}$/.test(request.nodeId || "") ||
+            !request.baseGraphRevision || Math.floor(request.baseGraphRevision)!==request.baseGraphRevision ||
+            request.baseGraphRevision>MAX_GRAPH_REVISION)return fail("invalid_request","Invalid Model asset export request.");
+        var previous=host[modelBridgeKey];
+        if(previous && previous.version===1 && (new Date()).getTime()<=previous.expires &&
+            (previous.state==="queued" || previous.state==="receiving"))return fail("model_asset_busy","Another Model transfer is running.");
+        try {
+            var resolved=graphCarrierTarget(request);if(resolved.error)return fail(resolved.error.code,resolved.error.message);
+            if(Number(resolved.properties.revision.value)!==request.baseGraphRevision || Number(resolved.properties.guard.value)!==0)
+                return fail("stale_graph","Reload the graph before exporting Model assets.");
+            var nodes=readNativeNodes(resolved.target.layer),record=null;
+            for(var i=0;i<nodes.length;i++)if(nodes[i].id===request.nodeId) {
+                if(record)throw new Error("Duplicate Model identity.");record=nodes[i];
+            }
+            if(!record || record.type!=="org.starfieldfx.nodes.model" || !record.modelAsset || record.modelAsset.revision===0)
+                return fail("invalid_request","This Model has no imported mesh to export.");
+            var session={version:1,id:request.assetId,nodeId:request.nodeId,token:resolved.token,
+                graphRevision:request.baseGraphRevision,source:Number(nodeParameter(record,13).value)+1,
+                revision:record.modelAsset.revision,bounds:record.modelAsset.bounds.slice(),
+                state:"queued",pages:[],bytes:0,expires:(new Date()).getTime()+60000};
+            // Source is read directly: Cube may retain an imported mesh.
+            modelAuthor(session);
+            var command=app.findMenuCommandId("Starfield Prepare Model Asset Export");
+            if(!command)return fail("model_asset_unavailable","Model asset transfer requires the paired Starfield Host build.");
+            host[modelBridgeKey]=session;
+            app.executeCommand(command);
+            return reply({ok:true,assetId:session.id,state:session.state});
+        } catch(error) {
+            var failed=modelSession(request.assetId);if(failed)modelTransferFailure(failed,error.toString());
+            return fail("model_asset_transfer_failed",error.toString());
+        }
+    };
+    // Called only by the native UI-idle callback. All results are bounded ASCII.
+    host.SFLD_modelAssetHostRequest=function() {
+        var session=host[modelBridgeKey];
+        if(!session || !modelSession(session.id) || session.state!=="queued")return "0";
+        try {
+            modelAuthor(session);
+            var parts=/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(session.token);
+            if(!parts)throw new Error("Invalid pinned Model target.");
+            return [session.id,parts[1],parts[2],parts[3],session.nodeId,session.source,session.revision].join("|");
+        } catch(error){modelTransferFailure(session,error.toString());return "0";}
+    };
+    host.SFLD_modelAssetHostBegin=function(id,bytes,bounds) {
+        var session=modelSession(id);
+        if(!session || session.state!=="queued")return "0";
+        try {
+            modelAuthor(session);
+            if(typeof bytes!=="number" || Math.floor(bytes)!==bytes || bytes<=0 || bytes>modelByteLimit ||
+                !(bounds instanceof Array) || bounds.length!==6)throw new Error("Invalid native Model payload.");
+            for(var i=0;i<6;i++)if(bounds[i]!==session.bounds[i])throw new Error("Native Model bounds do not match the author.");
+            session.bytes=bytes;session.state="receiving";return "1";
+        } catch(error){modelTransferFailure(session,error.toString());return "0";}
+    };
+    host.SFLD_modelAssetHostContinue=function(id) {
+        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
+        try {modelAuthor(session);return "1";}catch(error){modelTransferFailure(session,error.toString());return "0";}
+    };
+    host.SFLD_modelAssetHostChunk=function(id,index,hex) {
+        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
+        var expected=Math.min(modelPageHex,session.bytes*2-index*modelPageHex);
+        if(typeof index!=="number" || index!==session.pages.length || expected<=0 || typeof hex!=="string" ||
+            hex.length!==expected || !/^[0-9a-f]+$/.test(hex)) {
+            modelTransferFailure(session,"Invalid or out of order native Model page.");return "0";
+        }
+        session.pages.push(hex);return "1";
+    };
+    host.SFLD_modelAssetHostFinish=function(id) {
+        var session=modelSession(id);if(!session || session.state!=="receiving")return "0";
+        try {
+            modelAuthor(session);
+            if(session.pages.length!==Math.ceil(session.bytes*2/modelPageHex))throw new Error("Incomplete Model payload.");
+            session.state="ready";return "1";
+        } catch(error){modelTransferFailure(session,error.toString());return "0";}
+    };
+    host.SFLD_modelAssetHostFail=function(id,code,hostError) {
+        var session=modelSession(id);if(!session)return "0";
+        modelTransferFailure(session,"Native Model export failed (code "+code+", host "+hostError+").");return "1";
+    };
+    host.SFLD_readModelAssetPage=function(requestJson) {
+        var request=parseRequest(requestJson);
+        if(!request || request.operation!=="readModelAssetPage" || !/^[0-9a-f]{32}$/.test(request.assetId || "") ||
+            typeof request.page!=="number" || Math.floor(request.page)!==request.page || request.page<0 || request.page>=256)
+            return fail("invalid_request","Invalid Model page request.");
+        var session=modelSession(request.assetId);
+        if(!session || request.pinTarget!==true || !request.target || request.target.token!==session.token)
+            return fail("stale_target","The Model asset transfer no longer exists.");
+        if(session.state==="failed")return fail(session.error.code,session.error.message);
+        if(session.state!=="ready")return reply({ok:true,assetId:session.id,state:session.state});
+        try {modelAuthor(session);}catch(error){modelTransferFailure(session,error.toString());return fail(session.error.code,session.error.message);}
+        if(request.page>=session.pages.length)return fail("invalid_request","Model page is outside the payload.");
+        return reply({ok:true,assetId:session.id,state:"ready",page:request.page,pageCount:session.pages.length,
+            bytes:session.bytes,nodeId:session.nodeId,source:session.source,revision:session.revision,
+            bounds:session.bounds.slice(),hex:session.pages[request.page]});
+    };
+    host.SFLD_releaseModelAsset=function(requestJson) {
+        var request=parseRequest(requestJson);
+        if(!request || request.operation!=="releaseModelAsset" || !/^[0-9a-f]{32}$/.test(request.assetId || ""))
+            return fail("invalid_request","Invalid Model release request.");
+        var session=host[modelBridgeKey];
+        if(session && session.id===request.assetId && request.pinTarget===true && request.target && request.target.token===session.token)
+            host[modelBridgeKey]=null;
+        return reply({ok:true});
+    };
+    // File transport is loaded only by explicit preset file actions. Its sessions
+    // contain bounded plain data; these closures carry no host object references.
+    host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
+    host.__SFLD_modelTransactionAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
+        resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
+        validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
+        remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,
+        trigger:triggerGraphCarrier,float64:readGraphFloat64};
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
 })();

@@ -1,6 +1,15 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: staged implementation, 2026-10-09. Task M3-17.
+Status: native61/CEP62 test pair deployed 2026-10-10; AE2023 qualification open. Task M3-17.
+
+The owner-authorized test pair was published at13:59+08 from frozen source
+8d9b50e43b75562cfe4eda7501b9eb566c9f9744, complete May2023 /MT eight-target
+build exit0. All eight native/Core and eighteen CEP hashes, selected runtime and
+paired rollback report were verified; native60/CEP61 retained in backup
+m3-17-native61-panel62-model-20261010. BuildWindows complete Model builds include
+Model automatically and refuse direct dist publication; promotion uses the full
+paired tool. The historical unpublished statements below describe implementation
+stages, not the current deployment. Actual AE modal/OBJ/undo/reopen remain gates.
 
 ## Owner-authorized test release — 2026-10-10
 

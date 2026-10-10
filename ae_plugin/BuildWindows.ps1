@@ -34,6 +34,12 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
 }
 Import-Module Microsoft.PowerShell.Utility
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$taskSourceVersion=[regex]::Match([IO.File]::ReadAllText((Join-Path $repositoryRoot 'ae_plugin/PluginVersion.h')),'#define STARFIELD_VERSION_BUILD\s+(\d+)')
+if(-not $taskSourceVersion.Success){throw 'Native build version is unavailable.'}
+$taskSourceNativeBuild=[int]$taskSourceVersion.Groups[1].Value
+if($taskSourceNativeBuild -ge 61 -and -not $CoreOnly -and -not $NoDistPublish){
+    throw 'Model full builds require -NoDistPublish; publish the complete native/Core/CEP pair through Deploy-ModelTestBuild.ps1.'
+}
 if (-not $CoreOnly -and -not $NoDistPublish -and
     (Get-Process AfterFX, AfterFX_64 -ErrorAction SilentlyContinue)) {
     throw 'Close AE before publishing AEX files into dist, or build with -NoDistPublish -NoRuntimePublish.'
@@ -178,7 +184,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
 
     $taskNodeKinds=@('Emitter', 'Particle', 'Force', 'Transform')
-    if($IncludeModelCandidate){$taskNodeKinds+='Model'}
+    if($IncludeModelCandidate -or $taskSourceNativeBuild -ge 61){$taskNodeKinds+='Model'}
     foreach ($nodeKind in $taskNodeKinds) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"

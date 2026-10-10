@@ -18,7 +18,7 @@ CEP 节点画布 / 属性编辑 / 预设
 | StarfieldParticle.aex | 主渲染效果、ARB 图持久化、参数注册、SmartFX、Core 加载与输出转换 |
 | Emitter/ParticleNode/Force AEX | 菜单隐藏的独立原生作者参数；节点效果 SmartFX 透传输入 |
 | Transform AEX | Transform 控件与 Null 资源作者记录；CEP 资源与属性集成已实现，AE 宿主验收开放 |
-| StarfieldHost.aex | UI idle 上有界的初始化/原生绑定准备 |
+| StarfieldHost.aex | UI idle 上有界初始化/绑定、Model资产与整笔事务排队；原生文件窗口与UI范围互斥 |
 | StarfieldCore.dll | 纯数值图求值、确定性粒子模拟、CPU 栅格化、GPU 场景准备 |
 | cep_panel/ | 图 UI、曲线/渐变/预设、守卫事务与自适应检查 |
 

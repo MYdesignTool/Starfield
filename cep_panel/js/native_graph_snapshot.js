@@ -31,8 +31,8 @@
                 positions[record.id] = record.position;
                 record.outgoing.forEach(function (edge) {
                     graph.edges.push({id:edge.id,sourceNode:record.id,
-                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" ? "1" : "2",
-                        destinationNode:edge.target,destinationPort:emitterTargets[edge.target] ? "2" : "1"});
+                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" || record.type === "org.starfieldfx.nodes.model" ? "1" : "2",
+                        destinationNode:edge.target,destinationPort:record.type === "org.starfieldfx.nodes.model" ? "3" : emitterTargets[edge.target] ? "2" : "1"});
                 });
             });
             var output = snapshot.renderer;

@@ -6,10 +6,12 @@
         ? require("./graph_layout.js") : root.StarfieldGraphLayout;
     var snapshots = typeof module === "object" && module.exports
         ? require("./native_graph_snapshot.js") : root.StarfieldNativeGraphSnapshot;
-    var api = factory(layout, snapshots);
+    var modelAssets = typeof module === "object" && module.exports ? require("./model_assets.js") : root.StarfieldModelAssets;
+    var modelTransactions = typeof module === "object" && module.exports ? require("./model_graph_transactions.js") : root.StarfieldModelGraphTransactions;
+    var api = factory(layout, snapshots, modelAssets, modelTransactions);
     if (typeof module === "object" && module.exports) module.exports = api;
     else root.StarfieldGraphTransactions = api;
-}(typeof window !== "undefined" ? window : this, function (layout, snapshots) {
+}(typeof window !== "undefined" ? window : this, function (layout, snapshots, modelAssets, modelTransactions) {
     "use strict";
 
     var DEFAULT_MAX_BYTES = 24 * 1024;
@@ -209,6 +211,11 @@
                     Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
                     authoredEdit.layerHeightPixels = base.geometry ? Number(base.geometry.height) : 1;
                     authoredEdit.layerResources=base.layerResources || [];
+                    authoredEdit.modelAssets={};
+                    (base.nativeNodes || []).forEach(function(node){
+                        if(node.type==="org.starfieldfx.nodes.model" && node.modelAsset)
+                            authoredEdit.modelAssets[node.id]=node.modelAsset;
+                    });
                     var updated = edits.apply(graph, authoredEdit, idFactory);
                     graphHex = codec.toHex(updated);
                     if (graphHex.length / 2 > maxBytes) {
@@ -232,7 +239,8 @@
                     baseNodeManifest: nativeNodeManifest(graph), nodeManifest: nativeNodeManifest(updated),
                     baseRendererManifest: rendererManifest(graph), rendererManifest: rendererManifest(updated) };
                 if (targetToken) transaction.target = { token: targetToken };
-                call("submitGraph", transaction, function (committed) {
+                function confirmed(committed) {
+                    committed=snapshots.normalize(committed);
                     if (!committed || committed.ok !== true) { callback(committed || failure("bad_response", "No graph commit response.")); return; }
                     var saved = committed.snapshot;
                     try {
@@ -250,7 +258,25 @@
                         return;
                     }
                     callback({ ok: true, operation: "submitGraph", target: committed.target,
-                               snapshot: saved, graphHex: saved.graphHex });
+                               snapshot: saved, graphHex: saved.graphHex,committed:committed.committed,diagnostics:committed.diagnostics });
+                }
+                var needsModelTransaction=graph.nodes.concat(updated.nodes).some(function(node){return node.type==="org.starfieldfx.nodes.model";});
+                if(!needsModelTransaction){call("submitGraph",transaction,confirmed);return;}
+                if(!modelTransactions || !modelAssets){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}
+                transaction.target={token:targetToken || response.target && response.target.token};
+                var restore=(authoredEdit.modelAssetsToRestore || []).slice(),copies=authoredEdit.modelResourceCopies || [];
+                var needed=copies.filter(function(copy){var node=(base.nativeNodes || []).filter(function(n){return n.id===copy.sourceId;})[0];
+                    return node && node.modelAsset && node.modelAsset.revision>0;});
+                function submitModel(){(options.modelTransactions || modelTransactions.create({call:options.call,idFactory:idFactory})).apply(transaction,restore,confirmed);}
+                if(!needed.length){submitModel();return;}
+                modelAssets.create({call:options.call,idFactory:idFactory}).collect(base,transaction.target.token,function(exported){
+                    if(!exported || !exported.ok){callback(exported || failure("model_asset_transfer_failed","No Model copy assets."));return;}
+                    try{needed.forEach(function(copy){var asset=exported.assets.filter(function(a){return a.nodeId===copy.sourceId;})[0],
+                            node=updated.nodes.filter(function(n){return n.id===copy.nodeId;})[0];
+                        if(!asset || !node)throw new Error("The duplicated Model mesh is missing.");
+                        restore.push({nodeId:copy.nodeId,source:node.parameters.filter(function(p){return String(p.key)==="13";})[0].value+1,
+                            revision:asset.revision,bounds:asset.bounds.slice(),meshHex:asset.meshHex});});submitModel();
+                    }catch(error){callback(failure("invalid_model_transaction",error.message || String(error)));}
                 });
             }
             // Reuse only the immediate planning receipt. The host independently

@@ -44,10 +44,12 @@ foreach($taskFile in $taskBaseline.files){
 }
 Push-Location -LiteralPath $taskRepo
 try {
-    & git apply --check --directory=$taskRelative $taskPatch
-    if($LASTEXITCODE -ne 0){throw 'Candidate patch preflight failed. Live CEP is unchanged.'}
-    & git apply --directory=$taskRelative $taskPatch
-    if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
+    if([IO.File]::ReadAllText($taskPatch).Trim().Length){
+        & git apply --check --directory=$taskRelative $taskPatch
+        if($LASTEXITCODE -ne 0){throw 'Candidate patch preflight failed. Live CEP is unchanged.'}
+        & git apply --directory=$taskRelative $taskPatch
+        if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
+    }
 } finally {Pop-Location}
 $taskManifest=Join-Path $taskDestination 'cep_panel/CSXS/manifest.xml'
 $taskManifestText=[IO.File]::ReadAllText($taskManifest).Replace('0.1.0.61','0.1.0.62').Replace('Version="0.1.61"','Version="0.1.62"')
@@ -57,7 +59,7 @@ foreach($taskPage in @('index.html','presets.html')){
     $taskPageText=[regex]::Replace([IO.File]::ReadAllText($taskPagePath),'\?v=\d+','?v=62')
     [IO.File]::WriteAllText($taskPagePath,$taskPageText,[Text.UTF8Encoding]::new($false))
 }
-[ordered]@{basePanel=61;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
+[ordered]@{basePanel=$taskBaseline.basePanel;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
     modelGraphTransactionsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Algorithm SHA256).Hash;
     presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;

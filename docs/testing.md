@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-10源8d9b50e43b75562cfe4eda7501b9eb566c9f9744的冻结May2023 x64 Release /MT八目标实际exit0，命令`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`，日志artifacts/m3-17-native61-model-build.log、build-exit.txt及artifacts/prepared/m3-17-native61-model-8d9b50e/native-bundle/candidate.json八native/十八CEP哈希。13:59 +08按owner要求部署native61/CoreABI8/CEP62；fresh AE process0，26源/安装hash、selector/versioned Core与paired rollback report通过。before/after：artifacts/m3-17-native61-deploy-{before,after}.json；新Host编译证据有效，仍不能当作实际AE脚本/原生窗口/OBJ/预设/undo/reopen资格。
+
+Owner测试建议：① Particle Shape=Model在没有连接Model时显示默认cube；② 拖入Model并连接其output到Particle Model input，导入一个静态OBJ，核对origin/rotation/scale；③ 保存包含OBJ的预设，Add/Replace、复制及保存重开，网格和身份正常；④ 文件窗口取消及完成后继续编辑，撤销重做正常。六Shape只按参考、Face灰色不可用；实际Use Model(s)选项不推测。备份与单步回滚见current-state最新部署记录，完整目标未完成。
+
+Prepare更新已发布CEP62 baseline并支持empty delta，重现artifacts/prepared/m3-17-postrelease-panel62；所有在途cleanup文件保持。PID30420于13:57:30只读确认不存在，不再待停止，记录artifacts/m3-17-native-preset-test-process-check.json。
+
 2026-10-10 owner确认额度恢复并要求测试版，准备native61/CEP62完整配对。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/model_deployment_tests.ps1 -Run`：60检查通过，实际Deploy-ModelTestBuild/Deploy-TestBuild/Restore-TestBuild在artifacts/deploy-test的dummy binaries/CEP与模拟Junction执行；覆盖read-only report、缺Model拒绝且无安装副作用、八native/十八CEP安装hash、已安装Model拒绝partial替换、缺失未复制新helper时paired rollback、旧七native/十三原有CEP还原、新Model/五helper消失和旧selector。日志artifacts/m3-17-native61-deployment-tests.log；首次预期失败被PowerShell Stop处理的夹具问题修复，首个fixture日志保留。没有对真实Adobe路径做测试写入。
 
 STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native61-panel62-test/cep_panel：gatewayBuild统一native-presets-62；Shape92/作者74/graph transport271/DOM35/文件583/export588/Texture80/Cloud49/Birth51全部通过，m3-17-native61-*-tests.log。完整SDK冻结构建继续，不把既有native60构建或fake部署当作实际AE资格。

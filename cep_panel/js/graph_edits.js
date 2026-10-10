@@ -14,14 +14,16 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
-        "org.starfieldfx.nodes.particle": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.model": { output: "1" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
@@ -74,6 +76,14 @@
             {key:"3",type:5,value:[0,0,0]}, {key:"4",type:5,value:[100,100,100]},
             {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
         ],
+        model: [
+            {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
+            {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
+            {key:"6",type:5,value:[100,100,100]},
+            {key:"7",type:3,value:0}, {key:"8",type:3,value:0}, {key:"9",type:3,value:0},
+            {key:"10",type:3,value:0}, {key:"11",type:3,value:0},
+            {key:"12",type:7,value:defaultModelBounds()}, {key:"13",type:3,value:0}
+        ],
         output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
             {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30},{key:"8",type:3,value:1},{key:"9",type:4,value:360},{key:"10",type:4,value:0},{key:"11",type:3,value:0},{key:"12",type:4,value:8},{key:"13",type:4,value:70},{key:"14",type:4,value:0},{key:"15",type:3,value:0}]
     };
@@ -85,6 +95,12 @@
             view.setFloat64(4+32*i,i,true);
             for(var channel=0;channel<3;channel++) view.setFloat64(12+32*i+8*channel,1,true);
         }
+        return bytes;
+    }
+
+    function defaultModelBounds() {
+        var bytes=new Uint8Array(48),view=new DataView(bytes.buffer);
+        for(var axis=0;axis<6;axis++)view.setFloat64(axis*8,axis<3?-.5:.5,true);
         return bytes;
     }
 
@@ -220,14 +236,18 @@
         if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
         var sourceSchema = PORTS[source.type];
         var destinationSchema = PORTS[destination.type];
+        var modelConnection=destinationSchema && source.type===TYPES.model && destination.type===TYPES.particle &&
+            String(destinationPort)===destinationSchema.modelInput;
         if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
-            destinationSchema.input !== String(destinationPort)) {
+            (!modelConnection && destinationSchema.input !== String(destinationPort))) {
             fail("invalid_port", "connection must use a compatible built-in output and input port");
         }
+        if(source.type===TYPES.model && !modelConnection)
+            fail("model_requires_particle", "Connect Model to the Particle Model input.");
         if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
             fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
         }
-        if (destination.type === TYPES.particle && source.type !== TYPES.emitter) {
+        if (destination.type === TYPES.particle && source.type !== TYPES.emitter && !modelConnection) {
             fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
         }
         if (destination.type === TYPES.emitter) {
@@ -275,7 +295,8 @@
         var destinationSchema = PORTS[destination.type];
         if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
         var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
-        var destinationPort = edit.inputPort === undefined ? destinationSchema.input : String(edit.inputPort);
+        var destinationPort = edit.inputPort === undefined ?
+            (source.type===TYPES.model ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
         validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
         for (var i = 0; i < graph.edges.length; i++) {
             var existing = graph.edges[i];
@@ -394,6 +415,11 @@
                              return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
                          }) };
             graph.nodes.push(copy);
+            if(copy.type===TYPES.model){
+                var resource=copy.parameters.filter(function(p){return String(p.key)==="1";})[0];
+                if(resource.value.some(function(byte){return byte!==0;}))resource.value=copy.id.match(/../g).map(function(byte){return parseInt(byte,16);});
+                (edit.modelResourceCopies || (edit.modelResourceCopies=[])).push({sourceId:originals[n].id,nodeId:copy.id});
+            }
             ids["$" + originals[n].id] = copy.id;
             var originalPosition = positions[originals[n].id];
             var offset = edit.offset || { x: 28, y: 28 };
@@ -444,6 +470,32 @@
             if (!node) fail("missing_node", "cannot edit a node absent from the graph");
             if (node.type === TYPES.transform && change.parameterKey === "7")
                 fail("invalid_parameter", "Inherited motion is sampled by After Effects.");
+            if(node.type===TYPES.model) {
+                if(["1","2","3","12"].indexOf(change.parameterKey)>=0)
+                    fail("invalid_parameter","Model geometry is owned by the native import transaction.");
+                if(change.parameterKey==="13") {
+                    if(change.valueType!==3 || (change.value!==0 && change.value!==1))
+                        fail("invalid_parameter","Choose Cube or OBJ.");
+                    var asset=(edit.modelAssets || {})[node.id],revision=0,resource=new Uint8Array(16),bounds=defaultModelBounds();
+                    if(change.value===1 && asset && asset.revision>0) {
+                        if(!Number.isInteger(asset.revision) || asset.revision>2147483647 || !Array.isArray(asset.bounds) || asset.bounds.length!==6)
+                            fail("invalid_parameter","The Model asset descriptor is invalid.");
+                        revision=asset.revision;
+                        for(var byte=0;byte<16;byte++)resource[byte]=parseInt(node.id.substr(byte*2,2),16);
+                        var boundView=new DataView(bounds.buffer);
+                        asset.bounds.forEach(function(v,axis){
+                            if(!Number.isFinite(v) || Math.abs(v)>1e9 || (axis>2 && v<asset.bounds[axis-3]))
+                                fail("invalid_parameter","The Model bounds are invalid.");
+                            boundView.setFloat64(axis*8,v,true);
+                        });
+                    }
+                    node.parameters.forEach(function(parameter){
+                        if(parameter.key==="1")parameter.value=resource;
+                        if(parameter.key==="2")parameter.value=revision;
+                        if(parameter.key==="12")parameter.value=bounds;
+                    });
+                }
+            }
             var found = -1;
             for (var p = 0; p < node.parameters.length; p++) {
                 if (node.parameters[p].key === change.parameterKey) { found = p; break; }
