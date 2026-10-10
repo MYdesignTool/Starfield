@@ -17,3 +17,5 @@
 [官方指南的Motion Node段落](https://superluminal.tv/user-guide)说明圆周运动与沿光源路径运动/朝向；2026-10-09复查未找到三种模式完整菜单、Circle半径或Look At方程。Particle自身的Orient To段落不能当作Motion Look At的精确语义证据。
 
 2026-10-10补充：[官方Staff的Orbit Sphere答复](https://superluminal.tv/question/orbit-sphere)给出零发射速度粒子配合Circle绕球旋转的使用案例。它支持“在已有发射分布上增加旋转”的实现假设，但没有定义半径方程、默认轴、角度时钟或Speed单位；这几项仍不能视为实测一致。已向owner请求Speed0/100对照及Origin Type完整菜单；该请求仍待回复。
+
+2026-10-10再次核对官方Motion段落，没有Max Delay或Light Path末端行为说明。已单独请求owner的末端停住/循环/继续观察和Delay Random=0时Max Delay0/0.5秒对照。计算层只接受明确数字路径/速度/延迟，不把当前有界clamp查询及相对位移方程视作参考控件政策；不添加截图以外模式/控件。

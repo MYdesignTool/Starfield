@@ -24,6 +24,10 @@ class CompiledMotionPath {
 public:
     [[nodiscard]] double length() const noexcept { return distances_.empty()?0:distances_.back(); }
     [[nodiscard]] std::size_t sample_count() const noexcept { return parameters_.size(); }
+    [[nodiscard]] std::size_t storage_bytes() const noexcept {
+        return sizeof(*this)+(controls_.capacity()+derivative_controls_.capacity())*sizeof(Vec3)+
+            (knots_.capacity()+derivative_knots_.capacity()+parameters_.capacity()+distances_.capacity())*sizeof(double);
+    }
     [[nodiscard]] Result<Vec3> position_at_distance(double distance) const noexcept;
     // An exact zero derivative yields a zero tangent: callers preserve their
     // existing orientation instead of inventing a direction at a stationary point.

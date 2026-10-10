@@ -3,13 +3,14 @@
 #include "starfield/core/Settings.hpp"
 #include "starfield/core/MotionGeometry.hpp"
 #include "starfield/core/AgeCurve.hpp"
+#include "starfield/core/MotionCurveClock.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <array>
 
 namespace starfield::core {
-struct MotionCircleClock { double integral_seconds{}, weight{}; };
+using MotionCircleClock=MotionCurveClockSample;
 struct MotionCircleState { Vec3 position{}, velocity{}; };
 class CompiledMotionCircle {
 public:
@@ -23,11 +24,9 @@ public:
     [[nodiscard]] const MotionCircleSettings& settings() const noexcept { return settings_; }
 private:
     CompiledMotionCircle()=default;
-    struct Segment { double start{}, width{}, prefix{}; std::array<double,4> coefficients{}; };
     MotionCircleSettings settings_{};
     Vec3 unit_axis_{};
-    std::array<Segment,kMaxAgeCurvePoints-1> segments_{};
-    std::size_t count_{};
+    CompiledMotionCurveClock curve_clock_{};
     friend Result<CompiledMotionCircle> compile_motion_circle(const MotionCircleSettings&) noexcept;
 };
 [[nodiscard]] Result<CompiledMotionCircle> compile_motion_circle(const MotionCircleSettings&) noexcept;
@@ -40,55 +39,24 @@ namespace starfield::core {
 namespace motion_circle_detail {
 inline bool bounded(Vec3 v) noexcept { return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z)&&
     std::abs(v.x)<=kMaxMotionCoordinate&&std::abs(v.y)<=kMaxMotionCoordinate&&std::abs(v.z)<=kMaxMotionCoordinate; }
-inline double primitive(const std::array<double,4>& c,double t) noexcept {
-    return t*(c[0]+t*(c[1]/2+t*(c[2]/3+t*c[3]/4)));
-}
 }
 inline Result<CompiledMotionCircle> compile_motion_circle(const MotionCircleSettings& settings) noexcept {
     using R=Result<CompiledMotionCircle>;
     if(!motion_circle_detail::bounded(settings.origin)||!motion_circle_detail::bounded(settings.axis)||
         !std::isfinite(settings.radians_per_second)||std::abs(settings.radians_per_second)>1e6||
-        !std::isfinite(settings.speed_random_percent)||settings.speed_random_percent<0||settings.speed_random_percent>100||
-        static_cast<unsigned>(settings.over_life.interpolation)>3||
-        (settings.over_life.count && !valid_age_curve(settings.over_life,0,1000)))
+        !std::isfinite(settings.speed_random_percent)||settings.speed_random_percent<0||settings.speed_random_percent>100)
         return R::failure(ErrorCode::invalid_request,"invalid Motion Circle settings");
     const auto largest=std::max({std::abs(settings.axis.x),std::abs(settings.axis.y),std::abs(settings.axis.z)});
     if(largest==0)return R::failure(ErrorCode::invalid_request,"Motion Circle requires a nonzero axis");
     CompiledMotionCircle out;out.settings_=settings;
     auto axis=Vec3{settings.axis.x/largest,settings.axis.y/largest,settings.axis.z/largest};
     const auto length=std::hypot(axis.x,axis.y,axis.z);out.unit_axis_={axis.x/length,axis.y/length,axis.z/length};
-    const auto& curve=settings.over_life;
-    if(!curve.count){out.count_=1;out.segments_[0]={0,1,0,{1,0,0,0}};}
-    else {
-        out.count_=curve.count-1;double prefix=0;
-        for(std::size_t i=0;i<out.count_;++i) {
-            const auto& left=curve.points[i];const auto& right=curve.points[i+1];
-            auto& s=out.segments_[i];s.start=left.age;s.width=right.age-left.age;s.prefix=prefix;
-            const auto a=left.value/100,b=right.value/100;s.coefficients={a,0,0,0};
-            if(curve.interpolation==CurveInterpolation::bezier) {
-                const auto p=s.width*age_curve_bezier_slope(curve,i)/100,q=s.width*age_curve_bezier_slope(curve,i+1)/100;
-                s.coefficients={a,p,3*(b-a)-2*p-q,2*(a-b)+p+q};
-            } else if(curve.interpolation!=CurveInterpolation::hold)s.coefficients[1]=b-a;
-            for(auto coefficient:s.coefficients)if(!std::isfinite(coefficient))
-                return R::failure(ErrorCode::invalid_request,"Motion curve coefficients are not finite");
-            prefix+=s.width*motion_circle_detail::primitive(s.coefficients,1);
-            if(!std::isfinite(prefix))return R::failure(ErrorCode::invalid_request,"Motion curve integral is not finite");
-        }
-    }
+    auto curve=compile_motion_curve_clock(settings.over_life);if(!curve.has_value())return R::failure(curve.error());
+    out.curve_clock_=curve.take_value();
     return R::success(std::move(out));
 }
 inline Result<MotionCircleClock> CompiledMotionCircle::clock(double age,double lifetime) const noexcept {
-    using R=Result<MotionCircleClock>;
-    if(!std::isfinite(age)||!std::isfinite(lifetime)||age<0||lifetime<=0||lifetime>1e6||age>lifetime)
-        return R::failure(ErrorCode::invalid_request,"invalid Motion Circle particle clock");
-    const auto fraction=age/lifetime;
-    std::size_t low=0,high=count_-1;
-    while(low<high){const auto mid=(low+high+1)/2;if(segments_[mid].start<=fraction)low=mid;else high=mid-1;}
-    const auto& s=segments_[low];const auto t=std::clamp((fraction-s.start)/s.width,0.,1.);
-    const auto integral=(s.prefix+s.width*motion_circle_detail::primitive(s.coefficients,t))*lifetime;
-    // Preserve Hold's endpoint convention, and the shared Bezier value clamp.
-    const auto weight=evaluate_age_curve(settings_.over_life,fraction,100,100)/100;
-    return R::success({integral,weight});
+    return curve_clock_.clock(age,lifetime);
 }
 inline Result<MotionCircleState> CompiledMotionCircle::apply(Vec3 position,Vec3 velocity,double angle,double omega) const noexcept {
     using R=Result<MotionCircleState>;

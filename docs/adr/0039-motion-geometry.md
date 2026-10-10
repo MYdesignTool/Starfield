@@ -1,6 +1,6 @@
 # ADR 0039 — Motion geometry and first three modes
 
-Status: numeric geometry, Circle and Look At graph candidates implemented;
+Status: numeric geometry, Circle/Look At graph and path-travel seam implemented;
 public Motion contract remains proposed,
 M3-18. Installed native61/CEP63 is unchanged.
 
@@ -212,6 +212,57 @@ native61/CEP63 hashes and its Core selector/runtime still match. Evidence is
 artifacts/m3-18-motion-look-at-sdk-* and motion-look-at-installed-hashes.json.
 No Motion author is deployed; this does not qualify the remaining reference
 policies, GPU hardware or AE execution.
+
+### Light Path numeric travel seam (implemented, unpublished)
+
+Extract Circle's fixed-storage validated curve clock into a shared immutable
+helper without changing its integral or endpoint value conventions. Add an
+interval integral so an explicitly delayed path clock can integrate from the
+supplied delay to the particle's actual age. Over Life uses the actual age/life
+fraction; it is not restarted after delay. Nonnegative delay seconds and signed
+canonical distance units/second are numeric inputs, not a claimed mapping of
+the reference Max Delay or Speed controls. Speed attenuation takes an explicit
+stable random sample0..1; this seam does not assign a Delay Random distribution.
+
+A compiled travel helper owns the supplied1..256 points, existing bounded
+B-spline/arc-length table, validated clock and settings. It reports displacement
+S(distance)-S(0), preserving the existing emitted distribution and exact zero
+motion, and adds the clipped path derivative to the caller's velocity. This is
+an independent displacement-field candidate, not evidence that the reference
+anchors particles this way. The current scalar query clamps to endpoints, as
+the geometry helper already does; loop/extrapolation/reference end policy is
+still open and cannot be advertised from this choice. Caller-supplied historical
+distance/rate can use the same spatial query without rebuilding the spline.
+
+Optional numeric path alignment composes a proper rotation from the actual
+Euler/shared-affine/pose forward to the signed tangent, using the existing pose
+helper and XY projection for Limit To2D. Zero motion or zero tangent preserves
+the exact existing pose. Commit position, velocity and pose together only after
+every input/output check succeeds. Queries allocate no storage, and compiled
+copies preserve strong assignment failure safety. Expose capacity-based owned
+storage size so the later graph/resource cache can enforce a total byte budget.
+
+This seam adds no public control, graph mode evaluator, native ID or ABI change.
+Actual mode0 graph/history/Auxiliary integration, resource dependencies and
+whole-request work/memory budgets remain required next; do not replace them with
+passing helper tests or publish the three-mode author prematurely. The complete
+ordered Force/Transform/Motion contract and owner reference calibration remain
+requirements of M3-18.
+
+MSVC /MT standard and ASAN each pass1216 checks (2026-10-10), including an
+independent segmented quadrature for all four curve interpolation modes,
+unchanged Circle clock values, a short late interval at lifetime1e6, delay and
+explicit random sample, preserved emitted offset/identity/style, signed tangent
+and Limit To2D, Euler/shear/reflection, exact signed-zero/zero-length state,
+atomic output/basis failure, every path/copy allocation failure and cancellation,
+no-allocation unordered queries and four concurrent readers. Logs are
+artifacts/m3-18-motion-path-travel-{tests,asan}.log/exit.txt. Circle graph1766 and
+Look At graph1366 regressions pass at actual exit0 after clock extraction;
+path-clock-*-regression.log/exit.txt. CMake and the Core SDK project compile
+MotionPathTravel.cpp, and adapter fingerprints include the shared new headers.
+The new source still requires its own frozen full SDK build; prior Look At
+build artifacts do not cover it. Mode0 remains explicitly rejected by the graph
+until actual history/resource/ordered integration and budgets are implemented.
 
 ### Point resource capture seam
 

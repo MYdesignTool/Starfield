@@ -172,6 +172,18 @@ struct MotionLookAtSettings {
     Vec3 goal{}, forward{1,0,0};
     AgeCurve over_life{};
 };
+struct MotionCurveClockSample { double integral_seconds{}, weight{}; };
+struct MotionPathTravelSettings {
+    // Explicit numeric inputs, not a conversion of reference author controls.
+    double units_per_second{1}, delay_seconds{}, speed_random_percent{};
+    AgeCurve over_life{};
+    bool orient_to_path{};
+    Vec3 forward{1,0,0};
+};
+struct MotionPathTravelSample {
+    Vec3 displacement{}, velocity{}, tangent{};
+    double distance{}, units_per_second{};
+};
 
 // How the emission direction is sampled. `directional` uses the Euler angles and the
 // cone span; `uniform` samples the whole sphere and ignores both.

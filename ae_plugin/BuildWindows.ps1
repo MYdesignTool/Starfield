@@ -121,6 +121,8 @@ $adapterInputs = @(
     'src\core\ModelEvaluation.hpp',
     'include\starfield\core\MotionCircle.hpp', 'include\starfield\core\MotionGeometry.hpp',
     'include\starfield\core\ParticleMotionPose.hpp',
+    'include\starfield\core\MotionCurveClock.hpp', 'include\starfield\core\MotionPathTravel.hpp',
+    'src\core\MotionPathTravel.cpp',
     'src\core\MotionEvaluation.hpp',
     'ae_plugin\ModelGeometryParameter.cpp', 'ae_plugin\ModelGeometryParameter.hpp',
     'ae_plugin\ModelMirrorParameter.cpp', 'ae_plugin\ModelMirrorParameter.hpp',

@@ -9,6 +9,7 @@ add_library(starfield_core STATIC
     src/core/ModelResources.cpp
     src/core/ModelScene.cpp
     src/core/MotionGeometry.cpp
+    src/core/MotionPathTravel.cpp
     src/core/Graph.cpp
     src/core/GraphConstruction.cpp
     src/core/GraphEvaluation.cpp
@@ -49,6 +50,9 @@ endif()
 # ae_plugin/BuildWindows.ps1, which also runs the SDK's PiPL tool.
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(starfield_motion_path_travel_tests tests/motion_path_travel_tests.cpp)
+    target_link_libraries(starfield_motion_path_travel_tests PRIVATE starfield_core)
+    add_test(NAME starfield_motion_path_travel_tests COMMAND starfield_motion_path_travel_tests)
     add_executable(starfield_motion_look_at_graph_tests tests/motion_look_at_graph_tests.cpp)
     target_link_libraries(starfield_motion_look_at_graph_tests PRIVATE starfield_core)
     add_test(NAME starfield_motion_look_at_graph_tests COMMAND starfield_motion_look_at_graph_tests)

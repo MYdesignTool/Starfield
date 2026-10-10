@@ -161,6 +161,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 Light Path travel子阶段：Circle共用固定曲线clock提取/稳定延迟区间积分；独立有界路径travel贡献相对位移和瞬时速度，明确speed/delay/random数字，切线pose保留既有分布/Euler/affine剪切镜像；无分配乱序查询、capacity存储计量及失败原子性。标准/ASAN1216、Circle1766/Look At1366均exit0，m3-18-motion-path-travel-*与path-clock-*-regression.log；Core工程/CMake/fingerprint纳入新输入，冻结完整SDK继续。参考末端/Delay Random=0对照已请求，暂不推测公开转换或分布；实际graph mode0/history/Auxiliary、全局预算/资源依赖/有序frame和三模式作者仍为本卡要求，mode0仍typed reject，不部署计算层或缩减目标。
+
 2026-10-10 Look At源码da17da8已推送/git archive冻结；双NoPublish完整May2023 /MT八目标实际terminal exit0，审批服务首次额度失败后的日志/exit/八新产物hash已恢复核对，m3-18-motion-look-at-sdk-{build.log,build-exit.txt,build-hashes.json,terminal.json}保留。新26安装hash/selector/runtime匹配native61/CEP63，m3-18-motion-look-at-installed-hashes.json；没有重启构建或沿用旧Circle产物。继续Light Path/完整有序frame/资源/参考政策/三模式作者；未部署Motion，完整目标active。
 
 2026-10-10 Look At/姿态子阶段：mode2及goal7/forward8接入实际普通/历史graph，当前时间goal/Over Life最短弧；逐粒子四元数保持Euler/shared affine剪切镜像，CPU/GPU场景准备/Model共同消费，Linear shutter SLERP。ADR0039先定义snapshot9/232B迁移，单位pose保留旧3..8/C ABI8/sequence1/AE IDs，必须新源码完整SDK配对。标准/ASAN1366、Circle1766、Transform594/Model graph559/Model snapshot2695通过，m3-18-motion-look-at-*及look-at-*-regression.log；相机Circle/Cloud保留完整姿态轴，冻结SDK继续。安装61/63不变，没有作者入口。串联Look At/Circle→Look At可用，反序/后置Force/Transform与不同链合并明确拒绝；完整有序frame、Light Path及公开目标/单位政策仍是本卡完成要求，不缩减三模式目标。
