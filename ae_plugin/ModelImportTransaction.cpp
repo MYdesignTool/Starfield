@@ -29,7 +29,7 @@ PF_Err compare_mesh(PF_InData* data,PF_ArbitraryH a,PF_ArbitraryH b) noexcept {
 }
 }
 PF_Err import_model_obj_text(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],
-    std::string_view text,const core::Cancellation& cancel) noexcept try {
+    std::string_view text,const core::Cancellation& cancel,const ModelImportCheckpoint* checkpoint) noexcept try {
     constexpr auto guard=native_nodes::sync_guard_index(native_nodes::Kind::model);
     const auto plugin=node_graph_sync_plugin_id();
     if(!data||!out||!data->pica_basicP||!data->effect_ref||!plugin||!data->time_scale||!params||
@@ -43,6 +43,8 @@ PF_Err import_model_obj_text(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     core::ModelBounds bounds{};PF_ArbitraryH candidate{};auto error=prepare_model_obj_parameter(data,text,&candidate,cancel,&bounds);
     if(error){if(error!=PF_Interrupt_CANCEL)std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield OBJ: invalid or oversized mesh (error %d).",int(error));return error;}
     struct Mesh{PF_InData* data;PF_ArbitraryH handle;~Mesh(){data->utils->host_dispose_handle(handle);}} mesh{data,candidate};
+    if(checkpoint){const auto checked=validate_model_import_checkpoint(data,*checkpoint);
+        if(checked){std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield OBJ: target or Model author changed before commit. Import cancelled.");return checked;}}
     Suite<AEGP_PFInterfaceSuite1> pf(data->pica_basicP,kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1);
     Suite<AEGP_EffectSuite4> effects(data->pica_basicP,kAEGPEffectSuite,kAEGPEffectSuiteVersion4);
     Suite<AEGP_StreamSuite6> streams(data->pica_basicP,kAEGPStreamSuite,kAEGPStreamSuiteVersion6);
@@ -70,7 +72,8 @@ PF_Err import_model_obj_text(PF_InData* data,PF_OutData* out,PF_ParamDef* params
     }
     const auto revision=refs.fields[2].value.val.one_d,source=refs.fields[3].value.val.one_d;
     if(refs.fields[0].value.val.one_d!=0||!std::isfinite(revision)||revision<0||
-       revision>=(std::numeric_limits<A_long>::max)()||std::floor(revision)!=revision||(source!=1&&source!=2))return PF_Err_BAD_CALLBACK_PARAM;
+       revision>=(std::numeric_limits<A_long>::max)()||std::floor(revision)!=revision||(source!=1&&source!=2)||
+       revision!=params[layout::revision]->u.sd.value||source!=params[layout::source]->u.pd.value)return PF_Err_BAD_CALLBACK_PARAM;
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
     ae=utility.value->AEGP_StartUndoGroup("Starfield: Import OBJ");if(ae)return static_cast<PF_Err>(ae);
     struct Undo{const AEGP_UtilitySuite6* utility;~Undo(){utility->AEGP_EndUndoGroup();}} undo{utility.value};

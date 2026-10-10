@@ -4,6 +4,8 @@
 #include "starfield/core/ModelResources.hpp"
 
 namespace starfield::adapter {
+// Exact validated SFMG1 bytes, copied with the handle unlocked before decoding.
+[[nodiscard]] core::Result<core::OpaqueBytes> copy_model_geometry_parameter_bytes(PF_InData*,PF_ArbitraryH) noexcept;
 [[nodiscard]] core::Result<core::ModelGeometry> read_model_geometry_parameter(
     PF_InData*,PF_ArbitraryH,const core::Cancellation&) noexcept;
 [[nodiscard]] PF_Err create_model_geometry_parameter(PF_InData*,const core::ModelGeometry&,

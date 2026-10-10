@@ -36,6 +36,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="StarfieldHost.cpp" />
+    <ClCompile Include="UiExclusionHost.cpp" />
     <ClCompile Include="ModelAssetHost.cpp" />
     <ClCompile Include="EffectGraphBackup.cpp" />
     <ClCompile Include="ModelGraphTransaction.cpp" />

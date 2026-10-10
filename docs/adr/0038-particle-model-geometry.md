@@ -895,3 +895,37 @@ Cancellation during native asset validation/writes is numeric-only; it never
 executes another script while an effect reference is owned. Modal/script exclusion
 and actual AE timing remain the deployment gates above. No persistent ID, Core
 ABI or installed pairing changes in this transport stage.
+
+### Native modal exclusion and import checkpoint
+
+The resident Host owns a session-local exclusive UI token through private C
+exports SFLD_BeginUiExclusionV1/SFLD_EndUiExclusionV1. Effect DLLs resolve only
+the already loaded StarfieldHost.aex; a missing/mismatched Host, non-UI thread
+or occupied token fails closed. A token can only be released by its owning UI
+thread with the matching value. No SDK handle, allocator, hook, registry setting,
+environment change, named mutex or script probe crosses this private seam.
+
+The token spans PresetsUI's entire ExecuteScript, OBJ's chooser/file read/import
+commit, EditorPresetPicker's dialog, and Texture's inventory script/layer menu.
+Both Model idle steps acquire the same token for their whole callback, including
+failure notification. Bootstrap also acquires it; nested idle makes no SDK/script
+calls while a native UI scope owns it. Queue state survives deferral. Each native
+module keeps its own direct-reentry guard; that guard is not the cross-DLL policy.
+
+Before the OBJ chooser opens, the callback captures numeric project/comp/layer
+identity, layer time, effect flags and all current ordinary Model author/metadata
+values, including UUID/Source/revision/guard/bounds, plus exact bounded validated
+SFMG1 bytes. Every SDK effect/stream/value/handle/lock is disposed before the
+chooser. After return and again after parsing, before undo or any write, the same
+PF context is reacquired and compared. Changed target, current values, time or
+mesh is rejected; equal fractional times are accepted. The import transaction
+also rejects callback Source/revision that disagree with live streams. This is
+current-time author consistency, not a backup of animation/expression identity.
+
+These private helpers change no persistent ID, effect identity, schema or Core
+ABI. Actual separate DLLs and a same-thread Windows message pump exercise the
+token protocol; actual import code with fake SDK suites exercises checkpoints
+and rollback. First compile diagnostics were repaired and retained. This is
+preventive handling of the owner's unreplicated static hypothesis. Complete SDK
+pairing, actual AE2023 native/script/file-modal timing, pending preset operations,
+undo and reopen still require the full author candidate's deployment acceptance.

@@ -134,6 +134,10 @@ PF_Err dispatch(PF_InData* data,PF_ArbParamsExtra& extra) {
     }
 }
 }
+core::Result<core::OpaqueBytes> copy_model_geometry_parameter_bytes(PF_InData* data,PF_ArbitraryH handle) noexcept try {
+    return validated_bytes(data,handle);
+} catch(const std::bad_alloc&){return core::Result<core::OpaqueBytes>::failure(core::ErrorCode::allocation_failed,"Model mesh copy allocation failed");}
+catch(...){return core::Result<core::OpaqueBytes>::failure(core::ErrorCode::invalid_request,"Model mesh handle copy failed");}
 core::Result<core::ModelGeometry> read_model_geometry_parameter(PF_InData* data,PF_ArbitraryH handle,
     const core::Cancellation& cancel) noexcept try {
     if(cancel.is_cancelled())return core::Result<core::ModelGeometry>::failure(core::ErrorCode::cancelled,"Model mesh read cancelled");

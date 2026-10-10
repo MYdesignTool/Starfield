@@ -1,4 +1,5 @@
 #include "ModelTransactionHost.hpp"
+#include "UiExclusionHost.hpp"
 #include "ModelGraphTransaction.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -26,7 +27,7 @@ void clean(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(script_dep
 std::string arguments(const std::string& body,const char* name){const std::string marker=std::string(name)+"(";
     const auto start=body.find(marker),end=body.rfind("):'0')");CHECK(start!=std::string::npos && end!=std::string::npos);
     return body.substr(start+marker.size(),end-start-marker.size());}
-void reset(){stop_model_transaction_host();clean();initialize_model_transaction_host(&basic,7);
+void reset(){stop_model_transaction_host();clean();initialize_ui_exclusion();initialize_model_transaction_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|1|"+node+",000000000000000000000000000000ff";
     lengths={70001};descriptor_line.clear();result_line.clear();missing_suite.clear();
     available=continue_ok=prepare_ok=commit_ok=true;
@@ -37,6 +38,7 @@ void initialize(){
     utility.AEGP_IsScriptingAvailable=[](A_Boolean* out)->A_Err{*out=available;return 0;};
     utility.AEGP_ExecuteScript=[](AEGP_PluginID plugin,const char* body,A_Boolean platform,AEGP_MemHandle* out,AEGP_MemHandle* error)->A_Err{
         CHECK(plugin==7 && platform==FALSE);CHECK(handles==0 && locks==0);CHECK(script_depth++==0);++script_calls;
+        CHECK(!ui_exclusion_available());CHECK(SFLD_BeginUiExclusionV1()==0);
         if(reenter)CHECK(!step_model_transaction_host());
         std::string text(body),reply="1";
         if(text.find("SFLD_modelTransactionHostRequest")!=std::string::npos)reply=request_line;
@@ -98,6 +100,8 @@ ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransa
 }
 }
 int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(script_calls==0);
+    {HostUiExclusion modal;CHECK(modal);queue_model_graph_transaction();
+        CHECK(step_model_transaction_host());CHECK(script_calls==0 && executor_calls==0);}
     drain();CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && pages==3);CHECK(result_line.find(",[1,7,0,0,0,0,0,0,-1]")!=std::string::npos);
     reset();reenter=true;drain();CHECK(executor_calls==1 && commits==1);
     reset();committed_warning=true;drain();CHECK(result_line.find(",[1,7,0,0,0,516,0,0,-1]")!=std::string::npos);

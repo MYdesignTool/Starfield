@@ -1,5 +1,6 @@
 #include "ModelTransactionHost.hpp"
 #include "ModelGraphTransaction.hpp"
+#include "UiExclusionHost.hpp"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -159,8 +160,10 @@ void initialize_model_transaction_host(SPBasicSuite* suites,AEGP_PluginID id) no
 }
 void queue_model_graph_transaction() noexcept {if(!stopped && std::this_thread::get_id()==ui_thread)queued=true;}
 void stop_model_transaction_host() noexcept {stopped=true;queued=false;if(!running)session=Session{};}
-bool step_model_transaction_host() noexcept try {
+bool step_model_transaction_host() noexcept {
     if(stopped || running || std::this_thread::get_id()!=ui_thread || (!queued && session.id.empty()))return false;
+    HostUiExclusion exclusion;if(!exclusion)return true;
+    try {
     running=true;struct Running {~Running(){running=false;}} scope;
     std::string text;
     if(session.id.empty()){queued=false;
@@ -188,5 +191,6 @@ bool step_model_transaction_host() noexcept try {
     }
     if(session.index==session.assets.size()){apply();return queued;}
     return true;
-} catch(...){try{failed(PF_Err_OUT_OF_MEMORY);}catch(...){session=Session{};}running=false;return queued;}
+    } catch(...){try{failed(PF_Err_OUT_OF_MEMORY);}catch(...){session=Session{};}running=false;return queued;}
+}
 }

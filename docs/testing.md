@@ -1,5 +1,11 @@
 # 测试入口
 
+2026-10-10 Model原生UI保护：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelUiExclusionTests.ps1 -Run`与追加`-Sanitize`各470检查通过；实际resident状态/已加载模块解析/token与独立DLL、message-only Windows同线程消息泵参与，覆盖缺失/不匹配Host、模态期间重复重入、错误token/旧token/非UI线程释放、异常与stop恢复。没有调用真实AE脚本/文件窗口。`tests/RunModelAssetHostTests.ps1 -Run`及ASAN各148867、`tests/RunModelTransactionHostTests.ps1 -Run`及ASAN8886869/8887089通过，覆盖实际idle模块范围占用/排队恢复/脚本内拒绝重入与既有资源验证；计数包含字节与调用，执行器fake。日志artifacts/m3-17-model-ui-exclusion-{tests,asan,export,export-asan,transaction,transaction-asan}.log。首轮C导出属性声明不一致诊断保留于linkage-failed.log。
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelImportTransactionTests.ps1 -Run`和ASAN各20284检查通过（实际ImportTransaction/ImportCheckpoint/ARB helper，fake SDK，复用Model控件452）。覆盖全部98数字作者/metadata/bounds流变化、同revision不同mesh、project/comp/layer/UUID/time/flags、相等分数时间、suite与每一流读取失败、callback Source/revision过期、无undo/写入拒绝、正常导入及既有rollback；快照没有SDK引用或锁跨窗口。日志artifacts/m3-17-model-import-checkpoint-{tests,asan}.log，SDK名称/头文件首次诊断保留于sdk-type-failed.log。新源码完整SDK冻结待记录，真实AE模态及导入回调仍需验收。
+
+2cbc74a Host传输冻结完整May2023 x64 Release /MT八目标exit0，双NoPublish；artifacts/m3-17-model-transaction-host-build.log及八输出/十八安装哈希m3-17-model-transaction-host-{build,installed}-hashes.json。10:13 +08:00安装与native60/CEP61收据0不匹配，selector/所选Core匹配；本证据不含之后UI保护/导入快照源码。
+
 2026-10-10 M3-17恢复Host/CEP整笔传输：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelTransactionHostTests.ps1 -Run`和追加`-Sanitize`，May2023/MSVC /MT，8885968/8886148计数、0失败（包含逐字节核对和时限引起的idle调用次数变化，executor是fake）。覆盖所有描述/总64MiB在page复制前预检、单8MiB/63资产/64 IDs、顺序/长度/字节合法性、script handles/锁/suite释放、目标重新定位、线程/直接重入、取消/停止、prepare/commit失败及committed cleanup诊断；不是Modal/idle跨模块互斥或AE资格。日志artifacts/m3-17-model-transaction-host-{tests,asan}.log；首次夹具A_TimeMode误用已修正，time-type-failed日志保留。
 
 Prepare生成m3-17-model-transactions-panel62-v2/cep_panel后，进程STARFIELD_PANEL_ROOT指向该隔离目录：`node tests/model_graph_transport_tests.js`271检查、`node tests/model_graph_gateway_dom_tests.js`35检查通过。实际client/helper/Model validators/graph planner以及真实gateway物化与提交回调参与；DOM、SFMW、外层备份/undo/原生收据为模拟。覆盖跨页、停放mesh、Add/Replace UUID映射、导出复制、guard2备份/索引组失效、恢复前暂缓参数、stale/坏页/超限拒绝、取消迟到回调清理、队列ack丢失、已发布但通知丢失、commit拒绝和作者读回。日志artifacts/m3-17-model-graph-{transport,gateway-dom}-tests.log，fixture-api/typed-array-fixture/scheduler-fixture失败诊断保留；不能从这些夹具关闭AE rollback/undo/expression/模态资格。

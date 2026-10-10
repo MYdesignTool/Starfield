@@ -1,6 +1,7 @@
 #include "PresetsUI.hpp"
 #include "MainLauncher.hpp"
 #include "GraphCarrier.hpp"
+#include "UiExclusionClient.hpp"
 #include "AE_EffectSuites.h"
 #include "AE_GeneralPlug.h"
 #include "SPBasic.h"
@@ -49,6 +50,7 @@ void launch(PF_InData* data,MainLauncherAction action) noexcept {
     Suite<AEGP_UtilitySuite6> utility(data->pica_basicP,kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
     if(!utility || !utility->AEGP_ExecuteScript)return;
     if(action==MainLauncherAction::none)return;
+    EffectUiExclusion exclusion;if(!exclusion)return;
     const auto script=action==MainLauncherAction::panel ?
         "(function(){var id=app.findMenuCommandId('Starfield Particle Controls');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions.');}())" :
         "(function(){var id=app.findMenuCommandId('Starfield Presets');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions, then click Presets.');}())";

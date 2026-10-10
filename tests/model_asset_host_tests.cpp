@@ -1,4 +1,5 @@
 #include "ModelAssetHost.hpp"
+#include "UiExclusionHost.hpp"
 #include "ModelAssetMessage.hpp"
 #include "NodeRecord.hpp"
 #include "Parameters.hpp"
@@ -35,7 +36,7 @@ std::string arguments(const std::string& body,const char* name){const std::strin
     const auto start=body.find(marker);CHECK(start!=std::string::npos);const auto end=body.rfind("):'0')");CHECK(end!=std::string::npos);
     return body.substr(start+marker.size(),end-start-marker.size());}
 void no_owned(){CHECK(suites==0);CHECK(refs==0);CHECK(values==0);CHECK(handles==0);CHECK(locks==0);}
-void reset(){stop_model_asset_host();no_owned();initialize_model_asset_host(&basic,7);
+void reset(){stop_model_asset_host();no_owned();initialize_ui_exclusion();initialize_model_asset_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|"+uuid+"|1|17";
     missing_suite.clear();received.clear();failed.clear();payload_size=70001;reject_page=-1;
     available=continue_ack=true;wrong_uuid=duplicate=multiple_renderers=wrong_project=wrong_comp=wrong_layer=false;
@@ -47,6 +48,7 @@ void initialize(){
     utility.AEGP_IsScriptingAvailable=[](A_Boolean* out)->A_Err{*out=available;return 0;};
     utility.AEGP_ExecuteScript=[](AEGP_PluginID id,const A_char* body,A_Boolean platform,AEGP_MemHandle* out,AEGP_MemHandle* error)->A_Err{
         CHECK(id==7);CHECK(platform==FALSE);++script_calls;CHECK(refs==0);CHECK(values==0);CHECK(locks==0);
+        CHECK(!ui_exclusion_available());CHECK(SFLD_BeginUiExclusionV1()==0);CHECK(!step_model_asset_host());
         if(script_error){*error=mem("error");*out=mem("discarded");return 512;}
         std::string text(body),reply="1";
         if(text.find("SFLD_modelAssetHostRequest")!=std::string::npos)reply=request_line;
@@ -117,6 +119,8 @@ void initialize(){
 }
 }
 int main(){initialize();reset();CHECK(!step_model_asset_host());CHECK(script_calls==0);
+    {HostUiExclusion modal;CHECK(modal);queue_model_asset_export();
+        CHECK(step_model_asset_host());CHECK(script_calls==0 && generic_calls==0);}
     std::thread worker([]{queue_model_asset_export();CHECK(!step_model_asset_host());});worker.join();CHECK(script_calls==0);
     drain();CHECK(generic_calls==1 && begins==1 && finishes==1 && chunk_calls==3);CHECK(received.size()==payload_size*2);
     constexpr char hex[]="0123456789abcdef";for(std::size_t i=0;i<payload_size;++i){CHECK(received[i*2]==hex[(i&255)>>4]);CHECK(received[i*2+1]==hex[i&15]);}

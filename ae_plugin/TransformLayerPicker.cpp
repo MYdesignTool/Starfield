@@ -2,11 +2,13 @@
 #include "SPBasic.h"
 #define NOMINMAX
 #include <Windows.h>
+#include "UiExclusionClient.hpp"
 
 namespace starfield::adapter {
 bool choose_transform_layer(PF_InData* data,const std::vector<TransformLayerChoice>& choices,
                             AEGP_LayerIDVal current,AEGP_LayerIDVal& selected) noexcept try {
     if(!data || !data->pica_basicP || choices.empty() || choices.size()>4097)return false;
+    EffectUiExclusion exclusion;if(!exclusion)return false;
     const AEGP_UtilitySuite6* utility{};
     if(data->pica_basicP->AcquireSuite(kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6,
        reinterpret_cast<const void**>(&utility)) || !utility)return false;

@@ -4,6 +4,7 @@
 #include "SPBasic.h"
 #define NOMINMAX
 #include <Windows.h>
+#include "UiExclusionClient.hpp"
 #include <algorithm>
 #include <iterator>
 #include <vector>
@@ -116,6 +117,7 @@ INT_PTR CALLBACK dialog(HWND window,UINT message,WPARAM wp,LPARAM lp) noexcept {
 }
 int choose(PF_InData* data,bool gradients) {
     if(!data || !data->pica_basicP)return -1;
+    EffectUiExclusion exclusion;if(!exclusion)return -1;
     const AEGP_UtilitySuite6* utility{};
     if(data->pica_basicP->AcquireSuite(kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6,reinterpret_cast<const void**>(&utility)) || !utility)return -1;
     HWND owner{};const auto error=utility->AEGP_GetMainHWND(&owner);

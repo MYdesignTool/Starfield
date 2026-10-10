@@ -81,6 +81,7 @@
     <ClCompile Include="ModelMirrorParameter.cpp" />
     <ClCompile Include="ModelMirrorTransaction.cpp" />
     <ClCompile Include="ModelImportTransaction.cpp" />
+    <ClCompile Include="ModelImportCheckpoint.cpp" />
     <ClCompile Include="ModelImportUI.cpp" />
     <ClCompile Include="ModelAssetExport.cpp" />
     <ClCompile Include="ModelAssetWrite.cpp" />

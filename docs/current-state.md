@@ -6,6 +6,16 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### Model 原生模态保护与导入快照（2026-10-10）
+
+2cbc74a整笔Host/CEP传输候选已推送并git archive冻结，May2023 x64 Release /MT八目标构建exit0，双NoPublish；日志artifacts/m3-17-model-transaction-host-build.log，八产物/十八安装报告artifacts/m3-17-model-transaction-host-{build,installed}-hashes.json。10:13 +08:00安装0不匹配，selector及所选Core哈希匹配native60/CEP61，未发布候选。
+
+新的未部署源码在常驻Host内持有独占UI token，effect DLL只从已加载Host解析private C入口；缺失/不匹配Host或重入拒绝，不加载DLL、不执行脚本探测。PresetsUI脚本、OBJ chooser及整个导入提交、EditorPresetPicker、Texture库存脚本及图层菜单覆盖范围；两个Model idle通道和bootstrap在同一范围内执行，异常通知也不绕过范围。实际跨DLL/message-only Windows同线程消息循环标准/ASAN各470检查通过；实际导出148867/148867、事务8886869/8887089通过，含逐字节/调用计数及25ms切片引起的差异，后者executor仍为fake。日志m3-17-model-ui-exclusion-*.log；首次C导出声明不一致已修复，诊断保留。
+
+OBJ在打开文件窗口前复制数字目标、当前时间、UUID、Source/revision、当前作者/metadata/bounds、flags与完整有界SFMG1自有字节，不保留SDK对象。窗口返回及解析后提交前都重新核对；变化时在undo/写入前拒绝，普通导入事务也拒绝过期callback Source/revision。实际导入/快照标准/ASAN各20284通过（复用控件452、fake SDK），覆盖所有数字流、相同修订下网格变化、目标/时间/flags、suite/逐流失败、无写入拒绝、成功及原rollback。日志m3-17-model-import-checkpoint-{tests,asan}.log，首次SDK函数/头文件误用已修正并保留诊断。以上是假设风险的预防性实现，未复现AE缺陷；原生模态实际AE2023时序、预设文件窗口/取消与资源事务、撤销/重开仍需完整候选验收。此新源码完整SDK冻结构建待记录。
+
+继续M3-17 Particle Model入口/选择方式和完整配对；参数dump只含Shape/Use Model(s)当前值，完整下拉参考已再次请求，等待owner补充。全部在途及MNT改动保留，完整目标active。
+
 ### 恢复开发：Model整笔传输候选（2026-10-10）
 
 独立Host命令只排队，idle以最多八项工作/25ms slice拉取plain ASCII描述和32KiB网格页；全部描述符、UUID及总64MiB预检先于payload读取，随后调用已有ModelGraphTransaction完整备份/单undo/SFMW执行器。Host在prepare/commit前重新定位project/comp/layer；取消检查是纯数值，不在拥有effect ref时执行脚本。标准及ASAN传输夹具通过（逐字节与调用计数分别8885968/8886148，0失败；executor为fake），artifacts/m3-17-model-transaction-host-{tests,asan}.log；首轮夹具SDK时间类型错误已修正并保留诊断。

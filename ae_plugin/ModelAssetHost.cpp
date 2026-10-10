@@ -1,4 +1,5 @@
 #include "ModelAssetHost.hpp"
+#include "UiExclusionHost.hpp"
 #include "ModelAssetMessage.hpp"
 #include "NodeRecord.hpp"
 #include "EffectGraphBackup.hpp"
@@ -21,7 +22,7 @@ constexpr std::size_t mesh_limit=8*1024*1024,page_bytes=32768;
 SPBasicSuite* basic{};
 AEGP_PluginID plugin{};
 std::thread::id ui_thread;
-bool queued{},stopped{};
+bool queued{},stopped{},running{};
 struct Session {
     std::string id;
     std::vector<std::uint8_t> bytes;
@@ -194,13 +195,17 @@ void begin() {
 }
 }
 void initialize_model_asset_host(SPBasicSuite* suites,AEGP_PluginID id) noexcept {
-    basic=suites;plugin=id;ui_thread=std::this_thread::get_id();stopped=false;queued=false;clear_session();
+    basic=suites;plugin=id;ui_thread=std::this_thread::get_id();stopped=false;queued=false;running=false;clear_session();
 }
 void queue_model_asset_export() noexcept {if(!stopped && std::this_thread::get_id()==ui_thread)queued=true;}
-void stop_model_asset_host() noexcept {stopped=true;queued=false;clear_session();}
-bool step_model_asset_host() noexcept try {
-    if(stopped || std::this_thread::get_id()!=ui_thread || (!queued && session.id.empty()))return false;
+void stop_model_asset_host() noexcept {stopped=true;queued=false;if(!running)clear_session();}
+bool step_model_asset_host() noexcept {
+    if(stopped || running || std::this_thread::get_id()!=ui_thread || (!queued && session.id.empty()))return false;
+    HostUiExclusion exclusion;if(!exclusion)return true;
+    running=true;struct Running {~Running(){running=false;if(stopped)clear_session();}} active;
+    try {
     if(session.id.empty()){queued=false;begin();}
+    if(stopped)return false;
     if(session.id.empty())return queued;
     std::string ack;
     if(std::chrono::steady_clock::now()>session.expires ||
@@ -212,11 +217,13 @@ bool step_model_asset_host() noexcept try {
         for(std::size_t i=0;i<count;++i){const auto byte=session.bytes[start+i];text[i*2]=hex[byte>>4];text[i*2+1]=hex[byte&15];}
         if(!call_script("SFLD_modelAssetHostChunk",hex_literal(session.id)+","+std::to_string(session.page)+","+hex_literal(text),ack) || ack!="1"){
             clear_session();return queued;}
+        if(stopped)return false;
         ++session.page;
         if(std::chrono::steady_clock::now()-started>std::chrono::milliseconds(25))break;
     }
     if(session.page*page_bytes>=session.bytes.size()){
         (void)call_script("SFLD_modelAssetHostFinish",hex_literal(session.id),ack);clear_session();return queued;}
     return true;
-} catch(...){if(!session.id.empty())try{fail(session.id,ModelAssetError::allocation_failed);}catch(...){clear_session();}return queued;}
+    } catch(...){if(!session.id.empty())try{fail(session.id,ModelAssetError::allocation_failed);}catch(...){clear_session();}return queued;}
+}
 }

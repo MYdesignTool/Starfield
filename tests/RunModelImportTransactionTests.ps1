@@ -14,7 +14,7 @@ try {
         '/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'),'tests\model_import_transaction_tests.cpp',
-        'ae_plugin\ModelControls.cpp','ae_plugin\ModelImportTransaction.cpp','ae_plugin\ModelGeometryParameter.cpp')+$taskSources
+        'ae_plugin\ModelControls.cpp','ae_plugin\ModelImportTransaction.cpp','ae_plugin\ModelImportCheckpoint.cpp','ae_plugin\ModelGeometryParameter.cpp')+$taskSources
     $taskLinkArgs=''
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs="/link /DEBUG /PDB:$taskDir\tests.pdb"}
     [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDir\compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))

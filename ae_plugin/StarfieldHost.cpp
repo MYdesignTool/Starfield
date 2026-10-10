@@ -5,6 +5,7 @@
 #include "EffectReveal.hpp"
 #include "ModelAssetHost.hpp"
 #include "ModelTransactionHost.hpp"
+#include "UiExclusionHost.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -112,10 +113,12 @@ A_Err model_asset_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
 A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(sleep)*sleep=std::min(*sleep,A_long{30});
     const auto now=std::chrono::steady_clock::now();
-    if(stopped || running || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
+    if(stopped || running || std::this_thread::get_id()!=main_thread ||
+       !starfield::adapter::ui_exclusion_available())return A_Err_NONE;
     running=true;struct RunningScope{~RunningScope(){running=false;}} scope;
     if(starfield::adapter::step_model_asset_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_model_transaction_host() && sleep)*sleep=std::min(*sleep,A_long{1});
+    starfield::adapter::HostUiExclusion idle_scope;if(!idle_scope)return A_Err_NONE;
     if(now<next_scan)return A_Err_NONE;
     next_scan=now+std::chrono::milliseconds(500);
     Suite<AEGP_ItemSuite9> items(kAEGPItemSuite,kAEGPItemSuiteVersion9);
@@ -169,12 +172,14 @@ A_Err model_transaction_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command 
     starfield::adapter::queue_model_graph_transaction();return A_Err_NONE;
 }
 A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {
-    stopped=true;starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();return A_Err_NONE;
+    stopped=true;starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();
+    starfield::adapter::stop_ui_exclusion();return A_Err_NONE;
 }
 }
 extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A_long,A_long,
     AEGP_PluginID id,AEGP_GlobalRefcon* refcon) noexcept {
     basic=suites;plugin_id=id;main_thread=std::this_thread::get_id();
+    starfield::adapter::initialize_ui_exclusion();
     starfield::adapter::initialize_model_asset_host(suites,id);
     starfield::adapter::initialize_model_transaction_host(suites,id);
     if(refcon)*refcon=nullptr;

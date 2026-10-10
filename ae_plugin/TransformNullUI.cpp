@@ -2,6 +2,7 @@
 #include "NodeEffects.hpp"
 #include "NodeRecord.hpp"
 #include "TextureLayerInventory.hpp"
+#include "UiExclusionClient.hpp"
 #include "AE_EffectCBSuites.h"
 #include "adobesdk/DrawbotSuite.h"
 #include <algorithm>
@@ -108,6 +109,7 @@ PF_Err read_transform_layers(PF_InData* data,std::vector<TransformLayerChoice>& 
     choices.push_back({0,u"None"});
     if(!full_inventory && !selected)return PF_Err_NONE;
     if(full_inventory && parameter_index!=1) {
+        EffectUiExclusion exclusion;if(!exclusion)return PF_Err_BAD_CALLBACK_PARAM;
         Suite<AEGP_UtilitySuite6> utility(data->pica_basicP,kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
         if(utility && utility->AEGP_ExecuteScript) {
             Suite<AEGP_CompSuite11> comps(data->pica_basicP,kAEGPCompSuite,kAEGPCompSuiteVersion11);
