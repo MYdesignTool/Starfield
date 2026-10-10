@@ -656,6 +656,17 @@ NodeRegistry make_particle_node_registry() {
     registry.types.push_back(std::move(force));
     registry.types.push_back(std::move(output));
     registry.types.push_back(std::move(transform));
+    NodeTypeDescriptor motion;
+    motion.type_key=kMotionNode;motion.schema_version=1;
+    motion.ports={PortDescriptor{kMotionParticlesIn,PortDirection::input,kParticleStream,true,0},
+        PortDescriptor{kMotionParticlesOut,PortDirection::output,kParticleStream,false,0}};
+    motion.parameters={ParameterDescriptor{kMotionMode,ParameterKind::uint32,true},
+        ParameterDescriptor{kMotionOrigin,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kMotionAxis,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kMotionAngularRate,ParameterKind::float64,true},
+        ParameterDescriptor{kMotionSpeedRandom,ParameterKind::float64,false},
+        ParameterDescriptor{kMotionOverLife,ParameterKind::opaque_bytes,false}};
+    registry.types.push_back(std::move(motion));
     NodeTypeDescriptor model;
     model.type_key=kModelNode;model.schema_version=1;
     model.ports={PortDescriptor{kModelGeometryOut,PortDirection::output,kModelStream,false,0}};

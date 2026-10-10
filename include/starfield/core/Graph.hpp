@@ -192,6 +192,7 @@ inline constexpr const char* kEmitterNode = "org.starfieldfx.nodes.emitter";
 inline constexpr const char* kParticleNode = "org.starfieldfx.nodes.particle";
 inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
 inline constexpr const char* kTransformNode = "org.starfieldfx.nodes.transform";
+inline constexpr const char* kMotionNode = "org.starfieldfx.nodes.motion";
 inline constexpr const char* kModelNode = "org.starfieldfx.nodes.model";
 inline constexpr const char* kModelStream = "org.starfieldfx.types.model-stream";
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";
@@ -207,6 +208,10 @@ inline constexpr ParameterKey kModelOrigin{4},kModelRotation{5},kModelScale{6},
 inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
 inline constexpr PortKey kTransformParticlesIn{1},kTransformParticlesOut{2};
+inline constexpr PortKey kMotionParticlesIn{1},kMotionParticlesOut{2};
+// Motion's Core numeric units are explicit, not AE/public Speed units.
+inline constexpr ParameterKey kMotionMode{1},kMotionOrigin{2},kMotionAxis{3},kMotionAngularRate{4},
+    kMotionSpeedRandom{5},kMotionOverLife{6};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};

@@ -48,6 +48,9 @@ class TemporalEvaluator {
     double hz{kDefaultTemporalHz};
     std::map<std::pair<NodeId,double>,ForceValues> force_samples;
     std::map<std::pair<NodeId,double>,CompiledParticleTransform> transform_samples;
+    using CircleLease=std::shared_ptr<const CompiledMotionCircle>;
+    std::map<std::pair<NodeId,double>,CircleLease> circle_samples;
+    std::map<NodeId,CircleLease> constant_circles;
     TransformPlanningBudget transform_budget;
     using R=Result<EvaluatedGraph>;
     struct Branch {
@@ -58,6 +61,7 @@ class TemporalEvaluator {
         bool authored_birth{};
         std::shared_ptr<const TransformBranchPlan> transform;
         std::vector<const CompiledParticleTransform*> force_spaces;
+        std::vector<NodeId> circles;
     };
     Result<GraphNode> at(const GraphNode& node,double time) {
         if(cancel.is_cancelled()) return Result<GraphNode>::failure(ErrorCode::cancelled,"temporal sampling cancelled");
@@ -91,6 +95,63 @@ class TemporalEvaluator {
             transform_samples.emplace(key,values.value());
         }
         return values;
+    }
+    Result<CircleLease> circle_at(const GraphNode& node,double time) {
+        const auto key=std::make_pair(node.id,time);
+        if(const auto found=circle_samples.find(key);found!=circle_samples.end())
+            return Result<CircleLease>::success(found->second);
+        auto sampled=at(node,time);if(!sampled.has_value())return Result<CircleLease>::failure(sampled.error());
+        auto value=read_motion_circle(sampled.value());
+        if(!value.has_value())return Result<CircleLease>::failure(value.error());
+        auto lease=std::make_shared<const CompiledMotionCircle>(value.take_value());
+        if(circle_samples.size()>=4096)circle_samples.clear();
+        circle_samples.emplace(key,lease);return Result<CircleLease>::success(std::move(lease));
+    }
+    Result<bool> apply_circles(ParticleInstance& particle,const Branch& branch,double birth,double now,
+        std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes) {
+        using M=Result<bool>;
+        for(auto id:branch.circles) {
+            if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"Motion Circle history cancelled");
+            auto proof=constant_circles.find(id);
+            if(proof==constant_circles.end()) {
+                CircleLease value;
+                if(auto supplied=sampler.constant_motion_circle(id)) {
+                    auto compiled=compile_motion_circle(*supplied);if(!compiled.has_value())return M::failure(compiled.error());
+                    value=std::make_shared<const CompiledMotionCircle>(compiled.take_value());
+                }
+                proof=constant_circles.emplace(id,std::move(value)).first;
+            }
+            auto current=proof->second?Result<CircleLease>::success(proof->second):circle_at(*nodes.at(id),now);
+            if(!current.has_value())return M::failure(current.error());
+            const auto& c=*current.value();auto endpoint=c.clock(particle.age_seconds,particle.lifetime_seconds);
+            if(!endpoint.has_value())return M::failure(endpoint.error());
+            const auto random=motion_speed_random(particle,id,seed);
+            const auto factor=[&](double percent){return 1-percent/100*random;};
+            const auto omega=c.settings().radians_per_second*endpoint.value().weight*
+                factor(c.settings().speed_random_percent);
+            double angle=0;
+            if(proof->second)angle=c.settings().radians_per_second*endpoint.value().integral_seconds*
+                factor(c.settings().speed_random_percent);
+            else {
+                double t=birth;
+                while(t<now) {
+                    if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"Motion Circle history cancelled");
+                    if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Motion Circle history work limit");
+                    const auto end=std::min(now,(std::floor(t*hz+1e-8)+1)/hz);
+                    if(!(end>t))return M::failure(ErrorCode::invalid_time,"Motion Circle clock did not advance");
+                    const auto middle=(t+end)/2;auto sampled=circle_at(*nodes.at(id),middle);
+                    if(!sampled.has_value())return M::failure(sampled.error());
+                    const auto& values=*sampled.value();auto clock=values.clock(middle-birth,particle.lifetime_seconds);
+                    if(!clock.has_value())return M::failure(clock.error());
+                    angle+=values.settings().radians_per_second*clock.value().weight*(end-t)*
+                        factor(values.settings().speed_random_percent);
+                    t=end;
+                }
+            }
+            if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Motion Circle history work limit");
+            auto moved=apply_circle_state(particle,c,angle,omega);if(!moved.has_value())return moved;
+        }
+        return M::success(true);
     }
     Result<bool> motion(ParticleInstance& particle,const Branch& branch,
                         double birth,double now,std::uint32_t seed) {
@@ -166,7 +227,10 @@ public:
     R evaluate(const Graph& graph,double now,unsigned depth=0) {
         if(depth>16) return R::failure(ErrorCode::work_limit_exceeded,"auxiliary history depth limit");
         const auto validation=validate_graph(graph,particle_node_registry());
-        if(!validation) return R::failure(ErrorCode::invalid_request,"invalid temporal graph");
+        if(!validation) return R::failure(
+            validation.error.code==GraphErrorCode::allocation_failed?ErrorCode::allocation_failed:
+            validation.error.code==GraphErrorCode::internal_failure?ErrorCode::internal_failure:ErrorCode::invalid_request,
+            validation.error.detail);
         if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"temporal graph cancelled");
         std::map<NodeId,const GraphNode*> nodes;
         std::map<NodeId,std::vector<NodeId>> incoming,outgoing,dependencies,dependents;
@@ -177,6 +241,7 @@ public:
             if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());models.emplace(node.id,value.take_value());
             }
+            if(node.type_key==kMotionNode) {auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());}
             if(node.type_key==kParticleNode && (find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance))) {
                 auto authored=read_particle(node);if(!authored.has_value())return R::failure(authored.error());
             }
@@ -227,13 +292,14 @@ public:
         if(result.evaluated_nodes.size()!=active_nodes)return R::failure(ErrorCode::invalid_request,"temporal graph dependency order failed");
         auto model_indices=retain_model_styles(graph,models,result,cancel);if(!model_indices.has_value())return R::failure(model_indices.error());
         const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
+        const bool has_motions=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kMotionNode;});
         std::vector<const GraphNode*> plan_nodes;
         std::map<NodeId,std::size_t> plan_indices;
         std::vector<std::vector<std::size_t>> plan_incoming,plan_outgoing;
         std::vector<bool> plan_active;
         std::vector<std::size_t> plan_order;
         std::vector<std::optional<CompiledParticleTransform>> plan_transforms;
-        if(has_transforms) {
+        if(has_transforms || has_motions) {
             for(const auto& [id,n]:nodes){plan_indices.emplace(id,plan_nodes.size());plan_nodes.push_back(n);}
             const auto count=plan_nodes.size();plan_incoming.resize(count);plan_outgoing.resize(count);
             plan_active.resize(count);plan_transforms.resize(count);std::vector<std::size_t> degrees(count);
@@ -276,6 +342,11 @@ public:
                 for(auto dest:outgoing[next]) if(active[dest]) stack.push_back(dest);
             }
             if(!terminal) continue;
+            if(has_motions) {
+                auto planned=plan_motion_chain(plan_nodes,plan_incoming,plan_outgoing,plan_active,plan_order,
+                    plan_indices.at(id),plan_indices.at(output->id),cancel,work);
+                if(!planned.has_value())return R::failure(planned.error());base.circles=planned.take_value();
+            }
             std::sort(base.forces.begin(),base.forces.end(),[](auto a,auto b){return a->id<b->id;});
             if(has_transforms) {
                 auto planned=plan_transform_branch(plan_nodes,plan_incoming,plan_outgoing,plan_active,plan_order,
@@ -448,6 +519,8 @@ public:
                         if(tf){instance.position=tf->position(instance.position);instance.velocity=tf->velocity(instance.velocity);}
                         const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
+                        auto orbited=apply_circles(instance,branch,birth,now,own.seed,nodes);
+                        if(!orbited.has_value())return R::failure(orbited.error());
                         apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);

@@ -119,6 +119,8 @@ $adapterInputs = @(
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
     'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
     'src\core\ModelEvaluation.hpp',
+    'include\starfield\core\MotionCircle.hpp', 'include\starfield\core\MotionGeometry.hpp',
+    'src\core\MotionEvaluation.hpp',
     'ae_plugin\ModelGeometryParameter.cpp', 'ae_plugin\ModelGeometryParameter.hpp',
     'ae_plugin\ModelMirrorParameter.cpp', 'ae_plugin\ModelMirrorParameter.hpp',
     'ae_plugin\ModelMirrorTransaction.cpp', 'ae_plugin\ModelMirrorTransaction.hpp',

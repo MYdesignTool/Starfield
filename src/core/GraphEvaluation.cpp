@@ -4,6 +4,7 @@
 #include "starfield/core/Random.hpp"
 #include "starfield/core/ParticleBirth.hpp"
 #include "starfield/core/ModelResources.hpp"
+#include "starfield/core/MotionCircle.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -417,14 +418,15 @@ void apply_particle_style(ParticleInstance& particle, const ParticleValues& appe
 
 #include "TransformEvaluation.hpp"
 #include "ModelEvaluation.hpp"
+#include "MotionEvaluation.hpp"
 
 bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
     const auto& from = source.type_key;
     const auto& to = destination.type_key;
     if (from == kEmitterNode) return to == kParticleNode;
-    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kTransformNode;
-    if (from == kParticleNode || from == kForceNode || from == kTransformNode)
-        return to == kForceNode || to == kTransformNode || to == kOutputNode;
+    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode;
+    if (from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode)
+        return to == kForceNode || to == kTransformNode || to == kMotionNode || to == kOutputNode;
     return false;
 }
 
@@ -475,6 +477,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::vector<std::optional<ParticleValues>> particles(count);
         std::vector<std::optional<CompiledParticleTransform>> transforms(count);
         ModelValues models;
+        std::map<NodeId,CompiledMotionCircle> circles;
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -523,6 +526,9 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             } else if(node.type_key==kTransformNode) {
                 auto value=read_transform(node);if(!value.has_value())return R::failure(value.error());
                 transforms[i]=value.take_value();
+            } else if(node.type_key==kMotionNode) {
+                auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());
+                circles.emplace(node.id,value.take_value());
             } else if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());
                 models.emplace(node.id,value.take_value());
@@ -621,6 +627,30 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             return P::success(transform_plans[particle]);
         };
 
+        using MotionPlan=std::shared_ptr<const std::vector<NodeId>>;
+        std::vector<MotionPlan> motion_plans(count);
+        const auto motion_plan=[&](std::size_t particle)->Result<MotionPlan> {
+            if(circles.empty())return Result<MotionPlan>::success({});
+            if(motion_plans[particle])return Result<MotionPlan>::success(motion_plans[particle]);
+            auto chain=plan_motion_chain(nodes,incoming,outgoing,active,topological_order,particle,output,cancellation,budget.work);
+            if(!chain.has_value())return Result<MotionPlan>::failure(chain.error());
+            motion_plans[particle]=std::make_shared<const std::vector<NodeId>>(chain.take_value());
+            return Result<MotionPlan>::success(motion_plans[particle]);
+        };
+        const auto apply_circles=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
+            if(plan)for(auto id:*plan) {
+                if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Motion Circle cancelled");
+                if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Motion Circle work limit");
+                const auto& c=circles.at(id);auto clock=c.clock(instance.age_seconds,instance.lifetime_seconds);
+                if(!clock.has_value())return Result<bool>::failure(clock.error());
+                const auto factor=motion_speed_factor(instance,id,seed,c.settings().speed_random_percent);
+                auto moved=apply_circle_state(instance,c,c.settings().radians_per_second*factor*clock.value().integral_seconds,
+                    c.settings().radians_per_second*factor*clock.value().weight);
+                if(!moved.has_value())return moved;
+            }
+            return Result<bool>::success(true);
+        };
+
         // A topology edit can temporarily leave the Output ancestry without an
         // emitter (for example, while a user disconnects and rewires a chain).
         // Keep the graph valid and render transparent until a complete source
@@ -710,6 +740,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     const auto child = children[branch];
                     auto planned=transform_plan(child);if(!planned.has_value())return R::failure(planned.error());
                     const auto tf_plan=planned.value();
+                    auto circle_plan=motion_plan(child);if(!circle_plan.has_value())return R::failure(circle_plan.error());
                     if(tf_plan && !tf_plan->terminal)continue;
                     const auto* tf=tf_plan && tf_plan->combined?&*tf_plan->combined:nullptr;
                     Settings settings = emitters[emitter]->value;
@@ -802,6 +833,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             instance.velocity.x += velocity.x * inherited_velocity * decay;
                             instance.velocity.y += velocity.y * inherited_velocity * decay;
                             instance.velocity.z += velocity.z * inherited_velocity * decay;
+                            auto moved=apply_circles(instance,circle_plan.value(),child_settings.value.seed);
+                            if(!moved.has_value())return R::failure(moved.error());
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
@@ -822,7 +855,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         if (active_particles.empty()) {
             for (const std::size_t index : topological_order) {
                 const auto type = nodes[index]->type_key;
-                if (type == kForceNode || type==kTransformNode) {
+                if (type == kForceNode || type==kTransformNode || type==kMotionNode) {
                     return R::failure(ErrorCode::invalid_request,
                                       "active Force paths require a connected Particle node");
                 }
@@ -864,7 +897,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     has_particle_source[index] = has_particle_source[index] || has_particle_source[source];
                 }
             }
-            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key==kTransformNode) &&
+            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key==kTransformNode || nodes[index]->type_key==kMotionNode) &&
                 !has_particle_source[index]) {
                 return R::failure(ErrorCode::invalid_request,
                                   "every active Force path must descend from a Particle node");
@@ -877,6 +910,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             std::size_t emitter{0};
             std::size_t particle{0};
             std::shared_ptr<const TransformBranchPlan> transform;
+            MotionPlan motion;
         };
         const double time_seconds = to_seconds(*normalized);
         std::vector<BranchPlan> branches;
@@ -923,6 +957,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             std::sort(branch_forces.begin(), branch_forces.end(), by_dependency);
             auto planned=transform_plan(particle_index);if(!planned.has_value())return R::failure(planned.error());
             const auto tf_plan=planned.value();
+            auto circle_plan=motion_plan(particle_index);if(!circle_plan.has_value())return R::failure(circle_plan.error());
             if(tf_plan)branch_forces.erase(std::remove_if(branch_forces.begin(),branch_forces.end(),[&](auto force) {
                 return std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[force]->id)==tf_plan->force_nodes.end();
             }),branch_forces.end());
@@ -960,7 +995,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 bounded.value.seed=shifted_particle_seed(bounded.value.seed,appearance.birth.seed_shift);
                 auto sequence=slots.value();if(appearance.birth.chance_percent==0)sequence.count=0;
                 branches.push_back({std::move(bounded), sequence, emitter,
-                                    particle_index,tf_plan});
+                                    particle_index,tf_plan,circle_plan.value()});
             }
         }
 
@@ -1069,6 +1104,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     birth_position.x+=delta.x;birth_position.y+=delta.y;birth_position.z+=delta.z;
                 }
                 // Particle owns all per-life style curves.
+                auto moved=apply_circles(instance,plan.motion,plan.settings.value.seed);
+                if(!moved.has_value())return R::failure(moved.error());
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
@@ -1155,6 +1192,12 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
                 for(const auto& node:graph_.nodes)if(node.id==id) {
                     if(const auto* value=find_value(node,kParticleBirthChance))return std::get<double>(*value);
                     return 100;
+                }
+                return {};
+            }
+            std::optional<MotionCircleSettings> constant_motion_circle(NodeId id) override {
+                for(const auto& n:graph_.nodes)if(n.id==id && n.type_key==kMotionNode) {
+                    auto c=read_motion_circle(n);if(c.has_value())return c.value().settings();
                 }
                 return {};
             }

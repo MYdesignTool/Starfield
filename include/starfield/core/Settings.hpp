@@ -157,6 +157,16 @@ struct AgeCurve {
     CurveInterpolation interpolation{CurveInterpolation::linear};
 };
 
+// Numeric Motion contract only. The adapter converts reference-facing Speed
+// into explicit angular units once that mapping is qualified (ADR0039).
+struct MotionCircleSettings {
+    Vec3 origin{};
+    Vec3 axis{0,0,1};
+    double radians_per_second{};
+    double speed_random_percent{};
+    AgeCurve over_life{};
+};
+
 // How the emission direction is sampled. `directional` uses the Euler angles and the
 // cone span; `uniform` samples the whole sphere and ignores both.
 enum class DirectionMode : std::uint8_t { directional = 0, uniform = 1 };

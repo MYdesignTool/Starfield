@@ -161,6 +161,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 Circle graph子阶段：append-only Motion schema1/本地key1..6、显式rad/s、曲线精确antiderivative、历史采样/metadata proof和有界不可变lease、随机purpose22。实际普通/历史graph、Force/Transform前置、串联Circle、Auxiliary出生/瞬时速度、codec/snapshot和CPU像素接入；后置Force/Transform及不同链合并明确拒绝。标准/ASAN1764、Transform594/Model559回归通过，m3-18-motion-circle-graph-*与circle-*-regression.log。尚无作者/AE disk ID/ABI变化或部署；Light Path/Look At、完整frame/动画轴原点导数与参考公开单位仍为本卡要求。冻结SDK构建继续，安装61/63保持；不以Circle子阶段缩减首批三模式或完整目标。
+
 2026-10-10 Point capture阶段：新增AE只读适配器，按明确layer ID/局部点/PF时间验证comp归属/身份，完整矩阵转到效果层canonical frame；同源矩阵一次查询，成功且suite释放后整笔替换数字输出，错误/取消保留原输出。真实May2023 helper、fake SDK标准及ASAN各2365通过，m3-18-motion-point-capture-{tests,asan}.log；main工程及adapter输入指纹更新。本层不决定Starting With/anchor/Light Path构造/Look At目标，未改图或ABI、未暴露节点。新源4c9c50c已推送/冻结，双NoPublish完整May2023 /MT八目标实际exit0，新helper实际编译；m3-18-motion-points-sdk-build.log/输出hash及26安装hash/selector核对保留，native61/CEP63保持。下一阶段值/graph/数值资源快照、历史/shutter、依赖GUID/AE缓存与ABI迁移先行，参考未确认项保留，不新增Light flag或非首批选项。
 
 2026-10-10 独立MotionGeometry实现有界圆周旋转、不可变B-spline距离/切线查询和加权最短弧朝向；ADR0039区分数学定义与尚未确认的参考策略。单独MSVC /MT标准及ASAN各4759检查通过，日志artifacts/m3-18-motion-geometry-{tests,asan}.log，含极小向量、大坐标下小路径、解析弧长、重复/转折/端点、全部路径分配及复制赋值失败、取消、无分配乱序查询及四线程读取。初次夹具nan命名冲突和ASAN运行器环境/链接选项诊断已修正，不修改用户环境。Core工程及CMake纳入源码；尚无Motion graph/作者入口、资源或ABI迁移，不部署无入口计算层。源码3d6d718已推送/冻结，双NoPublish的完整May2023 /MT八目标实际exit0，m3-18-motion-geometry-sdk-build.log及八输出hash记录；构建后26安装hash/selector/Core仍匹配native61/CEP63。实际AE/Light Path路径构造、Circle单位/半径、Look At目标筛选仍开放。

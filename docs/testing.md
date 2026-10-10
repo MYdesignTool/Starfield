@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionCircleGraphTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各1764检查通过，artifacts/m3-18-motion-circle-graph-{tests,asan}.log。实际普通/历史Core graph及CPU renderer：曲线Linear/Draw/Hold/Bezier积分、独立quadrature/速度差分、animated rate与metadata exact clock、随机/逆序/串联、Force/Transform前置及未支持后置明确拒绝、Auxiliary出生位置/轨道速度继承、graph和snapshot往返、实际像素、Linear chord/Subframe arc、全部取消/分配失败及四线程请求。历史验证allocation_failed误报已修正。初始夹具错误Result bool/Force schema及诊断保留；不代表公开Speed单位/未知菜单、Light Path/Look At或AE2023资格。
+
+必要相邻回归：`tests/RunCoreTests.ps1 -TransformGraph`594、`tests/RunModelGraphTests.ps1 -Run`559通过；日志m3-18-circle-{transform,model}-regression.log。MotionCircle是固定存储header evaluator，既有graph fixture source lists仍可编译；未改MNT在途测试脚本。完整冻结May2023八目标构建证据继续记录，安装native61/CEP63不变。
+
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPointCaptureTests.ps1 -Run`及追加`-Sanitize`，May2023/MSVC x64 /MT标准和ASAN各2365检查通过，artifacts/m3-18-motion-point-capture-{tests,asan}.log。真实MotionPointCapture、既有affine及Geometry代码，SDK函数为夹具，未操作AE。验证非零comp时间偏移/倍率/负时间/逆序采样、row/column矩阵、完整剪切反射/效果层逆变换/指定局部点、PAR/Z原点、同源及owner矩阵一次采样、稳定ID/comp匹配、全SDK读取错误、Acquire成功空suite/缺函数、Release错误、取消含释放后取消、输出原样保留、分配失败与256请求上限。SDK签名与矩阵定义按本地May2023头文件核对；作者/筛选/曲线/资源ABI及selector-thread和实际parented/animated AE行为仍开放。
 
 新源4c9c50c781cb1b053320088c186e21193822e5ef推送后git archive冻结于artifacts/prepared/m3-18-motion-points-4c9c50c/source，`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish`完整May2023 x64 Release /MT八目标实际exit0；main实际编译MotionPointCapture，adapter fingerprint纳入新输入。日志artifacts/m3-18-motion-points-sdk-build.log、sdk-build-exit.txt和sdk-build-hashes.json。构建后26安装hash/selector及所选Core仍匹配native61/CEP63，m3-18-motion-points-installed-hashes.json。未部署未调用的seam，不代表实际Light/Null、shader/shutter、依赖缓存或AE qualification。

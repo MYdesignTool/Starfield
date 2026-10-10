@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## M3-18 独立计算阶段（2026-10-10）
 
+### Circle 图求值候选（未部署）
+
+Circle从几何工具接入实际Core graph/普通与历史粒子求值。新Motion类型及本地key见ADR0039：显式弧度速度、现有曲线精确积分/历史midpoint累积、稳定速度随机流22、瞬时轨道速度；原出生/样式/精灵基底及snapshot3..8保持。串联Circle按图顺序；Force/Transform在Circle前可用，后置及同一Particle不同Motion链合并暂时typed reject。这是首批三模式的Circle子阶段，Light Path/Look At、完整有序frame及公开Speed/Origin政策仍未完成，不能发布作者入口。Origin/axis动画导数、资源cache/ABI和AE gate仍需后续契约。
+
+标准和ASAN各1764聚焦检查通过，实际graph/history/codec/CPU绘制、速度/Auxiliary、Linear chord/Subframe arc、取消/全分配失败和并发；现有Transform594、Model graph559回归通过。artifacts/m3-18-motion-circle-graph-{tests,asan}.log、m3-18-circle-{transform,model}-regression.log；历史图验证现在保留allocation_failed而非误报无效图。源码冻结/完整May2023构建继续；安装仍native61/CEP63，无Motion作者/AE parameter/ABI发布，不凭数值测试认定宿主通过。所有MNT/其他在途改动保留。
+
 ### 图层点只读采样候选
 
 MotionPointCapture接入main工程与adapter fingerprint：按调用方指定的稳定layer ID、局部像素点及PF时间，转换comp时间并验证身份/所属comp；保留完整parent/shear/reflection矩阵，同源一次采样，映射到效果层及既有canonical/PAR/Z坐标。仅返回自有数字，不做名称筛选、anchor/模式策略或项目写入。May2023真实helper/fake SDK标准和ASAN各2365检查通过，日志artifacts/m3-18-motion-point-capture-{tests,asan}.log，覆盖逐SDK错误、suite空指针/函数缺失/释放错误、单位/矩阵/身份边界、取消、分配失败、256点上限和乱序时间。尚未接入Motion graph/作者/ABI，未部署。源码4c9c50c781cb1b053320088c186e21193822e5ef已推送/git archive冻结，双NoPublish完整May2023 /MT八目标实际exit0，m3-18-motion-points-sdk-build.log/exit.txt/hash报告保留；26安装hash/selector/Core仍匹配61/63。当前只处理M3-18，Model与MNT在途代码保持。

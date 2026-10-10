@@ -39,6 +39,9 @@ public:
     // Metadata proof, never inferred from one/equal frame samples. A constant
     // zero probability permits skipping an otherwise huge historical clock.
     [[nodiscard]] virtual std::optional<double> constant_birth_chance(NodeId) {return {};}
+    // Exact metadata proof of every Circle value's constancy over this request.
+    // Absent proof uses the bounded historical clock; equality is not proof.
+    [[nodiscard]] virtual std::optional<MotionCircleSettings> constant_motion_circle(NodeId) {return {};}
     [[nodiscard]] virtual Result<double> lifetime(NodeId id, double seconds) {
         auto sampled=node(id,seconds);
         if(!sampled.has_value()) return Result<double>::failure(sampled.error());

@@ -1,6 +1,7 @@
 # ADR 0039 — Motion geometry and first three modes
 
-Status: numeric geometry implemented; public Motion contract remains proposed,
+Status: numeric geometry implemented; Circle graph integration in progress;
+public Motion contract remains proposed,
 M3-18. Installed native61/CEP63 is unchanged.
 
 ## Scope and evidence
@@ -76,6 +77,67 @@ the installed 26-file native61/CEP63 pairing remains unchanged. These checks
 qualify the mathematical helpers, not reference Motion behavior or AE execution.
 
 ## Remaining integration
+
+### Circle graph substage (unpublished)
+
+The append-only Core graph identity is `org.starfieldfx.nodes.motion`, schema1,
+with particle input1/output2. Motion-local keys1..6 are mode:uint32,
+origin:Vec3, axis:Vec3, angular rate:double in explicit radians/second,
+speed random:double percent, and optional existing AgeCurve bytes. Mode1 is
+Circle; the reserved first-stage values0/2 are Light Path/Look At and reject
+until their evaluators exist. No AE disk IDs, author menu or advertised mode is
+added by this substage. Old graphs and snapshot3..8 are unchanged; an older Core
+rejects an unknown Motion graph rather than silently dropping its behavior.
+Full adapter/Core pairing is required before any graph author is published.
+
+Circle rotates the already emitted/integrated distribution around the supplied
+origin/axis. Its angle is the time integral of signed angular rate multiplied
+by Motion Over Life (percent) and a stable per-node/emitter/particle speed
+random factor. Its instantaneous velocity is R*v + omega cross R*(p-origin),
+so Auxiliary velocity inheritance sees the actual orbit velocity. Zero rate and
+zero integrated angle preserve position; style and authored sprite basis are
+unchanged. This is an independent candidate equation, not a measured mapping
+of the reference's public Speed100. The pending reference calibration still
+controls the author-facing conversion, origin policy and default axis.
+
+Initially supported chains have Force/Transform before Circle; serial Circle
+nodes execute in graph order. Different Circle chains of one Particle cannot
+merge; a Force/Transform after Circle is explicitly rejected in this temporary
+substage, including active zero-weight nodes, instead of being evaluated in an
+incorrect coordinate frame. This restriction must be removed with the common
+ordered Motion/Transform/Force contract before first-stage author delivery.
+Auxiliary prefixes evaluate the parent's Circle at each child birth.
+
+Static graphs compile fixed-size curve coefficients and exact antiderivatives
+once per node. Linear/Draw, Hold and the existing shape-preserving Bezier
+interpolation share the same values; default is constant100%. Temporal graphs
+integrate authored values on the existing absolute30/60/120Hz midpoint lattice
+and report the endpoint rate; histories are bounded/cancellable and sampling
+is shared by node/time using at most4096 immutable compiled leases, with leases
+remaining valid across eviction. Random identity is derived once per particle
+and Circle, not at every history tick. Origin/axis are currently sampled frame
+geometry, like the existing Transform frame; their animated derivatives are
+not yet part of reported velocity. That and ordered downstream frames must be
+resolved in the common Motion contract before author delivery. A new optional
+sampler metadata proof permits the exact
+static clock only when the caller certifies constancy. Equal samples are never
+used as that proof. New random purpose22 is appended; old streams are unchanged.
+No snapshot stride, Render boundary or Core C ABI change is needed for Circle
+position/velocity alone. Light Path and Look At remain required next substages;
+this temporary Circle-only Core entry does not close M3-18 or the full goal.
+
+The focused fixture exercises the actual graph evaluator and CPU renderer, not
+only a geometry helper: standard and ASAN1764 checks, Transform graph594 and
+Model graph559 pass (2026-10-10). Coverage includes exact curve integrals versus
+independent quadrature, animated rates, serial/order rejection, immutable graph
+and sequence/snapshot round trips, instant orbit velocity and Auxiliary birth
+inheritance, actual CPU pixels and Linear chord/Subframe arc behavior,
+reverse/concurrent requests, cancellation and every allocation failure through
+success. A temporal validation allocation was previously collapsed to
+invalid_request; the evaluator now retains the typed allocation/internal error.
+Initial fixture Result boolean and Force schema assumptions were corrected;
+diagnostics remain under artifacts. This does not qualify AE or unknown public
+reference behavior. Full frozen May2023 build evidence follows separately.
 
 ### Point resource capture seam
 

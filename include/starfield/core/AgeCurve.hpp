@@ -33,6 +33,19 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
     return true;
 }
 
+// Shared by value evaluation and Motion's exact curve antiderivative. Callers
+// supply a validated curve and index; this preserves the existing slope rule.
+[[nodiscard]] inline double age_curve_bezier_slope(const AgeCurve& curve, std::size_t index) noexcept {
+    const auto secant=[&](std::size_t a,std::size_t b){return (curve.points[b].value-curve.points[a].value)/(curve.points[b].age-curve.points[a].age);};
+    if(index==0)return secant(0,1);
+    if(index+1==curve.count)return secant(index-1,index);
+    const auto a=secant(index-1,index),b=secant(index,index+1);
+    if(a*b<=0)return 0.0;
+    const auto h0=curve.points[index].age-curve.points[index-1].age,h1=curve.points[index+1].age-curve.points[index].age;
+    const auto w0=2*h1+h0,w1=h1+2*h0;
+    return (w0+w1)/(w0/a+w1/b);
+}
+
 [[nodiscard]] inline double evaluate_age_curve(const AgeCurve& curve, double age,
                                                double linear_start, double linear_end) noexcept {
     age = std::clamp(age, 0.0, 1.0);
@@ -51,19 +64,9 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
                 return left.value + (right.value - left.value) * amount;
             // Shape-preserving cubic Hermite slopes give cubic Bezier segments
             // without overshoot, including plateaus and local extrema.
-            const auto slope=[&](std::size_t index) {
-                const auto secant=[&](std::size_t a,std::size_t b){return (curve.points[b].value-curve.points[a].value)/(curve.points[b].age-curve.points[a].age);};
-                if(index==0)return secant(0,1);
-                if(index+1==curve.count)return secant(index-1,index);
-                const auto a=secant(index-1,index),b=secant(index,index+1);
-                if(a*b<=0)return 0.0;
-                const auto h0=curve.points[index].age-curve.points[index-1].age,h1=curve.points[index+1].age-curve.points[index].age;
-                const auto w0=2*h1+h0,w1=h1+2*h0;
-                return (w0+w1)/(w0/a+w1/b);
-            };
             const auto t=amount,t2=t*t,t3=t2*t,h=right.age-left.age;
-            const auto value=(2*t3-3*t2+1)*left.value+(t3-2*t2+t)*h*slope(i-1)+
-                (-2*t3+3*t2)*right.value+(t3-t2)*h*slope(i);
+            const auto value=(2*t3-3*t2+1)*left.value+(t3-2*t2+t)*h*age_curve_bezier_slope(curve,i-1)+
+                (-2*t3+3*t2)*right.value+(t3-t2)*h*age_curve_bezier_slope(curve,i);
             return std::clamp(value,std::min(left.value,right.value),std::max(left.value,right.value));
         }
     return curve.points[curve.count - 1].value;

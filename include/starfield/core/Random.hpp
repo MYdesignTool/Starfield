@@ -33,6 +33,7 @@ enum class RandomPurpose : std::uint64_t {
     particle_life = 16, particle_angle = 17, particle_spin = 18,
     particle_texture = 19, particle_cloud = 20,
     particle_birth_chance = 21,
+    motion_speed = 22,
 };
 
 // splitmix64 finalizer: cheap, well distributed, and identical on every platform.
