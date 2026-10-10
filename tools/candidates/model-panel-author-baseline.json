@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Released native61/Core ABI8/CEP63 Model test baseline with ES3 reserved identifier fix and retired synchronous file entry points; actual AE2023 qualification remains open. Six Shape labels, Face unavailable.",
-  "basePanel": 63,
+  "status": "Released native62/Core ABI8/CEP64 Model test baseline; project root ID zero accepted throughout author/asset/import routes. Actual AE2023 Model qualification open; Face unavailable.",
+  "basePanel": 64,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "4C3E276CD2109C3462011B0528F60FA2562BAB52D54B0FDD9C18D8DE30E38CE7"
+      "normalizedSha256": "AEE80A2856921C9AA2506ED1799D42E774FC08DE4676AA1B49DAE925957EEF2D"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "1E90A5540F4CDA2DC0DC0C49C6AC6EE4C86B14B7DBCF90C45B1477EB4D9056C3"
+      "normalizedSha256": "048FDE879F11C6397808A7CB62D27E3835A6DCD14F9A8294885FD5561BEEDEBE"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "C67B26A28E1F61B5F4640C3A68A38DCEC9E9D3D1785A5F66BAEA21931DE65B54"
+      "normalizedSha256": "C546265D7B2B265F7D7C42038422C37A8255CFAD77832EEED020462F0469B31D"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "BAE582FF0371592CAA43434D60CA6C8400D87DC2695B28C8944C2D9F234B1E77"
+      "normalizedSha256": "7AFCDE01B90BDAC018A7947EFACDA15A6563A146E1021226101802C291B78D6A"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "007CB8307D015947C5CF4615A704186A8172EA29AF73E33C8FCBEBA96921EAD5"
+      "normalizedSha256": "92D8E4DEE064B068E5E32165366A8F11945C39C9CA269E0FDCB14B309DA61A65"
     }
   ]
 }

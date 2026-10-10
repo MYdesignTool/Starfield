@@ -1,5 +1,7 @@
 # Starfield 架构
 
+2026-10-10当前配对native62/CEP64修正Model project root ID0：CEP/原生事务、资产传输及OBJ checkpoint允许非负root，0仍须与实际SDK根项匹配；comp/layer保持正值。完整May2023八目标构建及26安装hash/rollback通过，真实AE Model gate保持开放。该源码包含M3-18数字计算层与snapshot10读取/写入能力，但没有Motion原生/CEP作者入口；owner允许未来按可操作模式分批部署，不要求三个作者一起完成。
+
 当前版本与部署证据见 [current-state.md](current-state.md)；这里维护职责和契约，历史构建叙述见 [历史记录](history/README.md)。
 
 ## 模块和数据流

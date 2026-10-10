@@ -1,6 +1,16 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native61/CEP63 test pair deployed 2026-10-10; AE2023 qualification open. Task M3-17.
+Status: native62/CEP64 root-ID fix deployed 2026-10-10; AE2023 qualification open. Task M3-17.
+
+At21:43+08 native62/packed32830/CoreABI8/CEP64 was published from frozen
+7fda058b2bd4717288d3e2fad43e94daa7bb13e0, complete May2023 /MT eight-target
+terminal exit0. A fresh AE process count0 permitted the existing paired tool;
+eight native/Core and eighteen CEP hashes, runtime selector and Restore report
+passed. Backup m3-17-native62-panel64-root-id-20261010 restores native61/CEP63.
+The owner confirmed CEP63 loaded and supplied root0 on AE23.5x52; actual repaired
+Model Add/OBJ/preset/undo/reopen still need host qualification. The earlier pairing
+paragraphs below remain historical evidence. Owner requested pausing the full
+goal after today's deployment.
 
 At14:27+08, with the owner confirming AE closed and a fresh process count0,
 CEP63 was published through the panel tool and existing KeepNative deployment.

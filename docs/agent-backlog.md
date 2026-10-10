@@ -84,6 +84,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10 21:43+08修复发布：7fda058冻结完整May2023 /MT八目标实际exit0，fresh AE count0后部署native62/packed32830/CoreABI8/CEP64；26安装hash、selector/runtime、实际paired rollback report通过，备份m3-17-native62-panel64-root-id-20261010恢复61/63。owner已确认CEP63加载、p0-c1-l29身份，root0修正版真实AE添加/OBJ/资源预设/undo/reopen待验收。owner要求今日部署后暂停目标，完整目标不记complete；Motion今后按可操作阶段分批交付，不要求三个作者一起发布，数值层无作者入口不作为可验收模式。
+
 2026-10-10当前卡切回M3-17：owner确认CEP63能加载、Model Add失败，只读AE23.5x52报告p0-c1-l29证实root ID0。CEP及Model事务/asset Host/OBJ checkpoint接受非负root，comp/layer及实际SDK重验保持；native62/packed32830/CEP64候选，schema/ABI不变，完整冻结SDK及配对部署继续。标准/ASAN事务9027364/9027464、资产149165、导入20628和CEP356/DOM35/export588/作者74/Shape92/ES3 18/只读报告11、新旧dummy配对61/60通过。安装61/63保留，真实AE Model gate开放；Motion在途/完整目标不缩减。
 
 2026-10-10 14:27+08 owner关闭AE、fresh process0后，CEP修正源0e5cbc5发布native61/CEP63。通过既有Deploy-TestBuild KeepNative保留八native/Core/selector，十八CEP/26hash和paired Restore report通过；备份m3-17-native61-panel63-es3-20261010可恢复61/62，旧60/61回滚继续保留。byte→byteIndex修正已安装，实际AE63加载及Model/OBJ/预设/撤销重开仍待owner，不关宿主gate。发布工具将nativeSourceCommit与CEP sourceCommit分列，避免热面板提交被当作新native构建。

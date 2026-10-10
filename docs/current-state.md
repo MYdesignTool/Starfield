@@ -1,14 +1,22 @@
 # 当前工程状态
 
-核对日期：2026-10-10。owner要求开始新的工作并授权出一版测试，完整目标active。当前安装 native61 / packed32829 / Core ABI8 / CEP63，native冻结源码8d9b50e43b75562cfe4eda7501b9eb566c9f9744、CEP修正源码0e5cbc5508f87bd8cfa866a4b06d5bc5b4ae8d39；Model测试配对已发布，CEP62保留字问题已修正，实际AE gate开放。native61/CEP62及原native60/CEP61的配对回滚保留。owner已确认此前CEP61节点添加修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
+核对日期：2026-10-10。当前安装 native62 / packed32830 / Core ABI8 / CEP64，完整冻结源码7fda058b2bd4717288d3e2fad43e94daa7bb13e0。21:43+08 fresh AE process0后发布Model root ID0修正；八native/Core及十八CEP安装hash/selector/runtime和配对rollback报告通过。owner已确认CEP63可加载，Model修正版实际AE gate仍开放。备份m3-17-native62-panel64-root-id-20261010可恢复native61/CEP63，较早回滚继续保留。所有Motion及MNT在途改动保留。owner要求本次修复部署后暂停目标，交接完成后执行paused。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 当前优先修复：M3-17 Model 根身份（2026-10-10）
 
-owner已确认CEP63实际正常加载；添加Model报invalid_model_transaction。只读Report-ModelTarget.jsx截图确认AE23.5x52目标p0-c1-l29。根ID0被CEP事务和原生Model事务/asset export/OBJ检查点误拒绝，候选已统一接受非负root、保留comp/layer正值与全部实际SDK身份重验，0不是通配符。准备native62/packed32830/CEP64完整配对，安装仍61/63，所有Motion/MNT在途保持；本次优先处理M3-17，三模式/Force后续任务不缩减。
+owner已确认CEP63实际正常加载；添加Model报invalid_model_transaction。只读Report-ModelTarget.jsx截图确认AE23.5x52目标p0-c1-l29。根ID0被CEP事务和原生Model事务/asset export/OBJ检查点误拒绝，已统一接受非负root、保留comp/layer正值与全部实际SDK身份重验，0不是通配符。native62/packed32830/CEP64完整配对已部署，所有Motion/MNT在途保持；本次处理M3-17，三模式/Force后续任务不缩减。
 
-标准/ASAN原生事务9027364/9027464、资产各149165、导入各20628（另控件452）actual exit0；CEP默认添加及owner token356、实际gateway DOM35/export588/作者74/Shape92/完整ES3三文件18、手动报告ES3/只读fake host11通过。真实发布/回滚dummy新配对61、原60检查通过。日志artifacts/m3-17-root-id-*及m3-17-model-target-report-tests.log；asset fixture遗留101期望和升级rollback夹具误删已存在helper已修正。下一步提交冻结完整SDK、fresh process check及保留61/63回滚的发布；真实AE添加/OBJ/资源预设/undo/reopen保持开放。
+标准/ASAN原生事务9027364/9027464、资产各149165、导入各20628（另控件452）actual exit0；CEP默认添加及owner token356、实际gateway DOM35/export588/作者74/Shape92/完整ES3三文件18、手动报告ES3/只读fake host11通过。真实发布/回滚dummy新配对61、原60检查通过。日志artifacts/m3-17-root-id-*及m3-17-model-target-report-tests.log；asset fixture遗留101期望和升级rollback夹具误删已存在helper已修正。7fda058 git archive冻结、精确CEP64重现及IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标会话71399实际terminal exit0，sdk-build.log/exit.txt/build-hashes.json保留。真实AE添加/OBJ/资源预设/undo/reopen保持开放。
+
+部署命令使用Deploy-ModelTestBuild.ps1的明确61/63→62/64配对和既有Deploy-TestBuild -IncludeModel，未启动/停止AE、写registry或cache；before/after、process和deploy/rollback报告在artifacts/m3-17-native62-*与m3-17-root-id-*。安装路径仍是既有Starfield→dist和CEP→cep_panel两个Junction。一步回滚（AE关闭）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native62-panel64-root-id-20261010' -Restore
+```
+
+owner允许Motion完成多少可操作阶段就发布多少，不要求三个模式一起上线；当前三个数字模式及有序Motion/Transform计算层在本次完整源码内，但没有原生/CEP作者，不能作为Motion验收入口。下一次恢复目标时选择可独立完成的模式继续作者/参考政策/资源和交互契约，保持Light Path、Circle、Look At范围。今天部署完成后按owner要求暂停，不标完整目标完成。
 
 ## M3-18 独立计算阶段（2026-10-10）
 

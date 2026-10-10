@@ -1,5 +1,9 @@
 # 测试入口
 
+Model修正版部署后再次复查：`powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/Check-RootIdInstalledPair.ps1`核对native62/CEP64当前26hash与selector/selected runtime；m3-17-native62-precommit-hashes.json保留。Prepare从发布后basePanel64重现十八安装CEP原始hash；m3-17-panel64-postdeploy-repro/candidate.json保存。sdk-terminal.json记录会话71399实际exit0，与exit.txt及八输出hash报告一致。历史Check-MotionInstalledPair.ps1固定61/63，不能用于62/64验收。
+
+2026-10-10 21:43+08 native62/CEP64已部署：7fda058b2bd4717288d3e2fad43e94daa7bb13e0 git archive冻结于artifacts/prepared/m3-17-native62-panel64-root-id/source，冻结源码重现精确CEP64，356事务/18ES3再检通过。IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 /MT八目标会话71399 terminal actual exit0，m3-17-root-id-sdk-build.log/exit.txt/build-hashes.json记录八新输出。Deploy-ModelTestBuild的61/63→62/64默认report、fresh AE count0和实际Install均exit0；八native/Core+十八CEP安装哈希、runtime selector和paired Restore report通过，before/after、部署/回滚log保留。一键恢复native61/CEP63的命令见current-state.md；未从编译或dummy通过关闭AE Model gate。
+
 2026-10-10 Model root ID0修正：`RunModelTransactionHostTests.ps1 -Run`及`-Sanitize`实际9027364/9027464、`RunModelAssetHostTests.ps1`两档各149165、`RunModelImportTransactionTests.ps1`两档各20628（另共用控件452），actual exit0；artifacts/m3-17-root-id-{transaction,asset,import}-{tests,asan}.log及exit.txt。覆盖root0成功、项目改变的重验失败、负数/overflow与comp/layer0拒绝，使用actual native helper/fake May2023 suites；不是AE资格。
 
 STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native62-panel64-root-id/cep_panel：model_graph_transport356（生产默认ID/client及owner p0-c1-l29）、gateway DOM35、asset gateway588、作者74、Shape92、ES3三个JSX18通过。`node --expose-internals tests/model_target_report_tests.js`11只读/ES3检查通过；owner实际报告AE23.5x52根0/comp1/layer29。`model_deployment_tests.ps1 -Run -UpgradeInstalledModel`61及旧`-Run`60，通过实际tools的dummy完整发布/rollback，所有路径在artifacts。首次asset fixture遗留101期待和升级rollback误删旧helper诊断保留；已修正重跑。源码冻结SDK/真实发布及AE gate仍待后续证据。

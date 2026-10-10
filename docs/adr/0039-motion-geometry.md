@@ -2,7 +2,21 @@
 
 Status: numeric geometry and all three numeric graph modes implemented;
 public Motion contract remains proposed,
-M3-18. Installed native61/CEP63 is unchanged.
+M3-18. The native62/CEP64 Model fix also contains the current numeric source,
+but has no public Motion author entry.
+
+## Owner-approved incremental publication — 2026-10-10
+
+The owner permits publishing completed Motion stages without waiting for all
+three modes to ship together. Deliver each usable mode with its Core, native/CEP
+controls and required resource/history/interaction contract as a paired build.
+Reference labels and units still require evidence; incomplete modes must not be
+advertised as usable. Numeric code alone is not an operable Motion stage. This
+supersedes earlier statements requiring all three authors before any publication;
+the first-stage mode scope remains Light Path, Circle and Look At.
+
+The owner requested a pause after today's repaired Model build is deployed.
+Next work can select one publicly operable Motion stage when the goal resumes.
 
 ## Scope and evidence
 
