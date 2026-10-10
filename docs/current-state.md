@@ -1,10 +1,18 @@
 # 当前工程状态
 
-核对日期：2026-10-10。owner要求开始新的工作并授权出一版测试，完整目标active。当前安装 native61 / packed32829 / Core ABI8 / CEP62，冻结部署源码8d9b50e43b75562cfe4eda7501b9eb566c9f9744；M3-17完整Model测试配对已发布，实际AE gate开放。native60/CEP61的配对回滚保留。owner已确认此前CEP61节点添加修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
+核对日期：2026-10-10。owner要求开始新的工作并授权出一版测试，完整目标active。当前安装 native61 / packed32829 / Core ABI8 / CEP63，native冻结源码8d9b50e43b75562cfe4eda7501b9eb566c9f9744、CEP修正源码0e5cbc5508f87bd8cfa866a4b06d5bc5b4ae8d39；Model测试配对已发布，CEP62保留字问题已修正，实际AE gate开放。native61/CEP62及原native60/CEP61的配对回滚保留。owner已确认此前CEP61节点添加修复；背面采样及其余Texture gate保留。所有在途及MNT-01改动保留。
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
 ## 源码与安装
+
+### native61／CEP63 补丁已部署（2026-10-10 14:27 +08）
+
+owner关闭AE后fresh只读确认process0，artifacts/m3-17-panel63-predeploy-processes.json。通过Deploy-PanelTestBuild调用既有Deploy-TestBuild KeepNative发布：八native/Core字节及selector保持native61，十八CEP文件统一generation63，26hash和配对Restore默认report通过，日志m3-17-panel63-deploy-wrapper.log、before/after为m3-17-native61-panel63-es3-20261010-{before,after}.json。sourceCommit记录CEP候选0e5cbc5，nativeSourceCommit单列原冻结8d9b50e，注释记录m3-17-panel63-receipt-source-annotation.json；本次未重新构建native。native61/CEP62备份在artifacts/disabled/m3-17-native61-panel63-es3-20261010。
+
+一步回滚（AE关闭）：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native61-panel63-es3-20261010' -Restore`。未启动/停止AE、改变注册表或缓存。owner实机CEP62加载错误已静态复现并修正；CEP63真实加载及Model/OBJ/预设/undo/reopen仍待owner验收，不凭ES3/fake host判通过。
+
+live三个JSX ES3检查18、旧入口90复查通过；新工具nativeSourceCommit字段fixture发布/恢复复查63通过。baseline刷新CEP63、empty delta可重现postrelease-panel63；最终26hash复查记录m3-17-panel63-postcommit-hashes.json。所有MNT等在途改动保留。
 
 ### CEP63 保留字修正候选（2026-10-10）
 

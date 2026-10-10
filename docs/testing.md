@@ -1,5 +1,9 @@
 # 测试入口
 
+CEP63安装后复查：live `node --expose-internals tests/extendscript_syntax_tests.js`18、实际gateway旧入口90通过，m3-17-panel63-installed-{es3,legacy}-tests.log；Prepare empty delta从base63重现postrelease-panel63。发布工具增加nativeSourceCommit独立字段后，dummy配对发布/回滚再跑63检查通过，m3-17-panel63-deployment-final-tests.log；该额外字段只补来源身份，不改变实际已部署的26字节哈希。最终源码与安装对照见m3-17-panel63-postcommit-hashes.json。
+
+2026-10-10 14:27+08 CEP63已部署：owner已关闭，fresh process0记录m3-17-panel63-predeploy-processes.json。Deploy-PanelTestBuild实际调用Deploy-TestBuild KeepNative，八native/Core/selector保持；26hash和十八CEP paired Restore默认report通过，m3-17-panel63-deploy-wrapper.log及m3-17-native61-panel63-es3-20261010-{before,after}.json。native冻结8d9b50e与CEP修正0e5cbc5分别记录，不重构建native、不调用AE、registry或cache操作。一步撤回61/62见current-state最新记录。live CEP语法与最终源码哈希复查另记；真实AE63加载/Model/OBJ/预设/撤销资格仍开放。
+
 2026-10-10 CEP63语法修正候选：STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native61-panel63-es3/cep_panel，`node --expose-internals tests/extendscript_syntax_tests.js`18检查/三个完整JSX通过；Node自带Acorn8.16.0以ecmaVersion3/allowReserved=never解析，无新增依赖或vendor。原CEP62的byte变量可静态复现保留字解析失败；owner已报告AE加载错误，修正后的真实AE执行待测。现代Node VM通过不等于ExtendScript兼容。`node tests/legacy_preset_file_tests.js`90检查，真实gateway两次重载及旧请求/坏generation/越界payload无modal/IO；旧catalog fixture专注codec/事务，文件写入在新文件fixture覆盖。
 
 同候选Model文件583/asset gateway588/graph transport271/DOM35/作者74/Shape92/Texture80/Cloud49/Birth51、完整panel native gateway及startup通过，日志artifacts/m3-17-panel63-*.log。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/panel_test_build_deployment_tests.ps1 -Run`62检查通过，artifact dummy native/CEP/Junction调用实际Deploy-PanelTestBuild/Deploy-TestBuild/Restore；验证报告无写、ES3错误/混合generation拒绝、保留Model八native、十八CEP安装/恢复/selector。fixture内仅模拟Get-Process查询，无实际进程操作或Adobe写入。初次Restore wrapper把中文绝对路径嵌入无BOM脚本造成乱码，改用PSScriptRoot及Stop并复查通过；首个诊断保留。首次ES3夹具allowReserved=false仍允许属性名default，改为never后通过；错误Shape测试文件名按实际model_particle_shape_tests.js重跑92通过。发布前默认report核对当前26hash成功，日志m3-17-panel63-deploy-report.log；实际部署另记。

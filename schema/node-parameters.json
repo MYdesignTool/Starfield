@@ -535,7 +535,7 @@
   },
   "particleModelCandidate": {
     "adr": "0038-particle-model-geometry",
-    "status": "native61/Core ABI8/CEP62 complete Model test pair deployed; binding7, mirror/SmartFX, OBJ checkpoints, native modal exclusion, CEP author and bounded asset transactions included. CEP63 ES3 correction prepared; AE2023 qualification pending.",
+    "status": "native61/Core ABI8/CEP63 complete Model test pair deployed; binding7, mirror/SmartFX, OBJ checkpoints, native modal exclusion, CEP author and bounded asset transactions included. CEP63 fixes ExtendScript reserved identifiers; AE2023 qualification pending.",
     "shapeMenuReference": {
       "confirmedByOwner": "2026-10-10",
       "screenshot": "codex-clipboard-44477b7b-d030-4009-94c2-83afa9bd282f.png",

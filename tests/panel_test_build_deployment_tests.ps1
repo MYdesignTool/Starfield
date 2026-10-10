@@ -63,6 +63,8 @@ Write-PanelTest $taskClient 'var GATEWAY_BUILD = "native-presets-62";'
 Check-PanelTest ((Invoke-PanelTest 'mixed-generation' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -ne 0) 'Mixed generation accepted.'
 Write-PanelTest $taskClient 'var GATEWAY_BUILD = "native-presets-63";'
 Check-PanelTest ((Invoke-PanelTest 'install' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -eq 0) 'Install failed.'
+$taskAfter=Get-Content -LiteralPath (Join-Path $taskRoot 'artifacts/panel-pair-after.json') -Raw | ConvertFrom-Json
+Check-PanelTest ($taskAfter.nativeSourceCommit -eq ('a'*40)) 'Native source identity was replaced by the CEP commit.'
 foreach($taskFile in $taskNative){Check-PanelTest ((Hash-PanelTest (Join-Path $taskBundle $taskFile.name)) -eq $taskFile.hash) 'Native bytes changed.'}
 foreach($taskFile in $taskNewPanel){Check-PanelTest ((Hash-PanelTest (Join-Path $taskRoot $taskFile.path)) -eq $taskFile.hash) 'Candidate panel hash differs.'}
 $taskBackup=Join-Path $taskRoot 'artifacts/disabled/panel-pair'

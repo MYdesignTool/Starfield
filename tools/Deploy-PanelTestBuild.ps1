@@ -14,6 +14,7 @@ $taskPrepared=Join-Path $taskRepo ('artifacts/prepared/'+$PreparedName)
 $taskCandidate=Join-Path $taskPrepared 'cep_panel'
 $taskInfo=Get-Content -LiteralPath (Join-Path $taskPrepared 'candidate.json') -Raw | ConvertFrom-Json
 $taskBaseline=Get-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BaselineName+'.json')) -Raw | ConvertFrom-Json
+$taskNativeSource=if($taskBaseline.nativeSourceCommit){$taskBaseline.nativeSourceCommit}else{$taskBaseline.sourceCommit}
 $taskBundle=Join-Path $taskRepo 'dist'
 $taskLive=Join-Path $taskRepo 'cep_panel'
 $taskBackup=Join-Path $taskRepo ('artifacts/disabled/'+$BackupName)
@@ -71,7 +72,7 @@ Write-Host "Rollback: powershell -NoProfile -ExecutionPolicy Bypass -File tools/
 if(-not $Install){Write-Host 'Read-only report. Add -Install to publish after AE closes.';exit 0}
 Check-PanelHost
 if(Test-Path -LiteralPath $taskBackup){throw 'Backup already exists; refusing to overwrite it.'}
-$taskBefore=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=61;panelGeneration=$taskBaseline.panelGeneration;
+$taskBefore=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=61;nativeSourceCommit=$taskNativeSource;panelGeneration=$taskBaseline.panelGeneration;
     native=$taskBaseline.native;panel=$taskBaseline.panel;selector=$taskSelector;candidateGeneration=$taskGeneration}
 $taskBefore | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BackupName+'-before.json')) -Encoding UTF8
 # This command retains installed native files and selector exactly and records the
@@ -101,7 +102,7 @@ try{
     if([IO.File]::ReadAllText($taskSelectorPath).Trim() -ne $taskSelector){throw 'Core selector changed during CEP publication.'}
     & (Join-Path $PSScriptRoot 'Restore-TestBuild.ps1') -PluginDir $PluginDir -BackupName $BackupName
     $taskAfter=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=61;coreAbi=8;panelGeneration=$taskGeneration;
-        sourceCommit=$taskPanelRecord.candidateCommit;native=$taskBaseline.native;panel=$taskPanelRecord;selector=$taskSelector;
+        sourceCommit=$taskPanelRecord.candidateCommit;nativeSourceCommit=$taskNativeSource;native=$taskBaseline.native;panel=$taskPanelRecord;selector=$taskSelector;
         backup=$taskBackup;hostQualification='open'}
     $taskAfter | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BackupName+'-after.json')) -Encoding UTF8
     Write-Host "Published native61 / CEP$taskGeneration; twenty-six hashes and paired rollback preflight verified."

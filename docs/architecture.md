@@ -18,6 +18,7 @@ CEP 节点画布 / 属性编辑 / 预设
 | StarfieldParticle.aex | 主渲染效果、ARB 图持久化、参数注册、SmartFX、Core 加载与输出转换 |
 | Emitter/ParticleNode/Force AEX | 菜单隐藏的独立原生作者参数；节点效果 SmartFX 透传输入 |
 | Transform AEX | Transform 控件与 Null 资源作者记录；CEP 资源与属性集成已实现，AE 宿主验收开放 |
+| Model AEX | 静态 OBJ 数值网格与变换作者、导入检查点；资源传输和预设已接入，AE 宿主验收开放 |
 | StarfieldHost.aex | UI idle 上有界初始化/绑定、Model资产与整笔事务排队；原生文件窗口与UI范围互斥 |
 | StarfieldCore.dll | 纯数值图求值、确定性粒子模拟、CPU 栅格化、GPU 场景准备 |
 | cep_panel/ | 图 UI、曲线/渐变/预设、守卫事务与自适应检查 |
@@ -42,11 +43,11 @@ CoreOnly 的 adapter-input 指纹会检查共享输入，runtime 发布还核对
 
 Transform 分别合成中心与精灵基底，保留 shear/reflection；Force 使用下游 Transform suffix。共享基底表最多4096项，snapshot4 保留200字节的显式粒子记录，仍能读取 snapshot3；内存对象 sizeof 不定义 wire stride。Null 作者选择与数值采样契约见 ADR0032。
 
-M3-17 Model候选的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证及一次验证的mesh lease。ModelScene用显式model-to-layer矩阵制作裁剪三角形、四采样覆盖/深度和独立粒子叠加。ModelResources负责SFMG1网格codec和粒子pose；RenderRequest自有网格，Core ABI8追加有界数值数组并接受ABI7精确前缀。snapshot8保留200B粒子并共享模型组，旧3..7保留读取；CPU绘制shape4，多个成员合并覆盖/深度再应用一次opacity。live图已接入Model元数据端口；完整依赖用于拓扑规划，粒子流用于发射/Force/Transform/Auxiliary，保持粒子身份与共享组。Temporal每帧采样一次活动Model；Linear shutter迁移组索引、对相同资源插值仿射矩阵。原生/CEP作者仍待接入。输入只有字节文本与数字，未执行文件IO或宿主操作。迁移和完整Model gate由ADR0038管理，现有安装保持native60/ABI7/CEP61。
+M3-17 Model实现的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证及一次验证的mesh lease。ModelScene用显式model-to-layer矩阵制作裁剪三角形、四采样覆盖/深度和独立粒子叠加。ModelResources负责SFMG1网格codec和粒子pose；RenderRequest自有网格，Core ABI8追加有界数值数组并接受ABI7精确前缀。snapshot8保留200B粒子并共享模型组，旧3..7保留读取；CPU绘制shape4，多个成员合并覆盖/深度再应用一次opacity。live图已接入Model元数据端口；完整依赖用于拓扑规划，粒子流用于发射/Force/Transform/Auxiliary，保持粒子身份与共享组。Temporal每帧采样一次活动Model；Linear shutter迁移组索引、对相同资源插值仿射矩阵。原生/CEP作者和有界资源传输已接入。Core输入只有字节文本与数字，文件IO和宿主操作在AE适配器内。迁移和完整Model gate由ADR0038管理，现有测试安装native61/ABI8/CEP63；AE2023实际验收开放。
 
 ## 渲染、资源与线程
 
-ModelGeometryParameter候选在ae_plugin内管理有界SFMG1任意参数句柄；保存数值网格，UUID/revision由未来Model作者管理。复制拥有独立存储，读取先复制并解锁，再解码/取消。所有ARB selectors已有独立fake-host覆盖；未注册Model参数或增加宿主资格。
+ModelGeometryParameter在ae_plugin内管理有界SFMG1任意参数句柄；保存数值网格，UUID/revision由Model作者管理。复制拥有独立存储，读取先复制并解锁，再解码/取消。Model参数已注册，所有ARB selectors已有独立fake-host覆盖；未增加宿主资格。
 
 SmartFX 构造不可变图/历史、几何和 Core lease；相同 generation 保持到对应 render/result 释放。内容身份参与 cache GUID。渲染输出为透明背景上的粒子 RGBA，不合成输入像素。
 Core 验证时间、尺寸、格式、图、数值和工作预算；adapter 尊重 rowbytes、PAR、downsample、ROI、AE 16-bpc 的32768刻度和8/16/32-bpc 输出。内部积累为 premultiplied，编码 alpha 由请求决定；32-bpc 可以保留 HDR RGB。

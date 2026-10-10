@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-62";
+    var GATEWAY_BUILD = "native-presets-63";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -764,13 +764,13 @@
                     throw new Error("Invalid Model scalar: "+key);
             } else {
                 if(!(v instanceof Array) || v.length!==(key==="1"?16:48))throw new Error("Invalid Model metadata: "+key);
-                for(var byte=0;byte<v.length;byte++)if(typeof v[byte]!=="number" || v[byte]<0 || v[byte]>255 || Math.floor(v[byte])!==v[byte])
+                for(var byteIndex=0;byteIndex<v.length;byteIndex++)if(typeof v[byteIndex]!=="number" || v[byteIndex]<0 || v[byteIndex]>255 || Math.floor(v[byteIndex])!==v[byteIndex])
                     throw new Error("Invalid Model metadata byte: "+key);
             }
         }
         for(var key in types)if(Object.prototype.hasOwnProperty.call(types,key) && !fields[key])throw new Error("Missing Model field: "+key);
         var imported=fields["13"].value===1 && fields["2"].value>0;
-        for(var byte=0;byte<16;byte++)if(fields["1"].value[byte]!== (imported?parseInt(node.id.substr(byte*2,2),16):0))
+        for(var byteIndex=0;byteIndex<16;byteIndex++)if(fields["1"].value[byteIndex]!== (imported?parseInt(node.id.substr(byteIndex*2,2),16):0))
             throw new Error("Model resource identity differs from its node.");
         if(!imported && fields["2"].value!==0)throw new Error("Cube cannot reference an imported Model revision.");
         var bounds=[];
@@ -955,7 +955,7 @@
             var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
             if(source!==1 && source!==2)throw new Error("Invalid Model Source.");
             var imported=source===2 && asset.revision>0,resource=[],bounds=[];
-            for(var byte=0;byte<16;byte++)resource.push(imported?parseInt(node.id.substr(byte*2,2),16):0);
+            for(var byteIndex=0;byteIndex<16;byteIndex++)resource.push(imported?parseInt(node.id.substr(byteIndex*2,2),16):0);
             for(var axis=0;axis<6;axis++)appendFloat64(bounds,imported?asset.bounds[axis]:axis<3?-.5:.5);
             node.parameters.push({key:"1",type:7,value:resource},{key:"2",type:3,value:imported?asset.revision:0});
             for(var group=0;group<3;group++) {
@@ -2583,35 +2583,15 @@
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
+    // Retire cached synchronous file entry points. File windows are owned by the
+    // queued native chooser; a script modal here would bypass idle exclusion.
     host.SFLD_readPresetFile=function(requestJson) {
         var request=parseRequest(requestJson);if(!request || request.operation!=="readPresetFile")return fail("invalid_request","Invalid preset import request.");
-        var file=null,opened=false;
-        try {
-            file=File.openDialog("Import Starfield preset","Starfield presets:*.sfldpreset;*.json");
-            if(!file)return reply({ok:true,cancelled:true});
-            if(file.length>256*1024)return fail("size_limit_exceeded","The preset file exceeds the supported size.");
-            file.encoding="UTF-8";if(!file.open("r"))return fail("preset_file_error",file.error || "Unable to read this preset.");opened=true;
-            var text=file.read();if(file.error)return fail("preset_file_error",file.error);
-            return reply({ok:true,text:text,path:file.fsName});
-        } catch(error){return fail("preset_file_error",error.toString());}
-        finally{if(opened)file.close();}
+        return fail("preset_file_protocol_changed","Close and reopen Starfield Presets to use the current file picker.");
     };
     host.SFLD_writePresetFile=function(requestJson) {
-        var request=parseRequest(requestJson);if(!request || request.operation!=="writePresetFile" || typeof request.text!=="string" || request.text.length>256*1024)return fail("invalid_request","Invalid preset save request.");
-        var file=null,opened=false;
-        try {
-            var data=JSON.parse(request.text);
-            if(!data || data.format!=="org.starfieldfx.preset" || (data.version!==1 && data.version!==2) || typeof data.name!=="string" || !data.name || data.name.length>120 ||
-                typeof data.graphHex!=="string" || !data.graphHex || data.graphHex.length>MAX_GRAPH_BYTES*2 || data.graphHex.length%2 || !/^[0-9a-f]+$/i.test(data.graphHex))return fail("invalid_preset","Unsupported preset data.");
-            file=File.saveDialog("Save Starfield preset","Starfield presets:*.sfldpreset");if(!file)return reply({ok:true,cancelled:true});
-            if(!/\.sfldpreset$/i.test(file.name))file=new File(file.fsName+".sfldpreset");
-            if(file.exists && !confirm("Replace the existing preset?\n"+file.fsName))return reply({ok:true,cancelled:true});
-            file.encoding="UTF-8";if(!file.open("w"))return fail("preset_file_error",file.error || "Unable to write this preset.");opened=true;
-            if(!file.write(request.text))return fail("preset_file_error",file.error || "The preset could not be written.");
-            if(!file.close())return fail("preset_file_error",file.error || "The preset file could not be closed.");opened=false;
-            return reply({ok:true,path:file.fsName});
-        } catch(error){return fail("preset_file_error",error.toString());}
-        finally{if(opened)file.close();}
+        var request=parseRequest(requestJson);if(!request || request.operation!=="writePresetFile")return fail("invalid_request","Invalid preset save request.");
+        return fail("preset_file_protocol_changed","Close and reopen Starfield Presets to use the current file picker.");
     };
     host.SFLD_getState = SFLD_getState;
     host.SFLD_getPanelState = SFLD_getPanelState;
