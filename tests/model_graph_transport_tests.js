@@ -134,6 +134,9 @@ for(const phase of ["executing","applying"]){active.state=phase;
     call("beginModelGraphTransaction",{...plan(cube),assets:[]},r=>{eq(r.error.code,"model_transaction_busy");ok(r.error.message.includes("state="+phase));});
     eq(host.__SFLD_modelGraphTransactionV1,active);eq(writes,0);
     call("releaseModelGraphTransaction",{},r=>eq(r.ok,true));eq(host.__SFLD_modelGraphTransactionV1,active);eq(active.cancelled,true);}
+active.message="The renderer is busy or its guard changed.";active.notificationError="Invalid native Model result encoding.";
+call("beginModelGraphTransaction",{...plan(cube),assets:[]},r=>{eq(r.error.code,"model_transaction_busy");ok(r.error.message.includes(active.message));ok(r.error.message.includes(active.notificationError));});
+call("readModelGraphTransaction",{},r=>{eq(r.message,active.message);eq(r.notificationError,active.notificationError);eq(r.state,"applying");});
 reset();const edit={type:"applyPreset",presetGraph:imported,presetModelAssets:[{nodeId:modelId,revision:17,bounds,meshHex}],mode:"add"};
 const updated=presets.apply(cube,edit,()=>uuid(++sequence));ok(edit.modelAssetsToRestore[0].nodeId!==modelId);eq(edit.modelAssetsToRestore[0].source,2);
 const tx=graphTransactions.create({codec,edits:{apply:presets.apply},call,modelTransactions:client(),idFactory:()=>uuid(++sequence)});
@@ -162,6 +165,9 @@ reset();const cancel=client().apply(plan(),[meshAsset],r=>{result=r;});cancel.ca
 reset();client().apply(plan(),[meshAsset],r=>{result=r;});stamp="changed";drain();eq(result.ok,false);eq(hostRuns,0);eq(writes,0);
 reset();loseResult=true;client().apply(plan(),[meshAsset],r=>{result=r;});
 for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();eq(result.committed,true);eq(result.diagnostics.notificationPending,true);eq(hostRuns,1);
+reset();loseResult=true;failedPrepare=true;client().apply(plan(),[meshAsset],r=>{result=r;});
+for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();
+eq(result.error.code,"model_transaction_outcome_unknown");ok(result.error.message.includes("state=applying"));ok(result.error.message.includes("prepare failure"));eq(hostRuns,1);
 // Re-evaluating the helper preserves only plain staged state and no DOM refs.
 reset();let lateBegin;
 const delayed=clientAPI.create({schedule:fn=>tasks.push(fn),now:()=>now,idFactory:()=>transactionId,call(operation,fields,callback){

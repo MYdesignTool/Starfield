@@ -1,6 +1,6 @@
 # 测试入口
 
-2026-10-11 M3-17 executing停滞候选：actual已部署JSX在两个独立VM中拒收Array（ack0、保留executing），候选primitive ASCII收据ack1/complete，artifacts/m3-17-result-receipt-realm-probe.log保留；不能推定AE引擎行为。Model Host保留执行器/rollback/undo后的数字结果，丢通知/ack只重发同一收据，250ms及排他防spin/重入，旧ID已释放则不写新事务。聚焦日志m3-17-result-receipt-{host-tests,host-asan,transport,dom,executor-tests,deployment-tests}.log；transport534、DOM41、actual executor636209、新63/65→64/66 dummy配对61通过，最终Host计数以最后复查为准。完整三JSX ES3 18、扩展手动只读报告27通过；native64/CEP66完整冻结SDK及真正部署继续，AE默认Model/OBJ仍未通过。
+2026-10-11 M3-17 executing停滞候选：actual已部署JSX在两个独立VM中拒收Array（ack0、保留executing），候选primitive ASCII收据ack1/complete，artifacts/m3-17-result-receipt-realm-probe.log保留；不能推定AE引擎行为。Model Host保留执行器/rollback/undo后的数字结果，丢通知/ack只重发同一收据，250ms及排他防spin/重入，旧ID已释放则不写新事务。聚焦日志m3-17-result-receipt-{host-tests,host-asan,transport,dom,executor-tests,deployment-tests}.log；transport554、DOM41、actual executor636209、新63/65→64/66 dummy配对61通过，最终Host标准9593769/ASAN9593869通过（计数含逐字节和调用）。完整三JSX ES3 18、扩展手动只读报告27通过；native64/CEP66完整冻结SDK及真正部署继续，AE默认Model/OBJ仍未通过。
 
 2026-10-11 00:28+08 native63/CEP65已部署：498862759b1ec39ff56dda8c36422911fb09c570 git archive冻结，May2023 x64 Release /MT完整八目标、IncludeModelCandidate/NoDistPublish/NoRuntimePublish会话24956 actual terminal exit0。构建日志、exit.txt、terminal.json及八产物hash在artifacts/m3-17-host-receipt-sdk-*。10日审批额度失败未执行打包/安装，11日恢复后打包旧已完成构建、fresh AE count0、实际Install及paired rollback report exit0，m3-17-native63-deploy-{before,after}.json、native63-installed-hashes.json核对26文件与selector/runtime。备份恢复62/64；当前真实AE63/65行为待owner，不由fixture或编译关gate。
 

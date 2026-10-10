@@ -84,7 +84,9 @@
         var request=parse(text,"beginModelGraphTransaction"),old=host[KEY];
         if(old && old.version===1){old=session(old.id);
             if(old.state==="executing" || old.state==="applying" || old.state!=="complete" && old.state!=="failed" && now()<=old.expires)
-                return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+").");}
+                return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+")."+
+                    (old.message?" Last error: "+String(old.message).substr(0,1000):"")+
+                    (old.notificationError?" Notification: "+String(old.notificationError).substr(0,1000):""));}
         if(!integer(request.baseGraphRevision,1,16777215) || typeof request.baseRecordStamp!=="string" || request.baseRecordStamp.length>256*1024 ||
             typeof request.graphHex!=="string" || request.graphHex.length<64 || request.graphHex.length>api.maxGraphBytes*2 || request.graphHex.length%2 ||
             !/^[0-9a-f]+$/.test(request.graphHex))throw new Error("Invalid Model graph planning receipt.");
@@ -173,7 +175,7 @@
     host.SFLD_readModelGraphTransaction=function(text){try{var s=matching(text,"readModelGraphTransaction").s;
         if(s.state==="complete" || s.state==="published")return api.reply({ok:true,transactionId:s.id,state:s.state,result:s.result});
         if(s.state==="failed")return api.fail(s.failureCode || "model_transaction_failed",s.message);
-        return api.reply({ok:true,transactionId:s.id,state:s.state});
+        return api.reply({ok:true,transactionId:s.id,state:s.state,message:s.message || "",notificationError:s.notificationError || ""});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
     host.SFLD_releaseModelGraphTransaction=function(text){try{var s=matching(text,"releaseModelGraphTransaction").s;
         if(s.state==="executing" || s.state==="applying")s.cancelled=true;else host[KEY]=null;return api.reply({ok:true});
