@@ -70,7 +70,9 @@ bool request(std::string_view text) {
     std::array<std::string_view,6> fields{};ModelTransactionId transaction{};std::size_t count{};
     if(!split(text,fields) || !id(fields[0],transaction))return false;
     session.id=fields[0];
-    if(!integer(fields[1],session.project) || session.project<=0 || !integer(fields[2],session.comp) || session.comp<=0 ||
+    // AE's project root item can have ID zero. Every target lookup still compares
+    // it with the current root; composition and layer IDs remain positive.
+    if(!integer(fields[1],session.project) || session.project<0 || !integer(fields[2],session.comp) || session.comp<=0 ||
        !integer(fields[3],session.layer) || session.layer<=0 || !integer(fields[4],count) || count>63)return false;
     auto ids=fields[5];
     while(!ids.empty()) {const auto comma=ids.find(',');ModelTransactionId desired{};

@@ -83,7 +83,7 @@ bool parse(std::string_view line,Target& target) {
         if((i+1==fields.size())!=(next==std::string_view::npos))return false;
         fields[i]=line.substr(0,next);if(next!=std::string_view::npos)line.remove_prefix(next+1);}
     if(!is_hex(fields[0]) || !is_hex(fields[4]) || fields[4]==std::string(32,'0') ||
-        !integer(fields[1],target.project) || target.project<=0 || !integer(fields[2],target.comp) || target.comp<=0 ||
+        !integer(fields[1],target.project) || target.project<0 || !integer(fields[2],target.comp) || target.comp<=0 ||
         !integer(fields[3],target.layer) || target.layer<=0 || !integer(fields[5],target.request.expected_source) ||
         target.request.expected_source<1 || target.request.expected_source>2 || !integer(fields[6],target.request.expected_revision) ||
         target.request.expected_revision>2147483647u)return false;

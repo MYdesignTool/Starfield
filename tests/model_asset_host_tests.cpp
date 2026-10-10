@@ -18,6 +18,7 @@ unsigned checks{},suites{},refs{},values{},handles{},locks{},script_calls{},gene
 #define CHECK(x) do{++checks;if(!(x)){std::cerr<<"check "<<checks<<" at "<<__LINE__<<": "<<#x<<'\n';std::exit(1);}}while(false)
 constexpr char transfer[]="0123456789abcdef0123456789abcdef",uuid[]="fedcba98765432100123456789abcdef";
 std::string request_line,missing_suite,received,failed;
+A_long root_id=101;
 bool available=true,continue_ack=true,wrong_uuid{},duplicate{},multiple_renderers{},wrong_project{},wrong_comp{},wrong_layer{},
     generic_error{},unacknowledged{},bad_payload_size{},sink_overflow{},script_error{},unterminated{},big_result{},wrong_type{};
 bool backup_renderer{},backup_model{};double renderer_guard{},model_guard{};
@@ -38,7 +39,7 @@ std::string arguments(const std::string& body,const char* name){const std::strin
 void no_owned(){CHECK(suites==0);CHECK(refs==0);CHECK(values==0);CHECK(handles==0);CHECK(locks==0);}
 void reset(){stop_model_asset_host();no_owned();initialize_ui_exclusion();initialize_model_asset_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|"+uuid+"|1|17";
-    missing_suite.clear();received.clear();failed.clear();payload_size=70001;reject_page=-1;
+    root_id=101;missing_suite.clear();received.clear();failed.clear();payload_size=70001;reject_page=-1;
     available=continue_ack=true;wrong_uuid=duplicate=multiple_renderers=wrong_project=wrong_comp=wrong_layer=false;
     generic_error=unacknowledged=bad_payload_size=sink_overflow=script_error=unterminated=big_result=wrong_type=false;
     backup_renderer=backup_model=false;renderer_guard=model_guard=0;
@@ -76,7 +77,7 @@ void initialize(){
     projects.AEGP_GetProjectRootFolder=[](AEGP_ProjectH,AEGP_ItemH* out)->A_Err{*out=opaque<AEGP_ItemH>(1);return 0;};
     items.AEGP_GetFirstProjItem=[](AEGP_ProjectH,AEGP_ItemH* out)->A_Err{*out=opaque<AEGP_ItemH>(1);return 0;};
     items.AEGP_GetNextProjItem=[](AEGP_ProjectH,AEGP_ItemH item,AEGP_ItemH* out)->A_Err{*out=item==opaque<AEGP_ItemH>(1)?opaque<AEGP_ItemH>(2):nullptr;return 0;};
-    items.AEGP_GetItemID=[](AEGP_ItemH item,A_long* out)->A_Err{*out=item==opaque<AEGP_ItemH>(1)?(wrong_project?102:101):202;return 0;};
+    items.AEGP_GetItemID=[](AEGP_ItemH item,A_long* out)->A_Err{*out=item==opaque<AEGP_ItemH>(1)?(wrong_project?root_id+1:root_id):202;return 0;};
     items.AEGP_GetItemType=[](AEGP_ItemH,AEGP_ItemType* out)->A_Err{*out=static_cast<AEGP_ItemType>(wrong_comp?AEGP_ItemType_FOLDER:AEGP_ItemType_COMP);return 0;};
     comps.AEGP_GetCompFromItem=[](AEGP_ItemH,AEGP_CompH* out)->A_Err{*out=opaque<AEGP_CompH>(2);return 0;};
     layers.AEGP_GetLayerFromLayerID=[](AEGP_CompH,AEGP_LayerIDVal id,AEGP_LayerH* out)->A_Err{CHECK(id==303);*out=wrong_layer?nullptr:opaque<AEGP_LayerH>(3);return 0;};
@@ -125,6 +126,10 @@ int main(){initialize();reset();CHECK(!step_model_asset_host());CHECK(script_cal
     drain();CHECK(generic_calls==1 && begins==1 && finishes==1 && chunk_calls==3);CHECK(received.size()==payload_size*2);
     constexpr char hex[]="0123456789abcdef";for(std::size_t i=0;i<payload_size;++i){CHECK(received[i*2]==hex[(i&255)>>4]);CHECK(received[i*2+1]==hex[i&15]);}
     CHECK(!step_model_asset_host());CHECK(generic_calls==1);
+    reset();root_id=0;request_line=std::string(transfer)+"|0|202|303|"+uuid+"|1|17";
+    drain();CHECK(generic_calls==1&&begins==1&&finishes==1);
+    reset();root_id=0;wrong_project=true;request_line=std::string(transfer)+"|0|202|303|"+uuid+"|1|17";
+    drain();CHECK(generic_calls==0&&begins==0&&finishes==0);
     for(unsigned which=0;which<2;++which){reset();if(which==0)backup_renderer=true;else backup_model=true;drain();CHECK(generic_calls==1 && finishes==1);}
     for(unsigned which=0;which<2;++which){reset();if(which==0)renderer_guard=1;else model_guard=1;drain();CHECK(generic_calls==0 && finishes==0);}
     for(const char* suite:{kAEGPUtilitySuite,kAEGPMemorySuite,kAEGPProjSuite,kAEGPItemSuite,kAEGPCompSuite,kAEGPLayerSuite,kAEGPEffectSuite,kAEGPStreamSuite}){
@@ -133,7 +138,8 @@ int main(){initialize();reset();CHECK(!step_model_asset_host());CHECK(script_cal
         case 3:wrong_project=true;break;case 4:wrong_comp=true;break;case 5:wrong_layer=true;break;case 6:wrong_type=true;break;}drain();CHECK(generic_calls==0 && finishes==0);}
     for(const std::string& line:std::vector<std::string>{"0",std::string(transfer)+"|101|202|303|"+uuid+"|0|17",std::string(transfer)+"|101|202|303|"+uuid+"|1|2147483648",
         std::string(transfer)+"|101|202|303|"+uuid+"|1|17|extra",std::string(transfer)+"|101|202|303|"+uuid+"|1|17');alert(1)",
-        std::string(transfer)+"|101|202|303|00000000000000000000000000000000|1|17",std::string(transfer)+"|101|202|-1|"+uuid+"|1|17"}){
+        std::string(transfer)+"|101|202|303|00000000000000000000000000000000|1|17",std::string(transfer)+"|101|202|-1|"+uuid+"|1|17",
+        std::string(transfer)+"|-1|202|303|"+uuid+"|1|17",std::string(transfer)+"|2147483648|202|303|"+uuid+"|1|17"}){
         reset();request_line=line;drain();CHECK(generic_calls==0 && chunk_calls==0);}
     for(unsigned which=0;which<4;++which){reset();switch(which){case 0:generic_error=true;break;case 1:unacknowledged=true;break;case 2:bad_payload_size=true;break;case 3:sink_overflow=true;break;}
         drain();CHECK(generic_calls==1 && begins==0 && finishes==0 && !failed.empty());}

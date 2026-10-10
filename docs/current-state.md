@@ -4,6 +4,12 @@
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
+## 当前优先修复：M3-17 Model 根身份（2026-10-10）
+
+owner已确认CEP63实际正常加载；添加Model报invalid_model_transaction。只读Report-ModelTarget.jsx截图确认AE23.5x52目标p0-c1-l29。根ID0被CEP事务和原生Model事务/asset export/OBJ检查点误拒绝，候选已统一接受非负root、保留comp/layer正值与全部实际SDK身份重验，0不是通配符。准备native62/packed32830/CEP64完整配对，安装仍61/63，所有Motion/MNT在途保持；本次优先处理M3-17，三模式/Force后续任务不缩减。
+
+标准/ASAN原生事务9027364/9027464、资产各149165、导入各20628（另控件452）actual exit0；CEP默认添加及owner token356、实际gateway DOM35/export588/作者74/Shape92/完整ES3三文件18、手动报告ES3/只读fake host11通过。真实发布/回滚dummy新配对61、原60检查通过。日志artifacts/m3-17-root-id-*及m3-17-model-target-report-tests.log；asset fixture遗留101期望和升级rollback夹具误删已存在helper已修正。下一步提交冻结完整SDK、fresh process check及保留61/63回滚的发布；真实AE添加/OBJ/资源预设/undo/reopen保持开放。
+
 ## M3-18 独立计算阶段（2026-10-10）
 
 ### Motion／Transform 有序粒子框架候选（未部署）

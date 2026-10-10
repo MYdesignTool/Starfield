@@ -6,7 +6,7 @@ const source=fs.readFileSync(path.join(process.env.STARFIELD_PANEL_ROOT,"jsx/sta
 const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(source)[1];
 let checks=0,now=1000,commands=0,arbReads=0,writes=0;
 const eq=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=v=>{checks++;assert.ok(v);};
-const nodeId="fedcba98765432100123456789abcdef",assetId="0123456789abcdef0123456789abcdef",token="p101-c202-l303";
+const nodeId="fedcba98765432100123456789abcdef",assetId="0123456789abcdef0123456789abcdef",token="p0-c202-l303";
 const properties={};
 function add(name,disk,value){const p={name,matchName:"org.starfieldfx.node.model-"+disk,value,numKeys:0,
     setValue(){writes++;throw new Error("Transport must not write the project");}};properties[name]=properties[p.matchName]=p;}
@@ -28,7 +28,7 @@ const backupRenderer={name:"Renderer backup",matchName:renderer.matchName,proper
 const parade={list:[renderer,model],get numProperties(){return this.list.length;},property(i){return this.list[i-1];}};
 const layer={id:303,width:1920,height:1080,source:{pixelAspect:1},property(name){return name==="ADBE Effect Parade"?parade:null;}};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,numLayers:1,layer(i){return i===1?layer:null;}});
-const app={project:{rootFolder:{id:101},numItems:1,item(i){return i===1?comp:null;}},
+const app={project:{rootFolder:{id:0},numItems:1,item(i){return i===1?comp:null;}},
     findMenuCommandId(name){eq(name,"Starfield Prepare Model Asset Export");return 9;},executeCommand(id){eq(id,9);commands++;}};
 const host={},context=vm.createContext({$:{global:host},app,CompItem,Date:function(){this.getTime=()=>now;}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
@@ -37,12 +37,12 @@ function request(operation,extra){return JSON.stringify(Object.assign({protocol:
     operation,pinTarget:true,target:{token},assetId,nodeId,baseGraphRevision:11,page:0},extra));}
 const call=(op,extra)=>JSON.parse(host["SFLD_"+op](request(op,extra)));
 const session=()=>host.__SFLD_modelAssetBridgeV1;
-function reset(){host.__SFLD_modelAssetBridgeV1=null;now=1000;commands=0;app.project.rootFolder.id=101;parade.list=[renderer,model];
+function reset(){host.__SFLD_modelAssetBridgeV1=null;now=1000;commands=0;app.project.rootFolder.id=0;parade.list=[renderer,model];
     properties.Source.value=1;properties["Mesh Revision"].value=17;properties["Panel Sync Guard"].value=0;
     carriers["Graph Revision"].value=11;carriers["Panel Graph Sync Guard"].value=0;
     boundNames.forEach((name,i)=>{properties[name].value=bounds[i];});}
 function begin(){const response=call("beginModelAssetExport");checks++;assert.equal(response.ok,true,JSON.stringify(response));eq(commands,1);eq(session().state,"queued");}
-function receive(bytes){eq(host.SFLD_modelAssetHostRequest(),assetId+"|101|202|303|"+nodeId+"|1|17");
+function receive(bytes){eq(host.SFLD_modelAssetHostRequest(),assetId+"|0|202|303|"+nodeId+"|1|17");
     eq(host.SFLD_modelAssetHostBegin(assetId,bytes,realm(bounds)),"1");eq(host.SFLD_modelAssetHostContinue(assetId),"1");}
 function finish(bytes){for(let i=0;i<Math.ceil(bytes*2/65536);i++)eq(host.SFLD_modelAssetHostChunk(assetId,i,"ab".repeat(Math.min(32768,bytes-i*32768))),"1");
     eq(host.SFLD_modelAssetHostFinish(assetId),"1");}
@@ -71,7 +71,7 @@ reset();begin();receive(70001);eq(host.SFLD_modelAssetHostChunk(assetId,0,"ab".r
 reset();begin();receive(32);now+=60001;eq(call("readModelAssetPage").error.code,"model_asset_timeout");eq(session().pages.length,0);
 reset();begin();eq(host.SFLD_modelAssetHostFail(assetId,8,516),"1");eq(call("readModelAssetPage").ok,false);eq(session().pages.length,0);
 reset();begin();receive(8*1024*1024);finish(8*1024*1024);eq(call("readModelAssetPage",{page:255}).hex.length,65536);eq(session().pages.length,256);
-reset();properties.Source.value=2;eq(call("beginModelAssetExport").ok,true);eq(host.SFLD_modelAssetHostRequest(),assetId+"|101|202|303|"+nodeId+"|2|17");
+reset();properties.Source.value=2;eq(call("beginModelAssetExport").ok,true);eq(host.SFLD_modelAssetHostRequest(),assetId+"|0|202|303|"+nodeId+"|2|17");
 // Both native lookup and the pinned renderer inventory must ignore guard2.
 reset();parade.list=[backupRenderer,backupModel,renderer,model];begin();receive(32);finish(32);
 eq(call("readModelAssetPage").ok,true);eq(call("releaseModelAsset").ok,true);
@@ -86,7 +86,7 @@ for(let i=0;i<3;i++){numeric.writeUInt32LE(i,128+i*12);numeric.writeUInt32LE(0xf
 let crc=0xffffffff;for(const byte of numeric.subarray(32)){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}numeric.writeUInt32LE((crc^0xffffffff)>>>0,12);
 reset();let collected=null,clientTasks=[];
 const client=assets.create({idFactory:()=>assetId,now:()=>now,call(operation,fields,callback){callback(call(operation,fields));},
-    schedule(fn){clientTasks.push(function(){eq(host.SFLD_modelAssetHostRequest(),assetId+"|101|202|303|"+nodeId+"|1|17");
+    schedule(fn){clientTasks.push(function(){eq(host.SFLD_modelAssetHostRequest(),assetId+"|0|202|303|"+nodeId+"|1|17");
         eq(host.SFLD_modelAssetHostBegin(assetId,numeric.length,realm(bounds)),"1");
         eq(host.SFLD_modelAssetHostChunk(assetId,0,numeric.toString("hex")),"1");eq(host.SFLD_modelAssetHostFinish(assetId),"1");fn();});}});
 client.collect({revision:11,nativeNodes:[{id:nodeId,type:"org.starfieldfx.nodes.model",parameters:[{key:"13",type:3,value:0}],modelAsset:{revision:17,bounds}}]},token,r=>{collected=r;});

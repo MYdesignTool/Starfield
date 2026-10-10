@@ -14,6 +14,7 @@ unsigned checks{},suites{},handles{},locks{},script_calls{},executor_calls{},pre
 #define CHECK(x) do{++checks;if(!(x)){std::cerr<<"check "<<checks<<" at "<<__LINE__<<": "<<#x<<'\n';std::exit(1);}}while(false)
 constexpr char transfer[]="0123456789abcdef0123456789abcdef",node[]="fedcba98765432100123456789abcdef";
 std::string request_line,descriptor_line,result_line,missing_suite;
+A_long root_id=101;
 std::vector<std::size_t> lengths;
 bool available{},continue_ok{},prepare_ok{},commit_ok{},script_error{},unterminated{},oversize{},reenter{},
     bad_project{},bad_comp{},bad_layer{},change_after_prepare{},bad_hex{},short_page{},stop_in_prepare{},committed_warning{},unique_assets{};
@@ -29,7 +30,7 @@ std::string arguments(const std::string& body,const char* name){const std::strin
     return body.substr(start+marker.size(),end-start-marker.size());}
 void reset(){stop_model_transaction_host();clean();initialize_ui_exclusion();initialize_model_transaction_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|1|"+node+",000000000000000000000000000000ff";
-    lengths={70001};descriptor_line.clear();result_line.clear();missing_suite.clear();
+    root_id=101;lengths={70001};descriptor_line.clear();result_line.clear();missing_suite.clear();
     available=continue_ok=prepare_ok=commit_ok=true;
     script_error=unterminated=oversize=reenter=bad_project=bad_comp=bad_layer=change_after_prepare=bad_hex=short_page=stop_in_prepare=committed_warning=unique_assets=false;
     script_calls=executor_calls=prepares=commits=results=pages=0;}
@@ -69,7 +70,7 @@ void initialize(){
     memory.AEGP_UnlockMemHandle=[](AEGP_MemHandle value)->A_Err{auto* m=reinterpret_cast<Memory*>(value);CHECK(m->locked);m->locked=false;CHECK(locks-- >0);return 0;};
     projects.AEGP_GetProjectByIndex=[](A_long index,AEGP_ProjectH* out)->A_Err{CHECK(index==0);*out=opaque<AEGP_ProjectH>(1);return 0;};
     projects.AEGP_GetProjectRootFolder=[](AEGP_ProjectH,AEGP_ItemH* out)->A_Err{*out=opaque<AEGP_ItemH>(1);return 0;};
-    items.AEGP_GetItemID=[](AEGP_ItemH item,A_long* out)->A_Err{*out=item==opaque<AEGP_ItemH>(1)?(bad_project?102:101):(bad_comp?203:202);return 0;};
+    items.AEGP_GetItemID=[](AEGP_ItemH item,A_long* out)->A_Err{*out=item==opaque<AEGP_ItemH>(1)?(bad_project?root_id+1:root_id):(bad_comp?203:202);return 0;};
     items.AEGP_GetFirstProjItem=[](AEGP_ProjectH,AEGP_ItemH* out)->A_Err{*out=opaque<AEGP_ItemH>(2);return 0;};
     items.AEGP_GetNextProjItem=[](AEGP_ProjectH,AEGP_ItemH,AEGP_ItemH* out)->A_Err{*out=nullptr;return 0;};
     items.AEGP_GetItemType=[](AEGP_ItemH,AEGP_ItemType* out)->A_Err{*out=AEGP_ItemType_COMP;return 0;};
@@ -103,6 +104,10 @@ int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(scri
     {HostUiExclusion modal;CHECK(modal);queue_model_graph_transaction();
         CHECK(step_model_transaction_host());CHECK(script_calls==0 && executor_calls==0);}
     drain();CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && pages==3);CHECK(result_line.find(",[1,7,0,0,0,0,0,0,-1]")!=std::string::npos);
+    reset();root_id=0;request_line=std::string(transfer)+"|0|202|303|1|"+node+",000000000000000000000000000000ff";
+    drain();CHECK(executor_calls==1&&prepares==1&&commits==1&&results==1);
+    reset();root_id=0;request_line=std::string(transfer)+"|0|202|303|1|"+node+",000000000000000000000000000000ff";
+    change_after_prepare=true;drain();CHECK(prepares==1&&commits==0&&results==1);
     reset();reenter=true;drain();CHECK(executor_calls==1 && commits==1);
     reset();committed_warning=true;drain();CHECK(result_line.find(",[1,7,0,0,0,516,0,0,-1]")!=std::string::npos);
     for(auto which:{0,1}){reset();if(which==0)prepare_ok=false;else commit_ok=false;drain();CHECK(executor_calls==1);CHECK(result_line.find(",[0,")!=std::string::npos);}
@@ -111,7 +116,9 @@ int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(scri
     for(auto which:{0,1,2,3,4,5,6}){reset();if(which==0)bad_project=true;if(which==1)bad_comp=true;if(which==2)bad_layer=true;
         if(which==3)bad_hex=true;if(which==4)short_page=true;if(which==5)continue_ok=false;if(which==6)missing_suite=kAEGPLayerSuite;
         drain();CHECK(executor_calls==0 && prepares==0 && commits==0 && results==1);}
-    for(const auto& line:{std::string("0"),std::string(transfer)+"|0|202|303|1|"+node,
+    for(const auto& line:{std::string("0"),std::string(transfer)+"|-1|202|303|1|"+node,
+        std::string(transfer)+"|2147483648|202|303|1|"+node,std::string(transfer)+"|101|0|303|1|"+node,
+        std::string(transfer)+"|101|202|0|1|"+node,
         std::string(transfer)+"|101|202|303|64|"+node,std::string(transfer)+"|101|202|303|1|"+node+","+node,
         std::string(transfer)+"|101|202|303|1|"+node+","}){reset();request_line=line;drain();CHECK(executor_calls==0 && pages==0);}
     for(const auto& line:{std::string(node)+"|3|17|32|-2|-3|-4|2|3|4",std::string(node)+"|2|2147483648|32|-2|-3|-4|2|3|4",

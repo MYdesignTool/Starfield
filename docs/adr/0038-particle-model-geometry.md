@@ -21,6 +21,29 @@ stages, not the current deployment. Actual AE modal/OBJ/undo/reopen remain gates
 
 ## Owner-authorized test release — 2026-10-10
 
+### Project root ID zero correction
+
+The owner confirmed CEP63 loads, then observed `invalid_model_transaction:
+Invalid Model transaction identity or assets.` when adding Model. The manual
+read-only report on AE23.5x52 returned `p0-c1-l29`. This confirms project root ID
+zero is a real host value, not a missing project; composition/layer IDs stay
+positive. The CEP client, Model transaction Host, asset export Host and OBJ
+import checkpoint incorrectly required a positive project root ID.
+
+The correction accepts nonnegative root IDs while retaining negative/overflow
+rejection and fresh SDK comparison of the actual project, comp and layer at
+every existing checkpoint. The zero root is never used as a wildcard. The client
+now reports the rejected identity field separately from invalid assets. No
+public parameter IDs, match names, graph/binding/sequence schema or Core ABI
+changes. Native build62/packed32830 and CEP64 require a new complete frozen
+eight-target May2023 build and paired publication; native61/CEP63 must remain
+available as rollback. Existing unreleased numeric Motion source is preserved
+and has no native/CEP author entry in this test release.
+
+Local tests exercise the actual client defaults and owner token, queued JSX
+transport/DOM, imported assets, native target revalidation and OBJ checkpoints.
+Fake host/executor coverage and compilation do not qualify the fix in actual AE.
+
 ### CEP63 ExtendScript compatibility correction
 
 The owner observed `gateway_load_failed: SyntaxError: Illegal use of reserved

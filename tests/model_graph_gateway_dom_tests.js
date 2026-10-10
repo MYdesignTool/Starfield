@@ -5,7 +5,7 @@ const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("n
 const root=process.env.STARFIELD_PANEL_ROOT;if(!root)throw new Error("Set STARFIELD_PANEL_ROOT to the isolated Model candidate.");
 const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"))[1];
 const edits=require(path.join(root,"js/graph_edits.js")),codec=require(path.join(root,"js/graph_codec.js")),layout=require(path.join(root,"js/graph_layout.js"));
-const {mainControls,nodeControls}=require("./node_property_fixture.js"),uuid=n=>n.toString(16).padStart(32,"0"),token="p101-c202-l303";
+const {mainControls,nodeControls}=require("./node_property_fixture.js"),uuid=n=>n.toString(16).padStart(32,"0"),token="p0-c202-l303";
 const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
@@ -32,7 +32,7 @@ function parade(){return {get numProperties(){return items.length;},property(i){
     addProperty(matchName){items.push({matchName,name:"",properties:modelControls()});epoch++;return wrap(items[items.length-1]);}};}
 const layer={id:303,name:"Particles",selected:true,width:1920,height:1080,time:0,source:{pixelAspect:1},property:name=>name==="ADBE Effect Parade"?parade():null};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"Comp",time:0,numLayers:1,layer:()=>layer});layer.containingComp=comp;
-const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:101},numItems:1,item:()=>comp},
+const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
     beginUndoGroup(){undo++;},endUndoGroup(){undo++;},findMenuCommandId:()=>55,executeCommand(){commands++;}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"),context);
@@ -56,7 +56,7 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
     eq(r.ok,true,JSON.stringify(r));return {desired,before,id:uuid(transaction)};}
 function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelGraphAssetPage(request("writeModelGraphAssetPage",{asset:0,page:0,hex:"ab".repeat(32)}))).ok,true);
     eq(JSON.parse(host.SFLD_queueModelGraphTransaction(request("queueModelGraphTransaction"))).ok,true);eq(commands,1);
-    ok(host.SFLD_modelTransactionHostRequest().startsWith(id+"|101|202|303|1|"));
+    ok(host.SFLD_modelTransactionHostRequest().startsWith(id+"|0|202|303|1|"));
     // Simulate the native complete backup: a disabled guard2 renderer and node
     // remain in the parade while the live renderer is held at guard1.
     const backupMain={...renderer,properties:copy(renderer.properties)},backupNode={...items[1],properties:copy(items[1].properties)};

@@ -8,7 +8,8 @@ const load=n=>require(path.join(root,"js",n+".js"));
 const edits=load("graph_edits"),presets=load("presets"),graphTransactions=load("graph_transactions"),snapshots=load("native_graph_snapshot"),codec=load("graph_codec");
 const clientAPI=load("model_graph_transactions"),assetAPI=load("model_assets"),copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 let checks=0;const eq=(a,b,message)=>{checks++;assert.deepEqual(a,b,message);},ok=v=>{checks++;assert.ok(v);};
-const uuid=n=>n.toString(16).padStart(32,"0"),modelId=uuid(101),transactionId=uuid(900),token="p101-c202-l303",bounds=[-2,-3,-4,2,3,4];
+const uuid=n=>n.toString(16).padStart(32,"0"),modelId=uuid(101),transactionId=uuid(900),bounds=[-2,-3,-4,2,3,4];
+let token="p101-c202-l303";
 function mesh(triangles=1){const b=Buffer.alloc(32+3*32+36*triangles);b.write("SFMG");b.writeUInt16LE(1,4);b.writeUInt16LE(32,6);b.writeUInt32LE(b.length,8);b.writeUInt32LE(3,16);b.writeUInt32LE(triangles,28);
     [[-2,-3,-4],[2,3,4],[2,-3,4]].forEach((point,p)=>point.concat(1).forEach((v,a)=>b.writeDoubleLE(v,32+p*32+a*8)));
     for(let t=0;t<triangles;t++)for(let i=0;i<3;i++){b.writeUInt32LE(i,128+t*36+i*12);b.writeUInt32LE(0xffffffff,132+t*36+i*12);b.writeUInt32LE(0xffffffff,136+t*36+i*12);}
@@ -44,7 +45,7 @@ api.remove=()=>{};api.writeRenderer=(resolved,r)=>{renderer=copy(r);};api.nonce=
 api.trigger=()=>{revision++;if(badSaved)nodes[0].position.x+=10;return realm({ok:true,nonce:66});};
 function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line==="0")return;
     eq(guard,0);const parts=line.split("|"),id=parts[0],count=Number(parts[4]),before={nodes:copy(nodes),renderer:copy(renderer),revision};
-    eq(parts.slice(1,4),["101","202","303"]);eq(host.SFLD_modelTransactionHostContinue(id),"1");
+    eq(parts.slice(1,4),/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(token).slice(1));eq(host.SFLD_modelTransactionHostContinue(id),"1");
     const assets=[];
     for(let i=0;i<count;i++){const fields=host.SFLD_modelTransactionHostAsset(id,i).split("|"),length=Number(fields[3]),pages=[];
         for(let page=0;page<Math.ceil(length/32768);page++)pages.push(host.SFLD_modelTransactionHostPage(id,i,page));
@@ -76,6 +77,32 @@ const meshAsset={nodeId:modelId,source:2,revision:17,bounds,meshHex};
 function client(){return clientAPI.create({call,schedule:fn=>tasks.push(fn),now:()=>now,idFactory:()=>transactionId});}
 reset();let result;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(result.committed,true);eq([hostRuns,prepares,commits,restores],[1,1,1,0]);eq(bytesRead,meshHex.length/2);
 eq(host.__SFLD_modelGraphTransactionV1,null);eq(nativeMeshes[modelId].meshHex,meshHex);
+// Exercise the production defaults rather than supplying an already-valid ID
+// factory and an alternate Model client. Only the asynchronous timer is queued
+// locally; real graph planning, client validation and JSX callbacks still run.
+token="p0-c1-l29";reset(presets.build("sparks",1080));const originalTimer=global.setTimeout;
+try{global.setTimeout=fn=>tasks.push(fn);
+    graphTransactions.create({codec,edits,call}).apply({type:"addNode",nodeType:"model"},r=>{result=r;},token,11,
+        {ok:true,target:{token},snapshot:copy(snapshot())});drain();
+    eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(nodes.filter(n=>n.type===edits.types.model).length,1);eq(bytesRead,0);
+}finally{global.setTimeout=originalTimer;}
+reset();client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(bytesRead,meshHex.length/2);
+token="p101-c202-l303";
+// The generic identity/assets error must identify which boundary rejected the
+// request without issuing a host call or revealing mesh payloads.
+for(const badToken of [undefined,null,"p-1-c202-l303","p00-c202-l303","p101-c0-l303","p101-c202-l0","pinned"]){
+    reset();client().apply({...plan(cube),target:{token:badToken}},[],r=>{result=r;});drain();
+    eq(result.error.code,"invalid_model_transaction");ok(result.error.message.includes("Invalid Model target identity"));
+    ok(result.error.message.includes("token="+String(badToken)));eq(hostRuns,0);eq(writes,0);
+}
+for(const badId of [undefined,0,"0".repeat(32),uuid(255),"A".repeat(32)]){
+    reset();clientAPI.create({call,idFactory:()=>badId}).apply(plan(cube),[],r=>{result=r;});
+    ok(result.error.message.includes("Invalid Model transaction ID"));eq(hostRuns,0);eq(writes,0);
+}
+for(const badAssets of [null,{},Array(64).fill(meshAsset)]){
+    reset();client().apply(plan(cube),badAssets,r=>{result=r;});
+    ok(result.error.message.includes("Invalid Model transaction asset list"));eq(hostRuns,0);eq(writes,0);
+}
 reset();const many=mesh(8192);client().apply(plan(),[{...meshAsset,meshHex:many}],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(bytesRead,many.length/2);eq(nativeMeshes[modelId].meshHex,many);
 reset();client().apply(plan(cube),[{...meshAsset,source:1}],r=>{result=r;});drain();eq(result.ok,true);eq(nativeMeshes[modelId].revision,17);
 eq(nodes.find(n=>n.id===modelId).parameters.find(p=>p.key==="2").value,0);eq(nodes.find(n=>n.id===modelId).parameters.find(p=>p.key==="13").value,0);

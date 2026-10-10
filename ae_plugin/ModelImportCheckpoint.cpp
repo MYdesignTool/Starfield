@@ -46,7 +46,7 @@ PF_Err capture_model_import_checkpoint(PF_InData* data,ModelImportCheckpoint& ou
        (error=streams.value->AEGP_GetEffectNumParamStreams(effect,&count)) || count!=101 ||
        (error=projects.value->AEGP_GetProjectByIndex(0,&project)) || !project ||
        (error=projects.value->AEGP_GetProjectRootFolder(project,&root)) || !root ||
-       (error=items.value->AEGP_GetItemID(root,&current.project)) || current.project<=0 ||
+       (error=items.value->AEGP_GetItemID(root,&current.project)) || current.project<0 ||
        (error=pf.value->AEGP_GetEffectLayer(data->effect_ref,&layer)) || !layer ||
        (error=layers.value->AEGP_GetLayerParentComp(layer,&comp)) || !comp ||
        (error=comps.value->AEGP_GetItemFromComp(comp,&item)) || !item ||

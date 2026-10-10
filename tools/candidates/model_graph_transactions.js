@@ -18,9 +18,13 @@
                 options.call("releaseModelGraphTransaction",fields(),function(){callback(response);});}
             function error(response){end(response && response.error?response:failure("model_transaction_failed","No Model transaction response."));}
             try{
-                if(typeof id!=="string" || !/^[0-9a-f]{32}$/.test(id) || /^0{32}$/.test(id) || id==="000000000000000000000000000000ff" ||
-                    typeof token!=="string" || !/^p[1-9][0-9]*-c[1-9][0-9]*-l[1-9][0-9]*$/.test(token) || !Array.isArray(meshes) || meshes.length>63)
-                    throw new Error("Invalid Model transaction identity or assets.");
+                if(typeof id!=="string" || !/^[0-9a-f]{32}$/.test(id) || /^0{32}$/.test(id) || id==="000000000000000000000000000000ff")
+                    throw new Error("Invalid Model transaction ID (kind="+typeof id+", value="+String(id)+").");
+                if(typeof token!=="string" || !/^p(0|[1-9][0-9]*)-c[1-9][0-9]*-l[1-9][0-9]*$/.test(token))
+                    throw new Error("Invalid Model target identity (kind="+typeof token+", token="+String(token)+").");
+                if(!Array.isArray(meshes) || meshes.length>63)
+                    throw new Error("Invalid Model transaction asset list (kind="+typeof meshes+", count="+
+                        (Array.isArray(meshes)?meshes.length:"not an array")+").");
                 var total=0,seen={};
                 meshes.forEach(function(mesh){
                     if(!mesh || typeof mesh.nodeId!=="string" || !/^[0-9a-f]{32}$/.test(mesh.nodeId) || seen[mesh.nodeId] ||

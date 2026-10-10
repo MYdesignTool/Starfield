@@ -6,7 +6,8 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 61 test candidate: Model geometry/author/asset transport and modal guards;
-// graph7, binding7, snapshot8, manifest30 and fully paired Core ABI8 / CEP62.
-#define STARFIELD_VERSION_BUILD 61
-#define STARFIELD_VERSION_PACKED 32829 /* 0x803d */
+// Build 62 test candidate: accept AE project root ID zero throughout Model
+// author/asset/import routes; full native/Core ABI8 pairing with CEP64.
+// Numeric Motion work has no public author entry in this test release.
+#define STARFIELD_VERSION_BUILD 62
+#define STARFIELD_VERSION_PACKED 32830 /* 0x803e */

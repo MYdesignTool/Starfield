@@ -70,6 +70,11 @@ core::OpaqueBytes mesh_bytes(){return handles.at(reinterpret_cast<PF_ArbitraryH>
 constexpr std::string_view triangle="v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
 void checkpoints(PF_InData& data){
     setup(data);adapter::ModelImportCheckpoint checkpoint;
+    project_id=0;CHECK(adapter::capture_model_import_checkpoint(&data,checkpoint)==0&&checkpoint.project==0);
+    CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)==0&&writes==0&&undo_groups==0);
+    project_id=101;CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)!=0&&writes==0&&undo_groups==0);
+    project_id=-1;CHECK(adapter::capture_model_import_checkpoint(&data,checkpoint)!=0&&writes==0&&undo_groups==0);
+    project_id=101;
     CHECK(adapter::capture_model_import_checkpoint(&data,checkpoint)==0);
     CHECK(checkpoint.project==101&&checkpoint.comp==202&&checkpoint.layer==303&&checkpoint.mesh==mesh_bytes());
     CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)==0&&refs==0&&suites==0&&locks==0&&handles.size()==2);

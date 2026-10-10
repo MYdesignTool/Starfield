@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-10 Model root ID0修正：`RunModelTransactionHostTests.ps1 -Run`及`-Sanitize`实际9027364/9027464、`RunModelAssetHostTests.ps1`两档各149165、`RunModelImportTransactionTests.ps1`两档各20628（另共用控件452），actual exit0；artifacts/m3-17-root-id-{transaction,asset,import}-{tests,asan}.log及exit.txt。覆盖root0成功、项目改变的重验失败、负数/overflow与comp/layer0拒绝，使用actual native helper/fake May2023 suites；不是AE资格。
+
+STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native62-panel64-root-id/cep_panel：model_graph_transport356（生产默认ID/client及owner p0-c1-l29）、gateway DOM35、asset gateway588、作者74、Shape92、ES3三个JSX18通过。`node --expose-internals tests/model_target_report_tests.js`11只读/ES3检查通过；owner实际报告AE23.5x52根0/comp1/layer29。`model_deployment_tests.ps1 -Run -UpgradeInstalledModel`61及旧`-Run`60，通过实际tools的dummy完整发布/rollback，所有路径在artifacts。首次asset fixture遗留101期待和升级rollback误删旧helper诊断保留；已修正重跑。源码冻结SDK/真实发布及AE gate仍待后续证据。
+
 有序frame源码8bd5a5ce10b274da9f7240ea7705e3e2303d262d已推送/git archive冻结于artifacts/prepared/m3-18-motion-frame-8bd5a5c/source；IncludeModelCandidate和双NoPublish完整May2023 x64 Release /MT八目标会话81513实际terminal exit0，artifacts/m3-18-motion-frame-sdk-build.log/exit.txt/build-hashes.json与sdk-terminal.json保存真实终态和八个新SHA256。冻结快照Circle1842/Look At1377/Path8432再检actual exit0；构建后motion-frame-installed-hashes.json确认26安装hash/selector/runtime保持native61/CEP63。没有Motion原生/CEP作者部署，不能由编译关闭参考、AE或GPU资格。
 
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionFrameTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各4141，实际exit0；artifacts/m3-18-motion-frame-{tests,asan}.log及各exit.txt。实际普通/历史/Auxiliary有序Motion/Transform与snapshot10：独立L*Q*A运算/剪切/镜像/退化、identity精确保留/失败原子性/无分配、前置/后置/串联/反序、动画Transform/三档lattice/partial/乱序/Path alignment、5001个独立帧、实际CPU像素/GPU准备轴/Model矩阵、3..9旧字节及所有表迁移10、每个10截断/header/非法数字/Model预检、Linear affine近似与实际Subframe、出生父状态继承、全取消/分配失败和并发。早期夹具错误PortId和GPU粒子数期望已修正；GPU准备不认定硬件资格，数值Null矩阵不認定AE回调。
