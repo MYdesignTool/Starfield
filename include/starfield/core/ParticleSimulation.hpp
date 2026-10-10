@@ -42,6 +42,9 @@ struct ParticleInstance {
     std::uint32_t cloud_style_index{}, cloud_random_key{};
     // Zero selects the builtin cube; otherwise a 1-based shared geometry group.
     std::uint32_t model_style_index{};
+    // Proper rotation in canonical world axes after the authored/shared basis.
+    // Separate from shared affine entries; snapshot9 owns its explicit wire form.
+    ParticleMotionPose motion_pose{kIdentityMotionPose};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

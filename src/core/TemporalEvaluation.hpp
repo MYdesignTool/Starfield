@@ -51,6 +51,7 @@ class TemporalEvaluator {
     using CircleLease=std::shared_ptr<const CompiledMotionCircle>;
     std::map<std::pair<NodeId,double>,CircleLease> circle_samples;
     std::map<NodeId,CircleLease> constant_circles;
+    std::map<std::pair<NodeId,double>,MotionLookAtSettings> look_at_samples;
     TransformPlanningBudget transform_budget;
     using R=Result<EvaluatedGraph>;
     struct Branch {
@@ -111,6 +112,7 @@ class TemporalEvaluator {
         std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes) {
         using M=Result<bool>;
         for(auto id:branch.circles) {
+            if(std::get<std::uint32_t>(*find_value(*nodes.at(id),kMotionMode))==2)continue;
             if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"Motion Circle history cancelled");
             auto proof=constant_circles.find(id);
             if(proof==constant_circles.end()) {
@@ -152,6 +154,24 @@ class TemporalEvaluator {
             auto moved=apply_circle_state(particle,c,angle,omega);if(!moved.has_value())return moved;
         }
         return M::success(true);
+    }
+    Result<bool> apply_look_ats(ParticleInstance& p,const Branch& branch,double now,
+        const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph) {
+        for(auto id:branch.circles)if(std::get<std::uint32_t>(*find_value(*nodes.at(id),kMotionMode))==2) {
+            if(cancel.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At history cancelled");
+            if(++work>kTemporalWorkLimit)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At history work limit");
+            const auto key=std::pair{id,now};auto found=look_at_samples.find(key);
+            if(found==look_at_samples.end()) {
+                auto sampled=at(*nodes.at(id),now);if(!sampled.has_value())return Result<bool>::failure(sampled.error());
+                auto mode=read_motion_mode(sampled.value());if(!mode.has_value()||mode.value()!=2)
+                    return Result<bool>::failure(ErrorCode::invalid_request,"historical Motion mode changed in Look At branch");
+                auto settings=read_motion_look_at(sampled.value());if(!settings.has_value())return Result<bool>::failure(settings.error());
+                if(look_at_samples.size()>=4096)look_at_samples.clear();
+                found=look_at_samples.emplace(key,settings.take_value()).first;
+            }
+            auto turned=apply_motion_look_at(p,found->second,graph.sprite_bases);if(!turned.has_value())return turned;
+        }
+        return Result<bool>::success(true);
     }
     Result<bool> motion(ParticleInstance& particle,const Branch& branch,
                         double birth,double now,std::uint32_t seed) {
@@ -241,7 +261,9 @@ public:
             if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());models.emplace(node.id,value.take_value());
             }
-            if(node.type_key==kMotionNode) {auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());}
+            if(node.type_key==kMotionNode) {auto mode=read_motion_mode(node);if(!mode.has_value())return R::failure(mode.error());
+                if(mode.value()==1){auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());}
+                else{auto value=read_motion_look_at(node);if(!value.has_value())return R::failure(value.error());}}
             if(node.type_key==kParticleNode && (find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance))) {
                 auto authored=read_particle(node);if(!authored.has_value())return R::failure(authored.error());
             }
@@ -524,6 +546,7 @@ public:
                         apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);
+                        auto turned=apply_look_ats(instance,branch,now,nodes,result);if(!turned.has_value())return R::failure(turned.error());
                         if(particle_values.authored_birth)instance.id=branch_birth_identity(identity,branch.particle->id);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));

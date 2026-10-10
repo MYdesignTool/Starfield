@@ -124,7 +124,8 @@ void graph_and_history() {
     near(moved.particles[0].velocity,Vec3{-.25*std::sin(.5),.25*std::cos(.5),0},"animated endpoint velocity");
     animated.fail_circle=true;check(!evaluate_temporal_particle_graph(animated.graph,{1,1},never,{},animated).has_value(),"history error propagated");
     animated.fail_circle=false;animated.bad_identity=true;check(!evaluate_temporal_particle_graph(animated.graph,{1,1},never,{},animated).has_value(),"history identity guarded");
-    for(unsigned mode:{0,2,9}){auto bad=g;set(node(bad,3),kMotionMode,std::uint32_t{mode});check(!evaluate_particle_graph(bad,{1,1},never).has_value(),"unimplemented mode rejected");}
+    for(unsigned mode:{0,9}){auto bad=g;set(node(bad,3),kMotionMode,std::uint32_t{mode});check(!evaluate_particle_graph(bad,{1,1},never).has_value(),"unimplemented mode rejected");}
+    {auto bad=g;set(node(bad,3),kMotionMode,std::uint32_t{2});check(!evaluate_particle_graph(bad,{1,1},never).has_value(),"Look At requires explicit goal and forward");}
     auto bad=g;set(node(bad,3),kMotionAxis,Vec3{});check(!evaluate_particle_graph(bad,{1,1},never).has_value(),"invalid axis rejected");
     set(node(g,1),kEmittingMode,std::uint32_t{1});Sampler once(g);once.proof=true;same(evaluate(g),temporal(once));
     check(evaluate(g,{-1,1}).particles.empty(),"negative exposure empty");

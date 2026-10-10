@@ -5,6 +5,7 @@
 #include "starfield/core/ParticleBirth.hpp"
 #include "starfield/core/ModelResources.hpp"
 #include "starfield/core/MotionCircle.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -478,6 +479,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::vector<std::optional<CompiledParticleTransform>> transforms(count);
         ModelValues models;
         std::map<NodeId,CompiledMotionCircle> circles;
+        std::map<NodeId,MotionLookAtSettings> look_ats;
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -527,8 +529,9 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 auto value=read_transform(node);if(!value.has_value())return R::failure(value.error());
                 transforms[i]=value.take_value();
             } else if(node.type_key==kMotionNode) {
-                auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());
-                circles.emplace(node.id,value.take_value());
+                auto mode=read_motion_mode(node);if(!mode.has_value())return R::failure(mode.error());
+                if(mode.value()==1){auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());circles.emplace(node.id,value.take_value());}
+                else{auto value=read_motion_look_at(node);if(!value.has_value())return R::failure(value.error());look_ats.emplace(node.id,value.take_value());}
             } else if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());
                 models.emplace(node.id,value.take_value());
@@ -630,7 +633,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         using MotionPlan=std::shared_ptr<const std::vector<NodeId>>;
         std::vector<MotionPlan> motion_plans(count);
         const auto motion_plan=[&](std::size_t particle)->Result<MotionPlan> {
-            if(circles.empty())return Result<MotionPlan>::success({});
+            if(circles.empty()&&look_ats.empty())return Result<MotionPlan>::success({});
             if(motion_plans[particle])return Result<MotionPlan>::success(motion_plans[particle]);
             auto chain=plan_motion_chain(nodes,incoming,outgoing,active,topological_order,particle,output,cancellation,budget.work);
             if(!chain.has_value())return Result<MotionPlan>::failure(chain.error());
@@ -639,6 +642,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         };
         const auto apply_circles=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
             if(plan)for(auto id:*plan) {
+                if(!circles.contains(id))continue;
                 if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Motion Circle cancelled");
                 if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Motion Circle work limit");
                 const auto& c=circles.at(id);auto clock=c.clock(instance.age_seconds,instance.lifetime_seconds);
@@ -647,6 +651,14 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 auto moved=apply_circle_state(instance,c,c.settings().radians_per_second*factor*clock.value().integral_seconds,
                     c.settings().radians_per_second*factor*clock.value().weight);
                 if(!moved.has_value())return moved;
+            }
+            return Result<bool>::success(true);
+        };
+        const auto apply_look_ats=[&](ParticleInstance& instance,const MotionPlan& plan)->Result<bool> {
+            if(plan)for(auto id:*plan)if(const auto found=look_ats.find(id);found!=look_ats.end()) {
+                if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At cancelled");
+                if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At work limit");
+                auto turned=apply_motion_look_at(instance,found->second,result.sprite_bases);if(!turned.has_value())return turned;
             }
             return Result<bool>::success(true);
         };
@@ -838,6 +850,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
+                            auto turned=apply_look_ats(instance,circle_plan.value());if(!turned.has_value())return R::failure(turned.error());
                             if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
@@ -1109,6 +1122,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
+                auto turned=apply_look_ats(instance,plan.motion);if(!turned.has_value())return R::failure(turned.error());
                 if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }

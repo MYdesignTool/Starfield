@@ -1,4 +1,22 @@
 // Private implementation included in GraphEvaluation.cpp's anonymous namespace.
+Result<std::uint32_t> read_motion_mode(const GraphNode& node) {
+    const auto* raw=find_value(node,kMotionMode);const auto* mode=raw?std::get_if<std::uint32_t>(raw):nullptr;
+    if(!mode||(*mode!=1 && *mode!=2))return Result<std::uint32_t>::failure(ErrorCode::invalid_request,"Motion mode has no evaluator");
+    return Result<std::uint32_t>::success(*mode);
+}
+Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node) {
+    using R=Result<MotionLookAtSettings>;MotionLookAtSettings s;
+    for(auto [key,destination]:{std::pair{kMotionGoal,&s.goal},std::pair{kMotionForward,&s.forward}}) {
+        const auto* raw=find_value(node,key);const auto* value=raw?std::get_if<Vec3>(raw):nullptr;
+        if(!value||!motion_circle_detail::bounded(*value))return R::failure(ErrorCode::invalid_request,"missing/invalid Look At goal/forward");*destination=*value;
+    }
+    if(s.forward.x==0&&s.forward.y==0&&s.forward.z==0)return R::failure(ErrorCode::invalid_request,"Look At forward must be nonzero");
+    if(const auto* raw=find_value(node,kMotionOverLife)) {
+        const auto* bytes=std::get_if<OpaqueBytes>(raw);if(!bytes||!decode_age_curve(*bytes,s.over_life,0,1000))
+            return R::failure(ErrorCode::invalid_request,"invalid Look At Over Life curve");
+    }
+    return R::success(std::move(s));
+}
 Result<CompiledMotionCircle> read_motion_circle(const GraphNode& node) {
     using R=Result<CompiledMotionCircle>;MotionCircleSettings s;
     const auto* mode=find_value(node,kMotionMode);
@@ -53,7 +71,7 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         auto at=stack.back();stack.pop_back();if(terminal[at])continue;terminal[at]=true;
         for(auto prev:incoming[at]){if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");if(reachable[prev])stack.push_back(prev);}
     }
-    struct Context {std::size_t parent;NodeId id;};std::vector<Context> contexts{{0,{}}};
+    struct Context {std::size_t parent;NodeId id;bool look{};};std::vector<Context> contexts{{0,{}}};
     std::vector<std::size_t> context_at(count,count);context_at[root]=0;
     for(auto at:order) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Motion context planning cancelled");
@@ -61,7 +79,9 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         const auto& type=nodes[at]->type_key;
         if(context && (type==kForceNode||type==kTransformNode))
             return R::failure(ErrorCode::invalid_request,"Force/Transform after Motion requires ordered-frame integration");
-        if(type==kMotionNode){contexts.push_back({context,nodes[at]->id});context=contexts.size()-1;}
+        if(type==kMotionNode){const auto mode=std::get<std::uint32_t>(*find_value(*nodes[at],kMotionMode));
+            if(contexts[context].look&&mode==1)return R::failure(ErrorCode::invalid_request,"Circle after Look At requires ordered orientation integration");
+            contexts.push_back({context,nodes[at]->id,contexts[context].look||mode==2});context=contexts.size()-1;}
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {
             if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");

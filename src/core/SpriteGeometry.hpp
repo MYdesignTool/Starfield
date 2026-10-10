@@ -3,6 +3,7 @@
 #include "starfield/core/Render.hpp"
 #include "starfield/core/ParticleTransform.hpp"
 #include "starfield/core/ParticleCloud.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 #include <algorithm>
 #include <cmath>
 namespace starfield::core::sprite_geometry {
@@ -55,6 +56,7 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
     std::span<const ParticleSpriteBasis> bases = {}, double texture_ratio = 0, bool ignore_perspective = false,
     std::span<const ParticleCloudStyle> clouds = {}) noexcept {
     sprite.particle=&particle;
+    if(!valid_particle_motion_pose(particle.motion_pose))return false;
     if(particle.cloud_style_index) {
         if(particle.shape!=2 || particle.cloud_style_index>clouds.size())return false;
         sprite.cloud_style=&clouds[particle.cloud_style_index-1];
@@ -88,6 +90,11 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         };
         a=transform_axis(a);b=transform_axis(b);
     }
+    const bool oriented=particle.motion_pose!=kIdentityMotionPose;
+    if(oriented) {
+        const auto orient=[&](Vec3 v){const auto w=motion_pose_axis(particle.motion_pose,{v.x,-v.y,v.z});return Vec3{w.x,-w.y,w.z};};
+        a=orient(a);b=orient(b);
+    }
     if(!request.camera.enabled) {
         sprite.x=(.5+particle.position.x/grid.aspect)*grid.frame_width;
         sprite.y=(.5-particle.position.y)*grid.frame_height;
@@ -112,7 +119,7 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
             // unrotated source. Keep the historic analytic primitive convention.
             const double layer_y=texture?axis.y:-axis.y;
             Vec3 axis_view{axis.x,layer_y,0};
-            if(!billboard || transformed) {
+            if(!billboard || transformed || oriented) {
                 const double local_axis[3]{axis.x/frame.pixel_aspect_ratio,layer_y,axis.z};
                 axis_view={};
                 for(int row=0;row<3;++row) {

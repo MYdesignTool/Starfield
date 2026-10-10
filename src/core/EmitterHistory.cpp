@@ -1,6 +1,7 @@
 #include "starfield/core/EmitterHistory.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/ModelResources.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -91,27 +92,30 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
         const bool textures = !graph.texture_styles.empty();
         const bool clouds=!graph.cloud_styles.empty();
         const bool models=!graph.model_styles.empty() || std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.shape==4;});
+        const bool poses=std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.motion_pose!=kIdentityMotionPose;});
         std::size_t model_bytes=0;
         for(const auto& style:graph.model_styles) {
             if(style.instances.empty() || style.instances.size()>kMaxModelsPerStyle)
                 return R::failure(ErrorCode::invalid_request,"invalid Model group size");
             model_bytes+=8+144*style.instances.size();
         }
-        const bool extended=has_bases || transfers || textures || clouds || models;
-        const std::size_t length=(models?64:clouds?56:textures?48:extended?40:32)+model_bytes+16*graph.evaluated_nodes.size()+
-            72*graph.sprite_bases.size()+24*graph.texture_styles.size()+24*graph.cloud_styles.size()+200*graph.particles.size();
+        const bool extended=has_bases || transfers || textures || clouds || models || poses;
+        const std::size_t stride=poses?232:200;
+        const std::size_t length=(poses?72:models?64:clouds?56:textures?48:extended?40:32)+model_bytes+16*graph.evaluated_nodes.size()+
+            72*graph.sprite_bases.size()+24*graph.texture_styles.size()+24*graph.cloud_styles.size()+stride*graph.particles.size();
         if(length>kMaxGraphPayloadBytes)return R::failure(ErrorCode::work_limit_exceeded,"temporal snapshot exceeds byte budget");
         OpaqueBytes bytes;bytes.reserve(length);
         const auto append=[&](std::uint64_t value,unsigned count) {
             for(unsigned i=0;i<count;++i) bytes.push_back(static_cast<std::byte>((value>>(8*i))&255));
         };
-        append(0x8004,2);append(models?8:clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
+        append(0x8004,2);append(poses?9:models?8:clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
         append(std::bit_cast<std::uint64_t>(time.value),8);append(time.scale,8);
         append(graph.evaluated_nodes.size(),4);append(graph.particles.size(),4);
         if(extended){append(graph.sprite_bases.size(),4);append(0,4);}
-        if(textures || clouds || models){append(graph.texture_styles.size(),4);append(0,4);}
-        if(clouds || models){append(graph.cloud_styles.size(),4);append(0,4);}
-        if(models){append(graph.model_styles.size(),4);append(0,4);}
+        if(textures || clouds || models || poses){append(graph.texture_styles.size(),4);append(0,4);}
+        if(clouds || models || poses){append(graph.cloud_styles.size(),4);append(0,4);}
+        if(models || poses){append(graph.model_styles.size(),4);append(0,4);}
+        if(poses){append(32,4);append(0,4);}
         for(const auto& node:graph.evaluated_nodes) for(auto b:node.value.bytes) append(b,1);
         for(const auto& basis:graph.sprite_bases) {
             if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid temporal sprite basis");
@@ -161,6 +165,8 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
                 return R::failure(ErrorCode::invalid_request,"invalid temporal particle values");
             append(p.shape | (static_cast<std::uint32_t>(p.transfer_mode)<<8) | ((p.shape==4?p.model_style_index:p.shape==2?p.cloud_style_index:p.texture_style_index)<<16),4);
             append(p.up_axis | ((p.shape==2?p.cloud_random_key:p.texture_random_key)<<8),4);append(p.limit_to_2d?1:0,4);append(p.sprite_basis_index,4);
+            if(!valid_particle_motion_pose(p.motion_pose))return R::failure(ErrorCode::invalid_request,"invalid snapshot Motion pose");
+            if(poses)for(auto component:p.motion_pose)append(std::bit_cast<std::uint64_t>(component),8);
         }
         return R::success(std::move(bytes));
     } catch(const std::bad_alloc&) {return R::failure(ErrorCode::allocation_failed,"temporal snapshot allocation failed");}
@@ -177,32 +183,34 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
         const auto clock=std::bit_cast<std::int64_t>(read(8));const auto scale=read(8);
         const auto nodes=read(4),particles=read(4);
         std::uint64_t bases=0, styles=0, clouds=0, models=0;
-        if(version>=4 && version<=8) {
+        if(version>=4 && version<=9) {
             if(bytes.size()<40)return R::failure(ErrorCode::invalid_request,"short Transform snapshot header");
             bases=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Transform snapshot header reserved field");
         }
-        if (version>=6 && version<=8) {
+        if (version>=6 && version<=9) {
             if(bytes.size()<48)return R::failure(ErrorCode::invalid_request,"short texture snapshot header");
             styles=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero texture snapshot reserved field");
         }
-        if(version>=7 && version<=8) {
+        if(version>=7 && version<=9) {
             if(bytes.size()<56)return R::failure(ErrorCode::invalid_request,"short Cloud snapshot header");
             clouds=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Cloud snapshot reserved field");
         }
-        if(version==8) {
+        if(version>=8 && version<=9) {
             if(bytes.size()<64)return R::failure(ErrorCode::invalid_request,"short Model snapshot header");
             models=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Model snapshot reserved field");
         }
-        const auto fixed=(version==8?64:version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+200*particles;
-        if(tag!=0x8004 || (version<3 || version>8) || length!=bytes.size() || !scale || !time.scale ||
+        if(version==9){if(bytes.size()<72||read(4)!=32||read(4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Motion pose snapshot header");}
+        const auto stride=version==9?232u:200u;
+        const auto fixed=(version==9?72:version==8?64:version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+stride*particles;
+        if(tag!=0x8004 || (version<3 || version>9) || length!=bytes.size() || !scale || !time.scale ||
             static_cast<long double>(clock)*time.scale!=static_cast<long double>(time.value)*scale ||
             nodes>kMaxGraphNodes || particles>kMaxParticleCount || bases>kMaxParticleSpriteBases || styles>kMaxTextureStyles || clouds>kMaxCloudStyles ||
-            models>kMaxModelStyles || bytes.size()<fixed || (version!=8 && bytes.size()!=fixed))
+            models>kMaxModelStyles || bytes.size()<fixed || (version<8 && bytes.size()!=fixed))
             return R::failure(ErrorCode::invalid_request,"invalid temporal snapshot header/time");
         // Validate all variable group lengths before allocating or reading entries.
-        const auto particle_start=bytes.size()-200*particles;
-        if(version==8) {
-            const auto saved=at;at=static_cast<std::size_t>(fixed-200*particles);
+        const auto particle_start=bytes.size()-stride*particles;
+        if(version>=8) {
+            const auto saved=at;at=static_cast<std::size_t>(fixed-stride*particles);
             for(std::uint64_t i=0;i<models;++i) {
                 if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot preflight cancelled");
                 if(at>particle_start || particle_start-at<8)return R::failure(ErrorCode::invalid_request,"short Model group header");
@@ -257,9 +265,9 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
             }
             const auto shape_word=static_cast<std::uint32_t>(read(4));
             if(version>=5) {
-                if(shape_word & ~(version==8?0xffff0307u:version>=6?0xffff0303u:0x303u))return R::failure(ErrorCode::invalid_request,"invalid snapshot transfer/shape bits");
+                if(shape_word & ~(version>=8?0xffff0307u:version>=6?0xffff0303u:0x303u))return R::failure(ErrorCode::invalid_request,"invalid snapshot transfer/shape bits");
                 p.shape=shape_word&255u;p.transfer_mode=static_cast<ParticleTransferMode>((shape_word>>8)&3u);
-                if(version==8 && p.shape==4)p.model_style_index=shape_word>>16;
+                if(version>=8 && p.shape==4)p.model_style_index=shape_word>>16;
                 else if(version>=7 && p.shape==2)p.cloud_style_index=shape_word>>16;
                 else if(version>=6)p.texture_style_index=shape_word>>16;
             } else p.shape=shape_word;
@@ -268,7 +276,9 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
             if(version>=7 && p.shape==2)p.cloud_random_key=axis_word>>8;
             else if(version>=6)p.texture_random_key=axis_word>>8;
             const auto limit=read(4);p.sprite_basis_index=static_cast<std::uint32_t>(read(4));p.limit_to_2d=limit!=0;
-            if(limit>1 || p.sprite_basis_index>bases || p.shape>(version==8?4u:version>=6?3u:2u) || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
+            if(version==9){for(auto& component:p.motion_pose)component=std::bit_cast<double>(read(8));
+                if(!valid_particle_motion_pose(p.motion_pose))return R::failure(ErrorCode::invalid_request,"invalid decoded Motion pose");}
+            if(limit>1 || p.sprite_basis_index>bases || p.shape>(version>=8?4u:version>=6?3u:2u) || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
                p.texture_style_index>styles || (p.shape==3 ? !p.texture_style_index : p.texture_style_index!=0) ||
                (p.shape!=3 && p.texture_random_key!=0) || p.cloud_style_index>clouds ||
                (p.shape!=2 && p.cloud_style_index!=0) || (!p.cloud_style_index && p.cloud_random_key!=0) ||

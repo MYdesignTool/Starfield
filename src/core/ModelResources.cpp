@@ -1,4 +1,5 @@
 #include "starfield/core/ModelResources.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -171,7 +172,7 @@ Result<std::array<double,16>> model_particle_matrix(const ParticleInstance& p,co
     if(!frame.layer_width||!frame.layer_height||!std::isfinite(frame.pixel_aspect_ratio)||frame.pixel_aspect_ratio<=0 ||
         !finite(p.position)||!finite(p.rotation_degrees)||!std::isfinite(p.size_pixels)||p.size_pixels<0 ||
         p.size_pixels>kMaxParticleSize||p.up_axis>2||!std::isfinite(p.anchor_x_percent)||!std::isfinite(p.anchor_y_percent)||
-        p.anchor_x_percent<0||p.anchor_x_percent>100||p.anchor_y_percent<0||p.anchor_y_percent>100 || !valid_model_instance(instance))
+        p.anchor_x_percent<0||p.anchor_x_percent>100||p.anchor_y_percent<0||p.anchor_y_percent>100 || !valid_model_instance(instance)||!valid_particle_motion_pose(p.motion_pose))
         return R::failure(ErrorCode::invalid_request,"invalid Model particle pose");
     ParticleSpriteBasis basis{1,0,0, 0,1,0, 0,0,1};
     if(p.sprite_basis_index) {
@@ -184,8 +185,9 @@ Result<std::array<double,16>> model_particle_matrix(const ParticleInstance& p,co
             if(p.up_axis==0)v={-v.z,v.y,v.x};else if(p.up_axis==1)v={v.x,v.z,-v.y};
         }
         v=rotate(v,angles);
-        const Vec3 world{basis[0]*v.x+basis[1]*v.y+basis[2]*v.z,
+        Vec3 world{basis[0]*v.x+basis[1]*v.y+basis[2]*v.z,
             basis[3]*v.x+basis[4]*v.y+basis[5]*v.z,basis[6]*v.x+basis[7]*v.y+basis[8]*v.z};
+        if(p.motion_pose!=kIdentityMotionPose)world=motion_pose_axis(p.motion_pose,world);
         return Vec3{world.x*p.size_pixels/frame.pixel_aspect_ratio,-world.y*p.size_pixels,world.z*p.size_pixels};
     };
     std::array<double,16> matrix{};matrix[15]=1;

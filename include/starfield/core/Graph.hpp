@@ -212,6 +212,7 @@ inline constexpr PortKey kMotionParticlesIn{1},kMotionParticlesOut{2};
 // Motion's Core numeric units are explicit, not AE/public Speed units.
 inline constexpr ParameterKey kMotionMode{1},kMotionOrigin{2},kMotionAxis{3},kMotionAngularRate{4},
     kMotionSpeedRandom{5},kMotionOverLife{6};
+inline constexpr ParameterKey kMotionGoal{7},kMotionForward{8};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};

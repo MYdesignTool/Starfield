@@ -166,6 +166,12 @@ struct MotionCircleSettings {
     double speed_random_percent{};
     AgeCurve over_life{};
 };
+using ParticleMotionPose=std::array<double,4>; // unit quaternion, w/x/y/z
+inline constexpr ParticleMotionPose kIdentityMotionPose{1,0,0,0};
+struct MotionLookAtSettings {
+    Vec3 goal{}, forward{1,0,0};
+    AgeCurve over_life{};
+};
 
 // How the emission direction is sampled. `directional` uses the Euler angles and the
 // cone span; `uniform` samples the whole sphere and ignores both.

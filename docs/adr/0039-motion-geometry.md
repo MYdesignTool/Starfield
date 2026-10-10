@@ -1,6 +1,6 @@
 # ADR 0039 — Motion geometry and first three modes
 
-Status: numeric geometry implemented; Circle graph integration in progress;
+Status: numeric geometry, Circle and Look At graph candidates implemented;
 public Motion contract remains proposed,
 M3-18. Installed native61/CEP63 is unchanged.
 
@@ -84,8 +84,8 @@ The append-only Core graph identity is `org.starfieldfx.nodes.motion`, schema1,
 with particle input1/output2. Motion-local keys1..6 are mode:uint32,
 origin:Vec3, axis:Vec3, angular rate:double in explicit radians/second,
 speed random:double percent, and optional existing AgeCurve bytes. Mode1 is
-Circle; the reserved first-stage values0/2 are Light Path/Look At and reject
-until their evaluators exist. No AE disk IDs, author menu or advertised mode is
+Circle; mode2 now evaluates numeric Look At as described below. Reserved mode0
+is Light Path and still rejects until its evaluator exists. No AE disk IDs, author menu or advertised mode is
 added by this substage. Old graphs and snapshot3..8 are unchanged; an older Core
 rejects an unknown Motion graph rather than silently dropping its behavior.
 Full adapter/Core pairing is required before any graph author is published.
@@ -123,8 +123,8 @@ sampler metadata proof permits the exact
 static clock only when the caller certifies constancy. Equal samples are never
 used as that proof. New random purpose22 is appended; old streams are unchanged.
 No snapshot stride, Render boundary or Core C ABI change is needed for Circle
-position/velocity alone. Light Path and Look At remain required next substages;
-this temporary Circle-only Core entry does not close M3-18 or the full goal.
+position/velocity alone. Light Path remains required, and Look At's author-facing
+policy is still open; these numeric Core entries do not close M3-18 or the full goal.
 
 The focused fixture exercises the actual graph evaluator and CPU renderer, not
 only a geometry helper: standard and ASAN1764 checks, Transform graph594 and
@@ -142,6 +142,69 @@ eight-target May2023 x64 Release /MT build passes with actual exit0 and both
 NoPublish switches. The build log/exit/eight hashes and retained26 installed
 native61/CEP63 hashes/Core selector are under artifacts/m3-18-motion-circle-*.
 There is no author entry and no deployment of this unfinished Motion substage.
+
+### Per-particle orientation and Look At migration (unpublished)
+
+Before Light Path's Orient To Path is authored, each evaluated particle needs
+an independent proper rotation after its authored Euler orientation and shared
+Transform basis. Append an owned unit quaternion `(w,x,y,z)`, default identity,
+to ParticleInstance. Settings.hpp owns this numeric value. Apply it in canonical
+world axes after the shared affine basis for Sprite projection (CPU and GPU
+scene preparation) and Model geometry. A proper left rotation preserves the
+basis's scale/shear/reflection and does not consume one of4096 shared entries
+for every distinct particle. Limit To2D uses an XY goal/forward projection.
+
+Snapshot migration is append-only: versions3..8 keep their exact bytes when all
+poses are identity. Version9 has a72-byte header, all version8 table counts
+(including zeros), a32-byte pose stride field and reserved0, and232-byte
+particles: the existing200-byte record followed by four binary64 quaternion
+components. Readers accept3..9 and initialize old records to identity; malformed
+unit quaternions/header/lengths reject before use. Existing byte/work budgets
+remain, without truncation. Old readers reject9 explicitly. Sequence envelope1,
+parameter disk IDs and C ABI8 stay unchanged: opaque snapshot versioning is
+separate from the fixed ABI prefix. Full Main/Core pairing is required; no
+Core-only publication or author release occurs in this substage. Linear shutter
+interpolates poses along the shortest unit-quaternion arc; actual Subframe
+evaluates each pose. An endpoint-only particle retains its endpoint pose.
+
+Motion schema1 adds optional key7=goal Vec3 and8=forward Vec3. Circle's keys2..4
+become descriptor-optional and remain semantically required in mode1. Mode2
+requires explicit goal and forward; no public target selection or forward-axis
+policy is inferred. The caller supplies forward in the particle's canonical
+pre-Euler frame, with any Up Axis choice already accounted for. Look At samples
+the goal at the request time and turns the actual Euler/basis/pose-mapped forward
+toward it by clamped Motion Over Life percent. Zero weight, coincident goal or a
+collapsed basis forward preserves the exact prior pose. Position/velocity,
+identity/style and the authored/shared basis stay unchanged. This independent
+equation is not proof of reference Starting With/goal selection behavior.
+
+For this intermediate graph contract, Look At follows Circle stages; serial
+Look At operations compose properly, and Circle after Look At rejects explicitly.
+Force/Transform after Motion still requires the pending complete ordered-frame
+contract. These restrictions must be resolved before first-stage author delivery.
+Light Path remains required; pose/Look At does not narrow the three-mode goal.
+
+The actual static and temporal graph evaluators now apply the independently
+validated Look At values after particle properties and the shared Transform
+style. Temporal goals are sampled once per node/request time in a bounded
+numeric cache; no AE object enters this layer. CPU Sprite geometry, GPU Sprite
+scene preparation and Model geometry consume the same proper world rotation.
+Legacy records with identity poses retain versions3..8 and their old stride.
+
+Focused MSVC /MT and ASAN runs each pass1366 checks (2026-10-10), covering
+Euler/shear/reflection preservation, serial Look At/Circle-before-Look At,
+animated goals, more than4096 distinct orientations, actual CPU pixels and GPU
+prepared axes, old3..8/table migration, every truncated9 record, bad quaternion
+and header rejection, Linear SLERP, cancellation and every allocation failure
+through success. A posed Circle/Cloud now uses its full world axes in the camera
+path even without a shared Transform; comparing it with an explicitly authored
+3D plane catches the prior billboard branch's dropped depth axis. Circle
+regression1766, Transform graph594, Model graph559 and Model particle/snapshot2695
+also pass. Logs are artifacts/m3-18-motion-look-at-{tests,asan}.log and
+m3-18-look-at-*-regression.log. These are numeric candidate checks, not reference
+Starting With/forward policies, GPU hardware or AE qualification. A new frozen
+full adapter/Core SDK build is required for this migration before publication;
+the prior Circle build cannot qualify these changed shared inputs.
 
 ### Point resource capture seam
 

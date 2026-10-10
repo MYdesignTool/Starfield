@@ -1,6 +1,7 @@
 #pragma once
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/ModelResources.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 #include <algorithm>
 #include <map>
 #include <cmath>
@@ -26,6 +27,8 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
         if(!valid_particle_sprite_basis(basis))return R::failure(ErrorCode::invalid_request,"invalid motion sprite basis");
     std::size_t model_members=0;
     for(const auto* endpoint:{&first,&last}) {
+        for(const auto& p:endpoint->particles)if(!valid_particle_motion_pose(p.motion_pose))
+            return R::failure(ErrorCode::invalid_request,"invalid endpoint Motion pose");
         for(const auto& style:endpoint->model_styles) {
             if(style.instances.empty() || style.instances.size()>kMaxModelsPerStyle)
                 return R::failure(ErrorCode::invalid_request,"invalid motion Model group");
@@ -99,6 +102,8 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
             p.size_pixels=lerp(a->size_pixels,b->size_pixels);p.size_y_pixels=lerp(a->size_y_pixels,b->size_y_pixels);
             p.opacity=lerp(a->opacity,b->opacity);p.color=vector(a->color,b->color);
             p.rotation_degrees=vector(a->rotation_degrees,b->rotation_degrees);
+            auto pose=interpolate_motion_pose(a->motion_pose,b->motion_pose,amount);
+            if(!pose.has_value())return R::failure(pose.error());p.motion_pose=pose.take_value();
             p.feather_percent=lerp(a->feather_percent,b->feather_percent);
             p.anchor_x_percent=lerp(a->anchor_x_percent,b->anchor_x_percent);
             p.anchor_y_percent=lerp(a->anchor_y_percent,b->anchor_y_percent);
