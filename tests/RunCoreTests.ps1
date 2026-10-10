@@ -52,6 +52,8 @@ try {
         'src\core\Graph.cpp',
         'src\core\GraphConstruction.cpp',
         'src\core\GraphEvaluation.cpp',
+        'src\core\MotionGeometry.cpp',
+        'src\core\MotionPathTravel.cpp',
         'src\core\EmitterHistory.cpp',
         'src\core\Random.cpp',
         'src\core\ParticleSimulation.cpp',

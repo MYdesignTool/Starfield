@@ -1,8 +1,78 @@
 // Private implementation included in GraphEvaluation.cpp's anonymous namespace.
 Result<std::uint32_t> read_motion_mode(const GraphNode& node) {
     const auto* raw=find_value(node,kMotionMode);const auto* mode=raw?std::get_if<std::uint32_t>(raw):nullptr;
-    if(!mode||(*mode!=1 && *mode!=2))return Result<std::uint32_t>::failure(ErrorCode::invalid_request,"Motion mode has no evaluator");
+    if(!mode||*mode>2)return Result<std::uint32_t>::failure(ErrorCode::invalid_request,"Motion mode has no evaluator");
     return Result<std::uint32_t>::success(*mode);
+}
+constexpr std::size_t kMotionPathRequestBytes=32*1024*1024;
+struct MotionPathClockValue {
+    MotionPathTravelSettings settings;
+    CompiledMotionCurveClock clock;
+    Result<std::pair<double,double>> distance_rate(double age,double life,double random) const noexcept {
+        using R=Result<std::pair<double,double>>;
+        auto endpoint=clock.clock(age,life);if(!endpoint.has_value())return R::failure(endpoint.error());
+        if(age<settings.delay_seconds||settings.delay_seconds>=life)return R::success({0,0});
+        auto interval=clock.integral_between(settings.delay_seconds,age,life);if(!interval.has_value())return R::failure(interval.error());
+        const auto speed=settings.units_per_second*(1-settings.speed_random_percent/100*random);
+        return R::success({speed*interval.value(),speed*endpoint.value().weight});
+    }
+};
+Result<MotionPathClockValue> compile_motion_path_clock(const MotionPathTravelSettings& s) {
+    using R=Result<MotionPathClockValue>;
+    if(!std::isfinite(s.units_per_second)||std::abs(s.units_per_second)>1e6||
+        !std::isfinite(s.delay_seconds)||s.delay_seconds<0||s.delay_seconds>1e6||
+        !std::isfinite(s.speed_random_percent)||s.speed_random_percent<0||s.speed_random_percent>100||
+        !motion_circle_detail::bounded(s.forward)||(s.orient_to_path&&s.forward.x==0&&s.forward.y==0&&s.forward.z==0))
+        return R::failure(ErrorCode::invalid_request,"invalid Light Path numeric clock");
+    auto clock=compile_motion_curve_clock(s.over_life);if(!clock.has_value())return R::failure(clock.error());
+    return R::success({s,clock.take_value()});
+}
+Result<MotionPathClockValue> read_motion_path_clock(const GraphNode& node) {
+    using R=Result<MotionPathClockValue>;MotionPathTravelSettings s;
+    auto mode=read_motion_mode(node);if(!mode.has_value()||mode.value()!=0)return R::failure(ErrorCode::invalid_request,"historical Light Path mode changed");
+    const auto* raw=find_value(node,kMotionPathSpeed);const auto* speed=raw?std::get_if<double>(raw):nullptr;
+    if(!speed)return R::failure(ErrorCode::invalid_request,"missing Light Path numeric speed");s.units_per_second=*speed;
+    for(auto [key,destination]:{std::pair{kMotionPathDelay,&s.delay_seconds},std::pair{kMotionSpeedRandom,&s.speed_random_percent}})
+        if(const auto* v=find_value(node,key)){const auto* number=std::get_if<double>(v);if(!number)return R::failure(ErrorCode::invalid_request,"invalid Light Path numeric value");*destination=*number;}
+    if(const auto* v=find_value(node,kMotionPathOrient)){const auto* flag=std::get_if<std::uint32_t>(v);
+        if(!flag||*flag>1)return R::failure(ErrorCode::invalid_request,"invalid Light Path orient flag");s.orient_to_path=*flag==1;}
+    if(const auto* v=find_value(node,kMotionForward)){const auto* forward=std::get_if<Vec3>(v);
+        if(!forward)return R::failure(ErrorCode::invalid_request,"invalid Light Path forward");s.forward=*forward;}
+    else if(s.orient_to_path)return R::failure(ErrorCode::invalid_request,"missing Light Path forward");
+    if(const auto* v=find_value(node,kMotionOverLife)){const auto* bytes=std::get_if<OpaqueBytes>(v);
+        if(!bytes||!decode_age_curve(*bytes,s.over_life,0,1000))return R::failure(ErrorCode::invalid_request,"invalid Light Path Over Life");}
+    return compile_motion_path_clock(s);
+}
+class MotionPathWorkCancellation final:public Cancellation {
+    const Cancellation& source_;std::uint64_t& work_;mutable bool exceeded_{};
+public:
+    MotionPathWorkCancellation(const Cancellation& source,std::uint64_t& work):source_(source),work_(work){}
+    bool is_cancelled()const noexcept override {
+        if(source_.is_cancelled())return true;
+        if(++work_>20'000'000){exceeded_=true;return true;}return false;
+    }
+    bool exceeded()const noexcept{return exceeded_;}
+};
+Result<const OpaqueBytes*> read_motion_path_points(const GraphNode& node,const Cancellation& cancel,std::uint64_t& work) {
+    using R=Result<const OpaqueBytes*>;const auto* raw=find_value(node,kMotionPathPoints);const auto* bytes=raw?std::get_if<OpaqueBytes>(raw):nullptr;
+    if(!bytes)return R::failure(ErrorCode::invalid_request,"missing Light Path points");
+    MotionPathWorkCancellation charged(cancel,work);auto checked=validate_motion_path_points(*bytes,charged);
+    if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path request work limit");
+    return checked.has_value()?R::success(bytes):R::failure(checked.error());
+}
+Result<CompiledMotionPathTravel> compile_motion_graph_path(const GraphNode& node,const MotionPathTravelSettings& settings,
+    const Cancellation& cancel,std::uint64_t& work,std::size_t& bytes_used) {
+    using R=Result<CompiledMotionPathTravel>;
+    auto bytes=read_motion_path_points(node,cancel,work);if(!bytes.has_value())return R::failure(bytes.error());
+    MotionPathWorkCancellation charged(cancel,work);auto points=decode_motion_path_points(*bytes.value(),charged);
+    if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path request work limit");
+    if(!points.has_value())return R::failure(points.error());
+    auto compiled=compile_motion_path_travel(points.value(),settings,charged);
+    if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path request work limit");
+    if(!compiled.has_value())return compiled;
+    const auto storage=compiled.value().storage_bytes();
+    if(storage>kMotionPathRequestBytes-bytes_used)return R::failure(ErrorCode::work_limit_exceeded,"Light Path request storage limit");
+    bytes_used+=storage;return compiled;
 }
 Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node) {
     using R=Result<MotionLookAtSettings>;MotionLookAtSettings s;
@@ -71,7 +141,7 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         auto at=stack.back();stack.pop_back();if(terminal[at])continue;terminal[at]=true;
         for(auto prev:incoming[at]){if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");if(reachable[prev])stack.push_back(prev);}
     }
-    struct Context {std::size_t parent;NodeId id;bool look{};};std::vector<Context> contexts{{0,{}}};
+    struct Context {std::size_t parent;NodeId id;bool look{},path{};};std::vector<Context> contexts{{0,{}}};
     std::vector<std::size_t> context_at(count,count);context_at[root]=0;
     for(auto at:order) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Motion context planning cancelled");
@@ -80,8 +150,9 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         if(context && (type==kForceNode||type==kTransformNode))
             return R::failure(ErrorCode::invalid_request,"Force/Transform after Motion requires ordered-frame integration");
         if(type==kMotionNode){const auto mode=std::get<std::uint32_t>(*find_value(*nodes[at],kMotionMode));
-            if(contexts[context].look&&mode==1)return R::failure(ErrorCode::invalid_request,"Circle after Look At requires ordered orientation integration");
-            contexts.push_back({context,nodes[at]->id,contexts[context].look||mode==2});context=contexts.size()-1;}
+            if(contexts[context].look&&mode!=2)return R::failure(ErrorCode::invalid_request,"position Motion after Look At requires ordered orientation integration");
+            if(contexts[context].path&&mode==1)return R::failure(ErrorCode::invalid_request,"Circle after Path requires ordered orientation integration");
+            contexts.push_back({context,nodes[at]->id,contexts[context].look||mode==2,contexts[context].path||mode==0});context=contexts.size()-1;}
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {
             if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");

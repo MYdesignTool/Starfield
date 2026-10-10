@@ -667,7 +667,11 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kMotionSpeedRandom,ParameterKind::float64,false},
         ParameterDescriptor{kMotionOverLife,ParameterKind::opaque_bytes,false},
         ParameterDescriptor{kMotionGoal,ParameterKind::vector3_float64,false},
-        ParameterDescriptor{kMotionForward,ParameterKind::vector3_float64,false}};
+        ParameterDescriptor{kMotionForward,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kMotionPathPoints,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kMotionPathSpeed,ParameterKind::float64,false},
+        ParameterDescriptor{kMotionPathDelay,ParameterKind::float64,false},
+        ParameterDescriptor{kMotionPathOrient,ParameterKind::uint32,false}};
     registry.types.push_back(std::move(motion));
     NodeTypeDescriptor model;
     model.type_key=kModelNode;model.schema_version=1;

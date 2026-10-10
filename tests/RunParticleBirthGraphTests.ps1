@@ -4,7 +4,7 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskDir='artifacts\particle-birth-graph-tests'
 if(-not $Run){Write-Host 'Report: compile/run birth graph and temporal/Auxiliary/cap regression with MSVC /MT. Add -Run to act.';exit 0}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory',
+$taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo
 try {

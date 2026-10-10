@@ -6,7 +6,7 @@ if(-not $Run){Write-Host 'Report: build/run Look At graph, history and renderer 
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 $taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','CpuRenderer','SpriteScene',
-    'ModelGeometry','ModelResources','ModelScene','MotionGeometry') | ForEach-Object {'src\core\'+$_+'.cpp'}
+    'ModelGeometry','ModelResources','ModelScene','MotionGeometry','MotionPathTravel') | ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null

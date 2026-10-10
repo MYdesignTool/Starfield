@@ -42,6 +42,8 @@ public:
     // Exact metadata proof of every Circle value's constancy over this request.
     // Absent proof uses the bounded historical clock; equality is not proof.
     [[nodiscard]] virtual std::optional<MotionCircleSettings> constant_motion_circle(NodeId) {return {};}
+    // Certifies only the numeric clock, not geometry or external dependencies.
+    [[nodiscard]] virtual std::optional<MotionPathTravelSettings> constant_motion_path_clock(NodeId) {return {};}
     [[nodiscard]] virtual Result<double> lifetime(NodeId id, double seconds) {
         auto sampled=node(id,seconds);
         if(!sampled.has_value()) return Result<double>::failure(sampled.error());

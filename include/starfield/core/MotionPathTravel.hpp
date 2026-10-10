@@ -20,6 +20,10 @@ public:
         std::span<const ParticleSpriteBasis> bases={}) const noexcept;
     [[nodiscard]] Result<bool> apply_at_distance(ParticleInstance&,double distance,double rate,
         std::span<const ParticleSpriteBasis> bases={}) const noexcept;
+    // Graph position is evaluated before style; alignment uses the final basis.
+    [[nodiscard]] Result<bool> apply_position_at_distance(ParticleInstance&,double distance,double rate) const noexcept;
+    [[nodiscard]] Result<bool> orient_at_distance(ParticleInstance&,double distance,double rate,
+        std::span<const ParticleSpriteBasis> bases={}) const noexcept;
     CompiledMotionPathTravel(const CompiledMotionPathTravel&)=default;
     CompiledMotionPathTravel(CompiledMotionPathTravel&&) noexcept=default;
     CompiledMotionPathTravel& operator=(const CompiledMotionPathTravel&)=default;
@@ -28,6 +32,9 @@ private:
     CompiledMotionPathTravel(CompiledMotionPath path,CompiledMotionCurveClock clock,MotionPathTravelSettings settings,Vec3 start):
         path_(std::move(path)),clock_(std::move(clock)),settings_(settings),start_(start){}
     [[nodiscard]] Result<bool> apply_sample(ParticleInstance&,const MotionPathTravelSample&,
+        std::span<const ParticleSpriteBasis>) const noexcept;
+    [[nodiscard]] Result<bool> apply_position_sample(ParticleInstance&,const MotionPathTravelSample&) const noexcept;
+    [[nodiscard]] Result<bool> orient_sample(ParticleInstance&,const MotionPathTravelSample&,
         std::span<const ParticleSpriteBasis>) const noexcept;
     CompiledMotionPath path_;
     CompiledMotionCurveClock clock_;

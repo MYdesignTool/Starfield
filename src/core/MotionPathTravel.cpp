@@ -50,8 +50,7 @@ Result<MotionPathTravelSample> CompiledMotionPathTravel::travel_at_distance(doub
         {direction.x*speed,direction.y*speed,direction.z*speed},
         rate<0?Vec3{-direction.x,-direction.y,-direction.z}:direction,distance,speed});
 }
-Result<bool> CompiledMotionPathTravel::apply_sample(ParticleInstance& particle,const MotionPathTravelSample& sample,
-    std::span<const ParticleSpriteBasis> bases) const noexcept {
+Result<bool> CompiledMotionPathTravel::apply_position_sample(ParticleInstance& particle,const MotionPathTravelSample& sample) const noexcept {
     using R=Result<bool>;
     if(!bounded(particle.position)||!bounded(particle.velocity)||!valid_particle_motion_pose(particle.motion_pose))
         return R::failure(ErrorCode::invalid_request,"invalid Motion path particle state");
@@ -62,6 +61,12 @@ Result<bool> CompiledMotionPathTravel::apply_sample(ParticleInstance& particle,c
     if(sample.units_per_second!=0){next.velocity={particle.velocity.x+sample.velocity.x,
         particle.velocity.y+sample.velocity.y,particle.velocity.z+sample.velocity.z};}
     if(!bounded(next.position)||!bounded(next.velocity))return R::failure(ErrorCode::invalid_request,"Motion path state exceeds bounds");
+    particle=next;return R::success(true);
+}
+Result<bool> CompiledMotionPathTravel::orient_sample(ParticleInstance& particle,const MotionPathTravelSample& sample,
+    std::span<const ParticleSpriteBasis> bases) const noexcept {
+    using R=Result<bool>;auto next=particle;
+    if(!valid_particle_motion_pose(next.motion_pose))return R::failure(ErrorCode::invalid_request,"invalid Motion path pose");
     if(settings_.orient_to_path&&(sample.distance!=0||sample.units_per_second!=0)){
         auto forward=particle_motion_forward(next,settings_.forward,bases);if(!forward.has_value())return R::failure(forward.error());
         auto f=forward.value(),t=sample.tangent;if(next.limit_to_2d){f.z=0;t.z=0;}
@@ -69,11 +74,23 @@ Result<bool> CompiledMotionPathTravel::apply_sample(ParticleInstance& particle,c
     }
     particle=next;return R::success(true);
 }
+Result<bool> CompiledMotionPathTravel::apply_sample(ParticleInstance& particle,const MotionPathTravelSample& sample,
+    std::span<const ParticleSpriteBasis> bases) const noexcept {
+    auto next=particle;auto moved=apply_position_sample(next,sample);if(!moved.has_value())return moved;
+    auto turned=orient_sample(next,sample,bases);if(!turned.has_value())return turned;
+    particle=next;return Result<bool>::success(true);
+}
 Result<bool> CompiledMotionPathTravel::apply(ParticleInstance& particle,double random_sample,std::span<const ParticleSpriteBasis> bases) const noexcept {
     auto sample=travel(particle.age_seconds,particle.lifetime_seconds,random_sample);
     return sample.has_value()?apply_sample(particle,sample.value(),bases):Result<bool>::failure(sample.error());
 }
 Result<bool> CompiledMotionPathTravel::apply_at_distance(ParticleInstance& particle,double distance,double rate,std::span<const ParticleSpriteBasis> bases) const noexcept {
     auto sample=travel_at_distance(distance,rate);return sample.has_value()?apply_sample(particle,sample.value(),bases):Result<bool>::failure(sample.error());
+}
+Result<bool> CompiledMotionPathTravel::apply_position_at_distance(ParticleInstance& particle,double distance,double rate) const noexcept {
+    auto sample=travel_at_distance(distance,rate);return sample.has_value()?apply_position_sample(particle,sample.value()):Result<bool>::failure(sample.error());
+}
+Result<bool> CompiledMotionPathTravel::orient_at_distance(ParticleInstance& particle,double distance,double rate,std::span<const ParticleSpriteBasis> bases) const noexcept {
+    auto sample=travel_at_distance(distance,rate);return sample.has_value()?orient_sample(particle,sample.value(),bases):Result<bool>::failure(sample.error());
 }
 } // namespace starfield::core

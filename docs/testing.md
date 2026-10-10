@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPathGraphTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准/ASAN各8288、实际exit0，artifacts/m3-18-motion-path-graph-{tests,asan}.log及exit.txt。实际mode0普通/历史graph/Auxiliary、SFMP1/6160B最大点包/every truncation/非法header/数字先验证再分配、动画speed/random/出生delay、四curve及metadata、30/60/120Hz partial interval、4096 clock cache淘汰后的lease、最终Euler/affine/reflection切线及串联Path/下游Look At、实际CPU像素/GPU准备/Linear与subframe、普通和历史32MiB累计capacity与20M曲线工作量边界、逐取消/全部分配失败和并发。候选明确数字单位/delay/clamp，不认定Reference作者、AE2023回调或GPU硬件。
+
+相邻必要回归：MotionCircleGraph1772、MotionLookAtGraph1372、MotionPathTravel1216、RunCoreTests -TransformGraph594、ModelGraph559及ModelParticle2695，均实际exit0；artifacts/m3-18-path-graph-*-regression.log和各exit.txt。GraphEvaluation新CPP依赖已补到直接编译运行器，RunCoreTests原MNT内容保留，仅两条Motion source行归本卡。完整冻结SDK与部署前后证据仍分别记录，安装61/63保持。
+
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPathTravelTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准/ASAN各1216、实际exit0，artifacts/m3-18-motion-path-travel-{tests,asan}.log与各exit.txt。实际共用曲线时钟和路径travel源码：四种插值分段独立quadrature、Circle时钟原值、life1e6最后1e-4秒稳定积分、明确delay/random sample、发射offset/身份/样式保留、反向/Limit To2D/Euler/shear/reflection、signed zero/退化路径、越界与缺basis失败原子性、全部compile/assignment分配失败、取消、1000乱序无分配及四线程只读。仅明确数字路径/延迟，不测Reference控件换算/末端政策/实际graph mode0/AE；全图总资源/工作预算须在接入时完成。
 
 共享Clock提取后的必要相邻回归：`tests/RunMotionCircleGraphTests.ps1 -Run`1766、`tests/RunMotionLookAtGraphTests.ps1 -Run`1366，均实际exit0；artifacts/m3-18-path-clock-{circle,look-at}-regression.log及exit.txt。新Core源码/CMake/fingerprint接入；未部署Motion。

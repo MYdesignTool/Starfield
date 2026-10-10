@@ -161,6 +161,10 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 mode0普通/历史Core graph/Auxiliary候选完成SFMP1数字点、delay捕获于birth、动画speed/curve随机积分及最终基底切线pose；32MiB累计capacity及20M工作量请求预算跨Auxiliary，当前几何/历史clock lease及4096淘汰验证。标准/ASAN8288、Circle1772/Look At1372/travel1216/Transform594/Model559/Model粒子2695均实际exit0，motion-path-graph-*及path-graph-*-regression日志保留。新共享源码提交/冻结完整SDK继续；外部依赖/GUID、完整有序frame/动画几何导数与公开参考政策及三模式作者仍需完成，不发布数学入口或关闭完整目标。
+
+Light Path接入GraphEvaluation后，既有直接编译该CPP的测试运行器需要追加MotionGeometry/MotionPathTravel链接输入。M3-18仅拥有这些依赖行，保留MNT-01的其余夹具/运行器改动；RunCoreTests的两行追加独立入索引，不提交其他在途diff。当前没有另一live agent的文件分配。
+
 2026-10-10 travel源码874f852已推送/git archive冻结；双NoPublish完整May2023 /MT八目标会话69978实际exit0，新CPP编译及八输出hash记录于m3-18-motion-path-travel-sdk-build.log/exit.txt/build-hashes.json；26安装hash/selector/runtime匹配61/63，travel-installed-hashes.json。下一步实际mode0 graph/history/Auxiliary、全请求资源/工作预算及外部来源/有序frame，随后三模式作者/配对发布/AE2023；不能由独立travel helper或SDK通过关闭本卡，完整目标active。
 
 2026-10-10 Light Path travel子阶段：Circle共用固定曲线clock提取/稳定延迟区间积分；独立有界路径travel贡献相对位移和瞬时速度，明确speed/delay/random数字，切线pose保留既有分布/Euler/affine剪切镜像；无分配乱序查询、capacity存储计量及失败原子性。标准/ASAN1216、Circle1766/Look At1366均exit0，m3-18-motion-path-travel-*与path-clock-*-regression.log；Core工程/CMake/fingerprint纳入新输入，冻结完整SDK继续。参考末端/Delay Random=0对照已请求，暂不推测公开转换或分布；实际graph mode0/history/Auxiliary、全局预算/资源依赖/有序frame和三模式作者仍为本卡要求，mode0仍typed reject，不部署计算层或缩减目标。

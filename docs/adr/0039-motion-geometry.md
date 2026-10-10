@@ -1,6 +1,6 @@
 # ADR 0039 — Motion geometry and first three modes
 
-Status: numeric geometry, Circle/Look At graph and path-travel seam implemented;
+Status: numeric geometry and all three numeric graph modes implemented;
 public Motion contract remains proposed,
 M3-18. Installed native61/CEP63 is unchanged.
 
@@ -268,6 +268,71 @@ native61/CEP63 hashes/selector/runtime are recorded under motion-path-travel-sdk
 and motion-path-travel-installed-hashes.json; prior Look At artifacts are not
 used as this build's proof. Mode0 remains explicitly rejected by the graph
 until actual history/resource/ordered integration and budgets are implemented.
+
+### Light Path graph/history contract
+
+Append Motion-local numeric keys9(path points),10(canonical units/second),
+11(nonnegative explicit delay seconds),12(orient flag0/1). Reuse5(speed random),
+6(Over Life),8(explicit forward, required when alignment is enabled). Mode0
+requires9/10; other modes retain their existing keys. This unpublished schema1
+extension changes no released AE ID, sequence or C ABI. Older evaluators reject
+the new keys/mode; Main/Core shared inputs must receive a full paired build.
+
+Points use an owned SFMP1 packet:16-byte little-endian header (magic SFMP u32,
+version1 u16, stride24 u16, count1..256 u32, reserved0 u32), followed by XYZ
+binary64 records. Exact length/header/finite coordinate bounds are checked before
+allocation. The graph envelope continues to own its checksum. No host reference,
+file path, layer identity or pointer occurs in this numeric packet.
+
+Validate every authored node, including parked ones; only active path geometry
+is adaptively compiled. The existing20M request work budget includes point
+validation, curve work and adaptive compilation cancellation polls. A separate
+32MiB cumulative compiled-path capacity budget is shared across Auxiliary prefix
+evaluation and temporal caches. Charges are not refunded on eviction, providing
+a conservative request bound without silently dropping tables or coarsening.
+Current geometry is keyed by node/time and immutable leases survive eviction.
+Clock-only history samples use a separate bounded4096-entry cache; geometry is
+not rebuilt at each historical speed midpoint. All failures remain typed.
+
+Delay is captured at particle birth. Integrate speed/random/curve from
+birth+delay on the absolute30/60/120Hz midpoint lattice, at the actual age/life
+fraction. Explicit caller metadata alone can certify a constant path clock and
+permit analytic interval integration; equal samples never prove constancy.
+Current geometry and current rate supply displacement/instantaneous velocity.
+Animated geometry derivatives and reference endpoint/delay policies remain open
+before public author delivery.
+
+Apply displacement/velocity before Particle/Transform style, then path alignment
+and Look At in chain order using the final Euler/shared-affine forward. Preserve
+the numeric helper's atomic all-state API and provide independently validated
+position/orientation phases for the graph. Serial paths and Circle→Path→Look At
+are supported in this stage. Positional Motion after Look At, Circle after Path,
+post-Motion Force/Transform and merging different Motion chains remain explicit
+rejections pending the complete ordered-frame contract. Auxiliary parents use
+the same path/history state and actual instantaneous velocity at child birth.
+These temporary rejections do not reduce M3-18's eventual required interactions.
+
+This defines a numeric candidate, not a reference behavior or published Light
+Path author. External light selection/order, dependency invalidation/GUID,
+selector/thread qualification, units and reference delay/end policies must be
+completed before the three-mode native/CEP pairing is released.
+
+The numeric graph/history stage is implemented2026-10-10. MSVC /MT standard and
+ASAN each pass8288 checks: SFMP1 max-size roundtrip/every truncation/header/number
+validation before allocation, actual graph/codec/snapshot9, metadata versus
+midpoint clocks, animated speed and birth delay, all four analytic curves,
+30/60/120Hz partial intervals, more than4096 historical samples, serial path
+alignment after Euler/reflected affine and downstream Look At, Auxiliary
+position/velocity, actual CPU pixels/GPU preparation and shutter samples.
+Whole-request32MiB storage rejection is exercised in ordinary and historical
+graphs; analytic curve work is charged against20M. Cancellation, every injected
+allocation failure, unchanged source graph and concurrent requests are covered.
+Circle1772, Look At1372, travel1216, Transform594, Model graph559 and Model
+particle2695 regressions pass; actual exit0 logs are in artifacts/m3-18-path-graph-*
+and motion-path-graph-{tests,asan}.log/exit.txt. Counts include new graph scratch
+allocations in the neighbouring Motion failure scans. Full frozen SDK proof is
+still required; installed61/63 remains untouched. These numeric tests do not
+qualify reference controls, AE callbacks or GPU hardware.
 
 ### Point resource capture seam
 

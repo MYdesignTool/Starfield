@@ -4,7 +4,7 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: compile/run Model OBJ import transactions with local May2023 SDK fake callbacks; add -Run to act.';exit 0}
 $taskDir=if($Sanitize){'artifacts\model-import-transaction-asan-tests'}else{'artifacts\model-import-transaction-tests'}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$taskSources=@('Time','Render','Settings','SequenceCodec','Graph','GraphConstruction','GraphEvaluation','EmitterHistory',
+$taskSources=@('Time','Render','Settings','SequenceCodec','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','ModelGeometry','ModelResources','Geometry') |
     ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo

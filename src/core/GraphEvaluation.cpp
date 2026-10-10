@@ -5,6 +5,8 @@
 #include "starfield/core/ParticleBirth.hpp"
 #include "starfield/core/ModelResources.hpp"
 #include "starfield/core/MotionCircle.hpp"
+#include "starfield/core/MotionPathTravel.hpp"
+#include "starfield/core/MotionPathPoints.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
 
 #include <algorithm>
@@ -434,7 +436,7 @@ bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destinatio
 } // namespace
 
 
-struct EvaluationBudget { std::uint64_t work{0};TransformPlanningBudget transform; };
+struct EvaluationBudget { std::uint64_t work{0};TransformPlanningBudget transform;std::size_t path_bytes{}; };
 static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTime time,
                                                const Cancellation& cancellation,
                                                EmitterDimensionContext dimension_context,
@@ -480,6 +482,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         ModelValues models;
         std::map<NodeId,CompiledMotionCircle> circles;
         std::map<NodeId,MotionLookAtSettings> look_ats;
+        std::map<NodeId,MotionPathClockValue> path_clocks;
+        std::map<NodeId,CompiledMotionPathTravel> paths;
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -531,7 +535,13 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             } else if(node.type_key==kMotionNode) {
                 auto mode=read_motion_mode(node);if(!mode.has_value())return R::failure(mode.error());
                 if(mode.value()==1){auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());circles.emplace(node.id,value.take_value());}
-                else{auto value=read_motion_look_at(node);if(!value.has_value())return R::failure(value.error());look_ats.emplace(node.id,value.take_value());}
+                else if(mode.value()==2){auto value=read_motion_look_at(node);if(!value.has_value())return R::failure(value.error());look_ats.emplace(node.id,value.take_value());}
+                else {
+                    auto value=read_motion_path_clock(node);if(!value.has_value())return R::failure(value.error());
+                    budget.work+=value.value().clock.segment_count();
+                    auto points=read_motion_path_points(node,cancellation,budget.work);if(!points.has_value())return R::failure(points.error());
+                    path_clocks.emplace(node.id,value.take_value());
+                }
             } else if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());
                 models.emplace(node.id,value.take_value());
@@ -633,15 +643,24 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         using MotionPlan=std::shared_ptr<const std::vector<NodeId>>;
         std::vector<MotionPlan> motion_plans(count);
         const auto motion_plan=[&](std::size_t particle)->Result<MotionPlan> {
-            if(circles.empty()&&look_ats.empty())return Result<MotionPlan>::success({});
+            if(circles.empty()&&look_ats.empty()&&path_clocks.empty())return Result<MotionPlan>::success({});
             if(motion_plans[particle])return Result<MotionPlan>::success(motion_plans[particle]);
             auto chain=plan_motion_chain(nodes,incoming,outgoing,active,topological_order,particle,output,cancellation,budget.work);
             if(!chain.has_value())return Result<MotionPlan>::failure(chain.error());
             motion_plans[particle]=std::make_shared<const std::vector<NodeId>>(chain.take_value());
             return Result<MotionPlan>::success(motion_plans[particle]);
         };
-        const auto apply_circles=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
+        const auto apply_motion_positions=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
             if(plan)for(auto id:*plan) {
+                if(const auto found=paths.find(id);found!=paths.end()) {
+                    const auto& clock=path_clocks.at(id);budget.work+=clock.clock.segment_count()+1;
+                    if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Light Path cancelled");
+                    if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path clock work limit");
+                    auto travel=clock.distance_rate(instance.age_seconds,instance.lifetime_seconds,motion_speed_random(instance,id,seed));
+                    if(!travel.has_value())return Result<bool>::failure(travel.error());
+                    auto moved=found->second.apply_position_at_distance(instance,travel.value().first,travel.value().second);
+                    if(!moved.has_value())return moved;continue;
+                }
                 if(!circles.contains(id))continue;
                 if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Motion Circle cancelled");
                 if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Motion Circle work limit");
@@ -654,11 +673,22 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             }
             return Result<bool>::success(true);
         };
-        const auto apply_look_ats=[&](ParticleInstance& instance,const MotionPlan& plan)->Result<bool> {
-            if(plan)for(auto id:*plan)if(const auto found=look_ats.find(id);found!=look_ats.end()) {
+        const auto apply_motion_orientations=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
+            if(plan)for(auto id:*plan) {
+                if(const auto found=paths.find(id);found!=paths.end()) {
+                    const auto& clock=path_clocks.at(id);if(!clock.settings.orient_to_path)continue;
+                    budget.work+=clock.clock.segment_count()+1;
+                    if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Light Path orientation cancelled");
+                    if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path orientation work limit");
+                    auto travel=clock.distance_rate(instance.age_seconds,instance.lifetime_seconds,motion_speed_random(instance,id,seed));
+                    if(!travel.has_value())return Result<bool>::failure(travel.error());
+                    auto turned=found->second.orient_at_distance(instance,travel.value().first,travel.value().second,result.sprite_bases);
+                    if(!turned.has_value())return turned;
+                } else if(const auto look=look_ats.find(id);look!=look_ats.end()) {
                 if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At cancelled");
                 if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At work limit");
-                auto turned=apply_motion_look_at(instance,found->second,result.sprite_bases);if(!turned.has_value())return turned;
+                auto turned=apply_motion_look_at(instance,look->second,result.sprite_bases);if(!turned.has_value())return turned;
+                }
             }
             return Result<bool>::success(true);
         };
@@ -669,6 +699,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         // path is connected again. Structural/type errors are still rejected by
         // validate_graph above.
         if (active_emitter_count == 0) return R::success(std::move(result));
+        if(output_particle_count&&to_seconds(*normalized)>=0)for(std::size_t i=0;i<count;++i)if(active[i]&&path_clocks.contains(nodes[i]->id)) {
+            auto value=compile_motion_graph_path(*nodes[i],path_clocks.at(nodes[i]->id).settings,cancellation,budget.work,budget.path_bytes);
+            if(!value.has_value())return R::failure(value.error());paths.emplace(nodes[i]->id,value.take_value());
+        }
 
         // Apply stage rules before either primary or Auxiliary evaluation. An
         // auxiliary prefix must not make an invalid active bypass disappear.
@@ -845,12 +879,12 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             instance.velocity.x += velocity.x * inherited_velocity * decay;
                             instance.velocity.y += velocity.y * inherited_velocity * decay;
                             instance.velocity.z += velocity.z * inherited_velocity * decay;
-                            auto moved=apply_circles(instance,circle_plan.value(),child_settings.value.seed);
+                            auto moved=apply_motion_positions(instance,circle_plan.value(),child_settings.value.seed);
                             if(!moved.has_value())return R::failure(moved.error());
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
-                            auto turned=apply_look_ats(instance,circle_plan.value());if(!turned.has_value())return R::failure(turned.error());
+                            auto turned=apply_motion_orientations(instance,circle_plan.value(),child_settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
                             if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
@@ -1117,12 +1151,12 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     birth_position.x+=delta.x;birth_position.y+=delta.y;birth_position.z+=delta.z;
                 }
                 // Particle owns all per-life style curves.
-                auto moved=apply_circles(instance,plan.motion,plan.settings.value.seed);
+                auto moved=apply_motion_positions(instance,plan.motion,plan.settings.value.seed);
                 if(!moved.has_value())return R::failure(moved.error());
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
-                auto turned=apply_look_ats(instance,plan.motion);if(!turned.has_value())return R::failure(turned.error());
+                auto turned=apply_motion_orientations(instance,plan.motion,plan.settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
                 if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }
@@ -1212,6 +1246,12 @@ Result<EvaluatedGraph> evaluate_particle_graph(const Graph& graph, RationalTime 
             std::optional<MotionCircleSettings> constant_motion_circle(NodeId id) override {
                 for(const auto& n:graph_.nodes)if(n.id==id && n.type_key==kMotionNode) {
                     auto c=read_motion_circle(n);if(c.has_value())return c.value().settings();
+                }
+                return {};
+            }
+            std::optional<MotionPathTravelSettings> constant_motion_path_clock(NodeId id) override {
+                for(const auto& n:graph_.nodes)if(n.id==id&&n.type_key==kMotionNode) {
+                    auto c=read_motion_path_clock(n);if(c.has_value())return c.value().settings;
                 }
                 return {};
             }

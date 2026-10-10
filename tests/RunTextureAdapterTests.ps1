@@ -4,7 +4,7 @@ $repositoryRoot=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $directory='artifacts\texture-adapter-tests'
 if(-not $Run){Write-Host 'Report: compile and run the bounded fake SmartFX texture fixture with May2023 SDK /MT. Add -Run to act.';exit 0}
 $msvcVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture') | ForEach-Object {'src\core\'+$_+'.cpp'}
+$sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture') | ForEach-Object {'src\core\'+$_+'.cpp'}
 $arguments=@('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/DNDEBUG','/MT','/DMSWindows','/DWIN32','/D_WINDOWS','/D_CRT_SECURE_NO_WARNINGS','/Iinclude','/Iae_plugin',
     '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP',
     ('/Fo'+$directory+'\'),('/Fe'+$directory+'\texture_adapter_tests.exe'),'tests\texture_adapter_tests.cpp','ae_plugin\TextureResources.cpp','ae_plugin\WorldBridge.cpp')+$sources

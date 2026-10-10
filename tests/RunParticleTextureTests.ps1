@@ -11,7 +11,7 @@ if (-not $Run) {
 }
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "Missing MSVC setup: $MSVCVarsPath" }
 $sources = @('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction',
-    'GraphEvaluation','EmitterHistory','Random','ParticleSimulation','ParticleTransform',
+    'GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory','Random','ParticleSimulation','ParticleTransform',
     'ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object { 'src\core\' + $_ + '.cpp' }
 $arguments = @('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/DNDEBUG','/MT','/Iinclude',
     ('/Fo' + $directory + '\'), ('/Fe' + $directory + '\particle_texture_tests.exe'), 'tests\particle_texture_tests.cpp') + $sources
