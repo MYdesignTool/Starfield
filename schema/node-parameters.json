@@ -535,13 +535,13 @@
   },
   "particleModelCandidate": {
     "adr": "0038-particle-model-geometry",
-    "status": "Unpublished Model module, binding7, mirror/SmartFX, OBJ import checkpoints, native modal exclusion, isolated CEP author, bounded whole-graph asset transactions and Particle Model selector; complete author release and AE2023 qualification pending.",
+    "status": "native61/Core ABI8/CEP62 complete Model test pair deployed; binding7, mirror/SmartFX, OBJ checkpoints, native modal exclusion, CEP author and bounded asset transactions included. CEP63 ES3 correction prepared; AE2023 qualification pending.",
     "shapeMenuReference": {
       "confirmedByOwner": "2026-10-10",
       "screenshot": "codex-clipboard-44477b7b-d030-4009-94c2-83afa9bd282f.png",
       "choices": ["Circle", "Rectangle", "Cloud", "Texture", "Face", "Model"],
       "nativeAuthorPlan": {"legacyValues": [1, 2, 3, 4], "faceReservedValue": 5, "modelValue": 6, "modelCoreValue": 4},
-      "policy": "Exactly these six Shape modes in this order; no inferred additions. Unpublished candidate implements native Model6 -> Core4 mapping. Face is disabled in the ECP/CEP custom menus pending OBJ face emission; unsupported native Face5 is rejected, never rendered as a fallback. Use Model(s) is a separate control."
+      "policy": "Exactly these six Shape modes in this order; no inferred additions. native61 implements native Model6 -> Core4 mapping. Face is disabled in the ECP/CEP custom menus pending OBJ face emission; unsupported native Face5 is rejected, never rendered as a fallback. Use Model(s) is a separate control."
     },
     "shape": 4, "coreAbi": 8, "snapshotVersion": 8, "nodeSchema": 1,
     "graphKeys": {"resource": 1, "revision": 2, "matrix": 3, "origin": 4, "rotation": 5, "scale": 6,
@@ -551,10 +551,10 @@
     "sourceChoices": ["Cube", "OBJ"],
     "nativeAssetExportCandidate": {"messageMagic": "0x53464d58", "version": 1, "operation": 1,
       "selector": "PF_Cmd_COMPLETELY_GENERAL", "transport": "Synchronous caller-owned bounded SFMG1 byte sink; no AE handles or allocators cross modules.",
-      "policy": "Read-only identity/source/revision/guard/bounds validation using the Model module PF context. Render-only rejected, revision0 has no payload; parked OBJ retained. Async UI-idle/CEP transport and import/rollback still pending. Not the persistent Core ABI."},
+      "policy": "Read-only identity/source/revision/guard/bounds validation using the Model module PF context. Render-only rejected, revision0 has no payload; parked OBJ retained. Async UI-idle/CEP transport and complete asset import/rollback included in native61/CEP62; actual AE qualification pending. Not the persistent Core ABI."},
     "rendererMirrorReservation": {"firstIndex": 755, "capacity": 256, "firstDiskId": 1900,
       "countIndex": 1011, "countDiskId": 2200, "format": "SFMR1 wraps SFMG1 with UUID/revision/CRC32",
-      "state": "Unpublished manifest30 main registers1012 parameters and dispatches SFMR1 selectors. Native graph transactions install/verify/rollback mirrors; SmartFX captures evaluated resources only. Installed native60/main755 remains unchanged."},
+      "state": "native61 manifest30 main registers1012 parameters and dispatches SFMR1 selectors. Native graph transactions install/verify/rollback mirrors; SmartFX captures evaluated resources only. Actual AE qualification pending."},
     "nativeAuthorReservation": {"kind": 5, "matchName": "org.starfieldfx.node.model", "diskFirst": 1501, "diskLast": 1518,
       "streams": {"source": 1, "importObj": 2, "mesh": 3, "revision": 4, "originFirst": 5,
         "rotationFirst": 8, "scaleFirst": 11, "flipX": 14, "flipY": 15, "flipZ": 16, "center": 17, "normalize": 18},

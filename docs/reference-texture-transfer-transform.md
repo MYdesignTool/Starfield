@@ -24,8 +24,8 @@ other nodes. Path Properties and Shadow Properties are property groups, not
 additional Shape entries. This screenshot confirms labels/order/completeness;
 it does not demonstrate Face rendering or Model selection semantics.
 
-The installed native60/CEP61 exposes the first four implemented entries. Model
-remains an unpublished candidate; Face requires the OBJ face-emission workflow
+The native61/CEP62 test pair exposes the six labels with Model implemented and
+Face disabled. Face requires the OBJ face-emission workflow
 described in the [official guide](https://superluminal.tv/user-guide). Do not
 silently render an unsupported Face choice as Circle or Model. The pending
 `Use Model(s)` reference concerns a separate control, not extra Shape modes.

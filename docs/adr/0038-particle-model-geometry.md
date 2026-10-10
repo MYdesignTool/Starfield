@@ -13,6 +13,29 @@ stages, not the current deployment. Actual AE modal/OBJ/undo/reopen remain gates
 
 ## Owner-authorized test release — 2026-10-10
 
+### CEP63 ExtendScript compatibility correction
+
+The owner observed `gateway_load_failed: SyntaxError: Illegal use of reserved
+word` in the deployed CEP62. Parsing its complete gateway as ES3 reproduces a
+failure at the Model loops declaring `byte`, a reserved identifier. The isolated
+CEP63 correction renames all three loop variables to `byteIndex`; numeric data,
+parameter IDs and native/Core contracts are unchanged. All three complete JSX
+sources must pass the ES3 preflight before publication. Modern Node VM execution
+alone is insufficient to establish ExtendScript syntax compatibility.
+
+The same candidate retires the unused synchronous preset read/write entry
+points: cached callers receive `preset_file_protocol_changed` and perform no
+modal operation or file IO. Current preset pages use the queued native chooser.
+The legacy call path was a static modal risk, distinct from the owner's observed
+syntax error; no AE reentrancy failure has been reproduced.
+
+`Deploy-PanelTestBuild.ps1` defaults to a report, verifies the saved complete
+native61/CoreABI8/CEP62 receipt and candidate generation, and invokes the existing
+`Deploy-TestBuild.ps1 -KeepNative -Install` only with AE closed. It retains the
+eight native/Core files and selector, snapshots all eighteen CEP files and uses
+the established paired Restore tool. Dummy-file/Junction install/restore tests
+pass 62 checks; actual AE execution remains a qualification gate.
+
 After review access returned the owner requested a test version. The full pair
 will use native61 / packed32829, CEP62 and Core ABI8, including seven AEX modules
 and Core. Existing parameter IDs and first four Shape values remain unchanged;

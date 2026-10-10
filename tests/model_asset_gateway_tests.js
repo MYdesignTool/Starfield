@@ -3,6 +3,7 @@
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 if(!process.env.STARFIELD_PANEL_ROOT)throw new Error("Set STARFIELD_PANEL_ROOT to the isolated Model candidate.");
 const source=fs.readFileSync(path.join(process.env.STARFIELD_PANEL_ROOT,"jsx/starfield_gateway.jsx"),"utf8");
+const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(source)[1];
 let checks=0,now=1000,commands=0,arbReads=0,writes=0;
 const eq=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=v=>{checks++;assert.ok(v);};
 const nodeId="fedcba98765432100123456789abcdef",assetId="0123456789abcdef0123456789abcdef",token="p101-c202-l303";
@@ -32,7 +33,7 @@ const app={project:{rootFolder:{id:101},numItems:1,item(i){return i===1?comp:nul
 const host={},context=vm.createContext({$:{global:host},app,CompItem,Date:function(){this.getTime=()=>now;}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const load=()=>vm.runInContext(source,context);load();
-function request(operation,extra){return JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",
+function request(operation,extra){return JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,
     operation,pinTarget:true,target:{token},assetId,nodeId,baseGraphRevision:11,page:0},extra));}
 const call=(op,extra)=>JSON.parse(host["SFLD_"+op](request(op,extra)));
 const session=()=>host.__SFLD_modelAssetBridgeV1;

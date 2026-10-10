@@ -3,6 +3,7 @@
 // planner. Project DOM, SFMW and native executor are simulated here.
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const root=process.env.STARFIELD_PANEL_ROOT;if(!root)throw new Error("Set STARFIELD_PANEL_ROOT to the isolated Model candidate.");
+const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"))[1];
 const load=n=>require(path.join(root,"js",n+".js"));
 const edits=load("graph_edits"),presets=load("presets"),graphTransactions=load("graph_transactions"),snapshots=load("native_graph_snapshot"),codec=load("graph_codec");
 const clientAPI=load("model_graph_transactions"),assetAPI=load("model_assets"),copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
@@ -62,7 +63,7 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
     failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
     for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
-function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
+function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
 function call(operation,fields,callback){
     if(operation==="beginModelAssetExport" || operation==="releaseModelAsset"){callback({ok:true,assetId:fields.assetId});return;}
     if(operation==="readModelAssetPage"){const n=nodes.find(n=>n.id===modelId),asset=nativeMeshes[modelId] || meshAsset;

@@ -1,4 +1,5 @@
-param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel62')
+param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel63',
+    [ValidateRange(62,9999)][int]$PanelGeneration=63)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskRecipe=Join-Path $PSScriptRoot 'candidates/model-panel-author-baseline.json'
@@ -52,14 +53,20 @@ try {
     }
 } finally {Pop-Location}
 $taskManifest=Join-Path $taskDestination 'cep_panel/CSXS/manifest.xml'
-$taskManifestText=[IO.File]::ReadAllText($taskManifest).Replace('0.1.0.61','0.1.0.62').Replace('Version="0.1.61"','Version="0.1.62"')
+$taskManifestText=[regex]::Replace([IO.File]::ReadAllText($taskManifest),'0\.1\.0\.\d+',('0.1.0.'+$PanelGeneration))
+$taskManifestText=[regex]::Replace($taskManifestText,'Version="0\.1\.\d+"',('Version="0.1.'+$PanelGeneration+'"'))
 [IO.File]::WriteAllText($taskManifest,$taskManifestText,[Text.UTF8Encoding]::new($false))
 foreach($taskPage in @('index.html','presets.html')){
     $taskPagePath=Join-Path $taskDestination ('cep_panel/'+$taskPage)
-    $taskPageText=[regex]::Replace([IO.File]::ReadAllText($taskPagePath),'\?v=\d+','?v=62')
+    $taskPageText=[regex]::Replace([IO.File]::ReadAllText($taskPagePath),'\?v=\d+',('?v='+$PanelGeneration))
     [IO.File]::WriteAllText($taskPagePath,$taskPageText,[Text.UTF8Encoding]::new($false))
 }
-[ordered]@{basePanel=$taskBaseline.basePanel;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
+foreach($taskGatewayPath in @('jsx/starfield_gateway.jsx','js/panel.js','js/preset_manager.js')){
+    $taskGatewayFile=Join-Path $taskDestination ('cep_panel/'+$taskGatewayPath)
+    $taskGatewayText=[regex]::Replace([IO.File]::ReadAllText($taskGatewayFile),'native-presets-\d+',('native-presets-'+$PanelGeneration))
+    [IO.File]::WriteAllText($taskGatewayFile,$taskGatewayText,[Text.UTF8Encoding]::new($false))
+}
+[ordered]@{basePanel=$taskBaseline.basePanel;panelGeneration=$PanelGeneration;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
     modelGraphTransactionsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Algorithm SHA256).Hash;
     presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;

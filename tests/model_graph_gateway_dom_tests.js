@@ -3,6 +3,7 @@
 // Mesh writes, native graph receipts and outer backup/undo are simulated.
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const root=process.env.STARFIELD_PANEL_ROOT;if(!root)throw new Error("Set STARFIELD_PANEL_ROOT to the isolated Model candidate.");
+const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"))[1];
 const edits=require(path.join(root,"js/graph_edits.js")),codec=require(path.join(root,"js/graph_codec.js")),layout=require(path.join(root,"js/graph_layout.js"));
 const {mainControls,nodeControls}=require("./node_property_fixture.js"),uuid=n=>n.toString(16).padStart(32,"0"),token="p101-c202-l303";
 const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
@@ -44,7 +45,7 @@ const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:c
 api.ensure(layer,realm([record(g.nodes[0])]),true,realm([]),false);eq(arbReads,0);
 const bounds=[-2,-3,-4,2,3,4],raw=Buffer.alloc(48);bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
 let transaction=500;
-function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:"native-presets-62",operation,requestId:"test",pinTarget:true,
+function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
     target:{token},transactionId:uuid(transaction),changes:[],...fields});}
 function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});const before=copy(api.snapshot(resolved));
     const desired=copy(before.nativeNodes[0]);desired.id=uuid(++transaction);desired.position={x:160,y:90};

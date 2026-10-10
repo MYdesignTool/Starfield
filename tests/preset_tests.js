@@ -33,16 +33,8 @@ const client=transactions.create({codec,edits:{apply:presets.apply},idFactory:fa
 }});
 let result;client.apply({type:"applyPreset",presetId:"sparks",mode:"add",applyRenderSettings:true},r=>result=r,"target",1);assert.equal(result.ok,true,result.error && result.error.message);assert.deepEqual(calls,["getGraphSnapshot","submitGraph"]);
 calls=[];client.apply({type:"applyPreset",presetId:"sparks",mode:"replace"},r=>result=r,"target",1);assert.equal(result.ok,false);assert.equal(result.error.code,"stale_graph");assert.deepEqual(calls,["getGraphSnapshot"]);
-// Test the real gateway file APIs with fake user-chosen files; imports are never eval'd.
-const global={},state={file:null,writes:0,read:0,closed:0};
-const fakeFile={exists:false,name:"My.sfldpreset",fsName:"user-chosen.sfldpreset",length:envelope.length,error:"",open(mode){this.mode=mode;return true;},read(){state.read++;return envelope;},write(text){state.writes++;assert.equal(text,envelope);return true;},close(){state.closed++;return true;}};
-function File(){return fakeFile;}File.openDialog=File.saveDialog=()=>state.file;
-vm.runInNewContext(fs.readFileSync(require.resolve("../cep_panel/jsx/starfield_gateway.jsx"),"utf8"),{$:{global},app:{},File,confirm:()=>true});
-const request=(operation,fields={})=>JSON.stringify({protocol:"org.starfieldfx.panel",version:1,operation,...fields});
-assert.equal(JSON.parse(global.SFLD_writePresetFile(request("writePresetFile",{text:envelope}))).cancelled,true);assert.equal(state.writes,0);
-state.file=fakeFile;assert.equal(JSON.parse(global.SFLD_readPresetFile(request("readPresetFile"))).text,envelope);assert.equal(state.read,1);
-assert.equal(JSON.parse(global.SFLD_writePresetFile(request("writePresetFile",{text:envelope}))).ok,true);assert.equal(state.writes,1);assert.equal(state.closed,2);
-assert.equal(JSON.parse(global.SFLD_writePresetFile(request("writePresetFile",{text:'{"format":"invalid"}'}))).ok,false);assert.equal(state.writes,1);
-fakeFile.length=999999;assert.equal(JSON.parse(global.SFLD_readPresetFile(request("readPresetFile"))).ok,false);assert.equal(state.read,1);
+// File workflows use the queued native chooser. Their actual client/helper/IO
+// checks live in model_preset_file_tests.js; retired synchronous API coverage is
+// in legacy_preset_file_tests.js against the explicitly prepared candidate.
 fs.writeFileSync("artifacts/preset-catalog.hex",built.map(g=>codec.toHex(g)).join("\n"));
-console.log("Preset catalog, Add/Replace, UUIDs, settings, codec, atomic transaction and actual file gateway checks passed.");
+console.log("Preset catalog, Add/Replace, UUIDs, settings, codec and atomic transaction checks passed.");

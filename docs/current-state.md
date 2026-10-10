@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### CEP63 保留字修正候选（2026-10-10）
+
+owner实机反馈当前CEP62加载失败：gateway_load_failed: SyntaxError: Illegal use of reserved word。完整gateway按ES3解析复现于三个Model循环变量byte；隔离CEP63全部改为byteIndex并统一gateway/cache/manifest generation。三个完整JSX的ES3检查18项、旧文件入口拒绝90项、文件583/资源588/transport271/DOM35/作者74/Shape92/Texture80/Cloud49/Birth51及原生gateway/startup回归通过。旧同步预设文件入口返回明确迁移错误且无modal/IO；现代Node测试遗漏ES3语法的原因已记录。
+
+新增Deploy-PanelTestBuild默认report，核对完整native61/CoreABI8/CEP62 receipt，通过既有Deploy-TestBuild KeepNative保留八原生文件/selector，并备份十八CEP供paired Restore。artifact dummy文件/Junction发布恢复62检查通过，日志m3-17-panel63-panel_test_build_deployment_tests-recheck.log；初次fixture的UTF8路径编码错误及错误测试文件名诊断保留。当前安装尚未改变，真实AE回归仍开放；fresh process检查后依owner已关闭反馈部署。
+
 ### native61／CEP62 测试版已部署（2026-10-10 13:59 +08）
 
 8d9b50e源码git archive冻结于artifacts/prepared/m3-17-native61-model-8d9b50e/source。May2023 x64 Release /MT、IncludeModelCandidate及双NoPublish完整八目标实际exit0，日志artifacts/m3-17-native61-model-build.log及build-exit.txt；包含实际新Host文件窗口代码。native-bundle/candidate.json记录八输出与十八CEP源hash、adapter fingerprint、CoreABI8及CEP62；发布前后fresh check均AE进程0。

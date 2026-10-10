@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10 owner报告CEP62保留字加载错误；ES3静态解析复现Model三处byte变量。CEP63隔离候选改byteIndex、统一generation，三个JSX ES3检查18/旧modal入口拒绝90及Model/Particle/Texture/Cloud/Birth/gateway/startup回归通过。新增默认report的panel-only配对工具调用既有Deploy-TestBuild KeepNative，dummy发布恢复62项通过。真实AE资格保持开放；owner关闭AE后发布native61/CEP63并保留61/62回滚。剩余Shape/Use Model(s)/实际Model gate及完整目标不缩减。
+
 2026-10-10 13:59 +08，owner授权测试版已发布native61/packed32829/CoreABI8/CEP62，源8d9b50e完整冻结May2023 /MT八目标实际exit0；26文件hash/selector/runtime与paired rollback report通过，before/after及日志artifacts/m3-17-native61-*.json/.log。新Host/Shape/Model作者/网格资产/renderer/CEP整笔资源同版发布，没有独立半成品Model。备份m3-17-native61-panel62-model-20261010回滚60/61；AE2023实际gate保持开放，Face禁用、Use Model(s)待参考。后续候选baseCEP62可重现；SDK全Model构建禁止直接partial dist并自动包含Model。13:57:30 PID30420已确认不存在，无Stop-Process。继续Particle/命名排序及Motion/Turbulence的完整目标。
 
 2026-10-10 owner额度恢复并要求测试版：准备native61/packed32829/CoreABI8/CEP62完整八native/Core+十八CEP，gateway62及cache/manifest升级；隔离Model/Particle/Texture/Cloud/Birth回归通过。默认report的Model配对发布工具、IncludeModel/记录推导rollback/部分未复制helper恢复及热Core的Model匹配核对接入；实际工具dummy模拟60检查通过。准备冻结完整SDK后fresh AE check再按授权发布，保留配对60/61回滚与实际AE gate；不扩充Shape或Use Model(s)。
