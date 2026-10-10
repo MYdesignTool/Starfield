@@ -141,18 +141,16 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         auto at=stack.back();stack.pop_back();if(terminal[at])continue;terminal[at]=true;
         for(auto prev:incoming[at]){if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");if(reachable[prev])stack.push_back(prev);}
     }
-    struct Context {std::size_t parent;NodeId id;bool look{},path{};};std::vector<Context> contexts{{0,{}}};
+    struct Context {std::size_t parent;NodeId id;};std::vector<Context> contexts{{0,{}}};
     std::vector<std::size_t> context_at(count,count);context_at[root]=0;
     for(auto at:order) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Motion context planning cancelled");
         if(!terminal[at]||context_at[at]==count)continue;auto context=context_at[at];
         const auto& type=nodes[at]->type_key;
-        if(context && (type==kForceNode||type==kTransformNode))
-            return R::failure(ErrorCode::invalid_request,"Force/Transform after Motion requires ordered-frame integration");
-        if(type==kMotionNode){const auto mode=std::get<std::uint32_t>(*find_value(*nodes[at],kMotionMode));
-            if(contexts[context].look&&mode!=2)return R::failure(ErrorCode::invalid_request,"position Motion after Look At requires ordered orientation integration");
-            if(contexts[context].path&&mode==1)return R::failure(ErrorCode::invalid_request,"Circle after Path requires ordered orientation integration");
-            contexts.push_back({context,nodes[at]->id,contexts[context].look||mode==2,contexts[context].path||mode==0});context=contexts.size()-1;}
+        if(context && type==kForceNode)
+            return R::failure(ErrorCode::invalid_request,"Force after Motion requires ordered-force integration");
+        if(type==kMotionNode||(context&&type==kTransformNode)){
+            contexts.push_back({context,nodes[at]->id});context=contexts.size()-1;}
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {
             if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");

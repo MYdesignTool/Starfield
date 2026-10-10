@@ -143,9 +143,12 @@ void orientation(){auto g=base();attach(g,path());set(node(g,3),kMotionPathOrien
     Sampler serial(twice);same(r,temporal(serial));attach(twice,{nid(6),kMotionNode,1,{{kMotionMode,std::uint32_t{2}},{kMotionGoal,Vec3{2,4,0}},{kMotionForward,Vec3{1,0,0}}}});
     r=evaluate(twice);for(auto& p:r.particles){auto f=take(particle_motion_forward(p,{1,0,0},r.sprite_bases));Vec3 target{2-p.position.x,4-p.position.y,-p.position.z};
         const double length=std::hypot(target.x,target.y,target.z);near(f,Vec3{target.x/length,target.y/length,target.z/length},"Look At follows path position/alignment");}
-    Sampler final(twice);same(r,temporal(final));attach(twice,path(7));check(!evaluate_particle_graph(twice,{1,1},never).has_value(),"path after Look At explicit rejection");
+    Sampler final(twice);same(r,temporal(final));attach(twice,path(7));auto downstream=evaluate(twice);
+    for(unsigned i=0;i<r.particles.size();++i){near(downstream.particles[i].position,Vec3{r.particles[i].position.x,r.particles[i].position.y+.4*r.particles[i].age_seconds,r.particles[i].position.z},"path after Look At advances its stage center");
+        check(downstream.particles[i].motion_pose==r.particles[i].motion_pose,"unoriented downstream path keeps earlier Look At pose");}
+    Sampler followed(twice);same(downstream,temporal(followed));
     auto after=g;attach(after,{nid(6),kMotionNode,1,{{kMotionMode,std::uint32_t{1}},{kMotionOrigin,Vec3{}},{kMotionAxis,Vec3{0,0,1}},{kMotionAngularRate,0.}}});
-    check(!evaluate_particle_graph(after,{1,1},never).has_value(),"circle after path explicit rejection");
+    same(evaluate(g),evaluate(after));Sampler circled(after);same(evaluate(after),temporal(circled));
     MotionPathTravelSettings settings;settings.orient_to_path=true;auto helper=take(compile_motion_path_travel(std::array<Vec3,2>{{{0,0,0},{0,10,0}}},settings,never));
     ParticleInstance p;p.age_seconds=1;p.lifetime_seconds=3;p.rotation_degrees={0,0,60};auto all=p,phased=p;
     take(helper.apply_at_distance(all,1,1));take(helper.apply_position_at_distance(phased,1,1));take(helper.orient_at_distance(phased,1,1));check(all.motion_pose==phased.motion_pose&&exact(all.position,phased.position)&&exact(all.velocity,phased.velocity),"split matches atomic API");

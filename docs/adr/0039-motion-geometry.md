@@ -339,6 +339,59 @@ motion-path-graph-sdk-* and motion-path-graph-installed-hashes.json. These numer
 tests and compilation do not qualify reference controls, AE callbacks or GPU
 hardware; the three-mode author and full ordered/resource contract remain open.
 
+### Ordered affine particle frame migration (unpublished)
+
+Motion followed by an inherited affine Transform cannot in general be represented
+by one proper quaternion after a shared basis: L*Q*B is not Q'*L*B for shear or
+nonuniform scale. Allocating a distinct shared entry per particle would also
+wrongly impose the4096 shared-basis limit on a larger particle population.
+Append an owned row-major3x3 ParticleMotionAffine value(default identity), with
+finite coefficient cap1e12. Settings.hpp owns it; ParticleInstance carries it.
+The final axis is Q*A*B*Euler*axis. The new A is independent per particle and
+may be singular or reflected, preserving full affine behavior without inverse
+or Euler decomposition. Apply a downstream Transform's sprite linear map L by
+setting A'=L*Q*A and Q'=identity; identity L preserves the old Q/A exactly.
+Centre/velocity use the Transform centre map, and particle size/opacity use its
+separate scalar controls. Commit all fields only after validation succeeds.
+
+Snapshot10 migration is append-only:80-byte header = snapshot9's72 bytes plus
+affineStride72 u32/reserved0 u32; particle stride304 = old200 + quaternion32 +
+affine72 binary64. Emit10 only if any A is nonidentity; otherwise keep exact
+existing3..9 formats. Readers accept3..10, initializing old A to identity and
+checking new stride/header/length/finite coefficient bounds before returning a
+snapshot. Preserve all existing shared tables and variable Model preflight.
+C ABI8/sequence1/released AE IDs remain unchanged, but shared Main/Core inputs
+require a new full paired build before author delivery. Old readers reject10.
+CPU/GPU scene preparation/Model apply the same Q*A*B frame; Linear shutter
+interpolates A coefficients alongside existing shared affine interpolation and
+SLERPs the remaining Q. This endpoint affine approximation can be singular;
+actual Subframe continues evaluating each ordered frame directly.
+
+Plan the Particle's common pre-Motion Transform/Force prefix as before, then
+execute Motion and downstream Transform stages in graph order, including
+Look At→Path/Circle and Motion→Transform→Motion. Particle's authored life style
+and Euler are set before the ordered stages; each Look At uses that stage's
+centre and forward. No-Motion graphs retain their released evaluator behavior.
+Post-Motion Force and merging genuinely different modifier chains remain open
+for the next ordered-force phase; explicit temporary rejection is retained.
+This numeric stage does not decide public target/unit/resource policies or
+claim reference/AE behavior. All three authors and the complete interactions
+remain M3-18 requirements.
+
+The implemented ordinary/history/Auxiliary stage uses the ordered frame rather
+than moving every centre before applying all orientations. The focused /MT and
+ASAN fixture each passes4141 checks: independent L*Q*A arithmetic, singular and
+reflected transforms, exact identity/atomic failure/no allocation, prefix and
+serial Transform, reverse Motion order, animated sampled Transform, Path alignment
+after shear,30/60/120Hz/partial/reverse histories,5001 distinct frames, CPU pixels,
+GPU prepared axes, Model Q*A*B, snapshot3..10 byte round trips/all10 truncations/
+bad headers/numbers/Model preflight, Linear approximation versus actual subframe,
+Auxiliary birth inheritance, cancellation/allocation failures and concurrent
+requests. Adjacent Circle1842/Look At1377/Path8432, Transform594, Model graph559
+and Model particle2695 pass. Frozen complete SDK evidence must accompany this
+new shared-input stage; previous Light Path SDK evidence does not cover it.
+No Motion author, released ID/schema/ABI change or deployed pairing is claimed.
+
 ### Point resource capture seam
 
 `MotionPointCapture` is read-only AE adapter infrastructure. A caller supplies

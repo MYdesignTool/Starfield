@@ -44,9 +44,18 @@ Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphN
     const std::vector<std::vector<std::size_t>>& incoming,const std::vector<std::vector<std::size_t>>& outgoing,
     const std::vector<bool>& active,const std::vector<std::size_t>& order,std::size_t root,std::size_t output,
     const std::vector<std::optional<CompiledParticleTransform>>& transforms,
-    const Cancellation& cancel,TransformPlanningBudget& budget) {
+    const Cancellation& cancel,TransformPlanningBudget& budget,std::span<const NodeId> deferred={}) {
     using R=Result<TransformBranchPlan>;
-    const auto count=nodes.size();std::vector<bool> reachable(count,false),terminal_path(count,false);
+    const auto count=nodes.size();std::vector<bool> reachable(count,false),terminal_path(count,false),ordered(count,false);
+    // Both private callers provide UUID-sorted nodes. Deferred stages are
+    // applied to the per-particle frame after the common simulated prefix.
+    for(auto id:deferred){
+        if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Transform ordered planning cancelled");
+        if(++budget.work>kMaxBranchTraversalWork)return R::failure(ErrorCode::work_limit_exceeded,"Transform ordered planning work limit");
+        const auto found=std::lower_bound(nodes.begin(),nodes.end(),id,[](auto* n,NodeId key){return n->id<key;});
+        if(found==nodes.end()||(*found)->id!=id)return R::failure(ErrorCode::invalid_request,"missing ordered Transform node");
+        ordered[static_cast<std::size_t>(found-nodes.begin())]=true;
+    }
     std::vector<std::size_t> stack{root};
     while(!stack.empty()) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Transform branch planning cancelled");
@@ -77,7 +86,7 @@ Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphN
         if(nodes[current]->type_key==kForceNode) {
             force_contexts.emplace(nodes[current]->id,context);result.force_nodes.push_back(nodes[current]->id);
         }
-        if(transforms[current]){contexts.push_back({context,current});context=contexts.size()-1;}
+        if(transforms[current]&&!ordered[current]){contexts.push_back({context,current});context=contexts.size()-1;}
         if(current==output)context_at[output]=context;
         for(auto next:outgoing[current])if(terminal_path[next]) {
             if(++budget.work>kMaxBranchTraversalWork)return R::failure(ErrorCode::work_limit_exceeded,"Transform context planning exceeds work limit");

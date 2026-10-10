@@ -128,7 +128,9 @@ void mixed_chains(){auto g=base();attach(g);attach(g,4,{-1,0,0});auto r=evaluate
     near(r.particles[0].position,Vec3{0,.25,0},"Circle then Look At position");near(take(particle_motion_forward(r.particles[0],{1,0,0},r.sprite_bases)),Vec3{0,1,0},"Look At uses resulting center");
     auto after=base();attach(after);after.edges.back().destination_node=nid(4);after.edges.back().destination_port=kMotionParticlesIn;
     after.nodes.push_back({nid(4),kMotionNode,1,{{kMotionMode,std::uint32_t{1}},{kMotionOrigin,Vec3{}},{kMotionAxis,Vec3{0,0,1}},{kMotionAngularRate,0.}}});
-    after.edges.push_back({eid(5),nid(4),kMotionParticlesOut,nid(255),kOutputParticles});check(!evaluate_particle_graph(after,{1,1},never).has_value(),"unimplemented Look At/Circle order rejects even zero rate");
+    after.edges.push_back({eid(5),nid(4),kMotionParticlesOut,nid(255),kOutputParticles});auto followed=evaluate(after);
+    near(take(particle_motion_forward(followed.particles[0],{1,0,0},followed.sprite_bases)),Vec3{0,1,0},"Look At then zero Circle keeps stage orientation");
+    Sampler reversed(after);auto sampled=temporal(reversed);check(sampled.particles[0].motion_pose==followed.particles[0].motion_pose,"temporal Look At then Circle stage order");
 }
 void rendering(){auto g=base();set(node(g,1),kBirthRate,1.);set(node(g,1),kEmittingMode,std::uint32_t{1});attach(g);
     RenderRequest request;request.graph=std::make_shared<const Graph>(g);request.frame.layer_width=request.frame.layer_height=request.frame.frame_width=request.frame.frame_height=64;

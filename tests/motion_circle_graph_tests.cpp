@@ -141,7 +141,8 @@ void topology_force_transform() {
     Sampler ts(tf);same(transformed,temporal(ts));
     auto after=base();attach(after);after.edges.back().destination_node=nid(4);after.edges.back().destination_port=kTransformParticlesIn;
     after.nodes.push_back(transform(4));after.edges.push_back({eid(5),nid(4),kTransformParticlesOut,nid(255),kOutputParticles});
-    check(!evaluate_particle_graph(after,{1,1},never).has_value(),"unsupported downstream Transform rejected");Sampler as(after);check(!evaluate_temporal_particle_graph(after,{1,1},never,{},as).has_value(),"temporal downstream Transform rejected");
+    auto ordered=evaluate(after);auto circle_only=base();attach(circle_only);same(ordered,evaluate(circle_only));
+    Sampler as(after);same(ordered,temporal(as));
     auto serial=base();attach(serial);attach(serial,5,-pi/2,{.1,0,0});
     near(evaluate(serial).particles[0].position,Vec3{.35,.1,0},"serial Circle order retained");Sampler ss(serial);same(evaluate(serial),temporal(ss));
     auto ambiguous=base();attach(ambiguous);ambiguous.edges.push_back({eid(99),nid(2),kParticleParticlesOut,nid(255),kOutputParticles});

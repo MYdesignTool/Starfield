@@ -47,6 +47,8 @@ M3-18未发布Core候选新增Motion schema1的Circle与数字Look At实际graph
 
 Light Path的数字候选已接入mode0普通/历史graph和Auxiliary：SFMP1有界点包、本地key9..12、实际age曲线及出生时delay、动画speed/random的绝对midpoint或显式metadata常量积分。当前几何按node/time不可变lease缓存，历史clock缓存4096项；20M全请求work含自适应编译/曲线，32MiB累计capacity路径预算跨Auxiliary共用，不因淘汰退款。位移/速度在style前，切线朝向在Euler/共享affine后；保留发射分布与剪切镜像，snapshot9已有pose契约不变。外部光源依赖/GUID、完整有序frame与作者尚未接入，clamp及明确数字delay不认定参考末端/Max Delay/Delay Random，公开控件前必须确认。
 
+后续M3-18有序frame候选已替代上述分离位置/朝向的执行方式：Particle样式/Euler先建立，Motion和后置Transform逐段按图顺序作用；普通/历史/Auxiliary共用Q*A*B*Euler。逐粒子row-major仿射A保持剪切/镜像，不占共享4096表；后置L以A'=L*Q*A、Q'=identity合成，前置仍用共享B。snapshot10显式80B header/304B记录，仅非单位A写10，原3..9保持；CPU/GPU准备/Model及Linear affine插值同步。反序Motion、后置Transform与交错串联已支持，后置Force/不同链合并及动画几何导数仍开放。共享输入须完整冻结配对构建；安装61/63没有该Motion作者入口。
+
 M3-17 Model实现的纯数值几何类型由Settings.hpp拥有，ModelGeometry处理单位cube与有界OBJ角点/三角化/验证及一次验证的mesh lease。ModelScene用显式model-to-layer矩阵制作裁剪三角形、四采样覆盖/深度和独立粒子叠加。ModelResources负责SFMG1网格codec和粒子pose；RenderRequest自有网格，Core ABI8追加有界数值数组并接受ABI7精确前缀。snapshot8保留200B粒子并共享模型组，旧3..7保留读取；CPU绘制shape4，多个成员合并覆盖/深度再应用一次opacity。live图已接入Model元数据端口；完整依赖用于拓扑规划，粒子流用于发射/Force/Transform/Auxiliary，保持粒子身份与共享组。Temporal每帧采样一次活动Model；Linear shutter迁移组索引、对相同资源插值仿射矩阵。原生/CEP作者和有界资源传输已接入。Core输入只有字节文本与数字，文件IO和宿主操作在AE适配器内。迁移和完整Model gate由ADR0038管理，现有测试安装native61/ABI8/CEP63；AE2023实际验收开放。
 
 ## 渲染、资源与线程

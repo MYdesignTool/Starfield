@@ -168,6 +168,8 @@ struct MotionCircleSettings {
 };
 using ParticleMotionPose=std::array<double,4>; // unit quaternion, w/x/y/z
 inline constexpr ParticleMotionPose kIdentityMotionPose{1,0,0,0};
+using ParticleMotionAffine=std::array<double,9>; // owned row-major ordered sprite frame
+inline constexpr ParticleMotionAffine kIdentityMotionAffine{1,0,0,0,1,0,0,0,1};
 struct MotionLookAtSettings {
     Vec3 goal{}, forward{1,0,0};
     AgeCurve over_life{};

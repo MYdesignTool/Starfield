@@ -56,7 +56,7 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
     std::span<const ParticleSpriteBasis> bases = {}, double texture_ratio = 0, bool ignore_perspective = false,
     std::span<const ParticleCloudStyle> clouds = {}) noexcept {
     sprite.particle=&particle;
-    if(!valid_particle_motion_pose(particle.motion_pose))return false;
+    if(!valid_particle_motion_pose(particle.motion_pose)||!valid_particle_motion_affine(particle.motion_affine))return false;
     if(particle.cloud_style_index) {
         if(particle.shape!=2 || particle.cloud_style_index>clouds.size())return false;
         sprite.cloud_style=&clouds[particle.cloud_style_index-1];
@@ -90,7 +90,9 @@ inline bool project_sprite(const ParticleInstance& particle, const RenderRequest
         };
         a=transform_axis(a);b=transform_axis(b);
     }
-    const bool oriented=particle.motion_pose!=kIdentityMotionPose;
+    const bool affined=particle.motion_affine!=kIdentityMotionAffine;
+    if(affined){const auto affine=[&](Vec3 v){const auto w=motion_affine_axis(particle.motion_affine,{v.x,-v.y,v.z});return Vec3{w.x,-w.y,w.z};};a=affine(a);b=affine(b);}
+    const bool oriented=particle.motion_pose!=kIdentityMotionPose||affined;
     if(oriented) {
         const auto orient=[&](Vec3 v){const auto w=motion_pose_axis(particle.motion_pose,{v.x,-v.y,v.z});return Vec3{w.x,-w.y,w.z};};
         a=orient(a);b=orient(b);

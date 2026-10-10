@@ -8,6 +8,7 @@
 #include "starfield/core/MotionPathTravel.hpp"
 #include "starfield/core/MotionPathPoints.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
+#include "starfield/core/ParticleMotionFrame.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -626,20 +627,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         }
         result.evaluated_nodes.reserve(active_count);
         for (const std::size_t index : topological_order) result.evaluated_nodes.push_back(nodes[index]->id);
-        const bool has_transforms=std::any_of(transforms.begin(),transforms.end(),[](const auto& value){return value.has_value();});
-        std::vector<std::shared_ptr<const TransformBranchPlan>> transform_plans(count);
-        const auto transform_plan=[&](std::size_t particle)->Result<std::shared_ptr<const TransformBranchPlan>> {
-            using P=Result<std::shared_ptr<const TransformBranchPlan>>;
-            if(!has_transforms)return P::success({});
-            if(transform_plans[particle])return P::success(transform_plans[particle]);
-            auto planned=plan_transform_branch(nodes,incoming,outgoing,active,topological_order,particle,output,transforms,cancellation,budget.transform);
-            if(!planned.has_value())return P::failure(planned.error());
-            auto value=planned.take_value();auto basis=retain_transform_basis(result,value);
-            if(!basis.has_value())return P::failure(basis.error());value.sprite_basis_index=basis.value();
-            transform_plans[particle]=std::make_shared<const TransformBranchPlan>(std::move(value));
-            return P::success(transform_plans[particle]);
-        };
-
         using MotionPlan=std::shared_ptr<const std::vector<NodeId>>;
         std::vector<MotionPlan> motion_plans(count);
         const auto motion_plan=[&](std::size_t particle)->Result<MotionPlan> {
@@ -650,44 +637,44 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             motion_plans[particle]=std::make_shared<const std::vector<NodeId>>(chain.take_value());
             return Result<MotionPlan>::success(motion_plans[particle]);
         };
-        const auto apply_motion_positions=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
+        const bool has_transforms=std::any_of(transforms.begin(),transforms.end(),[](const auto& value){return value.has_value();});
+        std::vector<std::shared_ptr<const TransformBranchPlan>> transform_plans(count);
+        const auto transform_plan=[&](std::size_t particle)->Result<std::shared_ptr<const TransformBranchPlan>> {
+            using P=Result<std::shared_ptr<const TransformBranchPlan>>;
+            if(!has_transforms)return P::success({});
+            if(transform_plans[particle])return P::success(transform_plans[particle]);
+            auto stages=motion_plan(particle);if(!stages.has_value())return P::failure(stages.error());
+            const auto deferred=stages.value()?std::span<const NodeId>{*stages.value()}:std::span<const NodeId>{};
+            auto planned=plan_transform_branch(nodes,incoming,outgoing,active,topological_order,particle,output,transforms,cancellation,budget.transform,deferred);
+            if(!planned.has_value())return P::failure(planned.error());
+            auto value=planned.take_value();auto basis=retain_transform_basis(result,value);
+            if(!basis.has_value())return P::failure(basis.error());value.sprite_basis_index=basis.value();
+            transform_plans[particle]=std::make_shared<const TransformBranchPlan>(std::move(value));
+            return P::success(transform_plans[particle]);
+        };
+        const auto apply_motion_frame=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
             if(plan)for(auto id:*plan) {
+                if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"ordered Motion cancelled");
+                if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"ordered Motion work limit");
                 if(const auto found=paths.find(id);found!=paths.end()) {
-                    const auto& clock=path_clocks.at(id);budget.work+=clock.clock.segment_count()+1;
-                    if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Light Path cancelled");
+                    const auto& clock=path_clocks.at(id);budget.work+=clock.clock.segment_count();
                     if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path clock work limit");
                     auto travel=clock.distance_rate(instance.age_seconds,instance.lifetime_seconds,motion_speed_random(instance,id,seed));
                     if(!travel.has_value())return Result<bool>::failure(travel.error());
-                    auto moved=found->second.apply_position_at_distance(instance,travel.value().first,travel.value().second);
-                    if(!moved.has_value())return moved;continue;
-                }
-                if(!circles.contains(id))continue;
-                if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Motion Circle cancelled");
-                if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Motion Circle work limit");
-                const auto& c=circles.at(id);auto clock=c.clock(instance.age_seconds,instance.lifetime_seconds);
-                if(!clock.has_value())return Result<bool>::failure(clock.error());
-                const auto factor=motion_speed_factor(instance,id,seed,c.settings().speed_random_percent);
-                auto moved=apply_circle_state(instance,c,c.settings().radians_per_second*factor*clock.value().integral_seconds,
-                    c.settings().radians_per_second*factor*clock.value().weight);
-                if(!moved.has_value())return moved;
-            }
-            return Result<bool>::success(true);
-        };
-        const auto apply_motion_orientations=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
-            if(plan)for(auto id:*plan) {
-                if(const auto found=paths.find(id);found!=paths.end()) {
-                    const auto& clock=path_clocks.at(id);if(!clock.settings.orient_to_path)continue;
-                    budget.work+=clock.clock.segment_count()+1;
-                    if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Light Path orientation cancelled");
-                    if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path orientation work limit");
-                    auto travel=clock.distance_rate(instance.age_seconds,instance.lifetime_seconds,motion_speed_random(instance,id,seed));
-                    if(!travel.has_value())return Result<bool>::failure(travel.error());
-                    auto turned=found->second.orient_at_distance(instance,travel.value().first,travel.value().second,result.sprite_bases);
-                    if(!turned.has_value())return turned;
+                    auto moved=found->second.apply_at_distance(instance,travel.value().first,travel.value().second,result.sprite_bases);
+                    if(!moved.has_value())return moved;
+                } else if(const auto circle=circles.find(id);circle!=circles.end()) {
+                    const auto& c=circle->second;auto clock=c.clock(instance.age_seconds,instance.lifetime_seconds);
+                    if(!clock.has_value())return Result<bool>::failure(clock.error());
+                    const auto factor=motion_speed_factor(instance,id,seed,c.settings().speed_random_percent);
+                    auto moved=apply_circle_state(instance,c,c.settings().radians_per_second*factor*clock.value().integral_seconds,
+                        c.settings().radians_per_second*factor*clock.value().weight);
+                    if(!moved.has_value())return moved;
                 } else if(const auto look=look_ats.find(id);look!=look_ats.end()) {
-                if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At cancelled");
-                if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At work limit");
-                auto turned=apply_motion_look_at(instance,look->second,result.sprite_bases);if(!turned.has_value())return turned;
+                    auto turned=apply_motion_look_at(instance,look->second,result.sprite_bases);if(!turned.has_value())return turned;
+                } else {
+                    const auto index=index_of(id);if(index>=count||!transforms[index])return Result<bool>::failure(ErrorCode::invalid_request,"missing ordered Transform");
+                    auto moved=apply_ordered_particle_transform(instance,*transforms[index]);if(!moved.has_value())return moved;
                 }
             }
             return Result<bool>::success(true);
@@ -879,12 +866,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             instance.velocity.x += velocity.x * inherited_velocity * decay;
                             instance.velocity.y += velocity.y * inherited_velocity * decay;
                             instance.velocity.z += velocity.z * inherited_velocity * decay;
-                            auto moved=apply_motion_positions(instance,circle_plan.value(),child_settings.value.seed);
-                            if(!moved.has_value())return R::failure(moved.error());
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
-                            auto turned=apply_motion_orientations(instance,circle_plan.value(),child_settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
+                            auto turned=apply_motion_frame(instance,circle_plan.value(),child_settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
                             if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
@@ -1151,12 +1136,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     birth_position.x+=delta.x;birth_position.y+=delta.y;birth_position.z+=delta.z;
                 }
                 // Particle owns all per-life style curves.
-                auto moved=apply_motion_positions(instance,plan.motion,plan.settings.value.seed);
-                if(!moved.has_value())return R::failure(moved.error());
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
-                auto turned=apply_motion_orientations(instance,plan.motion,plan.settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
+                auto turned=apply_motion_frame(instance,plan.motion,plan.settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
                 if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }

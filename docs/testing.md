@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionFrameTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各4141，实际exit0；artifacts/m3-18-motion-frame-{tests,asan}.log及各exit.txt。实际普通/历史/Auxiliary有序Motion/Transform与snapshot10：独立L*Q*A运算/剪切/镜像/退化、identity精确保留/失败原子性/无分配、前置/后置/串联/反序、动画Transform/三档lattice/partial/乱序/Path alignment、5001个独立帧、实际CPU像素/GPU准备轴/Model矩阵、3..9旧字节及所有表迁移10、每个10截断/header/非法数字/Model预检、Linear affine近似与实际Subframe、出生父状态继承、全取消/分配失败和并发。早期夹具错误PortId和GPU粒子数期望已修正；GPU准备不认定硬件资格，数值Null矩阵不認定AE回调。
+
+相关最小回归均actual exit0：MotionCircleGraph1842、MotionLookAtGraph1377、MotionPathGraph8432、RunCoreTests -TransformGraph594、RunModelGraphTests559、RunModelParticleTests2695，日志artifacts/m3-18-motion-frame-*-regression.log及exit.txt。新header加入adapter fingerprint，CMake/独立runner接入。共享输入变化须新提交冻结的完整May2023八目标，上一阶段SDK不覆盖本候选；安装native61/CEP63保持，没有Motion作者部署。
+
 Light Path graph源码cf64261ae13ec20895a4f31aca8a620431bd31c8已推送/git archive冻结于artifacts/prepared/m3-18-motion-path-graph-cf64261/source；显式IncludeModelCandidate及双NoPublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0。Main/Core均编译新geometry/travel共享输入；artifacts/m3-18-motion-path-graph-sdk-build.log/exit.txt/build-hashes.json及sdk-terminal.json记录八个新SHA256和实际终态。构建后motion-path-graph-installed-hashes.json复查26安装hash/selector/runtime匹配61/63。没有Motion作者或部署，不由编译推断参考、AE或GPU硬件资格。
 
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPathGraphTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准/ASAN各8288、实际exit0，artifacts/m3-18-motion-path-graph-{tests,asan}.log及exit.txt。实际mode0普通/历史graph/Auxiliary、SFMP1/6160B最大点包/every truncation/非法header/数字先验证再分配、动画speed/random/出生delay、四curve及metadata、30/60/120Hz partial interval、4096 clock cache淘汰后的lease、最终Euler/affine/reflection切线及串联Path/下游Look At、实际CPU像素/GPU准备/Linear与subframe、普通和历史32MiB累计capacity与20M曲线工作量边界、逐取消/全部分配失败和并发。候选明确数字单位/delay/clamp，不认定Reference作者、AE2023回调或GPU硬件。

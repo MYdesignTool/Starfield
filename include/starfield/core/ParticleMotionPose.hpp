@@ -7,6 +7,10 @@
 #include <numbers>
 
 namespace starfield::core {
+inline bool valid_particle_motion_affine(const ParticleMotionAffine& a)noexcept{return valid_particle_sprite_basis(a);}
+inline Vec3 motion_affine_axis(const ParticleMotionAffine& a,Vec3 v)noexcept {
+    return {a[0]*v.x+a[1]*v.y+a[2]*v.z,a[3]*v.x+a[4]*v.y+a[5]*v.z,a[6]*v.x+a[7]*v.y+a[8]*v.z};
+}
 inline bool valid_particle_motion_pose(const ParticleMotionPose& q) noexcept {
     double sum=0;for(auto v:q){if(!std::isfinite(v)||std::abs(v)>1.00000001)return false;sum+=v*v;}
     return std::abs(sum-1)<=1e-8;
@@ -45,13 +49,14 @@ inline Result<Vec3> particle_motion_forward(const ParticleInstance& p,Vec3 forwa
     std::span<const ParticleSpriteBasis> bases)noexcept {
     using R=Result<Vec3>;
     if(!motion_pose_detail::finite(forward)||!motion_pose_detail::finite(p.rotation_degrees)||
-        !valid_particle_motion_pose(p.motion_pose)||p.sprite_basis_index>bases.size())
+        !valid_particle_motion_pose(p.motion_pose)||!valid_particle_motion_affine(p.motion_affine)||p.sprite_basis_index>bases.size())
         return R::failure(ErrorCode::invalid_request,"invalid Motion particle forward/basis");
     auto angles=p.rotation_degrees;if(p.limit_to_2d||p.shape==0||p.shape==2)angles.x=angles.y=0;
     auto value=motion_pose_detail::euler(forward,angles);
     if(p.sprite_basis_index){const auto& b=bases[p.sprite_basis_index-1];
         if(!valid_particle_sprite_basis(b))return R::failure(ErrorCode::invalid_request,"invalid Motion shared basis");
         value={b[0]*value.x+b[1]*value.y+b[2]*value.z,b[3]*value.x+b[4]*value.y+b[5]*value.z,b[6]*value.x+b[7]*value.y+b[8]*value.z};}
+    if(p.motion_affine!=kIdentityMotionAffine)value=motion_affine_axis(p.motion_affine,value);
     value=motion_pose_axis(p.motion_pose,value);
     if(!motion_pose_detail::finite(value))return R::failure(ErrorCode::invalid_request,"Motion forward overflow");
     return R::success(value);

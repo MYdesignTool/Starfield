@@ -33,7 +33,7 @@ struct ParticleInstance {
     Vec3 position{};
     Vec3 velocity{}; // instantaneous world units/s, used by auxiliary inheritance
     // 0 preserves the identity path. Other indices are 1-based into the owning
-    // EvaluatedGraph's shared table; never copy nine doubles per particle.
+    // EvaluatedGraph's shared prefix table. Ordered per-particle state is separate.
     std::uint32_t sprite_basis_index{0};
     ParticleTransferMode transfer_mode{ParticleTransferMode::normal};
     // 1-based shared style index; zero is reserved for non-texture particles.
@@ -45,6 +45,8 @@ struct ParticleInstance {
     // Proper rotation in canonical world axes after the authored/shared basis.
     // Separate from shared affine entries; snapshot9 owns its explicit wire form.
     ParticleMotionPose motion_pose{kIdentityMotionPose};
+    // Ordered frame after the shared basis, before motion_pose; snapshot10.
+    ParticleMotionAffine motion_affine{kIdentityMotionAffine};
 };
 
 // The contiguous global emission-slot interval alive at one absolute time.

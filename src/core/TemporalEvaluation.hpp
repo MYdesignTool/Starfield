@@ -186,18 +186,25 @@ class TemporalEvaluator {
         }
         return P::success({geometry.take_value(),distance,rate});
     }
-    Result<bool> apply_motion_positions(ParticleInstance& particle,const Branch& branch,double birth,double now,
-        std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes,std::vector<PathParticleState>& path_states) {
+    Result<bool> apply_motion_frame(ParticleInstance& particle,const Branch& branch,double birth,double now,
+        std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph) {
         using M=Result<bool>;
-        path_states.assign(branch.motions.size(),{});
+
         for(std::size_t index=0;index<branch.motions.size();++index) {
-            const auto id=branch.motions[index];const auto mode=std::get<std::uint32_t>(*find_value(*nodes.at(id),kMotionMode));
-            if(mode==2)continue;
+            const auto id=branch.motions[index];const auto& stage=*nodes.at(id);
+            if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"ordered Motion history cancelled");
+            if(stage.type_key==kTransformNode){
+                if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"ordered Transform history work limit");
+                auto transform=transform_at(stage,now);if(!transform.has_value())return M::failure(transform.error());
+                auto moved=apply_ordered_particle_transform(particle,transform.value());if(!moved.has_value())return moved;continue;
+            }
+            const auto mode=std::get<std::uint32_t>(*find_value(stage,kMotionMode));
+            if(mode==2){auto turned=look_at(particle,stage,now,graph);if(!turned.has_value())return turned;continue;}
             if(mode==0) {
                 auto state=path_history(particle,*nodes.at(id),birth,now,seed);if(!state.has_value())return M::failure(state.error());
-                path_states[index]=state.take_value();const auto& path=path_states[index];
+                const auto path=state.take_value();
                 if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Light Path query work limit");
-                auto moved=path.path->apply_position_at_distance(particle,path.distance,path.rate);if(!moved.has_value())return moved;continue;
+                auto moved=path.path->apply_at_distance(particle,path.distance,path.rate,graph.sprite_bases);if(!moved.has_value())return moved;continue;
             }
             if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"Motion Circle history cancelled");
             auto proof=constant_circles.find(id);
@@ -241,32 +248,19 @@ class TemporalEvaluator {
         }
         return M::success(true);
     }
-    Result<bool> apply_motion_orientations(ParticleInstance& p,const Branch& branch,double now,
-        const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph,const std::vector<PathParticleState>& path_states) {
-        for(std::size_t index=0;index<branch.motions.size();++index) {
-            const auto id=branch.motions[index];
-            if(path_states[index].path) {
-                const auto& path=path_states[index];if(!path.path->settings().orient_to_path)continue;
-                if(cancel.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Light Path orientation cancelled");
-                if(++work>kTemporalWorkLimit)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path orientation work limit");
-                auto turned=path.path->orient_at_distance(p,path.distance,path.rate,graph.sprite_bases);if(!turned.has_value())return turned;
-                continue;
-            }
-            if(std::get<std::uint32_t>(*find_value(*nodes.at(id),kMotionMode))!=2)continue;
-            if(cancel.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At history cancelled");
-            if(++work>kTemporalWorkLimit)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At history work limit");
-            const auto key=std::pair{id,now};auto found=look_at_samples.find(key);
-            if(found==look_at_samples.end()) {
-                auto sampled=at(*nodes.at(id),now);if(!sampled.has_value())return Result<bool>::failure(sampled.error());
-                auto mode=read_motion_mode(sampled.value());if(!mode.has_value()||mode.value()!=2)
-                    return Result<bool>::failure(ErrorCode::invalid_request,"historical Motion mode changed in Look At branch");
-                auto settings=read_motion_look_at(sampled.value());if(!settings.has_value())return Result<bool>::failure(settings.error());
-                if(look_at_samples.size()>=4096)look_at_samples.clear();
-                found=look_at_samples.emplace(key,settings.take_value()).first;
-            }
-            auto turned=apply_motion_look_at(p,found->second,graph.sprite_bases);if(!turned.has_value())return turned;
+    Result<bool> look_at(ParticleInstance& p,const GraphNode& node,double now,const EvaluatedGraph& graph) {
+        if(cancel.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"Look At history cancelled");
+        if(++work>kTemporalWorkLimit)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At history work limit");
+        const auto key=std::pair{node.id,now};auto found=look_at_samples.find(key);
+        if(found==look_at_samples.end()) {
+            auto sampled=at(node,now);if(!sampled.has_value())return Result<bool>::failure(sampled.error());
+            auto mode=read_motion_mode(sampled.value());if(!mode.has_value()||mode.value()!=2)
+                return Result<bool>::failure(ErrorCode::invalid_request,"historical Motion mode changed in Look At branch");
+            auto settings=read_motion_look_at(sampled.value());if(!settings.has_value())return Result<bool>::failure(settings.error());
+            if(look_at_samples.size()>=4096)look_at_samples.clear();
+            found=look_at_samples.emplace(key,settings.take_value()).first;
         }
-        return Result<bool>::success(true);
+        return apply_motion_look_at(p,found->second,graph.sprite_bases);
     }
     Result<bool> motion(ParticleInstance& particle,const Branch& branch,
                         double birth,double now,std::uint32_t seed) {
@@ -470,7 +464,7 @@ public:
             std::sort(base.forces.begin(),base.forces.end(),[](auto a,auto b){return a->id<b->id;});
             if(has_transforms) {
                 auto planned=plan_transform_branch(plan_nodes,plan_incoming,plan_outgoing,plan_active,plan_order,
-                    plan_indices.at(id),plan_indices.at(output->id),plan_transforms,cancel,transform_budget);
+                    plan_indices.at(id),plan_indices.at(output->id),plan_transforms,cancel,transform_budget,base.motions);
                 if(!planned.has_value())return R::failure(planned.error());auto value=planned.take_value();
                 auto basis=retain_transform_basis(result,value);if(!basis.has_value())return R::failure(basis.error());
                 value.sprite_basis_index=basis.value();base.transform=std::make_shared<const TransformBranchPlan>(std::move(value));
@@ -502,7 +496,7 @@ public:
         };
         std::vector<Candidate> storage;storage.reserve(std::min<std::uint32_t>(cap,4096));
         std::priority_queue<Candidate,std::vector<Candidate>,decltype(older)> kept(older,std::move(storage));
-        std::vector<PathParticleState> path_states;
+
         for(const auto& branch:branches) {
             if(const auto chance=sampler.constant_birth_chance(branch.particle->id);chance) {
                 if(!std::isfinite(*chance) || *chance<0 || *chance>100)
@@ -640,12 +634,10 @@ public:
                         if(tf){instance.position=tf->position(instance.position);instance.velocity=tf->velocity(instance.velocity);}
                         const Vec3 birth_position=instance.position;
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
-                        auto orbited=apply_motion_positions(instance,branch,birth,now,own.seed,nodes,path_states);
-                        if(!orbited.has_value())return R::failure(orbited.error());
                         apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);
-                        auto turned=apply_motion_orientations(instance,branch,now,nodes,result,path_states);if(!turned.has_value())return R::failure(turned.error());
+                        auto turned=apply_motion_frame(instance,branch,birth,now,own.seed,nodes,result);if(!turned.has_value())return R::failure(turned.error());
                         if(particle_values.authored_birth)instance.id=branch_birth_identity(identity,branch.particle->id);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));

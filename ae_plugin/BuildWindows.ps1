@@ -121,6 +121,7 @@ $adapterInputs = @(
     'src\core\ModelEvaluation.hpp',
     'include\starfield\core\MotionCircle.hpp', 'include\starfield\core\MotionGeometry.hpp',
     'include\starfield\core\ParticleMotionPose.hpp',
+    'include\starfield\core\ParticleMotionFrame.hpp',
     'include\starfield\core\MotionCurveClock.hpp', 'include\starfield\core\MotionPathTravel.hpp',
     'include\starfield\core\MotionPathPoints.hpp',
     'src\core\MotionPathTravel.cpp',

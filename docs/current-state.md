@@ -6,6 +6,14 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## M3-18 独立计算阶段（2026-10-10）
 
+### Motion／Transform 有序粒子框架候选（未部署）
+
+普通、历史与Auxiliary按图顺序执行Motion和后置Transform，支持Look At→Path/Circle、Motion→Transform→Motion及串联Transform。逐粒子自有3×3仿射值与四元数组成Q*A*B*Euler，保留Null数值矩阵的剪切、镜像和退化轴；前置Transform仍用原共享基底，后置不会重复应用。Particle样式/Euler先建立，每个Look At读取所在阶段的中心。后置Force与不同链合并仍明确拒绝，完整有序积分、外部Light依赖/GUID、动画几何导数、参考单位/目标及三模式作者继续，不缩减目标。
+
+ADR0039先定义snapshot10的80B header/304B粒子记录；仅非单位逐粒子仿射写10，原3..9字节格式保持，旧记录读入单位仿射。CPU/GPU场景准备/Model共同消费，Linear shutter按系数插值仿射、SLERP剩余四元数；它是端点近似，实际Subframe重新求值。C ABI8/sequence1/AE IDs保持，共享Main/Core输入需本阶段提交冻结后的完整SDK构建，尚不沿用上一阶段产物。
+
+聚焦标准/ASAN各4141、Circle1842/Look At1377/Path8432、Transform594、Model graph559/Model particle2695实际exit0，artifacts/m3-18-motion-frame-{tests,asan}.log和*-regression.log/exit.txt保留。覆盖独立矩阵运算、5001个独立帧、真实CPU像素/GPU准备轴/Model矩阵、全旧格式往返和10截断、所有取消/分配失败、历史动画/三档lattice/乱序与Auxiliary出生。早期fixture误用PortId及Once仍发射两粒子的诊断已修正；不认定AE或GPU硬件资格。当前安装native61/CEP63保持，完整目标active。
+
 ### Light Path 普通/历史图候选（未部署）
 
 源码cf64261ae13ec20895a4f31aca8a620431bd31c8已推送并git archive冻结于artifacts/prepared/m3-18-motion-path-graph-cf64261/source；显式IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0。Main/Core均编译MotionGeometry/MotionPathTravel共享输入；sdk-build.log/exit.txt/build-hashes.json和sdk-terminal.json保留八新产物与真实終态，motion-path-graph-installed-hashes.json确认26安装hash/selector/runtime仍匹配native61/CEP63。无Motion作者部署，完整目标active。

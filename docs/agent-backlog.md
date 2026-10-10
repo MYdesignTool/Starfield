@@ -161,6 +161,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 有序Motion/Transform数值候选：逐粒子Q*A*B*Euler及snapshot10迁移先记录ADR0039，普通/历史/Auxiliary按图顺序处理朝向、位移和后置Transform，支持反序Motion与交错/串联Transform。标准/ASAN4141、Circle1842/Look At1377/Path8432、Transform594/Model graph559/Model particle2695实际exit0，motion-frame-*日志保留；前置/无Motion旧分支保持，MNT改动未纳入。下一步本阶段提交冻结完整SDK，然后有序Force、外部资源/动画几何导数、参考政策与三模式作者，安装61/63保持，完整目标active。
+
 2026-10-10 mode0源码cf64261已推送/git archive冻结；双NoPublish完整May2023 x64 Release /MT八目标会话18162实际terminal exit0，新Main/Core路径CPP及八hash/terminal证据记录于motion-path-graph-sdk-*。构建后26安装hash/selector/runtime匹配61/63，motion-path-graph-installed-hashes.json。下阶段外部Light依赖/GUID、完整有序frame/动画几何导数与参考单位/延迟/目标政策，随后三模式作者/配对发布/AE2023，完整目标active。
 
 2026-10-10 mode0普通/历史Core graph/Auxiliary候选完成SFMP1数字点、delay捕获于birth、动画speed/curve随机积分及最终基底切线pose；32MiB累计capacity及20M工作量请求预算跨Auxiliary，当前几何/历史clock lease及4096淘汰验证。标准/ASAN8288、Circle1772/Look At1372/travel1216/Transform594/Model559/Model粒子2695均实际exit0，motion-path-graph-*及path-graph-*-regression日志保留。新共享源码提交/冻结完整SDK继续；外部依赖/GUID、完整有序frame/动画几何导数与公开参考政策及三模式作者仍需完成，不发布数学入口或关闭完整目标。
