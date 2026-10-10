@@ -1,12 +1,20 @@
 # 当前工程状态
 
-2026-10-10 M3-17 Model停滞修复进行中：owner确认native62/CEP64首加无反馈、面板重开后busy；只读实机报告AE23.5x52/p0-c1-l29/main，state=receiving、剩270秒、command5061和request function存在。三个Host脚本通道将任何error handle当失败；空诊断句柄fixture在旧代码复现首请求返回被丢弃。native63/packed32831/CEP65候选改为读取诊断内容、Model先只读Request后Claim、pre-ID三次有界读取、十五秒无进展只终止尚未写入阶段、applying不可被过期begin覆盖、busy包含阶段，轮询250ms。完整冻结SDK/配对部署待完成；实机根因仍待新版本验收。当前只修M3-17，不推进已暂停的Motion。
+核对日期：2026-10-11。当前安装 **native63 / packed32831 / Core ABI8 / CEP65**，完整冻结源码498862759b1ec39ff56dda8c36422911fb09c570。00:28+08 fresh AE process0后发布Model事务停滞修正；八native/Core与十八CEP安装hash、selector/selected runtime及配对rollback report通过，artifacts/m3-17-native63-deploy-{before,after}.json和m3-17-native63-installed-hashes.json记录实际状态。备份m3-17-native63-panel65-host-receipt-20261011可恢复native62/CEP64，较早配对备份保留。owner要求本次成果部署后暂停验收，Motion及MNT在途保持，不记完整目标完成。
 
-核对日期：2026-10-10。当前安装 native62 / packed32830 / Core ABI8 / CEP64，完整冻结源码7fda058b2bd4717288d3e2fad43e94daa7bb13e0。21:43+08 fresh AE process0后发布Model root ID0修正；八native/Core及十八CEP安装hash/selector/runtime和配对rollback报告通过。owner已确认CEP63可加载，Model修正版实际AE gate仍开放。备份m3-17-native62-panel64-root-id-20261010可恢复native61/CEP63，较早回滚继续保留。所有Motion及MNT在途改动保留。owner要求本次修复部署后暂停目标，交接完成后执行paused。
+owner确认native62/CEP64首加无反馈、面板重开后busy；只读实机报告AE23.5x52/p0-c1-l29/main，state=receiving、剩270秒、command5061和request function存在。三个Host把任何error handle当失败；空诊断句柄fixture复现首请求返回被丢弃，符合实机阶段但尚不认定宿主根因已验收。native63读取诊断字符串，Model先只读Request后Claim；executor前Begin保护backup/rollback全程，executing/applying不因过期被替换。pre-ID三次有界读取，十五秒无进展只终止未写入阶段，busy包含state，poll250ms。默认cube/OBJ/资源预设/undo/reopen与modal时序仍待AE验收。
+
+完整git archive冻结、精确CEP65重现、IncludeModelCandidate及双NoPublish的May2023 x64 Release /MT八目标会话24956实际terminal exit0；m3-17-host-receipt-sdk-build.log/exit.txt/terminal.json/build-hashes.json保留。标准/ASAN Host事务9101543/9102018、资产各150677、文件各1770；CEP transport499/DOM41/export588/作者74/预设文件583、完整ES3三文件18/只读报告21，新旧dummy升级各61检查通过。前置失败/夹具入口误拼等诊断保留。上次审批服务额度失败导致打包/安装命令未执行，恢复后只继续已结束构建的打包，未重启构建。所有scratch输出已归入artifacts；无registry/cache或进程启动/停止。
+
+一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native63-panel65-host-receipt-20261011' -Restore
+```
 
 owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle、Look At，随后推进Turbulence。Motion截图及参考库存记录于docs/reference-motion-phases.md；其余Motion模式不属于首批交付。
 
-## 当前优先修复：M3-17 Model 根身份（2026-10-10）
+## Model 根身份修复记录（2026-10-10）
 
 owner已确认CEP63实际正常加载；添加Model报invalid_model_transaction。只读Report-ModelTarget.jsx截图确认AE23.5x52目标p0-c1-l29。根ID0被CEP事务和原生Model事务/asset export/OBJ检查点误拒绝，已统一接受非负root、保留comp/layer正值与全部实际SDK身份重验，0不是通配符。native62/packed32830/CEP64完整配对已部署，所有Motion/MNT在途保持；本次处理M3-17，三模式/Force后续任务不缩减。
 

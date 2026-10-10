@@ -9,9 +9,14 @@
     function uuid(value){return typeof value==="string" && /^[0-9a-f]{32}$/.test(value) && !/^0{32}$/.test(value) && value!==OUTPUT;}
     function now(){return (new Date()).getTime();}
     function plain(value){return JSON.parse(JSON.stringify(value));}
-    function failure(session,message){session.message=String(message);session.state="failed";session.assets=[];}
+    function failure(session,message,code){session.message=String(message);session.failureCode=code || "model_transaction_failed";session.state="failed";session.assets=[];}
     function session(id){var value=host[KEY];if(!value || value.version!==1 || value.id!==id)return null;
-        if(now()>value.expires && value.state!=="complete" && value.state!=="published" && value.state!=="applying")failure(value,"Model graph transaction expired.");
+        var time=now(),progress=typeof value.lastProgress==="number"?value.lastProgress:value.expires-5*60*1000;
+        if(time>value.expires && value.state!=="complete" && value.state!=="published" && value.state!=="executing" && value.state!=="applying")failure(value,"Model graph transaction expired.");
+        else if((value.state==="uploading" || value.state==="queued" || value.state==="receiving") && time-progress>15000){
+            var phase=value.state;
+            failure(value,"Model Host made no progress for 15 seconds (state="+phase+"). No graph changes were started. Retry the edit.",
+                phase==="receiving"?"model_host_transfer_stalled":"model_host_not_started");}
         return value;}
     function target(s,guard,base){
         if(s.cancelled || now()>s.expires)throw new Error("Model graph transaction cancelled or expired.");
@@ -77,7 +82,9 @@
         if(!s || s.request.target.token!==request.target.token)throw new Error("Model transaction is missing or belongs to another target.");return {s:s,request:request};}
     host.SFLD_beginModelGraphTransaction=function(text){try{
         var request=parse(text,"beginModelGraphTransaction"),old=host[KEY];
-        if(old && old.version===1 && old.state!=="complete" && old.state!=="failed" && now()<=old.expires)return api.fail("model_transaction_busy","Another Model graph transaction is running.");
+        if(old && old.version===1){old=session(old.id);
+            if(old.state==="executing" || old.state==="applying" || old.state!=="complete" && old.state!=="failed" && now()<=old.expires)
+                return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+").");}
         if(!integer(request.baseGraphRevision,1,16777215) || typeof request.baseRecordStamp!=="string" || request.baseRecordStamp.length>256*1024 ||
             typeof request.graphHex!=="string" || request.graphHex.length<64 || request.graphHex.length>api.maxGraphBytes*2 || request.graphHex.length%2 ||
             !/^[0-9a-f]+$/.test(request.graphHex))throw new Error("Invalid Model graph planning receipt.");
@@ -86,7 +93,7 @@
         var resolved=api.resolve(request);if(resolved.error)return api.fail(resolved.error.code,resolved.error.message);
         api.validateTransform(nodes,resolved.target.layer);
         var s={version:1,id:request.transactionId,request:plain(request),assets:validateAssets(nodes,request.assets || []),state:"uploading",
-            expires:now()+5*60*1000,time:resolved.target.layer.time,cancelled:false,uploadAsset:0,uploadPage:0};
+            expires:now()+5*60*1000,lastProgress:now(),time:resolved.target.layer.time,cancelled:false,uploadAsset:0,uploadPage:0};
         target(s,0,true);
         var command=app.findMenuCommandId("Starfield Apply Model Graph Transaction");
         if(!command)return api.fail("model_transaction_unavailable","Model graph edits require the paired Starfield Host build.");
@@ -100,7 +107,7 @@
         var a=s.assets[s.uploadAsset],expected=a?Math.min(PAGE,a.bytes*2-s.uploadPage*PAGE):0;
         if(!a || r.asset!==s.uploadAsset || r.page!==s.uploadPage || typeof r.hex!=="string" || r.hex.length!==expected || expected<=0 || !/^[0-9a-f]+$/.test(r.hex))
             throw new Error("Invalid or out of order Model upload page.");
-        a.pages.push(r.hex);++s.uploadPage;
+        a.pages.push(r.hex);++s.uploadPage;s.lastProgress=now();
         if(s.uploadPage===Math.ceil(a.bytes*2/PAGE)){++s.uploadAsset;s.uploadPage=0;}
         return api.reply({ok:true,transactionId:s.id,asset:r.asset,page:r.page});
     }catch(error){if(typeof s!=="undefined" && s && s.state==="uploading")failure(s,error.toString());return api.fail("model_transaction_upload_failed",error.toString());}};
@@ -109,20 +116,25 @@
         if(s.state!=="uploading")throw new Error("Model graph request is already queued or finished.");target(s,0,true);
         for(var i=0;i<s.assets.length;i++)if(s.assets[i].pages.length!==Math.ceil(s.assets[i].bytes*2/PAGE))throw new Error("Incomplete Model upload.");
         var command=app.findMenuCommandId("Starfield Apply Model Graph Transaction");if(!command)throw new Error("Paired Model Host command is unavailable.");
-        s.state="queued";app.executeCommand(command);return api.reply({ok:true,transactionId:s.id,state:s.state});
-    }catch(error){if(typeof s!=="undefined" && s && s.state==="uploading")failure(s,error.toString());return api.fail("model_transaction_queue_failed",error.toString());}};
+        s.state="queued";s.lastProgress=now();app.executeCommand(command);return api.reply({ok:true,transactionId:s.id,state:s.state});
+    }catch(error){if(typeof s!=="undefined" && s && (s.state==="uploading" || s.state==="queued"))failure(s,error.toString());return api.fail("model_transaction_queue_failed",error.toString());}};
     host.SFLD_modelTransactionHostRequest=function(){var s=host[KEY];if(!s || !session(s.id) || s.state!=="queued")return "0";
         try{target(s,0,true);var parts=/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(s.request.target.token);
             if(!parts)throw new Error("Invalid Model target identity.");var ids=[s.request.rendererManifest.id];for(var n=0;n<s.request.nodeManifest.length;n++)ids.push(s.request.nodeManifest[n].id);
-            s.state="receiving";return [s.id,parts[1],parts[2],parts[3],s.assets.length,ids.join(",")].join("|");
+            return [s.id,parts[1],parts[2],parts[3],s.assets.length,ids.join(",")].join("|");
         }catch(error){failure(s,error.toString());return "0";}};
+    host.SFLD_modelTransactionHostClaim=function(id){var s=session(id);if(!s || s.state!=="queued")return "0";
+        try{target(s,0,true);s.state="receiving";s.lastProgress=now();return "1";}
+        catch(error){failure(s,error.toString());return "0";}};
     host.SFLD_modelTransactionHostContinue=function(id){var s=session(id);if(!s || s.state!=="receiving")return "0";
-        try{target(s,0,true);return "1";}catch(error){failure(s,error.toString());return "0";}};
+        try{target(s,0,true);s.lastProgress=now();return "1";}catch(error){failure(s,error.toString());return "0";}};
     host.SFLD_modelTransactionHostAsset=function(id,index){var s=session(id);if(!s || s.state!=="receiving" || !integer(index,0,s.assets.length-1))return "0";
         var a=s.assets[index];return [a.nodeId,a.source,a.revision,a.bytes].concat(a.bounds).join("|");};
     host.SFLD_modelTransactionHostPage=function(id,index,page){var s=session(id);if(!s || s.state!=="receiving" || !integer(index,0,s.assets.length-1))return "0";
         var a=s.assets[index];return integer(page,0,a.pages.length-1)?a.pages[page]:"0";};
-    host.SFLD_modelTransactionHostPrepare=function(id){var s=session(id);if(!s || s.state!=="receiving")return "0";
+    host.SFLD_modelTransactionHostBegin=function(id){var s=session(id);if(!s || s.state!=="receiving")return "0";
+        try{target(s,0,true);s.state="executing";return "1";}catch(error){failure(s,error.toString());return "0";}};
+    host.SFLD_modelTransactionHostPrepare=function(id){var s=session(id);if(!s || s.state!=="executing")return "0";
         try{var resolved=target(s,1,true);s.beforeRevision=Number(resolved.properties.revision.value);s.state="applying";
             var previous=api.snapshot(resolved).nativeNodes;
             api.ensure(resolved.target.layer,s.request.nodeManifest,true,previous,true);
@@ -153,10 +165,10 @@
         s.result.diagnostics=s.diagnostics;s.state="complete";s.assets=[];return "1";};
     host.SFLD_readModelGraphTransaction=function(text){try{var s=matching(text,"readModelGraphTransaction").s;
         if(s.state==="complete" || s.state==="published")return api.reply({ok:true,transactionId:s.id,state:s.state,result:s.result});
-        if(s.state==="failed")return api.fail("model_transaction_failed",s.message);
+        if(s.state==="failed")return api.fail(s.failureCode || "model_transaction_failed",s.message);
         return api.reply({ok:true,transactionId:s.id,state:s.state});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
     host.SFLD_releaseModelGraphTransaction=function(text){try{var s=matching(text,"releaseModelGraphTransaction").s;
-        if(s.state==="applying")s.cancelled=true;else host[KEY]=null;return api.reply({ok:true});
+        if(s.state==="executing" || s.state==="applying")s.cancelled=true;else host[KEY]=null;return api.reply({ok:true});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
 }());

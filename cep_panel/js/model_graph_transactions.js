@@ -66,7 +66,7 @@
                         if(!response.result || response.result.committed!==true){error(failure("model_transaction_outcome_unknown","Invalid published Model result."));return;}
                         published=response.result;
                     }
-                    schedule(read,50);
+                    schedule(read,250);
                 });
             }
             return {cancel:function(){end(published || failure(queued?"model_transaction_cancel_pending":"cancelled",

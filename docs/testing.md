@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-11 00:28+08 native63/CEP65已部署：498862759b1ec39ff56dda8c36422911fb09c570 git archive冻结，May2023 x64 Release /MT完整八目标、IncludeModelCandidate/NoDistPublish/NoRuntimePublish会话24956 actual terminal exit0。构建日志、exit.txt、terminal.json及八产物hash在artifacts/m3-17-host-receipt-sdk-*。10日审批额度失败未执行打包/安装，11日恢复后打包旧已完成构建、fresh AE count0、实际Install及paired rollback report exit0，m3-17-native63-deploy-{before,after}.json、native63-installed-hashes.json核对26文件与selector/runtime。备份恢复62/64；当前真实AE63/65行为待owner，不由fixture或编译关gate。
+
+最后聚焦标准/ASAN Host事务9101543/9102018、asset各150677、preset file各1770；CEP transport499/DOM41/export588/作者74/文件583、ES3三文件18与只读报告21通过。dummy新62/64→63/65和旧61/63→62/64实际tools部署/恢复各61检查通过。日志m3-17-host-receipt-*记录actual exit；计数含逐字节与切片调用，执行器和AE suites仍fake。后续Prepare以basePanel65重现安装源，不沿用历史62/64 checker。
+
 2026-10-10 M3-17 receiving停滞候选：空错误字符串句柄的旧Host失败日志`artifacts/m3-17-host-receipt-before-fix.log`保留。实际ModelTransactionHost/ModelAssetHost/PresetFileHost使用分配的空诊断句柄而非只有null的fake SDK；标准与ASAN覆盖默认零资产、pre-ID失回复重新只读、claim/begin失回复不执行写入、全部资源预算、锁/句柄平衡和UI排他。最终计数以`m3-17-host-receipt-{tests,asan,assets-tests,assets-asan,files-tests,files-asan}.log`为准，实际执行器仍fake，不能代替AE验收。
 
 `STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-native63-panel65-host-receipt/cep_panel`下Model transport实际client/JSX/planner及DOM回归通过；覆盖只读Request/显式Claim/整个executor前Begin、queued/receiving十五秒失进展及重试、executing/applying跨过期不能覆盖且release只请求取消、丢失队列/最终回执仍不重放。asset588、author74、preset files583、三个完整JSX ES3 18、只读报告21通过。默认Model之前缺少实际Host零资产与分配空诊断夹具；现在补齐。DOM夹具遗漏Claim及错拼preset测试入口的初次诊断保留并已修正。`model_deployment_tests.ps1 -Run -UpgradeInstalledModel -InstalledModelBuild 62`真实部署/回滚工具的artifacts dummy配对61检查通过，目标62/64→63/65。完整冻结SDK与真实部署证据另记，不以这些fixture关闭宿主gate。

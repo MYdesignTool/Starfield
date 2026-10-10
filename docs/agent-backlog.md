@@ -2,7 +2,7 @@
 
 旧任务卡和精确历史所有权见 [归档](history/2026-10-07/agent-backlog.md)；产品进度见 [路线图](roadmap.md)。
 
-2026-10-10 当前活动修复卡：M3-17。owner报告native62/CEP64默认Model首加无反馈、重开busy；只读实机state=receiving。修正三个Host的空错误字符串句柄处理及Model只读Request/Claim、写入前无进展恢复与applying保留，准备native63/CEP65完整配对。此前整体目标按owner要求暂停，Motion及MNT在途保持。
+2026-10-11 M3-17停滞修正版已部署，等待owner验收并按要求暂停。完整冻结4988627源码/May2023八目标terminal exit0，00:28+08 AE process0后发布native63/CoreABI8/CEP65；26hash、selector/runtime及paired rollback report通过。空诊断句柄处理、只读Request/Claim、executor前Begin、未写入阶段无进展恢复与executing/applying保留已接入。备份m3-17-native63-panel65-host-receipt-20261011恢复62/64。实际AE默认添加/OBJ/预设/撤销重开仍开放，Motion及MNT保持，完整目标未完成。
 
 ## MNT-01 — 工作区整理（2026-10-07）
 
