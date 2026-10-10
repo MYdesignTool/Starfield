@@ -66,6 +66,8 @@
   <ItemGroup>
     <ClCompile Include="NodeEffectMain.cpp" />
     <ClCompile Include="NodeEffects.cpp" />
+    <ClCompile Include="ParticleShapeUI.cpp" />
+    <ClCompile Include="ParticleShapePicker.cpp" />
     <ClCompile Include="ParticleGradientUI.cpp" />
     <ClCompile Include="EditorPresetPicker.cpp" />
     <ClCompile Include="GpuRender.cpp" />

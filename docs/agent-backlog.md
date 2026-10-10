@@ -82,6 +82,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-10 Shape入口实现候选：原生disk213六项/Model6-Core4映射与数值回放接通；ECP/隔离CEP Face禁用，native5拒绝，旧四值保持。实际注册/事件标准及ASAN112、实际图编译/Model标准及ASAN9245（另控件452）、CEP选择/gateway/默认cube Add/Replace92及共享作者/资源/Texture/Cloud/Birth回归通过。Prepare重现m3-17-model-shapes-panel62-v3，不改live CEP；完整SDK冻结继续。Face、Use Model(s)参考、真实ECP drag/动画/撤销重开及全Model配对仍开放，完整目标active。
+
 2026-10-10 owner限定完整Shape仅Circle、Rectangle、Cloud、Texture、Face、Model，顺序固定；禁止推断其他模式。参考与ADR0038/schema已更新；Path/Shadow是Properties。native Face5/Model6为未发布作者计划，内部Model4保持，禁止日后重释保存值。Use Model(s)仍待参考。d1fa6e4冻结May2023 /MT八目标及NoRuntimePublish末尾标记已记录，原会话退出码无法恢复，报告null；10:46十八安装哈希/selector/Core匹配60/61。没有部署候选或关闭AE gate；下一步完整Particle Model作者选择映射及配对验收。
 
 2026-10-10继续：2cbc74a已推送/冻结完整八目标双NoPublish SDK build通过，十八安装哈希及selector保持60/61。后续源码接入resident Host独占UI token与已加载effect client，覆盖已知原生脚本/模态范围和两个idle通道；独立DLL/Windows消息泵标准/ASAN470、实际导出148867及事务8886869/8887089回归通过。OBJ数字/完整网格自有快照在chooser后及提交前重新验证，导入/快照各20284通过，真实AE时序/撤销仍开放，SDK冻结证据见上方记录。Particle Shape六种顺序已由owner确认，Use Model(s)仍待参考。完整目标active，继续Model完整作者/配对验收，未部署。

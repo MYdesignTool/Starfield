@@ -19,6 +19,33 @@ mapping has been released. Face remains dependent on OBJ face emission; an
 unsupported choice must not silently fall back to another shape. This scope
 record changes no parameter IDs, persistent enum values, schemas or Core ABI.
 
+### Unpublished Particle Shape author selector
+
+The candidate appends Face5/Model6 to the existing disk213 popup without changing
+values1..4. Shared explicit conversion maps native6 to Core4 for both live UI
+compilation and numeric animation playback. Native5 and out-of-range values are
+rejected. Binding records retain the raw native value; no new binding version,
+snapshot or Core ABI is required beyond the complete existing Model candidate.
+
+The ECP control uses Drawbot and a Windows popup with the six reference labels;
+Face is grayed out until OBJ face emission exists. UI exclusion covers the menu
+and each publication callback; no inventory script or SDK effect/stream reference
+spans TrackPopupMenu. A click stores only numeric selection/previous value and
+requests DRAG; the SDK-valid DRAG callback sets change_flags and uses existing
+graph publication with parameter restoration on failure. Changed prior value is
+rejected, and a consumed drag cannot publish twice. Timeline/script access to the
+ordinary popup remains subject to native5 rejection; this does not claim Face is
+implemented or disabled everywhere in AE.
+
+The isolated CEP presents the same six labels with Face disabled, explicit values
+0/1/2/3/null/4 and Model shown at ordinal6. Forged Face selection is rejected before
+graph mutation. Gateway conversion preserves raw6/Core4 round trips and validates
+Shape's integer wire value during manifest preflight. Model uses its existing
+uniform particle size; the unused Size Y control is hidden in native/CEP Model
+mode. Native registration/events, compiler mappings and actual candidate gateway
+fixtures provide local evidence only. ECP mouse/drag delivery, keyboard/timeline,
+animation, undo/reopen and render behavior remain AE2023 gates for the full pair.
+
 ## Live graph and shutter milestone evidence
 
 Model schema1 metadata and Particle port3 now participate in full dependency

@@ -6,6 +6,12 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ## 源码与安装
 
+### Particle Model 选择入口候选（2026-10-10）
+
+候选Shape实际注册六项（disk213及旧1..4不变），原生6/Core4显式映射同时用于UI编译和数值回放，Face5明确拒绝。ECP Drawbot/Windows菜单和隔离CEP只使用owner确认的六个标签，Face禁用；Timeline/script访问仍可能请求Face5并被拒绝，不代表Face已实现。原生点击只记录数值并请求DRAG，后者发布且失败还原参数；两回调持有Host UI exclusion，菜单前释放Utility suite。Model模式隐藏未使用的Size Y。
+
+实际Particle注册/EffectMain事件fixture标准/ASAN各112检查通过（picker/publication fake，独立Host token DLL）；实际NativeNodeGraph/Model模块标准/ASAN各9245，另ModelControls452通过。隔离CEP实际view/select/gateway普通参数与默认cube预设Add/Replace92，作者74/transport271/DOM35/preset332/export588/Texture80/Cloud49/Birth51回归通过。日志artifacts/m3-17-particle-shape-*及m3-17-shape-*-tests.log；最初矩形成员、disk_ids命名空间、GPU stub及CEP属性别名夹具诊断已修复并保留。Prepare从tracked patch重现于artifacts/prepared/m3-17-model-shapes-panel62-v3/cep_panel；live CEP/native60不变。此新源码完整冻结SDK构建继续；Use Model(s)完整菜单参考与全Model配对/AE gate仍开放。
+
 ### Particle Shape 范围与最新构建记录（2026-10-10）
 
 owner补充完整Shape截图并明确不增加模式：Circle、Rectangle、Cloud、Texture、Face、Model，顺序固定。参考清单、schema参考元数据及ADR0038已记录；Path/Shadow是属性分组。已有native1..4/Core0..3保持，未来native Face5、Model6须显式映射，不能将内部Model4直接解释为第五个原生选项。没有发布新Shape菜单或改变已保存值；Face依赖和Use Model(s)参考仍开放。

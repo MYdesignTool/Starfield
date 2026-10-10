@@ -86,6 +86,7 @@ $adapterInputs = @(
     'ae_plugin\EditorPresetPicker.cpp', 'ae_plugin\EditorPresetPicker.hpp',
     'schema\editor-presets.json', 'tools\Generate-EditorPresets.ps1',
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
+    'ae_plugin\ParticleShape.hpp', 'ae_plugin\ParticleShapeUI.hpp', 'ae_plugin\ParticleShapeUI.cpp', 'ae_plugin\ParticleShapePicker.cpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\EffectReveal.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',

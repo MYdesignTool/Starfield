@@ -7,6 +7,7 @@
 #include "AE_GeneralPlug.h"
 #include "NodeRecord.hpp"
 #include "NodeGraphSync.hpp"
+#include "ParticleShape.hpp"
 #include "Parameters.hpp"
 #include "MotionBlur.hpp"
 #include "TransformBinding.hpp"
@@ -896,7 +897,10 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         for(auto [index,key]:{std::pair{particle_layout::shape,kParticleShape},std::pair{particle_layout::up_axis,kUpAxis},
                             std::pair{particle_layout::orient,kOrientTo},std::pair{particle_layout::random_limit,kRandomLimit}}) {
             if(!read_uint(suites,plugin_id,effect,index,time,integer) || integer<1) return false;
-            add_value(node,key,integer-1);
+            if(index==particle_layout::shape) {
+                std::uint32_t shape{};if(!particle_shapes::native_to_core(integer,shape))return suites.fail(index);
+                add_value(node,key,shape);
+            } else add_value(node,key,integer-1);
         }
         integer=1;
         // Saved v1/v2 binding records predate Transfer Mode and retain Normal.

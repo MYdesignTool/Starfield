@@ -334,6 +334,21 @@ void ui_capture(PF_InData& data){
     const auto compiled=compile_native_node_graph(&data,pointers.data(),graph,found,1);
     if(compiled)std::printf("UI compile error %d, last effect %u stream %ld, nodes %zu edges %zu\n",compiled,ui_last_effect,long(ui_last_index),graph.nodes.size(),graph.edges.size());
     CHECK(compiled==PF_Err_NONE&&found&&graph.nodes.size()==4&&ui_mesh_reads==0);
+    for(const auto native:{1,2,3,4,6}) {
+        ui_values[2][p::shape].one_d=native;
+        CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE);
+        const auto particle=std::find_if(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.id==nid(2);});
+        CHECK(particle!=graph.nodes.end() && std::get<std::uint32_t>(value(*particle,kParticleShape))==
+            static_cast<std::uint32_t>(native==6?4:native-1));
+        CHECK(ui_refs==0 && ui_suites==0);
+    }
+    for(const auto native:{0,5,7}) {
+        ui_values[2][p::shape].one_d=native;
+        CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM);
+        CHECK(ui_refs==0 && ui_suites==0);
+    }
+    ui_values[2][p::shape].one_d=1;
+    CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE);
     if(compiled==PF_Err_NONE){CHECK(std::any_of(graph.edges.begin(),graph.edges.end(),[](const auto& e){return e.source_node==nid(4)&&e.destination_node==nid(2)&&e.destination_port==kParticleModelsIn;}));
         CHECK(graph.optional_records.size()==2&&graph.optional_records[1][2]==std::byte{7});}
     // A disabled transaction backup is absent from the authored graph, even

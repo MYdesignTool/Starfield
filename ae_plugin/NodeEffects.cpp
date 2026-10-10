@@ -9,6 +9,8 @@
 #include "NodeEffectFlags.h"
 #include "NodeRecord.hpp"
 #include "ParticleGradientUI.hpp"
+#include "ParticleShape.hpp"
+#include "ParticleShapeUI.hpp"
 #include "TransformNullUI.hpp"
 #include "ModelControls.hpp"
 #include "ModelGeometryParameter.hpp"
@@ -120,11 +122,13 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
 
 PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
                  A_short choice_count, A_short initial, const char* choices,
-                 PF_ParamFlags flags=kNodeEditableFlags) noexcept {
+                 PF_ParamFlags flags=kNodeEditableFlags,A_long ui_flags=PF_PUI_NONE,A_short height=0) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = flags;
+    def.ui_flags=ui_flags;
+    if(ui_flags&PF_PUI_CONTROL){def.ui_width=240;def.ui_height=height;}
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.pd.num_choices = choice_count;
@@ -285,7 +289,8 @@ PF_Err particle_group(PF_InData* data,const char* name,A_long id,bool end=false,
 PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
     PF_Err error = PF_Err_NONE;
     {
-        error=add_popup(in_data,"Shape",kParticleShapeId,4,1,"Circle|Rectangle|Cloud|Texture");if(error)return error;
+        error=add_popup(in_data,"Shape",kParticleShapeId,6,1,starfield::adapter::particle_shapes::popup_names,
+            kNodeEditableFlags,PF_PUI_CONTROL,26);if(error)return error;
         error=add_slider(in_data,"Life (Seconds)",kLifetimeId,0,10000,2,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Life Random",kLifeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=particle_group(in_data,"Particle Properties",kParticlePropertiesId);if(error)return error;
@@ -661,6 +666,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 const auto* event=static_cast<PF_EventExtra*>(extra);
+                if(event && event->effect_win.index==starfield::adapter::native_nodes::particle_layout::shape)
+                    return starfield::adapter::particle_shape_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 if(event && (event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_front ||
                              event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_back))
                     return PF_Err_NONE; // AE owns these ordinary PF_LAYER widgets.

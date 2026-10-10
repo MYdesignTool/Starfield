@@ -83,7 +83,7 @@ index 309f1c5..93ae495 100644
 @@ -88,6 +98,12 @@
          return bytes;
      }
- 
+
 +    function defaultModelBounds() {
 +        var bytes=new Uint8Array(48),view=new DataView(bytes.buffer);
 +        for(var axis=0;axis<6;axis++)view.setFloat64(axis*8,axis<3?-.5:.5,true);
@@ -185,7 +185,7 @@ index 9ad537b..6888f3d 100644
              });
              var output = snapshot.renderer;
 diff --git a/cep_panel/js/graph_view.js b/cep_panel/js/graph_view.js
-index ecdadd2..d441344 100644
+index ecdadd2..e1d50ce 100644
 --- a/cep_panel/js/graph_view.js
 +++ b/cep_panel/js/graph_view.js
 @@ -13,6 +13,7 @@
@@ -196,7 +196,17 @@ index ecdadd2..d441344 100644
          output: "org.starfieldfx.nodes.output"
      };
      var SPECS = {
-@@ -115,6 +116,18 @@
+@@ -65,7 +66,8 @@
+             "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
+             "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" },
+             "14": {label:"Life Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+-            "15": {label:"Shape",kind:"popup",min:1,max:4,displayOffset:1,choices:["Circle","Rectangle","Cloud","Texture"]},
++            "15": {label:"Shape",kind:"popup",min:1,max:6,values:[0,1,2,3,null,4],disabledChoices:[4],
++                choices:["Circle","Rectangle","Cloud","Texture","Face","Model"]},
+             "16": {label:"Size Y (Pixels)",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
+             "17": {label:"Orient To",kind:"popup",min:1,max:3,displayOffset:1,choices:["Nothing","Motion(particle)","Emitter"]},
+             "18": {label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+@@ -115,6 +117,18 @@
              "7": {hidden:true},
              "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
          },
@@ -215,16 +225,24 @@ index ecdadd2..d441344 100644
          output: {
              "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
              "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
-@@ -125,7 +138,7 @@
+@@ -125,7 +139,7 @@
              "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
          }
      };
 -    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",
 +    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",
                     output: "Output" };
- 
+
      function fail(code, message) {
-@@ -373,8 +386,9 @@
+@@ -271,6 +285,7 @@
+             max: spec && typeof spec.max === "number" ? spec.max : undefined,
+             choices: spec && spec.choices ? spec.choices.slice() : undefined,
+             enumValues: spec && spec.values ? spec.values.slice() : undefined,
++            disabledChoices: spec && spec.disabledChoices ? spec.disabledChoices.slice() : undefined,
+             unit: spec && spec.unit ? spec.unit : undefined,
+             legacyKey: spec ? spec.legacyKey : undefined,
+             legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
+@@ -373,8 +388,9 @@
              var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
              var shape = findParameter(source,"5");
              var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
@@ -236,7 +254,16 @@ index ecdadd2..d441344 100644
                           params: [], graphParameters: source.parameters, curves: null,
                           curveParameterKeys: kind === "particle"
                              ? { size: "7", opacity: "8", rotation:"27", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
-@@ -431,6 +445,15 @@
+@@ -405,7 +421,7 @@
+                     if (graphParameter.key === "7" || graphParameter.key === "8") continue;
+                     if(Number(graphParameter.key)>=37 && Number(graphParameter.key)<=39 &&
+                         Number((findParameter(source,"15") || {}).value)!==2)continue;
+-                    if(graphParameter.key==="16" && Number((findParameter(source,"15") || {}).value)===2)continue;
++                    if(graphParameter.key==="16" && [2,4].indexOf(Number((findParameter(source,"15") || {}).value))>=0)continue;
+                     if(Number(graphParameter.key)>=31 && Number(graphParameter.key)<=36 &&
+                         Number((findParameter(source,"15") || {}).value)!==3)continue;
+                 }
+@@ -431,6 +447,15 @@
                          parameter.enumValues.push(graphParameter.value);textureSelected=parameter.enumValues.length-1;}
                      parameter.value=textureSelected+1;node.params.push(parameter);continue;
                  }
@@ -252,6 +279,21 @@ index ecdadd2..d441344 100644
                  if (kind === "transform") {
                      var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
                      var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
+@@ -664,7 +689,13 @@
+                      } else origin[2] = Number(displayValue) / height;
+                      return origin;
+                  }
+-                 if (parameter.kind === "popup") return parameter.enumValues ? parameter.enumValues[Number(displayValue)-1] : Number(displayValue) - parameter.displayOffset;
++                 if (parameter.kind === "popup") {
++                     var index=Number(displayValue)-1;
++                     if(parameter.disabledChoices && (Math.floor(index)!==index || index<0 ||
++                        index>=parameter.choices.length || parameter.disabledChoices.indexOf(index)>=0))
++                         throw new Error("This Shape requires the OBJ face-emission workflow.");
++                     return parameter.enumValues ? parameter.enumValues[index] : Number(displayValue) - parameter.displayOffset;
++                 }
+                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
+                  return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
+              } };
 diff --git a/cep_panel/js/node_palette.js b/cep_panel/js/node_palette.js
 index ae027f9..aa25e6a 100644
 --- a/cep_panel/js/node_palette.js
@@ -266,7 +308,7 @@ index ae027f9..aa25e6a 100644
          var palette=options.root, items=options.items, toggle=options.toggle;
          var viewport=options.viewport, doc=options.document || document, win=options.window || window;
 diff --git a/cep_panel/js/panel.js b/cep_panel/js/panel.js
-index 5e5c6fa..cca41cf 100644
+index 5e5c6fa..f4fa516 100644
 --- a/cep_panel/js/panel.js
 +++ b/cep_panel/js/panel.js
 @@ -165,12 +165,15 @@
@@ -288,7 +330,7 @@ index 5e5c6fa..cca41cf 100644
              ",ok:false,error:{code:'gateway_load_failed',message:error.toString()}});}}())";
 @@ -230,11 +233,11 @@
      }
- 
+
      var NODE_TYPES = {
 -        emitter: true, particle: true, force: true, transform: true, output: true
 +        emitter: true, particle: true, force: true, transform: true, model: true, output: true
@@ -298,7 +340,7 @@ index 5e5c6fa..cca41cf 100644
 -        force: { x: 235, y: 178 }, transform: {x:235,y:220}, output: { x: 235, y: 256 }
 +        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, output: { x: 235, y: 256 }
      };
- 
+
      function positionFor(node, index) {
 @@ -360,7 +363,7 @@
          var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
@@ -316,7 +358,7 @@ index 5e5c6fa..cca41cf 100644
 +        if (side === "model") return {x:display.x,y:display.y+NODE_HEIGHT/2};
          return { x: display.x + NODE_WIDTH / 2, y: display.y };
      }
- 
+
      function edgePath(edge, sides) {
          var startSide = sides[edge[0]] ? sides[edge[0]].output : "bottom";
 -        var endSide = sides[edge[1]] ? sides[edge[1]].input : "top";
@@ -329,7 +371,7 @@ index 5e5c6fa..cca41cf 100644
 -               end.x + " " + (end.y - distance) + " " + end.x + " " + end.y;
 +               (endSide==="model"?end.x-distance:end.x) + " " + (endSide==="model"?end.y:end.y-distance) + " " + end.x + " " + end.y;
      }
- 
+
      function placePort(port, side) {
          if (!port) return;
 +        if(side==="model") {port.style.left="-6px";port.style.top="calc(50% - 5px)";return;}
@@ -439,6 +481,14 @@ index 5e5c6fa..cca41cf 100644
          } else {
              connectionState.point = canvasPoint(event.clientX, event.clientY);
          }
+@@ -2290,6 +2314,7 @@
+             var option = document.createElement("option");
+             option.value = String(i + 1);
+             option.textContent = choices[i];
++            option.disabled=parameter.disabledChoices && parameter.disabledChoices.indexOf(i)>=0;
+             select.appendChild(option);
+         }
+         select.value = String(parameter.value);
 diff --git a/cep_panel/js/graph_transactions.js b/cep_panel/js/graph_transactions.js
 index 6ee9c08..e791ae6 100644
 --- a/cep_panel/js/graph_transactions.js
@@ -456,7 +506,7 @@ index 6ee9c08..e791ae6 100644
 -}(typeof window !== "undefined" ? window : this, function (layout, snapshots) {
 +}(typeof window !== "undefined" ? window : this, function (layout, snapshots, modelAssets, modelTransactions) {
      "use strict";
- 
+
      var DEFAULT_MAX_BYTES = 24 * 1024;
 @@ -209,6 +211,11 @@
                      Object.keys(edit).forEach(function (key) { authoredEdit[key] = edit[key]; });
@@ -508,7 +558,7 @@ index 6ee9c08..e791ae6 100644
              }
              // Reuse only the immediate planning receipt. The host independently
 diff --git a/cep_panel/jsx/starfield_gateway.jsx b/cep_panel/jsx/starfield_gateway.jsx
-index 792b33f..c2c42a1 100644
+index 792b33f..d96d07d 100644
 --- a/cep_panel/jsx/starfield_gateway.jsx
 +++ b/cep_panel/jsx/starfield_gateway.jsx
 @@ -42,7 +42,8 @@
@@ -519,12 +569,12 @@ index 792b33f..c2c42a1 100644
 +        "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
 +        "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"}
      };
- 
+
      // One row per bound effect parameter. `index` is the registered parameter index
 @@ -235,13 +236,18 @@
          return findTarget();
      }
- 
+
 +    function transactionBackup(effect) {
 +        if(!effect)return false;
 +        var guard=effect.property(effect.matchName===MATCH_NAME?"Panel Graph Sync Guard":"Panel Sync Guard");
@@ -562,7 +612,7 @@ index 792b33f..c2c42a1 100644
 @@ -721,6 +727,62 @@
              "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
      }
- 
+
 +    function modelControl(index) {
 +        var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
 +            "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
@@ -622,7 +672,24 @@ index 792b33f..c2c42a1 100644
      function textureControl(key) {
          var names={"31":"Layer","32":"Dark Side","33":"Texture Time Sample","34":"Texture Color Use",
              "35":"Use Texture Ratio","36":"Ignore Perspective"};
-@@ -879,6 +941,21 @@
+@@ -835,6 +897,16 @@
+         }
+     }
+
++    function particleShapeToNative(value) {
++        if(typeof value!=="number" || !isFinite(value) || Math.floor(value)!==value || value<0 || value>4)
++            throw new Error("Invalid Particle Shape value.");
++        return value===4?6:value+1;
++    }
++    function particleShapeFromNative(value) {
++        if(value===6)return 4;
++        if(value>=1 && value<=4 && Math.floor(value)===value)return value-1;
++        throw new Error("Unsupported Particle Shape; Face requires OBJ face emission.");
++    }
+     function readNativeNode(effect, layer) {
+         var type = nativeNodeTypeByMatch(effect.matchName);
+         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
+@@ -879,6 +951,21 @@
              var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                  [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
              for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
@@ -644,7 +711,18 @@ index 792b33f..c2c42a1 100644
          } else if (type === "org.starfieldfx.nodes.transform") {
              var tg=transformGeometry(layer),anchor=nodeControlValue(effect,transformControl(2));
              node.parameters.push({key:"1",type:5,value:[(Number(anchor[0])-tg.width/2)*tg.aspect/tg.height,
-@@ -998,7 +1075,7 @@
+@@ -948,7 +1035,9 @@
+                 scalar(26,"Limit Angle");scalar(28,"Anchor X (Percent)");scalar(29,"Anchor Y (Percent)");scalar(22,"Limit To 2D",3);
+                 var enums=[[15,"Shape"],[17,"Orient To"],[25,"Random Limit"],[24,"Up Axis"],[30,"Transfer Mode"]];
+                 for(var ei=0;ei<enums.length;ei++) {
+-                    scalar(enums[ei][0],enums[ei][1],3);node.parameters[node.parameters.length-1].value-=1;
++                    scalar(enums[ei][0],enums[ei][1],3);
++                    var enumParameter=node.parameters[node.parameters.length-1];
++                    enumParameter.value=enums[ei][0]===15?particleShapeFromNative(enumParameter.value):enumParameter.value-1;
+                 }
+                 node.parameters.push({key:"31",type:3,value:readTextureLayer(effect,layer,31)});
+                 node.parameters.push({key:"32",type:3,value:readTextureLayer(effect,layer,32)});
+@@ -998,7 +1087,7 @@
          var nodes = [], parade = layer.property("ADBE Effect Parade");
          for (var i = 1; parade && i <= parade.numProperties; i++) {
              var effect = parade.property(i);
@@ -653,7 +731,7 @@ index 792b33f..c2c42a1 100644
          }
          return nodes;
      }
-@@ -1080,6 +1157,15 @@
+@@ -1080,6 +1169,15 @@
          if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
              throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
          }
@@ -669,7 +747,7 @@ index 792b33f..c2c42a1 100644
          setNodeControl(effect, "Panel Sync Guard", 1);
          try {
              if(node.type === "org.starfieldfx.nodes.particle") {
-@@ -1140,6 +1226,13 @@
+@@ -1140,6 +1238,13 @@
                      else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                          ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                      else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
@@ -683,7 +761,27 @@ index 792b33f..c2c42a1 100644
                  } else if (type === "org.starfieldfx.nodes.transform") {
                      var geometry=transformGeometry(layer);
                      if(key==="1") {
-@@ -1287,6 +1380,7 @@
+@@ -1210,7 +1315,7 @@
+                             setNodeControl(effect,birthControl(key),value);
+                         }
+                         else if(scalars[key]) setNodeControl(effect,scalars[key],value);
+-                        else if(enums[key]) setNodeControl(effect,enums[key],Number(value)+1);
++                        else if(enums[key]) setNodeControl(effect,enums[key],key==="15"?particleShapeToNative(value):Number(value)+1);
+                         else if(key==="27") writeNodeCurve(effect,"Rotation",value);
+                         else if(key==="18" || key==="20") {
+                             var group=key==="18"?"Angle":"Speed";
+@@ -1274,6 +1379,10 @@
+                     throw new Error("node manifest contains an invalid or duplicate parameter key.");
+                 }
+                 keys["$" + parameter.key] = true;
++                if(node.type==="org.starfieldfx.nodes.particle" && parameter.key==="15") {
++                    if(parameter.type!==3)throw new Error("Invalid Particle Shape wire type.");
++                    particleShapeToNative(parameter.value);
++                }
+             }
+             for (var e = 0; e < node.outgoing.length; e++) {
+                 var connection = node.outgoing[e];
+@@ -1287,6 +1396,7 @@
                  edgeIds["$" + connection.id] = true;
              }
              if(node.type==="org.starfieldfx.nodes.transform")validateTransformRecord(node);
@@ -691,16 +789,16 @@ index 792b33f..c2c42a1 100644
          }
          var knownTargets = nodeIds(nodes);
          knownTargets["$000000000000000000000000000000ff"] = true;
-@@ -1300,7 +1394,7 @@
+@@ -1300,7 +1410,7 @@
          return nodes;
      }
- 
+
 -    function addNativeNode(layer, node) {
 +    function addNativeNode(layer, node, deferModel) {
          var spec = nativeNodeType(node.type);
          var parade = layer.property("ADBE Effect Parade");
          if (!parade || typeof parade.addProperty !== "function") throw new Error("AE cannot add an effect to this layer.");
-@@ -1316,7 +1410,8 @@
+@@ -1316,7 +1426,8 @@
              stage = "write node identity";
              setNodeIdentity(effect, node.id);
              stage = "write node record and parameters";
@@ -710,7 +808,7 @@ index 792b33f..c2c42a1 100644
          } catch (error) {
              var detail = spec.label + " (" + spec.matchName + "), " + stage + ": " + error.toString();
              if (!effect) {
-@@ -1364,7 +1459,7 @@
+@@ -1364,7 +1475,7 @@
          }
          return true;
      }
@@ -719,7 +817,7 @@ index 792b33f..c2c42a1 100644
          validateNodeManifest(nodes);
          var previous={};
          if (previousNodes) for(var p=0;p<previousNodes.length;p++) previous["$"+previousNodes[p].id]=previousNodes[p];
-@@ -1378,7 +1473,7 @@
+@@ -1378,7 +1489,7 @@
                  if (!effect || nodeIdentity(effect) !== node.id) throw new Error("The node identity changed while applying the graph.");
              }
              if (!effect) {
@@ -728,7 +826,7 @@ index 792b33f..c2c42a1 100644
                  // addProperty appends. Indexed-group references are invalidated,
                  // but earlier numeric slots remain valid and are reacquired.
                  var parade = layer.property("ADBE Effect Parade"), last = parade.numProperties;
-@@ -1390,7 +1485,8 @@
+@@ -1390,7 +1501,8 @@
                  if (existingType !== node.type) throw new Error("A node identity is already used by a different effect type.");
                  if (writeExisting) {
                      var before = previous["$"+node.id];
@@ -738,7 +836,7 @@ index 792b33f..c2c42a1 100644
                      else if (before.position.x !== node.position.x || before.position.y !== node.position.y ||
                          JSON.stringify(before.outgoing) !== JSON.stringify(node.outgoing)) writeNodeRecord(effect,node);
                  }
-@@ -2512,6 +2608,157 @@
+@@ -2512,6 +2624,157 @@
      host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
      host.SFLD_submitGraph = SFLD_submitGraph;
      host.SFLD_ensureNodeEffects = SFLD_ensureNodeEffects;

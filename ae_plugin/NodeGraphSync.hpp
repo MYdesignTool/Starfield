@@ -1,6 +1,7 @@
 #pragma once
 #include "ParticleLayout.hpp"
 #include "NodeRecord.hpp"
+#include "ParticleShape.hpp"
 
 #include "AE_Effect.h"
 #include "AE_GeneralPlug.h"
@@ -76,6 +77,10 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
         edit.value_kind!=(edit.parameter_index==2?ValueKind::point2:ValueKind::scalar)))return false;
     if(edit.node_kind==5 && (edit.value_kind!=ValueKind::scalar || edit.additional_count))return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
+    if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::shape) {
+        std::uint32_t shape{};
+        if(edit.value_kind!=ValueKind::scalar || !particle_shapes::native_to_core(edit.value[0],shape))return false;
+    }
     if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::seed_shift &&
         (edit.value_kind!=ValueKind::scalar || std::floor(edit.value[0])!=edit.value[0] ||
          edit.value[0]<-2147483648.0 || edit.value[0]>2147483647.0))return false;

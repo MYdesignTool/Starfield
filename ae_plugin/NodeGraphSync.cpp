@@ -261,7 +261,7 @@ PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) 
     // guard opens the conditional controls synchronously for the complete batch;
     // resetting it in the gateway's finally block restores mode-based visibility.
     for(auto [index,hidden]:{std::pair{layout::gradient,!syncing && params[layout::color_mode]->u.pd.value==1},
-                             std::pair{layout::size_y,!syncing && (params[layout::shape]->u.pd.value==1 || params[layout::shape]->u.pd.value==3)},
+                             std::pair{layout::size_y,!syncing && (params[layout::shape]->u.pd.value==1 || params[layout::shape]->u.pd.value==3 || params[layout::shape]->u.pd.value==6)},
                              std::pair{layout::cloud,!syncing && params[layout::shape]->u.pd.value!=3},
                              std::pair{layout::cloud_circles,!syncing && params[layout::shape]->u.pd.value!=3},
                              std::pair{layout::cloud_aspect,!syncing && params[layout::shape]->u.pd.value!=3},
