@@ -8,9 +8,11 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ### Light Path 数值 travel 候选（未部署）
 
+源码874f852c266ad82aac5d9072cf41a0a5ed360c03已推送/git archive冻结于artifacts/prepared/m3-18-motion-path-travel-874f852/source；显式IncludeModelCandidate/NoDistPublish/NoRuntimePublish的May2023 x64 Release /MT完整八目标会话69978实际terminal exit0，日志明确编译MotionPathTravel.cpp。sdk-build.log/exit.txt/build-hashes.json保存新八产物证据，m3-18-motion-path-travel-installed-hashes.json确认26安装hash/selector/runtime仍匹配native61/CEP63；没有部署未接入图的计算层。下一步将明确数字路径接入mode0 graph/history/Auxiliary和全请求预算，再处理资源依赖/有序frame/三模式作者，完整目标active。
+
 已抽出Circle的固定存储共用曲线时钟，保留积分/endpoint值惯例，并新增稳定的延迟区间积分（长寿命末段不作两个巨大累计值相减）。MotionPathTravel拥有已供给的有界数字路径、曲线和明确canonical speed/delay，贡献S(distance)-S(0)及瞬时路径速度，保持已有发射分布；可用Euler/shared affine后的真实forward合成有向切线朝向，保留剪切镜像与Limit To2D。失败整笔保留中心/速度/pose，乱序查询无分配；storage_bytes按capacity为下一步全局资源预算提供数字。
 
-标准/ASAN各1216、Circle graph1766、Look At graph1366、实际exit0；日志artifacts/m3-18-motion-path-travel-{tests,asan}.log及path-clock-*-regression.log/exit.txt。Core工程/CMake/fingerprint接入新源码，完整冻结SDK继续。该层输入明确delay与random sample，不推测Max Delay/Delay Random分布、Speed换算或末端政策；已向owner请求Light Path末端及Delay Random=0时Max Delay对照。当前clamp只是几何查询选择，未发布任何控件。实际mode0 graph/history/Auxiliary、总预算/外部光源依赖/有序frame及三模式作者仍需完成；graph mode0仍typed reject，安装native61/CEP63保持，完整目标active。
+标准/ASAN各1216、Circle graph1766、Look At graph1366、实际exit0；日志artifacts/m3-18-motion-path-travel-{tests,asan}.log及path-clock-*-regression.log/exit.txt。Core工程/CMake/fingerprint接入新源码，冻结SDK证据见上。该层输入明确delay与random sample，不推测Max Delay/Delay Random分布、Speed换算或末端政策；已向owner请求Light Path末端及Delay Random=0时Max Delay对照。当前clamp只是几何查询选择，未发布任何控件。实际mode0 graph/history/Auxiliary、总预算/外部光源依赖/有序frame及三模式作者仍需完成；graph mode0仍typed reject，安装native61/CEP63保持，完整目标active。
 
 ### Look At 图求值与逐粒子朝向候选（未部署）
 

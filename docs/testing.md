@@ -2,7 +2,9 @@
 
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionPathTravelTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准/ASAN各1216、实际exit0，artifacts/m3-18-motion-path-travel-{tests,asan}.log与各exit.txt。实际共用曲线时钟和路径travel源码：四种插值分段独立quadrature、Circle时钟原值、life1e6最后1e-4秒稳定积分、明确delay/random sample、发射offset/身份/样式保留、反向/Limit To2D/Euler/shear/reflection、signed zero/退化路径、越界与缺basis失败原子性、全部compile/assignment分配失败、取消、1000乱序无分配及四线程只读。仅明确数字路径/延迟，不测Reference控件换算/末端政策/实际graph mode0/AE；全图总资源/工作预算须在接入时完成。
 
-共享Clock提取后的必要相邻回归：`tests/RunMotionCircleGraphTests.ps1 -Run`1766、`tests/RunMotionLookAtGraphTests.ps1 -Run`1366，均实际exit0；artifacts/m3-18-path-clock-{circle,look-at}-regression.log及exit.txt。新Core源码/CMake/fingerprint接入，完整冻结SDK继续；未部署Motion。
+共享Clock提取后的必要相邻回归：`tests/RunMotionCircleGraphTests.ps1 -Run`1766、`tests/RunMotionLookAtGraphTests.ps1 -Run`1366，均实际exit0；artifacts/m3-18-path-clock-{circle,look-at}-regression.log及exit.txt。新Core源码/CMake/fingerprint接入；未部署Motion。
+
+源码874f852c266ad82aac5d9072cf41a0a5ed360c03已推送/git archive冻结于artifacts/prepared/m3-18-motion-path-travel-874f852/source；完整May2023 x64 Release /MT八目标会话69978实际terminal exit0，显式IncludeModelCandidate及双NoPublish。artifacts/m3-18-motion-path-travel-sdk-build.log/exit.txt/build-hashes.json：Core实际编译MotionPathTravel.cpp，共享Circle新Clock进入Main/Core，八新产物分别读取实际SHA256。m3-18-motion-path-travel-installed-hashes.json确认26安装hash及selector/runtime匹配native61/CEP63。没有mode0图/原生/CEP入口或部署，编译不认定公开参考转换、实际AE或GPU资格。
 
 2026-10-10 `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionLookAtGraphTests.ps1 -Run`及追加`-Sanitize`，MSVC x64 /MT标准与ASAN各1366检查通过，artifacts/m3-18-motion-look-at-{tests,asan}.log。实际普通/历史graph的数字goal/forward、当前时间采样与Over Life、零权重/重合/退化/反向、Euler/shear/reflection、串联Look At及Circle前置；5001个不同朝向无共享基底；CPU实际矩形像素、GPU场景实际inverse axes、Model矩阵Gram和中心、旧snapshot3..8精确往返/所有共享表迁移9、每个9截断/stride/reserved/坏q、SLERP与全部取消/分配失败。早期1298/1345/1355检查日志是扩展夹具前记录，最终记录1366；GPU准备不代表硬件资格，数字goal不代表参考目标筛选或AE。
 

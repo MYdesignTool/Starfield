@@ -260,8 +260,13 @@ artifacts/m3-18-motion-path-travel-{tests,asan}.log/exit.txt. Circle graph1766 a
 Look At graph1366 regressions pass at actual exit0 after clock extraction;
 path-clock-*-regression.log/exit.txt. CMake and the Core SDK project compile
 MotionPathTravel.cpp, and adapter fingerprints include the shared new headers.
-The new source still requires its own frozen full SDK build; prior Look At
-build artifacts do not cover it. Mode0 remains explicitly rejected by the graph
+Source874f852 is now pushed/git-archive frozen and its full eight-target May2023
+x64 Release /MT build passes with actual terminal exit0 and both NoPublish
+switches. MotionPathTravel.cpp is compiled in Core; new shared Circle clock
+code is compiled in Main/Core. Eight new hashes and all26 unchanged installed
+native61/CEP63 hashes/selector/runtime are recorded under motion-path-travel-sdk-*
+and motion-path-travel-installed-hashes.json; prior Look At artifacts are not
+used as this build's proof. Mode0 remains explicitly rejected by the graph
 until actual history/resource/ordered integration and budgets are implemented.
 
 ### Point resource capture seam

@@ -161,6 +161,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-10 travel源码874f852已推送/git archive冻结；双NoPublish完整May2023 /MT八目标会话69978实际exit0，新CPP编译及八输出hash记录于m3-18-motion-path-travel-sdk-build.log/exit.txt/build-hashes.json；26安装hash/selector/runtime匹配61/63，travel-installed-hashes.json。下一步实际mode0 graph/history/Auxiliary、全请求资源/工作预算及外部来源/有序frame，随后三模式作者/配对发布/AE2023；不能由独立travel helper或SDK通过关闭本卡，完整目标active。
+
 2026-10-10 Light Path travel子阶段：Circle共用固定曲线clock提取/稳定延迟区间积分；独立有界路径travel贡献相对位移和瞬时速度，明确speed/delay/random数字，切线pose保留既有分布/Euler/affine剪切镜像；无分配乱序查询、capacity存储计量及失败原子性。标准/ASAN1216、Circle1766/Look At1366均exit0，m3-18-motion-path-travel-*与path-clock-*-regression.log；Core工程/CMake/fingerprint纳入新输入，冻结完整SDK继续。参考末端/Delay Random=0对照已请求，暂不推测公开转换或分布；实际graph mode0/history/Auxiliary、全局预算/资源依赖/有序frame和三模式作者仍为本卡要求，mode0仍typed reject，不部署计算层或缩减目标。
 
 2026-10-10 Look At源码da17da8已推送/git archive冻结；双NoPublish完整May2023 /MT八目标实际terminal exit0，审批服务首次额度失败后的日志/exit/八新产物hash已恢复核对，m3-18-motion-look-at-sdk-{build.log,build-exit.txt,build-hashes.json,terminal.json}保留。新26安装hash/selector/runtime匹配native61/CEP63，m3-18-motion-look-at-installed-hashes.json；没有重启构建或沿用旧Circle产物。继续Light Path/完整有序frame/资源/参考政策/三模式作者；未部署Motion，完整目标active。
