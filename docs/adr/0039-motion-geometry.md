@@ -62,6 +62,13 @@ value types. The compiled class follows the existing immutable Transform helper
 pattern. Build inputs include the new Core implementation; no UI or native
 release is made for an unused numeric helper.
 
+The focused MSVC /MT fixture and ASAN run each pass 4759 checks, including
+allocation and copy-assignment failure, analytical length comparisons,
+degeneracies, cancellation, local-coordinate translation and concurrent reads.
+Source 3d6d718 is frozen and passes the full unpublished May2023 SDK build;
+the installed 26-file native61/CEP63 pairing remains unchanged. These checks
+qualify the mathematical helpers, not reference Motion behavior or AE execution.
+
 ## Remaining integration
 
 Confirm reference resource/units/Origin Type/Starting With policies before

@@ -161,7 +161,7 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
-2026-10-10 独立MotionGeometry实现有界圆周旋转、不可变B-spline距离/切线查询和加权最短弧朝向；ADR0039区分数学定义与尚未确认的参考策略。单独MSVC /MT标准及ASAN各4759检查通过，日志artifacts/m3-18-motion-geometry-{tests,asan}.log，含极小向量、大坐标下小路径、解析弧长、重复/转折/端点、全部路径分配失败、取消、无分配乱序查询及四线程读取。初次夹具nan命名冲突和ASAN运行器环境/链接选项诊断已修正，不修改用户环境。Core工程及CMake纳入源码；尚无Motion graph/作者入口、资源或ABI迁移，不部署无入口计算层。完整SDK构建证据待续，实际AE/Light Path路径构造、Circle单位/半径、Look At目标筛选仍开放。
+2026-10-10 独立MotionGeometry实现有界圆周旋转、不可变B-spline距离/切线查询和加权最短弧朝向；ADR0039区分数学定义与尚未确认的参考策略。单独MSVC /MT标准及ASAN各4759检查通过，日志artifacts/m3-18-motion-geometry-{tests,asan}.log，含极小向量、大坐标下小路径、解析弧长、重复/转折/端点、全部路径分配及复制赋值失败、取消、无分配乱序查询及四线程读取。初次夹具nan命名冲突和ASAN运行器环境/链接选项诊断已修正，不修改用户环境。Core工程及CMake纳入源码；尚无Motion graph/作者入口、资源或ABI迁移，不部署无入口计算层。源码3d6d718已推送/冻结，双NoPublish的完整May2023 /MT八目标实际exit0，m3-18-motion-geometry-sdk-build.log及八输出hash记录；构建后26安装hash/selector/Core仍匹配native61/CEP63。实际AE/Light Path路径构造、Circle单位/半径、Look At目标筛选仍开放。
 
 2026-10-09 owner截图限定Light Path、Circle、Look At，复杂Motion按阶段执行；参考清单docs/reference-motion-phases.md。拥有：独立Motion数值类型/采样与粒子路径/朝向、graph/history/资源/渲染的明确契约、独立原生节点及CEP/预设/schema/build/focused tests/新ADR。只追加自有身份/IDs；不复用Transform或Force身份，不注册无实际行为的选项。动画/Light资源采样边界和Circle半径/Look At目标语义先记录证据与独立方程，再接入作者。完成条件：三模式实际行为、共享曲线编辑/持久化、配对构建/发布及AE2023验收。
 
