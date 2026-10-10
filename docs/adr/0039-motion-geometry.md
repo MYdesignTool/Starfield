@@ -204,7 +204,14 @@ also pass. Logs are artifacts/m3-18-motion-look-at-{tests,asan}.log and
 m3-18-look-at-*-regression.log. These are numeric candidate checks, not reference
 Starting With/forward policies, GPU hardware or AE qualification. A new frozen
 full adapter/Core SDK build is required for this migration before publication;
-the prior Circle build cannot qualify these changed shared inputs.
+the prior Circle build cannot qualify these changed shared inputs. Source
+da17da8 is now pushed/frozen and its full double-NoPublish SDK session67021
+returned actual terminal exit0. After an initial approval-service usage failure,
+the build log/exit and all eight new output hashes were read back. All26 installed
+native61/CEP63 hashes and its Core selector/runtime still match. Evidence is
+artifacts/m3-18-motion-look-at-sdk-* and motion-look-at-installed-hashes.json.
+No Motion author is deployed; this does not qualify the remaining reference
+policies, GPU hardware or AE execution.
 
 ### Point resource capture seam
 

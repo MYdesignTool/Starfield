@@ -8,11 +8,13 @@ owner最新顺序：优先完善Particle；Motion首批限定Light Path、Circle
 
 ### Look At 图求值与逐粒子朝向候选（未部署）
 
+源码da17da843a898c5108f9641cf38e2d59879763af已提交并推送，git archive冻结于artifacts/prepared/m3-18-motion-look-at-da17da8/source；双NoPublish的May2023 x64 Release /MT完整八目标构建会话67021实际terminal exit0（2026-10-10 11:23:16 UTC）。审核服务首次因额度失败未执行后续读取，未绕过或重启构建；恢复后已读回sdk-build.log/exit.txt和全部八产物SHA256，m3-18-motion-look-at-sdk-build-hashes.json及terminal.json保留。新26安装hash、Core selector/所选runtime复查匹配native61/CEP63，m3-18-motion-look-at-installed-hashes.json；无Motion作者/AE参数入口或部署。继续Light Path与完整有序frame、外部资源依赖/参考政策及三模式作者，完整目标active，编译不认定AE/GPU资格。
+
 Motion mode2已接入实际普通/历史Core graph：明确数字goal/forward、当前请求时间采样、Over Life最短弧朝向，零权重/重合目标/退化forward保留原状态。独立单位四元数在已有Euler和共享仿射之后施加，保留粒子位置/速度/身份/样式及Transform的剪切/镜像；5001个不同朝向不消耗共享4096基底表。CPU Sprite/GPU场景准备/Model使用同一姿态，Linear shutter使用SLERP。公开Starting With/目标/forward轴政策仍待参考，不增加截图以外选项。
 
 ADR0039在代码前定义snapshot9迁移：72B显式header、旧200B记录加32B四元数；单位朝向仍输出原snapshot3..8，旧记录读取初始化单位朝向，全部旧共享表兼容。C ABI8/sequence1/AE IDs保持，共享adapter/Core输入已改变，需新的完整配对构建，不能沿用Circle SDK证据或Core热发布。串联Look At及Circle→Look At已支持；反序、后置Force/Transform及不同Motion链合并仍明确拒绝，完整有序frame必须在作者交付前完成。Light Path仍是首批要求，完整目标active。
 
-标准与ASAN各1366检查通过（实际exit0），覆盖实际graph/history、Euler/shear/reflection、动画goal、超过4096朝向、CPU像素/GPU准备轴、Model矩阵、相机下Circle/Cloud完整三维轴、snapshot3..9/每个截断/坏四元数和header、SLERP、取消和全分配失败。相机路径修正候选billboard分支忽略pose深度轴的问题。Circle1766、Transform594、Model graph559及Model粒子/快照/数值ABI2695回归通过；artifacts/m3-18-motion-look-at-{tests,asan}.log与m3-18-look-at-*-regression.log。冻结源码完整SDK构建继续；候选没有原生/CEP作者入口，安装native61/CEP63保持，实际AE与GPU硬件资格不由数值测试推断。
+标准与ASAN各1366检查通过（实际exit0），覆盖实际graph/history、Euler/shear/reflection、动画goal、超过4096朝向、CPU像素/GPU准备轴、Model矩阵、相机下Circle/Cloud完整三维轴、snapshot3..9/每个截断/坏四元数和header、SLERP、取消和全分配失败。相机路径修正候选billboard分支忽略pose深度轴的问题。Circle1766、Transform594、Model graph559及Model粒子/快照/数值ABI2695回归通过；artifacts/m3-18-motion-look-at-{tests,asan}.log与m3-18-look-at-*-regression.log。冻结SDK终态及待复查证据见上；候选没有原生/CEP作者入口，未发布新配对，实际AE与GPU硬件资格不由数值测试推断。
 
 ### Circle 图求值候选（未部署）
 
