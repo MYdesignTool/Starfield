@@ -171,17 +171,21 @@ items.splice(items.indexOf(copies.backupMain),1);items.splice(items.indexOf(copi
 api.resolve({pinTarget:true,target:{token}}).properties.guard.setValue(0);commands=0;
 if(process.env.STARFIELD_DOM_MATERIAL==="1"){
     const rawMaterial=items.find(e=>e.matchName==="org.starfieldfx.node.material"),beforeValues=copy(rawMaterial.properties);
-    const record=copy(api.read(wrap(rawMaterial),layer));
+    // Exercise the public transaction boundary; private control readers/writers
+    // are deliberately not exported by the production gateway.
+    const readNodes=()=>copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes;
+    const records=readNodes();
     for(const value of [2,4294967295]){
-        const bad=copy(record);bad.parameters.find(p=>p.key==="1").value=value;
-        checks++;assert.throws(()=>api.write(wrap(rawMaterial),realm(bad),layer),/material switch 1/);
-        eq(rawMaterial.properties,beforeValues);
+        const bad=copy(records);bad.find(n=>n.type===edits.types.material).parameters.find(p=>p.key==="1").value=value;
+        checks++;assert.throws(()=>api.ensure(layer,realm(bad),true,realm(records),false),/material switch 1/);
+        eq(copy(rawMaterial.properties),beforeValues);
     }
     rawMaterial.properties["Color Source"].value=0;
-    checks++;assert.throws(()=>api.read(wrap(rawMaterial),layer),/Invalid native Material Color Source: 0/);
+    checks++;assert.throws(readNodes,/Invalid native Material Color Source: 0/);
     rawMaterial.properties["Color Source"].value=1;
-    for(const field of record.parameters)field.key=Number(field.key);
-    api.write(wrap(rawMaterial),realm(record),layer);eq(rawMaterial.properties["Color Source"].value,1);
+    const numeric=copy(records);
+    for(const field of numeric.find(n=>n.type===edits.types.material).parameters)field.key=Number(field.key);
+    api.ensure(layer,realm(numeric),true,realm([]),false);eq(rawMaterial.properties["Color Source"].value,1);
 }
 pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,0);eq(arbReads,0);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
