@@ -16,6 +16,9 @@ if(-not $Prepare){Write-Host "Report: prepare isolated Model author source at $t
 if(Test-Path -LiteralPath $taskDestination){throw 'Candidate directory already exists; choose a new name. No files were replaced.'}
 $taskBaseline=Get-Content -LiteralPath $taskRecipe -Raw | ConvertFrom-Json
 if($taskBaseline.schema -ne 1 -or $taskBaseline.files.Count -ne $taskAllowed.Count){throw 'Invalid candidate recipe.'}
+[xml]$taskInstalledManifest=[IO.File]::ReadAllText((Join-Path $taskRepo 'cep_panel/CSXS/manifest.xml'))
+if($taskInstalledManifest.ExtensionManifest.ExtensionBundleVersion -ne ('0.1.0.'+$taskBaseline.basePanel) -or
+    $PanelGeneration -le $taskBaseline.basePanel){throw 'Recipe basePanel differs from the source manifest or candidate does not advance it.'}
 function Get-SourceHash([string]$taskPath){
     $taskText=[IO.File]::ReadAllText($taskPath).Replace("`r`n","`n")
     $taskHash=[Security.Cryptography.SHA256]::Create()

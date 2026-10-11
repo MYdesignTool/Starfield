@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "Installed native70/Core ABI9/CEP73 from frozen source23bb594; paired build/hash/rollback gates passed. AE2023 material/light/render acceptance remains open. Frozen archive retains the tested72→73 candidate delta.",
-  "basePanel": 72,
+  "basePanel": 73,
   "files": [
     {
       "path": "index.html",

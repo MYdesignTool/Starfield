@@ -41,4 +41,17 @@ foreach($taskEmbedded in @('js/graph_edits.js','jsx/starfield_gateway.jsx')){
     Check-PreparedPanel ($taskEmbeddedText.Contains($taskFactory)) 'Embedded control contract differs from canonical factory.'
     Check-PreparedPanel (([regex]::Matches($taskEmbeddedText,'BEGIN STARFIELD NATIVE RECORD CONTRACT')).Count -eq 1) 'Duplicated embedded control contract.'
 }
+[xml]$taskManifest=[IO.File]::ReadAllText((Join-Path $taskCandidate 'CSXS/manifest.xml'))
+Check-PreparedPanel ($taskManifest.ExtensionManifest.ExtensionBundleVersion -eq ('0.1.0.'+$taskGeneration)) 'Bundle version differs.'
+foreach($taskExtension in $taskManifest.ExtensionManifest.ExtensionList.Extension){
+    Check-PreparedPanel ($taskExtension.Version -eq ('0.1.'+$taskGeneration)) 'Extension version differs.'
+}
+# An updated source/hash recipe must not retain a stale installed generation.
+$taskRecipe.basePanel=[int]$taskRecipe.basePanel-1
+$taskRecipe | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskTools 'candidates/model-panel-author-baseline.json') -Encoding UTF8
+$taskPriorPreference=$ErrorActionPreference;$ErrorActionPreference='Continue'
+try{& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $taskTools 'Prepare-ModelPanelCandidate.ps1') -Prepare -DestinationName stale-baseline -PanelGeneration $taskGeneration *> (Join-Path $taskRoot 'stale-baseline.log');$taskExitCode=$LASTEXITCODE}
+finally{$ErrorActionPreference=$taskPriorPreference}
+Check-PreparedPanel ($taskExitCode -ne 0) 'Stale recipe generation was accepted.'
+Check-PreparedPanel (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'artifacts/prepared/stale-baseline'))) 'Stale recipe created a candidate.'
 Write-Output "model_panel_preparation_tests: $taskChecks checks passed; nested archive patch applied; fixture $taskRoot; no live panel or Adobe writes."

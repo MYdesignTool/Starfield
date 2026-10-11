@@ -108,3 +108,9 @@ numeric key、旧wrapper及gateway重载。旧模拟器未施加这些AE约束�
 
 本次仅准备native70/CEP74补丁，native/Core保持原字节。发布事实见current-state。
 专项离线通过不关闭AE灯光/视觉、undo/reopen宿主gate；不启动或调度AE。
+
+补充核实：发布预检另发现recipe的文件hash已更新到CEP73而basePanel仍72。
+这会导致候选声明错误基线，配对门已拒绝；本次将基线同步为73，并新增
+Prepare阶段的源manifest/recipe一致性检查和“过期recipe不得创建候选”回归。
+首次冻结审计缺忽略的GpuKernels.hpp，按冻结GPU源码重新生成NVRTC输入，
+未修改生产源码或引用旧生成物后冒充新源码验证。
