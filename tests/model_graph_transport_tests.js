@@ -167,7 +167,8 @@ reset();loseResult=true;client().apply(plan(),[meshAsset],r=>{result=r;});
 for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();eq(result.committed,true);eq(result.diagnostics.notificationPending,true);eq(hostRuns,1);
 reset();loseResult=true;failedPrepare=true;client().apply(plan(),[meshAsset],r=>{result=r;});
 for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();
-eq(result.error.code,"model_transaction_outcome_unknown");ok(result.error.message.includes("state=applying"));ok(result.error.message.includes("prepare failure"));eq(hostRuns,1);
+eq(result.error.code,"model_transaction_outcome_unknown");ok(result.error.message.includes("state=applying"));ok(result.error.message.includes("prepare failure"));
+ok(result.error.message.includes("Model prepare / ensure node effects"));eq(hostRuns,1);
 // Re-evaluating the helper preserves only plain staged state and no DOM refs.
 reset();let lateBegin;
 const delayed=clientAPI.create({schedule:fn=>tasks.push(fn),now:()=>now,idFactory:()=>transactionId,call(operation,fields,callback){

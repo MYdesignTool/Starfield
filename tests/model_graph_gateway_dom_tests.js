@@ -7,20 +7,30 @@ const gatewayBuild=/var GATEWAY_BUILD = "([^"]+)"/.exec(fs.readFileSync(path.joi
 const edits=require(path.join(root,"js/graph_edits.js")),codec=require(path.join(root,"js/graph_codec.js")),layout=require(path.join(root,"js/graph_layout.js"));
 const {mainControls,nodeControls}=require("./node_property_fixture.js"),uuid=n=>n.toString(16).padStart(32,"0"),token="p0-c202-l303";
 const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
-let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0;
+const stableEffects=process.env.STARFIELD_DOM_STABLE_EFFECTS==="1";
+let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
-function fresh(captured){if(captured!==epoch)throw new Error("Invalid indexed group reference");}
+function fresh(captured){if(captured!==epoch){staleReads++;throw new ReferenceError("Object is invalid");}}
 function property(p,captured){return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,numKeys:0,canSetExpression:false,
     get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);p.value=copy(value);
         if(p===renderer.properties["Commit Graph Edit"]){commits++;const resolved=api.resolve({pinTarget:true,target:{token}});
             resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);}}};}
-function wrap(raw){const captured=epoch,ordered=Array.from(new Set(Object.values(raw.properties)));
-    return {matchName:raw.matchName,get name(){fresh(captured);return raw.name;},set name(v){fresh(captured);raw.name=v;},
-        get numProperties(){fresh(captured);return ordered.length;},property(key){fresh(captured);
+function wrap(raw){
+    // Reacquiring an effect may reuse its wrapper identity while earlier child
+    // Property handles remain invalid. Exercise both wrapper policies rather
+    // than relying on JavaScript object identity to validate an AE handle.
+    if(stableEffects && raw.wrapper){raw.wrapperEpoch=epoch;return raw.wrapper;}
+    const originalEpoch=epoch,ordered=Array.from(new Set(Object.values(raw.properties)));
+    raw.wrapperEpoch=epoch;
+    const captured=()=>stableEffects?raw.wrapperEpoch:originalEpoch;
+    const wrapped={get matchName(){fresh(captured());return raw.matchName;},get name(){fresh(captured());return raw.name;},set name(v){fresh(captured());raw.name=v;},
+        get numProperties(){fresh(captured());return ordered.length;},property(key){fresh(captured());
             if(key==="Model Mesh" || key==="org.starfieldfx.node.model-1503"){arbReads++;throw new Error("CUSTOM_VALUE forbidden");}
-            const p=raw.properties[key] || (typeof key==="number"?ordered[key-1]:null);return p?property(p,captured):null;},
-        remove(){fresh(captured);items.splice(items.indexOf(raw),1);epoch++;}};}
+            const p=raw.properties[key] || (typeof key==="number"?ordered[key-1]:null);return p?property(p,captured()):null;},
+        remove(){fresh(captured());items.splice(items.indexOf(raw),1);epoch++;}};
+    if(stableEffects)raw.wrapper=wrapped;
+    return wrapped;}
 function modelControls(){const properties=nodeControls();
     function add(name,disk,value){const p={name,matchName:"org.starfieldfx.node.model-"+disk,value};properties[name]=properties[p.matchName]=p;}
     add("Source",1501,1);add("Mesh Revision",1504,0);
@@ -61,13 +71,14 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     eq(host.SFLD_modelTransactionHostBegin(id),"1");
     // Simulate the native complete backup: a disabled guard2 renderer and node
     // remain in the parade while the live renderer is held at guard1.
-    const backupMain={...renderer,properties:copy(renderer.properties)},backupNode={...items[1],properties:copy(items[1].properties)};
+    const backupMain={matchName:renderer.matchName,name:renderer.name,properties:copy(renderer.properties)},
+        backupNode={matchName:items[1].matchName,name:items[1].name,properties:copy(items[1].properties)};
     for(const p of new Set(Object.values(backupMain.properties)))if(p.name==="Panel Graph Sync Guard")p.value=2;
     for(const p of new Set(Object.values(backupNode.properties)))if(p.name==="Panel Sync Guard")p.value=2;
     for(let i=0;i<8;i++)backupNode.properties["Node UUID "+i].value=parseInt(uuid(700).substr(i*4,4),16);
     items.push(backupMain,backupNode);epoch++;
     resolved=api.resolve({pinTarget:true,target:{token}});resolved.properties.guard.setValue(1);
-    eq(host.SFLD_modelTransactionHostPrepare(id),"1");
+    eq(host.SFLD_modelTransactionHostPrepare(id),"1",host.__SFLD_modelGraphTransactionV1.message);
     let current=copy(api.snapshot(api.resolve({pinTarget:true,target:{token}})));const model=current.nativeNodes.find(n=>n.id===desired.id);
     eq(model.parameters.find(p=>p.key==="13").value,0);eq(model.modelAsset.revision,0);eq(arbReads,0);
     const effect=items.find(e=>e.matchName==="org.starfieldfx.node.model" && e.properties["Panel Sync Guard"].value!==2 &&
@@ -86,4 +97,5 @@ api.resolve({pinTarget:true,target:{token}}).properties.guard.setValue(0);comman
 pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,0);eq(arbReads,0);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
-console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; actual gateway callbacks with stale indexed refs/guard2; native writes simulated, no AE qualification`);
+eq(staleReads,0,"No cached invalid Property may be used after native backup/add/remove.");
+console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; effect wrapper identity ${stableEffects?"reused":"fresh"}; actual gateway callbacks, native writes simulated, no AE qualification`);

@@ -29,7 +29,7 @@ function Hash-PanelFile([string]$taskPath){return (Get-FileHash -LiteralPath $ta
 function Check-PanelHost(){if(-not $taskSimulation -and (Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue)){throw 'Close AE before publishing the CEP patch.'}}
 Assert-PanelJunction (Join-Path $PluginDir 'Starfield') $taskBundle
 Assert-PanelJunction $CepJunction $taskLive
-if($taskBaseline.nativeBuild -ne 61 -or $taskBaseline.coreAbi -ne 8 -or @($taskBaseline.native).Count -ne 8 -or
+if($taskBaseline.nativeBuild -notin @(61,65) -or $taskBaseline.coreAbi -ne 8 -or @($taskBaseline.native).Count -ne 8 -or
     $taskInfo.basePanel -ne $taskBaseline.panelGeneration -or $taskInfo.panelGeneration -le $taskInfo.basePanel){throw 'Unexpected installed/candidate pairing.'}
 $taskNativeNames=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex',
     'StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
@@ -72,7 +72,7 @@ Write-Host "Rollback: powershell -NoProfile -ExecutionPolicy Bypass -File tools/
 if(-not $Install){Write-Host 'Read-only report. Add -Install to publish after AE closes.';exit 0}
 Check-PanelHost
 if(Test-Path -LiteralPath $taskBackup){throw 'Backup already exists; refusing to overwrite it.'}
-$taskBefore=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=61;nativeSourceCommit=$taskNativeSource;panelGeneration=$taskBaseline.panelGeneration;
+$taskBefore=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=$taskBaseline.nativeBuild;nativeSourceCommit=$taskNativeSource;panelGeneration=$taskBaseline.panelGeneration;
     native=$taskBaseline.native;panel=$taskBaseline.panel;selector=$taskSelector;candidateGeneration=$taskGeneration}
 $taskBefore | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BackupName+'-before.json')) -Encoding UTF8
 # This command retains installed native files and selector exactly and records the
@@ -101,11 +101,11 @@ try{
     foreach($taskNative in $taskBaseline.native){if((Hash-PanelFile (Join-Path $taskBundle $taskNative.name)) -ne $taskNative.hash){throw 'Native pair changed during CEP publication.'}}
     if([IO.File]::ReadAllText($taskSelectorPath).Trim() -ne $taskSelector){throw 'Core selector changed during CEP publication.'}
     & (Join-Path $PSScriptRoot 'Restore-TestBuild.ps1') -PluginDir $PluginDir -BackupName $BackupName
-    $taskAfter=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=61;coreAbi=8;panelGeneration=$taskGeneration;
+    $taskAfter=[ordered]@{checkedAt=(Get-Date).ToString('o');nativeBuild=$taskBaseline.nativeBuild;coreAbi=8;panelGeneration=$taskGeneration;
         sourceCommit=$taskPanelRecord.candidateCommit;nativeSourceCommit=$taskNativeSource;native=$taskBaseline.native;panel=$taskPanelRecord;selector=$taskSelector;
         backup=$taskBackup;hostQualification='open'}
     $taskAfter | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BackupName+'-after.json')) -Encoding UTF8
-    Write-Host "Published native61 / CEP$taskGeneration; twenty-six hashes and paired rollback preflight verified."
+    Write-Host "Published native$($taskBaseline.nativeBuild) / CEP$taskGeneration; twenty-six hashes and paired rollback preflight verified."
 }catch{
     $taskFailure=$_
     foreach($taskEntry in $taskEntries){$taskEntry.installedHash=Hash-PanelFile (Join-Path $taskRepo $taskEntry.path)}

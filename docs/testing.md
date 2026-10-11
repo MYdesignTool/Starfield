@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-11 M3-17 CEP68：`STARFIELD_PANEL_ROOT` 指向 isolated prepared panel，`node tests/model_graph_gateway_dom_tests.js` 默认 fresh wrapper42，追加 `STARFIELD_DOM_STABLE_EFFECTS=1` reused wrapper42。旧gateway在native backup后的Prepare复现ReferenceError/Object invalid；新gateway每次目标解析清缓存，两种策略均0 stale reads。此为模拟生命周期证据，不认定实际AE根因。
+
+Model transport555、asset gateway588、panel author74、preset file583、完整三JSX ES3 18。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/panel_test_build_deployment_tests.ps1 -Run -InstalledNativeBuild 65`64，默认61版本64；真实tools在artifact假仓库发布并整套恢复，native/source/selector保留。日志artifacts/m3-17-indexed-refs-*；首次误拼preset_file_transport_tests不存在，正确入口已通过。native65未变，不能由夹具关闭AE gate。
+
 2026-10-11 01:44+08 native65/CEP67已部署：9200c6b git archive冻结、精确CEP67重现，IncludeModelCandidate/双NoPublish完整May2023 x64 Release /MT八目标会话78547 actual terminal exit0。`artifacts/m3-17-live-guard-sdk-{build.log,build-exit.txt,terminal.json,build-hashes.json}`保留；fresh AE0、实际Install、26安装hash/selector/runtime和paired Restore report通过，native65-deploy-before/after及installed-hashes记录状态，备份可恢复64/66。live transport554/DOM41/三完整JSX ES3 18通过，首次未提供PanelRoot的测试拒绝日志和正确final日志分开保留；候选初次ES3入口误拼未执行，正确extendscript_syntax_tests随后18通过。Model Error516的触发动作/宿主根因仍开放，无报告脚本或控制台再请求。源码已本地提交，push因自动审批拒绝待明确确认，未绕过。
 
 2026-10-11 M3-17 live guard候选：`tests/RunModelNativeSyncGuardTests.ps1 -Run [-Sanitize]`编译实际Model NodeGraphSync，模拟constant saved guards与旧PF delivery。修复前45检查/9失败；修正后标准/ASAN各40检查/0失败，覆盖renderer1、源Model1/2、临时UUID、真实Source提交、错误guard/读取、重复renderer、scope释放及delivery fast path。不是AE516根因复现。首次runner路径与缺Util include编译诊断保留，修正后才执行上述测试。`m3-17-live-guard-*.log`保留；Model binding9433、controls452、Emitter native sync8697+camera12、Particle callback600回归实际exit0。旧Cloud runner缺少Model链接输入导致初次LNK失败，已补三项实际Model输入后重跑通过。完整冻结SDK/部署进行中，安装64/66保持。

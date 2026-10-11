@@ -2,6 +2,23 @@
 
 Status: native65/CEP67 live-guard fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
+### CEP68 indexed Property lifetime correction candidate — 2026-10-11
+
+The owner reports ReferenceError/Object is invalid at prepare stage3, with both
+rollback errors0. The actual gateway fixture reproduces that error when a native
+backup invalidates cached child Properties but reacquiring an effect reuses its
+wrapper identity. Equality of effect wrappers cannot validate cached AE handles.
+Each graphCarrierTarget resolution now clears Property and layer inventories;
+lookup reuse remains bounded to the freshly resolved operation. Prepare failures
+include a static substep label in the retained result. Revision, identity, guard
+and receipt checks remain mandatory. No parameter/schema/native ABI/build change.
+
+Fresh/reused wrapper fixtures each pass42, Model protocol555/export588/author74,
+preset583 and full ES3 three-file18. Panel deployment accepts recorded native65
+in addition to native61, verifies every hash and selector, and retains native
+source identity. Dummy65/67→65/68 and61/62→61/63 each pass64 with complete paired
+restoration. This demonstrates the cache gap, not proven AE2023 host cause.
+
 At01:44+08 native65/packed32833/CoreABI8/CEP67 was installed from frozen local
 9200c6bec7cf54a9e34c82b061ddd3e0bf82909d. Complete May2023 /MT eight-target
 session78547 actual terminal exit0, fresh AE process0,26 installed hashes,

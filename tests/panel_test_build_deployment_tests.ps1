@@ -1,4 +1,4 @@
-param([switch]$Run)
+param([switch]$Run,[ValidateSet(61,65)][int]$InstalledNativeBuild=61)
 $ErrorActionPreference='Stop'
 if(-not $Run){Write-Host 'Report only. Add -Run for dummy files/Junctions under artifacts/deploy-test; no Adobe files are changed.';exit 0}
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -6,6 +6,8 @@ $taskRoot=Join-Path $taskRepo ('artifacts/deploy-test/panel-es3-'+[guid]::NewGui
 $taskAllowed=[IO.Path]::GetFullPath((Join-Path $taskRepo 'artifacts/deploy-test'))+'\'
 if(-not [IO.Path]::GetFullPath($taskRoot).StartsWith($taskAllowed,[StringComparison]::OrdinalIgnoreCase)){throw 'Fixture escapes artifacts.'}
 $taskChecks=0
+$taskBasePanel=if($InstalledNativeBuild -eq 65){67}else{62}
+$taskNextPanel=$taskBasePanel+1
 function Check-PanelTest([bool]$taskPass,[string]$taskMessage){$script:taskChecks++;if(-not $taskPass){throw $taskMessage}}
 function Write-PanelTest([string]$taskPath,[string]$taskText){New-Item -ItemType Directory -Path (Split-Path -Parent $taskPath) -Force | Out-Null;[IO.File]::WriteAllText($taskPath,$taskText,[Text.UTF8Encoding]::new($false))}
 function Hash-PanelTest([string]$taskPath){return (Get-FileHash -LiteralPath $taskPath).Hash}
@@ -24,26 +26,26 @@ New-Item -ItemType Junction -Path $taskCep -Target $taskLive | Out-Null
 $taskNames=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex',
     'StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
 $taskNative=@()
-foreach($taskName in $taskNames){Write-PanelTest (Join-Path $taskBundle $taskName) ('native61-'+$taskName);$taskNative += @{name=$taskName;hash=(Hash-PanelTest (Join-Path $taskBundle $taskName))}}
+foreach($taskName in $taskNames){Write-PanelTest (Join-Path $taskBundle $taskName) ('native'+$InstalledNativeBuild+'-'+$taskName);$taskNative += @{name=$taskName;hash=(Hash-PanelTest (Join-Path $taskBundle $taskName))}}
 $taskCoreHash=($taskNative | Where-Object name -eq 'StarfieldCore.dll').hash
 $taskSelector='StarfieldCore-'+$taskCoreHash.Substring(0,16)+'.dll'
-Write-PanelTest (Join-Path $taskBundle ('StarfieldRuntime/'+$taskSelector)) 'native61-StarfieldCore.dll'
+Write-PanelTest (Join-Path $taskBundle ('StarfieldRuntime/'+$taskSelector)) ('native'+$InstalledNativeBuild+'-StarfieldCore.dll')
 Write-PanelTest (Join-Path $taskBundle 'StarfieldRuntime/current.txt') $taskSelector
 $taskPaths=@('index.html','css/panel.css','js/graph_edits.js','js/native_graph_snapshot.js','js/graph_view.js','js/node_palette.js',
     'js/panel.js','js/graph_transactions.js','jsx/starfield_gateway.jsx','presets.html','js/presets.js','js/preset_manager.js',
     'CSXS/manifest.xml','js/model_assets.js','js/model_graph_transactions.js','js/preset_files.js','jsx/preset_file_transport.jsx','jsx/model_transaction_transport.jsx')
 $taskOldPanel=@();$taskNewPanel=@()
 foreach($taskPath in $taskPaths){
-    Write-PanelTest (Join-Path $taskLive $taskPath) ('old62-'+$taskPath)
-    $taskText=if($taskPath -eq 'CSXS/manifest.xml'){'ExtensionBundleVersion="0.1.0.63"'}
-        elseif($taskPath -in @('jsx/starfield_gateway.jsx','js/panel.js','js/preset_manager.js')){'var GATEWAY_BUILD = "native-presets-63";'}
-        elseif($taskPath -in @('index.html','presets.html')){'script.js?v=63'}else{'// candidate63 '+$taskPath}
+    Write-PanelTest (Join-Path $taskLive $taskPath) ('old'+$taskBasePanel+'-'+$taskPath)
+    $taskText=if($taskPath -eq 'CSXS/manifest.xml'){'ExtensionBundleVersion="0.1.0.'+$taskNextPanel+'"'}
+        elseif($taskPath -in @('jsx/starfield_gateway.jsx','js/panel.js','js/preset_manager.js')){'var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'";'}
+        elseif($taskPath -in @('index.html','presets.html')){'script.js?v='+$taskNextPanel}else{'// candidate'+$taskNextPanel+' '+$taskPath}
     Write-PanelTest (Join-Path $taskCandidate $taskPath) $taskText
     $taskOldPanel += @{path='cep_panel/'+$taskPath;installedHash=(Hash-PanelTest (Join-Path $taskLive $taskPath))}
     $taskNewPanel += @{path='cep_panel/'+$taskPath;hash=(Hash-PanelTest (Join-Path $taskCandidate $taskPath))}
 }
-Write-PanelTest (Join-Path $taskRoot 'artifacts/prepared/panel-test/candidate.json') (ConvertTo-Json @{basePanel=62;panelGeneration=63})
-Write-PanelTest (Join-Path $taskRoot 'artifacts/m3-17-native61-deploy-after.json') (ConvertTo-Json @{nativeBuild=61;coreAbi=8;panelGeneration=62;sourceCommit=('a'*40);native=$taskNative;panel=@{files=$taskOldPanel};selector=$taskSelector} -Depth 6)
+Write-PanelTest (Join-Path $taskRoot 'artifacts/prepared/panel-test/candidate.json') (ConvertTo-Json @{basePanel=$taskBasePanel;panelGeneration=$taskNextPanel})
+Write-PanelTest (Join-Path $taskRoot 'artifacts/m3-17-native61-deploy-after.json') (ConvertTo-Json @{nativeBuild=$InstalledNativeBuild;coreAbi=8;panelGeneration=$taskBasePanel;sourceCommit=('a'*40);native=$taskNative;panel=@{files=$taskOldPanel};selector=$taskSelector} -Depth 6)
 function Invoke-PanelTest([string]$taskName,[string]$taskTool,[string[]]$taskArguments){
     $taskPreference=$ErrorActionPreference;$ErrorActionPreference='Continue'
     try{& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $taskRoot ('tools/'+$taskTool)) @taskArguments *> (Join-Path $taskRoot ($taskName+'.log'));$taskCode=$LASTEXITCODE}
@@ -54,17 +56,18 @@ $taskArguments=@('-PreparedName','panel-test','-BackupName','panel-pair','-Plugi
 Check-PanelTest ((Invoke-PanelTest 'report' 'Deploy-PanelTestBuild.ps1' $taskArguments) -eq 0) 'Report failed.'
 Check-PanelTest (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'artifacts/disabled/panel-pair'))) 'Report created a backup.'
 $taskGateway=Join-Path $taskCandidate 'jsx/starfield_gateway.jsx'
-Write-PanelTest $taskGateway 'var GATEWAY_BUILD = "native-presets-63"; var byte=0;'
+Write-PanelTest $taskGateway ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'"; var byte=0;')
 Check-PanelTest ((Invoke-PanelTest 'reserved-word' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -ne 0) 'ES3 reserved word accepted.'
 Check-PanelTest (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'artifacts/disabled/panel-pair'))) 'Invalid syntax created a backup.'
-Write-PanelTest $taskGateway 'var GATEWAY_BUILD = "native-presets-63";'
+Write-PanelTest $taskGateway ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'";')
 $taskClient=Join-Path $taskCandidate 'js/panel.js'
-Write-PanelTest $taskClient 'var GATEWAY_BUILD = "native-presets-62";'
+Write-PanelTest $taskClient ('var GATEWAY_BUILD = "native-presets-'+$taskBasePanel+'";')
 Check-PanelTest ((Invoke-PanelTest 'mixed-generation' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -ne 0) 'Mixed generation accepted.'
-Write-PanelTest $taskClient 'var GATEWAY_BUILD = "native-presets-63";'
+Write-PanelTest $taskClient ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'";')
 Check-PanelTest ((Invoke-PanelTest 'install' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -eq 0) 'Install failed.'
 $taskAfter=Get-Content -LiteralPath (Join-Path $taskRoot 'artifacts/panel-pair-after.json') -Raw | ConvertFrom-Json
 Check-PanelTest ($taskAfter.nativeSourceCommit -eq ('a'*40)) 'Native source identity was replaced by the CEP commit.'
+Check-PanelTest ($taskAfter.nativeBuild -eq $InstalledNativeBuild -and $taskAfter.panelGeneration -eq $taskNextPanel) 'Installed native/panel generation was misreported.'
 foreach($taskFile in $taskNative){Check-PanelTest ((Hash-PanelTest (Join-Path $taskBundle $taskFile.name)) -eq $taskFile.hash) 'Native bytes changed.'}
 foreach($taskFile in $taskNewPanel){Check-PanelTest ((Hash-PanelTest (Join-Path $taskRoot $taskFile.path)) -eq $taskFile.hash) 'Candidate panel hash differs.'}
 $taskBackup=Join-Path $taskRoot 'artifacts/disabled/panel-pair'
