@@ -6,8 +6,8 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 65 test candidate: authoritative live node/renderer transaction guards
-// before native publication; full native/Core ABI8 pairing with CEP67.
+// Build 66 test candidate: rounded OBJ planarity tolerance and typed native
+// expression lookup; full native/Core ABI8 pairing with CEP71.
 // Numeric Motion work has no public author entry in this test release.
-#define STARFIELD_VERSION_BUILD 65
-#define STARFIELD_VERSION_PACKED 32833 /* 0x8041 */
+#define STARFIELD_VERSION_BUILD 66
+#define STARFIELD_VERSION_PACKED 32834 /* 0x8042 */

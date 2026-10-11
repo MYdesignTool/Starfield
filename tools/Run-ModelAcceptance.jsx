@@ -50,32 +50,36 @@
             observed.push({id:actual.id,type:actual.type,schemaVersion:actual.schemaVersion});}
         return observed;}
     function exportNext(){var step=run.step;
-        if(assetIndex>=step.assets.length){run.cases.push({name:step.name,ok:true,revision:run.saved.revision,nodes:verify(step,run.saved),assetReadbacks:assetIndex});run.index++;run.phase="begin";write();later();return;}
-        var asset=step.assets[assetIndex];activeAsset={id:run.id.substr(0,28)+("000"+assetIndex).slice(-4),expected:asset};
+        if(assetIndex>=step.assets.length){run.cases.push({name:step.name,ok:true,revision:run.saved.revision,nodes:verify(step,run.saved),assetReadbacks:assetIndex,
+            elapsedMilliseconds:(new Date()).getTime()-run.stepStarted,prepareMilliseconds:run.queuedAt-run.stepStarted,
+            queueAndCommitMilliseconds:run.committedAt-run.queuedAt,readbackMilliseconds:(new Date()).getTime()-run.committedAt});run.index++;run.phase="begin";write();later();return;}
+        var asset=step.assets[assetIndex];activeAsset={id:run.id.substr(0,28)+("000"+assetIndex).slice(-4),expected:asset,page:0};
         checkReply(request("beginModelAssetExport",{assetId:activeAsset.id,nodeId:asset.nodeId,baseGraphRevision:run.saved.revision}));run.phase="export";later();}
     host.__SFLD_modelAcceptanceTick=function(){try{
         if(!run.running)return;
-        if((new Date()).getTime()-run.started>120000){finish("Acceptance deadline exceeded at case "+run.index+" / "+run.phase);return;}
+        if((new Date()).getTime()-run.started>(fixture.deadlineMilliseconds || 120000)){finish("Acceptance deadline exceeded at case "+run.index+" / "+run.phase);return;}
         if(run.phase==="begin"){
             if(run.index===fixture.steps.length){finish(null);return;}
-            run.step=materialize(fixture.steps[run.index]);var before=snapshot();
+            run.stepStarted=(new Date()).getTime();run.step=materialize(fixture.steps[run.index]);var before=snapshot();
             run.id=("00000000000000000000000000000000"+(new Date()).getTime().toString(16)+run.index.toString(16)).slice(-32);
             var fields={baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,graphHex:run.step.graphHex,nodeManifest:run.step.nodeManifest,rendererManifest:run.step.rendererManifest,assets:[]};
             for(var d=0;d<run.step.assets.length;d++){var descriptor=run.step.assets[d];fields.assets.push({nodeId:descriptor.nodeId,source:2,revision:descriptor.revision,bounds:descriptor.bounds,bytes:descriptor.meshHex.length/2});}
             checkReply(request("beginModelGraphTransaction",fields));
             for(var mesh=0;mesh<run.step.assets.length;mesh++){var hex=run.step.assets[mesh].meshHex;for(var page=0;page*65536<hex.length;page++)checkReply(request("writeModelGraphAssetPage",{asset:mesh,page:page,hex:hex.substr(page*65536,65536)}));}
-            checkReply(request("queueModelGraphTransaction",{}));run.phase="poll";run.lastState="";write();later();return;
+            checkReply(request("queueModelGraphTransaction",{}));run.queuedAt=(new Date()).getTime();run.phase="poll";run.lastState="";write();later();return;
         }
         if(run.phase==="poll"){var reply=checkReply(request("readModelGraphTransaction",{}));
             if(reply.state!==run.lastState){run.lastState=reply.state;write();}
             if(reply.state!=="complete"){later();return;}
             if(!reply.result || !reply.result.ok || !reply.result.committed)throw new Error(JSON.stringify(reply.result));
             if(reply.result.diagnostics && (reply.result.diagnostics.cleanupError || reply.result.diagnostics.undoError))throw new Error("Native cleanup/undo failed: "+JSON.stringify(reply.result.diagnostics));
-            run.saved=snapshot();verify(run.step,run.saved);checkReply(request("releaseModelGraphTransaction",{}));assetIndex=0;exportNext();return;
+            run.committedAt=(new Date()).getTime();run.saved=snapshot();verify(run.step,run.saved);checkReply(request("releaseModelGraphTransaction",{}));assetIndex=0;exportNext();return;
         }
-        if(run.phase==="export"){var exported=request("readModelAssetPage",{assetId:activeAsset.id,nodeId:activeAsset.expected.nodeId,page:0});
+        if(run.phase==="export"){var exported=request("readModelAssetPage",{assetId:activeAsset.id,nodeId:activeAsset.expected.nodeId,page:activeAsset.page});
             checkReply(exported);if(exported.state==="queued" || exported.state==="receiving"){later();return;}
-            if(exported.state!=="ready" || exported.pageCount!==1 || exported.hex!==activeAsset.expected.meshHex)throw new Error("Native mesh readback differs for "+activeAsset.expected.nodeId);
+            var expectedPages=Math.ceil(activeAsset.expected.meshHex.length/65536);
+            if(exported.state!=="ready" || exported.pageCount!==expectedPages || exported.hex!==activeAsset.expected.meshHex.substr(activeAsset.page*65536,65536))throw new Error("Native mesh readback differs for "+activeAsset.expected.nodeId+" / page "+activeAsset.page);
+            activeAsset.page++;if(activeAsset.page<expectedPages){later();return;}
             checkReply(request("releaseModelAsset",{assetId:activeAsset.id}));activeAsset=null;assetIndex++;exportNext();return;
         }
         throw new Error("Unknown acceptance phase.");
@@ -83,6 +87,7 @@
     try{
         var file=new File(config.fixture);file.encoding="UTF-8";if(!file.open("r"))throw new Error("Missing acceptance fixtures.");try{fixture=JSON.parse(file.read());}finally{file.close();}
         if(fixture.gatewayBuild!==config.gatewayBuild || fixture.version!==1)throw new Error("Acceptance fixture generation differs.");
+        if(fixture.deadlineMilliseconds!==undefined && (typeof fixture.deadlineMilliseconds!=="number" || !isFinite(fixture.deadlineMilliseconds) || fixture.deadlineMilliseconds<120000 || fixture.deadlineMilliseconds>600000 || Math.floor(fixture.deadlineMilliseconds)!==fixture.deadlineMilliseconds))throw new Error("Invalid bounded acceptance deadline.");
         $.evalFile(new File(config.repo+"/cep_panel/jsx/starfield_gateway.jsx"));$.evalFile(new File(config.repo+"/cep_panel/jsx/model_transaction_transport.jsx"));
         if(host.SFLD_modelTransactionReady()!==config.gatewayBuild)throw new Error("Installed gateway/transport generation differs.");
         if(previous && previous instanceof CompItem)for(var s=1;s<=previous.numLayers;s++)selection.push({layer:previous.layer(s),selected:previous.layer(s).selected});

@@ -1,12 +1,22 @@
 # 当前工程状态
 
-## 当前源码候选：CEP71 整体提交链路修正（2026-10-11）
+## 源码候选：native66 / CEP71（未部署）
+
+owner真实OBJ第6680行误拒绝已离线复现并修正，整文件2858顶点/5600三角形、SFMG1 384480字节通过；原文件只读。Model/Transform编辑失败仍是宿主假设，候选按实际效果布局排除跨kind数字参数访问，实际native8796/camera12及生成混合表达式644标准/ASAN通过。控件453/导入20632标准-ASAN与小/真实模型自动验收自检172/271通过。新验收逐页回读12页资源并记录各阶段耗时。完整SDK候选冻结构建继续；不部署或向owner当前AE调度脚本，详见model-transaction-audit.md。
+
+## 当前安装：native65 / CEP71（2026-10-11 13:38+08）
 
 M3-17按owner要求整体排查：五类control布局投影统一、提交后重取receipt/snapshot、跨realm数组和type/build/contract诊断；native65/ABI8/IDs/持久化schema保持。实际注册数据DOM/协议/资产/预设及原生标准/ASAN回归通过，见 [整体排查](model-transaction-audit.md)。新UUID类型和AE为什么返回3未证实，不能把候选通过当实机已验收。
 
-8例真实AE事务/资源回读自动验收已生成并通过135项模拟/ES3自检。默认report，启动AfterFX需ADR0011单次明确授权，不要求owner逐错反馈。待冻结、配对发布和实机结果；Motion/MNT保持，Git push仍等已有明确授权回复。
+9b7764309add2a8208e7e56c02f0b195e0b7cbb4 git archive冻结27文件，与已测候选逐字节一致，冻结源关键回归通过。fresh AE process0后经Deploy-PanelTestBuild→Deploy-TestBuild -KeepNative发布；26hash/selector/runtime与paired Restore report通过。原生65/packed32833/ABI8和9200c6b源码保持，SDK未重建。baseline71重现全部27已安装面板字节。receipts为artifacts/m3-17-native65-panel71-record-contract-20261011-{before,after}.json，checker为artifacts/Check-ModelContractInstalledPair.ps1。
 
-## 当前安装：native65 / CEP70（2026-10-11 11:46+08）
+首次单次启动已获owner授权并执行，PID34732没有产生entry/result，不视为验收。随后AE33872由Explorer启动并打开owner工程；向现有实例再次调度的独立授权请求，owner要求先保留其自行测试并继续离线排查，因此未执行。新版入口独立记录启动阶段、ASCII路径和无JSON错误；真实AE自动结果仍缺失。Motion/MNT保持，Git push仍等已有明确授权回复。配对备份保留65/70，之前备份全部保留。一步回滚（AE关闭）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native65-panel71-record-contract-20261011' -Restore
+```
+
+## native65 / CEP70 部署记录（2026-10-11 11:46+08）
 
 owner明确stage5：Particle59f0e5c664ba89e29834484229eea6c6 schema expected7/actual3。受控旧label3 actual gateway夹具复现原错误；Model最终核对改用与browser nativeRecordSchema一致的完整Particle布局投影，逐项类型/必需字段/重复及未知key检查后才映射7，所有请求值/位置/连接仍核对；准备阶段raw schema保持严格。安装文件声明7，实机为何返回3仍未确认。另一夹具证实gateway重载后transport保留旧API；两个页面按API身份/build配对，显式Model begin重新加载，原生检查点重取匹配API，foreign generation在prepare写入前拒绝，正常poll不反复加载。无ID/schema/ABI/native变更。
 

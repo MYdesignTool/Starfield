@@ -107,7 +107,10 @@ Result<bool> triangulate(ModelGeometry& mesh,const std::array<ModelCorner,256>& 
     normal=scale(normal,1/magnitude);
     std::array<Point,256> points{};const auto ax=std::abs(normal.x),ay=std::abs(normal.y),az=std::abs(normal.z);
     for(std::size_t i=0;i<count;++i) {
-        if(std::abs(dot(normal,local[i]))>1e-8)return R::failure(ErrorCode::invalid_request,"OBJ polygon is not planar");
+        // Decimal OBJ exports round each vertex independently. Permit that
+        // small discrepancy relative to face extent without flattening XYZ or
+        // accepting visibly warped polygons. Projection is triangulation only.
+        if(std::abs(dot(normal,local[i]))>1e-6)return R::failure(ErrorCode::invalid_request,"OBJ polygon is not planar");
         points[i]=ax>=ay && ax>=az?Point{local[i].y,local[i].z}:ay>=az?Point{local[i].x,local[i].z}:Point{local[i].x,local[i].y};
     }
     double area=0;

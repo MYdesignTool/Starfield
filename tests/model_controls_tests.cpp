@@ -158,7 +158,9 @@ void imported(PF_InData& data){
     controls.params[layout::source].u.pd.value=1;CHECK(adapter::capture_model_author_controls(&data,controls.pointers,never).has_value());
     dispose(prepared);controls.params[layout::mesh].u.arb_d.value=nullptr;controls.params[layout::source].u.pd.value=2;
     CHECK(!adapter::capture_model_author_controls(&data,controls.pointers,never).has_value());
-    PF_ArbitraryH failed=reinterpret_cast<PF_ArbitraryH>(1);CHECK(adapter::prepare_model_obj_parameter(&data,"bad obj",&failed,never)==PF_Err_BAD_CALLBACK_PARAM&&!failed);
+    adapter::ModelObjDiagnostic diagnostic;
+    PF_ArbitraryH failed=reinterpret_cast<PF_ArbitraryH>(1);CHECK(adapter::prepare_model_obj_parameter(&data,"bad obj",&failed,never,nullptr,&diagnostic)==PF_Err_BAD_CALLBACK_PARAM&&!failed);
+    CHECK(diagnostic.line==1 && diagnostic.detail && !std::strcmp(diagnostic.detail,"Unsupported OBJ statement"));
     CHECK(adapter::prepare_model_obj_parameter(&data,obj,nullptr,never)==PF_Err_BAD_CALLBACK_PARAM);
     failed=reinterpret_cast<PF_ArbitraryH>(1);CHECK(adapter::prepare_model_obj_parameter(&data,obj,&failed,cancelled)==PF_Interrupt_CANCEL&&!failed);
     fail_allocate=true;CHECK(adapter::prepare_model_obj_parameter(&data,obj,&failed,never)==PF_Err_OUT_OF_MEMORY&&!failed&&handles.size()==1);

@@ -5,17 +5,21 @@
     if(!api)throw new Error("Load the paired Model gateway before its transaction transport.");
     function currentAPI(build){
         var current=host.__SFLD_modelTransactionAPI;
-        if(!current || typeof current.gatewayBuild!=="string" || current.gatewayBuild!==build)
+        if(!current || typeof current.gatewayBuild!=="string" || current.gatewayBuild!==build ||
+            current.recordContractId!=="native-control-contract-1" || typeof current.recordSchema!=="function")
             throw new Error("Model gateway generation changed (expected "+build+", actual "+
-                (current?String(current.gatewayBuild):"missing")+"). Reload the Starfield panel.");
+                (current?String(current.gatewayBuild):"missing")+", record contract="+
+                (current?String(current.recordContractId):"missing")+"). Reload the Starfield panel.");
         // Re-evaluating the gateway replaces its closures. Never keep a previous
         // snapshot/authoring implementation alive through native callbacks.
         api=current;
     }
-    host.SFLD_modelTransactionReady=function(){return api===host.__SFLD_modelTransactionAPI?api.gatewayBuild:"";};
+    host.SFLD_modelTransactionReady=function(){return api===host.__SFLD_modelTransactionAPI &&
+        api.recordContractId==="native-control-contract-1" && typeof api.recordSchema==="function"?api.gatewayBuild:"";};
     var KEY="__SFLD_modelGraphTransactionV1",MODEL="org.starfieldfx.nodes.model",OUTPUT="000000000000000000000000000000ff";
     var PAGE=65536,MAX_MESH=8*1024*1024,MAX_TOTAL=64*1024*1024;
     function integer(value,min,max){return typeof value==="number" && isFinite(value) && Math.floor(value)===value && value>=min && value<=max;}
+    function array(value){return Object.prototype.toString.call(value)==="[object Array]";}
     function uuid(value){return typeof value==="string" && /^[0-9a-f]{32}$/.test(value) && !/^0{32}$/.test(value) && value!==OUTPUT;}
     function now(){return (new Date()).getTime();}
     function plain(value){return JSON.parse(JSON.stringify(value));}
@@ -41,7 +45,7 @@
     }
     function parameter(node,key){for(var i=0;i<node.parameters.length;i++)if(String(node.parameters[i].key)===String(key))return node.parameters[i];return null;}
     function close(a,b,color){
-        if(a instanceof Array && b instanceof Array){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(!close(a[i],b[i],color))return false;return true;}
+        if(array(a) && array(b)){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(!close(a[i],b[i],color))return false;return true;}
         if(typeof a==="number" && typeof b==="number")return isFinite(a) && isFinite(b) && Math.abs(a-b)<=(color?1/255+1e-7:1e-6*Math.max(1,Math.abs(a)));
         return a===b;
     }
@@ -50,47 +54,30 @@
         var key=String(expected.key),curve=node.type==="org.starfieldfx.nodes.particle" && (key==="7" || key==="8" || key==="27" || key==="13") ||
             node.type==="org.starfieldfx.nodes.force" && key==="9";
         if(expected.type===7 && curve){var a=expected.value,b=actual.value;
-            if(!(a instanceof Array) || !(b instanceof Array) || a.length!==b.length || a.length<4)return false;
+            if(!array(a) || !array(b) || a.length!==b.length || a.length<4)return false;
             for(var h=0;h<4;h++)if(a[h]!==b[h])return false;
             for(var offset=4;offset<a.length;offset+=8)if(!close(api.float64(a,offset),api.float64(b,offset),key==="13" && (offset-4)%32!==0))return false;
             return true;}
         return close(expected.value,actual.value,node.type==="org.starfieldfx.nodes.particle" && (key==="1" || key==="2"));
     }
-    function particleProjectionSchema(node){
-        // Match graph_edits.nativeRecordSchema: the portable schema follows the
-        // complete ordinary control layout, not a legacy snapshot's label.
-        // Do not rewrite the record/stamp, supply defaults or skip value checks.
-        var required={"1":5,"3":4,"4":4,"5":4,"6":4,"9":4,"10":4,"11":4,"12":3,"13":7,
-            "14":4,"15":3,"16":4,"17":3,"18":5,"19":4,"20":5,"21":4,"22":3,"23":4,
-            "24":3,"25":3,"26":4,"28":4,"29":4};
-        var optional={"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,
-            "37":3,"38":4,"39":4,"40":2,"41":4},found={};
-        function invalid(detail){throw new Error("Saved node "+node.id+" / Particle control layout differs: "+detail+".");}
-        if(!integer(node.schemaVersion,1,7))invalid("unsupported schemaVersion "+node.schemaVersion);
-        if(!(node.parameters instanceof Array))invalid("missing parameters");
-        for(var p=0;p<node.parameters.length;p++){
-            var field=node.parameters[p],key=String(field.key),type=required[key] || optional[key];
-            if(!type || field.type!==type || found[key])invalid("parameter "+key+" type or identity");
-            found[key]=true;
-        }
-        for(var key in required)if(Object.prototype.hasOwnProperty.call(required,key) && !found[key])invalid("missing parameter "+key);
-        return 7;
-    }
     function records(expected,actual,ignoreModelAsset){
         function differs(node,field,wanted,observed){
             function describe(value){var text=JSON.stringify(value);return typeof text==="string"?text.substr(0,192):String(value);}
-            throw new Error("Saved node "+node.id+" / "+field+" differs (expected "+describe(wanted)+", actual "+describe(observed)+").");
+            throw new Error("Saved node "+node.id+" ("+node.type+") / "+field+" differs (expected "+describe(wanted)+", actual "+describe(observed)+
+                "; gateway="+api.gatewayBuild+", contract="+api.recordContractId+").");
         }
         if(expected.length!==actual.length)throw new Error("Saved node count differs (expected "+expected.length+", actual "+actual.length+").");var map={};
         for(var i=0;i<actual.length;i++){if(map[actual[i].id])throw new Error("Duplicate saved node identity.");map[actual[i].id]=actual[i];}
         for(var n=0;n<expected.length;n++){var node=expected[n],saved=map[node.id];
             if(!saved)differs(node,"identity",node.id,"missing");
             if(saved.type!==node.type)differs(node,"type",node.type,saved.type);
-            var savedSchema=saved.schemaVersion;
-            if(!ignoreModelAsset && node.type==="org.starfieldfx.nodes.particle" && node.schemaVersion===7){
-                particleProjectionSchema(node);savedSchema=particleProjectionSchema(saved);
-            }
-            if(savedSchema!==node.schemaVersion)differs(node,"schemaVersion",node.schemaVersion,saved.schemaVersion);
+            // Browser planning and all publication paths use one validated
+            // control layout. Prepared-to-live comparison keeps raw labels
+            // strict so concurrent edits cannot be hidden by projection.
+            var expectedSchema=node.schemaVersion,savedSchema=saved.schemaVersion;
+            if(!ignoreModelAsset){expectedSchema=api.recordSchema(node);
+                try{savedSchema=api.recordSchema(saved);}catch(error){differs(node,"control layout: "+error.message,expectedSchema,saved.schemaVersion);}}
+            if(savedSchema!==expectedSchema)differs(node,"schemaVersion",node.schemaVersion,saved.schemaVersion);
             if(!close(node.position.x,saved.position.x))differs(node,"position.x",node.position.x,saved.position.x);
             if(!close(node.position.y,saved.position.y))differs(node,"position.y",node.position.y,saved.position.y);
             // Connections are identities/endpoints, independent of JSON member
@@ -120,12 +107,12 @@
         if(key==="position" && close(expected.position.x,actual.position.x) && close(expected.position.y,actual.position.y))continue;
         throw new Error("Saved renderer field differs: "+key);}}
     function validateAssets(nodes,assets){
-        if(!(assets instanceof Array) || assets.length>63)throw new Error("Invalid Model asset count.");var map={},seen={},total=0,copy=[];
+        if(!array(assets) || assets.length>63)throw new Error("Invalid Model asset count.");var map={},seen={},total=0,copy=[];
         for(var n=0;n<nodes.length;n++)map[nodes[n].id]=nodes[n];
         for(var i=0;i<assets.length;i++){var a=assets[i],node=map[a.nodeId];
             if(!uuid(a.nodeId) || !node || node.type!==MODEL || seen[a.nodeId] || !integer(a.source,1,2) || !integer(a.revision,0,2147483647) ||
                 !integer(a.bytes,0,MAX_MESH) || (a.revision===0?a.bytes!==0:a.bytes<32) || a.bytes>MAX_TOTAL-total ||
-                !(a.bounds instanceof Array) || a.bounds.length!==6)throw new Error("Invalid Model asset descriptor.");
+                !array(a.bounds) || a.bounds.length!==6)throw new Error("Invalid Model asset descriptor.");
             for(var axis=0;axis<6;axis++)if(typeof a.bounds[axis]!=="number" || !isFinite(a.bounds[axis]) || Math.abs(a.bounds[axis])>1e9 ||
                 (axis>=3 && a.bounds[axis]<a.bounds[axis-3]))throw new Error("Invalid Model asset bounds.");
             var model=api.modelRecord(node);
@@ -223,6 +210,7 @@
             var nonce=api.nonce(fresh.properties.commit,fresh.properties.receipt),receipt=api.trigger(fresh,"Starfield: apply Model graph",s.request.requestId,nonce,false);
             if(!receipt.ok)throw new Error(receipt.error && receipt.error.message || "Native graph commit failed.");
             step="read published snapshot";
+            fresh=target(s,1,false);
             var updated=api.snapshot(fresh);
             if(!updated.initialized || updated.revision<=s.beforeRevision)throw new Error("Native graph acknowledgement is not current.");
             step="verify published records";

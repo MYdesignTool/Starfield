@@ -621,6 +621,12 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
     // Check the metadata property name before reading ANY numeric value, so a
     // search never evaluates our own bindings (or another renderer's bindings).
     // Display names of effects remain irrelevant; all eight UUID words follow.
+    // Do not resolve a numeric child against another node kind's effect layout.
+    // Exclude incompatible Model/Transform layouts before param(index) while
+    // AE resolves stream identities, not after opening the numeric child.
+    // The count excludes PF input0, as does Effect.numProperties. UUID name and
+    // all words still prove the source identity after this layout gate.
+    text += "fx.numProperties === " + std::to_string(native_nodes::last_parameter_index(node.kind)) + " && ";
     text += "fx.param(" + std::to_string(first) + ").name === \"Node UUID 0\" && ";
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         if (chunk) text += " && ";

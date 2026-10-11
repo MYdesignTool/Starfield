@@ -1,6 +1,28 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native65/CEP70 Particle projection and gateway lifetime correction deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+Status: native65/CEP71 unified control contract and publication lifetime correction deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+
+### Rounded OBJ and typed binding lookup candidate — 2026-10-11
+
+Owner's read-only Cinema4D OBJ reproduces a rejection at line6680; the maximum
+normalized quad deviation is5.5953e-7 from decimal export rounding. The candidate
+accepts planarity residuals up to1e-6 relative to face extent, using projection
+only for triangulation and retaining original vertex coordinates. Budget,
+self-intersection, degeneracy and clearly non-planar rejection remain. No file,
+geometry/sequence schema, parameter ID or ABI migration is needed. Import
+diagnostics now carry static parser detail and line instead of a generic size
+error. Full owner mesh parses to2858positions/5600triangles and384480SFMG1 bytes;
+the user's source file is never modified or retained in tracked fixtures.
+
+The Model/Transform stream matchName failure remains a host hypothesis. Native
+expressions now gate incompatible complete effect layouts before numeric child
+resolution, then still prove the metadata name and all eight UUID words. The
+actual mixed native transaction and generated JS expressions pass standard/ASAN
+fixtures; this does not qualify AE. native66/packed32834/ABI8/CEP71 is a full
+unpublished candidate, with exact65/71 to66/71 paired deployment/rollback tests.
+Performance is not claimed from fewer cross-kind lookups. Automated acceptance
+records prepare, queue/commit and paged readback durations, including polling;
+both small and owner-size numeric meshes self-test, awaiting separate host run.
 
 ### CEP71 complete control contract and verification — 2026-10-11
 
@@ -22,6 +44,15 @@ standard/ASAN fixtures. An eight-case AE automation with resource readback is
 prepared and self-tested; process start needs ADR0011 authorization. See
 docs/model-transaction-audit.md for evidence and unresolved gates. Actual AE
 origin of label3 is not established.
+
+At13:38+08 the git archive9b77643 panel71 was published after27 frozen/tested
+byte matches, frozen-source regressions and a fresh process0 check. Native65/
+packed32833/ABI8/source9200c6b retained;26 installed hashes and selector/runtime/
+paired Restore preflight pass. Baseline71 reproduces all27 installed files.
+Backup m3-17-native65-panel71-record-contract-20261011 restores65/70. The
+first authorized process dispatch produced no entry/result; owner deferred a
+separate existing-instance run while testing their project. No AE
+qualification or customer-release gate is closed by this deployment.
 
 ### CEP70 Particle projection and gateway lifetime — 2026-10-11
 

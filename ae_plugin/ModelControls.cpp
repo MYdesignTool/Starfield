@@ -167,12 +167,18 @@ core::Result<core::GraphNode> model_author_graph_node(core::NodeId id,const Mode
 }
 
 PF_Err prepare_model_obj_parameter(PF_InData* data,std::string_view text,PF_ArbitraryH* output,
-    const core::Cancellation& cancellation,core::ModelBounds* bounds) noexcept {
+    const core::Cancellation& cancellation,core::ModelBounds* bounds,ModelObjDiagnostic* diagnostic) noexcept {
+    if(diagnostic)*diagnostic={};
     if(!output)return PF_Err_BAD_CALLBACK_PARAM;
     *output=nullptr;
-    auto parsed=core::parse_model_obj(text,cancellation);
-    if(!parsed.has_value())return host_error(parsed.error());
+    core::ModelParseLocation location;
+    auto parsed=core::parse_model_obj(text,cancellation,{},&location);
+    if(!parsed.has_value()){
+        if(diagnostic)*diagnostic={location.line,parsed.error().detail};
+        return host_error(parsed.error());
+    }
     const auto error=create_model_geometry_parameter(data,parsed.value(),output,cancellation);
+    if(error && diagnostic)diagnostic->detail="Model mesh encoding or host handle allocation failed";
     if(!error&&bounds)*bounds=parsed.value().bounds;return error;
 }
 }

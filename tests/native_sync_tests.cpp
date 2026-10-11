@@ -68,8 +68,9 @@ struct Fixture {
     std::vector<AEGP_StreamVal2> values;
     std::vector<PF_ParamDef> params;
 };
-std::array<Fixture, 5> fixtures;
+std::array<Fixture, 7> fixtures;
 bool transform_present{};
+bool model_present{};
 bool cloud_animation_test{};
 bool birth_animation_test{};
 using Matrix=transform_binding::Matrix;
@@ -181,7 +182,7 @@ double evaluated_binding(A_long index, A_long time) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
         return expr.find(u"fx.param("+number(records::uuid_first_index(kind)+7)+u").value === "+number(value))!=std::u16string::npos;
     };
-    std::size_t id = identity(records::Kind::transform,5) ? 4 : identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
+    std::size_t id = identity(records::Kind::model,6) ? 6 : identity(records::Kind::transform,5) ? 4 : identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
     if(id==4 && expr.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
         const std::u16string marker=u"// Starfield Transform affine entry ";
         const auto first=expr.find(marker)+marker.size(),last=expr.find(u"\n",first);
@@ -294,7 +295,7 @@ int main() {
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr source, AEGP_EffectRefH* ref)->A_Err {
         *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
     };
-    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = transform_present?5:4; return 0; };
+    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = model_present?7:transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
@@ -1516,6 +1517,49 @@ int main() {
         metadata_chance_expression=metadata_life_expression=temporal_metadata_enabled=false;
         remember_native_control_proofs(&renderer_data,{});
         check(live_refs==0 && acquisitions==0,"Cloud conversion and compatibility sampling release all host references");
+    }
+    {
+        // Exercise actual installation in a mixed Model/Transform parade. The
+        // separate JS regression runs these generated expressions, rather than
+        // hand-written imitations of the UUID lookup or layout gate.
+        using namespace core::graph_keys;
+        model_present=transform_present=true;
+        fixtures[5].name="ADBE Null Control Fixture";
+        auto& model=fixtures[6];model.name="org.starfieldfx.node.model";
+        model.values.resize(records::parameter_count(records::Kind::model));
+        model.params.resize(model.values.size());
+        for(auto& p:model.params)p.param_type=PF_Param_FLOAT_SLIDER;
+        uuid(6,records::uuid_first_index(records::Kind::model),6);
+        model.values[records::model_layout::source].one_d=1;
+        for(A_long i=records::model_layout::scale;i<records::model_layout::scale+3;++i)model.values[i].one_d=100;
+        model.values[records::model_layout::center].one_d=1;
+        model.values[records::model_layout::normalize].one_d=1;
+        fixtures[4].values[1].layer_id=0;
+        connection(3,records::Kind::force,5,13);
+        connection(4,records::Kind::transform,255,14);
+        connection(6,records::Kind::model,2,15);
+        auto change=edit(5,records::model_layout::origin,37);
+        check(direct_edit(change)==0 && change.accepted,"Model edit installs bindings with a Transform in the same parade");
+        check(std::get<core::Vec3>(parameter(saved_graph(),kModelNode,kModelOrigin)).x==37,
+              "Model edit retains its own source parameter and UUID");
+        std::ofstream output("artifacts/model-transform-animation-expressions.json");
+        output<<"[";bool first=true;unsigned models=0,transforms=0;
+        for(const auto& expression:expressions) {
+            const bool is_model=expression.find(u"fx.param(93).value === 6")!=std::u16string::npos;
+            const bool is_transform=expression.find(u"fx.param(89).value === 5")!=std::u16string::npos;
+            if(!is_model && !is_transform)continue;
+            models+=is_model;transforms+=is_transform;
+            if(!first)output<<",";first=false;output<<"\"";
+            for(auto c:expression) {
+                if(c==u'\n')output<<"\\n";
+                else {if(c==u'\\' || c==u'\"')output<<"\\";output<<static_cast<char>(c);}
+            }
+            output<<"\"";
+        }
+        output<<"]";
+        check(bool(output) && models==14 && transforms>12,"actual mixed Model and Transform expressions recorded");
+        check(live_refs==0 && acquisitions==0,"mixed Model/Transform edit releases host references");
+        model_present=transform_present=false;
     }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.

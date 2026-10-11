@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-70";
+    var GATEWAY_BUILD = "native-presets-71";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -309,12 +309,12 @@
 
     function validateValue(binding, value) {
         if (binding.kind === "point3d") {
-            if (!(value instanceof Array) || value.length !== 3) return false;
+            if (!(nativeRecords.array(value)) || value.length !== 3) return false;
             for (var i = 0; i < 3; i++) if (typeof value[i] !== "number" || !isFinite(value[i])) return false;
             return true;
         }
         if (binding.kind === "color") {
-            if (!(value instanceof Array) || value.length !== 3) return false;
+            if (!(nativeRecords.array(value)) || value.length !== 3) return false;
             for (var c = 0; c < 3; c++) {
                 if (typeof value[c] !== "number" || !isFinite(value[c]) || value[c] < 0 || value[c] > 255) return false;
             }
@@ -573,7 +573,7 @@
     }
 
     function sameValue(left, right) {
-        if (left instanceof Array && right instanceof Array && left.length === right.length) {
+        if (nativeRecords.array(left) && nativeRecords.array(right) && left.length === right.length) {
             for (var i = 0; i < left.length; i++) if (!sameValue(left[i], right[i])) return false;
             return true;
         }
@@ -649,7 +649,7 @@
             points=[{age:0,value:0},{age:1,value:0}];
         }
         if (bytes !== null && bytes !== undefined) {
-            if (!(bytes instanceof Array) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 64 ||
+            if (!(nativeRecords.array(bytes)) || bytes.length < 36 || bytes[0] !== 1 || bytes[1] < 2 || bytes[1] > 64 ||
                 bytes.length !== 4 + bytes[1] * 16 || bytes[2]>3 || bytes[3]!==0) throw new Error(label + " curve payload is malformed.");
             for (var i = 0; i < bytes[1]; i++) {
                 var age = readGraphFloat64(bytes, 4 + i * 16);
@@ -756,14 +756,14 @@
             fields[key]=p;
             if(p.type===5) {
                 var limit=key==="4"?1e9:key==="5"?32768:100000;
-                if(!(v instanceof Array) || v.length!==3)throw new Error("Invalid Model vector: "+key);
+                if(!(nativeRecords.array(v)) || v.length!==3)throw new Error("Invalid Model vector: "+key);
                 for(var axis=0;axis<3;axis++)if(typeof v[axis]!=="number" || !isFinite(v[axis]) || Math.abs(v[axis])>limit ||
                     (key==="5" && v[axis]>=32768))throw new Error("Invalid Model vector: "+key);
             } else if(p.type===3) {
                 if(typeof v!=="number" || !isFinite(v) || Math.floor(v)!==v || v<0 || v>(key==="2"?2147483647:1))
                     throw new Error("Invalid Model scalar: "+key);
             } else {
-                if(!(v instanceof Array) || v.length!==(key==="1"?16:48))throw new Error("Invalid Model metadata: "+key);
+                if(!(nativeRecords.array(v)) || v.length!==(key==="1"?16:48))throw new Error("Invalid Model metadata: "+key);
                 for(var byteIndex=0;byteIndex<v.length;byteIndex++)if(typeof v[byteIndex]!=="number" || v[byteIndex]<0 || v[byteIndex]>255 || Math.floor(v[byteIndex])!==v[byteIndex])
                     throw new Error("Invalid Model metadata byte: "+key);
             }
@@ -862,7 +862,7 @@
                 if(p.type!==3 || typeof v!=="number" || !isFinite(v) || Math.floor(v)!==v || v<0 || v>2147483647)
                     throw new Error("Invalid Transform layer resource.");
             } else if(key==="1" || key==="2" || key==="3" || key==="4") {
-                if(p.type!==5 || !(v instanceof Array) || v.length!==3)throw new Error("Invalid Transform vector "+key+".");
+                if(p.type!==5 || !(nativeRecords.array(v)) || v.length!==3)throw new Error("Invalid Transform vector "+key+".");
                 var limit=key==="4"?10000:key==="3"?32768:1000000;
                 for(var a=0;a<3;a++)if(typeof v[a]!=="number" || !isFinite(v[a]) || Math.abs(v[a])>limit)
                     throw new Error("Transform vector is out of range: "+key+".");
@@ -907,11 +907,64 @@
         if(value>=1 && value<=4 && Math.floor(value)===value)return value-1;
         throw new Error("Unsupported Particle Shape; Face requires OBJ face emission.");
     }
+    // BEGIN STARFIELD NATIVE RECORD CONTRACT
+// One ES3 factory embedded verbatim in both CEP planning and the AE gateway.
+// Portable control layouts only: native disk IDs/ABI/defaults stay elsewhere.
+function createNativeRecordContract() {
+    var prefix="org.starfieldfx.nodes.",specs={
+        emitter:{version:7,required:{"2":4,"3":3,"5":3,"6":5,"7":5,"8":4,"9":4,"10":4,"11":4,"12":4,
+            "14":4,"15":4,"16":4,"17":3,"18":4,"19":4,"20":4,"21":4,"22":4,"23":3,
+            "24":4,"25":4,"26":4,"27":4,"28":4,"29":4,"30":4,"31":3,"32":5},optional:{}},
+        particle:{version:7,required:{"1":5,"3":4,"4":4,"5":4,"6":4,"9":4,"10":4,"11":4,"12":3,"13":7,
+            "14":4,"15":3,"16":4,"17":3,"18":5,"19":4,"20":5,"21":4,"22":3,"23":4,
+            "24":3,"25":3,"26":4,"28":4,"29":4},optional:{"7":7,"8":7,"27":7,"30":3,"31":3,
+            "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
+        force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
+        transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
+    };
+    function own(object,key){return Object.prototype.hasOwnProperty.call(object,key);}
+    function array(value){return Object.prototype.toString.call(value)==="[object Array]";}
+    function integer(value,min,max){return typeof value==="number" && isFinite(value) && Math.floor(value)===value && value>=min && value<=max;}
+    function spec(type){if(typeof type!=="string" || type.substr(0,prefix.length)!==prefix)return null;
+        var kind=type.substr(prefix.length);if(!own(specs,kind))return null;return specs[kind];}
+    function invalid(node,detail){var error=new Error("Native node "+(node && node.id || "missing")+" ("+
+        (node && node.type || "missing")+") control record: "+detail+".");error.code="invalid_native_node_record";throw error;}
+    function wire(field){var value=field.value;
+        if(field.type===2)return integer(value,-2147483648,2147483647);
+        if(field.type===3)return integer(value,0,4294967295);
+        if(field.type===4)return typeof value==="number" && isFinite(value);
+        if(field.type===5){if(!array(value) || value.length!==3)return false;
+            for(var axis=0;axis<3;axis++)if(typeof value[axis]!=="number" || !isFinite(value[axis]))return false;return true;}
+        if(field.type===7){var tag=Object.prototype.toString.call(value);
+            if(!array(value) && tag!=="[object Uint8Array]")return false;
+            if(!integer(value.length,0,24576))return false;
+            for(var byteIndex=0;byteIndex<value.length;byteIndex++)if(!integer(value[byteIndex],0,255))return false;return true;}
+        return false;
+    }
+    function schema(node){var layout=node && spec(node.type),found={};
+        if(!layout)invalid(node,"unsupported node type");
+        if(!integer(node.schemaVersion,1,layout.version))invalid(node,"unsupported schemaVersion "+node.schemaVersion);
+        if(!array(node.parameters) || node.parameters.length>64)invalid(node,"missing or oversized parameters");
+        for(var p=0;p<node.parameters.length;p++){
+            var field=node.parameters[p];if(!field || !/^[1-9][0-9]*$/.test(String(field.key)))invalid(node,"invalid parameter identity");
+            var key=String(field.key),type=0;
+            if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
+            if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            found[key]=true;
+        }
+        for(var key in layout.required)if(own(layout.required,key) && !found[key])invalid(node,"missing parameter "+key);
+        return layout.version;
+    }
+    return {id:"native-control-contract-1",array:array,schema:schema,version:function(type){var layout=spec(type);
+        if(!layout)invalid({type:type},"unsupported node type");return layout.version;}};
+}
+    var nativeRecords=createNativeRecordContract();
+    // END STARFIELD NATIVE RECORD CONTRACT
     function readNativeNode(effect, layer) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
-            schemaVersion: type === "org.starfieldfx.nodes.emitter" ? 7 :
-                type === "org.starfieldfx.nodes.particle" ? 7 : type === "org.starfieldfx.nodes.force" ? 3 : 1,
+            schemaVersion: nativeRecords.version(type),
             parameters: [], position: { x: Number(nodeControlValue(effect, "Node Layout X")),
                 y: Number(nodeControlValue(effect, "Node Layout Y")) }, outgoing: [] };
         function scalar(key, name, valueType) {
@@ -1143,7 +1196,7 @@
             throw new Error("Node layout position is missing or outside the supported range.");
         }
         var outgoing = node.outgoing || [];
-        if (!(outgoing instanceof Array) || outgoing.length > 4) {
+        if (!(nativeRecords.array(outgoing)) || outgoing.length > 4) {
             throw new Error("A node can store at most four outgoing connections.");
         }
         setNodeControl(effect, "Node Layout X", Number(node.position.x));
@@ -1353,19 +1406,20 @@
     }
 
     function validateNodeManifest(nodes) {
-        if (!(nodes instanceof Array) || nodes.length > 4095) throw new Error("node manifest is missing or exceeds its limit.");
+        if (!(nativeRecords.array(nodes)) || nodes.length > 4095) throw new Error("node manifest is missing or exceeds its limit.");
         var seen = {};
         var edgeIds = {};
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
             if (!node || typeof node.id !== "string" || !/^[0-9a-fA-F]{32}$/.test(node.id) ||
-                !nativeNodeType(node.type) || !(node.parameters instanceof Array) || node.parameters.length > 64 ||
+                !nativeNodeType(node.type) || !(nativeRecords.array(node.parameters)) || node.parameters.length > 64 ||
                 typeof node.schemaVersion !== "number" || node.schemaVersion < 1 || Math.floor(node.schemaVersion) !== node.schemaVersion ||
                 !node.position || !isFinite(Number(node.position.x)) || !isFinite(Number(node.position.y)) ||
                 Math.abs(Number(node.position.x)) > 1000000000 || Math.abs(Number(node.position.y)) > 1000000000 ||
-                !(node.outgoing instanceof Array) || node.outgoing.length > 4) {
+                !(nativeRecords.array(node.outgoing)) || node.outgoing.length > 4) {
                 throw new Error("node manifest contains an invalid node record.");
             }
+            nativeRecords.schema(node);
             node.id = node.id.toLowerCase();
             if (/^0{32}$/.test(node.id) || node.id === "000000000000000000000000000000ff") {
                 throw new Error("Node identities must be nonzero and cannot use the renderer's Output identity.");
@@ -1458,7 +1512,7 @@
     function sameNodeParameters(left, right) {
         if (!left || !right || left.type !== right.type || left.schemaVersion !== right.schemaVersion) return false;
         function close(a,b) {
-            if (a instanceof Array && b instanceof Array) {
+            if (nativeRecords.array(a) && nativeRecords.array(b)) {
                 if (a.length !== b.length) return false;
                 for (var i=0;i<a.length;i++) if (!close(a[i],b[i])) return false;
                 return true;
@@ -1686,7 +1740,11 @@
             }
         }
         if (failed) return { ok: false, error: { code: "graph_commit_failed", message: failed } };
-        var acceptedNonce = Number(receipt.value);
+        // A supervised native callback may replace indexed-group children.
+        // Only the plain target identity survives publication.
+        var acknowledged=graphCarrierTarget({pinTarget:true,target:{token:resolved.token}});
+        if(acknowledged.error)return {ok:false,error:acknowledged.error};
+        var acceptedNonce = Number(acknowledged.properties.receipt.value);
         if (acceptedNonce !== nonce) {
             if (acceptedNonce === -nonce) {
                 return { ok: false, error: { code: "graph_commit_rejected", message: "The effect rejected the graph transaction. The existing graph was kept." },
@@ -1881,6 +1939,8 @@
             resolved.properties.nodeEffectsReady.setValue(1);
             var receipt = triggerGraphCarrier(resolved, "Starfield: compile node effects", request.requestId, null, false);
             if (!receipt.ok) throw new Error(receipt.error.message);
+            resolved=graphCarrierTarget(request);
+            if(resolved.error)throw new Error(resolved.error.message);
             var snapshot = nativeSnapshot(resolved);
             if (!snapshot.initialized) throw new Error("The renderer did not acknowledge the independent node records.");
             return reply({ ok: true, operation: "syncGraphSnapshot", requestId: request.requestId || "",
@@ -1963,6 +2023,8 @@
             var nonce = nextGraphNonce(fresh.properties.commit, fresh.properties.receipt);
             var receipt = triggerGraphCarrier(fresh, "Starfield: edit graph", request.requestId, nonce, false);
             if (!receipt.ok) throw new Error(receipt.error && receipt.error.message || "The graph carrier rejected the edit.");
+            fresh=graphCarrierTarget(request);
+            if(fresh.error)throw new Error(fresh.error.message);
             var updated = nativeSnapshot(fresh);
             if (!updated || !updated.initialized || updated.revision <= snapshot.revision) {
                 throw new Error("The host acknowledgement did not match the saved graph snapshot.");
@@ -2251,7 +2313,7 @@
         if (typeof request.baseRevision !== "string" || request.baseRevision.length === 0) {
             return fail("invalid_request", "baseRevision from the last getState response is required.");
         }
-        if (!(request.changes instanceof Array) || request.changes.length === 0 || request.changes.length > MAX_CHANGES) {
+        if (!(nativeRecords.array(request.changes)) || request.changes.length === 0 || request.changes.length > MAX_CHANGES) {
             return fail("invalid_request", "changes must contain 1 to " + MAX_CHANGES + " entries.");
         }
         var report = { resolution: "name" };
@@ -2698,7 +2760,7 @@
         try {
             modelAuthor(session);
             if(typeof bytes!=="number" || Math.floor(bytes)!==bytes || bytes<=0 || bytes>modelByteLimit ||
-                !(bounds instanceof Array) || bounds.length!==6)throw new Error("Invalid native Model payload.");
+                !(nativeRecords.array(bounds)) || bounds.length!==6)throw new Error("Invalid native Model payload.");
             for(var i=0;i<6;i++)if(bounds[i]!==session.bounds[i])throw new Error("Native Model bounds do not match the author.");
             session.bytes=bytes;session.state="receiving";return "1";
         } catch(error){modelTransferFailure(session,error.toString());return "0";}
@@ -2756,7 +2818,7 @@
     // File transport is loaded only by explicit preset file actions. Its sessions
     // contain bounded plain data; these closures carry no host object references.
     host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
-    host.__SFLD_modelTransactionAPI={gatewayBuild:GATEWAY_BUILD,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
+    host.__SFLD_modelTransactionAPI={gatewayBuild:GATEWAY_BUILD,recordContractId:nativeRecords.id,recordSchema:nativeRecords.schema,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
         resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
         validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
         remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,

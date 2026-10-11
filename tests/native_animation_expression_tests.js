@@ -2,12 +2,16 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const expressions = JSON.parse(fs.readFileSync(path.join(root, "artifacts/native-animation-expressions.json"), "utf8"));
-assert.equal(expressions.length, 74);
+assert.equal(expressions.length, 79);
 function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {name:`Node UUID ${n}`,value:n === 7 ? uuid : 0};
     Object.keys(values).forEach(key => properties[key] = {get value(){return typeof values[key]==="function" ? values[key]() : values[key];}});
-    const effect = {param(index){if(!properties[index]) return {value:Number(index)};return properties[index];}};
+    const example=expressions.find(text=>text.includes(`fx.param(${firstUuid}).name`));
+    assert.ok(example,"actual generated expression for this registered kind");
+    const count=/fx.numProperties === (\d+) &&/.exec(example);
+    assert.ok(count,"native layout gate precedes any numeric child resolution");
+    const effect = {numProperties:Number(count[1]),param(index){if(!properties[index]) return {value:Number(index)};return properties[index];}};
     Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
 }
 let frameTime=0;
@@ -40,9 +44,9 @@ assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer,th
 // Looking at their numeric values while searching creates expression-to-
 // expression dependencies, including a dependency on the current alias itself.
 let unrelatedReads=0;
-const renderer={param(index){return {name:`Node Input ${index-98}`,
+const renderer={numProperties:2000,param(index){return {name:`Node Input ${index-98}`,
     get value(){unrelatedReads++;throw new Error("recursive renderer binding evaluated");}};}};
-const unrelated={param(){return {name:"Animated parameter",get value(){unrelatedReads++;return 0;}};}};
+const unrelated={numProperties:15,param(){return {name:"Animated parameter",get value(){unrelatedReads++;return 0;}};}};
 for(const effects of [[renderer,emitter,particle,force,renderer,unrelated],
     [unrelated,renderer,force,particle,duplicate,emitter]]) {
     const layer=()=>({numProperties:effects.length});layer.effect=index=>effects[index-1];
@@ -53,10 +57,16 @@ for(const effects of [[renderer,emitter,particle,force,renderer,unrelated],
 }
 assert.equal(unrelatedReads,0,"UUID lookup never evaluates renderer or unrelated animated values");
 // Keep a regression demonstrating what the previous generated expressions did.
-const legacy=originExpression.replace(/fx\.param\(\d+\)\.name === "Node UUID 0" && /,"");
+const legacy=originExpression.replace(/fx.numProperties === \d+ && /,"").replace(/fx\.param\(\d+\)\.name === "Node UUID 0" && /,"");
 const oldLayer=()=>({numProperties:2});oldLayer.effect=index=>index===1?renderer:emitter;
 vm.runInNewContext(legacy,{thisLayer:oldLayer,thisProperty});
 assert.ok(unrelatedReads>0,"legacy lookup reads renderer animation aliases while searching");
+let incompatibleLookups=0;
+const foreignLayouts=[90,100,110,2000].filter(count=>count!==emitter.numProperties).map(count=>({numProperties:count,
+    param(){incompatibleLookups++;throw new Error("cross-kind stream identity mismatch");}}));
+const mixed=()=>({numProperties:foreignLayouts.length+1});mixed.effect=index=>foreignLayouts.concat(emitter)[index-1];
+assert.equal(vm.runInNewContext(originExpression,{thisLayer:mixed,thisProperty}),emitter.param(4).value[0]);
+assert.equal(incompatibleLookups,0,"mixed Model/Transform/renderer layouts are rejected before resolving numeric streams");
 const ownLayer=()=>({numProperties:2});
 ownLayer.effect=index=>{assert.notEqual(index,1,"own renderer is skipped before any property lookup");return emitter;};
 assert.equal(vm.runInNewContext(originExpression,{thisLayer:ownLayer,

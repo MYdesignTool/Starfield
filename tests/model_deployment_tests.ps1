@@ -1,9 +1,9 @@
-param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64)][int]$InstalledModelBuild=61)
+param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64,65)][int]$InstalledModelBuild=61)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: simulated complete native61/CEP62 deployment and paired rollback under artifacts; add -Run.';exit 0}
-$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){$InstalledModelBuild+2}else{61}
-$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){$InstalledModelBuild+3}else{62}
+$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 65){71}else{$InstalledModelBuild+2}}else{61}
+$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 65){71}else{$InstalledModelBuild+3}}else{62}
 $taskRoot=Join-Path $taskRepo ('artifacts/deploy-test/model-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
 $taskChecks=0

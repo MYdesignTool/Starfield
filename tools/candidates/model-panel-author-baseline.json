@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Released native65/Core ABI8/CEP70 Model Particle layout projection and current gateway pairing; AE2023 qualification open, Face unavailable.",
-  "basePanel": 70,
+  "status": "Installed native65/Core ABI8/CEP71; owner confirms Model add but reports edit/OBJ failures. Native66 source candidate is under verification. First authorized AE launch produced no result; owner deferred a separate existing-instance run.",
+  "basePanel": 71,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "C00FEB59DC4230ABF9CC51AED662AD04A7A3A3BA0184AD83E07C794BFC1FCE91"
+      "normalizedSha256": "2833C940F48815780690FAB43BE0B471087E33A92C4AD8FD9AF5EC1D3CD8CD32"
     },
     {
       "path": "css/panel.css",
@@ -13,7 +13,7 @@
     },
     {
       "path": "js/graph_edits.js",
-      "normalizedSha256": "838526A5DF64DCF0632491DB81438D06667635CDA798BD5F5FA9097B1B59372B"
+      "normalizedSha256": "3F01998B99AEB7E095621541F3C6265337A88DC50C9FB34096FC88EEB589D725"
     },
     {
       "path": "js/native_graph_snapshot.js",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "97DE55ADA4309894844EFF67A99B56C98D63ACBF8FCDB763B1ADE6E3BAA7482B"
+      "normalizedSha256": "F1287D96CE8188A7C6FBB68B14DAB4768864239307F6D1434023D7D0A792E6A8"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "390CCA405C892D8EC09EF400283102D7EF9AD72BC0C1DAD9CFE0AF281D08BF71"
+      "normalizedSha256": "3D1816FD3D07577E0ADAA6D8E9E4AA430698C9B097D160930D68BA367B9C4CF6"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "60022DE84D22AD92E0D2202BEB29D7F404D60421332A5ED643D0DF17171F5AE8"
+      "normalizedSha256": "B4D9E140B325A6911B3A11EA1ACB47B02E514BD1AB62A84048AD5ACBFDA78C5B"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "F0E7731CF30FD9CB10BF0B63B8E65FD5F5E86F4314B72C7870EE1372B89C3E05"
+      "normalizedSha256": "0AFBC7177AEEAAE43D887ABA65BA42C42E8506653E6EEF325C46233FBC315F8E"
     }
   ]
 }

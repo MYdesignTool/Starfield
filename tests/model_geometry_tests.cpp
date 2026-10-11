@@ -73,6 +73,17 @@ int main(){
     const std::string continuation="\xef\xbb\xbf# OBJ data\r\nv +0 0 0\r\nv 1e0 0 0 # vertex\r\nv 0 1 0\r\no ignored\r\ng ignored\r\ns 1\r\nmtllib material.mtl\r\nusemtl flat\r\nf 1 \\\r\n 2 3 #face\r\n";
     check(parse(continuation).has_value(),"BOM CRLF comments names and continuation parse as data");
     const auto immutable=triangle;auto copy=parse(immutable);check(copy.has_value() && immutable==triangle,"parser does not modify input bytes");
+    // Reduced from the owner's Cinema 4D export: decimal rounding, not a warped face.
+    const std::string rounded_quad="v 8.491384 87.894997 -3.271388\nv 8.972266 88.259541 -3.456652\n"
+        "v 9.958464 88.259541 0\nv 9.424725 87.894997 0\nf 1 2 3 4\n";
+    auto rounded=parse(rounded_quad);check(rounded.has_value() && rounded.value().triangles.size()==2,
+        "decimal-rounded Cinema 4D quad triangulates without flattening");
+    if(rounded.has_value())check(rounded.value().positions[0].value.x==8.491384 &&
+        rounded.value().positions[1].value.y==88.259541 && rounded.value().positions[1].value.z==-3.456652,
+        "rounding tolerance leaves all original vertex coordinates intact");
+    check(parse("v 0 0 0\nv 1 0 0\nv 1 1 0.000001\nv 0 1 0\nf 1 2 3 4\n").has_value(),
+        "sub-micro extent planarity noise is accepted");
+    rejected("v 0 0 0\nv 1 0 0\nv 1 1 0.00001\nv 0 1 0\nf 1 2 3 4\n",ErrorCode::invalid_request);
     const std::string square="v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nv 500 500 500\nf 1 2 3 4\n";
     auto quad=parse(square);check(quad.has_value() && quad.value().triangles.size()==2 && quad.value().bounds.maximum.x==1 && quad.value().bounds.maximum.z==0,
         "bounds cover referenced faces rather than unrelated positions");

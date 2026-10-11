@@ -13,6 +13,10 @@ struct ModelAuthorCapture {
     core::ModelLocalSettings pose{};
     core::ModelGeometry geometry{};
 };
+struct ModelObjDiagnostic {
+    std::size_t line{};
+    const char* detail{}; // Static core message; no source text or borrowed file data.
+};
 // Registers streams1..18 only. The node module appends shared identity/topology.
 // No Model module or selector is exposed until the full resource path is ready.
 [[nodiscard]] PF_Err register_model_author_controls(PF_InData*) noexcept;
@@ -27,5 +31,6 @@ struct ModelAuthorCapture {
 // Prepares a new owned handle, leaves every live control untouched on success
 // and failure. Caller must commit through the UI transaction or dispose it.
 [[nodiscard]] PF_Err prepare_model_obj_parameter(PF_InData*,std::string_view,
-    PF_ArbitraryH*,const core::Cancellation&,core::ModelBounds* bounds=nullptr) noexcept;
+    PF_ArbitraryH*,const core::Cancellation&,core::ModelBounds* bounds=nullptr,
+    ModelObjDiagnostic* diagnostic=nullptr) noexcept;
 }

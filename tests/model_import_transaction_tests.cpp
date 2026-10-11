@@ -112,6 +112,9 @@ void checkpoints(PF_InData& data){
 void transactions(PF_InData& data){
     setup(data);PF_OutData out{};const auto original=mesh_bytes();
     CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),"bad",never)!=0&&writes==0&&mesh_bytes()==original);
+    CHECK(std::strstr(out.return_msg,"Unsupported OBJ statement") && std::strstr(out.return_msg,"line 1"));
+    out={};CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 4\n",never)!=0 && writes==0 && mesh_bytes()==original);
+    CHECK(std::strstr(out.return_msg,"Invalid OBJ face index") && std::strstr(out.return_msg,"line 4"));
     CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),triangle,cancelled)==PF_Interrupt_CANCEL&&writes==0);
     CHECK(adapter::import_model_obj_text(&data,&out,pointers.data(),triangle,never)==0&&host_values[layout::source].one_d==2&&
         host_values[layout::revision].one_d==1&&host_values[guard].one_d==0&&syncs==1&&undo_groups==1&&undo_ends==1);

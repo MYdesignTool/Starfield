@@ -120,33 +120,62 @@
     // portable graph schema is determined by that complete field layout, not
     // by a potentially stale projection label. This never upgrades graph hex
     // or adds defaults to an older project's missing controls.
+    // BEGIN STARFIELD NATIVE RECORD CONTRACT
+// One ES3 factory embedded verbatim in both CEP planning and the AE gateway.
+// Portable control layouts only: native disk IDs/ABI/defaults stay elsewhere.
+function createNativeRecordContract() {
+    var prefix="org.starfieldfx.nodes.",specs={
+        emitter:{version:7,required:{"2":4,"3":3,"5":3,"6":5,"7":5,"8":4,"9":4,"10":4,"11":4,"12":4,
+            "14":4,"15":4,"16":4,"17":3,"18":4,"19":4,"20":4,"21":4,"22":4,"23":3,
+            "24":4,"25":4,"26":4,"27":4,"28":4,"29":4,"30":4,"31":3,"32":5},optional:{}},
+        particle:{version:7,required:{"1":5,"3":4,"4":4,"5":4,"6":4,"9":4,"10":4,"11":4,"12":3,"13":7,
+            "14":4,"15":3,"16":4,"17":3,"18":5,"19":4,"20":5,"21":4,"22":3,"23":4,
+            "24":3,"25":3,"26":4,"28":4,"29":4},optional:{"7":7,"8":7,"27":7,"30":3,"31":3,
+            "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
+        force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
+        transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
+    };
+    function own(object,key){return Object.prototype.hasOwnProperty.call(object,key);}
+    function array(value){return Object.prototype.toString.call(value)==="[object Array]";}
+    function integer(value,min,max){return typeof value==="number" && isFinite(value) && Math.floor(value)===value && value>=min && value<=max;}
+    function spec(type){if(typeof type!=="string" || type.substr(0,prefix.length)!==prefix)return null;
+        var kind=type.substr(prefix.length);if(!own(specs,kind))return null;return specs[kind];}
+    function invalid(node,detail){var error=new Error("Native node "+(node && node.id || "missing")+" ("+
+        (node && node.type || "missing")+") control record: "+detail+".");error.code="invalid_native_node_record";throw error;}
+    function wire(field){var value=field.value;
+        if(field.type===2)return integer(value,-2147483648,2147483647);
+        if(field.type===3)return integer(value,0,4294967295);
+        if(field.type===4)return typeof value==="number" && isFinite(value);
+        if(field.type===5){if(!array(value) || value.length!==3)return false;
+            for(var axis=0;axis<3;axis++)if(typeof value[axis]!=="number" || !isFinite(value[axis]))return false;return true;}
+        if(field.type===7){var tag=Object.prototype.toString.call(value);
+            if(!array(value) && tag!=="[object Uint8Array]")return false;
+            if(!integer(value.length,0,24576))return false;
+            for(var byteIndex=0;byteIndex<value.length;byteIndex++)if(!integer(value[byteIndex],0,255))return false;return true;}
+        return false;
+    }
+    function schema(node){var layout=node && spec(node.type),found={};
+        if(!layout)invalid(node,"unsupported node type");
+        if(!integer(node.schemaVersion,1,layout.version))invalid(node,"unsupported schemaVersion "+node.schemaVersion);
+        if(!array(node.parameters) || node.parameters.length>64)invalid(node,"missing or oversized parameters");
+        for(var p=0;p<node.parameters.length;p++){
+            var field=node.parameters[p];if(!field || !/^[1-9][0-9]*$/.test(String(field.key)))invalid(node,"invalid parameter identity");
+            var key=String(field.key),type=0;
+            if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
+            if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            found[key]=true;
+        }
+        for(var key in layout.required)if(own(layout.required,key) && !found[key])invalid(node,"missing parameter "+key);
+        return layout.version;
+    }
+    return {id:"native-control-contract-1",array:array,schema:schema,version:function(type){var layout=spec(type);
+        if(!layout)invalid({type:type},"unsupported node type");return layout.version;}};
+}
+    var nativeRecords=createNativeRecordContract();
+    // END STARFIELD NATIVE RECORD CONTRACT
     function nativeRecordSchema(record) {
-        var kind = Object.keys(TYPES).filter(function (key) { return TYPES[key] === record.type; })[0];
-        if (!kind || kind === "output" || !Array.isArray(record.parameters)) {
-            fail("invalid_native_node_record", "The host returned an unsupported native node record.");
-        }
-        var expected = SCHEMA_VERSIONS[kind], fields = {}, optional = {}, found = {};
-        if (!Number.isInteger(record.schemaVersion) || record.schemaVersion < 1 || record.schemaVersion > expected) {
-            fail("invalid_native_node_record", "The host returned an unsupported " + kind + " record version.");
-        }
-        DEFAULTS[kind].forEach(function (p) { fields[p.key] = p.type; });
-        if (kind === "particle") optional = {"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4};
-        if (kind === "force") optional = {"9":7};
-        if (kind === "transform") optional = {"7":7,"8":3};
-        Object.keys(optional).forEach(function (key) { fields[key] = optional[key]; });
-        record.parameters.forEach(function (p) {
-            var key = String(p.key);
-            if (!Object.prototype.hasOwnProperty.call(fields,key) || p.type !== fields[key] || found[key]) {
-                fail("invalid_native_node_record", "The " + kind + " native control layout differs at parameter " + key + ".");
-            }
-            found[key] = true;
-        });
-        Object.keys(fields).forEach(function (key) {
-            if (!found[key] && !Object.prototype.hasOwnProperty.call(optional,key)) {
-                fail("invalid_native_node_record", "The " + kind + " native control record is incomplete at parameter " + key + ". Close and reopen the Starfield panels.");
-            }
-        });
-        return expected;
+        return nativeRecords.schema(record);
     }
 
     function copyValue(value) {

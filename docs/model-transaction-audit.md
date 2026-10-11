@@ -1,5 +1,17 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+native65/CEP71于13:38+08部署：源码9b77643冻结27文件逐字节匹配并重跑关键回归，fresh AE0，26hash/selector/runtime和paired Restore通过；native9200c6b/packed32833/ABI8保持，SDK未重建。baseline71重现27安装面板字节。备份m3-17-native65-panel71-record-contract-20261011恢复65/70。首次授权启动已执行但无entry/result；owner正在自行测试，后续现有实例调度未获授权，保持离线排查。
+
+## Model编辑及真实OBJ反馈 — 2026-10-11
+
+owner确认Model可添加但慢，编辑时报Model/Transform stream matchName内部校验失败；OBJ时报invalid/oversized。后者已用owner只读文件 `D:\Project\Code\test\test.obj` 离线复现：385660字节，第6680行quad normalized non-planarity3.2092e-8，整体quad最大5.5953e-7，原1e-8阈值误拒绝小数导出误差。候选1e-6容差保留原XYZ、不扩大容量限制、继续拒绝明显扭曲/退化/自交。完整文件修后2858positions/5600triangles，编码SFMG1为384480字节；Core几何4145、控件453及导入20632标准/ASAN通过。错误消息包含静态解析原因与行号，失败仍不写控件。
+
+表达式扫描原先先在任意effect上打开数字UUID参数，再检查name/UUID；Model100、Transform90、Emitter110等真实布局不同。候选在param(index)之前检查完整布局计数，后续name/八UUID字不变。实际mixed Model/Transform native edit及生成表达式执行通过：native8796/camera12标准及ASAN，JS混合644/既有动画通过。该证据证明候选避免跨kind数字子流访问，**不能证明AE内部校验错误已消失**，仍为宿主根因假设。ASAN聚合fixture首次默认栈溢出，测试exe单独增栈16MiB后通过；生产DLL标志不变。
+
+新入口 `tests/RunMixedNodeBindingTests.ps1 -Run [-Sanitize]` 补齐Model链接依赖并运行实际生成JS；旧RunCoreTests的NativeSync范围缺少Model helper链接，本轮失败日志保留，未混入其他工作区测试修改。验收生成器可接收artifacts内的实际SFMG1输出，同一8例覆盖真实模型资源/复制/预设/删除。分页逐页核对，并记录prepare、queue/commit、readback及总耗时；计时含250ms轮询/调度，不能作为native单函数耗时。小mesh172、owner mesh271模拟/ES3检查通过；12页资源回读准备完成，没有真实AE结果或性能改善声明。
+
+native66/packed32834/CoreABI8/CEP71完整源码候选正在冻结构建，未部署。原生参数IDs、effect match names、schema及C ABI保持；只修改开发build号。owner仍在使用65/71，继续原工程测试；不自动启动、关闭、写入其AE或安装路径。
+
 M3-17。CEP70出现另一 UUID 的 schema7/3 错误，owner要求停止逐个报错验收。范围包括 Model/普通图提交、预设、资产传输、脚本生命周期、备份回滚和发布。AE为什么返回3、新UUID的节点类型均未证实。
 
 ## 确认缺口及 CEP71 修正

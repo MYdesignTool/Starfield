@@ -1,6 +1,6 @@
 # Starfield 架构
 
-2026-10-11 M3-17 CEP71候选：同一ES3 ordinary control contract嵌入browser规划和AE gateway，用于五类完整参数布局投影和preflight；Model最终核对调用匹配build/contract API。提交后按plain token重新解析receipt和snapshot，不跨native回调保留indexed-group children。持久化schemas/IDs/ABI8和native65保持；实际注册表矩阵及标准/ASAN通过，AE自动验收待单次启动授权，详见docs/model-transaction-audit.md。
+2026-10-11 13:38+08 M3-17 native65/CEP71已部署：同一ES3 ordinary control contract嵌入browser规划和AE gateway，用于五类完整布局投影和preflight；Model最终核对调用匹配build/contract API。提交后按plain token重取receipt/snapshot。源码9b77643冻结/27字节匹配、fresh AE0、26hash/selector/runtime/配对回滚通过；schemas/IDs/ABI8及native65保持。实际注册矩阵和标准/ASAN通过，首次获准AE启动未产生结果、owner延后现有实例自动调度；native66源码候选修正OBJ小数导出容差并在数字子流访问前检查完整effect布局，实机Model/Transform错误仍待确认，详见docs/model-transaction-audit.md。
 
 2026-10-10当前配对native62/CEP64修正Model project root ID0：CEP/原生事务、资产传输及OBJ checkpoint允许非负root，0仍须与实际SDK根项匹配；comp/layer保持正值。完整May2023八目标构建及26安装hash/rollback通过，真实AE Model gate保持开放。该源码包含M3-18数字计算层与snapshot10读取/写入能力，但没有Motion原生/CEP作者入口；owner允许未来按可操作模式分批部署，不要求三个作者一起完成。
 

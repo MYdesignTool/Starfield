@@ -40,8 +40,11 @@ PF_Err import_model_obj_text(PF_InData* data,PF_OutData* out,PF_ParamDef* params
         return PF_Err_BAD_CALLBACK_PARAM;
     for(int axis=0;axis<6;++axis)if(!params[layout::author_bounds_first+axis]||
         params[layout::author_bounds_first+axis]->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_BAD_CALLBACK_PARAM;
-    core::ModelBounds bounds{};PF_ArbitraryH candidate{};auto error=prepare_model_obj_parameter(data,text,&candidate,cancel,&bounds);
-    if(error){if(error!=PF_Interrupt_CANCEL)std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield OBJ: invalid or oversized mesh (error %d).",int(error));return error;}
+    core::ModelBounds bounds{};ModelObjDiagnostic diagnostic;PF_ArbitraryH candidate{};
+    auto error=prepare_model_obj_parameter(data,text,&candidate,cancel,&bounds,&diagnostic);
+    if(error){if(error!=PF_Interrupt_CANCEL)std::snprintf(out->return_msg,sizeof(out->return_msg),
+        "Starfield OBJ: %s (line %llu, error %d).",diagnostic.detail?diagnostic.detail:"Mesh preparation failed",
+        static_cast<unsigned long long>(diagnostic.line),int(error));return error;}
     struct Mesh{PF_InData* data;PF_ArbitraryH handle;~Mesh(){data->utils->host_dispose_handle(handle);}} mesh{data,candidate};
     if(checkpoint){const auto checked=validate_model_import_checkpoint(data,*checkpoint);
         if(checked){std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield OBJ: target or Model author changed before commit. Import cancelled.");return checked;}}

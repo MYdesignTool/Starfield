@@ -11,9 +11,15 @@ const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.fro
 let sequence=10000;const next=()=>uuid(++sequence),steps=[];
 const markerFront=1270000044,markerBack=1270000066;
 const geometry=Buffer.alloc(164);geometry.write("SFMG");geometry.writeUInt16LE(1,4);geometry.writeUInt16LE(32,6);geometry.writeUInt32LE(164,8);geometry.writeUInt32LE(3,16);geometry.writeUInt32LE(1,28);
-const bounds=[-2,-3,-4,2,3,4];[[-2,-3,-4],[2,3,4],[2,-3,4]].forEach((v,i)=>v.concat(1).forEach((n,a)=>geometry.writeDoubleLE(n,32+i*32+a*8)));
+let bounds=[-2,-3,-4,2,3,4];[[-2,-3,-4],[2,3,4],[2,-3,4]].forEach((v,i)=>v.concat(1).forEach((n,a)=>geometry.writeDoubleLE(n,32+i*32+a*8)));
 for(let i=0;i<3;i++){geometry.writeUInt32LE(i,128+i*12);geometry.writeUInt32LE(0xffffffff,132+i*12);geometry.writeUInt32LE(0xffffffff,136+i*12);}
-geometry.writeUInt32LE(codec.crc32(geometry.subarray(32)),12);const meshHex=geometry.toString("hex");assert.deepEqual(assets.validateMesh(meshHex).bounds,bounds);
+geometry.writeUInt32LE(codec.crc32(geometry.subarray(32)),12);let meshHex=geometry.toString("hex");assert.deepEqual(assets.validateMesh(meshHex).bounds,bounds);
+// An optional owned numeric mesh permits the same full transaction/preset/
+// duplicate suite to use a real parser output without retaining the user's OBJ.
+if(process.argv[5]){const meshPath=path.resolve(process.argv[5]);
+    if(!meshPath.startsWith(path.join(root,"artifacts")+path.sep))throw Error("Acceptance mesh must be under artifacts.");
+    const mesh=fs.readFileSync(meshPath);if(mesh.length>8*1024*1024)throw Error("Acceptance mesh exceeds the Model budget.");
+    meshHex=mesh.toString("hex");bounds=assets.validateMesh(meshHex).bounds;}
 function parameter(n,key,value){n.parameters.find(p=>p.key===String(key)).value=value;}
 function portableAssets(g){return g.nodes.filter(n=>n.type===edits.types.model && n.parameters.find(p=>p.key==="13").value===1)
     .map(n=>({nodeId:n.id,source:2,revision:17,bounds:bounds.slice(),meshHex}));}
@@ -40,8 +46,21 @@ const preset=copy(graph),presetAssets=portableAssets(preset),resources=[{id:mark
 const encoded=presets.encode(preset,"Model acceptance","Checks",resources,presetAssets),decoded=presets.decode(encoded);
 for(const mode of ["add","replace"]){graph=presets.apply(graph,{type:"applyPreset",presetGraph:decoded.graph,presetModelAssets:decoded.modelAssets,presetResources:decoded.resources,mode,applyRenderSettings:true,layerResources:resources},next);save("resource preset "+mode,graph);}
 graph=edits.apply(graph,{type:"deleteNodes",nodeIds:graph.nodes.filter(n=>n.type===edits.types.model).map(n=>n.id)},next);save("delete Model nodes with existing Texture references",graph);
-fs.mkdirSync(destination,{recursive:true});const fixtures={version:1,gatewayBuild:build,markerFront,markerBack,steps};
+const exportPages=steps.reduce((sum,step)=>sum+step.assets.reduce((pages,a)=>pages+Math.ceil(a.meshHex.length/65536),0),0);
+fs.mkdirSync(destination,{recursive:true});const fixtures={version:1,gatewayBuild:build,markerFront,markerBack,steps,
+    deadlineMilliseconds:Math.min(600000,120000+exportPages*500)};
 fs.writeFileSync(path.join(destination,"fixtures.json"),JSON.stringify(fixtures));
 const config={version:1,gatewayBuild:build,repo:root,fixture:path.join(destination,"fixtures.json"),result:path.join(destination,"result.json")};
-fs.writeFileSync(path.join(destination,"Run.jsx"),'$.global.__SFLD_modelAcceptanceConfig='+JSON.stringify(config)+';\n$.evalFile(new File('+JSON.stringify(path.join(root,"tools/Run-ModelAcceptance.jsx"))+'));\n');
+// ASCII source avoids relying on the host's source-file encoding for Unicode paths.
+// The entry log deliberately does not require JSON: a cold ExtendScript engine
+// must report a missing JSON runtime before loading the production gateway.
+const literal=value=>JSON.stringify(value).replace(/[^\x20-\x7e]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+const wrapper='(function(){\n'+
+    'function quote(s){return "\\\""+String(s).replace(/\\\\/g,"\\\\\\\\").replace(/"/g,"\\\\\\\"").replace(/\\r/g,"\\\\r").replace(/\\n/g,"\\\\n").replace(/\\t/g,"\\\\t")+"\\\"";}\n'+
+    'function entry(stage,error){var f=new File('+literal(path.join(destination,'entry.json'))+');f.encoding="UTF-8";if(!f.open("w"))throw new Error("Cannot write acceptance entry log.");try{f.write("{\\\"stage\\\":"+quote(stage)+",\\\"error\\\":"+quote(error)+"}");}finally{f.close();}}\n'+
+    'try{entry("entered","");if(typeof JSON==="undefined" || typeof JSON.parse!=="function" || typeof JSON.stringify!=="function")throw new Error("Missing JSON runtime in the AE script engine.");\n'+
+    '$.global.__SFLD_modelAcceptanceConfig='+literal(config)+';entry("dispatching","");\n'+
+    '$.evalFile(new File('+literal(path.join(root,"tools/Run-ModelAcceptance.jsx"))+'));entry("scheduled","");\n'+
+    '}catch(error){entry("failed",String(error)+" (line "+error.line+")");}\n}());\n';
+fs.writeFileSync(path.join(destination,"Run.jsx"),wrapper);
 console.log(`Prepared ${steps.length} production-planner AE cases at ${destination}; no AE process/project was changed.`);
