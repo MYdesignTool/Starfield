@@ -1,8 +1,8 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native65/CEP67 live-guard fix deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+Status: native65/CEP68 fresh Property resolution deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
-### CEP68 indexed Property lifetime correction candidate — 2026-10-11
+### CEP68 indexed Property lifetime correction — 2026-10-11
 
 The owner reports ReferenceError/Object is invalid at prepare stage3, with both
 rollback errors0. The actual gateway fixture reproduces that error when a native
@@ -18,6 +18,16 @@ preset583 and full ES3 three-file18. Panel deployment accepts recorded native65
 in addition to native61, verifies every hash and selector, and retains native
 source identity. Dummy65/67→65/68 and61/62→61/63 each pass64 with complete paired
 restoration. This demonstrates the cache gap, not proven AE2023 host cause.
+
+At10:26+08 the panel was published from frozen committed sourced974522 after
+27 candidate byte hashes matched. A fresh zero-AE check allowed KeepNative;
+all eight native65 bytes, Core selector and native source9200c6b were retained.
+26 installed hashes and paired Restore report passed; backup
+m3-17-native65-panel68-indexed-refs-20261011 restores65/67. The nested archive
+patch skip/exit0 discovered by freeze comparison was corrected using paths from
+the enclosing Git root; independent marker regression15 passes. Installed
+baseline68 reproduces all27 panel files. Await owner Model add/undo/reopen checks;
+this CEP-only change needs no native SDK rebuild and does not qualify AE.
 
 At01:44+08 native65/packed32833/CoreABI8/CEP67 was installed from frozen local
 9200c6bec7cf54a9e34c82b061ddd3e0bf82909d. Complete May2023 /MT eight-target

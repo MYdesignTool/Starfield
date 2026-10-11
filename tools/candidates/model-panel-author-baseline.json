@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Released native65/Core ABI8/CEP67 authoritative saved transaction guards; AE2023 Model qualification open, Face unavailable.",
-  "basePanel": 67,
+  "status": "Released native65/Core ABI8/CEP68 fresh Model graph target Property caches; AE2023 qualification open, Face unavailable.",
+  "basePanel": 68,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "5F86A8B838776F5E44AF71ABD5E876AE3A2424FF8A3A8C4EBD4FA7644ED63081"
+      "normalizedSha256": "CB23A9F3C8F8EF1BBD0366749A8E0506532BA5AEC25820C3C1E10AB3CF5B933E"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "079A966C32AC7A138CA2A00F7FCECC139EBDCED8EC537C23B871A3AA58783780"
+      "normalizedSha256": "7024D73C215705FD892016A12CF362B902FA3D545C9250054041479498067C56"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "8F31B5C526EB14DCF9B2F87DBF6C3C6A6E3D6F6E74FE9550D0253CB717CD94B4"
+      "normalizedSha256": "616C8AC8F1A0FC82C404790E96AF355BE4533DCD8C7F95028BC8F70466577591"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "09473035E8A2A3B8CB1F6A8F89BFB2799AA326B5464FFF55BFBC6B27C9708A47"
+      "normalizedSha256": "7A1C92700E45159752E1702D011F180F1E59A5CC160A05F05A1794D083CC9FC7"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "BD1F946804B694F319061AE2F78EAA18BD285B59BE5CE2E81E2DE85A9CB866FF"
+      "normalizedSha256": "B74290EC127063A424E6A235FF0CE9402C9B82025B6CA5BB4CE98661B99513FC"
     }
   ]
 }

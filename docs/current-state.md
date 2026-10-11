@@ -1,14 +1,20 @@
 # 当前工程状态
 
-## CEP68 准备阶段引用修正候选（2026-10-11）
+## 当前安装：native65 / CEP68（2026-10-11 10:26+08）
 
 owner 报 `graph_commit_failed: ReferenceError: Object is invalid (stage 3, error 516, rollback 0, asset rollback 0)`。stage3 是 JS prepare，尚未开始资产写入。实际 gateway 的扩充 DOM 夹具在复用 effect wrapper 身份、旧 child Property 失效时复现同样错误；原缓存仅靠 effect 身份命中，且原生备份到 Prepare 之间没有清理。每次重新解析 graph 目标都清空 Property/图层缓存，仍保留单次操作中的查找复用。prepare 错误直接包含具体步骤。此证据确认缓存生命周期缺口，不认定 AE 实机根因或验收完成。
 
-仅准备 CEP68，native65/packed32833/CoreABI8 及其冻结源码9200c6b保持。DOM fresh/reused 各42、transport555、asset588、author74、preset583、完整三JSX ES3 18、新65/67→65/68和旧61/62→61/63 dummy部署/整套回滚各64通过；日志 artifacts/m3-17-indexed-refs-*。首次预设测试入口误拼未运行，正确 model_preset_file_tests 已通过。冻结候选及实机发布继续；Git push 仍等待已有明确授权请求答复。
+CEP68 已从本地提交d974522ddb0481419c42f146855771d721fa431c git archive冻结重现，27面板文件字节匹配已测候选；fresh AE process0后经Deploy-PanelTestBuild→Deploy-TestBuild -KeepNative部署，native65/packed32833/CoreABI8及冻结源码9200c6b保持。26安装hash、selector/selected runtime和paired Restore report通过；receipt artifacts/m3-17-native65-panel68-indexed-refs-20261011-{before,after}.json，checker Check-ModelIndexedInstalledPair.ps1。DOM fresh/reused 各42、transport555、asset588、author74、preset583、完整三JSX ES3 18、新65/67→65/68和旧61/62→61/63 dummy部署/整套回滚各64通过；日志 artifacts/m3-17-indexed-refs-*。首次预设测试入口误拼未运行，正确 model_preset_file_tests 已通过。Git push 仍等待已有明确授权请求答复。部署后按owner既有要求暂停等待添加Model实机验收，完整目标未完成。
 
 首次 git archive 冻结内容比对拦住未应用的 gateway patch：从仓库内的快照子目录执行 git apply 会 skip 且 exit0。Prepare工具现解析实际 enclosing Git root，再给出候选相对该root的完整路径；保持artifact边界和补丁文件白名单。独立nested archive marker回归15通过，修正版快照27文件逐字节一致；失败快照保留作诊断，不用于部署。
 
-## 当前安装：native65 / CEP67（2026-10-11 01:44+08）
+新备份可恢复native65/CEP67，较早65/67→64/66等备份保留。一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native65-panel68-indexed-refs-20261011' -Restore
+```
+
+## native65 / CEP67 部署记录（2026-10-11 01:44+08）
 
 owner新增截图为脚本404行的native node compile/parameter1/stream-1/error516；触发动作和具体SDK失败点尚未确认。实际Model Source回调fixture复现守卫缺口：params[] guard0而live renderer guard1仍会独立提交，live Model guard1/2也未阻止旧delivery。修正先读源节点和主渲染器的实时常量guard，再读取UUID/编译；guard2备份排除、guard1事务负责最终发布，正常原生Source编辑保持。编译诊断增加本地阶段/效果索引，不改IDs/schema/ABI8。不是实机根因或修复完成声明，owner应直接复验原触发步骤，不再要求重复运行只读报告。
 
