@@ -57,6 +57,13 @@ build's SHA-256 fingerprint of AEX source and ABI inputs before building; if
 any differ, it refuses the core-only path and requires a matching AEX rebuild
 and installation. The full build publishes both binaries and matching PDBs.
 
+2026-10-12 fingerprint amendment: the full-build manifest also derives all
+checkout-owned ClCompile/ClInclude inputs from the three AEX projects and all
+local ae_plugin/Core public/private headers. This covers omitted MotionGeometry,
+Host ModelScene, TransformNullUI/LayerPicker and transitive CurveEditorModel.
+It deliberately prefers an unnecessary paired rebuild to an omitted adapter
+dependency; generated SDK/GPU artifacts stay separate local build inputs.
+
 The release bundle pins `StarfieldCore.dll` next to the `.aex` and does not
 depend on a developer workspace. The match name, existing AE parameter IDs,
 packed plug-in version and graph schema are unchanged by this split. A core

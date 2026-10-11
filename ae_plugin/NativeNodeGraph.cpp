@@ -495,15 +495,29 @@ core::OpaqueBytes make_layout_record(std::vector<LayoutEntry>& entries) {
     return bytes;
 }
 
-core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
+core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes,const std::vector<RawNode>& previous) {
     std::sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    std::array<bool,kNativeBindingCapacity> used{};
+    // Adding a lower UUID must not move an existing effect to another alias.
+    // The on-disk readers already support non-contiguous, unique slot spans.
+    for(auto& node:nodes) {
+        const auto old=std::find_if(previous.begin(),previous.end(),[&](const auto& n){return n.id==node.id && n.kind==node.kind;});
+        if(old==previous.end())continue;
+        for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index) {
+            auto& field=node.fields[index];const auto& before=old->fields[index];
+            if(!field.present || !animated_index(node.kind,index) || !before.present || before.type!=field.type || before.slot<0)continue;
+            const auto count=component_count(field.type);
+            if(before.slot+count>kNativeBindingCapacity)return {};
+            for(A_long c=0;c<count;++c)if(used[before.slot+c])return {};
+            field.slot=before.slot;for(A_long c=0;c<count;++c)used[field.slot+c]=true;
+        }
+    }
     core::OpaqueBytes bytes;
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
     const bool births=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
     const bool models=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::model;});
     append_u16(bytes, kBindingRecordTag); append_u16(bytes, std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::material;})?8:models?7:births?6:attachments?2:1); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
-    A_long slot = 0;
     for (auto& node : nodes) {
         const auto field_limit = native_nodes::binding_field_count(node.kind);
         if (field_limit < 1 || static_cast<std::size_t>(field_limit) >= node.fields.size() ||
@@ -519,9 +533,14 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes) {
         append_u16(bytes, count);
         for (A_long index = 1; index <= field_limit; ++index) {
             auto& field = node.fields[index]; if (!field.present) continue;
-            if (animated_index(node.kind,index)) {
-                field.slot = slot; slot += component_count(field.type);
-                if (slot > kNativeBindingCapacity) return {};
+            if (animated_index(node.kind,index) && field.slot<0) {
+                const auto count=component_count(field.type);A_long slot=0;
+                for(;slot+count<=kNativeBindingCapacity;++slot) {
+                    bool free=true;for(A_long c=0;c<count;++c)if(used[slot+c])free=false;
+                    if(free)break;
+                }
+                if(slot+count>kNativeBindingCapacity)return {};
+                field.slot=slot;for(A_long c=0;c<count;++c)used[slot+c]=true;
             }
             append_u16(bytes, static_cast<std::uint16_t>(index));
             append_u16(bytes, static_cast<std::uint16_t>(field.type));
@@ -667,7 +686,8 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
 }
 
 PF_Err resolve_binding_sources(SuiteSet& suites,AEGP_PluginID id,AEGP_LayerH owner,
-    const AEGP_MemorySuite1* memory,std::vector<RawNode>& nodes) {
+    const AEGP_MemorySuite1* memory,std::vector<RawNode>& nodes,bool* has_backups=nullptr) {
+    if(has_backups)*has_backups=false;
     if(nodes.empty())return PF_Err_NONE;
     const AEGP_DynamicStreamSuite4* dynamic{};
     auto error=suites.basic->AcquireSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4,
@@ -704,7 +724,7 @@ PF_Err resolve_binding_sources(SuiteSet& suites,AEGP_PluginID id,AEGP_LayerH own
         if(error)return static_cast<PF_Err>(error);
         Kind kind{};const char* type{};std::uint16_t schema{};if(!decode_node_kind(match,kind,type,schema))continue;
         double guard{};if(!read_one_d(suites,id,raw,native_nodes::sync_guard_index(kind),time,guard))return PF_Err_BAD_CALLBACK_PARAM;
-        if(guard==transaction_backup_guard)continue;
+        if(guard==transaction_backup_guard){if(has_backups)*has_backups=true;continue;}
         core::Uuid128 uuid{};if(!read_uuid(suites,id,raw,native_nodes::uuid_first_index(kind),time,uuid))return PF_Err_BAD_CALLBACK_PARAM;
         for(auto& node:nodes)if(node.id==core::NodeId{uuid}) {
             if(node.kind!=kind || !node.source_name.empty() || names.back().empty())return PF_Err_BAD_CALLBACK_PARAM;
@@ -1092,7 +1112,7 @@ core::PortKey destination_port(Kind kind) noexcept {
         case Kind::force: return kForceParticlesIn;
         case Kind::transform: return kTransformParticlesIn;
         case Kind::model: return kModelMaterialIn;
-        case Kind::material: return {};
+        case Kind::material: return kMaterialGeometryIn;
     }
     return {};
 }
@@ -1424,7 +1444,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             }
             graph.edges.push_back(core::GraphEdge{connection.edge, connection.source,
                 source_port(connection.source_kind), connection.destination,
-                found_destination ? (connection.source_kind==Kind::model && destination_kind==Kind::particle ?
+                found_destination ? ((connection.source_kind==Kind::model || connection.source_kind==Kind::material) && destination_kind==Kind::particle ?
                     core::graph_keys::kParticleModelsIn : destination_port(destination_kind)) : core::PortKey{1}});
         }
 
@@ -1434,7 +1454,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             stage("layout record");
             graph.optional_records.push_back(make_layout_record(layout_entries));
             stage("binding record");
-            auto bindings = make_binding_record(raw_nodes);
+            auto bindings = make_binding_record(raw_nodes,previous_nodes);
             if (bindings.empty() && !raw_nodes.empty()) return PF_Err_BAD_CALLBACK_PARAM;
             if (!bindings.empty()) graph.optional_records.push_back(std::move(bindings));
         }
@@ -1456,6 +1476,7 @@ struct NativeBindingTransaction::Impl {
         A_long index{-1};
         A_long parameter{-1};
         bool changed{};
+        bool retired{};
     };
     PF_InData* data{};
     AEGP_PluginID id{};
@@ -1507,7 +1528,8 @@ PF_Err NativeBindingTransaction::rollback_model_resources() noexcept {
 }
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
-                                        const char** failed_stage, A_long* failed_parameter) noexcept {
+                                        const char** failed_stage, A_long* failed_parameter,
+                                        const core::Graph* previous_graph) noexcept {
     if (failed_stream) *failed_stream = -1;
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
@@ -1515,6 +1537,12 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        std::vector<RawNode> previous_nodes;
+        if(previous_graph && !read_binding_record(*previous_graph,previous_nodes))return PF_Err_BAD_CALLBACK_PARAM;
+        const bool identities_changed=previous_graph && (nodes.size()!=previous_nodes.size() ||
+            std::any_of(nodes.begin(),nodes.end(),[&](const auto& node){
+                return std::none_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& old){
+                    return node.id==old.id && node.kind==old.kind;});}));
         auto& tx = *impl_;
         stage("acquire binding suites");
         auto error = tx.suites.acquire(); if (error) return error;
@@ -1536,7 +1564,8 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             if(ae || !binding_owner)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
         }
         stage("resolve unique literal binding sources");
-        if(const auto result=resolve_binding_sources(tx.suites,tx.id,binding_owner,tx.memory,nodes);result)return result;
+        bool has_backups=false;
+        if(const auto result=resolve_binding_sources(tx.suites,tx.id,binding_owner,tx.memory,nodes,&has_backups);result)return result;
         // Resource slots belong to the renderer: SmartFX cannot checkout a sibling
         // Particle effect's PF_LAYER parameter. Clear only the former occupied tail.
         std::vector<AEGP_LayerIDVal> resource_ids;
@@ -1600,18 +1629,35 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 slot<static_cast<A_long>(resource_ids.size())?resource_ids[slot]:0);result)return result;
         tx.models=std::make_unique<ModelMirrorTransaction>(tx.data,tx.id,tx.renderer,tx.owner_layer);
         if(const auto result=tx.models->install(graph,failed_stream,failed_stage);result)return result;
+        struct Alias {A_long slot,parameter;std::u16string expression;bool retired;};
+        std::vector<Alias> aliases;
+        std::array<bool,kNativeBindingCapacity> occupied{};
+        for(const auto& node:nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
+            const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
+            for(A_long component=0;component<component_count(field.type);++component){
+                occupied[field.slot+component]=true;
+                aliases.push_back({field.slot+component,index,binding_expression(node,index,component),false});
+            }
+        }
+        // Old aliases must stop evaluating before their node disappears. Reuse
+        // the same rollback machinery as active aliases; never scan arbitrary
+        // user streams or alter an unowned slot.
+        for(const auto& node:previous_nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
+            const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
+            for(A_long component=0;component<component_count(field.type);++component)
+                if(!occupied[field.slot+component])aliases.push_back({field.slot+component,index,u"",true});
+        }
         tx.changes.reserve(kNativeBindingCapacity);
-        for (const auto& node : nodes) for (A_long index = 1; index < static_cast<A_long>(node.fields.size()); ++index) {
-            const auto& field = node.fields[index]; if (!field.present || field.slot < 0) continue;
-            for (A_long component = 0; component < component_count(field.type); ++component) {
+        for(const auto& alias:aliases) {
                 tx.changes.emplace_back(); auto& change = tx.changes.back();
-                change.index = kNativeBindingFirstIndex + field.slot + component;
-                change.parameter = index;
+                change.index = kNativeBindingFirstIndex + alias.slot;
+                change.parameter = alias.parameter;
+                change.retired = alias.retired;
                 if (failed_stream) *failed_stream = change.index;
-                if (failed_parameter) *failed_parameter = index;
+                if (failed_parameter) *failed_parameter = change.parameter;
                 stage("open alias stream");
                 ae = tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id, tx.renderer,
-                    kNativeBindingFirstIndex + field.slot + component, &change.ref);
+                    change.index, &change.ref);
                 if (ae || !change.ref) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
                 AEGP_StreamType type = AEGP_StreamType_NO_DATA;
                 stage("read alias type");
@@ -1639,8 +1685,9 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     if (!ae && text) change.previous = reinterpret_cast<const char16_t*>(text);
                     if (ae) return static_cast<PF_Err>(ae);
                 }
-                const auto desired = binding_expression(node, index, component);
-                if (change.previous == desired && change.enabled) continue;
+                const auto& desired = alias.expression;
+                if(change.previous==desired && (change.retired?!change.enabled:change.enabled) &&
+                    (change.retired || (!identities_changed && !has_backups)))continue;
                 // Snapshot values only for aliases we will actually mutate.
                 // An unchanged, enabled expression was checked against the exact
                 // freshly compiled node identity and source parameter above.
@@ -1652,10 +1699,19 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 change.previous_value = previous.val.one_d;
                 tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 change.changed = true;
+                // Drop the compiled dependency before an alias changes source.
+                // Merely overwriting enabled text can retain a stale effect layout.
+                stage("disable previous expression");
+                ae=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
+                if(ae)return static_cast<PF_Err>(ae);
+                stage("clear previous expression");
+                ae=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
+                if(ae)return static_cast<PF_Err>(ae);
                 AEGP_StreamValue2 sentinel{}; sentinel.streamH = change.ref; sentinel.val.one_d = kNativeBindingUnavailable;
                 stage("write alias sentinel");
                 ae = tx.suites.stream->AEGP_SetStreamValue(tx.id, change.ref, &sentinel);
                 if (ae) return static_cast<PF_Err>(ae);
+                if(change.retired)continue;
                 stage("write expression");
                 ae = tx.suites.stream->AEGP_SetExpression(tx.id, change.ref, reinterpret_cast<const A_UTF16Char*>(desired.c_str()));
                 if (!ae) {
@@ -1663,7 +1719,6 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     ae = tx.suites.stream->AEGP_SetExpressionState(tx.id, change.ref, TRUE);
                 }
                 if (ae) return static_cast<PF_Err>(ae);
-            }
         }
         // Newly installed/repaired expressions must evaluate before acceptance.
         // Matching enabled aliases were not modified: repeatedly evaluating all
@@ -1673,6 +1728,12 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             if (!change.changed) continue;
             if (failed_stream) *failed_stream = change.index;
             if (failed_parameter) *failed_parameter = change.parameter;
+            if(change.retired){
+                A_Boolean enabled=TRUE;stage("verify retired expression disabled");
+                ae=tx.suites.stream->AEGP_GetExpressionState(tx.id,change.ref,&enabled);
+                if(ae || enabled)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+                continue;
+            }
             AEGP_StreamValue2 evaluated{};
             stage("read evaluated value");
             ae = tx.suites.stream->AEGP_GetNewStreamValue(tx.id, change.ref, AEGP_LTimeMode_LayerTime, &sample_time, FALSE, &evaluated);

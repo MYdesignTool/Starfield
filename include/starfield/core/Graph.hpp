@@ -197,7 +197,7 @@ inline constexpr const char* kModelNode = "org.starfieldfx.nodes.model";
 inline constexpr const char* kModelStream = "org.starfieldfx.types.model-stream";
 inline constexpr const char* kMaterialNode = "org.starfieldfx.nodes.material";
 inline constexpr const char* kMaterialStream = "org.starfieldfx.types.material-stream";
-inline constexpr PortKey kMaterialOut{1},kModelMaterialIn{2};
+inline constexpr PortKey kMaterialOut{1},kMaterialGeometryIn{2},kModelMaterialIn{2};
 inline constexpr ParameterKey kMaterialColorSource{1},kMaterialColor{2},kMaterialRoughness{3},
     kMaterialMetallic{4},kMaterialOpacity{5},kMaterialLights{6};
 inline constexpr const char* kOutputNode = "org.starfieldfx.nodes.output";

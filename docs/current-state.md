@@ -1,5 +1,24 @@
 # 当前工程状态
 
+## M3-17 native71 / CEP75 repair candidate — 2026-10-12
+
+Owner reports CEP Material edits fail with heterogeneous effect-stream mismatch;
+native Effect Controls edits work. New graph authoring is Model → Material →
+Output (also Material → Particle model input). Old single attachments migrate
+only during an explicit edit, retaining edge IDs; shared legacy attachments stay
+readable/editable without duplicating animated controls. No read-only project
+migration. Numeric IDs, graph schemas, CoreABI9 and binding record bytes unchanged.
+
+Mesh-preserving edits now use the ordinary explicit graph commit. Model asset/
+identity changes retain full transaction handling. UUID/kind/field alias spans
+are reused, changed sources are disabled/cleared before installation, removed
+aliases are retired with rollback, and identity/backup changes force rebinding.
+The AE mismatch root cause remains a hypothesis pending actual-host acceptance.
+Native71/packed32839 and isolated CEP75 source candidates; live70/74 untouched.
+BuildWindows derives compiled inputs from three AEX projects plus all local
+adapter/Core headers (ADR0012), correcting the confirmed audit fingerprint gap.
+Full frozen SDK/audit/publication gates are pending. No AE process was started.
+
 ## native70 / CEP74 deployed — 2026-10-11 23:59+08
 
 M3-17 Material authoring patch installed at 23:59:15+08. Native70/packed32838/

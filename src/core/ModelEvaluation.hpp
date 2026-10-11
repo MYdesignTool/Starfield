@@ -18,10 +18,24 @@ Result<ModelMaterial> read_material(const GraphNode& node) {
     if(!valid_model_material(m))return R::failure(ErrorCode::invalid_request,"Material value outside bounds");return R::success(m);
 }
 Result<bool> attach_materials(const Graph& graph,const MaterialValues& materials,ModelValues& models) {
-    for(const auto& edge:graph.edges)if(const auto found=materials.find(edge.source_node);found!=materials.end()) {
-        if(!models.contains(edge.destination_node)||edge.source_port!=kMaterialOut||edge.destination_port!=kModelMaterialIn)
-            return Result<bool>::failure(ErrorCode::invalid_request,"Material requires Model material input");
+    // Retain the deployed metadata attachment when reading an old project.
+    for(const auto& edge:graph.edges)if(const auto found=materials.find(edge.source_node);found!=materials.end() &&
+        models.contains(edge.destination_node) && edge.destination_port==kModelMaterialIn) {
+        if(edge.source_port!=kMaterialOut)return Result<bool>::failure(ErrorCode::invalid_request,"invalid legacy Material output");
         models.at(edge.destination_node).material=found->second;
+    }
+    // A downstream Material owns a shaded geometry branch, not the upstream
+    // Model's shared instance. Fan-out can therefore use independent colors.
+    for(std::size_t pass=0;pass<materials.size();++pass) {
+        bool progress=false;
+        for(const auto& edge:graph.edges)if(materials.contains(edge.destination_node) &&
+            edge.destination_port==kMaterialGeometryIn && !models.contains(edge.destination_node)) {
+            const auto source=models.find(edge.source_node);
+            if(source==models.end())continue;
+            auto instance=source->second;instance.material=materials.at(edge.destination_node);
+            models.emplace(edge.destination_node,std::move(instance));progress=true;
+        }
+        if(!progress)break;
     }
     return Result<bool>::success(true);
 }
@@ -71,8 +85,9 @@ Result<ParticleModelInstance> read_model(const GraphNode& node) {
     return R::success(instance);
 }
 bool is_model_graph_edge(const GraphEdge& edge,const GraphNode& source,const GraphNode& destination) noexcept {
-    return (source.type_key==kModelNode && edge.source_port==kModelGeometryOut &&
+    return ((source.type_key==kModelNode || source.type_key==kMaterialNode) && edge.source_port==kModelGeometryOut &&
         ((destination.type_key==kParticleNode && edge.destination_port==kParticleModelsIn) ||
+         (destination.type_key==kMaterialNode && edge.destination_port==kMaterialGeometryIn) ||
          (destination.type_key==kOutputNode && edge.destination_port==kOutputParticles))) ||
         (source.type_key==kMaterialNode && destination.type_key==kModelNode &&
          edge.source_port==kMaterialOut && edge.destination_port==kModelMaterialIn);
@@ -81,7 +96,11 @@ Result<ModelStyleIndices> retain_model_styles(const Graph& graph,const ModelValu
     const Cancellation& cancel) {
     using R=Result<ModelStyleIndices>;
     std::map<NodeId,std::vector<NodeId>> inputs;
-    for(const auto& edge:graph.edges)if(models.contains(edge.source_node))inputs[edge.destination_node].push_back(edge.source_node);
+    for(const auto& edge:graph.edges)if(models.contains(edge.source_node)) {
+        const auto target=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==edge.destination_node;});
+        if(target!=graph.nodes.end() && (target->type_key==kParticleNode || target->type_key==kOutputNode))
+            inputs[edge.destination_node].push_back(edge.source_node);
+    }
     ModelStyleIndices indices;
     for(auto& [particle,members]:inputs) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Model graph grouping cancelled");

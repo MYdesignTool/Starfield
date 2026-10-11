@@ -2,6 +2,39 @@
 
 Status: implementation candidate, 2026-10-11. Owner task M3-17.
 
+## Owner correction — 2026-10-12
+
+New authoring uses Model output1 → Material input2 → Output input1, or Material
+output1 → Particle's model input3. Material forwards immutable model geometry
+with its own shading values; it never rasterizes an intermediate image. The
+geometry and inherited particle color remain available to the final renderer.
+Material accepts one geometry input. Model may fan out to independent material
+branches. New CEP connections cannot feed Material back into Model.
+
+Migration: existing schema1 Material→Model input2 graphs remain readable and
+render with the previous attachment behavior. The registry retains that legacy
+input and its explicit type union. Schema1 Material adds optional geometry input2
+and forwards a model stream on output1; native IDs, six author controls, graph
+envelope, binding record layout and CoreABI9 stay unchanged. The next deliberate
+CEP edit converts a legacy attachment by reversing its edge (preserving edge ID)
+and forwarding the Model's previous destinations through Material. The read-only
+refresh preserves shared legacy materials; they keep their attachment ports until
+the owner replaces those connections, avoiding duplicated animated controls. The
+refresh itself does not edit the project. Frozen paired rollback restores old
+readers and the pre-edit graph. Presets may carry either supported direction.
+
+Ordinary edits with unchanged Model identities/resources use the normal guarded
+explicit graph commit. Mesh restore, Model addition/removal/duplication continue
+through the complete asset transaction. This removes effect duplication from
+material color/source/roughness edits. Binding serialization preserves existing
+UUID/kind/field alias slots; rebinding disables and clears the previous expression
+before installing a new source. Offline tests cover these ordering guarantees;
+obsolete aliases are disabled/cleared with transactional rollback, and changes
+to node identities or transaction backups force active expressions to rebuild.
+the reported AE stream mismatch cause remains a hypothesis until host acceptance.
+
+The original topology paragraphs below describe the legacy slice.
+
 The owner reports native69/CEP72 testing has shown no errors, and requests direct
 Model output plus a basic Material node. This is limited owner evidence, not a
 complete undo/reopen/render qualification.

@@ -142,6 +142,24 @@ $adapterInputs = @(
     'src\core\ModelResources.cpp', 'include\starfield\core\ModelResources.hpp',
     'src\core\SequenceCodec.cpp', 'src\core\Settings.cpp', 'src\core\Time.cpp'
 )
+# Include project-owned compile inputs and transitive local headers, rather than
+# relying on this historical hand-maintained list alone (ADR0012).
+foreach($taskProject in @('Starfield.vcxproj','NodeEffect.vcxproj','StarfieldHost.vcxproj')) {
+    $taskProjectPath=Join-Path $PSScriptRoot $taskProject
+    [xml]$taskProjectXml=[IO.File]::ReadAllText($taskProjectPath)
+    foreach($taskInput in $taskProjectXml.SelectNodes('//*[local-name()="ClCompile" or local-name()="ClInclude"][@Include]')) {
+        $taskAbsolute=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot ([string]$taskInput.Include)))
+        $taskPrefix=$repositoryRoot+[IO.Path]::DirectorySeparatorChar
+        if(-not $taskAbsolute.StartsWith($taskPrefix,[StringComparison]::OrdinalIgnoreCase)){throw 'AEX input escapes the checkout.'}
+        $adapterInputs+=$taskAbsolute.Substring($taskPrefix.Length)
+    }
+}
+foreach($taskHeaders in @('ae_plugin','include/starfield/core','src/core')) {
+    $adapterInputs+=@(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot $taskHeaders) -File -Recurse |
+        Where-Object {$_.Extension -in @('.h','.hpp')} |
+        ForEach-Object {$_.FullName.Substring($repositoryRoot.Length+1)})
+}
+$adapterInputs=@($adapterInputs | Sort-Object -Unique)
 $adapterFingerprint = ($adapterInputs | ForEach-Object {
     $path = Join-Path $repositoryRoot $_
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing adapter input: $path" }

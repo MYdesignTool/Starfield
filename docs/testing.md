@@ -1,5 +1,21 @@
 # 测试入口
 
+## M3-17 native71 / CEP75 downstream Material candidate — 2026-10-12
+
+Owned source regressions: Material core49 and native registration/binding183
+checks; mixed native ASAN10798, camera12, Transform60, literal Model/Transform
+JS643 and Transform168. Panel Material31 includes downstream ports, migration
+idempotence, source immutability and shared legacy attachment preservation.
+Dummy70/74→71/75 publication/full paired rollback64 passed under artifacts.
+These are offline fixtures; they do not establish AE2023 acceptance.
+
+Logs: artifacts/m3-17-material75-core-asan.log,
+artifacts/m3-17-material75-native-asan.log,
+artifacts/m3-17-material75-mixed-asan-v2.log,
+artifacts/m3-17-material75-deploy-fixture.log. The first mixed ASAN attempt failed
+on a null bootstrap graph; v2 corrected that edge and passed. Full frozen
+May2023 SDK build, complete panel audit and final independent hash checks pending.
+
 ## M3-17 native70 / CEP73 deployed Material / direct Model
 
 Isolated panel: artifacts/prepared/m3-17-material-panel73-v4/cep_panel.

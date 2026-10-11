@@ -14,12 +14,13 @@ static unsigned checks{},failures{};
 void check(bool value,const char* name){++checks;if(!value){++failures;std::printf("FAIL %s\n",name);}}
 NodeId node(unsigned n){NodeId id;id.value.bytes[15]=static_cast<unsigned char>(n);return id;}
 EdgeId edge(unsigned n){return {node(n).value};}
-Graph fixture(){return {{
+Graph fixture(bool legacy=false){return {{
     {node(1),kOutputNode,4,{{kParticleCount,std::uint32_t{1000}}}},
     {node(2),kModelNode,1,{}},
     {node(3),kMaterialNode,1,{{kMaterialColorSource,std::uint32_t{1}},{kMaterialColor,Vec3{.2,.4,.8}},
         {kMaterialRoughness,.5},{kMaterialMetallic,0.},{kMaterialOpacity,1.},{kMaterialLights,std::uint32_t{1}}}}},
-    {{edge(1),node(2),kModelGeometryOut,node(1),kOutputParticles},{edge(2),node(3),kMaterialOut,node(2),kModelMaterialIn}}, {}};}
+    legacy?std::vector<GraphEdge>{{edge(1),node(2),kModelGeometryOut,node(1),kOutputParticles},{edge(2),node(3),kMaterialOut,node(2),kModelMaterialIn}}:
+        std::vector<GraphEdge>{{edge(1),node(3),kMaterialOut,node(1),kOutputParticles},{edge(2),node(2),kModelGeometryOut,node(3),kMaterialGeometryIn}}, {}};}
 struct Sampler:TemporalGraphSampler{Graph graph;explicit Sampler(Graph g):graph(std::move(g)){}
     Result<GraphNode> node(NodeId id,double seconds)override{for(auto n:graph.nodes)if(n.id==id){if(n.type_key==kMaterialNode)n.parameters[2].value=std::clamp(seconds,0.,1.);return Result<GraphNode>::success(n);}return Result<GraphNode>::failure(ErrorCode::invalid_request,"missing");}
     Result<double> rate(NodeId,double)override{return Result<double>::success(0);}};
@@ -57,7 +58,20 @@ int main(){NeverCancelled cancel;auto graph=fixture();
     graph.nodes[2].parameters[4].value=.5;request.graph=std::make_shared<Graph>(graph);pixels=renderer.render(request,cancel);
     check(pixels.has_value(),"opacity pixels render");if(pixels.has_value()){const auto* p=reinterpret_cast<const float*>(pixels.value().pixels.data());check(std::abs(p[4*(50*100+50)+3]-.5)<1e-5,"material opacity");}
     graph.nodes[2].parameters[2].value=2.;check(!evaluate_particle_graph(graph,{0,1},cancel,{100,1}).has_value(),"out-of-range material rejects");
-    graph=fixture();graph.edges.push_back({edge(3),node(3),kMaterialOut,node(1),kOutputParticles});check(!validate_graph(graph,particle_node_registry()),"Material cannot feed particle output");
+    graph=fixture();graph.nodes.push_back({node(4),kModelNode,1,{}});
+    graph.edges.push_back({edge(3),node(4),kModelGeometryOut,node(3),kMaterialGeometryIn});
+    check(!validate_graph(graph,particle_node_registry()),"Material rejects two geometry inputs");
+    auto legacy=evaluate_particle_graph(fixture(true),{0,1},cancel,{100,1});
+    check(legacy.has_value(),"legacy Material-to-Model remains readable");
+    if(legacy.has_value())check(legacy.value().model_styles.back().instances[0].material.color.z==.8,"legacy shading retained");
+    auto branches=fixture();auto second=branches.nodes[2];second.id=node(4);second.parameters[1].value=Vec3{1,0,0};branches.nodes.push_back(second);
+    branches.edges.push_back({edge(3),node(2),kModelGeometryOut,node(4),kMaterialGeometryIn});
+    branches.edges.push_back({edge(4),node(4),kMaterialOut,node(1),kOutputParticles});
+    auto fanout=evaluate_particle_graph(branches,{0,1},cancel,{100,1});check(fanout.has_value(),"independent material branches evaluate");
+    if(fanout.has_value()){check(fanout.value().particles.size()==2,"one geometry instance per branch");
+        const auto& a=fanout.value().model_styles[fanout.value().particles[0].model_style_index-1].instances[0].material;
+        const auto& b=fanout.value().model_styles[fanout.value().particles[1].model_style_index-1].instances[0].material;
+        check(a.color.z!=b.color.z,"branch materials do not mutate shared geometry");}
     m={};m.enabled=true;m.color_source=1;m.color={.8,.2,.1};
     ModelLight point;point.type=ModelLightType::point;point.position={0,0,-50};
     auto near_light=model_shading::shade(m,{},{},{0,0,-1},{0,0,-1},{&point,1});
@@ -71,7 +85,7 @@ int main(){NeverCancelled cancel;auto graph=fixture();
     m.ae_lights=false;c=model_shading::shade(m,{},{},{0,0,-1},{0,0,-1},{&point,1});check(c.x==.8,"lights disabled preserves base");
     auto transform=kIdentityModelMatrix;transform[0]=-2;transform[5]=3;transform[10]=4;
     auto normal=model_shading::normal({1,1,0},transform);check(normal.x<0&&normal.y>0&&std::abs(normal.x/normal.y+1.5)<1e-6,"normal inverse transpose with reflection");
-    auto unlit=fixture();unlit.nodes.erase(unlit.nodes.begin()+2);unlit.edges.resize(1);
+    auto unlit=fixture(true);unlit.nodes.erase(unlit.nodes.begin()+2);unlit.edges.resize(1);
     auto old=evaluate_particle_graph(unlit,{0,1},cancel,{100,1});check(old.has_value(),"direct unlit model");
     if(old.has_value()){auto bytes=encode_evaluated_particles(old.value(),{0,1});check(bytes.has_value()&&std::to_integer<unsigned>(bytes.value()[2])<=10,"old unlit snapshot version retained");}
     graph=fixture();auto graph_bytes=serialize_graph(graph,particle_node_registry());SfCoreApi api{};

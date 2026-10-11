@@ -590,6 +590,7 @@
       "opacity": 1605,
       "ae_lights": 1606
     },
-    "migration": "New independent IDs; ADR0041, native70/CoreABI9 paired deployment. Existing IDs untouched."
+    "ports": {"geometryInput": 2, "geometryOutput": 1, "maxGeometryInputs": 1},
+    "migration": "ADR0041: native71/CEP75 adds Model-to-Material-to-Output geometry flow; schema1 upstream Material-to-Model records remain readable and convert on the next deliberate CEP edit. CoreABI9 and disk IDs1601..1606 unchanged."
   }
 }

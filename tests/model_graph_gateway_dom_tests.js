@@ -102,13 +102,15 @@ g=edits.apply(g,{type:"addNode",nodeType:"model",position:{x:100.123456789,y:50.
 if(!fullGraph)g=edits.apply(g,{type:"addNode",nodeType:"output"},()=>uuid(255));
 if(process.env.STARFIELD_DOM_MATERIAL==="1"){
     g=edits.apply(g,{type:"addNode",nodeType:"material"},()=>uuid(108));
-    g=edits.apply(g,{type:"connect",from:uuid(108),to:uuid(101)},()=>uuid(109));
-    g=edits.apply(g,{type:"connect",from:uuid(101),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(110));
+    g=edits.apply(g,{type:"connect",from:uuid(101),to:uuid(108)},()=>uuid(109));
+    g=edits.apply(g,{type:"connect",from:uuid(108),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(110));
     // Exercise the actual new-node default before changing to independent color.
 }
 const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[n.id],
     outgoing:g.edges.filter(e=>e.sourceNode===n.id).map(e=>({id:e.id,target:e.destinationNode})).sort((a,b)=>a.id.localeCompare(b.id))});
-api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output && n.type!==edits.types.material).map(record)),true,realm([]),false);eq(arbReads,0);
+api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output && n.type!==edits.types.material).map(n=>{
+    const r=record(n);r.outgoing=r.outgoing.filter(e=>e.target!==uuid(108));return r;
+})),true,realm([]),false);eq(arbReads,0);
 const bounds=[-2,-3,-4,2,3,4],raw=Buffer.alloc(48);bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
 let transaction=500;
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
@@ -119,6 +121,7 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
     const nodes=replace?before.nativeNodes.filter(n=>n.type!==edits.types.model).concat([desired]):before.nativeNodes.concat([desired]);
     if(process.env.STARFIELD_DOM_MATERIAL==="1"){
+        if(replace)desired.outgoing=record(g.nodes.find(n=>n.type===edits.types.model)).outgoing;
         let material=nodes.find(n=>n.type===edits.types.material);
         if(!material){material=record(g.nodes.find(n=>n.type===edits.types.material));nodes.push(material);}
         if(!replace)for(const [key,value] of [[1,1],[2,[.2,.4,.8]],[3,.75],[4,.3],[5,.4],[6,0]])
@@ -186,8 +189,28 @@ if(process.env.STARFIELD_DOM_MATERIAL==="1"){
     const numeric=copy(records);
     for(const field of numeric.find(n=>n.type===edits.types.material).parameters)field.key=Number(field.key);
     api.ensure(layer,realm(numeric),true,realm([]),false);eq(rawMaterial.properties["Color Source"].value,1);
+    const coordinator=require(path.join(root,"js/graph_transactions.js")),operations=[];
+    const client=coordinator.create({codec,edits,idFactory:()=>uuid(++transaction),call(operation,fields,callback){
+        operations.push(operation);
+        assert.equal(operation,"submitGraph","Material edits must not copy the effect parade or enter an asset transaction.");
+        callback(JSON.parse(host["SFLD_"+operation](request(operation,fields))));
+    }});
+    let response;const count=items.length;
+    const prepared=()=>({ok:true,target:{token},snapshot:copy(api.snapshot(api.resolve({pinTarget:true,target:{token}})))});
+    for(const value of [1,0]) {
+        const before=prepared();
+        client.apply({type:"setParameters",changes:[{nodeId:uuid(108),parameterKey:"1",valueType:3,value}]},r=>{response=r;},token,before.snapshot.revision,before);
+        eq(response.ok,true,JSON.stringify(response));eq(rawMaterial.properties["Color Source"].value,value+1);
+        eq(items.length,count);eq(host.__SFLD_modelGraphTransactionV1,null);
+    }
+    const before=prepared();
+    client.apply({type:"setParameters",changes:[{nodeId:uuid(108),parameterKey:"2",valueType:5,value:[.4,.6,.2]}]},r=>{response=r;},token,before.snapshot.revision,before);
+    eq(response.ok,true,JSON.stringify(response));eq(rawMaterial.properties.Color.value,[.4,.6,.2,1]);
+    eq(operations,["submitGraph","submitGraph","submitGraph"]);eq(items.length,count);
+    // The subsequent full-asset failure fixture counts only its own commands.
+    commands=0;
 }
-pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,0);eq(arbReads,0);
+pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,process.env.STARFIELD_DOM_MATERIAL==="1"?6:0);eq(arbReads,0);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
 eq(staleReads,0,"No cached invalid Property may be used after native backup/add/remove.");

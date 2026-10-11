@@ -104,6 +104,7 @@ std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
 A_long nonfinite_alias=-1, unresolved_alias=-1;
 A_long fail_expression = -1;
+unsigned expression_clear_count{};
 bool disable_next_expression{};
 AEGP_LayerSuite9 layers{};
 AEGP_ItemSuite9 items{};
@@ -392,6 +393,7 @@ int main() {
     stream.AEGP_SetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, const A_UTF16Char* text)->A_Err {
         auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
         if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
+        if(!*text)++expression_clear_count;
         expressions[index] = reinterpret_cast<const char16_t*>(text); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
@@ -1284,6 +1286,37 @@ int main() {
         });
         check(matrix_alias!=expressions.end(),"first Transform matrix alias exists");
         const auto matrix_stream=kNativeBindingFirstIndex+static_cast<A_long>(matrix_alias-expressions.begin());
+        const auto reset_count=expression_clear_count;
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(transformed,nullptr,nullptr,nullptr,&transformed)==0,
+                "unchanged identities retain their enabled bindings");bindings.accept();
+        }
+        check(expression_clear_count==reset_count,"ordinary control edits skip redundant expression recompilation");
+        auto retired=transformed;
+        retired.optional_records.erase(std::remove_if(retired.optional_records.begin(),retired.optional_records.end(),
+            [](const auto& bytes){return bytes.size()>=2 && bytes[0]==std::byte{2} && bytes[1]==std::byte{0x80};}),retired.optional_records.end());
+        const auto retirement_text=expressions;
+        const auto retirement_enabled=expression_enabled;
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0 &&
+                expressions[matrix_stream-kNativeBindingFirstIndex].empty() &&
+                !expression_enabled[matrix_stream-kNativeBindingFirstIndex],
+                "removed node bindings are disabled and cleared before acceptance");
+        }
+        check(expressions==retirement_text && expression_enabled==retirement_enabled,
+            "unaccepted alias retirement restores exact expression text and enabled states");
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0,"alias retirement can commit");bindings.accept();
+        }
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(transformed,nullptr,nullptr,nullptr,&retired)==0,"restored node bindings are rebuilt after identity changes");bindings.accept();
+        }
+        check(expressions==retirement_text && expression_enabled==retirement_enabled,
+            "retired alias spans can be reused without stale expression state");
         const auto before_expression_failure=expressions;
         expressions[matrix_stream-kNativeBindingFirstIndex]=u"0";
         {

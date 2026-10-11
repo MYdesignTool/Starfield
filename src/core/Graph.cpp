@@ -432,10 +432,13 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
                                describe(GraphErrorCode::port_direction_mismatch), {}, edge.id,
                                source_port->direction != PortDirection::output ? edge.source_port : edge.destination_port);
             }
-            const bool model_output=source_node.node->type_key==graph_keys::kModelNode &&
+            const bool model_output=(source_node.node->type_key==graph_keys::kModelNode || source_node.node->type_key==graph_keys::kMaterialNode) &&
                 destination_node.node->type_key==graph_keys::kOutputNode &&
                 edge.source_port==graph_keys::kModelGeometryOut && edge.destination_port==graph_keys::kOutputParticles;
-            if (source_port->type_key != destination_port->type_key && !model_output) {
+            const bool legacy_material=source_node.node->type_key==graph_keys::kMaterialNode &&
+                destination_node.node->type_key==graph_keys::kModelNode &&
+                edge.source_port==graph_keys::kMaterialOut && edge.destination_port==graph_keys::kModelMaterialIn;
+            if (source_port->type_key != destination_port->type_key && !model_output && !legacy_material) {
                 return failure(GraphErrorCode::port_type_mismatch, describe(GraphErrorCode::port_type_mismatch), {},
                                edge.id, edge.destination_port);
             }
@@ -692,7 +695,8 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kModelSource,ParameterKind::uint32,false}};
     registry.types.push_back(std::move(model));
     NodeTypeDescriptor material{kMaterialNode,1,{
-        PortDescriptor{kMaterialOut,PortDirection::output,kMaterialStream,false,0}}, {
+        PortDescriptor{kMaterialGeometryIn,PortDirection::input,kModelStream,false,1},
+        PortDescriptor{kMaterialOut,PortDirection::output,kModelStream,false,0}}, {
         {kMaterialColorSource,ParameterKind::uint32,true},{kMaterialColor,ParameterKind::vector3_float64,true},
         {kMaterialRoughness,ParameterKind::float64,true},{kMaterialMetallic,ParameterKind::float64,true},
         {kMaterialOpacity,ParameterKind::float64,true},{kMaterialLights,ParameterKind::uint32,true}}, {}};

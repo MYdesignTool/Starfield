@@ -194,7 +194,14 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         if (error) return edit->status = error;
         NativeBindingTransaction bindings(data, plugin_id, edit->renderer, edit->layer);
         edit->stage = node_sync::Stage::animation_bindings;
-        error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter);
+        std::optional<core::Graph> previous_graph;
+        if(scratch[kGraphParameterId].u.arb_d.value){
+            auto saved=read_graph_parameter(data,scratch[kGraphParameterId].u.arb_d.value);
+            if(!saved.has_value())return edit->status=PF_Err_BAD_CALLBACK_PARAM;
+            previous_graph=saved.take_value();
+        }
+        error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
+            previous_graph?&*previous_graph:nullptr);
         if (error) return edit->status = error;
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.

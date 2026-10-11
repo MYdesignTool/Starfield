@@ -50,7 +50,8 @@ public:
     NativeBindingTransaction(const NativeBindingTransaction&) = delete;
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
-                   const char** failed_stage = nullptr, A_long* failed_parameter = nullptr) noexcept;
+                   const char** failed_stage = nullptr, A_long* failed_parameter = nullptr,
+                   const core::Graph* previous_graph = nullptr) noexcept;
     void accept() noexcept;
     [[nodiscard]] PF_Err rollback_model_resources() noexcept;
 private:

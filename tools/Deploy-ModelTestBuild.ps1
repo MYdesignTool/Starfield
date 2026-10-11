@@ -26,8 +26,9 @@ $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneratio
     ($taskFrozen.nativeBuild -eq 67 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 66 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 68 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 67 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 69 -and $taskFrozen.panelGeneration -eq 72 -and $taskBaselineBuild -eq 68 -and $taskBaselinePanel -eq 71) -or
-    ($taskFrozen.nativeBuild -eq 70 -and $taskFrozen.panelGeneration -eq 73 -and $taskBaselineBuild -eq 69 -and $taskBaselinePanel -eq 72 -and $taskBaselineAbi -eq 8)
-$taskHasMaterial=$taskFrozen.nativeBuild -eq 70
+    ($taskFrozen.nativeBuild -eq 70 -and $taskFrozen.panelGeneration -eq 73 -and $taskBaselineBuild -eq 69 -and $taskBaselinePanel -eq 72 -and $taskBaselineAbi -eq 8) -or
+    ($taskFrozen.nativeBuild -eq 71 -and $taskFrozen.panelGeneration -eq 75 -and $taskBaselineBuild -eq 70 -and $taskBaselinePanel -eq 74 -and $taskBaselineAbi -eq 9)
+$taskHasMaterial=$taskFrozen.nativeBuild -in @(70,71)
 $taskExpectedAbi=if($taskHasMaterial){9}else{8}
 if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne $taskExpectedAbi -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild
@@ -48,8 +49,9 @@ $taskCepLink=Assert-ModelJunction $CepJunction $taskPanelRoot
 if(@(Get-ChildItem -LiteralPath $taskPluginDir -Force | Where-Object Name -like 'Starfield*').Count -ne 1){throw 'Unexpected host Starfield entries.'}
 foreach($taskEntry in $taskBaseline.native){if((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash -ne $taskEntry.hash){throw 'Installed native baseline differs.'}}
 if($taskBaselineBuild -eq 60 -and (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldModel.aex'))){throw 'Unexpected installed Model before full promotion.'}
-if($taskBaselineBuild -ge 61 -and (@($taskBaseline.native).Count -ne 8 -or @($taskBaseline.panel.files).Count -ne 18 -or
+if($taskBaselineBuild -ge 61 -and (@($taskBaseline.native).Count -ne $(if($taskBaselineBuild -ge 70){9}else{8}) -or @($taskBaseline.panel.files).Count -ne 18 -or
     'StarfieldModel.aex' -notin @($taskBaseline.native.name))){throw 'Incomplete installed Model pair.'}
+if($taskBaselineBuild -ge 70 -and 'StarfieldMaterial.aex' -notin @($taskBaseline.native.name)){throw 'Incomplete installed Material pair.'}
 foreach($taskEntry in $taskBaseline.panel.files){if((Get-FileHash -LiteralPath (Join-Path $taskRepo $taskEntry.path)).Hash -ne $taskEntry.installedHash){throw 'Installed CEP baseline differs.'}}
 $taskSelector=(Get-Content -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime/current.txt') -Raw).Trim()
 if($taskSelector -ne $taskBaseline.selector -or (Get-FileHash -LiteralPath (Join-Path $taskBundle ('StarfieldRuntime/'+$taskSelector))).Hash -ne ($taskBaseline.native | Where-Object name -eq 'StarfieldCore.dll').hash){throw 'Installed baseline runtime differs.'}

@@ -227,6 +227,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-12 owner确认材质效果控件可改但CEP提交出现Material/Emitter或Material/Model类型错配，并要求Model→Material→Output。本卡拥有下游几何转发、旧方向兼容/下一次有意编辑迁移、无资源变化的普通提交分流、原生绑定槽稳定和表达式重绑顺序、专项测试与完整配对构建。继续保留Motion/MNT在途改动；不请求owner重复诊断，不启动或派发AE。
+
 2026-10-11 owner反馈Material新增失败（Color Source popup0 out of range1..2）。本卡继续拥有隔离CEP参数映射、真实注册范围/颜色维度回归、native70配对Panel补丁门；不改变已发布native/Core/参数ID。外部审查逐项核实见[review-verification-2026-10-11.md](review-verification-2026-10-11.md)；确认的指纹/旧ABI测试/聚合入口及文档整理另行排期，保持其他在途文件。部署与当前证据只更新current-state。
 
 2026-10-11 owner实测native69/CEP72目前未见报错，新增优先范围为Model直接Output、独立Material节点（Particle/Material两种颜色来源、粗糙度、金属度、透明度、AE灯光）。本卡拥有ADR0041列出的Core Render/Settings/graph/snapshot、AE数值灯光捕获、Material kind6/新IDs、绑定8及隔离CEP/配对发布；保持Motion/MNT改动。先实现完整可编辑闭环并核对，不要求owner反复诊断；AE启动和脚本调度仍无新授权。

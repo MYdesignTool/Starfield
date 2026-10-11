@@ -33,7 +33,7 @@ for(const [from,to] of [[emitter,particle],[model,particle],[particle,output]])g
 equal(graph.edges.find(e=>e.sourceNode===model.id).destinationPort,"3");
 equal(codec.fromHex(codec.toHex(graph)).edges.length,3);
 const projected=view.project(graph).nodes.find(n=>n.id===model.id);
-equal(projected.inputPort,"2");equal(projected.outputPort,"1");equal(projected.params.length,15);
+equal(projected.inputPort,null);equal(projected.outputPort,"1");equal(projected.params.length,15);
 equal(projected.params.filter(p=>p.graphKey==="4").map(p=>p.label),["Offset X","Offset Y","Offset Z"]);
 equal(view.project(graph).nodes.find(n=>n.id===particle.id).modelInputPort,"3");
 for(const key of ["1","2","3","12"])reject(()=>edits.apply(graph,{type:"setParameters",changes:[{nodeId:model.id,parameterKey:key,valueType:7,value:[]}]}),/owned by the native import/);

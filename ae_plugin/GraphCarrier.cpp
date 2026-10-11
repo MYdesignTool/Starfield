@@ -2,6 +2,7 @@
 #include "NativeNodeGraph.hpp"
 #include "NativeTemporalCache.hpp"
 #include "Parameters.hpp"
+#include "GraphParameter.hpp"
 #include "SPBasic.h"
 
 #include <atomic>
@@ -83,7 +84,16 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
         A_long failed_binding = -1;
         A_long failed_parameter = -1;
         const char* failed_stage = "unknown";
-        error = bindings.install(graph, &failed_binding, &failed_stage, &failed_parameter);
+        std::optional<core::Graph> previous_graph;
+        if(params[kGraphParameterId]->u.arb_d.value){
+            auto saved=read_graph_parameter(data,params[kGraphParameterId]->u.arb_d.value);
+            if(!saved.has_value()){
+                data->utils->host_dispose_handle(replacement);
+                return reject(output,params,nonce,"saved binding graph unavailable",PF_Err_BAD_CALLBACK_PARAM);
+            }
+            previous_graph=saved.take_value();
+        }
+        error = bindings.install(graph, &failed_binding, &failed_stage, &failed_parameter,previous_graph?&*previous_graph:nullptr);
         if (error) {
             data->utils->host_dispose_handle(replacement);
             char reason[200]{};

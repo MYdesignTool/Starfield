@@ -1,6 +1,7 @@
 #define STARFIELD_MODEL_BINDING_LIBRARY
 #include "model_native_binding_tests.cpp"
 #undef STARFIELD_MODEL_BINDING_LIBRARY
+#include "GraphParameter.hpp"
 void compile_material_model(PF_InData& data){
     using namespace adapter;using Kind=native_nodes::Kind;
     ui_values[0].assign(native_nodes::parameter_count(Kind::material),{});
@@ -10,7 +11,7 @@ void compile_material_model(PF_InData& data){
     for(int a=0;a<6;++a)ui_values[1][layout::author_bounds_first+a].one_d=a<3?-.5:.5;
     for(unsigned row=0;row<2;++row){auto kind=row==0?Kind::material:Kind::model;ui_values[row][native_nodes::uuid_first_index(kind)+7].one_d=row==0?3:4;
         ui_values[row][native_nodes::connection_count_index(kind)].one_d=1;
-        ui_values[row][native_nodes::connection_uuid_index(kind,0,7)].one_d=row==0?4:255;
+        ui_values[row][native_nodes::connection_uuid_index(kind,0,7)].one_d=row==0?255:3;
         ui_values[row][native_nodes::connection_edge_uuid_index(kind,0,7)].one_d=row+1;}
     ui_pf.AEGP_GetEffectLayer=[](PF_ProgPtr,AEGP_LayerH* out)->A_Err{*out=reinterpret_cast<AEGP_LayerH>(1);return 0;};
     ui_effect.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* out)->A_Err{*out=2;return 0;};
@@ -39,7 +40,33 @@ void compile_material_model(PF_InData& data){
     CHECK(ui_refs==0&&ui_suites==0);auto material=std::find_if(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kMaterialNode;});CHECK(material!=graph.nodes.end());
     if(material!=graph.nodes.end()){CHECK(std::get<double>(value(*material,kMaterialRoughness))==.75&&std::get<core::Vec3>(value(*material,kMaterialColor)).z==.8);}
     CHECK(core::validate_graph(graph,core::particle_node_registry()).ok());CHECK(adapter::NativeAnimationPlan(graph,100,100,24).valid());
-    for(const auto& e:graph.edges)CHECK(e.destination_port.value==(e.source_node==nid(3)?2u:1u));
+    for(const auto& e:graph.edges)CHECK(e.destination_port.value==(e.source_node==nid(4)?2u:1u));
+    const auto model_slots=[](const core::Graph& g){std::vector<unsigned> slots;
+        for(const auto& bytes:g.optional_records){if(bytes.size()<12 || bytes[0]!=std::byte{2} || bytes[1]!=std::byte{0x80})continue;
+            auto word=[&](std::size_t at){return std::to_integer<unsigned>(bytes[at]) | (std::to_integer<unsigned>(bytes[at+1])<<8);};
+            std::size_t at=12;
+            while(at<bytes.size()) {const bool model=std::to_integer<unsigned>(bytes[at+15])==4;const auto count=word(at+18);at+=20;
+                for(unsigned field=0;field<count;++field,at+=32)if(model)slots.push_back(word(at+4));}
+        }return slots;};
+    // Start with Model4 only, then add Material3 ahead of it in UUID order.
+    // Existing animated fields must retain their original alias spans.
+    ui_values[0][native_nodes::sync_guard_index(Kind::material)].one_d=2;
+    ui_values[1][native_nodes::connection_uuid_index(Kind::model,0,7)].one_d=255;
+    core::Graph baseline;CHECK(compile_native_node_graph(&data,pointers.data(),baseline,found,1)==0);
+    const auto original_slots=model_slots(baseline);CHECK(!original_slots.empty());
+    PF_ArbitraryH saved{};CHECK(create_graph_parameter(&data,baseline,&saved)==0);
+    main[kGraphParameterId].u.arb_d.value=saved;
+    ui_values[0][native_nodes::sync_guard_index(Kind::material)].one_d=0;
+    ui_values[1][native_nodes::connection_uuid_index(Kind::model,0,7)].one_d=3;
+    core::Graph expanded;CHECK(compile_native_node_graph(&data,pointers.data(),expanded,found,1)==0);
+    CHECK(model_slots(expanded)==original_slots);CHECK(NativeAnimationPlan(expanded,100,100,24).valid());
+    // Old persisted direction is still accepted by the actual native compiler.
+    ui_values[0][native_nodes::connection_uuid_index(Kind::material,0,7)].one_d=4;
+    ui_values[1][native_nodes::connection_uuid_index(Kind::model,0,7)].one_d=255;
+    core::Graph legacy;CHECK(compile_native_node_graph(&data,pointers.data(),legacy,found,1)==0);
+    CHECK(core::validate_graph(legacy,core::particle_node_registry()).ok());
+    dispose(saved);main[kGraphParameterId].u.arb_d.value=nullptr;
+    CHECK(ui_refs==0&&ui_suites==0);
 }
 int main(){PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;
     PF_InData data{};data.utils=&utils;data.inter.add_param=add;
