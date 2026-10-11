@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-71";
+    var GATEWAY_BUILD = "native-presets-72";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -1719,6 +1719,12 @@ function createNativeRecordContract() {
         } catch (error) { return fail("invalid_native_node_record", error.toString()); }
     }
 
+    function graphCommitCommand() {
+        var command = typeof app.findMenuCommandId === "function" ? app.findMenuCommandId("Starfield Commit Node Graph") : 0;
+        if (!command || typeof app.executeCommand !== "function") throw new Error("Starfield native graph command is unavailable. Install the matching native69 / CEP72 pair before editing.");
+        return command;
+    }
+
     function triggerGraphCarrier(resolved, undoLabel, requestId, nonce, manageUndoGroup) {
         var commit = resolved.properties.commit;
         var receipt = resolved.properties.receipt;
@@ -1726,11 +1732,15 @@ function createNativeRecordContract() {
         var failed = null;
         var groupOpen = false;
         try {
+            var command = graphCommitCommand();
             if (manageUndoGroup !== false) {
                 app.beginUndoGroup(undoLabel);
                 groupOpen = true;
             }
             commit.setValue(nonce);
+            // Explicit synchronous AEGP command. setValue is only a request
+            // write; no supervised callback or queued idle script is assumed.
+            app.executeCommand(command);
         } catch (error) {
             failed = error.toString();
         } finally {
@@ -1750,7 +1760,7 @@ function createNativeRecordContract() {
                 return { ok: false, error: { code: "graph_commit_rejected", message: "The effect rejected the graph transaction. The existing graph was kept." },
                          context: { nonce: nonce } };
             }
-            return { ok: false, error: { code: "graph_commit_unconfirmed", message: "The effect did not acknowledge the graph transaction. Reload the graph before making another edit." },
+            return { ok: false, error: { code: "graph_commit_unconfirmed", message: "The native graph command did not publish a saved receipt (requested " + nonce + ", saved " + acceptedNonce + ")." },
                      context: { nonce: nonce } };
         }
         return { ok: true, nonce: nonce, requestId: requestId || "" };
@@ -1887,13 +1897,16 @@ function createNativeRecordContract() {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
         request = pinGraphTransaction(request,resolved.token);
-        var groupOpen = false, added = [], layer = resolved.target.layer;
+        var groupOpen = false, guarded = false, added = [], previous = [], layer = resolved.target.layer;
         var wasReady = Number(resolved.properties.nodeEffectsReady.value);
         try {
+            graphCommitCommand(); // Reject mismatched installation before adding effects.
+            if (Number(resolved.properties.guard.value) !== 0) throw new Error("Another graph transaction owns this renderer.");
             app.beginUndoGroup("Starfield: synchronize node effects"); groupOpen = true;
-            resolved.properties.guard.setValue(1);
+            resolved.properties.guard.setValue(1); guarded = true;
             if (wasReady !== 1) {
                 var existing = reconcileNativeRecords(layer), occupied = nodeIds(existing);
+                previous = JSON.parse(JSON.stringify(existing));
                 occupied["$000000000000000000000000000000ff"] = true;
                 var emitter = null, particle = null;
                 for (var prior = 0; prior < existing.length; prior++) {
@@ -1947,17 +1960,26 @@ function createNativeRecordContract() {
                 target:{token:resolved.token}, nonce:receipt.nonce, snapshot:snapshot });
         } catch (error) {
             var rollbackMessage = "";
-            if (added.length) {
-                try {
+            try {
+                if (added.length) {
                     removeNativeNodeEffects(layer, added);
-                    var restored = graphCarrierTarget(request);
-                    if (!restored.error) restored.properties.nodeEffectsReady.setValue(wasReady);
-                } catch (rollbackError) { rollbackMessage = " Bootstrap rollback failed: " + rollbackError.toString(); }
-            }
+                }
+                for (var priorIndex = 0; priorIndex < previous.length; priorIndex++) {
+                    var priorEffect = nodeEffectById(layer, previous[priorIndex].id);
+                    setNodeControl(priorEffect, "Panel Sync Guard", 1);
+                    try { writeNodeRecord(priorEffect, previous[priorIndex]); }
+                    finally { setNodeControl(priorEffect, "Panel Sync Guard", 0); }
+                }
+                var restored = graphCarrierTarget(request);
+                if (restored.error) throw new Error(restored.error.message);
+                if (guarded) restored.properties.nodeEffectsReady.setValue(wasReady);
+            } catch (rollbackError) { rollbackMessage = " Bootstrap rollback failed: " + rollbackError.toString(); }
             return fail("node_effect_sync_failed", error.toString() + rollbackMessage);
         } finally {
-            var clean = graphCarrierTarget(request);
-            if (!clean.error) clean.properties.guard.setValue(0);
+            if (guarded) {
+                var clean = graphCarrierTarget(request);
+                if (!clean.error) clean.properties.guard.setValue(0);
+            }
             if (groupOpen) app.endUndoGroup();
         }
     }
@@ -2008,6 +2030,10 @@ function createNativeRecordContract() {
         var groupOpen = false;
         var result = null;
         var layer = resolved.target.layer;
+        try { graphCommitCommand(); }
+        catch (missingCommand) { return fail("graph_commit_unavailable", missingCommand.toString()); }
+        if (Number(resolved.properties.guard.value) !== 0)
+            return fail("graph_transaction_busy", "Another graph transaction owns this renderer.");
         try {
             app.beginUndoGroup("Starfield: edit graph and nodes");
             groupOpen = true;

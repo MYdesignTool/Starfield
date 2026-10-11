@@ -1,5 +1,40 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+## native69 / CEP72 deployed — 2026-10-11 19:27+08
+
+Installed native69/packed32837/CoreABI8/CEP72 from frozen source
+897a3589cf145c76b2158ea9b54bb266fd1a7e40. Complete May2023 x64 Release /MT
+eight-target build session43224 finished exit0. Frozen standard/ASAN command23,
+native9153/camera12/Transform60 and generated mixed JS643/168, full panel/actual
+registration DOM audit and dummy68/71→69/72 publish/full restore61 passed.
+Fresh AE0 permitted standing-authorized publication. Independent26 pair files,
+all27 tested CEP bytes and selector/runtime matched. Source archive, build logs
+and gate exits: artifacts/prepared/m3-17-native69-explicit-commit. Deployment
+before/after, independent hashes, wrapper and rollback report: artifacts/m3-17-native69-*.
+Initial SDK invocation omitted the two explicit NoPublish switches and was
+rejected before building; the corrected full build is the terminal evidence.
+An automatic review rejected an earlier report/package command for lacking a
+fresh process check; a new read-only AE0 check satisfied the deployment condition.
+
+ADR0040's explicit command/saved-stream publisher is now the production CEP path.
+No parameter IDs, matchNames, schemas or ABI migration. Installed source baseline
+is CEP72, candidate delta cleared; frozen archive retains the tested71→72 delta.
+Native68/CEP71 backup: artifacts/disabled/m3-17-native69-panel72-explicit-commit-20261011.
+Both existing Junctions unchanged. Unrelated Motion/MNT work preserved; push pending.
+
+The exact AE cause/correction is not certified by offline tests. Eight owner-OBJ
+batch cases and initial initialization are ready under artifacts/m3-17-native69-owner-batch;
+271 harness checks passed without AE. The launcher now reads the prepared generation
+instead of hardcoding71, with seven read-only contract checks. This tools-only fix
+follows the native source freeze and changes no deployed binary/panel bytes.
+No AE process or script was started/dispatched. Awaiting the separate ADR0011
+launch authorization; real first-effect/repeated refresh, native Model controls,
+undo/reopen/render qualification remains open. This is a test release, not customer
+release qualification.
+
+One-step rollback, AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native69-panel72-explicit-commit-20261011' -Restore`
+
 ## Explicit commit contract correction (native69 / CEP72)
 
 First-effect missing receipt exposed an untested script→USER_CHANGED assumption.

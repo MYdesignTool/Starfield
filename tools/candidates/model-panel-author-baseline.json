@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Installed native68/CEP71 retained; native69/CEP72 explicit graph command delta prepared; frozen SDK/regression pending.",
-  "basePanel": 71,
+  "status": "Installed native69/Core ABI8/CEP72 from frozen source897a358. Full May2023 SDK, frozen standard/ASAN explicit command and publication, panel matrix,26 pair/all27 CEP hashes and paired rollback passed. AE23.5x52 acceptance remains open; owner batch prepared; no launch/dispatch.",
+  "basePanel": 72,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "2833C940F48815780690FAB43BE0B471087E33A92C4AD8FD9AF5EC1D3CD8CD32"
+      "normalizedSha256": "83A16D04F4851BA779E21C43FE343CC8C637F94D078FB43EE45FDF37018EBFC9"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "F1287D96CE8188A7C6FBB68B14DAB4768864239307F6D1434023D7D0A792E6A8"
+      "normalizedSha256": "FCBEC31E1FF8355588EA929191A9D68F88BA184B5C40999775A341604B24608D"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "3D1816FD3D07577E0ADAA6D8E9E4AA430698C9B097D160930D68BA367B9C4CF6"
+      "normalizedSha256": "4105A09C2949200DB0961200576C6823D3D5BA5EFF8B259FA7F3AC0838D99697"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "B4D9E140B325A6911B3A11EA1ACB47B02E514BD1AB62A84048AD5ACBFDA78C5B"
+      "normalizedSha256": "EA71B6E4FE5C13C3C1EB4B59C9048475B02BB35CA77DF37C9F1DACFD841E1EF3"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "0AFBC7177AEEAAE43D887ABA65BA42C42E8506653E6EEF325C46233FBC315F8E"
+      "normalizedSha256": "16DC4412A8058718695515FF6BE0D3B84BFE7EC9D05E7EBED49F4F10A6C44FCE"
     }
   ]
 }
