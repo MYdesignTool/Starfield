@@ -46,15 +46,39 @@
         return close(expected.value,actual.value,node.type==="org.starfieldfx.nodes.particle" && (key==="1" || key==="2"));
     }
     function records(expected,actual,ignoreModelAsset){
-        if(expected.length!==actual.length)throw new Error("Saved node count differs.");var map={};
+        function differs(node,field,wanted,observed){
+            function describe(value){var text=JSON.stringify(value);return typeof text==="string"?text.substr(0,192):String(value);}
+            throw new Error("Saved node "+node.id+" / "+field+" differs (expected "+describe(wanted)+", actual "+describe(observed)+").");
+        }
+        if(expected.length!==actual.length)throw new Error("Saved node count differs (expected "+expected.length+", actual "+actual.length+").");var map={};
         for(var i=0;i<actual.length;i++){if(map[actual[i].id])throw new Error("Duplicate saved node identity.");map[actual[i].id]=actual[i];}
         for(var n=0;n<expected.length;n++){var node=expected[n],saved=map[node.id];
-            if(!saved || saved.type!==node.type || saved.schemaVersion!==node.schemaVersion || !close(node.position.x,saved.position.x) || !close(node.position.y,saved.position.y) ||
-                JSON.stringify(node.outgoing)!==JSON.stringify(saved.outgoing))throw new Error("Saved node identity, layout or connection differs.");
+            if(!saved)differs(node,"identity",node.id,"missing");
+            if(saved.type!==node.type)differs(node,"type",node.type,saved.type);
+            if(saved.schemaVersion!==node.schemaVersion)differs(node,"schemaVersion",node.schemaVersion,saved.schemaVersion);
+            if(!close(node.position.x,saved.position.x))differs(node,"position.x",node.position.x,saved.position.x);
+            if(!close(node.position.y,saved.position.y))differs(node,"position.y",node.position.y,saved.position.y);
+            // Connections are identities/endpoints, independent of JSON member
+            // order and AE slot order. Verify every edge exactly once; do not
+            // weaken topology validation by comparing serialized object text.
+            if(node.outgoing.length!==saved.outgoing.length)differs(node,"connection count",node.outgoing.length,saved.outgoing.length);
+            var edges={},wantedEdges={};
+            for(var e=0;e<saved.outgoing.length;e++){
+                var observed=saved.outgoing[e],edgeKey="$"+observed.id;
+                if(edges[edgeKey])differs(node,"duplicate connection",observed.id,"duplicate");
+                edges[edgeKey]=observed;
+            }
+            for(var c=0;c<node.outgoing.length;c++){
+                var wanted=node.outgoing[c],wantedKey="$"+wanted.id,edge=edges[wantedKey];
+                if(wantedEdges[wantedKey])differs(node,"duplicate requested connection",wanted.id,"duplicate");
+                wantedEdges[wantedKey]=true;
+                if(!edge)differs(node,"connection identity",wanted.id,"missing");
+                if(edge.target!==wanted.target)differs(node,"connection "+wanted.id+" target",wanted.target,edge.target);
+            }
             for(var p=0;p<node.parameters.length;p++){var field=node.parameters[p];
                 if(ignoreModelAsset && node.type===MODEL && /^(1|2|12|13)$/.test(String(field.key)))continue;
                 if(node.type==="org.starfieldfx.nodes.transform" && String(field.key)==="7")continue;
-                if(!valueMatches(node,field,parameter(saved,field.key)))throw new Error("Saved parameter differs: "+node.id+" / "+field.key);}
+                if(!valueMatches(node,field,parameter(saved,field.key)))differs(node,"parameter "+field.key,field,parameter(saved,field.key));}
         }
     }
     function renderer(expected,actual){for(var key in expected)if(Object.prototype.hasOwnProperty.call(expected,key) && !close(expected[key],actual[key])){
@@ -150,19 +174,26 @@
             s.preparedNodes=plain(prepared.nativeNodes);s.preparedRenderer=plain(prepared.renderer);return "1";
         }catch(error){s.message="Model prepare / "+step+": "+error.toString();return "0";}};
     host.SFLD_modelTransactionHostCommit=function(id){var s=session(id);if(!s || s.state!=="applying")return "0";
+        var step="read prepared snapshot";
         try{var resolved=target(s,1,false),before=api.snapshot(resolved);
             if(before.revision!==s.beforeRevision)throw new Error("Graph revision changed while applying Model assets.");
+            step="verify prepared records";
             records(s.preparedNodes,before.nativeNodes,true);renderer(s.preparedRenderer,before.renderer);
+            step="write authored node parameters";
             api.ensure(resolved.target.layer,s.request.nodeManifest,true,before.nativeNodes,false);
+            step="write renderer parameters";
             var fresh=target(s,1,false);api.writeRenderer(fresh,s.request.rendererManifest);
+            step="publish native graph";
             var nonce=api.nonce(fresh.properties.commit,fresh.properties.receipt),receipt=api.trigger(fresh,"Starfield: apply Model graph",s.request.requestId,nonce,false);
             if(!receipt.ok)throw new Error(receipt.error && receipt.error.message || "Native graph commit failed.");
+            step="read published snapshot";
             var updated=api.snapshot(fresh);
             if(!updated.initialized || updated.revision<=s.beforeRevision)throw new Error("Native graph acknowledgement is not current.");
+            step="verify published records";
             records(s.request.nodeManifest,updated.nativeNodes,false);renderer(s.request.rendererManifest,updated.renderer);
             s.result={ok:true,committed:true,operation:"submitGraph",target:{token:fresh.token},snapshot:updated,nonce:receipt.nonce};
             s.state="published";s.assets=[];return "1";
-        }catch(error){s.message=error.toString();return "0";}};
+        }catch(error){s.message="Model commit / "+step+": "+error.toString();return "0";}};
     host.SFLD_modelTransactionHostResult=function(id,wire){var s=session(id);if(!s)return "2";
         if(typeof wire!=="string" || wire.length>128 || !/^-?[0-9]+(\|-?[0-9]+){8}$/.test(wire)){
             s.notificationError="Invalid native Model result encoding (kind="+typeof wire+").";return "0";}

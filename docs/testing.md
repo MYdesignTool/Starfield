@@ -4,6 +4,8 @@
 
 export588/author74/preset file583/ES3完整三JSX18、nested preparation15、native65 panel-only dummy64；日志artifacts/m3-17-stage5-*。首次全图期望节点数未算Force已按实际before count修正。仅CEP改动，native65/ABI8不变。
 
+追加`tests/panel_test_build_deployment_tests.ps1 -Run -InstalledNativeBuild 65 -InstalledPanelGeneration 68`64确认当前65/68→65/69整套恢复。2026-10-11 10:53+08本地495f192 git archive/Prepare重现27panel字节，fresh AE0后KeepNative发布69；26hash/selector/runtime和paired Restore report通过，备份m3-17-native65-panel69-record-checks-20261011恢复65/68。当前只读核查`artifacts/Check-ModelRecordInstalledPair.ps1`；baseline69重现27安装字节。native65源码9200c6b保留，无SDK重建，AE gate开放。
+
 2026-10-11 M3-17 CEP68：`STARFIELD_PANEL_ROOT` 指向 isolated prepared panel，`node tests/model_graph_gateway_dom_tests.js` 默认 fresh wrapper42，追加 `STARFIELD_DOM_STABLE_EFFECTS=1` reused wrapper42。旧gateway在native backup后的Prepare复现ReferenceError/Object invalid；新gateway每次目标解析清缓存，两种策略均0 stale reads。此为模拟生命周期证据，不认定实际AE根因。
 
 Model transport555、asset gateway588、panel author74、preset file583、完整三JSX ES3 18。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/panel_test_build_deployment_tests.ps1 -Run -InstalledNativeBuild 65`64，默认61版本64；真实tools在artifact假仓库发布并整套恢复，native/source/selector保留。日志artifacts/m3-17-indexed-refs-*；首次误拼preset_file_transport_tests不存在，正确入口已通过。native65未变，不能由夹具关闭AE gate。

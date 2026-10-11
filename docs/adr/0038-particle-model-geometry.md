@@ -1,8 +1,8 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native65/CEP68 fresh Property resolution deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+Status: native65/CEP69 semantic record verification deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
-### CEP69 saved-record verification candidate — 2026-10-11
+### CEP69 saved-record verification — 2026-10-11
 
 Owner reports the aggregate identity/layout/connection mismatch at stage5,
 rollback errors0. Actual gateway fixtures with Emitter/Particle/Force/Model and
@@ -21,6 +21,15 @@ not publish. Reordered slots/members pass, and four actual DOM modes each42
 include fractional layout and nonempty two-way fanout. Export588/author74/
 preset583/ES3 three-file18, nested archive15 and paired dummy64 pass. Native65
 bytes/source identity remain; AE2023 Model qualification stays open.
+
+At10:53+08 CEP69 was deployed from frozen local495f192 after27 candidate byte
+hashes matched. Fresh zero-AE check permitted KeepNative, preserving native65/
+packed32833/CoreABI8 and native source9200c6b. 26 installed hashes, selector/
+selected runtime and paired Restore report passed. Backup
+m3-17-native65-panel69-record-checks-20261011 restores65/68; earlier backups stay.
+Explicit installed-panel68 dummy publication/restoration passes64. Baseline69
+reproduces27 installed panel bytes. Actual owner failure cause remains unproven;
+the next failure must identify exact field and verification phase directly.
 
 ### CEP68 indexed Property lifetime correction — 2026-10-11
 
