@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-17 native71 / CEP75 downstream Material candidate — 2026-10-12
+## M3-17 native71 / CEP75 downstream Material deployed — 2026-10-12
 
 Owned source regressions: Material core49 and native registration/binding183
 checks; mixed native ASAN10798, camera12, Transform60, literal Model/Transform
@@ -13,8 +13,14 @@ Logs: artifacts/m3-17-material75-core-asan.log,
 artifacts/m3-17-material75-native-asan.log,
 artifacts/m3-17-material75-mixed-asan-v2.log,
 artifacts/m3-17-material75-deploy-fixture.log. The first mixed ASAN attempt failed
-on a null bootstrap graph; v2 corrected that edge and passed. Full frozen
-May2023 SDK build, complete panel audit and final independent hash checks pending.
+on a null bootstrap graph; v2 corrected that edge and passed. Frozen aa1ea34 full
+May2023 SDK and complete panel audit passed (sessions2097/31986 actual exit0).
+Frozen source/artifacts logs: material75-frozen-{core-asan,native-asan,mixed-asan,
+model-particle,model-scene,panel-audit}. SDK log: artifacts/m3-17-native71-frozen-sdk-v2.log.
+Initial SDK invocation's absolute NVRTC leaf failed Join-Path resolution; copying
+the ignored two-DLL build input beneath the frozen source corrected it. Archived
+tracked sources stayed unchanged. Independent27 panel/9 native/486 source and
+paired rollback hashes passed after installation, proof material75-installed-proof.json.
 
 ## M3-17 native70 / CEP73 deployed Material / direct Model
 

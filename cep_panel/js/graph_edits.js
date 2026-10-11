@@ -24,8 +24,8 @@
         "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
-        "org.starfieldfx.nodes.model": { input:"2",output: "1" },
-        "org.starfieldfx.nodes.material": { output:"1" },
+        "org.starfieldfx.nodes.model": { output: "1" },
+        "org.starfieldfx.nodes.material": { input:"2",output:"1" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
@@ -276,18 +276,19 @@ function createNativeRecordContract() {
         if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
         var sourceSchema = PORTS[source.type];
         var destinationSchema = PORTS[destination.type];
-        var modelConnection=destinationSchema && source.type===TYPES.model && destination.type===TYPES.particle &&
+        var geometrySource=source.type===TYPES.model || source.type===TYPES.material;
+        var modelConnection=destinationSchema && geometrySource && destination.type===TYPES.particle &&
             String(destinationPort)===destinationSchema.modelInput;
         if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
             (!modelConnection && destinationSchema.input !== String(destinationPort))) {
             fail("invalid_port", "connection must use a compatible built-in output and input port");
         }
-        if(source.type===TYPES.model && !modelConnection && destination.type!==TYPES.output)
-            fail("invalid_model_destination","Connect Model to Particle or Output.");
-        if(source.type===TYPES.material && destination.type!==TYPES.model || destination.type===TYPES.model && source.type!==TYPES.material)
-            fail("invalid_material_connection","Connect Material to the Model material input.");
-        if(destination.type===TYPES.model && graph.edges.some(function(e){return e.destinationNode===destination.id && e.sourceNode!==source.id;}))
-            fail("material_already_connected","A Model accepts one Material.");
+        if(geometrySource && !modelConnection && destination.type!==TYPES.output && destination.type!==TYPES.material)
+            fail("invalid_model_destination","Connect geometry to Material, Particle or Output.");
+        if(destination.type===TYPES.material && !geometrySource)
+            fail("invalid_material_connection","A Material input accepts model geometry.");
+        if(destination.type===TYPES.material && graph.edges.some(function(e){return e.destinationNode===destination.id && e.sourceNode!==source.id;}))
+            fail("material_already_connected","A Material accepts one geometry input.");
         if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
             fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
         }
@@ -340,7 +341,7 @@ function createNativeRecordContract() {
         if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
         var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
         var destinationPort = edit.inputPort === undefined ?
-            (source.type===TYPES.model && destination.type===TYPES.particle ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
+            ((source.type===TYPES.model || source.type===TYPES.material) && destination.type===TYPES.particle ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
         validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
         for (var i = 0; i < graph.edges.length; i++) {
             var existing = graph.edges[i];
@@ -619,6 +620,22 @@ function createNativeRecordContract() {
     function apply(inputGraph, edit, idFactory) {
         if (!edit || typeof edit.type !== "string") fail("invalid_edit", "edit type is required");
         var graph = copyGraph(inputGraph);
+        // Upgrade only as part of an explicit, undoable edit. Preserve the old
+        // edge identity and fan-out destinations; read-only refresh is untouched.
+        var legacy=graph.edges.filter(function(edge){
+            var source=nodeById(graph,edge.sourceNode),target=nodeById(graph,edge.destinationNode);
+            return source && target && source.type===TYPES.material && target.type===TYPES.model;
+        });
+        legacy.forEach(function(edge){
+            var material=edge.sourceNode,model=edge.destinationNode;
+            // A shared legacy Material cannot become a single-input geometry
+            // node without duplicating authored controls. Keep that attachment
+            // readable/editable until its connections are deliberately replaced.
+            if(legacy.filter(function(old){return old.sourceNode===material;}).length!==1 ||
+                graph.edges.some(function(input){return input.destinationNode===material;}))return;
+            graph.edges.forEach(function(out){if(out.sourceNode===model)out.sourceNode=material;});
+            edge.sourceNode=model;edge.sourcePort="1";edge.destinationNode=material;edge.destinationPort="2";
+        });
         graph.nodes.forEach(function(node){
             if(node.type===TYPES.particle && !node.parameters.some(function(p){return p.key==="30";}))
                 node.parameters.push({key:"30",type:3,value:0});

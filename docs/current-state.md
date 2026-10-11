@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## M3-17 native71 / CEP75 repair candidate — 2026-10-12
+## M3-17 native71 / CEP75 deployed — 2026-10-12 00:56+08
 
 Owner reports CEP Material edits fail with heterogeneous effect-stream mismatch;
 native Effect Controls edits work. New graph authoring is Model → Material →
@@ -14,10 +14,30 @@ identity changes retain full transaction handling. UUID/kind/field alias spans
 are reused, changed sources are disabled/cleared before installation, removed
 aliases are retired with rollback, and identity/backup changes force rebinding.
 The AE mismatch root cause remains a hypothesis pending actual-host acceptance.
-Native71/packed32839 and isolated CEP75 source candidates; live70/74 untouched.
+Native71/packed32839/CoreABI9/CEP75 installed from frozen source
+aa1ea342db8211c773324b660310e593c56a2c29. Full May2023 x64 Release /MT nine-module
+SDK session2097 completed exit0, with both NoPublish switches. Frozen panel audit
+session31986 completed exit0 (actual six registrations, transaction DOM/reload/
+wrapper matrix, Material ordinary edits and legacy compatibility). Frozen ASAN
+native10798/camera12, Material49/registration183, Model particle2695/scene150946
+and literal mixed expressions passed. All486 archived source hashes unchanged.
 BuildWindows derives compiled inputs from three AEX projects plus all local
 adapter/Core headers (ADR0012), correcting the confirmed audit fingerprint gap.
-Full frozen SDK/audit/publication gates are pending. No AE process was started.
+Fresh AE0 preceded standing-authorized publication. Independent9 native,18 paired
+CEP,27 complete panel and selector/runtime hashes match; backup9 native/18 CEP
+hashes match old70/74. Before/after/rollback receipts: artifacts/m3-17-native71-*;
+independent proof: artifacts/m3-17-material75-installed-proof.json. Existing two
+Junctions retained; normalized recipe now75, frozen archive retains74-to75 delta.
+AE23.5x52 Material parameter editing/color/render/undo/reopen acceptance remains
+open. No AE process or script started/dispatched; no Git push.
+
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native71-panel75-material-downstream-20261012' -Restore`.
+
+Owner's latest direction is to continue M3-18 after the Material repair and deploy
+completed Motion stages. Circle is the proposed first author stage; reference
+Origin Type choices and Speed calibration are still pending. Preserve Motion/MNT
+changes; no extra Particle Shape or Motion mode.
 
 ## native70 / CEP74 deployed — 2026-10-11 23:59+08
 

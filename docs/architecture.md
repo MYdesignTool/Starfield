@@ -1,11 +1,11 @@
 # Starfield 架构
 
-M3-17's 2026-10-12 ADR0041 candidate uses Model → Material → Output and supports
+M3-17's 2026-10-12 deployed ADR0041 slice uses Model → Material → Output and supports
 Material → Particle model input. Material forwards geometry with branch-local
 shading. Legacy Material → Model remains readable. Existing UUID/field alias
 spans stay stable; structural edits rebuild bindings and retire removed aliases.
 Mesh-preserving parameter edits use ordinary guarded commits. Native71/CEP75
-requires full paired publication and AE2023 acceptance.
+passed full paired publication; AE2023 acceptance remains open.
 
 The native70 legacy ADR0041 slice adds Material metadata → Model and direct Model →
 Output. Numeric material values and captured AE lights stay owned by Core render

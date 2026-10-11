@@ -397,7 +397,9 @@
             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
             var shape = findParameter(source,"5");
             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
-                         inputPort: kind === "material" ? null : kind === "model" ? "2" : kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+                         inputPort: kind === "material" ? "2" : kind === "model" ?
+                            (graph.edges.some(function(edge){return edge.destinationNode===source.id && edge.destinationPort==="2";})?"2":null) :
+                            kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
                          modelInputPort: kind === "particle" ? "3" : null,
                          outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" || kind === "material" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,

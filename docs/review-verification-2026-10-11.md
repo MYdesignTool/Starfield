@@ -12,6 +12,9 @@
    另有报告未列出的Host所编译的src/core/ModelScene.cpp。
    TransformNullUI.hpp/CurveEditorModel.hpp等传递依赖也需覆盖；
    只从ClCompile派生仍不充分。下一次CoreOnly前应修复。
+   2026-10-12 M3-17已修复：BuildWindows合并三个AEX工程ClCompile/ClInclude，
+   再覆盖adapter/Core所有本地h/hpp；冻结aa1ea34完整SDK通过，指纹确认包含
+   上述六项漏项。native71已配对部署。聚合门和旧ABI断言仍是独立待办。
 2. **P1-2 默认聚合门失败成立。** 实跑RunPanelTests.cjs：40套件、20失败。
    缺候选环境、缺--expose-internals及断言漂移均存在，main_order的30/29、
    palette缺Model/Material已复现。失败列表和原日志分别在

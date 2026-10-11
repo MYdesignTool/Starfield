@@ -1,10 +1,12 @@
 # 开发路线图
 
-2026-10-12 M3-17 repair candidate follows the owner's Model → Material → Output
+2026-10-12 M3-17 native71/CEP75 repair follows the owner's Model → Material → Output
 direction. CEP material edits avoid full asset transactions; native binding spans
 are stable and removed aliases are retired. Legacy attachments remain readable.
-Frozen native71/CEP75 build, regression and paired rollback gates precede publication.
-AE2023 acceptance remains an actual-host gate.
+Frozen build, regression, installed hashes and paired rollback gates passed;
+deployed00:56+08. AE2023 acceptance remains an actual-host gate. Owner requests
+continued M3-18 work and deployment of completed stages; Circle reference
+Origin Type/Speed calibration is pending, while independent integration proceeds.
 
 Owner's 2026-10-11 scope prioritizes Model direct output and a basic Material:
 Particle/independent color, roughness, metallic, opacity and AE lights. This

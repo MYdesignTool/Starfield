@@ -260,7 +260,16 @@
                     callback({ ok: true, operation: "submitGraph", target: committed.target,
                                snapshot: saved, graphHex: saved.graphHex,committed:committed.committed,diagnostics:committed.diagnostics });
                 }
-                var needsModelTransaction=graph.nodes.concat(updated.nodes).some(function(node){return node.type==="org.starfieldfx.nodes.model";});
+                // Mesh-preserving edits need no copied effect parade or asset
+                // upload. Only Model identity/resource changes own that transaction.
+                function modelResources(nodes) {
+                    return nodes.filter(function(node){return node.type==="org.starfieldfx.nodes.model";}).map(function(node){
+                        return {id:node.id,parameters:node.parameters.filter(function(p){return ["1","2","12","13"].indexOf(String(p.key))>=0;})
+                            .sort(function(a,b){return Number(a.key)-Number(b.key);})};
+                    }).sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0;});
+                }
+                var needsModelTransaction=JSON.stringify(modelResources(transaction.baseNodeManifest))!==JSON.stringify(modelResources(transaction.nodeManifest)) ||
+                    (authoredEdit.modelAssetsToRestore || []).length>0 || (authoredEdit.modelResourceCopies || []).length>0;
                 if(!needsModelTransaction){call("submitGraph",transaction,confirmed);return;}
                 if(!modelTransactions || !modelAssets){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}
                 transaction.target={token:targetToken || response.target && response.target.token};

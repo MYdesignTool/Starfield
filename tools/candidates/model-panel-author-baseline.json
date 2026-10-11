@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "status": "Installed native70/Core ABI9/CEP74: native frozen23bb594 retained; CEP patch frozena3829ac passed isolated registration/DOM/ES3 and paired rollback gates. AE2023 Material/color/light acceptance remains open. artifacts/prepared/m3-17-material-panel74-frozen-v2/source.zip retains the tested73-to-74 delta.",
-  "basePanel": 74,
+  "basePanel": 75,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "418C8B2593101C25B30A7B68491016615F98F1DCBA15329FFA2A90034594C306"
+      "normalizedSha256": "83F879771D7FD7BCF79228127C32A98583CE4EA278EAF51D33BFA4CCB3D092EE"
     },
     {
       "path": "css/panel.css",
@@ -13,15 +13,15 @@
     },
     {
       "path": "js/graph_edits.js",
-      "normalizedSha256": "90B30348DB2DF1449A378BEED49A7BAF73C404C53F85F920083558F067E71EC8"
+      "normalizedSha256": "90F51DAB7C9626206CFFA1FB07DA73406FC1ADCC9CB8E757B4ECB9965A418042"
     },
     {
       "path": "js/native_graph_snapshot.js",
-      "normalizedSha256": "58B4CD7AC9BF87C054B4ECBD7B40180150D5FC398A44480950D91E2FFD1FE968"
+      "normalizedSha256": "93BF413FDE5FDD0E64F02A652325729552243D7A71D76033024C8158FA6FA038"
     },
     {
       "path": "js/graph_view.js",
-      "normalizedSha256": "94BC83F4889287825704D9383D55BE2113ADF2FD3E671B2057B5ED77D0D65462"
+      "normalizedSha256": "DCFE05C11686512E3EDD4B23063ADD40144E071076989D4B00D05E9E0B4A049A"
     },
     {
       "path": "js/node_palette.js",
@@ -29,19 +29,19 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "A6F19F3CA36CC3318E6C70A1B3A2B729771E90C25A4B489CCA86E810BEEB6852"
+      "normalizedSha256": "926D9F27F498A7655D65F2C1915D83332DC48E8169D5FB4AC9F67D485C33FF24"
     },
     {
       "path": "js/graph_transactions.js",
-      "normalizedSha256": "3F580275A404037D5B747E56B88ED4BCFB088359C28D194323949E75A2784386"
+      "normalizedSha256": "B5F464EBF61B9B9F9FD618F20AE7AD0D18745E456B1E762270046F09132B7C6A"
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "1A927891D355A93C9FCEAB46B2F88E24A9389B92035D2DDCADE3C2978B17AE1E"
+      "normalizedSha256": "12F56A3D51F4450398F9F6C60BB3B46EA4C84E1864568A2ED28F6461F1F81B0B"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "90BB49ABC3552F9E193CACCAC7EFA2902BBF7E3F9EC5CE1E37F7586881FF66B2"
+      "normalizedSha256": "880F7D6EB400DFB8A2D3178FD636DCA11A72E155FDF3195856563638F98A23D5"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "22E7BBDA72B82CFA0C83D0CAF8567B66B7F848660F04E8E8D5C7B9F0DADF9EE8"
+      "normalizedSha256": "3363484FB5916B632A4FB69B424BB1979CF9DFA6944B25EFC02AFEFC499D75CD"
     }
   ]
 }
