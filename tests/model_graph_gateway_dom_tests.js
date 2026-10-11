@@ -8,6 +8,8 @@ const edits=require(path.join(root,"js/graph_edits.js")),codec=require(path.join
 const {mainControls,nodeControls}=require("./node_property_fixture.js"),uuid=n=>n.toString(16).padStart(32,"0"),token="p0-c202-l303";
 const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 const stableEffects=process.env.STARFIELD_DOM_STABLE_EFFECTS==="1";
+const fullGraph=process.env.STARFIELD_DOM_FULL_GRAPH==="1";
+const reorderedConnections=process.env.STARFIELD_DOM_REORDER_CONNECTIONS==="1";
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
@@ -49,18 +51,26 @@ vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf
 const api=host.__SFLD_modelTransactionAPI;vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);
 let resolved=api.resolve({pinTarget:true,target:{token}});ok(!resolved.error,JSON.stringify(resolved.error));
 resolved.properties.nodeEffectsReady.setValue(1);resolved.properties.revision.setValue(11);
-let g=edits.apply({version:1,nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:"model"},()=>uuid(101));
-g=edits.apply(g,{type:"addNode",nodeType:"output"},()=>uuid(255));g=layout.set(g,{[uuid(101)]:{x:100,y:50},[uuid(255)]:{x:400,y:250}});
-const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[uuid(101)],outgoing:[]});
-api.ensure(layer,realm([record(g.nodes[0])]),true,realm([]),false);eq(arbReads,0);
+let g=fullGraph?require(path.join(root,"js/presets.js")).build("sparks",1080):{version:1,nodes:[],edges:[],optionalRecords:[]};
+if(fullGraph){
+    g=edits.apply(g,{type:"addNode",nodeType:"particle"},()=>uuid(102));
+    g=edits.apply(g,{type:"connect",from:g.nodes.find(n=>n.type===edits.types.emitter).id,to:uuid(102)},()=>uuid(103));
+    g=edits.apply(g,{type:"connect",from:uuid(102),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(104));
+}
+g=edits.apply(g,{type:"addNode",nodeType:"model",position:{x:100.123456789,y:50.234567891}},()=>uuid(101));
+if(!fullGraph)g=edits.apply(g,{type:"addNode",nodeType:"output"},()=>uuid(255));
+const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[n.id],
+    outgoing:g.edges.filter(e=>e.sourceNode===n.id).map(e=>({id:e.id,target:e.destinationNode})).sort((a,b)=>a.id.localeCompare(b.id))});
+api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output).map(record)),true,realm([]),false);eq(arbReads,0);
 const bounds=[-2,-3,-4,2,3,4],raw=Buffer.alloc(48);bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
 let transaction=500;
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
     target:{token},transactionId:uuid(transaction),changes:[],...fields});}
 function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});const before=copy(api.snapshot(resolved));
-    const desired=copy(before.nativeNodes[0]);desired.id=uuid(++transaction);desired.position={x:160,y:90};
+    const desired=copy(before.nativeNodes.find(n=>n.type===edits.types.model));desired.id=uuid(++transaction);desired.position={x:160.456789123,y:90.567891234};
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
-    const nodes=replace?[desired]:before.nativeNodes.concat([desired]);
+    const nodes=replace?before.nativeNodes.filter(n=>n.type!==edits.types.model).concat([desired]):before.nativeNodes.concat([desired]);
+    if(reorderedConnections)for(const node of nodes)node.outgoing=node.outgoing.slice().reverse().map(edge=>({target:edge.target,id:edge.id}));
     const r=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,
         graphHex:codec.toHex(g),nodeManifest:nodes,rendererManifest:before.renderer,assets:[{nodeId:desired.id,source:2,revision:17,bounds,bytes:32}]})));
     eq(r.ok,true,JSON.stringify(r));return {desired,before,id:uuid(transaction)};}
@@ -86,9 +96,9 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     effect.properties.Source.value=2;effect.properties["Mesh Revision"].value=17;
     for(const [i,name] of ["Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"].entries())effect.properties[name].value=bounds[i];
     return {effect,backupMain,backupNode};}
-let pair=begin(true),copies=stage(pair);eq(host.SFLD_modelTransactionHostCommit(pair.id),"1");eq(commits,1);eq(arbReads,0);eq(undo,0);
+let pair=begin(true),copies=stage(pair);eq(host.SFLD_modelTransactionHostCommit(pair.id),"1",host.__SFLD_modelGraphTransactionV1.message);eq(commits,1);eq(arbReads,0);eq(undo,0);
 eq(copies.effect.properties["Angle Y"].value,45);eq(copies.effect.properties["Panel Sync Guard"].value,0);
-eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,1);
+eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,pair.before.nativeNodes.length);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"1|7|0|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.committed,true);
 eq(JSON.parse(host.SFLD_releaseModelGraphTransaction(request("releaseModelGraphTransaction"))).ok,true);
@@ -98,4 +108,4 @@ pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransac
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
 eq(staleReads,0,"No cached invalid Property may be used after native backup/add/remove.");
-console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; effect wrapper identity ${stableEffects?"reused":"fresh"}; actual gateway callbacks, native writes simulated, no AE qualification`);
+console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; effect wrapper identity ${stableEffects?"reused":"fresh"}; ${fullGraph?"Emitter/Particle/Model connections":"Model only"}, fractional layout; native writes simulated, no AE qualification`);

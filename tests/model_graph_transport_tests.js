@@ -33,7 +33,7 @@ const api=host.__SFLD_modelTransactionAPI;
 let nodes=[],renderer={},revision=11,guard=0,stamp="stamp",tasks=[],hostRuns=0,prepares=0,commits=0,restores=0,writes=0,bytesRead=0,
     failedPrepare=false,failedCommit=false,badSaved=false,cleanupError=0,undoError=0,loseQueueAck=false,loseResult=false,now=1000,sequence=2000,
     throwQueue=false,skipNative=false,stopAfterClaim=false,loseRequestAck=false;
-const nativeMeshes={};
+const nativeMeshes={};let savedMutation=null,preparedMutation=null,publishes=0;
 function snapshot(){const current=copy(nodes);for(const n of current)if(n.type===edits.types.model){const asset=nativeMeshes[n.id],raw=n.parameters.find(p=>p.key==="12").value;
     n.modelAsset=asset?{revision:asset.revision,bounds:asset.bounds}: {revision:n.parameters.find(p=>p.key==="2").value,bounds:Array.from({length:6},(_,i)=>Buffer.from(raw).readDoubleLE(i*8))};}
     return realm({initialized:true,revision,checksum:"00000000",nativeNodes:current,renderer:copy(renderer),recordStamp:stamp,geometry:{width:1920,height:1080,pixelAspect:1}});}
@@ -44,7 +44,7 @@ api.ensure=(layer,desired,writeExisting,previous,defer)=>{writes++;if(defer){pre
     }else{commits++;if(failedCommit)throw new Error("commit failure");for(const n of desired){if(n.type===edits.types.model && n.parameters.find(p=>p.key==="13").value===1){
         ok(nativeMeshes[n.id]);eq(nativeMeshes[n.id].revision,n.parameters.find(p=>p.key==="2").value);}}nodes=copy(desired);}};
 api.remove=()=>{};api.writeRenderer=(resolved,r)=>{renderer=copy(r);};api.nonce=()=>66;
-api.trigger=()=>{revision++;if(badSaved)nodes[0].position.x+=10;return realm({ok:true,nonce:66});};
+api.trigger=()=>{publishes++;revision++;if(badSaved)nodes[0].position.x+=10;if(savedMutation)savedMutation(nodes);return realm({ok:true,nonce:66});};
 function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line==="0")return;
     eq(host.__SFLD_modelGraphTransactionV1.state,"queued");
     if(loseRequestAck){loseRequestAck=false;tasks.push(nativeRun);return;}
@@ -63,11 +63,13 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
     if(success){for(const a of assets){nativeMeshes[a.nodeId]=copy(a);const n=nodes.find(n=>n.id===a.nodeId),raw=Buffer.alloc(48);a.bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
         for(const [key,value] of [[1,a.source===2?Array.from(Buffer.from(a.nodeId,"hex")):Array(16).fill(0)],[2,a.source===2?a.revision:0],
             [12,a.source===2?Array.from(raw):manifest(cube).find(n=>n.type===edits.types.model).parameters.find(p=>p.key==="12").value],[13,a.source-1]])n.parameters.find(p=>p.key===String(key)).value=value;}
+        if(preparedMutation)preparedMutation(nodes);
         success=host.SFLD_modelTransactionHostCommit(id)==="1";}
     if(!success){nodes=before.nodes;renderer=before.renderer;revision=before.revision;restores++;}
     guard=0;if(!loseResult)eq(host.SFLD_modelTransactionHostResult(id,[success?1:0,success?7:5,success?0:512,0,0,cleanupError,undoError,0,-1].join("|")),"1");
 }
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
+    savedMutation=preparedMutation=null;publishes=0;
     failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=throwQueue=skipNative=stopAfterClaim=loseRequestAck=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
     for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
@@ -114,6 +116,40 @@ reset();client().apply(plan(cube),[{...meshAsset,source:1}],r=>{result=r;});drai
 eq(nodes.find(n=>n.id===modelId).parameters.find(p=>p.key==="2").value,0);eq(nodes.find(n=>n.id===modelId).parameters.find(p=>p.key==="13").value,0);
 for(const key of ["failedPrepare","failedCommit","badSaved"]){reset();if(key==="failedPrepare")failedPrepare=true;if(key==="failedCommit")failedCommit=true;if(key==="badSaved")badSaved=true;
     client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(result.committed,false);eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);}
+// Strict verification must distinguish real saved changes from harmless edge
+// serialization/slot order. Keep the native full restore simulation on failure.
+for(const phase of ["prepared","published"])for(const [label,mutation] of [
+    ["identity",ns=>ns[0].id=uuid(8001)],
+    ["type",ns=>ns[0].type=edits.types.force],
+    ["schemaVersion",ns=>ns[0].schemaVersion++],
+    ["position.x",ns=>ns[0].position.x+=10],
+    ["position.y",ns=>ns[0].position.y-=10],
+    ["connection count",ns=>ns.find(n=>n.outgoing.length).outgoing.pop()],
+    ["connection identity",ns=>ns.find(n=>n.outgoing.length).outgoing[0].id=uuid(8002)],
+    [" target",ns=>ns.find(n=>n.outgoing.length).outgoing[0].target=uuid(8003)],
+    ["parameter 2",ns=>ns[0].parameters.find(p=>p.key==="2").value+=1]
+]){
+    reset();if(phase==="prepared")preparedMutation=mutation;else savedMutation=mutation;
+    client().apply(plan(),[meshAsset],r=>{result=r;});drain();
+    eq(result.ok,false);eq(result.committed,false);eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);
+    ok(result.error.message.includes("Model commit / verify "+phase+" records"));ok(result.error.message.includes(label));
+    ok(result.error.message.includes("expected"));ok(result.error.message.includes("actual"));
+    eq(publishes,phase==="prepared"?0:1);
+}
+reset();savedMutation=ns=>{for(const n of ns)n.outgoing=n.outgoing.slice().reverse().map(e=>({target:e.target,id:e.id}));};
+client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(restores,0);eq(hostRuns,1);
+let fanout=edits.apply(imported,{type:"addNode",nodeType:"particle"},()=>uuid(8004));
+fanout=edits.apply(fanout,{type:"connect",from:fanout.nodes.find(n=>n.type===edits.types.emitter).id,to:uuid(8004)},()=>uuid(8005));
+fanout=edits.apply(fanout,{type:"connect",from:uuid(8004),to:fanout.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(8006));
+for(const phase of ["prepared","published"]){
+    reset(fanout);const duplicate=ns=>{const n=ns.find(n=>n.outgoing.length===2);n.outgoing[1]=copy(n.outgoing[0]);};
+    if(phase==="prepared")preparedMutation=duplicate;else savedMutation=duplicate;
+    client().apply(plan(fanout),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(nodes,manifest(fanout));eq(revision,11);
+    ok(result.error.message.includes("duplicate connection"));ok(result.error.message.includes("verify "+phase+" records"));
+    eq(publishes,phase==="prepared"?0:1);
+}
+reset(fanout);savedMutation=ns=>{for(const n of ns)n.outgoing=n.outgoing.slice().reverse().map(e=>({target:e.target,id:e.id}));};
+client().apply(plan(fanout),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(restores,0);eq(hostRuns,1);
 reset();cleanupError=516;undoError=512;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(result.diagnostics.cleanupError,516);eq(result.diagnostics.undoError,512);eq(hostRuns,1);
 reset();loseQueueAck=true;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(hostRuns,1);
 reset();loseRequestAck=true;client().apply(plan(cube),[],r=>{result=r;});drain();eq(result.ok,true);eq(hostRuns,1);eq(prepares,1);

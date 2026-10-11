@@ -88,6 +88,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 当前CEP69候选处理stage5记录核对：actual gateway真实非空连接/双Particle分支仅换JSON成员顺序复现旧汇总错误，改为edge ID/target集合匹配并保留count/重复/丢失/端点严格检查；每个节点identity/type/schema/坐标/参数差异分别给expected/actual和prepare后/publish后步骤。transport1089/四DOM各42/export588/author74/preset583/ES3 18/nested prepare15/panel-only dummy64通过，native65/ABI8不变。不能确认实际AE失败原因；冻结和配对部署继续，Motion/MNT保持，Git push仍待已有授权请求。
+
 2026-10-11 10:26+08 native65/CEP68已部署：本地源码d974522 git archive冻结并重现27panel字节，fresh AE0后KeepNative保留八native及9200c6b身份；26hash/selector/runtime和paired Restore report通过，备份68→67。准备阶段缓存缺口及冻结patch skip/exit0分别修正；nested archive marker15通过。按owner既有要求部署后暂停等待Model添加实机验收，完整目标不完成；Git push仍待已提出的当前授权请求。
 
 2026-10-11 当前修正候选仅CEP68：owner新报Object invalid/prepare stage3；actual gateway fixture复现原生备份后effect身份复用、child Property失效仍命中旧缓存。graph目标解析入口清缓存，prepare报错增加步骤；DOM两种包装策略各42、transport555/export588/author74/preset583/ES3 18、native65及旧61的panel-only整套部署/rollback dummy各64通过。native65/ABI8与源码9200c6b保持，无SDK重建；冻结、发布和owner实机验收继续。Motion/MNT不动，Git push等待既有确认请求。

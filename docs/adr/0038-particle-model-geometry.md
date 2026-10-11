@@ -2,6 +2,26 @@
 
 Status: native65/CEP68 fresh Property resolution deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
+### CEP69 saved-record verification candidate — 2026-10-11
+
+Owner reports the aggregate identity/layout/connection mismatch at stage5,
+rollback errors0. Actual gateway fixtures with Emitter/Particle/Force/Model and
+two Particle branches reproduce the old failure merely by reordering connection
+JSON members. That does not establish actual AE cause. Connections are sets of
+edge identities and exact targets, consistent with canonicalManifest/stamp and
+portable graph edge verification. Compare those fields instead of JSON text.
+Reject changed count, duplicate/missing edge or target, and keep exact node
+identity/type/schema plus existing position/parameter tolerances. Errors name
+prepared versus published verification, UUID, field and bounded expected/actual.
+No persistent IDs/schema/ABI/native behavior change; cache correction remains.
+
+Protocol1089 tests both verification stages with nine changed-field cases and
+duplicate edges, preserving full simulated rollback; early verification must
+not publish. Reordered slots/members pass, and four actual DOM modes each42
+include fractional layout and nonempty two-way fanout. Export588/author74/
+preset583/ES3 three-file18, nested archive15 and paired dummy64 pass. Native65
+bytes/source identity remain; AE2023 Model qualification stays open.
+
 ### CEP68 indexed Property lifetime correction — 2026-10-11
 
 The owner reports ReferenceError/Object is invalid at prepare stage3, with both

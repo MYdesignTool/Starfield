@@ -1,4 +1,5 @@
-param([switch]$Run,[ValidateSet(61,65)][int]$InstalledNativeBuild=61)
+param([switch]$Run,[ValidateSet(61,65)][int]$InstalledNativeBuild=61,
+    [ValidateRange(0,9998)][int]$InstalledPanelGeneration=0)
 $ErrorActionPreference='Stop'
 if(-not $Run){Write-Host 'Report only. Add -Run for dummy files/Junctions under artifacts/deploy-test; no Adobe files are changed.';exit 0}
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -6,7 +7,7 @@ $taskRoot=Join-Path $taskRepo ('artifacts/deploy-test/panel-es3-'+[guid]::NewGui
 $taskAllowed=[IO.Path]::GetFullPath((Join-Path $taskRepo 'artifacts/deploy-test'))+'\'
 if(-not [IO.Path]::GetFullPath($taskRoot).StartsWith($taskAllowed,[StringComparison]::OrdinalIgnoreCase)){throw 'Fixture escapes artifacts.'}
 $taskChecks=0
-$taskBasePanel=if($InstalledNativeBuild -eq 65){67}else{62}
+$taskBasePanel=if($InstalledPanelGeneration){$InstalledPanelGeneration}elseif($InstalledNativeBuild -eq 65){67}else{62}
 $taskNextPanel=$taskBasePanel+1
 function Check-PanelTest([bool]$taskPass,[string]$taskMessage){$script:taskChecks++;if(-not $taskPass){throw $taskMessage}}
 function Write-PanelTest([string]$taskPath,[string]$taskText){New-Item -ItemType Directory -Path (Split-Path -Parent $taskPath) -Force | Out-Null;[IO.File]::WriteAllText($taskPath,$taskText,[Text.UTF8Encoding]::new($false))}

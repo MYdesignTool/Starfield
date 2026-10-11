@@ -1,5 +1,11 @@
 # 当前工程状态
 
+## CEP69 保存记录核对候选（2026-10-11）
+
+owner新报Saved node identity/layout/connection differs，stage5且两个rollback0。actual gateway完整Emitter/Particle/Force/双Particle分支/Model夹具，保持连接ID和目标，仅改变JSON成员顺序即可复现旧错误；没有证据断定这是AE实机根因。新核对按edge ID/target集合逐项匹配，与authoringStamp/portable graph的无序连接契约一致；count、重复、丢失和端点变化仍拒绝，坐标容差不扩大、identity/schema/参数仍严格核对。错误直接给prepare后或publish后步骤、node UUID、具体字段及有界expected/actual，无需用户再运行报告脚本。
+
+transport1089（准备/提交两处九类真实变化及重复连接均失败且模拟整套恢复，准备核对失败不发布；排序/成员顺序变化通过）；actual gateway四种包装/图模式各42，含fractional layout/双分支非空连接；export588/author74/preset583/完整ES3三JSX18、nested archive15、native65 panel-only dummy64通过。artifacts/m3-17-stage5-*保留旧错误与新证据；第一次全图期望节点数误写3，sparks实际含Force，夹具已按before数量修正。native65/ABI8保持，CEP69冻结/发布继续，AE gate开放。
+
 ## 当前安装：native65 / CEP68（2026-10-11 10:26+08）
 
 owner 报 `graph_commit_failed: ReferenceError: Object is invalid (stage 3, error 516, rollback 0, asset rollback 0)`。stage3 是 JS prepare，尚未开始资产写入。实际 gateway 的扩充 DOM 夹具在复用 effect wrapper 身份、旧 child Property 失效时复现同样错误；原缓存仅靠 effect 身份命中，且原生备份到 Prepare 之间没有清理。每次重新解析 graph 目标都清空 Property/图层缓存，仍保留单次操作中的查找复用。prepare 错误直接包含具体步骤。此证据确认缓存生命周期缺口，不认定 AE 实机根因或验收完成。

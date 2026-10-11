@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-11 M3-17 CEP69：`STARFIELD_PANEL_ROOT` 指向隔离候选，model_graph_transport_tests1089，覆盖prepared/published两步的missing UUID/type/schema/x/y/edge count/edge ID/target/parameter与重复edge失败、模拟整套回滚、prepared失败不得publish，JSON成员和双分支edge slot排序不同可通过。actual gateway DOM默认Model/追加 `STARFIELD_DOM_FULL_GRAPH=1` 双Particle分支图、两种 `STARFIELD_DOM_STABLE_EFFECTS=0/1` 均42；`STARFIELD_DOM_REORDER_CONNECTIONS=1`输入字段顺序变化复现旧失败，新版通过。坐标使用小数，未扩大容差。字段诊断含UUID、步骤、expected/actual，不能据此认定AE根因或资格。
+
+export588/author74/preset file583/ES3完整三JSX18、nested preparation15、native65 panel-only dummy64；日志artifacts/m3-17-stage5-*。首次全图期望节点数未算Force已按实际before count修正。仅CEP改动，native65/ABI8不变。
+
 2026-10-11 M3-17 CEP68：`STARFIELD_PANEL_ROOT` 指向 isolated prepared panel，`node tests/model_graph_gateway_dom_tests.js` 默认 fresh wrapper42，追加 `STARFIELD_DOM_STABLE_EFFECTS=1` reused wrapper42。旧gateway在native backup后的Prepare复现ReferenceError/Object invalid；新gateway每次目标解析清缓存，两种策略均0 stale reads。此为模拟生命周期证据，不认定实际AE根因。
 
 Model transport555、asset gateway588、panel author74、preset file583、完整三JSX ES3 18。`powershell -NoProfile -ExecutionPolicy Bypass -File tests/panel_test_build_deployment_tests.ps1 -Run -InstalledNativeBuild 65`64，默认61版本64；真实tools在artifact假仓库发布并整套恢复，native/source/selector保留。日志artifacts/m3-17-indexed-refs-*；首次误拼preset_file_transport_tests不存在，正确入口已通过。native65未变，不能由夹具关闭AE gate。
