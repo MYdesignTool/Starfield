@@ -1,5 +1,34 @@
 # 测试入口
 
+## native68／CEP71 deployment — 2026-10-11 18:45+08
+
+Installed native68/packed32836/CoreABI8/CEP71 from frozen source
+61942b06b9e1171efc15aad9023f3ed637044c8a. Full May2023 x64 Release /MT eight-target
+build session81508 finished exit0. Frozen standard/ASAN native9048/camera12,
+Transform60, generated mixed JS643/Transform168, complete panel audit and
+scene150946/Model particle2695 ASAN gates finished exit0. Whole-graph backup
+standard/ASAN810845 and dummy67/71→68/71 deploy/full restore61 also passed.
+Fresh AE0 permitted standing-authorized deployment. Independent26 pair hashes,
+all27 tested CEP files and selector/runtime match. Installed before/after state:
+artifacts/m3-17-native68-deploy-{before,after}.json; hash report:
+artifacts/m3-17-native68-installed-hashes.json; wrapper log:
+artifacts/m3-17-native68-panel71-deploy.log. A wrapper log-name collision occurred
+before native publication; original67/71 hashes were rechecked, staging was
+restored, saved baselines/logs retained, then the normal paired tool succeeded.
+
+Literal source resolution eliminates heterogeneous effect iteration at alias
+evaluation; backup names cannot shadow author sources. Owner-mesh workload
+68,952,940→16,889,395 succeeds under unchanged caps, with independent coverage
+oracle. These are verified offline properties; the exact AE stream mismatch
+root cause and installed host correction remain unconfirmed. Existing-project
+rebind, manual effect rename rewriting, Model editing and render performance
+remain AE gates. No AE launch/dispatch occurred. Eight owner-mesh acceptance
+cases are ready in artifacts/m3-17-native68-owner-acceptance; starting AE requires
+the separate ADR0011 authorization. No new particle modes or Motion author
+surface added. IDs/matchNames/schemas/ABI unchanged. Foreign Motion/MNT edits
+preserved, local source commits89e8507/61942b0, Git push still pending.
+
+
 ## M3-17 native68 candidate — literal sources and triangle spans (2026-10-11)
 
 Owner reports native67/CEP71 still produces Particle/Emitter stream matchName

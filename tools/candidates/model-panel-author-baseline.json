@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Installed native67/Core ABI8/CEP71; owner reports stream mismatch and Model render cap. native68 literal binding/scanline candidate is unpublished; full frozen build and AE qualification pending. Panel71 bytes unchanged.",
+  "status": "Installed native68/Core ABI8/CEP71 from frozen source61942b0: literal source binding and bounded triangle spans. Full SDK/frozen regression,26 pair hashes/all27 panel bytes, selector/runtime and paired rollback report passed. Actual AE2023 stream mismatch/editing/render acceptance open; eight owner-mesh cases prepared; no launch/dispatch.",
   "basePanel": 71,
   "files": [
     {
