@@ -1,5 +1,15 @@
 # 当前任务卡
 
+## M3-17 native70 / CEP74 authoring patch deployed — 2026-10-11
+
+Material parameter validation/RGBA authoring patch and stale recipe/extension
+version gates are deployed. The frozen source, precise offline evidence,
+AE qualification boundary and native70/CEP73 one-step rollback are recorded only
+in [current-state.md](current-state.md). External report dispositions and confirmed
+fingerprint/aggregate runner/ABI follow-ups are in
+[review-verification-2026-10-11.md](review-verification-2026-10-11.md).
+M3-17 remains open for owner AE2023 acceptance; preserve in-progress Motion/MNT.
+
 ## M3-17 native70 / CEP73 deployed — 2026-10-11 20:48+08
 
 Owner's requested Model direct Output and basic Material slice is installed from

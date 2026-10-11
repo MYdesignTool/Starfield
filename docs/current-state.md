@@ -1,5 +1,45 @@
 # 当前工程状态
 
+## native70 / CEP74 deployed — 2026-10-11 23:59+08
+
+M3-17 Material authoring patch installed at 23:59:15+08. Native70/packed32838/
+CoreABI9 retains every byte from frozen23bb594. CEP74 is prepared from frozen
+a3829ac414a65e9933dc31594a67847a447df436. Material switches are validated as 0/1
+before writes; Color Source explicitly maps to AE1/2, graph RGB writes AE RGBA,
+and native readback rejects invalid popup values. Exceptions include the attempted
+native value. The owner's original popup0 failure chain is not yet reproduced
+offline; valid0 already mapped to1 in the old writer, so no certified root-cause
+claim is made. The separate RGB/RGBA defect was reproduced and corrected.
+
+Frozen full registration/panel/transaction audit passed, including all six native
+kinds, new/default Material and existing/independent Material, invalid values
+without writes, numeric keys, wrapper invalidation, old schemas and gateway
+reloads. ES3 three-file18, record-contract538, preparation24, dummy native70/ABI9
+publication/full rollback70 and legacy61/ABI8 rollback67 checks passed. Logs and
+source archive: artifacts/prepared/m3-17-material-panel74-frozen-v2 and
+artifacts/m3-17-material74-frozen-v2-*.log. First frozen attempt's missing ignored
+GPU input and private test API call failures remain recorded; the final archive
+was independently rebuilt and tested, with all486 tracked source files unchanged.
+
+Fresh AE0 preceded standing-authorized publication. Independent all9 native,
+18 paired CEP files, all27 frozen/tested/installed CEP files and selector/runtime
+match. Before/after state: artifacts/m3-17-native70-panel74-material-fix-20261011-*.json;
+installed proof: artifacts/m3-17-material74-installed-hashes.json. Both existing
+Junctions retained. Recipe basePanel73 mismatch was corrected and stale-recipe/
+mixed Extension Version candidates are rejected before publication. Installed
+baseline now74; the frozen archive retains the tested73-to-74 delta.
+
+Paired native70/CEP73 backup: artifacts/disabled/m3-17-native70-panel74-material-fix-20261011.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native70-panel74-material-fix-20261011' -Restore`.
+Actual AE23.5x52 Material creation/color/light/render/undo/reopen gates remain
+open. No AE process or script started/dispatched; unrelated Motion/MNT work
+preserved; no Git push. External audit disposition and confirmed follow-ups:
+[review-verification-2026-10-11.md](review-verification-2026-10-11.md).
+The generic aggregate runner still fails; this release's isolated gates do not
+establish a green whole-repository test run. Fix fingerprint omissions before
+the next CoreOnly/native release.
+
 ## native70 / CEP73 deployed — 2026-10-11 20:48+08
 
 Owner reports native69/CEP72 currently produces no errors in their manual tests.

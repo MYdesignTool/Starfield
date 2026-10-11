@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-73";
+    var GATEWAY_BUILD = "native-presets-74";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -600,7 +600,8 @@
                 } else property.setValue(value);
             }
         } catch (error) {
-            throw new Error("Node parameter '" + name + "' (" + effect.matchName + "): " + error.toString());
+            throw new Error("Node parameter '" + name + "' (" + effect.matchName + ", native value " +
+                JSON.stringify(value) + "): " + error.toString());
         }
     }
 
@@ -954,6 +955,13 @@ function createNativeRecordContract() {
             var key=String(field.key),type=0;
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"material") {
+                if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
+                if(key==="2")for(var channel=0;channel<3;channel++)
+                    if(field.value[channel]<0 || field.value[channel]>1)invalid(node,"material color must be in 0..1");
+                if((key==="3" || key==="4" || key==="5") && (field.value<0 || field.value>1))
+                    invalid(node,"material parameter "+key+" must be in 0..1");
+            }
             found[key]=true;
         }
         for(var key in layout.required)if(own(layout.required,key) && !found[key])invalid(node,"missing parameter "+key);
@@ -1008,7 +1016,9 @@ function createNativeRecordContract() {
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
         } else if(type==="org.starfieldfx.nodes.material") {
-            node.parameters.push({key:"1",type:3,value:Number(nodeControlValue(effect,materialControl(1)))-1},
+            var materialSource=Number(nodeControlValue(effect,materialControl(1)));
+            if(materialSource!==1 && materialSource!==2)throw new Error("Invalid native Material Color Source: "+materialSource);
+            node.parameters.push({key:"1",type:3,value:materialSource===1?0:1},
                 {key:"2",type:5,value:nodeControlValue(effect,materialControl(2)).slice(0,3)});
             for(var mi=3;mi<=5;mi++)node.parameters.push({key:String(mi),type:4,value:Number(nodeControlValue(effect,materialControl(mi)))/100});
             node.parameters.push({key:"6",type:3,value:Number(nodeControlValue(effect,materialControl(6)))});
@@ -1230,6 +1240,7 @@ function createNativeRecordContract() {
         if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
             throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
         }
+        if(node.type==="org.starfieldfx.nodes.material")nativeRecords.schema(node);
         if(node.type==="org.starfieldfx.nodes.model") {
             var requestedModel=validateModelRecord(node),storedAsset=modelAssetDescriptor(effect);
             if(requestedModel.imported) {
@@ -1300,7 +1311,14 @@ function createNativeRecordContract() {
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
                 } else if(type==="org.starfieldfx.nodes.material") {
-                    setNodeControl(effect,materialControl(Number(key)),key==="1"?value+1:Number(key)>=3 && Number(key)<=5?value*100:value);
+                    // Portable enums are zero based; AE popup values are one based.
+                    // Validate before any write and use exact native switch constants.
+                    if(key==="1")setNodeControl(effect,materialControl(1),value===0?1:2);
+                    else if(key==="2")setNodeControl(effect,materialControl(2),[value[0],value[1],value[2],1]);
+                    else if(key==="3" || key==="4" || key==="5")
+                        setNodeControl(effect,materialControl(Number(key)),Number(value)*100);
+                    else if(key==="6")setNodeControl(effect,materialControl(6),value===0?0:1);
+                    else throw new Error("Material graph parameter is not mapped: "+key);
                 } else if(type === "org.starfieldfx.nodes.model") {
                     if(key==="1" || key==="2" || key==="12")continue; // Native mesh transaction owns derived metadata.
                     if(key==="13")setNodeControl(effect,modelControl(1),value+1);

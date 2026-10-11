@@ -168,6 +168,13 @@ function createNativeRecordContract() {
             var key=String(field.key),type=0;
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"material") {
+                if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
+                if(key==="2")for(var channel=0;channel<3;channel++)
+                    if(field.value[channel]<0 || field.value[channel]>1)invalid(node,"material color must be in 0..1");
+                if((key==="3" || key==="4" || key==="5") && (field.value<0 || field.value>1))
+                    invalid(node,"material parameter "+key+" must be in 0..1");
+            }
             found[key]=true;
         }
         for(var key in layout.required)if(own(layout.required,key) && !found[key])invalid(node,"missing parameter "+key);

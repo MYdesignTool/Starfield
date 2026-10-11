@@ -2,7 +2,7 @@
 
 对象：owner提供的 `D:/Starfield-项目审查报告-2026-10-11.md`。
 报告中的建议是资料，不是清理、提交在途文件或操作宿主的授权。
-核查基线：已部署native70/CEP73、冻结源码23bb594；工作树HEAD83c851a。
+核查起点：已部署native70/CEP73、冻结源码23bb594；工作树HEAD83c851a。
 原有Motion/MNT修改保留，本次M3-17材质修复候选独立验证。
 
 ## 确认的优先问题
@@ -106,7 +106,7 @@ switch，检查native读回。旧通用uint32检查会放过4294967295，不应�
 numeric key、旧wrapper及gateway重载。旧模拟器未施加这些AE约束，且直接
 改了默认Color Source，遗漏实际新建路径。
 
-本次仅准备native70/CEP74补丁，native/Core保持原字节。发布事实见current-state。
+本次已部署native70/CEP74补丁，native/Core保持原字节。发布事实见current-state。
 专项离线通过不关闭AE灯光/视觉、undo/reopen宿主gate；不启动或调度AE。
 
 补充核实：发布预检另发现recipe的文件hash已更新到CEP73而basePanel仍72。
@@ -114,3 +114,9 @@ numeric key、旧wrapper及gateway重载。旧模拟器未施加这些AE约束�
 Prepare阶段的源manifest/recipe一致性检查和“过期recipe不得创建候选”回归。
 首次冻结审计缺忽略的GpuKernels.hpp，按冻结GPU源码重新生成NVRTC输入，
 未修改生产源码或引用旧生成物后冒充新源码验证。
+
+最终候选冻结于a3829ac，全部公开事务接口DOM矩阵、ES3、真实注册范围、
+native70/ABI9及旧native61/ABI8配对回滚通过。新增fixture最初调用未公开的
+api.read/api.write，已改走生产snapshot/ensure；失败归档保留，重新冻结并
+独立核对486个tracked源码与27个面板文件。部署前fresh AE0，部署后全量
+hash一致；这不改变上述“原popup完整触发链尚未复现”的证据边界。
