@@ -1,6 +1,6 @@
 # Starfield 架构
 
-M3-17's ADR0041 candidate adds Material metadata → Model and direct Model →
+M3-17's deployed ADR0041 slice adds Material metadata → Model and direct Model →
 Output. Numeric material values and captured AE lights stay owned by Core render
 staging; AE suites and borrowed light buffers remain inside ae_plugin. GGX/Smith/
 Schlick shading uses transformed corner normals, perspective interpolation and

@@ -14,16 +14,18 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, material:1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
-        "org.starfieldfx.nodes.model": { output: "1" },
+        "org.starfieldfx.nodes.model": { input:"2",output: "1" },
+        "org.starfieldfx.nodes.material": { output:"1" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
     var DEFAULTS = {
@@ -76,6 +78,7 @@
             {key:"3",type:5,value:[0,0,0]}, {key:"4",type:5,value:[100,100,100]},
             {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
         ],
+        material:[{key:"1",type:3,value:0},{key:"2",type:5,value:[1,1,1]},{key:"3",type:4,value:.5},{key:"4",type:4,value:0},{key:"5",type:4,value:1},{key:"6",type:3,value:1}],
         model: [
             {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
             {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
@@ -134,6 +137,7 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
     function own(object,key){return Object.prototype.hasOwnProperty.call(object,key);}
@@ -271,8 +275,12 @@ function createNativeRecordContract() {
             (!modelConnection && destinationSchema.input !== String(destinationPort))) {
             fail("invalid_port", "connection must use a compatible built-in output and input port");
         }
-        if(source.type===TYPES.model && !modelConnection)
-            fail("model_requires_particle", "Connect Model to the Particle Model input.");
+        if(source.type===TYPES.model && !modelConnection && destination.type!==TYPES.output)
+            fail("invalid_model_destination","Connect Model to Particle or Output.");
+        if(source.type===TYPES.material && destination.type!==TYPES.model || destination.type===TYPES.model && source.type!==TYPES.material)
+            fail("invalid_material_connection","Connect Material to the Model material input.");
+        if(destination.type===TYPES.model && graph.edges.some(function(e){return e.destinationNode===destination.id && e.sourceNode!==source.id;}))
+            fail("material_already_connected","A Model accepts one Material.");
         if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
             fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
         }
@@ -325,7 +333,7 @@ function createNativeRecordContract() {
         if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
         var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
         var destinationPort = edit.inputPort === undefined ?
-            (source.type===TYPES.model ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
+            (source.type===TYPES.model && destination.type===TYPES.particle ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
         validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
         for (var i = 0; i < graph.edges.length; i++) {
             var existing = graph.edges[i];

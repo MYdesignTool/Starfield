@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-72";
+    var GATEWAY_BUILD = "native-presets-73";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -43,7 +43,8 @@
         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
         "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
-        "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"}
+        "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"},
+        "org.starfieldfx.nodes.material":{kind:"material",label:"Material",matchName:"org.starfieldfx.node.material"}
     };
 
     // One row per bound effect parameter. `index` is the registered parameter index
@@ -727,6 +728,7 @@
             "Rotation X","Rotation Y","Rotation Z","Scale X","Scale Y","Scale Z","Particles Scale","Particles Opacity"][index-1],diskId:1400+index};
     }
 
+    function materialControl(index){return {name:["Color Source","Color","Roughness","Metallic","Opacity","AE Lights"][index-1],diskId:1600+index};}
     function modelControl(index) {
         var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
             "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
@@ -921,6 +923,7 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
     function own(object,key){return Object.prototype.hasOwnProperty.call(object,key);}
@@ -1004,6 +1007,11 @@ function createNativeRecordContract() {
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
+        } else if(type==="org.starfieldfx.nodes.material") {
+            node.parameters.push({key:"1",type:3,value:Number(nodeControlValue(effect,materialControl(1)))-1},
+                {key:"2",type:5,value:nodeControlValue(effect,materialControl(2)).slice(0,3)});
+            for(var mi=3;mi<=5;mi++)node.parameters.push({key:String(mi),type:4,value:Number(nodeControlValue(effect,materialControl(mi)))/100});
+            node.parameters.push({key:"6",type:3,value:Number(nodeControlValue(effect,materialControl(6)))});
         } else if(type === "org.starfieldfx.nodes.model") {
             var source=Number(nodeControlValue(effect,modelControl(1))),asset=modelAssetDescriptor(effect);
             if(source!==1 && source!==2)throw new Error("Invalid Model Source.");
@@ -1291,6 +1299,8 @@ function createNativeRecordContract() {
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+                } else if(type==="org.starfieldfx.nodes.material") {
+                    setNodeControl(effect,materialControl(Number(key)),key==="1"?value+1:Number(key)>=3 && Number(key)<=5?value*100:value);
                 } else if(type === "org.starfieldfx.nodes.model") {
                     if(key==="1" || key==="2" || key==="12")continue; // Native mesh transaction owns derived metadata.
                     if(key==="13")setNodeControl(effect,modelControl(1),value+1);

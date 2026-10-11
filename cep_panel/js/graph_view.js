@@ -13,6 +13,7 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
@@ -117,6 +118,14 @@
             "7": {hidden:true},
             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
         },
+        material:{
+            "1":{label:"Color Source",kind:"popup",choices:["Particle Color","Material Color"],values:[0,1]},
+            "2":{label:"Color",kind:"color"},
+            "3":{label:"Roughness",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "4":{label:"Metallic",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "5":{label:"Opacity",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "6":{label:"AE Lights",kind:"popup",choices:["Off","On"],values:[0,1]}
+        },
         model: {
             "1": {hidden:true}, "2": {hidden:true}, "3": {hidden:true}, "12": {hidden:true},
             "13": {label:"Source",kind:"popup",choices:["Cube","OBJ"],values:[0,1]},
@@ -139,7 +148,7 @@
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",material:"Material",
                    output: "Output" };
 
     function fail(code, message) {
@@ -388,9 +397,9 @@
             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
             var shape = findParameter(source,"5");
             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
-                         inputPort: kind === "model" ? null : kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+                         inputPort: kind === "material" ? null : kind === "model" ? "2" : kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
                          modelInputPort: kind === "particle" ? "3" : null,
-                         outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" ? "1" : "2"),
+                         outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" || kind === "material" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,
                          curveParameterKeys: kind === "particle"
                             ? { size: "7", opacity: "8", rotation:"27", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }

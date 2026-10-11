@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-17 Material / direct Model candidate
+## M3-17 native70 / CEP73 deployed Material / direct Model
 
 Isolated panel: artifacts/prepared/m3-17-material-panel73-v4/cep_panel.
 RunMaterialTests.ps1 -Run -Sanitize: 44 Core/pixel/snapshot/ABI prefix checks.
@@ -13,6 +13,14 @@ model_deployment_tests.ps1 -Run -UpgradeInstalledModel -InstalledModelBuild 69:
 63 dummy pair/hash/full rollback checks. Logs: artifacts/m3-17-material-*.
 RunModelParticleTests.ps1 -Run: 2695 old behavior checks remain passing.
 All are offline checks; AE2023 manual material/light/render acceptance is open.
+Frozen production source23bb594: artifacts/prepared/m3-17-native70-material.
+Nine-target SDK exit0, frozen ASAN Core/native/light/Model scene/Model particle/
+explicit command checks, full panel DOM matrix and dummy deployment exit0.
+Mixed test's initial missing LightCapture link input is retained as failed evidence;
+frozen-mixed-repaired.log/exit and mixed-harness-repair.json record the passing
+verification harness. Production/archive bytes were not changed to repair tests.
+Independent installed27 pair/all27 CEP and selector/runtime evidence:
+artifacts/m3-17-native70-installed-hashes.json. Paired rollback report passed.
 
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08
 

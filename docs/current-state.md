@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## native70 / CEP73 Material candidate — 2026-10-11
+## native70 / CEP73 deployed — 2026-10-11 20:48+08
 
 Owner reports native69/CEP72 currently produces no errors in their manual tests.
 This is limited evidence; prior undo/reopen/OBJ gates are not inferred from it.
@@ -10,12 +10,23 @@ parallel/point/spot lighting. Old graphs without Material retain unlit color.
 Imported direct geometry keeps native mesh units; builtin direct cube is 100px.
 No complex materials, shadows or texture maps.
 
-Candidate adds Core ABI9, binding8 and Model snapshot11 with legacy readers,
-and StarfieldMaterial.aex / kind6 / disk1601..1606. Complete nine-module native70/
-CEP73 build required. Installed69/72 remains unchanged pending frozen build and
-hash gates. Worktree evidence: Material Core ASAN44, native binding/compiler ASAN170,
-AE light capture1104, old Model particle2695, full panel audit and dummy69/72→
-70/73 publication/full rollback63 passed. Logs: artifacts/m3-17-material-*.
+Installed packed32838/Core ABI9/CEP73 from frozen source
+23bb594cd37df1eeeda426d99d93ca744c1ae56e. New binding8, Model snapshot11 and
+StarfieldMaterial.aex / kind6 / disk1601..1606 retain legacy readers. Complete
+nine-module May2023 x64 Release /MT SDK build session51176 finished exit0.
+Frozen ASAN: Material Core44, native registration/binding/compiler170,
+light capture1104, old Model particle2695, Model scene150946 and explicit graph
+command23 passed. Frozen full panel/registration DOM audit and dummy69/72→70/73
+publish/full rollback63 passed. Initial mixed test link omitted LightCapture.cpp;
+repaired harness passed ASAN and generated-expression checks without modifying
+frozen production sources or archive. Its hash is recorded in mixed-harness-repair.json.
+
+Fresh AE0 allowed standing-authorized publication through existing Junctions.
+Independent27 pair files, all27 tested CEP bytes and selector/runtime matched.
+Evidence: artifacts/prepared/m3-17-native70-material and artifacts/m3-17-native70-*.
+Retained69/72 backup: artifacts/disabled/m3-17-native70-panel73-material-20261011.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native70-panel73-material-20261011' -Restore`.
 Actual AE2023 material/light/render qualification remains open.
 
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08

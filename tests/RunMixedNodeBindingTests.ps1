@@ -9,7 +9,7 @@ $taskCore=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','Graph
 $taskSources=@('tests\native_sync_tests.cpp','tests\camera_capture_tests.cpp','ae_plugin\NodeGraphSync.cpp','ae_plugin\Camera.cpp',
     'ae_plugin\GraphCarrier.cpp','ae_plugin\NativeGraphCommit.cpp','ae_plugin\GraphParameter.cpp','ae_plugin\NativeNodeGraph.cpp',
     'ae_plugin\Parameters.cpp','ae_plugin\WorldBridge.cpp','ae_plugin\EmitterHistoryCapture.cpp','ae_plugin\NativeTemporalCache.cpp',
-    'ae_plugin\NativeTemporalUI.cpp','ae_plugin\MotionBlur.cpp','ae_plugin\ModelControls.cpp','ae_plugin\ModelGeometryParameter.cpp',
+    'ae_plugin\NativeTemporalUI.cpp','ae_plugin\MotionBlur.cpp','ae_plugin\LightCapture.cpp','ae_plugin\ModelControls.cpp','ae_plugin\ModelGeometryParameter.cpp',
     'ae_plugin\ModelMirrorParameter.cpp','ae_plugin\ModelMirrorTransaction.cpp')+$taskCore
 Push-Location -LiteralPath $taskRepo
 try {

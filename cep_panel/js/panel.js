@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-72";
+    var GATEWAY_BUILD = "native-presets-73";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -235,11 +235,11 @@
     }
 
     var NODE_TYPES = {
-        emitter: true, particle: true, force: true, transform: true, model: true, output: true
+        emitter: true, particle: true, force: true, transform: true, model: true, material:true, output: true
     };
     var DEFAULT_NODE_POSITIONS = {
         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
-        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, output: { x: 235, y: 256 }
+        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, material:{x:90,y:30}, output: { x: 235, y: 256 }
     };
 
     function positionFor(node, index) {
@@ -365,7 +365,7 @@
         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
         var bounds = { left: viewportLeft, top: viewportTop,
                        right: viewportRight, bottom: viewportBottom };
-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd", model:"#8fc4a5",
+        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd", model:"#8fc4a5",material:"#d3b67d",
                        output: "#83c9b1" };
         for (var i = 0; i < state.nodes.length; i++) {
             if (!isSupportedNode(state.nodes[i])) continue;
@@ -589,6 +589,7 @@
                    " · opacity " + shortNumber(parameterValue(node, "opacity") || graphParameterValue(node, 5)) + (state.graphMode ? "%" : "");
         }
         if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
+        if(kind==="material")return graphParameterValue(node,1)===1?"Material Color":"Particle Color";
         if(kind==="model")return graphParameterValue(node,13)===1?"OBJ":"Cube";
         var status = state.frameStatus;
         if (status && status.available === false) return "Live count unavailable";

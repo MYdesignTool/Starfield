@@ -3,8 +3,8 @@
 Owner's 2026-10-11 scope prioritizes Model direct output and a basic Material:
 Particle/independent color, roughness, metallic, opacity and AE lights. This
 M3-17 slice follows ADR0041; Motion remains staged, with no extra Particle modes.
-native70/CEP73 requires a frozen nine-module SDK build, graph/control/pixel/light
-checks and full paired rollback before promotion.
+native70/CEP73 passed frozen nine-module SDK, graph/control/pixel/light and paired
+rollback gates and was deployed at20:48+08. Actual AE2023 material acceptance is open.
 
 M3-17 currently prioritizes ADR0040's full graph submission contract correction:
 native69/CEP72 explicit command replaces assumed supervision and is deployed after

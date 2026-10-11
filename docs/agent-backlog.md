@@ -1,5 +1,17 @@
 # 当前任务卡
 
+## M3-17 native70 / CEP73 deployed — 2026-10-11 20:48+08
+
+Owner's requested Model direct Output and basic Material slice is installed from
+frozen23bb594. Nine-target May2023/ABI9 build and frozen ASAN Core44/native170/
+light1104/Model particle2695/scene150946/command23, panel matrix and dummy paired
+rollback63 passed. Mixed test's missing light link input was repaired in a
+recorded verification harness; production/archive stayed frozen. Independent27
+pair/all27 CEP hashes and selector/runtime match. Backup69/72 retained at
+artifacts/disabled/m3-17-native70-panel73-material-20261011; one-step undo in
+current-state.md. M3-17 remains open for owner AE23.5x52 Material/color/light/
+undo/reopen acceptance. No AE launch/dispatch, Motion expansion or MNT cleanup.
+
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08
 
 Installed native69/packed32837/CoreABI8/CEP72 from frozen source

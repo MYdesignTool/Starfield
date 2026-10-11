@@ -18,8 +18,9 @@
                 throw {code:"invalid_native_node_record",message:"The current native control snapshot is missing. Close and reopen the Starfield panels."};
             }
             var graph = {version:1,nodes:[],edges:[],optionalRecords:[]}, positions = {};
-            var emitterTargets = {};
+            var emitterTargets = {},particleTargets={};
             snapshot.nativeNodes.forEach(function (record) {
+                if(record.type==="org.starfieldfx.nodes.particle")particleTargets[record.id]=true;
                 if (record.type === "org.starfieldfx.nodes.emitter") emitterTargets[record.id] = true;
             });
             snapshot.nativeNodes.forEach(function (record) {
@@ -31,8 +32,8 @@
                 positions[record.id] = record.position;
                 record.outgoing.forEach(function (edge) {
                     graph.edges.push({id:edge.id,sourceNode:record.id,
-                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" || record.type === "org.starfieldfx.nodes.model" ? "1" : "2",
-                        destinationNode:edge.target,destinationPort:record.type === "org.starfieldfx.nodes.model" ? "3" : emitterTargets[edge.target] ? "2" : "1"});
+                        sourcePort:record.type === "org.starfieldfx.nodes.emitter" || record.type === "org.starfieldfx.nodes.model" || record.type==="org.starfieldfx.nodes.material" ? "1" : "2",
+                        destinationNode:edge.target,destinationPort:record.type==="org.starfieldfx.nodes.material" ? "2" : record.type === "org.starfieldfx.nodes.model" && particleTargets[edge.target] ? "3" : emitterTargets[edge.target] ? "2" : "1"});
                 });
             });
             var output = snapshot.renderer;
