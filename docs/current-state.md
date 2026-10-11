@@ -1,5 +1,11 @@
 # 当前工程状态
 
+## 当前源码候选：CEP71 整体提交链路修正（2026-10-11）
+
+M3-17按owner要求整体排查：五类control布局投影统一、提交后重取receipt/snapshot、跨realm数组和type/build/contract诊断；native65/ABI8/IDs/持久化schema保持。实际注册数据DOM/协议/资产/预设及原生标准/ASAN回归通过，见 [整体排查](model-transaction-audit.md)。新UUID类型和AE为什么返回3未证实，不能把候选通过当实机已验收。
+
+8例真实AE事务/资源回读自动验收已生成并通过135项模拟/ES3自检。默认report，启动AfterFX需ADR0011单次明确授权，不要求owner逐错反馈。待冻结、配对发布和实机结果；Motion/MNT保持，Git push仍等已有明确授权回复。
+
 ## 当前安装：native65 / CEP70（2026-10-11 11:46+08）
 
 owner明确stage5：Particle59f0e5c664ba89e29834484229eea6c6 schema expected7/actual3。受控旧label3 actual gateway夹具复现原错误；Model最终核对改用与browser nativeRecordSchema一致的完整Particle布局投影，逐项类型/必需字段/重复及未知key检查后才映射7，所有请求值/位置/连接仍核对；准备阶段raw schema保持严格。安装文件声明7，实机为何返回3仍未确认。另一夹具证实gateway重载后transport保留旧API；两个页面按API身份/build配对，显式Model begin重新加载，原生检查点重取匹配API，foreign generation在prepare写入前拒绝，正常poll不反复加载。无ID/schema/ABI/native变更。

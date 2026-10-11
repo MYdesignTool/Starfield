@@ -92,4 +92,8 @@ const client=assets.create({idFactory:()=>assetId,now:()=>now,call(operation,fie
 client.collect({revision:11,nativeNodes:[{id:nodeId,type:"org.starfieldfx.nodes.model",parameters:[{key:"13",type:3,value:0}],modelAsset:{revision:17,bounds}}]},token,r=>{collected=r;});
 eq(collected,null);eq(clientTasks.length,1);clientTasks.shift()();eq(collected.ok,true);eq(collected.assets[0],{nodeId,revision:17,bounds,meshHex:numeric.toString("hex")});
 eq(session(),null);eq(writes,0);eq(arbReads,0);
+// AEGP/CEP boundaries must not depend on the caller's Array prototype.
+reset();begin();const foreign=vm.createContext({entry:host.SFLD_modelAssetHostBegin,id:assetId});
+eq(vm.runInContext('entry(id,32,[-2,-3,-4,2,3,4])',foreign),"1");eq(session().state,"receiving");
+eq(host.SFLD_modelAssetHostContinue(assetId),"1");eq(call("releaseModelAsset").ok,true);eq(session(),null);eq(writes,0);eq(arbReads,0);
 console.log(`model_asset_gateway_tests: ${checks} checks passed; isolated gateway; no AE qualification`);

@@ -2,6 +2,27 @@
 
 Status: native65/CEP70 Particle projection and gateway lifetime correction deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
+### CEP71 complete control contract and verification — 2026-10-11
+
+The Particle-only publication projection disagreed with the all-kind browser
+rule. tools/candidates/native_record_contract.js now supplies one ES3 factory
+embedded byte-for-byte in graph_edits and gateway by isolated Prepare. It owns
+validated ordinary control projection for Emitter7/Particle7/Force3/Transform1/
+Model1, without owning disk IDs, registry defaults, persistent graph schemas or
+ABI. Required/optional keys, unique canonical identities, wire types and bounded
+finite values precede bounded legacy-label projection. Prepared raw labels and
+all requested values/layout/topology remain strict. Callbacks rebind the same
+build and contract; receipt/snapshot reads reacquire after native publication.
+Array boundaries use neutral tags. No persistent migration or native rebuild is
+needed; native65 bytes remain pinned.
+
+Actual registration catalogs replace the permissive common property bank in
+the mixed-node matrix; actual native backup/executor, Host and exclusion pass
+standard/ASAN fixtures. An eight-case AE automation with resource readback is
+prepared and self-tested; process start needs ADR0011 authorization. See
+docs/model-transaction-audit.md for evidence and unresolved gates. Actual AE
+origin of label3 is not established.
+
 ### CEP70 Particle projection and gateway lifetime — 2026-10-11
 
 Owner's precise published-record failure is Particle UUID59f0e5c664ba89e29834484229eea6c6,

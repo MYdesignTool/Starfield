@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include "native_node_catalog.hpp"
 
 // Actual node EffectMain; only the independent graph-sync callback is replaced.
 PF_Err register_node_graph_sync(PF_InData*) noexcept { return PF_Err_NONE; }
@@ -21,6 +22,7 @@ PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
                                  const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
 namespace starfield::adapter {
 PF_Err transform_null_event(PF_InData*,PF_OutData*,PF_ParamDef*[],PF_EventExtra*) noexcept {return PF_Err_NONE;}
+PF_Err particle_shape_event(PF_InData*,PF_OutData*,PF_ParamDef*[],PF_EventExtra*) noexcept {return PF_Err_NONE;}
 bool choose_curve_preset(PF_InData*,starfield::core::AgeCurve&) noexcept {return false;}
 bool choose_gradient_preset(PF_InData*,starfield::core::ColorGradient&) noexcept {return false;}
 }
@@ -100,14 +102,15 @@ int main() {
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
+    print_native_node_catalog(kind==Kind::emitter?"emitter":kind==Kind::particle?"particle":kind==Kind::force?"force":"transform",registered);
     bool dimensions_valid=true,hidden_valid=true;A_long registered_index=0;
     for(const auto& def:registered) {
         ++registered_index;
         const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
-        const bool null_button=kind==Kind::transform && registered_index==1;
-        dimensions_valid &= null_button?(def.ui_width==240 && def.ui_height==56 && bool(def.ui_flags&PF_PUI_CONTROL)):
+        const bool compact_control=(kind==Kind::transform || kind==Kind::particle) && registered_index==1;
+        dimensions_valid &= compact_control?(def.ui_width==240 && def.ui_height==(kind==Kind::particle?26:56) && bool(def.ui_flags&PF_PUI_CONTROL)):
             custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
-        if(registered_index>base_parameter_count(kind))hidden_valid &=
+        if(registered_index>base_parameter_count(kind) && (kind!=Kind::particle || registered_index<particle_layout::transfer))hidden_valid &=
             bool(def.ui_flags&PF_PUI_NO_ECW_UI) && bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
     }
     check(dimensions_valid,"only declared custom controls have nonstandard dimensions");
@@ -133,7 +136,7 @@ int main() {
         for(A_long i=particle_layout::gradient;i<particle_layout::gradient_first+16;++i)
             bank_unsupervised &= (registered[i-1].flags&PF_ParamFlag_CANNOT_TIME_VARY) && !(registered[i-1].flags&PF_ParamFlag_SUPERVISE);
         check(bank_unsupervised,"custom events author one bank without intermediate supervised leaf callbacks");
-        check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==3,"supported shape choices lead Particle controls");
+        check(std::strcmp(registered[0].name,"Shape")==0 && registered[0].u.pd.num_choices==6,"the six reference shape choices lead Particle controls");
         check(std::strcmp(registered[1].name,"Life (Seconds)")==0 && registered[1].u.fs_d.value==2,"Life is two seconds by default");
         check(std::strcmp(registered[2].name,"Life Random")==0 && registered[2].u.fs_d.display_flags==PF_ValueDisplayFlag_PERCENT,"Life Random is a percentage");
         for(A_long index:{particle_layout::angle,particle_layout::angle+1,particle_layout::angle+2,
@@ -170,7 +173,7 @@ int main() {
             (registered[i].flags & PF_ParamFlag_START_COLLAPSED),"Transform rotations animate and default collapsed");
         for(A_long i=9;i<14;++i)check(registered[i].u.fs_d.value==100,"Transform scale and opacity default to 100 percent");
         check(registered[9].u.fs_d.valid_min<0,"system Scale accepts reflection");
-        check(binding_field_count(kind)==26 && base_parameter_count(kind)==14,
+        check(binding_field_count(kind)==transform_layout::compensation_last && base_parameter_count(kind)==transform_layout::last,
             "synthetic affine bindings have their own bound, separate from native indices");
     }
     int colors = 0;

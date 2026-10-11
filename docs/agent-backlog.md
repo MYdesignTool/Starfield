@@ -88,6 +88,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 owner要求停止逐错反馈。CEP71整体候选统一五类control contract，native回调后重取receipt/snapshot，处理跨realm数组，诊断包含type/build/contract。实际注册18 DOM矩阵、协议2340/contract458/asset600/作者/预设/ES3、原生executor/Host/exclusion/asset/import标准及ASAN通过，见docs/model-transaction-audit.md。8例AE自动验收和135自检已准备，冻结与配对发布继续，启动AE需ADR0011单次明确授权；实际label3来源未证实。native65/ABI8/IDs保持，Motion/MNT不动，Git push待已有回复，不关闭Model/客户发布gate。
+
 2026-10-11 11:46+08 native65/CEP70已从本地33b10b6提交冻结、27panel字节核对及冻结源关键回归后部署。fresh AE0/KeepNative、26hash/selector/runtime/paired Restore report通过；原生9200c6b/ABI8保持，无SDK重建。baseline70重现27安装字节，新备份70→69；owner stage5 Particle7/3的完整布局投影和API生命周期缺口已修正，实机为何返回3及Model验收仍开放。按此前要求暂停待复验，完整目标未完成，Git push仍待已有明确授权请求，Motion/MNT保持。
 
 2026-10-11 CEP70候选修复owner精确Particle7/3差异：final核对按既有browser完整控制布局投影，未知schema/缺少必需字段/错误类型/重复和未知key/真实值变化仍拒绝回滚，prepared raw schema不变。API身份/build及显式begin重载处理persistent engine旧闭包；native checkpoints重取同代API，foreign generation写前失败。transport1435/page36/十DOM44或45/asset588/author74/preset583/ES3 18/nested15/65-69→70 dummy64通过；受控legacy label复现原错误，不认定实机为何读3。native65/ABI8保持，冻结及配对部署继续，Motion/MNT与Git待授权状态保留。

@@ -1,5 +1,5 @@
-param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel70',
-    [ValidateRange(62,9999)][int]$PanelGeneration=70)
+param([switch]$Prepare,[string]$DestinationName='m3-17-model-panel71',
+    [ValidateRange(62,9999)][int]$PanelGeneration=71)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskRecipe=Join-Path $PSScriptRoot 'candidates/model-panel-author-baseline.json'
@@ -67,6 +67,21 @@ try {
         if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
     }
 } finally {Pop-Location}
+# One policy, two execution engines. Embed the exact ES3 factory in existing
+# checked files; no extra deployment path or independent helper lifetime.
+$taskContract=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'candidates/native_record_contract.js')).Replace("`r`n","`n").TrimEnd()
+$taskContractBlock="    // BEGIN STARFIELD NATIVE RECORD CONTRACT`n"+$taskContract+"`n    var nativeRecords=createNativeRecordContract();`n    // END STARFIELD NATIVE RECORD CONTRACT"
+foreach($taskContractTarget in @(@('js/graph_edits.js','    function nativeRecordSchema(record) {'),@('jsx/starfield_gateway.jsx','    function readNativeNode(effect, layer) {'))){
+    $taskContractPath=Join-Path $taskDestination ('cep_panel/'+$taskContractTarget[0])
+    $taskContractText=[IO.File]::ReadAllText($taskContractPath).Replace("`r`n","`n")
+    if($taskContractText.Contains('// BEGIN STARFIELD NATIVE RECORD CONTRACT')){
+        $taskContractText=[regex]::Replace($taskContractText,'(?s)    // BEGIN STARFIELD NATIVE RECORD CONTRACT.*?    // END STARFIELD NATIVE RECORD CONTRACT',[Text.RegularExpressions.MatchEvaluator]{param($taskMatch) $taskContractBlock})
+    }else{
+        if(-not $taskContractText.Contains($taskContractTarget[1])){throw 'Missing contract insertion point.'}
+        $taskContractText=$taskContractText.Replace($taskContractTarget[1],$taskContractBlock+"`n"+$taskContractTarget[1])
+    }
+    [IO.File]::WriteAllText($taskContractPath,$taskContractText,[Text.UTF8Encoding]::new($false))
+}
 $taskManifest=Join-Path $taskDestination 'cep_panel/CSXS/manifest.xml'
 $taskManifestText=[regex]::Replace([IO.File]::ReadAllText($taskManifest),'0\.1\.0\.\d+',('0.1.0.'+$PanelGeneration))
 $taskManifestText=[regex]::Replace($taskManifestText,'Version="0\.1\.\d+"',('Version="0.1.'+$PanelGeneration+'"'))
@@ -87,6 +102,7 @@ foreach($taskGatewayPath in @('jsx/starfield_gateway.jsx','js/panel.js','js/pres
     presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;
     presetFileTransportSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Algorithm SHA256).Hash;
     modelTransactionTransportSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_transport.jsx') -Algorithm SHA256).Hash;
+    nativeRecordContractSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/native_record_contract.js') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
 Write-Host "Prepared isolated Model author candidate: $taskDestination"

@@ -9,7 +9,7 @@ $taskTools=Join-Path $taskRoot 'tools'
 New-Item -ItemType Directory -Path (Join-Path $taskTools 'candidates') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'cep_panel') -Destination (Join-Path $taskRoot 'cep_panel') -Recurse
 Copy-Item -LiteralPath (Join-Path $taskRepo 'tools/Prepare-ModelPanelCandidate.ps1') -Destination $taskTools
-foreach($taskHelper in @('model_assets.js','model_graph_transactions.js','preset_files.js','preset_file_transport.jsx','model_transaction_transport.jsx')){
+foreach($taskHelper in @('model_assets.js','model_graph_transactions.js','preset_files.js','preset_file_transport.jsx','model_transaction_transport.jsx','native_record_contract.js')){
     Copy-Item -LiteralPath (Join-Path $taskRepo ('tools/candidates/'+$taskHelper)) -Destination (Join-Path $taskTools 'candidates')
 }
 function Hash-PreparedText([string]$taskPath){
@@ -35,4 +35,10 @@ Check-PreparedPanel ([IO.File]::ReadAllText((Join-Path $taskCandidate 'css/panel
 foreach($taskEntry in $taskRecipe.files){Check-PreparedPanel ((Hash-PreparedText (Join-Path $taskRoot ('cep_panel/'+$taskEntry.path))) -eq $taskEntry.normalizedSha256) 'Source baseline changed.'}
 Check-PreparedPanel ([IO.File]::ReadAllText((Join-Path $taskCandidate 'jsx/starfield_gateway.jsx')).Contains('native-presets-'+$taskGeneration)) 'Candidate generation differs.'
 Check-PreparedPanel (Test-Path -LiteralPath (Join-Path $taskCandidate 'jsx/model_transaction_transport.jsx')) 'Paired Model helper missing.'
+$taskFactory=[IO.File]::ReadAllText((Join-Path $taskTools 'candidates/native_record_contract.js')).Replace("`r`n","`n").TrimEnd()
+foreach($taskEmbedded in @('js/graph_edits.js','jsx/starfield_gateway.jsx')){
+    $taskEmbeddedText=[IO.File]::ReadAllText((Join-Path $taskCandidate $taskEmbedded)).Replace("`r`n","`n")
+    Check-PreparedPanel ($taskEmbeddedText.Contains($taskFactory)) 'Embedded control contract differs from canonical factory.'
+    Check-PreparedPanel (([regex]::Matches($taskEmbeddedText,'BEGIN STARFIELD NATIVE RECORD CONTRACT')).Count -eq 1) 'Duplicated embedded control contract.'
+}
 Write-Output "model_panel_preparation_tests: $taskChecks checks passed; nested archive patch applied; fixture $taskRoot; no live panel or Adobe writes."

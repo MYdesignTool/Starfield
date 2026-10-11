@@ -138,12 +138,15 @@ for(const phase of ["prepared","published"])for(const [label,mutation] of [
 }
 reset();savedMutation=ns=>{for(const n of ns)n.outgoing=n.outgoing.slice().reverse().map(e=>({target:e.target,id:e.id}));};
 client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(restores,0);eq(hostRuns,1);
-// The browser's nativeRecordSchema already projects a complete legacy Particle
-// control layout to schema7. Final verification must use that same contract.
-for(let label=1;label<=7;label++){
-    reset();savedMutation=ns=>{ns.find(n=>n.type===edits.types.particle).schemaVersion=label;};
-    client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(result.committed,true);eq(restores,0);
-    eq(nodes.find(n=>n.type===edits.types.particle).schemaVersion,label,"Raw saved record is not rewritten.");
+// All supported node kinds use the same validated control layout in planning
+// and publication. Exercise every bounded legacy label, not just Particle.
+let mixed=edits.apply(imported,{type:"addNode",nodeType:"transform"},()=>uuid(8010));
+mixed=edits.apply(mixed,{type:"addNode",nodeType:"emitter"},()=>uuid(8011));
+mixed=edits.apply(mixed,{type:"addNode",nodeType:"particle"},()=>uuid(8012));
+for(const kind of ["emitter","particle","force","transform","model"])for(let label=1;label<=edits.schemaVersion(kind);label++){
+    reset(mixed);savedMutation=ns=>{for(const n of ns.filter(n=>n.type===edits.types[kind]))n.schemaVersion=label;};
+    client().apply(plan(mixed),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(result.committed,true);eq(restores,0);
+    for(const n of nodes.filter(n=>n.type===edits.types[kind]))eq(n.schemaVersion,label,"Raw saved record is not rewritten.");
 }
 for(const [field,mutate] of [
     ["schemaVersion",n=>n.schemaVersion=8],["schemaVersion",n=>n.schemaVersion=0],["schemaVersion",n=>n.schemaVersion=3.5],
@@ -160,6 +163,26 @@ for(const [field,mutate] of [
 reset();preparedMutation=ns=>{ns.find(n=>n.type===edits.types.particle).schemaVersion=3;};
 client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(publishes,0);
 ok(result.error.message.includes("verify prepared records"));ok(result.error.message.includes("schemaVersion"));
+for(const kind of ["emitter","particle","force","transform","model"])for(const mutate of [
+    n=>n.schemaVersion=edits.schemaVersion(kind)+1,n=>n.parameters[0].type=99,
+    n=>n.parameters.push(copy(n.parameters[0])),n=>n.parameters.push({key:"999",type:4,value:0}),
+    n=>n.parameters.find(p=>p.type===5).value=[0,NaN,0]
+]){
+    reset(mixed);savedMutation=ns=>mutate(ns.find(n=>n.type===edits.types[kind]));
+    client().apply(plan(mixed),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(publishes,1);
+    eq(nodes,manifest(mixed));eq(revision,11);ok(result.error.message.includes(edits.types[kind]));ok(result.error.message.includes("verify published records"));
+}
+for(const kind of ["emitter","particle","force"]){
+    reset(mixed);preparedMutation=ns=>{ns.find(n=>n.type===edits.types[kind]).schemaVersion=1;};
+    client().apply(plan(mixed),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(publishes,0);
+    eq(nodes,manifest(mixed));ok(result.error.message.includes("schemaVersion"));
+}
+// Entire snapshots can originate in another script realm; the wire data has
+// no dependency on either engine's Array prototype.
+reset(mixed);const ownSnapshot=api.snapshot,foreignRealm=vm.createContext({});
+api.snapshot=()=>vm.runInContext("("+JSON.stringify(copy(ownSnapshot()))+")",foreignRealm);
+try{client().apply(plan(mixed),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(restores,0);}
+finally{api.snapshot=ownSnapshot;}
 let fanout=edits.apply(imported,{type:"addNode",nodeType:"particle"},()=>uuid(8004));
 fanout=edits.apply(fanout,{type:"connect",from:fanout.nodes.find(n=>n.type===edits.types.emitter).id,to:uuid(8004)},()=>uuid(8005));
 fanout=edits.apply(fanout,{type:"connect",from:uuid(8004),to:fanout.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(8006));

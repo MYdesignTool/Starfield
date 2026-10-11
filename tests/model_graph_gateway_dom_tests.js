@@ -12,6 +12,10 @@ const fullGraph=process.env.STARFIELD_DOM_FULL_GRAPH==="1";
 const reorderedConnections=process.env.STARFIELD_DOM_REORDER_CONNECTIONS==="1";
 const staleGatewayAPI=process.env.STARFIELD_DOM_STALE_GATEWAY_API==="1";
 const legacyParticleLabel=process.env.STARFIELD_DOM_LEGACY_PARTICLE_LABEL==="1";
+const legacyKind=process.env.STARFIELD_DOM_LEGACY_KIND || (legacyParticleLabel?"particle":"");
+const catalogDir=process.env.STARFIELD_NODE_CATALOG_DIR;
+const invalidateCommit=process.env.STARFIELD_DOM_INVALIDATE_COMMIT==="1";
+const reloadOnCommit=process.env.STARFIELD_DOM_RELOAD_ON_COMMIT==="1";
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
@@ -19,13 +23,16 @@ function fresh(captured){if(captured!==epoch){staleReads++;throw new ReferenceEr
 function property(p,captured){return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,numKeys:0,canSetExpression:false,
     get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);p.value=copy(value);
         if(p===renderer.properties["Commit Graph Edit"]){commits++;const resolved=api.resolve({pinTarget:true,target:{token}});
-            resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);}}};}
+            resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);
+            if(invalidateCommit)epoch++;
+            if(reloadOnCommit){vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;}}}};}
 function wrap(raw){
     // Reacquiring an effect may reuse its wrapper identity while earlier child
     // Property handles remain invalid. Exercise both wrapper policies rather
     // than relying on JavaScript object identity to validate an AE handle.
     if(stableEffects && raw.wrapper){raw.wrapperEpoch=epoch;return raw.wrapper;}
     const originalEpoch=epoch,ordered=Array.from(new Set(Object.values(raw.properties)));
+    if(catalogDir)ordered.sort((a,b)=>a.propertyIndex-b.propertyIndex);
     raw.wrapperEpoch=epoch;
     const captured=()=>stableEffects?raw.wrapperEpoch:originalEpoch;
     const wrapped={get matchName(){fresh(captured());return raw.matchName;},get name(){fresh(captured());return raw.name;},set name(v){fresh(captured());raw.name=v;},
@@ -42,20 +49,32 @@ function modelControls(){const properties=nodeControls();
     for(const [i,name] of ["Flip X","Flip Y","Flip Z","Center","Normalize"].entries())add(name,1514+i,0);
     for(const [i,name] of ["Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"].entries())add(name,1519+i,i<3?-.5:.5);
     return properties;}
+function registeredControls(matchName){if(!catalogDir)return modelControls();
+    const kind=matchName.substr(matchName.lastIndexOf(".")+1),raw=fs.readFileSync(path.join(catalogDir,"m3-17-full-audit-catalog-"+kind+".log")),
+        log=raw.toString(raw[0]===255 && raw[1]===254?"utf16le":"utf8").replace(/^\uFEFF/,"");
+    const line=log.split(/\r?\n/).find(line=>line.startsWith("NODE_CONTROL_CATALOG:"));assert.ok(line,"Missing actual registration catalog for "+kind);
+    const catalog=JSON.parse(line.substr("NODE_CONTROL_CATALOG:".length)),properties={};assert.equal(catalog.kind,kind);
+    for(const c of catalog.controls){const p={name:c.name,matchName:matchName+"-"+c.disk,propertyIndex:c.index,value:c.value};
+        properties[c.name]=properties[p.matchName]=properties[matchName+"-"+String(c.disk).padStart(4,"0")]=p;}
+    return properties;}
 function parade(){return {get numProperties(){return items.length;},property(i){return items[i-1]?wrap(items[i-1]):null;},
-    addProperty(matchName){items.push({matchName,name:"",properties:modelControls()});epoch++;return wrap(items[items.length-1]);}};}
+    addProperty(matchName){items.push({matchName,name:"",properties:registeredControls(matchName)});epoch++;return wrap(items[items.length-1]);}};}
 const layer={id:303,name:"Particles",selected:true,width:1920,height:1080,time:0,source:{pixelAspect:1},property:name=>name==="ADBE Effect Parade"?parade():null};
-function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"Comp",time:0,numLayers:1,layer:()=>layer});layer.containingComp=comp;
+const sourceTransform={property:name=>name==="ADBE Anchor Point"?{value:[0,0,0]}:null};
+const front={id:44,name:"Front",index:2,width:320,height:180,source:{pixelAspect:1},hasVideo:true,property:()=>sourceTransform},
+    back={id:66,name:"Back",index:3,width:320,height:180,source:{pixelAspect:1},hasVideo:true,property:()=>sourceTransform};
+function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"Comp",time:0,numLayers:3,layer:i=>[layer,front,back][i-1]});
+for(const l of [layer,front,back])l.containingComp=comp;layer.index=1;
 const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
     beginUndoGroup(){undo++;},endUndoGroup(){undo++;},findMenuCommandId:()=>55,executeCommand(){commands++;}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const gatewaySource=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8");
 // The session engine survives CEP reloads. A transport may still close over a
 // previous gateway even after SFLD_ready and the public API have been replaced.
-const oldGatewaySource=gatewaySource.replace('type === "org.starfieldfx.nodes.particle" ? 7',
-    'type === "org.starfieldfx.nodes.particle" ? 3');
-if(staleGatewayAPI || legacyParticleLabel)assert.notEqual(oldGatewaySource,gatewaySource);
-vm.runInContext(staleGatewayAPI || legacyParticleLabel?oldGatewaySource:gatewaySource,context);
+const oldGatewaySource=gatewaySource.replace('schemaVersion: nativeRecords.version(type)',
+    'schemaVersion: type === "org.starfieldfx.nodes.'+(legacyKind || "particle")+'" ? '+((legacyKind==="force")?1:3)+' : nativeRecords.version(type)');
+if(staleGatewayAPI || legacyKind)assert.notEqual(oldGatewaySource,gatewaySource);
+vm.runInContext(staleGatewayAPI || legacyKind?oldGatewaySource:gatewaySource,context);
 vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);
 if(staleGatewayAPI)vm.runInContext(gatewaySource,context);
 let api=host.__SFLD_modelTransactionAPI;
@@ -67,6 +86,10 @@ if(fullGraph){
     g=edits.apply(g,{type:"addNode",nodeType:"particle"},()=>uuid(102));
     g=edits.apply(g,{type:"connect",from:g.nodes.find(n=>n.type===edits.types.emitter).id,to:uuid(102)},()=>uuid(103));
     g=edits.apply(g,{type:"connect",from:uuid(102),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(104));
+    g=edits.apply(g,{type:"addNode",nodeType:"emitter"},()=>uuid(105));
+    g=edits.apply(g,{type:"connect",from:uuid(105),to:uuid(102)},()=>uuid(106));
+    g=edits.apply(g,{type:"addNode",nodeType:"transform"},()=>uuid(107));
+    for(const n of g.nodes.filter(n=>n.type===edits.types.particle))for(const [key,value] of [[31,44],[32,66]])n.parameters.find(p=>p.key===String(key)).value=value;
 }
 g=edits.apply(g,{type:"addNode",nodeType:"model",position:{x:100.123456789,y:50.234567891}},()=>uuid(101));
 if(!fullGraph)g=edits.apply(g,{type:"addNode",nodeType:"output"},()=>uuid(255));

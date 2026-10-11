@@ -15,6 +15,7 @@
 #include "MotionBlur.hpp"
 #include "ModelImportUI.hpp"
 #include "ModelAssetMessage.hpp"
+#include "native_node_catalog.hpp"
 
 PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
 AEGP_PluginID node_graph_sync_plugin_id() noexcept {return 1;}
@@ -78,6 +79,7 @@ void registration_module(PF_InData& data){
     CHECK(EffectMain(PF_Cmd_GLOBAL_SETUP,&data,&output,nullptr,nullptr,nullptr)==PF_Err_NONE);
     CHECK(output.my_version==STARFIELD_VERSION_PACKED&&output.out_flags==STARFIELD_NODE_OUT_FLAGS&&output.out_flags2==STARFIELD_NODE_OUT_FLAGS2);
     CHECK(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&output,nullptr,nullptr,nullptr)==PF_Err_NONE&&output.num_params==101&&registered.size()==100);
+    print_native_node_catalog("model",registered);
     CHECK(registered[18].uu.id==adapter::native_nodes::disk_ids::kLayoutXId&&!std::strcmp(registered[18].name,"Node Layout X"));
     CHECK(registered[85].uu.id==adapter::native_nodes::uuid_id(0)&&!std::strcmp(registered[85].name,"Node UUID 0"));
     CHECK(registered[93].uu.id==adapter::native_nodes::disk_ids::kSyncGuardId);
