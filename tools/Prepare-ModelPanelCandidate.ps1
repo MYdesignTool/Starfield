@@ -43,12 +43,27 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_tr
 foreach($taskFile in $taskBaseline.files){
     if((Get-SourceHash (Join-Path $taskDestination ('cep_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
 }
-Push-Location -LiteralPath $taskRepo
+# A git archive beneath artifacts/ still discovers the enclosing checkout.
+# Running apply from that archive treats its patch paths as outside the cwd and
+# silently skips them with exit0. Resolve the enclosing Git root explicitly and
+# give apply the full candidate path relative to that root.
+$taskApplyRoot=$taskRepo
+$taskApplyRelative=$taskRelative
+if([IO.File]::ReadAllText($taskPatch).Trim().Length){
+    $taskGitRoot=(& git -C $taskRepo rev-parse --show-toplevel 2>$null)
+    if($LASTEXITCODE -eq 0){
+        $taskApplyRoot=[IO.Path]::GetFullPath([string]$taskGitRoot).TrimEnd('\','/')
+        $taskGitPrefix=$taskApplyRoot+[IO.Path]::DirectorySeparatorChar
+        if(-not $taskDestination.StartsWith($taskGitPrefix,[StringComparison]::OrdinalIgnoreCase)){throw 'Candidate escapes the enclosing Git root.'}
+        $taskApplyRelative=$taskDestination.Substring($taskGitPrefix.Length).Replace('\','/')
+    }
+}
+Push-Location -LiteralPath $taskApplyRoot
 try {
     if([IO.File]::ReadAllText($taskPatch).Trim().Length){
-        & git apply --check --directory=$taskRelative $taskPatch
+        & git apply --check --directory=$taskApplyRelative $taskPatch
         if($LASTEXITCODE -ne 0){throw 'Candidate patch preflight failed. Live CEP is unchanged.'}
-        & git apply --directory=$taskRelative $taskPatch
+        & git apply --directory=$taskApplyRelative $taskPatch
         if($LASTEXITCODE -ne 0){throw 'Candidate patch failed. Live CEP is unchanged.'}
     }
 } finally {Pop-Location}
