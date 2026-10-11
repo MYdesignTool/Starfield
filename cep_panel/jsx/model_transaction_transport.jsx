@@ -3,6 +3,16 @@
 (function(){
     var host=typeof $!=="undefined" && $.global?$.global:this,api=host.__SFLD_modelTransactionAPI;
     if(!api)throw new Error("Load the paired Model gateway before its transaction transport.");
+    function currentAPI(build){
+        var current=host.__SFLD_modelTransactionAPI;
+        if(!current || typeof current.gatewayBuild!=="string" || current.gatewayBuild!==build)
+            throw new Error("Model gateway generation changed (expected "+build+", actual "+
+                (current?String(current.gatewayBuild):"missing")+"). Reload the Starfield panel.");
+        // Re-evaluating the gateway replaces its closures. Never keep a previous
+        // snapshot/authoring implementation alive through native callbacks.
+        api=current;
+    }
+    host.SFLD_modelTransactionReady=function(){return api===host.__SFLD_modelTransactionAPI?api.gatewayBuild:"";};
     var KEY="__SFLD_modelGraphTransactionV1",MODEL="org.starfieldfx.nodes.model",OUTPUT="000000000000000000000000000000ff";
     var PAGE=65536,MAX_MESH=8*1024*1024,MAX_TOTAL=64*1024*1024;
     function integer(value,min,max){return typeof value==="number" && isFinite(value) && Math.floor(value)===value && value>=min && value<=max;}
@@ -20,6 +30,7 @@
         return value;}
     function target(s,guard,base){
         if(s.cancelled || now()>s.expires)throw new Error("Model graph transaction cancelled or expired.");
+        currentAPI(s.request.gatewayBuild);
         var resolved=api.resolve(s.request);if(resolved.error)throw new Error(resolved.error.message);
         if(Number(resolved.properties.guard.value)!==guard)throw new Error("The renderer is busy or its guard changed.");
         if(typeof resolved.target.layer.time==="number" && resolved.target.layer.time!==s.time)throw new Error("The target time changed during Model transfer.");
@@ -45,6 +56,26 @@
             return true;}
         return close(expected.value,actual.value,node.type==="org.starfieldfx.nodes.particle" && (key==="1" || key==="2"));
     }
+    function particleProjectionSchema(node){
+        // Match graph_edits.nativeRecordSchema: the portable schema follows the
+        // complete ordinary control layout, not a legacy snapshot's label.
+        // Do not rewrite the record/stamp, supply defaults or skip value checks.
+        var required={"1":5,"3":4,"4":4,"5":4,"6":4,"9":4,"10":4,"11":4,"12":3,"13":7,
+            "14":4,"15":3,"16":4,"17":3,"18":5,"19":4,"20":5,"21":4,"22":3,"23":4,
+            "24":3,"25":3,"26":4,"28":4,"29":4};
+        var optional={"7":7,"8":7,"27":7,"30":3,"31":3,"32":3,"33":3,"34":3,"35":3,"36":3,
+            "37":3,"38":4,"39":4,"40":2,"41":4},found={};
+        function invalid(detail){throw new Error("Saved node "+node.id+" / Particle control layout differs: "+detail+".");}
+        if(!integer(node.schemaVersion,1,7))invalid("unsupported schemaVersion "+node.schemaVersion);
+        if(!(node.parameters instanceof Array))invalid("missing parameters");
+        for(var p=0;p<node.parameters.length;p++){
+            var field=node.parameters[p],key=String(field.key),type=required[key] || optional[key];
+            if(!type || field.type!==type || found[key])invalid("parameter "+key+" type or identity");
+            found[key]=true;
+        }
+        for(var key in required)if(Object.prototype.hasOwnProperty.call(required,key) && !found[key])invalid("missing parameter "+key);
+        return 7;
+    }
     function records(expected,actual,ignoreModelAsset){
         function differs(node,field,wanted,observed){
             function describe(value){var text=JSON.stringify(value);return typeof text==="string"?text.substr(0,192):String(value);}
@@ -55,7 +86,11 @@
         for(var n=0;n<expected.length;n++){var node=expected[n],saved=map[node.id];
             if(!saved)differs(node,"identity",node.id,"missing");
             if(saved.type!==node.type)differs(node,"type",node.type,saved.type);
-            if(saved.schemaVersion!==node.schemaVersion)differs(node,"schemaVersion",node.schemaVersion,saved.schemaVersion);
+            var savedSchema=saved.schemaVersion;
+            if(!ignoreModelAsset && node.type==="org.starfieldfx.nodes.particle" && node.schemaVersion===7){
+                particleProjectionSchema(node);savedSchema=particleProjectionSchema(saved);
+            }
+            if(savedSchema!==node.schemaVersion)differs(node,"schemaVersion",node.schemaVersion,saved.schemaVersion);
             if(!close(node.position.x,saved.position.x))differs(node,"position.x",node.position.x,saved.position.x);
             if(!close(node.position.y,saved.position.y))differs(node,"position.y",node.position.y,saved.position.y);
             // Connections are identities/endpoints, independent of JSON member
@@ -100,8 +135,9 @@
             seen[a.nodeId]=true;total+=a.bytes;copy.push({nodeId:a.nodeId,source:a.source,revision:a.revision,bytes:a.bytes,bounds:a.bounds.slice(),pages:[]});
         }return copy;
     }
-    function parse(text,operation){var request=api.parse(text);if(!request || request.operation!==operation || request.pinTarget!==true ||
-        !request.target || typeof request.target.token!=="string" || !uuid(request.transactionId))throw new Error("Invalid pinned Model transaction request.");return request;}
+    function parse(text,operation){currentAPI(api.gatewayBuild);var request=api.parse(text);if(!request || request.operation!==operation || request.pinTarget!==true ||
+        !request.target || typeof request.target.token!=="string" || !uuid(request.transactionId))throw new Error("Invalid pinned Model transaction request.");
+        currentAPI(request.gatewayBuild);return request;}
     function matching(text,operation){var request=parse(text,operation),s=session(request.transactionId);
         if(!s || s.request.target.token!==request.target.token)throw new Error("Model transaction is missing or belongs to another target.");return {s:s,request:request};}
     host.SFLD_beginModelGraphTransaction=function(text){try{

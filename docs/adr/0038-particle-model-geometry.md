@@ -1,8 +1,8 @@
 # ADR 0038 — Particle Model geometry and resources
 
-Status: native65/CEP69 semantic record verification deployed 2026-10-11; AE2023 qualification open. Task M3-17.
+Status: native65/CEP70 Particle projection and gateway lifetime correction deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
-### CEP70 Particle projection and gateway lifetime candidate — 2026-10-11
+### CEP70 Particle projection and gateway lifetime — 2026-10-11
 
 Owner's precise published-record failure is Particle UUID59f0e5c664ba89e29834484229eea6c6,
 portable schema7 versus raw schema3. The installed gateway file declares7; this
@@ -33,7 +33,12 @@ Transport1435, real generated page scripts36, ten actual DOM modes44/45,
 asset588/author74/preset583/full ES3 three-file18, nested preparation15 and
 native65/CEP69→70 dummy paired publication/restoration64 pass. Tests simulate
 native writes/CEP/AE DOM and do not qualify AE2023. Native65/source9200c6b/ABI8
-remain unchanged; CEP70 freeze/publication and owner Model acceptance are pending.
+remain unchanged. At11:46+08 CEP70 was published from frozen commit33b10b6
+after27 candidate byte hashes matched and key frozen-source regressions passed.
+Fresh zero-AE check, KeepNative,26 installed hashes, selector/runtime and paired
+Restore report passed. Backup m3-17-native65-panel70-schema-projection-20261011
+restores65/69. Released baseline70 reproduces all27 installed panel bytes.
+No native SDK rebuild was needed; actual owner Model acceptance remains pending.
 
 ### CEP69 saved-record verification — 2026-10-11
 

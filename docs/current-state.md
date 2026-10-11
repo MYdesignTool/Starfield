@@ -1,12 +1,18 @@
 # 当前工程状态
 
-## CEP70 修正候选（未部署，2026-10-11）
+## 当前安装：native65 / CEP70（2026-10-11 11:46+08）
 
 owner明确stage5：Particle59f0e5c664ba89e29834484229eea6c6 schema expected7/actual3。受控旧label3 actual gateway夹具复现原错误；Model最终核对改用与browser nativeRecordSchema一致的完整Particle布局投影，逐项类型/必需字段/重复及未知key检查后才映射7，所有请求值/位置/连接仍核对；准备阶段raw schema保持严格。安装文件声明7，实机为何返回3仍未确认。另一夹具证实gateway重载后transport保留旧API；两个页面按API身份/build配对，显式Model begin重新加载，原生检查点重取匹配API，foreign generation在prepare写入前拒绝，正常poll不反复加载。无ID/schema/ABI/native变更。
 
-transport1435/page脚本36/十DOM模式44或45、asset588/author74/preset583/完整ES3三JSX18/nested15/65-69→70 dummy64通过。当前安装仍65/69；CEP70源码冻结和配对发布继续，Motion/MNT保留，Git push仍待已有授权回复；真实AE验收开放。
+transport1435/page脚本36/十DOM模式44或45、asset588/author74/preset583/完整ES3三JSX18/nested15/65-69→70 dummy64通过。提交33b10b6c970fd317d9cdb8fa48873f360a5998d7 git archive冻结，27候选字节hash匹配，并在冻结源重跑关键回归。fresh AE process0后经Deploy-PanelTestBuild→Deploy-TestBuild -KeepNative于11:46+08部署，原生65/packed32833/CoreABI8及9200c6b源码保持，无SDK重建。26安装hash、selector/runtime、paired Restore report通过；发布后的baseline70可重现全部27安装面板字节。
 
-## 当前安装：native65 / CEP69（2026-10-11 10:53+08）
+receipts：artifacts/m3-17-native65-panel70-schema-projection-20261011-{before,after}.json；当前checker：artifacts/Check-ModelProjectionInstalledPair.ps1，旧69 checker仅用于历史配对。Motion/MNT保留，Git push仍待已有授权回复；真实AE Model默认cube/OBJ/资源预设/撤销重开及modal timing开放。按owner此前要求，部署后暂停等待Model添加复验，完整目标未完成。新备份恢复native65/CEP69，较早配对备份保留。一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native65-panel70-schema-projection-20261011' -Restore
+```
+
+## native65 / CEP69 部署记录（2026-10-11 10:53+08）
 
 owner新报Saved node identity/layout/connection differs，stage5且两个rollback0。actual gateway完整Emitter/Particle/Force/双Particle分支/Model夹具，保持连接ID和目标，仅改变JSON成员顺序即可复现旧错误；没有证据断定这是AE实机根因。新核对按edge ID/target集合逐项匹配，与authoringStamp/portable graph的无序连接契约一致；count、重复、丢失和端点变化仍拒绝，坐标容差不扩大、identity/schema/参数仍严格核对。错误直接给prepare后或publish后步骤、node UUID、具体字段及有界expected/actual，无需用户再运行报告脚本。
 

@@ -7,7 +7,7 @@
     "use strict";
 
     var REQUEST_TIMEOUT_MS = 8000;
-    var GATEWAY_BUILD = "native-presets-69";
+    var GATEWAY_BUILD = "native-presets-70";
     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
     var openPresetsButton=document.getElementById("openPresets");
     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
@@ -167,13 +167,15 @@
         envelope.gatewayBuild=GATEWAY_BUILD;
         var modelOperation=operation.indexOf("ModelGraph")>=0;
         var readOnly=operation==="getState" || operation==="getFrameStatus" || operation==="getGraphSnapshot" ||
-            operation==="getPanelState" || operation==="getPanelPulse" || modelOperation || operation.indexOf("ModelAsset")>=0;
+            operation==="getPanelState" || operation==="getPanelPulse" ||
+            modelOperation && operation!=="beginModelGraphTransaction" || operation.indexOf("ModelAsset")>=0;
         var script="(function(){try{"+
             "if("+(readOnly?"false":"true")+" || typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+
             (modelOperation?" || typeof __SFLD_modelTransactionAPI==='undefined'":"")+
             "){$.evalFile(new File("+quote(root+"/jsx/starfield_gateway.jsx")+"));}"+
             "if(typeof SFLD_ready!=='function' || SFLD_ready()!=="+quote(GATEWAY_READY_TOKEN)+")throw new Error('Gateway generation mismatch.');"+
-            (modelOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+quote(root+"/jsx/model_transaction_transport.jsx")+"));}":"")+
+            (modelOperation?"if(typeof SFLD_modelTransactionReady!=='function' || SFLD_modelTransactionReady()!=="+quote(GATEWAY_BUILD)+
+                " || typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+quote(root+"/jsx/model_transaction_transport.jsx")+"));}":"")+
             "return SFLD_"+operation+"("+quote(JSON.stringify(envelope))+");"+
             "}catch(error){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+quote(GATEWAY_BUILD)+
             ",ok:false,error:{code:'gateway_load_failed',message:error.toString()}});}}())";

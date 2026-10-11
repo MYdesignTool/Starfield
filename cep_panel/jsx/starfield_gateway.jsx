@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-69";
+    var GATEWAY_BUILD = "native-presets-70";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -2756,7 +2756,7 @@
     // File transport is loaded only by explicit preset file actions. Its sessions
     // contain bounded plain data; these closures carry no host object references.
     host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
-    host.__SFLD_modelTransactionAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
+    host.__SFLD_modelTransactionAPI={gatewayBuild:GATEWAY_BUILD,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
         resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
         validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
         remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,

@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Released native65/Core ABI8/CEP69 Model semantic edge verification and exact field diagnostics; AE2023 qualification open, Face unavailable.",
-  "basePanel": 69,
+  "status": "Released native65/Core ABI8/CEP70 Model Particle layout projection and current gateway pairing; AE2023 qualification open, Face unavailable.",
+  "basePanel": 70,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "627EE2A536F0FDFB5540DB437547B40E37A6D124D1311618CCF4D6F57E37DC1C"
+      "normalizedSha256": "C00FEB59DC4230ABF9CC51AED662AD04A7A3A3BA0184AD83E07C794BFC1FCE91"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "AB5DB9B6165D4EF58BC1DEDCD3F0BF87837123C8DA79FAD94B4947B5F74F135B"
+      "normalizedSha256": "97DE55ADA4309894844EFF67A99B56C98D63ACBF8FCDB763B1ADE6E3BAA7482B"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "C77BDFFAA3451A33379E15CD09D5855345694526AC878818FAAB8265CA456C91"
+      "normalizedSha256": "390CCA405C892D8EC09EF400283102D7EF9AD72BC0C1DAD9CFE0AF281D08BF71"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "DF9AD11B7C825DB56F7268A77D4804EF003F880A4B5F3929296131A2C8573A05"
+      "normalizedSha256": "60022DE84D22AD92E0D2202BEB29D7F404D60421332A5ED643D0DF17171F5AE8"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "A1BD86BA61B0552B3D9FD65F5D74F36636D82BC03EA14743BED145196590459F"
+      "normalizedSha256": "F0E7731CF30FD9CB10BF0B63B8E65FD5F5E86F4314B72C7870EE1372B89C3E05"
     }
   ]
 }
