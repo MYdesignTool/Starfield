@@ -17,7 +17,7 @@ inline void print_native_node_catalog(const char* kind,const std::vector<PF_Para
         switch(control.param_type) {
             case PF_Param_FLOAT_SLIDER:std::printf("%.17g",control.u.fs_d.value);break;
             case PF_Param_SLIDER:std::printf("%ld",control.u.sd.value);break;
-            case PF_Param_POPUP:std::printf("%d",control.u.pd.value);break;
+            case PF_Param_POPUP:std::printf("%d,\"minimum\":1,\"maximum\":%d",control.u.pd.value,control.u.pd.num_choices);break;
             case PF_Param_CHECKBOX:std::printf("%d",static_cast<int>(control.u.bd.value));break;
             case PF_Param_LAYER:std::printf("0");break;
             case PF_Param_ANGLE:std::printf("%.17g",static_cast<double>(control.u.ad.value)/65536);break;

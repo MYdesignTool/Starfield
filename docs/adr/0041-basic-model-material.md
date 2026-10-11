@@ -45,3 +45,12 @@ registration and graph publication, color-source/roughness/metallic/opacity pixe
 light transforms/types/animated values, mixed graph/preset/undo persistence,
 bounded work/cancellation, SDK build and full paired rollback. Compilation and
 offline checks cannot establish AE host qualification.
+
+2026-10-11 authoring amendment: graph Color Source0/1 maps only to native popup
+1/2; graph RGB maps to native RGBA with alpha1. Roughness/metallic/opacity unit
+intervals map to native0..100, and AE Lights is strictly0/1. Shared browser/ES3
+preflight rejects invalid Material values before changing streams. Readback
+rejects invalid native popup values instead of manufacturing a portable enum.
+No ID, graph schema, ABI or native build changes are required for this CEP fix.
+Actual registration DOM fixtures must enforce popup ranges and color dimensions
+and create a default Material through HostPrepare before editing it.

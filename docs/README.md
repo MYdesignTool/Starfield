@@ -10,6 +10,7 @@
 | [testing.md](testing.md) | 测试入口、范围与日志 |
 | [compatibility-matrix.md](compatibility-matrix.md) | 宿主证据边界和剩余场景 |
 | [parameter-mapping.md](parameter-mapping.md) | 参数权威来源、单位与坐标转换 |
+| [review-verification-2026-10-11.md](review-verification-2026-10-11.md) | 外部审查逐项核实、反证与后续优先级 |
 | [adr/](adr/) | 保存格式与行为契约；按 Status 判断是否生效 |
 | [history/](history/README.md) | 带日期的旧构建、观察和交接证据 |
 

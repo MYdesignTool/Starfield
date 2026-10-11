@@ -217,6 +217,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 owner反馈Material新增失败（Color Source popup0 out of range1..2）。本卡继续拥有隔离CEP参数映射、真实注册范围/颜色维度回归、native70配对Panel补丁门；不改变已发布native/Core/参数ID。外部审查逐项核实见[review-verification-2026-10-11.md](review-verification-2026-10-11.md)；确认的指纹/旧ABI测试/聚合入口及文档整理另行排期，保持其他在途文件。部署与当前证据只更新current-state。
+
 2026-10-11 owner实测native69/CEP72目前未见报错，新增优先范围为Model直接Output、独立Material节点（Particle/Material两种颜色来源、粗糙度、金属度、透明度、AE灯光）。本卡拥有ADR0041列出的Core Render/Settings/graph/snapshot、AE数值灯光捕获、Material kind6/新IDs、绑定8及隔离CEP/配对发布；保持Motion/MNT改动。先实现完整可编辑闭环并核对，不要求owner反复诊断；AE启动和脚本调度仍无新授权。
 
 2026-10-11 14:48+08 native67/packed32835/CoreABI8/CEP71已部署。源码816eb83fc0da5a9757cbf8c1e483bcfb32104380经git archive冻结，完整May2023 x64 Release /MT八目标会话75911实际exit0；冻结ASAN native8802/camera12/Transform60、真实生成JS混合644/Transform168及整套PanelAudit均exit0，dummy66/71→67/71发布与整套恢复61通过。fresh AE0后经Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash、全部27已测CEP文件和selector/runtime独立核对通过。首次Emitter Type绑定覆盖Effect计数缺失/0/999/throw和八UUID不匹配；删除native66未经证实的计数契约假设，改为固定UUID参数名称查找，未找到源与非有限值分开诊断且均回滚。实机stream98失败是否消失仍等待owner自行复测；没有启动AE或执行验收脚本，不能视为客户发布资格。IDs/schema/ABI8保持，Motion/MNT改动保留；Git push仍待已有独立授权回复，部署交接后按owner既有要求暂停。

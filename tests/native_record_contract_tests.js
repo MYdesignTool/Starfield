@@ -26,6 +26,12 @@ for(const kind of ["emitter","particle","force","transform","model","material"])
     // No invented defaults or schema mutation on rejection.
     const raw=copy(node);bad(()=>contract.schema({...node,parameters:node.parameters.slice(1).concat(node.parameters[1])}));eq(node,raw);
 }
+const material=copy(create("material"));
+for(const key of [1,2,3,4,5,6])for(const value of (key===2?[[1,1,-.1],[1,1,1.1]]:
+    key===1 || key===6?[-1,2,4294967295]:[-.01,1.01])){
+    const wrong=copy(material);wrong.parameters.find(p=>p.key===String(key)).value=value;
+    for(const boundary of [contract.schema,api.recordSchema,edits.nativeRecordSchema])bad(()=>boundary(wrong));
+}
 bad(()=>contract.schema(copy(create("output"))));
 eq(contract.array(vm.runInContext("[]",foreign)),true);eq(contract.array({length:0}),false);
 console.log(`native_record_contract_tests: ${checks} checks passed; identical ES3 factory in browser/gateway, all six kinds, cross-realm data and strict wire/layout rejection`);

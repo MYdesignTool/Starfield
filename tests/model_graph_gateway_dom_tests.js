@@ -21,7 +21,12 @@ const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
 function fresh(captured){if(captured!==epoch){staleReads++;throw new ReferenceError("Object is invalid");}}
 function property(p,captured){return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,numKeys:0,canSetExpression:false,
-    get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);p.value=copy(value);}};}
+    get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);
+        if(p.minimum!==undefined)assert.ok(Number.isInteger(value) && value>=p.minimum && value<=p.maximum,
+            p.name+": popup value "+value+" outside "+p.minimum+".."+p.maximum);
+        if(p.color)assert.ok(Array.isArray(value) && value.length===4 && value.every(v=>Number.isFinite(v) && v>=0 && v<=1),
+            p.name+": AE color requires four unit-interval components");
+        p.value=copy(value);}};}
 function wrap(raw){
     // Reacquiring an effect may reuse its wrapper identity while earlier child
     // Property handles remain invalid. Exercise both wrapper policies rather
@@ -50,7 +55,8 @@ function registeredControls(matchName){if(!catalogDir)return modelControls();
         log=raw.toString(raw[0]===255 && raw[1]===254?"utf16le":"utf8").replace(/^\uFEFF/,"");
     const line=log.split(/\r?\n/).find(line=>line.startsWith("NODE_CONTROL_CATALOG:"));assert.ok(line,"Missing actual registration catalog for "+kind);
     const catalog=JSON.parse(line.substr("NODE_CONTROL_CATALOG:".length)),properties={};assert.equal(catalog.kind,kind);
-    for(const c of catalog.controls){const p={name:c.name,matchName:matchName+"-"+c.disk,propertyIndex:c.index,value:c.value};
+    for(const c of catalog.controls){const p={name:c.name,matchName:matchName+"-"+c.disk,propertyIndex:c.index,value:c.value,
+        minimum:c.minimum,maximum:c.maximum,color:c.type===5};
         properties[c.name]=properties[p.matchName]=properties[matchName+"-"+String(c.disk).padStart(4,"0")]=p;}
     return properties;}
 function parade(){return {get numProperties(){return items.length;},property(i){return items[i-1]?wrap(items[i-1]):null;},
@@ -98,11 +104,11 @@ if(process.env.STARFIELD_DOM_MATERIAL==="1"){
     g=edits.apply(g,{type:"addNode",nodeType:"material"},()=>uuid(108));
     g=edits.apply(g,{type:"connect",from:uuid(108),to:uuid(101)},()=>uuid(109));
     g=edits.apply(g,{type:"connect",from:uuid(101),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(110));
-    for(const [key,value] of [[1,1],[2,[.2,.4,.8]],[3,.75],[4,.3],[5,.4],[6,1]])g.nodes.find(n=>n.id===uuid(108)).parameters.find(p=>p.key===String(key)).value=value;
+    // Exercise the actual new-node default before changing to independent color.
 }
 const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[n.id],
     outgoing:g.edges.filter(e=>e.sourceNode===n.id).map(e=>({id:e.id,target:e.destinationNode})).sort((a,b)=>a.id.localeCompare(b.id))});
-api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output).map(record)),true,realm([]),false);eq(arbReads,0);
+api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output && n.type!==edits.types.material).map(record)),true,realm([]),false);eq(arbReads,0);
 const bounds=[-2,-3,-4,2,3,4],raw=Buffer.alloc(48);bounds.forEach((v,i)=>raw.writeDoubleLE(v,i*8));
 let transaction=500;
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
@@ -112,12 +118,18 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
     if(!replace)desired.outgoing=[];
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
     const nodes=replace?before.nativeNodes.filter(n=>n.type!==edits.types.model).concat([desired]):before.nativeNodes.concat([desired]);
+    if(process.env.STARFIELD_DOM_MATERIAL==="1"){
+        let material=nodes.find(n=>n.type===edits.types.material);
+        if(!material){material=record(g.nodes.find(n=>n.type===edits.types.material));nodes.push(material);}
+        if(!replace)for(const [key,value] of [[1,1],[2,[.2,.4,.8]],[3,.75],[4,.3],[5,.4],[6,0]])
+            material.parameters.find(p=>p.key===String(key)).value=value;
+    }
     if(replace)for(const n of nodes)for(const e of n.outgoing)if(e.target===previousModelId)e.target=desired.id;
     for(const node of nodes)node.schemaVersion=edits.nativeRecordSchema(node);
     if(reorderedConnections)for(const node of nodes)node.outgoing=node.outgoing.slice().reverse().map(edge=>({target:edge.target,id:edge.id}));
     const r=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,
         graphHex:codec.toHex(g),nodeManifest:nodes,rendererManifest:before.renderer,assets:[{nodeId:desired.id,source:2,revision:17,bounds,bytes:32}]})));
-    eq(r.ok,true,JSON.stringify(r));return {desired,before,id:uuid(transaction)};}
+    eq(r.ok,true,JSON.stringify(r));return {desired,before,nodes,id:uuid(transaction)};}
 function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelGraphAssetPage(request("writeModelGraphAssetPage",{asset:0,page:0,hex:"ab".repeat(32)}))).ok,true);
     eq(JSON.parse(host.SFLD_queueModelGraphTransaction(request("queueModelGraphTransaction"))).ok,true);eq(commands,1);
     ok(host.SFLD_modelTransactionHostRequest().startsWith(id+"|0|202|303|1|"));
@@ -133,6 +145,14 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     items.push(backupMain,backupNode);epoch++;
     resolved=api.resolve({pinTarget:true,target:{token}});resolved.properties.guard.setValue(1);
     eq(host.SFLD_modelTransactionHostPrepare(id),"1",host.__SFLD_modelGraphTransactionV1.message);
+    if(process.env.STARFIELD_DOM_MATERIAL==="1"){
+        const material=items.find(e=>e.matchName==="org.starfieldfx.node.material");
+        const fields=pair.nodes.find(n=>n.type===edits.types.material).parameters,field=k=>fields.find(p=>p.key===String(k)).value;
+        eq(material.properties["Color Source"].value,field(1)+1);
+        eq(material.properties.Color.value,[...field(2),1]);
+        for(const [key,name] of [[3,"Roughness"],[4,"Metallic"],[5,"Opacity"],[6,"AE Lights"]])
+            eq(material.properties[name].value,field(key)*(key===6?1:100));
+    }
     if(typeof host.SFLD_modelTransactionReady==="function")eq(host.SFLD_modelTransactionReady(),gatewayBuild);
     let current=copy(api.snapshot(api.resolve({pinTarget:true,target:{token}})));const model=current.nativeNodes.find(n=>n.id===desired.id);
     eq(model.parameters.find(p=>p.key==="13").value,0);eq(model.modelAsset.revision,0);eq(arbReads,0);
@@ -143,12 +163,26 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     return {effect,backupMain,backupNode};}
 let pair=begin(true),copies=stage(pair);eq(host.SFLD_modelTransactionHostCommit(pair.id),"1",host.__SFLD_modelGraphTransactionV1.message);eq(commits,1);eq(arbReads,0);eq(undo,0);
 eq(copies.effect.properties["Angle Y"].value,45);eq(copies.effect.properties["Panel Sync Guard"].value,0);
-eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,pair.before.nativeNodes.length);
+eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,pair.nodes.length);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"1|7|0|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.committed,true);
 eq(JSON.parse(host.SFLD_releaseModelGraphTransaction(request("releaseModelGraphTransaction"))).ok,true);
 items.splice(items.indexOf(copies.backupMain),1);items.splice(items.indexOf(copies.backupNode),1);epoch++;
 api.resolve({pinTarget:true,target:{token}}).properties.guard.setValue(0);commands=0;
+if(process.env.STARFIELD_DOM_MATERIAL==="1"){
+    const rawMaterial=items.find(e=>e.matchName==="org.starfieldfx.node.material"),beforeValues=copy(rawMaterial.properties);
+    const record=copy(api.read(wrap(rawMaterial),layer));
+    for(const value of [2,4294967295]){
+        const bad=copy(record);bad.parameters.find(p=>p.key==="1").value=value;
+        checks++;assert.throws(()=>api.write(wrap(rawMaterial),realm(bad),layer),/material switch 1/);
+        eq(rawMaterial.properties,beforeValues);
+    }
+    rawMaterial.properties["Color Source"].value=0;
+    checks++;assert.throws(()=>api.read(wrap(rawMaterial),layer),/Invalid native Material Color Source: 0/);
+    rawMaterial.properties["Color Source"].value=1;
+    for(const field of record.parameters)field.key=Number(field.key);
+    api.write(wrap(rawMaterial),realm(record),layer);eq(rawMaterial.properties["Color Source"].value,1);
+}
 pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,0);eq(arbReads,0);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
