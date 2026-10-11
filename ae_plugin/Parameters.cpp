@@ -603,8 +603,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
 
     // Revision and checksum receipts are ordinary numeric streams. The panel edits separate node
-    // effects and changes the numeric commit stream to compile those records into
-    // the renderer's arbitrary-data graph. Index 40 guards batched Output writes.
+    // effects and writes a numeric request. The explicit resident AEGP command
+    // publishes the graph and saved receipt. Index 40 guards batched writes.
     const struct GraphCarrierParameter {
         const char* name;
         A_long disk_id;
@@ -613,7 +613,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     } graph_carrier_parameters[] = {
         {"Graph Revision", kGraphRevisionDiskId, 0.0, false},
         {"Panel Graph Sync Guard", kGraphSyncGuardDiskId, 0.0, false},
-        {"Commit Graph Edit", kGraphEditCommitDiskId, 0.0, true},
+        {"Commit Graph Edit", kGraphEditCommitDiskId, 0.0, false},
         {"Graph Edit Receipt", kGraphEditReceiptDiskId, 0.0, false},
     };
     constexpr PF_FpLong kCarrierControlLimit = 1000000.0;

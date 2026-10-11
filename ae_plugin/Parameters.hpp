@@ -21,7 +21,7 @@ namespace starfield::adapter {
 // The output effect retains hidden bootstrap controls for a clean first application,
 // but editable graph values live on separate node effects. Indices 90..97 are
 // renderer globals; 98..609 are derived animation inputs (ADR 0023).
-// Graph topology edits use the numeric commit trigger at 41.
+// Graph topology edits write request nonce 41, then invoke the resident command.
 inline constexpr std::size_t kCurveParameterCount = 34; // two counts and 32 age/value sliders
 inline constexpr std::size_t kEmitterSizeParameterCount = 3;
 inline constexpr std::size_t kParticleVariationParameterCount = 2;

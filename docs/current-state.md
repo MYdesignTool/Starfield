@@ -1,5 +1,24 @@
 # 当前工程状态
 
+## M3-17 native69 / CEP72 explicit commit candidate — 2026-10-11
+
+Owner reports first-effect `node_effect_sync_failed` / missing acknowledgement
+after native68. ADR0040 replaces the assumed script→supervised callback→param
+flags publication with an explicit synchronous resident command and saved AEGP
+stream publication/readback. Native69/packed32837, CEP72, ABI8; IDs/matchNames and
+record schemas unchanged. Existing68/71 pair remains installed. Candidate panel
+delta is isolated in tools/candidates/model-panel-author.patch, live CEP71 restored.
+
+Actual command standard/ASAN23, actual compiler/publisher ASAN native9153/camera12,
+Transform60, generated JS643/168, first-effect missing callback/command/receipt and
+retry gateway checks, full registration/DOM audit and dummy68/71→69/72 restore61
+passed. Source/build freeze and final release gates pending. First mixed test
+incorrectly hid a still-connected Model fixture; restored its inventory before the
+explicit-path test. Host test harness Windows define/path issues were corrected;
+failure logs retained. No AE process started/dispatched; no host correction claim.
+AE23.5x52 first application, repeated refresh, Model edits, undo/reopen remain open.
+Motion/MNT changes preserved, Git push still pending.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

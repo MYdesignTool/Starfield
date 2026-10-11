@@ -49,6 +49,8 @@ A_long fail_read = -1;
 A_long fail_evaluated_read = -1;
 A_long wrong_type = -1;
 bool corrupt_receipt{};
+bool panel_publish{};
+bool panel_output_only{};
 struct Memory { std::vector<std::byte> bytes; };
 std::unordered_map<PF_Handle, std::unique_ptr<Memory>> handles;
 PF_Handle allocate(A_u_longlong count) {
@@ -298,7 +300,7 @@ int main() {
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr source, AEGP_EffectRefH* ref)->A_Err {
         *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
     };
-    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = model_present?7:transform_present?5:4; return 0; };
+    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = panel_output_only?1:model_present?7:transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
@@ -350,7 +352,7 @@ int main() {
     stream.AEGP_SetStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_StreamValue2* value)->A_Err {
         ++sets; auto& key = *reinterpret_cast<Ref*>(ref);
         check(key.effect == 0, "native compile writes renderer only");
-        check(key.index != kGraphEditCommitId && key.index != kGraphEditReceiptId, "native edit preserves CEP nonce and receipt");
+        check(key.index != kGraphEditCommitId && (panel_publish || key.index != kGraphEditReceiptId), "native edit preserves CEP nonce and receipt");
         if (key.index == fail_set) { fail_set = -1; return PF_Err_OUT_OF_MEMORY; }
         if (key.index == kGraphParameterId) {
             if (ignore_graph) { ignore_graph = false; return 0; }
@@ -1609,6 +1611,49 @@ int main() {
         check(direct_edit(restore_name)==0 && restore_name.accepted,"author rename rebinds literal source");
         check(live_refs==0 && acquisitions==0,"literal inventory and rejected names release all host references");
         model_present=transform_present=false;
+    }
+    {
+        // Actual compiler, aliases, arbitrary serializer and stream publisher.
+        // No USER_CHANGED_PARAM is dispatched for the script request write.
+        panel_publish=true;
+        model_present=transform_present=true;
+        main.values[kGraphSyncGuardId].one_d=1;main.values[kNodeEffectsReadyId].one_d=1;
+        main.values[kGraphEditCommitId].one_d=987654;
+        PF_OutData output{};
+        const auto initial_commit_error=commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987654,701,&output);
+        if(initial_commit_error)std::printf("Explicit command diagnostic: %d %s\n",initial_commit_error,output.return_msg);
+        check(initial_commit_error==0 &&
+            main.values[kGraphEditReceiptId].one_d==987654,"explicit command publishes saved receipt without supervised callback");
+        auto before_graph=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
+        const auto before_revision=main.values[kGraphRevisionId].one_d;
+        const auto before_expressions=expressions;
+        main.values[kGraphEditCommitId].one_d=987653;
+        auto empty_context=renderer_data;empty_context.width=empty_context.height=empty_context.time_scale=0;
+        empty_context.effect_ref=nullptr; // explicit borrowed owner replaces PF lookup
+        empty_context.pixel_aspect_ratio={0,0};
+        check(commit_panel_graph(&empty_context,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987653,701,&output)==0 &&
+            main.values[kGraphEditReceiptId].one_d==987653,"generic callback recovers missing geometry and time from its owned layer");
+        // Restore the first publication baseline for the failure comparison.
+        main.values[kGraphEditReceiptId].one_d=987654;main.values[kGraphRevisionId].one_d=before_revision;
+        main.values[kGraphEditCommitId].one_d=987655;fail_set=kGraphEditReceiptId;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987655,701,&output)!=0,
+            "receipt partial-write failure rejects explicit publication");
+        check(main.values[kGraphEditReceiptId].one_d==987654 && main.values[kGraphRevisionId].one_d==before_revision &&
+            handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes==before_graph && expressions==before_expressions,
+            "failed explicit receipt restores exact graph, revision, receipt and aliases");
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987655,701,&output)==0 &&
+            main.values[kGraphEditReceiptId].one_d==987655 && main.values[kGraphRevisionId].one_d==before_revision+1,
+            "failed request can retry without stale callback state");
+        const auto before_writes=sets;main.values[kGraphSyncGuardId].one_d=2;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987655,701,&output)!=0 && sets==before_writes,
+            "transaction backup guard cannot publish a graph command");
+        main.values[kGraphSyncGuardId].one_d=1;main.values[kGraphEditCommitId].one_d=987656;panel_output_only=true;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987656,701,&output)==0 &&
+            main.values[kGraphEditReceiptId].one_d==987656 && saved_graph().nodes.size()==1,
+            "explicit deletion of every node publishes Output-only without recreating defaults");
+        panel_output_only=false;main.values[kGraphSyncGuardId].one_d=0;panel_publish=false;
+        model_present=transform_present=false;
+        check(live_refs==0 && acquisitions==0,"explicit graph command releases borrowed stream values and suites");
     }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.

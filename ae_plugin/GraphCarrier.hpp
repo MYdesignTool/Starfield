@@ -13,7 +13,9 @@ namespace starfield::adapter {
 [[nodiscard]] PF_Err register_graph_carrier(PF_InData* in_data) noexcept;
 [[nodiscard]] AEGP_PluginID graph_carrier_plugin_id() noexcept;
 
-// Handles the single commit trigger used by the CEP transaction bridge.
+// Legacy direct-callback helper retained for old adapter fixtures. EffectMain
+// no longer dispatches CEP commits here; native69 uses commit_panel_graph through
+// the explicit resident command and saved AEGP stream readback.
 [[nodiscard]] PF_Err commit_graph_request(PF_InData* in_data, PF_OutData* out_data,
                                           PF_ParamDef* params[],
                                           PF_UserChangedParamExtra* extra) noexcept;

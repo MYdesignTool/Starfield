@@ -1,5 +1,25 @@
 # 测试入口
 
+## native69 explicit graph command candidate
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunGraphCommitHostTests.ps1 -Run [-Sanitize]`
+  compiles the actual resident hook with fake SDK services; default reports only.
+  Covers missing/ambiguous pending owner, backup exclusion, duplicate command,
+  negative receipt, missing receiver, stream type, same-thread reentry, worker
+  rejection, outer Model exclusion and callback-local reference cleanup.
+- `tests/RunMixedNodeBindingTests.ps1 -Run [-Sanitize]` now includes the actual
+  explicit compiler/publisher, receipt-write rollback, retry, absent generic
+  geometry/time, and Output-only graph. Run generated expressions afterward.
+- Prepare `tools/Prepare-ModelPanelCandidate.ps1 -Prepare -DestinationName <name>
+  -PanelGeneration 72`, then `tests/RunModelPanelAudit.ps1 -Run -PanelRoot <isolated>`.
+  Gateway setters no longer acknowledge commits; the explicit command does.
+- `tests/model_deployment_tests.ps1 -Run -UpgradeInstalledModel -InstalledModelBuild 68`
+  validates69/72 promotion and full68/71 restoration under artifacts only.
+
+Root preliminary evidence: artifacts/m3-17-native69-{host-command,mixed-asan,panel-audit,dummy-deploy}*.
+Failed preliminary harness logs are retained. These do not qualify AE2023. Complete
+frozen SDK and independent installation hashes remain release gates. ADR0040.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

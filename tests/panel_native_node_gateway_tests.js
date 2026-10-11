@@ -12,6 +12,7 @@ const source = fs.readFileSync(path.join(panelRoot,"jsx/starfield_gateway.jsx"),
 const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
 let epoch = 0, rejectNext = false, revision = 0, commits = 0, roundWireNumbers = false, beforeSubmit = null;
 let rejectNextAdd = null;
+let nativeCommandAvailable=true,ignoreNativeCommand=false;
 let nodePropertyReads = 0;
 let numericNodeVisits = 0, hideDirectCurveIds = false;
 const undo = { begins: 0, ends: 0 }, clone = value => Array.isArray(value) ? value.slice() : value;
@@ -26,7 +27,7 @@ function wrapProperty(p,captured,isNode) {
         get value(){assertFresh(captured);if(isNode)nodePropertyReads++;return clone(p.value);},
         get expression(){throw new Error("AEGP_CanVaryOverTime: expressions are forbidden on node records");},
         set expression(_){throw new Error("Expression requests are unsupported");},
-        setValue(v){assertFresh(captured);p.value=clone(v);if(p===renderer.properties["Commit Graph Edit"]) compile(v);} };
+        setValue(v){assertFresh(captured);p.value=clone(v);} };
 }
 function wrapEffect(raw) {
     const captured=epoch;
@@ -59,7 +60,9 @@ const exported={};
 vm.runInNewContext("JSON.stringify = wireStringify;\n"+source,{CompItem,wireStringify:value=>JSON.stringify(value,
     (_,item)=>roundWireNumbers&&typeof item==="number"?Number(item.toPrecision(12)):item),
     $:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5},numItems:1,item:()=>comp},
-    beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;}}});
+    beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;},
+    findMenuCommandId(name){assert.equal(name,"Starfield Commit Node Graph");return nativeCommandAvailable?99:0;},
+    executeCommand(id){assert.equal(id,99);if(!ignoreNativeCommand)compile(renderer.properties["Commit Graph Edit"].value);}}});
 const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toString(16).padStart(4,"0")).join("");
 function graphFromEffects() {
     const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={};
@@ -135,6 +138,18 @@ function invoke(operation,fields={}) {
 let next=10;
 const snapshots=require(path.join(panelRoot,"js/native_graph_snapshot.js"));
 assert.equal(invoke("getGraphSnapshot").snapshot.initialized,false);
+nativeCommandAvailable=false;
+const unavailable=invoke("syncGraphSnapshot");
+assert.equal(unavailable.ok,false);assert.match(unavailable.error.message,/native graph command is unavailable/);
+assert.equal(items.length,1,"missing resident command rejects before effect creation");
+assert.equal(renderer.properties["Node Effects Ready"].value,0);
+nativeCommandAvailable=true;ignoreNativeCommand=true;
+const missed=invoke("syncGraphSnapshot");
+assert.equal(missed.ok,false);assert.match(missed.error.message,/did not publish a saved receipt/);
+assert.equal(items.length,1,"unacknowledged first initialization removes every newly created node");
+assert.equal(renderer.properties["Node Effects Ready"].value,0);
+assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
+ignoreNativeCommand=false;
 const boot=snapshots.normalize(invoke("syncGraphSnapshot"));
 assert.equal(boot.ok,true,JSON.stringify(boot));assert.equal(boot.snapshot.initialized,true);
 assert.equal(boot.snapshot.checksumMatches,true,"ordinary record codec must match the compiled payload CRC");

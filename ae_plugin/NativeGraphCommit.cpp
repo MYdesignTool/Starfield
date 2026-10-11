@@ -3,6 +3,7 @@
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "MotionBlur.hpp"
+#include "NativeTemporalCache.hpp"
 #include "SPBasic.h"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <vector>
 
 namespace starfield::adapter {
 namespace {
@@ -49,12 +51,12 @@ PF_Err write_graph_snapshot(PF_InData* data, PF_ParamDef* params[], const core::
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
-PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugin_id,
-                               PF_OutData* output) noexcept {
+static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID plugin_id,
+                               PF_OutData* output, PF_InData* panel_data = nullptr, A_long nonce = 0) noexcept {
     if (!edit) return PF_Err_BAD_CALLBACK_PARAM;
     edit->accepted = false; edit->revision = 0; edit->status = PF_Err_BAD_CALLBACK_PARAM;
     edit->stage = node_sync::Stage::context; edit->stream_index = -1;
-    if (!edit->handles || !edit->basic || !node_sync::valid_edit(*edit) ||
+    if (!edit->handles || !edit->basic || (!panel_data && !node_sync::valid_edit(*edit)) ||
         !edit->renderer || !edit->layer || edit->width <= 0 || edit->height <= 0 ||
         edit->time_scale <= 0 || edit->pixel_aspect.num <= 0 || edit->pixel_aspect.den <= 0)
         return edit->status;
@@ -67,7 +69,10 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         context.pixel_aspect_ratio = edit->pixel_aspect;
         context.num_params = static_cast<A_long>(kTotalEffectParameterCount + 1);
         PF_InData* data = &context;
-        std::array<PF_ParamDef, kTotalEffectParameterCount + 1> scratch{};
+        if(panel_data)context.effect_ref=panel_data->effect_ref;
+        // Generic calls can be nested below AE's scripting stack. Keep the
+        // bounded parameter bank off that UI thread's stack.
+        std::vector<PF_ParamDef> scratch(kTotalEffectParameterCount + 1);
         std::array<PF_ParamDef*, kTotalEffectParameterCount + 1> pointers{};
         for (std::size_t i = 0; i < scratch.size(); ++i) {
             scratch[i].param_type = PF_Param_FLOAT_SLIDER; pointers[i] = &scratch[i];
@@ -80,9 +85,9 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
             const AEGP_StreamSuite6* streams{};
             AEGP_EffectRefH renderer{};
             PF_ArbitraryH graph{};
-            std::array<AEGP_StreamRefH, 5> refs{};
-            std::array<AEGP_StreamValue2, 5> old{};
-            std::array<bool, 5> read{};
+            std::array<AEGP_StreamRefH, 6> refs{};
+            std::array<AEGP_StreamValue2, 6> old{};
+            std::array<bool, 6> read{};
             ~Publish() {
                 for (std::size_t i = 0; i < refs.size(); ++i) {
                     if (read[i]) streams->AEGP_DisposeStreamValue(&old[i]);
@@ -102,6 +107,27 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
                                              reinterpret_cast<const void**>(&publish.streams));
         if (ae_error || !publish.renderer) return edit->status = static_cast<PF_Err>(ae_error ? ae_error : PF_Err_BAD_CALLBACK_PARAM);
         const A_Time time{data->current_time, data->time_scale};
+        if(panel_data) {
+            // Prove the live request before touching bindings or graph. Backup
+            // effects use guard=2 and must never become a command target.
+            for(const auto index:{kGraphSyncGuardId,kGraphEditCommitId,kNodeEffectsReadyId}) {
+                AEGP_StreamRefH ref{};AEGP_StreamValue2 value{};
+                ae_error=publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id,publish.renderer,index,&ref);
+                AEGP_StreamType type{};
+                if(!ae_error && ref)ae_error=publish.streams->AEGP_GetStreamType(ref,&type);
+                if(!ae_error && (!ref || type!=AEGP_StreamType_OneD))ae_error=PF_Err_BAD_CALLBACK_PARAM;
+                if(!ae_error) {
+                    ae_error=publish.streams->AEGP_GetNewStreamValue(plugin_id,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+                    if(!ae_error) {
+                        const double expected=index==kGraphEditCommitId?nonce:1;
+                        if(value.val.one_d!=expected)ae_error=PF_Err_BAD_CALLBACK_PARAM;
+                        publish.streams->AEGP_DisposeStreamValue(&value);
+                    }
+                }
+                if(ref)publish.streams->AEGP_DisposeStream(ref);
+                if(ae_error){edit->stream_index=index;return edit->status=static_cast<PF_Err>(ae_error);}
+            }
+        }
         edit->stage = node_sync::Stage::controls;
         constexpr std::array<A_long, 18> controls{kMaxParticlesId, kLayoutOutputXId, kLayoutOutputYId,
             kGraphRevisionId, kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,kTimeSamplingHzId,kAccelerationId,
@@ -158,7 +184,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         core::Graph graph;
         bool found = false;
         PF_Err error = compile_native_node_graph(data, pointers.data(), graph, found, plugin_id, edit);
-        if (error || !found) return edit->status = error ? error : PF_Err_BAD_CALLBACK_PARAM;
+        if (error || (!found && !panel_data)) return edit->status = error ? error : PF_Err_BAD_CALLBACK_PARAM;
         edit->stage = node_sync::Stage::snapshot;
         A_long revision = 0;
         error = write_graph_snapshot(data, pointers.data(), graph, &revision);
@@ -173,9 +199,10 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.
         // Do not add continuous/color/point values to this scalar-only contract.
-        constexpr std::array<A_long, 5> indices{kControlSourceId, kGraphRevisionId,
-            kGraphChecksumHighId, kGraphChecksumLowId, kGraphParameterId};
-        constexpr std::size_t graph_slot = indices.size() - 1;
+        constexpr std::array<A_long, 6> indices{kControlSourceId, kGraphRevisionId,
+            kGraphChecksumHighId, kGraphChecksumLowId, kGraphParameterId, kGraphEditReceiptId};
+        constexpr std::size_t graph_slot = 4;
+        const std::size_t publish_count=panel_data?indices.size():graph_slot+1;
         const std::array<PF_FpLong, graph_slot> scalars{kNodeControlSource,
             scratch[kGraphRevisionId].u.fs_d.value, scratch[kGraphChecksumHighId].u.fs_d.value,
             scratch[kGraphChecksumLowId].u.fs_d.value};
@@ -187,7 +214,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
                 return edit->status = PF_Err_BAD_CALLBACK_PARAM;
         }
         edit->stage = node_sync::Stage::capture;
-        for (std::size_t i = 0; i < indices.size(); ++i) {
+        for (std::size_t i = 0; i < publish_count; ++i) {
             edit->stream_index = indices[i];
             if(publish.read[i])continue;
             ae_error = publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id, publish.renderer,
@@ -220,9 +247,16 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
             ++written; // Include the graph in rollback even if this call partially fails.
             ae_error = publish.streams->AEGP_SetStreamValue(plugin_id, publish.refs[graph_slot], &value);
         }
+        if(!ae_error && panel_data) {
+            // Receipt is last. It certifies a complete publication, never just
+            // receipt of the command. Include failed/partial writes in rollback.
+            edit->stream_index=kGraphEditReceiptId;
+            AEGP_StreamValue2 value{};value.streamH=publish.refs[5];value.val.one_d=nonce;
+            ++written;ae_error=publish.streams->AEGP_SetStreamValue(plugin_id,publish.refs[5],&value);
+        }
         // A successful suite call still needs an actual saved graph and receipt.
         if (!ae_error) {
-            for (std::size_t i = 0; i < indices.size(); ++i) {
+            for (std::size_t i = 0; i < publish_count; ++i) {
                 edit->stage = i == graph_slot ? node_sync::Stage::verify_graph : node_sync::Stage::verify_scalars;
                 edit->stream_index = indices[i];
                 AEGP_StreamValue2 saved{};
@@ -241,7 +275,7 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
                         if (actual) data->utils->host_unlock_handle(handle);
                         if (expected) data->utils->host_unlock_handle(publish.graph);
                     }
-                } else if (saved.val.one_d != scalars[i]) {
+                } else if (saved.val.one_d != (i==5?nonce:scalars[i])) {
                     ae_error = PF_Err_BAD_CALLBACK_PARAM;
                 }
                 publish.streams->AEGP_DisposeStreamValue(&saved);
@@ -262,10 +296,53 @@ PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit, AEGP_PluginID plugi
             return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
         }
         bindings.accept();
+        if(panel_data)capture_native_temporal_metadata(data,graph,plugin_id);
         edit->revision = revision; edit->status = PF_Err_NONE; edit->accepted = true;
         edit->stage = node_sync::Stage::complete; edit->stream_index = -1;
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return edit->status = PF_Err_OUT_OF_MEMORY; }
     catch (...) { return edit->status = PF_Err_INTERNAL_STRUCT_DAMAGED; }
+}
+
+PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit,AEGP_PluginID plugin_id,PF_OutData* output) noexcept {
+    return commit_graph_streams(edit,plugin_id,output);
+}
+PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
+                         A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output) noexcept {
+    if(!data || !data->utils || !data->pica_basicP || !renderer || !layer || !plugin_id ||
+        nonce<1 || nonce>1000000)return PF_Err_BAD_CALLBACK_PARAM;
+    node_sync::NativeEdit context;
+    context.records_only=true;
+    context.renderer=renderer;context.layer=layer;context.handles=data->utils;context.basic=data->pica_basicP;
+    context.width=data->width;context.height=data->height;context.time=data->current_time;
+    context.time_scale=data->time_scale;context.pixel_aspect=data->pixel_aspect_ratio;
+    if(context.basic && (context.width<=0 || context.height<=0 || context.time_scale<=0 ||
+        context.pixel_aspect.num<=0 || context.pixel_aspect.den<=0)) {
+        const AEGP_LayerSuite9* layers{};const AEGP_ItemSuite9* items{};
+        auto error=context.basic->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,reinterpret_cast<const void**>(&layers));
+        if(!error)error=context.basic->AcquireSuite(kAEGPItemSuite,kAEGPItemSuiteVersion9,reinterpret_cast<const void**>(&items));
+        if(!error && layers && items) {
+            AEGP_ItemH item{};A_Ratio aspect{};A_Time time{};
+            error=layers->AEGP_GetLayerSourceItem(layer,&item);
+            if(!error && !item)error=PF_Err_BAD_CALLBACK_PARAM;
+            if(!error)error=items->AEGP_GetItemDimensions(item,&context.width,&context.height);
+            if(!error)error=items->AEGP_GetItemPixelAspectRatio(item,&aspect);
+            if(!error)error=layers->AEGP_GetLayerCurrentTime(layer,AEGP_LTimeMode_LayerTime,&time);
+            if(!error){context.pixel_aspect={aspect.num,aspect.den};context.time=time.value;context.time_scale=time.scale;}
+        }
+        if(items)context.basic->ReleaseSuite(kAEGPItemSuite,kAEGPItemSuiteVersion9);
+        if(layers)context.basic->ReleaseSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
+        if(error)return static_cast<PF_Err>(error);
+    }
+    const auto error=commit_graph_streams(&context,plugin_id,output,data,nonce);
+    if(error && output && context.stage==node_sync::Stage::compile && context.compile_stage)
+        std::snprintf(output->return_msg,sizeof(output->return_msg),
+            "Starfield graph command failed: node compile: %s, effect %ld, stream %ld (error %d).",
+            context.compile_stage,static_cast<long>(context.compile_effect_index),static_cast<long>(context.stream_index),static_cast<int>(error));
+    else if(error && output)std::snprintf(output->return_msg,sizeof(output->return_msg),
+        "Starfield graph command failed: %s, stream %ld%s%s (error %d).",
+        node_sync::stage_name(context.stage),static_cast<long>(context.stream_index),
+        context.binding_stage?", ":"",context.binding_stage?context.binding_stage:"",static_cast<int>(error));
+    return error;
 }
 }

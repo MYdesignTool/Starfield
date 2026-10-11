@@ -1,5 +1,19 @@
 # 当前任务卡
 
+## Active M3-17: explicit graph commit repair (native69 / CEP72)
+
+Owner's repeated first-effect failure requires auditing initialization through saved
+publication, not substituting another expression guard. ADR0040 owns the new UI
+command and private synchronous message. Owned files extend to StarfieldHost.cpp,
+GraphCommitRequest.hpp, EffectMain.cpp, NativeGraphCommit, NativeNodeGraph,
+NodeGraphSync.hpp, Parameters/PluginVersion/BuildWindows, isolated panel delta,
+native/gateway/host-command/deployment fixtures and their runners, release docs.
+Hidden nonce supervision is retired from production dispatch; no parameter IDs,
+schemas, effect names or ABI8 migration. Preserve unrelated Motion/MNT edits.
+Standard/ASAN command23 and actual compiler ASAN9153, generated JS643/168,
+full panel matrix and dummy paired restore61 passed. Frozen build/final release
+pending; installed68/71 and actual AE23.5x52 gates remain. No AE launch/dispatch.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

@@ -9,6 +9,7 @@
 
 #include "Diagnostics.hpp"
 #include "GraphCarrier.hpp"
+#include "GraphCommitRequest.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "PluginFlags.h"
@@ -126,9 +127,6 @@ PF_Err dispatch(PF_Cmd cmd,
             }
             return starfield::adapter::graph_arbitrary_callback(in_data, static_cast<PF_ArbParamsExtra*>(extra));
         case PF_Cmd_USER_CHANGED_PARAM:
-            if (const PF_Err carrier_error = starfield::adapter::commit_graph_request(
-                    in_data, out_data, params, static_cast<PF_UserChangedParamExtra*>(extra));
-                carrier_error != PF_Err_NONE) return carrier_error;
             return starfield::adapter::user_changed_param(in_data, out_data, params,
                                                           static_cast<PF_UserChangedParamExtra*>(extra));
         case PF_Cmd_UPDATE_PARAMS_UI:
@@ -137,6 +135,13 @@ PF_Err dispatch(PF_Cmd cmd,
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
         case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra && *static_cast<const std::uint32_t*>(extra)==0x53464731) {
+                auto& request=*static_cast<starfield::adapter::GraphCommitRequest*>(extra);
+                if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;
+                request.acknowledged=1;
+                return request.status=starfield::adapter::commit_panel_graph(in_data,request.renderer,
+                    request.layer,request.nonce,request.plugin,out_data);
+            }
             if(extra)starfield::adapter::refresh_native_temporal_idle(in_data,
                 starfield::adapter::graph_carrier_plugin_id(),
                 *static_cast<starfield::adapter::NativeBootstrapRequest*>(extra));

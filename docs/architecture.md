@@ -1,5 +1,12 @@
 # Starfield 架构
 
+M3-17 native69/CEP72 candidate changes CEP graph submission per ADR0040: ordinary
+request nonce plus explicit synchronous resident AEGP command, guarded unique-owner
+resolution, versioned generic receiver and atomic saved-stream graph/receipt
+publication. Render still reads owned graph/aliases; no script or idle queue in
+this command. Core ABI8 / persistent schemas / parameter IDs unchanged. Installed
+68/71 remains until release verification; AE2023 acceptance open.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

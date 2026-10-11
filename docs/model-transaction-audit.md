@@ -1,5 +1,16 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+## Explicit commit contract correction (native69 / CEP72)
+
+First-effect missing receipt exposed an untested script→USER_CHANGED assumption.
+ADR0040 replaces it with a synchronous resident command / EffectCallGeneric and
+atomic saved-stream publisher shared with native edits. Existing parameter IDs,
+schemas and ABI8 remain. The command invokes no script and permits Model's outer
+UI exclusion; it never replays an acknowledged nonce. Actual command and publisher
+fixtures now cover absent supervision, rejection/rollback, retry, ambiguous owner,
+missing receiver and Output-only deletion. Actual host cause/correction remains
+unconfirmed until AE23.5x52 batch acceptance. Frozen build and release pending.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

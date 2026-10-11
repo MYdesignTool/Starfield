@@ -70,7 +70,7 @@ $adapterInputs = @(
     'ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphParameter.hpp',
     'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalCache.hpp',
     'ae_plugin\NativeTemporalUI.cpp', 'ae_plugin\NativeTemporalUI.hpp',
-    'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp',
+    'ae_plugin\NativeBootstrap.hpp', 'ae_plugin\StarfieldHost.cpp', 'ae_plugin\GraphCommitRequest.hpp',
     'ae_plugin\UiExclusionHost.hpp', 'ae_plugin\UiExclusionHost.cpp', 'ae_plugin\UiExclusionClient.hpp',
     'ae_plugin\ModelAssetHost.hpp', 'ae_plugin\ModelAssetHost.cpp', 'ae_plugin\ScriptDiagnostic.hpp',
     'ae_plugin\PresetFileHost.hpp', 'ae_plugin\PresetFileHost.cpp', 'ae_plugin\PresetFileChooser.cpp',

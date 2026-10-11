@@ -1239,7 +1239,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
     graph = {};
     found_node_effects = false;
     if (!in_data || !params || !in_data->pica_basicP || (!in_data->effect_ref && !(edit && edit->layer))) return PF_Err_BAD_CALLBACK_PARAM;
-    if (edit && !node_sync::valid_edit(*edit)) return PF_Err_BAD_CALLBACK_PARAM;
+    if (edit && !edit->records_only && !node_sync::valid_edit(*edit)) return PF_Err_BAD_CALLBACK_PARAM;
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
 
     const auto stage = [&](const char* name) noexcept { if(edit)edit->compile_stage=name; };
@@ -1314,7 +1314,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             stage("node identity");
             if (!read_uuid(suites, plugin_id, effect.value, native_nodes::uuid_first_index(kind), time, uuid))
                 return PF_Err_BAD_CALLBACK_PARAM;
-            if (edit && static_cast<std::uint32_t>(kind) == edit->node_kind) {
+            if (edit && !edit->records_only && static_cast<std::uint32_t>(kind) == edit->node_kind) {
                 bool matches = true;
                 for (std::size_t chunk = 0; chunk < edit->uuid.size(); ++chunk) {
                     const auto word = static_cast<std::uint16_t>((uuid.bytes[chunk * 2] << 8u) | uuid.bytes[chunk * 2 + 1]);
@@ -1351,7 +1351,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
 
         if(edit)edit->compile_effect_index=-1;
         stage("output controls");
-        if (edit && !suites.edit_applied) return PF_Err_BAD_CALLBACK_PARAM;
+        if (edit && !edit->records_only && !suites.edit_applied) return PF_Err_BAD_CALLBACK_PARAM;
         if (!params[kMaxParticlesId] || params[kMaxParticlesId]->param_type != PF_Param_FLOAT_SLIDER ||
             !std::isfinite(params[kMaxParticlesId]->u.fs_d.value) || params[kMaxParticlesId]->u.fs_d.value < 0.0 ||
             params[kMaxParticlesId]->u.fs_d.value > static_cast<PF_FpLong>(std::numeric_limits<std::uint32_t>::max()) ||

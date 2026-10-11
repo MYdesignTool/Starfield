@@ -54,6 +54,7 @@ struct NativeEdit {
     PF_Err status{PF_Err_BAD_CALLBACK_PARAM};
     A_long revision{};
     bool accepted{};
+    bool records_only{}; // explicit panel compiler context, no authored value override
     Stage stage{Stage::context};
     mutable A_long stream_index{-1};
     mutable const char* compile_stage{}; // static local diagnostic, never persisted/transported
@@ -70,6 +71,7 @@ struct NativeEdit {
 static_assert(std::is_trivially_copyable_v<NativeEdit>);
 
 inline bool valid_edit(const NativeEdit& edit) noexcept {
+    if(edit.records_only)return false; // native control edits require an authored UUID/value
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
     if (edit.node_kind > 5 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||

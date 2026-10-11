@@ -21,11 +21,7 @@ const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
 function fresh(captured){if(captured!==epoch){staleReads++;throw new ReferenceError("Object is invalid");}}
 function property(p,captured){return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,numKeys:0,canSetExpression:false,
-    get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);p.value=copy(value);
-        if(p===renderer.properties["Commit Graph Edit"]){commits++;const resolved=api.resolve({pinTarget:true,target:{token}});
-            resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);
-            if(invalidateCommit)epoch++;
-            if(reloadOnCommit){vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;}}}};}
+    get value(){fresh(captured);return copy(p.value);},setValue(value){fresh(captured);p.value=copy(value);}};}
 function wrap(raw){
     // Reacquiring an effect may reuse its wrapper identity while earlier child
     // Property handles remain invalid. Exercise both wrapper policies rather
@@ -66,7 +62,12 @@ const front={id:44,name:"Front",index:2,width:320,height:180,source:{pixelAspect
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"Comp",time:0,numLayers:3,layer:i=>[layer,front,back][i-1]});
 for(const l of [layer,front,back])l.containingComp=comp;layer.index=1;
 const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
-    beginUndoGroup(){undo++;},endUndoGroup(){undo++;},findMenuCommandId:()=>55,executeCommand(){commands++;}}});
+    beginUndoGroup(){undo++;},endUndoGroup(){undo++;},findMenuCommandId:name=>name==="Starfield Commit Node Graph"?99:55,
+    executeCommand(id){commands++;if(id!==99)return;
+        commits++;const resolved=api.resolve({pinTarget:true,target:{token}}),value=Number(resolved.properties.commit.value);
+        resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);
+        if(invalidateCommit)epoch++;
+        if(reloadOnCommit){vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;}}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const gatewaySource=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8");
 // The session engine survives CEP reloads. A transport may still close over a

@@ -1,5 +1,10 @@
 # 开发路线图
 
+M3-17 currently prioritizes ADR0040's full graph submission contract correction:
+native69/CEP72 explicit command replaces assumed supervision. Freeze/build, paired
+release and AE23.5x52 acceptance are separate gates; first-effect, Model, undo/reopen
+qualification remains open. No new Motion/particle modes added in this repair.
+
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
 Installed native68/packed32836/CoreABI8/CEP71 from frozen source

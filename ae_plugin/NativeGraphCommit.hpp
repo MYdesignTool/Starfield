@@ -14,4 +14,9 @@ namespace starfield::adapter {
 [[nodiscard]] PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit,
     AEGP_PluginID plugin_id, PF_OutData* out_data) noexcept;
 
+// Explicit UI command: compile saved node streams, atomically publish and
+// verify graph plus nonce. Does not rely on USER_CHANGED_PARAM delivery.
+[[nodiscard]] PF_Err commit_panel_graph(PF_InData*, AEGP_EffectRefH,
+    AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*) noexcept;
+
 } // namespace starfield::adapter
