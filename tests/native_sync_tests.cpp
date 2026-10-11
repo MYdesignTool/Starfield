@@ -65,6 +65,7 @@ PF_Handle clone(PF_Handle handle) {
 }
 struct Fixture {
     const char* name{};
+    std::u16string display_name;
     std::vector<AEGP_StreamVal2> values;
     std::vector<PF_ParamDef> params;
 };
@@ -86,6 +87,7 @@ AEGP_EffectSuite4 effect{};
 AEGP_StreamSuite6 stream{};
 AEGP_DynamicStreamSuite4 dynamic{};
 bool dynamic_enabled{};
+bool dynamic_unavailable{};
 std::array<AEGP_DynStreamFlags,records::parameter_count(records::Kind::particle)> visibility_flags{};
 int visibility_sets{};
 AEGP_UtilitySuite6 utility{};
@@ -110,7 +112,7 @@ A_Err acquire(const char* name, int32, const void** out) {
     if (!std::strcmp(name, kAEGPPFInterfaceSuite)) *out = &pf;
     else if (!std::strcmp(name, kAEGPEffectSuite)) *out = &effect;
     else if (!std::strcmp(name, kAEGPStreamSuite)) *out = &stream;
-    else if(dynamic_enabled && !std::strcmp(name,kAEGPDynamicStreamSuite))*out=&dynamic;
+    else if (!dynamic_unavailable && !std::strcmp(name,kAEGPDynamicStreamSuite))*out=&dynamic;
     else if (!std::strcmp(name, kAEGPUtilitySuite)) *out = &utility;
     else if (!std::strcmp(name, kAEGPLayerSuite)) *out = &layers;
     else if (!std::strcmp(name, kAEGPItemSuite)) *out = &items;
@@ -301,6 +303,17 @@ int main() {
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
     effect.AEGP_DisposeEffect = [](AEGP_EffectRefH)->A_Err { return 0; };
+    dynamic.AEGP_GetNewStreamRefForLayer=[](AEGP_PluginID,AEGP_LayerH,AEGP_StreamRefH* out)->A_Err {
+        ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{0,-3});return 0;};
+    dynamic.AEGP_GetNewStreamRefByMatchname=[](AEGP_PluginID,AEGP_StreamRefH,const A_char* match,AEGP_StreamRefH* out)->A_Err {
+        check(!std::strcmp(match,"ADBE Effect Parade"),"literal binding opens effect parade");
+        ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{0,-2});return 0;};
+    dynamic.AEGP_GetNewStreamRefByIndex=[](AEGP_PluginID,AEGP_StreamRefH,A_long index,AEGP_StreamRefH* out)->A_Err {
+        ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{static_cast<std::size_t>(index),-1});return 0;};
+    stream.AEGP_GetStreamName=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean,AEGP_MemHandle* out)->A_Err {
+        const auto& fixture=fixtures[reinterpret_cast<Ref*>(ref)->effect];std::u16string text=fixture.display_name;
+        if(text.empty())for(const auto* name=fixture.name;*name;++name)text+=static_cast<char16_t>(*name);
+        *out=reinterpret_cast<AEGP_MemHandle>(new std::u16string(text));return 0;};
     effect.AEGP_EffectCallGeneric = [](AEGP_PluginID, AEGP_EffectRefH, const A_Time*, PF_Cmd, void*)->A_Err {
         ++calls; check(false, "cross-effect generic calls are forbidden in native edits");
         return PF_Err_BAD_CALLBACK_PARAM;
@@ -370,6 +383,8 @@ int main() {
     memory.AEGP_LockMemHandle = [](AEGP_MemHandle ref, void** result)->A_Err {
         *result = const_cast<char16_t*>(reinterpret_cast<std::u16string*>(ref)->c_str()); return 0;
     };
+    memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle ref,AEGP_MemSize* size)->A_Err {
+        *size=(reinterpret_cast<std::u16string*>(ref)->size()+1)*sizeof(char16_t);return 0;};
     memory.AEGP_UnlockMemHandle = [](AEGP_MemHandle)->A_Err {return 0;};
     memory.AEGP_FreeMemHandle = [](AEGP_MemHandle ref)->A_Err {delete reinterpret_cast<std::u16string*>(ref);return 0;};
     stream.AEGP_SetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, const A_UTF16Char* text)->A_Err {
@@ -422,8 +437,9 @@ int main() {
         ui_values[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=1;
         check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 &&
               !(visibility_flags[layout::cloud_density]&AEGP_DynStreamFlag_HIDDEN),"CEP sync guard temporarily exposes conditional Cloud controls");
-        dynamic_enabled=false;pf.AEGP_GetNewEffectForEffect=original_pf;
+        dynamic_enabled=false;dynamic_unavailable=true;pf.AEGP_GetNewEffectForEffect=original_pf;
         check(update_native_particle_visibility(&renderer_data,ui_params.data())==0 && acquisitions==0,"unavailable optional visibility suite cannot reject effect loading");
+        dynamic_unavailable=false;
     }
     check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
 #if defined(STARFIELD_CLOUD_CALLBACK_TEST)
@@ -591,7 +607,7 @@ int main() {
         {
             NativeBindingTransaction bindings(&local,701,effect_ref(0));const char* stage=nullptr;
             check(bindings.install(textured,nullptr,&stage)==PF_Err_BAD_CALLBACK_PARAM && stage &&
-                std::strcmp(stage,"resolve texture owner layer")==0,"missing owner and PF context fails before a host query");
+                std::strcmp(stage,"resolve binding owner layer")==0,"missing owner and PF context fails before a host query");
         }
         {
             NativeBindingTransaction bindings(&renderer_data,701);
@@ -1570,6 +1586,28 @@ int main() {
         output<<"]";
         check(bool(output) && models==14 && transforms>12,"actual mixed Model and Transform expressions recorded");
         check(live_refs==0 && acquisitions==0,"mixed Model/Transform edit releases host references");
+        const auto old_expressions=expressions;
+        fixtures[1].display_name=fixtures[2].display_name=u"Ambiguous author name";
+        auto ambiguous=edit(0,1,fixtures[1].values[1].one_d);
+        check(direct_edit(ambiguous)!=0 && !ambiguous.accepted,"duplicate live effect names reject the binding transaction");
+        check(expressions==old_expressions,"ambiguous source rejection preserves all previous expressions");
+        fixtures[2].display_name.clear();
+        fixtures[1].display_name=u"Emitter \"路径\\\n\u2028\u2029\U0001f680";
+        auto escaped=edit(0,1,fixtures[1].values[1].one_d);
+        check(direct_edit(escaped)==0 && escaped.accepted,"literal binding accepts quotes/newlines/Unicode in custom names");
+        std::ofstream escaped_output("artifacts/native-escaped-source-expression.json");
+        auto json_string=[&](const std::u16string& text) {
+            constexpr char hex[]="0123456789abcdef";escaped_output<<'"';
+            for(auto unit:text){escaped_output<<"\\u";for(int shift=12;shift>=0;shift-=4)escaped_output<<hex[(unit>>shift)&15];}
+            escaped_output<<'"';
+        };
+        escaped_output<<"{\"name\":";json_string(fixtures[1].display_name);escaped_output<<",\"expression\":";
+        json_string(expressions[0]);escaped_output<<"}";escaped_output.close();
+        check(bool(escaped_output),"actual escaped-name binding saved for independent JS execution");
+        fixtures[1].display_name.clear();
+        auto restore_name=edit(0,1,fixtures[1].values[1].one_d);
+        check(direct_edit(restore_name)==0 && restore_name.accepted,"author rename rebinds literal source");
+        check(live_refs==0 && acquisitions==0,"literal inventory and rejected names release all host references");
         model_present=transform_present=false;
     }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));

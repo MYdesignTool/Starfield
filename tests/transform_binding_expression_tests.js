@@ -64,7 +64,7 @@ const noneBindings=JSON.parse(fs.readFileSync("artifacts/transform-none-animatio
 const selectedBindings=JSON.parse(fs.readFileSync("artifacts/transform-selected-animation-expressions.json","utf8"));
 assert.equal(noneBindings.length,12);assert.equal(selectedBindings.length,12);checks+=2;
 function effect(uuid, sourceValue) {
-    return {param(index) {
+    return {name:uuid===5?"org.starfieldfx.node.transform":"__Starfield transaction backup",param(index) {
         if(typeof index==="string") {
             const metadata=/^Node UUID ([0-7])$/.exec(index);
             if(!metadata)throw Error("No named metadata");
@@ -80,7 +80,7 @@ function effect(uuid, sourceValue) {
 const unrelated={param(index){if(typeof index==="string")throw Error("No named metadata");return {name:"Other parameter",get value(){throw Error("unrelated numeric read");}};}};
 function complete(bindings, geometry, effects, source) {
     const host=()=>({numProperties:effects.length});Object.assign(host,geometry);
-    host.effect=index=>effects[index-1];
+    host.effect=name=>{assert.equal(typeof name,"string");const found=effects.find(f=>f.name===name);if(!found)throw Error("missing source");return found;};
     return bindings.map(({expression})=>vm.runInNewContext(expression,{thisLayer:host,time:2.5,
         thisProperty:{propertyGroup(){return {propertyIndex:1};}},
         thisComp:{layer(index){assert.equal(index,7);return source;}}},{timeout:1000}));

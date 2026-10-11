@@ -157,6 +157,17 @@ A_Err EffectGraphBackup::prepare(const std::array<std::uint8_t,16>& operation,st
             if(!e && flags!=(record.flags&~AEGP_EffectFlags_ACTIVE))e=PF_Err_INTERNAL_STRUCT_DAMAGED;
             if(e && duplicate){const auto removed=erase(duplicate);if(removed)rollback_error_=removed;}
             if(!e)record.created=true;}
+        if(!e) {
+            // Literal expression references must never resolve a transaction's
+            // duplicate by the author's name. Identity/rollback remain UUID based.
+            AEGP_EffectRefH raw{};A_long backup_slot{};e=find(record,true,raw,backup_slot);Ref ref{effects_,raw};
+            std::array<A_UTF16Char,512> temporary{};std::size_t at{};
+            for(auto c:u"__Starfield transaction backup ")if(c)temporary[at++]=c;
+            constexpr char16_t hex[]=u"0123456789abcdef";
+            for(auto byte:operation){temporary[at++]=hex[byte>>4];temporary[at++]=hex[byte&15];}
+            temporary[at++]=u' ';temporary[at++]=hex[(i>>4)&15];temporary[at++]=hex[i&15];
+            if(!e)e=set_name(backup_slot,temporary);
+        }
         if(e){const auto cleanup=delete_backups();if(cleanup)rollback_error_=cleanup;const auto reset=release_guard();if(reset)rollback_error_=reset;prepared_=false;return e;}
     }return 0;
 }

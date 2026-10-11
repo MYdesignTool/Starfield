@@ -5,7 +5,7 @@ const models=expressions.filter(text=>text.includes('fx.param("Node UUID 7").val
 const transforms=expressions.filter(text=>text.includes('fx.param("Node UUID 7").value === 5'));
 assert.equal(models.length,14);assert.ok(transforms.length>12);
 let frame=0,expectedCount=0,incompatible=0,checks=2;
-function effect(count,first,uuid,values){return {get numProperties(){throw Error("Effect parameter count unavailable");},name:"Same node name",
+function effect(count,first,uuid,values){return {get numProperties(){throw Error("Effect parameter count unavailable");},name:uuid===6?"org.starfieldfx.node.model":uuid===5?"org.starfieldfx.node.transform":"__Starfield transaction backup",
     param(index){
         if(typeof index === "string") {
             const metadata=/^Node UUID ([0-7])$/.exec(index);
@@ -22,7 +22,7 @@ const otherModel=effect(100,86,999,{5:999});
 const unrelated={param(index){if(typeof index==="number")incompatible++;throw Error("unrelated effect lookup");}};
 const renderer={param(index){if(typeof index==="number")incompatible++;throw Error("recursive renderer lookup");}};
 const thisProperty={propertyGroup:()=>({propertyIndex:1})};
-function layer(effects){const result=()=>({numProperties:effects.length});result.effect=index=>effects[index-1];
+function layer(effects){const result=()=>({numProperties:effects.length});result.effect=name=>{assert.equal(typeof name,"string");const found=effects.find(f=>f.name===name);if(!found)throw Error("missing source");return found;};
     result.width=1920;result.height=1080;return result;}
 const matrix=[1,0,0,960,0,1,0,540,0,0,1,0];
 for(frame of [0,1,2,0])for(const effects of [[renderer,transform,unrelated,otherModel,model],
@@ -37,7 +37,4 @@ for(frame of [0,1,2,0])for(const effects of [[renderer,transform,unrelated,other
     assert.equal(vm.runInNewContext(text,{thisLayer:layer(effects),thisProperty}),expected);checks++;
 }
 assert.equal(incompatible,0,"actual generated Model/Transform expressions do not open another kind's numeric streams");checks++;
-const legacy=models[0].replace(/fx\.param\("Node UUID (\d)"\)/g,(_,n)=>`fx.param(${86+Number(n)})`);expectedCount=100;
-vm.runInNewContext(legacy,{thisLayer:layer([renderer,transform,model]),thisProperty});
-assert.ok(incompatible>0,"old lookup crosses Model/Transform layouts even when the guard catches the error");checks++;
-console.log(`Actual mixed Model/Transform expression execution: ${checks} checks passed (JS host fixture, not AE qualification).`);
+console.log(`Actual mixed Model/Transform literal expression execution: ${checks} checks passed (JS host fixture, not AE qualification).`);

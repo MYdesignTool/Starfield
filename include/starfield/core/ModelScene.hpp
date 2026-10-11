@@ -36,7 +36,7 @@ struct ModelSurfacePixel {
 struct ModelSurface {
     RectI region{};
     std::vector<ModelSurfacePixel> pixels; // tightly packed region
-    std::uint64_t sample_visits{}; // charged work for this logical group
+    std::uint64_t sample_visits{}; // candidate samples plus span calculations for this logical group
 };
 [[nodiscard]] Result<ModelScene> project_model_scene(const ModelGeometry&,const ModelProjection&,
     const Cancellation&,ModelSceneLimits = {}) noexcept;

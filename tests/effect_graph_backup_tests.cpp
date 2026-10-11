@@ -141,12 +141,13 @@ void mutate(){
 void success_tests(){
     for(bool at_end:{false,true}){reset();duplicate_at_end=at_end;const auto saved=snapshot();const auto third_a=parade[0],third_b=parade[3];
         {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)==0);no_refs();CHECK(parade.size()==14);CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==1);
-            std::vector<UUID> ids;unsigned copies{};
+            std::vector<UUID> ids;std::vector<std::u16string> backup_names;unsigned copies{};
             for(const auto& p:parade)if(p->kind>=-1 && p->numbers.at(guard(p->kind))==2){++copies;CHECK(!(p->flags&AEGP_EffectFlags_ACTIVE));
                 auto observed=*p;observed.flags|=AEGP_EffectFlags_ACTIVE;observed.numbers[guard(p->kind)]=0;
                 const auto found=std::find_if(saved.begin(),saved.end(),[&](const Effect& old){return old.kind==p->kind;});CHECK(found!=saved.end());
                 if(p->kind>=0){const auto id=uuid(*p);CHECK(id!=uuid(*found));CHECK(std::find(ids.begin(),ids.end(),id)==ids.end());ids.push_back(id);uuid(observed,uuid(*found));}
-                CHECK(observed==*found);p->name=u"Renamed backup";}
+                CHECK(p->name!=found->name);CHECK(std::find(backup_names.begin(),backup_names.end(),p->name)==backup_names.end());backup_names.push_back(p->name);
+                observed.name=found->name;CHECK(observed==*found);p->name=u"Renamed backup";}
             CHECK(copies==6);mutate();releases.clear();CHECK(backup.restore()==0);no_refs();CHECK(backup.rollback_error()==0);equals(saved);
             CHECK(parade[0]==third_a && parade[3]==third_b);CHECK(releases.size()==6 && releases.back().first==-1);CHECK(backup.restore()!=0);}
         no_owned();
@@ -179,6 +180,8 @@ void prepare_failure_tests(){
     for(bool no_change:{false,true})for(unsigned at=1;at<=writes;++at){reset();const auto saved=snapshot();inject("scalar-write",at,no_change);
         {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)!=0);CHECK(backup.rollback_error()==0);}equals(saved);no_owned();}
     for(bool no_change:{false,true})for(unsigned at=1;at<=6;++at){reset();const auto saved=snapshot();inject("flags-write",at,no_change);
+        {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)!=0);CHECK(backup.rollback_error()==0);}equals(saved);no_owned();}
+    for(bool no_change:{false,true})for(unsigned at=1;at<=6;++at){reset();const auto saved=snapshot();inject("name-write",at,no_change);
         {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)!=0);CHECK(backup.rollback_error()==0);}equals(saved);no_owned();}
     for(bool with_ref:{false,true})for(unsigned at=1;at<=6;++at){reset();const auto saved=snapshot();duplicate_error_with_ref=with_ref;inject("duplicate",at);
         {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)==injected);CHECK(backup.rollback_error()==0);}equals(saved);no_owned();}

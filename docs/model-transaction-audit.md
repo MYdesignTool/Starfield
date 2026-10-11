@@ -1,5 +1,44 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+## M3-17 native68 candidate — literal sources and triangle spans (2026-10-11)
+
+Owner reports native67/CEP71 still produces Particle/Emitter stream matchName
+mismatch on Model addition, and Model sample visit cap exceeded on OBJ import.
+The expression host's reuse of a call site across heterogeneous effects remains
+a hypothesis; no AE root cause or fix is claimed from mock tests. native68 emits
+one literal Effect(name) reference per alias after a fresh native kind/full-UUID
+inventory. Every UTF-16 name unit is escaped. Source identity still checks all
+eight immutable UUID words before numeric control access; errors/sentinels retain
+rollback. No expression enumerates the effect parade. Transaction duplicates
+receive unique private names and original names are restored on rollback.
+Missing/ambiguous author names reject before alias writes; this deliberately
+replaces the old assumption that duplicate display names were irrelevant.
+Custom author renames rebind at the next native graph commit; host automatic
+rename rewriting and old-project migration remain AE acceptance gates.
+
+Read-only owner OBJ (2858 positions/5600 triangles) reproduces the old cap at
+size133, angle30, Center enabled: 68,952,940 bounding-box candidates. Scanline
+half-plane spans preserve final edge/top-left/depth tests and reduce charged
+work to16,889,395 including span calculations, succeeding under the unchanged
+64,000,000 group/512,000,000 frame caps. Twelve owner-mesh poses were exercised;
+this is an offline render workload result, not a claim about the user's exact
+frame or AE performance. Independent whole-ROI oracle compares fractional,
+thin, reflected, clipped-ROI and overlapping triangles, coverage/depth/source
+identity and exact work-budget boundary. Row/span work is charged even if empty,
+preflight runs before depth allocation and cancellation remains bounded.
+
+Evidence so far: scene150946 standard/ASAN, Model particle2695 standard,
+whole-graph transaction810845 standard/ASAN, mixed native9048/camera12/Transform60
+ASAN, actual generated mixed JS643/Transform168 and animation/gateway checks,
+dummy67/71→68/71 full deploy/rollback61. Initial test harness visibility/stage and
+backup-name expectations were corrected; ASAN scene exe now runs inside the
+vcvars process to retain its runtime search path. Failure logs are retained.
+Build68/packed32836/CoreABI8/CEP71; persistent IDs/matchNames/schemas unchanged.
+Full frozen SDK/panel verification and deployment pending. Installed67/71
+retained until release receipts say otherwise. No AE process started or script
+dispatched; owner chose manual testing. Motion/MNT work preserved; push pending.
+
+
 ## native67部署及证据
 
 2026-10-11 14:48+08 native67/packed32835/CoreABI8/CEP71已部署。源码816eb83fc0da5a9757cbf8c1e483bcfb32104380经git archive冻结，完整May2023 x64 Release /MT八目标会话75911实际exit0；冻结ASAN native8802/camera12/Transform60、真实生成JS混合644/Transform168及整套PanelAudit均exit0，dummy66/71→67/71发布与整套恢复61通过。fresh AE0后经Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash、全部27已测CEP文件和selector/runtime独立核对通过。首次Emitter Type绑定覆盖Effect计数缺失/0/999/throw和八UUID不匹配；删除native66未经证实的计数契约假设，改为固定UUID参数名称查找，未找到源与非有限值分开诊断且均回滚。实机stream98失败是否消失仍等待owner自行复测；没有启动AE或执行验收脚本，不能视为客户发布资格。IDs/schema/ABI8保持，Motion/MNT改动保留；Git push仍待已有独立授权回复，部署交接后按owner既有要求暂停。

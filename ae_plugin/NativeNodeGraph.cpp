@@ -60,6 +60,7 @@ struct RawNode {
     core::NodeId id{};
     Kind kind{};
     std::array<RawField, particle_layout::birth_enabled+1> fields{};
+    std::u16string source_name; // UI binding only; never serialized
 };
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
@@ -611,25 +612,22 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
 }
 
 std::u16string binding_expression(const RawNode& node, A_long index, A_long component) {
-    // PropertyGroup and Effect are host objects; use documented methods.
-    std::string text = "var count = thisLayer(\"ADBE Effect Parade\").numProperties; var result = -1099511627776;\n";
-    text += "var owner = thisProperty.propertyGroup(1).propertyIndex;\n";
-    text += "for (var n = 1; n <= count; n++) { if (n === owner) continue; var fx = thisLayer.effect(n); var match = false; try { match = ";
-    // Other effects can have animated inputs at these same numeric indices.
-    // In particular, the renderer's 98..609 aliases overlap node UUID indices.
-    // Resolve immutable metadata by name before reading ANY numeric value, so a
-    // search never evaluates our own bindings (or another renderer's bindings).
-    // Display names of effects remain irrelevant; all eight UUID words follow.
-    // Do not resolve a numeric child against another node kind's effect layout.
-    // Effect parameter counts are not a native layout contract. All node kinds
-    // register the same constant UUID names; a globally unique full UUID proves
-    // source identity without opening another kind's numeric child streams.
+    // A host expression call site must never visit heterogeneous effect layouts.
+    // Resolve the live UUID/kind in native code, then emit a literal reference.
+    // Escape every UTF-16 unit: names cannot inject script, including newlines,
+    // quotes, backslashes, surrogate pairs and U+2028/U+2029.
+    std::string text="var result = -1099511627776; var fx = null; var match = false;\ntry { fx = thisLayer.effect(\"";
+    constexpr char hex[]="0123456789abcdef";
+    for(auto unit:node.source_name) {
+        text+="\\u";for(int shift=12;shift>=0;shift-=4)text+=hex[(unit>>shift)&15];
+    }
+    text+="\"); match = ";
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         if (chunk) text += " && ";
         const unsigned word = (node.id.value.bytes[chunk * 2] << 8u) | node.id.value.bytes[chunk * 2 + 1];
         text += "fx.param(\"Node UUID " + std::to_string(chunk) + "\").value === " + std::to_string(word);
     }
-    text += "; } catch (unrelatedEffect) {} if (match) { ";
+    text += "; } catch (missingSource) {} if (match) { ";
     if(node.kind==Kind::transform && transform_layout::matrix_field(index)) {
         transform_binding::PixelAffine offset{};
         const bool calibrated=attachment_fields(node,offset);
@@ -641,7 +639,7 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
         if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
         text += "; ";
     }
-    text += "break; } }\nresult;";
+    text += "}\nresult;";
     return std::u16string(text.begin(), text.end());
 }
 
@@ -662,6 +660,56 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
         kind=Kind::model;type_key=core::graph_keys::kModelNode;schema=1;return true;
     }
     return false;
+}
+
+PF_Err resolve_binding_sources(SuiteSet& suites,AEGP_PluginID id,AEGP_LayerH owner,
+    const AEGP_MemorySuite1* memory,std::vector<RawNode>& nodes) {
+    if(nodes.empty())return PF_Err_NONE;
+    const AEGP_DynamicStreamSuite4* dynamic{};
+    auto error=suites.basic->AcquireSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4,
+        reinterpret_cast<const void**>(&dynamic));
+    if(error || !dynamic)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    struct SuiteRelease {SPBasicSuite* basic;~SuiteRelease(){basic->ReleaseSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4);}} release{suites.basic};
+    AEGP_StreamRefH root{},parade{};
+    error=dynamic->AEGP_GetNewStreamRefForLayer(id,owner,&root);StreamRef layer_ref(suites.stream,root);
+    if(error || !root)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    error=dynamic->AEGP_GetNewStreamRefByMatchname(id,root,"ADBE Effect Parade",&parade);StreamRef parade_ref(suites.stream,parade);
+    if(error || !parade)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    A_long count{};error=suites.effect->AEGP_GetLayerNumEffects(owner,&count);
+    if(error || count<0 || count>4224)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+    std::vector<std::u16string> names;
+    const A_Time time{suites.data->current_time,suites.data->time_scale};
+    for(A_long i=0;i<count;++i) {
+        AEGP_StreamRefH group{};error=dynamic->AEGP_GetNewStreamRefByIndex(id,parade,i,&group);StreamRef group_ref(suites.stream,group);
+        if(error || !group)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_MemHandle handle{};error=suites.stream->AEGP_GetStreamName(id,group,FALSE,&handle);
+        struct NameMemory {const AEGP_MemorySuite1* memory;AEGP_MemHandle handle;bool locked{};
+            ~NameMemory(){if(locked)memory->AEGP_UnlockMemHandle(handle);if(handle)memory->AEGP_FreeMemHandle(handle);}} name_memory{memory,handle};
+        if(error || !handle)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_MemSize bytes{};error=memory->AEGP_GetMemHandleSize(handle,&bytes);
+        if(error || bytes<sizeof(char16_t) || bytes>1024 || bytes%sizeof(char16_t))return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        void* data{};error=memory->AEGP_LockMemHandle(handle,&data);name_memory.locked=!error;
+        if(error || !data)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        const auto* text=static_cast<const char16_t*>(data);const auto* end=std::find(text,text+bytes/sizeof(char16_t),char16_t{});
+        if(end==text+bytes/sizeof(char16_t))return PF_Err_BAD_CALLBACK_PARAM;
+        names.emplace_back(text,end);
+        AEGP_EffectRefH raw{};error=suites.effect->AEGP_GetLayerEffectByIndex(id,owner,i,&raw);EffectRef effect(suites.effect,raw);
+        if(error || !raw)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_InstalledEffectKey key{};char match[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+        error=suites.effect->AEGP_GetInstalledKeyFromLayerEffect(raw,&key);if(!error)error=suites.effect->AEGP_GetEffectMatchName(key,match);
+        if(error)return static_cast<PF_Err>(error);
+        Kind kind{};const char* type{};std::uint16_t schema{};if(!decode_node_kind(match,kind,type,schema))continue;
+        double guard{};if(!read_one_d(suites,id,raw,native_nodes::sync_guard_index(kind),time,guard))return PF_Err_BAD_CALLBACK_PARAM;
+        if(guard==transaction_backup_guard)continue;
+        core::Uuid128 uuid{};if(!read_uuid(suites,id,raw,native_nodes::uuid_first_index(kind),time,uuid))return PF_Err_BAD_CALLBACK_PARAM;
+        for(auto& node:nodes)if(node.id==core::NodeId{uuid}) {
+            if(node.kind!=kind || !node.source_name.empty() || names.back().empty())return PF_Err_BAD_CALLBACK_PARAM;
+            node.source_name=names.back();
+        }
+    }
+    for(const auto& node:nodes)if(node.source_name.empty() || std::count(names.begin(),names.end(),node.source_name)!=1)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    return PF_Err_NONE;
 }
 
 bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effect,
@@ -1464,6 +1512,16 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             tx.owned_renderer = true;
             if (ae || !tx.renderer) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
         }
+        stage("resolve unique literal binding sources");
+        AEGP_LayerH binding_owner=tx.owner_layer;
+        if(!nodes.empty() && !binding_owner) {
+            stage("resolve binding owner layer");
+            if(!tx.data || !tx.data->effect_ref)return PF_Err_BAD_CALLBACK_PARAM;
+            ae=tx.suites.pf_interface->AEGP_GetEffectLayer(tx.data->effect_ref,&binding_owner);
+            if(ae || !binding_owner)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+        }
+        stage("resolve unique literal binding sources");
+        if(const auto result=resolve_binding_sources(tx.suites,tx.id,binding_owner,tx.memory,nodes);result)return result;
         // Resource slots belong to the renderer: SmartFX cannot checkout a sibling
         // Particle effect's PF_LAYER parameter. Clear only the former occupied tail.
         std::vector<AEGP_LayerIDVal> resource_ids;

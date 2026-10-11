@@ -1,105 +1,55 @@
 "use strict";
-const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
-const root = path.resolve(__dirname, "..");
-const expressions = JSON.parse(fs.readFileSync(path.join(root, "artifacts/native-animation-expressions.json"), "utf8"));
-assert.equal(expressions.length, 79);
-function node(firstUuid, uuid, values) {
-    const properties = {};
-    for(let n = 0; n < 8; n++) properties[firstUuid+n] = {name:`Node UUID ${n}`,value:n === 7 ? uuid : 0};
-    Object.keys(values).forEach(key => properties[key] = {get value(){return typeof values[key]==="function" ? values[key]() : values[key];}});
-    const effect = {param(index){
-        if(typeof index === "string") {
-            const entry=Object.values(properties).find(p=>p.name===index);
-            if(!entry)throw Error("No named metadata: "+index);
-            return entry;
-        }
-        if(!properties[index]) return {value:Number(index)};
-        return properties[index];
-    }};
-    Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
+const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
+const root=path.resolve(__dirname,"..");
+const expressions=JSON.parse(fs.readFileSync(path.join(root,"artifacts/native-animation-expressions.json"),"utf8"));
+assert.equal(expressions.length,79);
+let frameTime=0,lookups=0;
+const names={1:"org.starfieldfx.node.emitter",2:"org.starfieldfx.node.particle",4:"org.starfieldfx.node.force"};
+function node(first,uuid,values,name=names[uuid]) {
+    const properties={};for(let i=0;i<8;i++)properties['Node UUID '+i]={value:i===7?uuid:0};
+    for(const key of Object.keys(values))properties[key]={get value(){return typeof values[key]==='function'?values[key]():values[key];}};
+    return {name,param(index){if(typeof index==='string')return properties[index];return properties[index]||{value:0};}};
 }
-let frameTime=0;
-const thisProperty={propertyGroup(level){assert.equal(level,1);return {propertyIndex:0};}};
-const emitter = node(102, 1, {1:1,4:()=>[250+frameTime*100,500]}), particle = node(510,2,{10:1,11:[0.3,0.5,0.7,1]});
-const force = node(208,4,{}), duplicate = node(102,777,{4:[999,999]});
-for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
-    const parade = {numProperties:effects.length};
-    const layer = name => {assert.equal(name,"ADBE Effect Parade");return parade;};
-    layer.effect = index => effects[index-1];
-    const context = {thisLayer:layer,thisProperty};
-    assert.throws(()=>vm.runInNewContext('var group=thisLayer("ADBE Effect Parade"); group(1);',context),
-        /not a function/, "host PropertyGroup objects are not fake JS functions");
-    for(const expression of expressions) {
-        const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes('fx.param("Node UUID 7").value === 1') ? emitter : expression.includes('fx.param("Node UUID 7").value === 2') ? particle : force;
-        let expected = source.param(Number(match[1])).value;
-        if(match[2] !== undefined) expected = expected[Number(match[2])];
-        assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
-    }
+const emitter=node(102,1,{1:1,4:()=>[250+frameTime*100,500]}),particle=node(510,2,{10:1,11:[.3,.5,.7,1]}),force=node(208,4,{});
+const duplicate=node(102,777,{4:[999,999]},'__Starfield transaction backup');
+const unrelated={name:'Unrelated',param(){throw Error('cross-kind stream resolution');}};
+const renderer={name:'org.starfieldfx.particle',param(){throw Error('recursive renderer alias');}};
+function host(effects) {
+    const layer=()=>{throw Error('expression must not enumerate effects');};
+    layer.effect=name=>{assert.equal(typeof name,'string');lookups++;const found=effects.find(f=>f.name===name);if(!found)throw Error('missing effect');return found;};return layer;
 }
-const originExpression=expressions.find(expr=>expr.includes('fx.param("Node UUID 7").value === 1') && expr.includes("result = fx.param(4).value[0]"));
-const initialExpression=expressions.find(expr=>expr.includes('fx.param("Node UUID 7").value === 1') && expr.includes("result = fx.param(1).value;"));
-assert.ok(initialExpression,"actual first Emitter Type binding (renderer stream 98) is covered");
-for(const countMode of [undefined,0,999,"throw"]){
-    const initial=node(102,1,{1:1});let countReads=0;
-    if(countMode!==undefined)Object.defineProperty(initial,"numProperties",{get(){countReads++;if(countMode==="throw")throw Error("Effect count unavailable");return countMode;}});
-    const initialLayer=()=>({numProperties:2});initialLayer.effect=index=>index===1?{}:initial;
-    const ownProperty={propertyGroup:()=>({propertyIndex:1})};
-    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:initialLayer,thisProperty:ownProperty}),1);
-    assert.equal(countReads,0,"new layer binding does not depend on Effect parameter count");
-    // Reproduce native66's extra gate using the generated current expression.
-    const native66=initialExpression.replace('try { match = ','try { match = fx.numProperties === 110 && ')
-        .replace(/fx\.param\("Node UUID (\d)"\)/g,(_,n)=>`fx.param(${102+Number(n)})`);
-    assert.equal(vm.runInNewContext(native66,{thisLayer:initialLayer,thisProperty:ownProperty}),-1099511627776,
-        "native66 gate loses an otherwise valid first source in this host fixture");
+function identity(expression){return Number(/fx.param\("Node UUID 7"\).value === (\d+)/.exec(expression)[1]);}
+for(frameTime of [0,.5,1,0])for(const effects of [[renderer,emitter,particle,force,unrelated,duplicate],[unrelated,duplicate,force,particle,emitter,renderer]])for(const expression of expressions) {
+    const source={1:emitter,2:particle,4:force}[identity(expression)];const field=/result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
+    let expected=source.param(Number(field[1])).value;if(field[2]!==undefined)expected=expected[Number(field[2])];
+    const before=lookups;assert.equal(vm.runInNewContext(expression,{thisLayer:host(effects)}),expected);assert.equal(lookups,before+1);
+    assert.ok(!expression.includes('for (var n')&&!expression.includes('thisLayer.effect(n)'));
 }
-// Every UUID word must agree before opening a numeric source parameter.
-for(let word=0;word<8;word++){
-    const impostor=node(102,1,{1:99});impostor.param(`Node UUID ${word}`).value++;
-    const impostorParam=impostor.param;let numericReads=0;
-    impostor.param=index=>{if(typeof index==="number")numericReads++;return impostorParam(index);};
-    const rejected=()=>({numProperties:1});rejected.effect=()=>impostor;
-    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:rejected,thisProperty}),-1099511627776);
-    assert.equal(numericReads,0,"a partial UUID cannot resolve a source stream");
+const initialExpression=expressions.find(e=>identity(e)===1&&e.includes('result = fx.param(1).value;'));
+const originExpression=expressions.find(e=>identity(e)===1&&e.includes('result = fx.param(4).value[0]'));
+assert.ok(initialExpression,'actual renderer stream 98 is covered');
+for(const count of [undefined,0,999,'throw']) {
+    const initial=node(102,1,{1:1});Object.defineProperty(initial,'numProperties',{get(){throw Error('Effect count must never be consulted');}});
+    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:host([renderer,initial])}),1);
 }
-const missingLayer=()=>({numProperties:0});missingLayer.effect=()=>{throw new Error("missing effect");};
-assert.equal(vm.runInNewContext(originExpression,{thisLayer:missingLayer,thisProperty}),-1099511627776,"missing UUID cannot turn particle settings into zero");
-const failingEmitter=node(102,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
-const failingLayer=()=>({numProperties:1});failingLayer.effect=()=>failingEmitter;
-assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer,thisProperty}),/Origin XY evaluation failed/,
-    "source-property failures are not caught as unrelated effects");
-// Renderer aliases overlap the native UUID indices (102..109, 510..517).
-// Looking at their numeric values while searching creates expression-to-
-// expression dependencies, including a dependency on the current alias itself.
-let unrelatedReads=0;
-const renderer={param(index){if(typeof index==="string")throw Error("Renderer has no node UUID");return {name:`Node Input ${index-98}`,
-    get value(){unrelatedReads++;throw new Error("recursive renderer binding evaluated");}};}};
-const unrelated={param(index){if(typeof index==="string")throw Error("No named UUID");return {name:"Animated parameter",get value(){unrelatedReads++;return 0;}};}};
-for(const effects of [[renderer,emitter,particle,force,renderer,unrelated],
-    [unrelated,renderer,force,particle,duplicate,emitter]]) {
-    const layer=()=>({numProperties:effects.length});layer.effect=index=>effects[index-1];
-    for(const expression of expressions) {
-        assert.ok(expression.includes('fx.param("Node UUID 0").value'),"identity lookup uses constant metadata names");
-        assert.ok(!expression.includes("fx.numProperties"),"Effect count is not a layout contract");
-        assert.notEqual(vm.runInNewContext(expression,{thisLayer:layer,thisProperty}),-1099511627776);
-    }
+for(let word=0;word<8;word++) {
+    const wrong=node(102,1,{1:99});wrong.param('Node UUID '+word).value++;
+    const param=wrong.param;let numeric=0;wrong.param=i=>{if(typeof i==='number')numeric++;return param(i);};
+    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:host([wrong])}),-1099511627776);assert.equal(numeric,0);
 }
-assert.equal(unrelatedReads,0,"UUID lookup never evaluates renderer or unrelated animated values");
-// Keep a regression demonstrating what the previous generated expressions did.
-const legacy=originExpression.replace(/fx\.param\("Node UUID (\d)"\)/g,(_,n)=>`fx.param(${102+Number(n)})`);
-const oldLayer=()=>({numProperties:2});oldLayer.effect=index=>index===1?renderer:emitter;
-vm.runInNewContext(legacy,{thisLayer:oldLayer,thisProperty});
-assert.ok(unrelatedReads>0,"legacy lookup reads renderer animation aliases while searching");
-let incompatibleLookups=0;
-const foreignLayouts=[90,100,110,2000].map(count=>({numProperties:count,
-    param(index){if(typeof index==="string")throw Error("No matching UUID");incompatibleLookups++;throw new Error("cross-kind stream identity mismatch");}}));
-const mixed=()=>({numProperties:foreignLayouts.length+1});mixed.effect=index=>foreignLayouts.concat(emitter)[index-1];
-assert.equal(vm.runInNewContext(originExpression,{thisLayer:mixed,thisProperty}),emitter.param(4).value[0]);
-assert.equal(incompatibleLookups,0,"mixed Model/Transform/renderer layouts are rejected before resolving numeric streams");
-const ownLayer=()=>({numProperties:2});
-ownLayer.effect=index=>{assert.notEqual(index,1,"own renderer is skipped before any property lookup");return emitter;};
-assert.equal(vm.runInNewContext(originExpression,{thisLayer:ownLayer,
-    thisProperty:{propertyGroup:()=>({propertyIndex:1})}}),emitter.param(4).value[0]);
+assert.equal(vm.runInNewContext(originExpression,{thisLayer:host([renderer,unrelated])}),-1099511627776);
+const failing=node(102,1,{4:()=>{throw Error('Origin XY evaluation failed');}});
+assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:host([failing])}),/Origin XY evaluation failed/);
+// Host-type caching is a hypothesis, not an AE emulator. This adversarial
+// fixture rejects a call site visiting more than one effect layout, even if JS
+// catches its exception; the actual new expression opens only its target.
+let mismatches=0,pinned;
+const cachingLayer=host([particle,emitter]);const direct=cachingLayer.effect;
+cachingLayer.effect=key=>{const fx=direct(key);if(pinned&&pinned!==fx.name){mismatches++;throw Error('stream matchName mismatch');}pinned=fx.name;return fx;};
+assert.equal(vm.runInNewContext(originExpression,{thisLayer:cachingLayer}),emitter.param(4).value[0]);assert.equal(mismatches,0);
+const escaped=JSON.parse(fs.readFileSync(path.join(root,'artifacts/native-escaped-source-expression.json'),'utf8'));
+assert.equal(vm.runInNewContext(escaped.expression,{thisLayer:host([node(102,1,{1:1},escaped.name)])}),1);
+assert.ok(!escaped.expression.includes(escaped.name),'UTF-16 name is entirely escaped');
 // Exercise the actual gateway setter without exposing test entry points in production.
 const gateway = fs.readFileSync(path.join(root,"cep_panel/jsx/starfield_gateway.jsx"),"utf8")
     .replace("    function setNodeControl(effect, control, value) {","    $.global.testSetNodeControl = setNodeControl;\n    function setNodeControl(effect, control, value) {");

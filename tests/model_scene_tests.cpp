@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <limits>
 #include <new>
+#include <random>
 
 static bool fail_allocation=false;
 void* operator new(std::size_t n){if(fail_allocation)throw std::bad_alloc();if(auto p=std::malloc(n?n:1))return p;throw std::bad_alloc();}
@@ -41,6 +42,45 @@ ModelSurface draw(const ModelGeometry& mesh,const ModelProjection& p) {
 ModelSurfacePixel pixel(const ModelSurface& s,int x,int y) {
     if(x<s.region.left||x>=s.region.right||y<s.region.top||y>=s.region.bottom)return {};
     return s.pixels[static_cast<std::size_t>(y-s.region.top)*static_cast<std::size_t>(s.region.width())+x-s.region.left];
+}
+// Independent whole-ROI oracle: no bounds or scanline helper from production.
+void scanline_oracle() {
+    std::mt19937 random(94051);std::uniform_real_distribution<double> coordinate(0,32),depth(-10,10),iw(.01,10);
+    for(unsigned trial=0;trial<180;++trial) {
+        ModelScene scene;scene.region=trial%2?RectI{5,3,29,27}:RectI{0,0,32,32};
+        for(unsigned i=0;i<8;++i) {
+            ModelProjectedTriangle t;t.source_triangle=i;
+            for(auto& v:t.vertices)v={coordinate(random),coordinate(random),iw(random),depth(random),{}};
+            if(trial%3==0)t.vertices[2]={t.vertices[0].x+.00000001,t.vertices[0].y+.00000001,1,0,{}};
+            scene.triangles.push_back(t);
+        }
+        if(trial%5==0){auto copy=scene.triangles.front();std::swap(copy.vertices[1],copy.vertices[2]);copy.source_triangle=99;scene.triangles.push_back(copy);}
+        auto actual=rasterize_model_scene(scene,never);check(actual.has_value(),"fractional thin scanline scene succeeds");if(!actual.has_value())continue;
+        for(int y=scene.region.top;y<scene.region.bottom;++y)for(int x=scene.region.left;x<scene.region.right;++x) {
+            unsigned mask=0;double nearest=std::numeric_limits<double>::infinity();std::uint32_t source=kMissingModelAttribute;
+            for(auto t:scene.triangles) {
+                auto edge=[](auto a,auto b,double px,double py){return (b.x-a.x)*(py-a.y)-(b.y-a.y)*(px-a.x);};
+                auto& v=t.vertices;double area=edge(v[0],v[1],v[2].x,v[2].y);if(area==0)continue;
+                if(area<0){std::swap(v[1],v[2]);area=-area;}
+                auto inside=[](double e,auto a,auto b){return e>0||(e==0&&(b.y<a.y||(b.y==a.y&&b.x>a.x)));};
+                for(unsigned s=0;s<4;++s) {
+                    const double px=x+(s%2?.75:.25),py=y+(s/2?.75:.25);
+                    double a=edge(v[1],v[2],px,py),b=edge(v[2],v[0],px,py),c=edge(v[0],v[1],px,py);
+                    if(!inside(a,v[1],v[2])||!inside(b,v[2],v[0])||!inside(c,v[0],v[1]))continue;
+                    mask|=1u<<s;
+                    const double wa=a/area,wb=b/area,wc=c/area;
+                    const double d=(wa*v[0].depth_over_w+wb*v[1].depth_over_w+wc*v[2].depth_over_w)/
+                        (wa*v[0].reciprocal_w+wb*v[1].reciprocal_w+wc*v[2].reciprocal_w);
+                    if(d<nearest||(d==nearest&&t.source_triangle<source)){nearest=d;source=t.source_triangle;}
+                }
+            }
+            const auto p=pixel(actual.value(),x,y);const auto covered=(mask&1)+((mask>>1)&1)+((mask>>2)&1)+((mask>>3)&1);
+            check(p.coverage==covered*.25f && (!mask||(near(p.depth,nearest)&&p.source_triangle==source)),"scanline matches independent whole-ROI coverage/depth/source");
+        }
+        auto caps=ModelSceneLimits{};caps.sample_visits=actual.value().sample_visits;
+        check(rasterize_model_scene(scene,never,caps).has_value(),"exact charged-work budget succeeds");
+        if(caps.sample_visits){--caps.sample_visits;auto r=rasterize_model_scene(scene,never,caps);check(!r.has_value()&&r.error().code==ErrorCode::work_limit_exceeded,"one below charged-work budget rejects");}
+    }
 }
 void same(const ModelSurface& a,const ModelSurface& b,const char* label) {
     for(int y=0;y<32;++y)for(int x=0;x<32;++x) {
@@ -166,5 +206,6 @@ int main() {
     for(std::size_t i=0;i<dest.size();i+=4){dest[i]=.2f;dest[i+1]=.4f;dest[i+2]=.6f;dest[i+3]=.8f;}
     check(composite_model_surface(base,{1,1,1},.5,ParticleTransferMode::stencil,output,dest,never).has_value(),"stencil applies to existing accumulation");
     check(near(dest[(16*32+16)*4],.1,1e-6)&&near(dest[(16*32+16)*4+3],.4,1e-6),"stencil removes color and alpha together");
+    scanline_oracle();
     std::printf("Model scene: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

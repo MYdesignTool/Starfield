@@ -62,6 +62,26 @@ RectI triangle_bounds(const ModelProjectedTriangle& t,RectI region) noexcept {
     return intersect(region,{static_cast<std::int32_t>(std::floor(x0)),static_cast<std::int32_t>(std::floor(y0)),
         static_cast<std::int32_t>(std::ceil(x1)),static_cast<std::int32_t>(std::ceil(y1))});
 }
+constexpr double offsets[4][2]{{.25,.25},{.75,.25},{.25,.75},{.75,.75}};
+struct SampleSpan {std::int32_t first{},end{};};
+// Positive winding. Restrict the candidate samples with the three half-planes,
+// then retain the original edge/top-left tests for exact coverage. One pixel of
+// padding absorbs rounding at an intersection without changing those tests.
+SampleSpan sample_span(const ModelProjectedTriangle& t,RectI box,std::int32_t y,unsigned sample) noexcept {
+    double low=box.left,high=box.right;const double py=y+offsets[sample][1];
+    for(unsigned i=0;i<3;++i) {
+        const auto& a=t.vertices[i];const auto& b=t.vertices[(i+1)%3];
+        const double dx=b.x-a.x,dy=b.y-a.y;
+        if(dy==0) {if(!inside(dx*(py-a.y),inclusive(a,b)))return {};}
+        else {
+            const double cross=a.x+dx*((py-a.y)/dy);
+            if(dy>0)high=std::min(high,cross);else low=std::max(low,cross);
+        }
+    }
+    if(low>high)return {};
+    return {std::max(box.left,static_cast<std::int32_t>(std::ceil(low-offsets[sample][0]))-1),
+        std::min(box.right,static_cast<std::int32_t>(std::floor(high-offsets[sample][0]))+2)};
+}
 }
 
 Result<ModelScene> project_model_scene(const ModelGeometry& mesh,const ModelProjection& input,
@@ -172,19 +192,29 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
     std::uint64_t estimated_work=0;
     for(std::size_t i=0;i<scene.triangles.size();++i) {
         if(i%64==0&&cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model raster validation cancelled");
-        const auto& t=scene.triangles[i];
+        auto t=scene.triangles[i];
         if(t.source_triangle>=kMaxModelTriangles)return R::failure(ErrorCode::invalid_request,"invalid Model source triangle");
         for(const auto& v:t.vertices)if(!std::isfinite(v.x)||!std::isfinite(v.y)||v.x<0||v.y<0||v.x>32768||v.y>32768||
             !std::isfinite(v.reciprocal_w)||v.reciprocal_w<=0||v.reciprocal_w>1e250 ||
             !std::isfinite(v.depth_over_w)||std::abs(v.depth_over_w)>1e250||!finite(v.texture_over_w))
                 return R::failure(ErrorCode::invalid_request,"invalid projected Model vertex");
         if(edge(t.vertices[0],t.vertices[1],t.vertices[2].x,t.vertices[2].y)!=0) {
+            if(edge(t.vertices[0],t.vertices[1],t.vertices[2].x,t.vertices[2].y)<0)std::swap(t.vertices[1],t.vertices[2]);
             const auto box=triangle_bounds(t,scene.region);
             if(!box.empty()) {
-                const auto visits=static_cast<std::uint64_t>(box.width())*static_cast<std::uint64_t>(box.height())*4;
-                if(visits>limits.sample_visits-estimated_work)
-                    return R::failure(ErrorCode::work_limit_exceeded,"Model sample visit cap exceeded");
-                estimated_work+=visits;surface.region=unite(surface.region,box);
+                for(auto y=box.top;y<box.bottom;++y) {
+                    if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model raster preflight cancelled");
+                    for(unsigned s=0;s<4;++s) {
+                        const auto span=sample_span(t,box,y,s);
+                        // Charge the span calculation even when there is no
+                        // sample, bounding thin/empty triangle work as well.
+                        const auto visits=1+static_cast<std::uint64_t>(std::max(0,span.end-span.first));
+                        if(visits>limits.sample_visits-estimated_work)
+                            return R::failure(ErrorCode::work_limit_exceeded,"Model sample visit cap exceeded");
+                        estimated_work+=visits;
+                    }
+                }
+                surface.region=unite(surface.region,box);
             }
         }
     }
@@ -201,19 +231,20 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
         }
         std::vector<unsigned char> masks(width*height,0);
         std::uint64_t work=0;
-        constexpr double offsets[4][2]{{.25,.25},{.75,.25},{.25,.75},{.75,.75}};
         for(auto triangle:scene.triangles) {
             if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model rasterization cancelled");
             auto& v=triangle.vertices;auto area=edge(v[0],v[1],v[2].x,v[2].y);
             if(area==0)continue;if(area<0){std::swap(v[1],v[2]);area=-area;}
             const auto box=triangle_bounds(triangle,surface.region);if(box.empty())continue;
-            const auto visits=static_cast<std::uint64_t>(box.width())*static_cast<std::uint64_t>(box.height())*4;
-            if(visits>limits.sample_visits-work)return R::failure(ErrorCode::work_limit_exceeded,"Model sample visit cap exceeded");
-            work+=visits;
             const bool e0=inclusive(v[1],v[2]),e1=inclusive(v[2],v[0]),e2=inclusive(v[0],v[1]);
             for(std::int32_t y=box.top;y<box.bottom;++y) {
                 if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model rasterization cancelled");
-                for(std::int32_t x=box.left;x<box.right;++x)for(unsigned s=0;s<4;++s) {
+                for(unsigned s=0;s<4;++s) {
+                  const auto span=sample_span(triangle,box,y,s);
+                  const auto visits=1+static_cast<std::uint64_t>(std::max(0,span.end-span.first));
+                  if(visits>limits.sample_visits-work)return R::failure(ErrorCode::work_limit_exceeded,"Model sample visit cap exceeded");
+                  work+=visits;
+                  for(std::int32_t x=span.first;x<span.end;++x) {
                     const double px=x+offsets[s][0],py=y+offsets[s][1];
                     const double a=edge(v[1],v[2],px,py),b=edge(v[2],v[0],px,py),c=edge(v[0],v[1],px,py);
                     if(!inside(a,e0)||!inside(b,e1)||!inside(c,e2))continue;
@@ -230,6 +261,7 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
                         }
                         masks[index]|=static_cast<unsigned char>(1u<<s);
                     }
+                  }
                 }
             }
         }

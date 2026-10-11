@@ -25,7 +25,8 @@ try {
     [IO.File]::WriteAllLines("$taskDir\compile.rsp",$taskArgs,[Text.Encoding]::ASCII)
     $taskTransformArgs=@('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/MT','/Iinclude','/Iae_plugin',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\transform.exe'),'tests\transform_binding_tests.cpp')
-    if($Sanitize){$taskTransformArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\transform-compiler.pdb'),'/link','/DEBUG',('/PDB:'+ $taskDir+'\transform.pdb'))}
+    $taskTransformLink=''
+    if($Sanitize){$taskTransformArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\transform-compiler.pdb'));$taskTransformLink="/link /DEBUG /PDB:$taskDir\transform.pdb"}
     [IO.File]::WriteAllLines("$taskDir\transform.rsp",$taskTransformArgs,[Text.Encoding]::ASCII)
     $taskBatch=@"
 @echo off
@@ -35,7 +36,7 @@ cl.exe @$taskDir\compile.rsp $taskLink
 if errorlevel 1 exit /b %errorlevel%
 $taskDir\tests.exe
 if errorlevel 1 exit /b %errorlevel%
-cl.exe @$taskDir\transform.rsp
+cl.exe @$taskDir\transform.rsp $taskTransformLink
 if errorlevel 1 exit /b %errorlevel%
 $taskDir\transform.exe
 exit /b %errorlevel%

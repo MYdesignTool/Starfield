@@ -23,7 +23,8 @@ $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneratio
     ($taskFrozen.nativeBuild -eq 64 -and $taskFrozen.panelGeneration -eq 66 -and $taskBaselineBuild -eq 63 -and $taskBaselinePanel -eq 65) -or
     ($taskFrozen.nativeBuild -eq 65 -and $taskFrozen.panelGeneration -eq 67 -and $taskBaselineBuild -eq 64 -and $taskBaselinePanel -eq 66) -or
     ($taskFrozen.nativeBuild -eq 66 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 65 -and $taskBaselinePanel -eq 71) -or
-    ($taskFrozen.nativeBuild -eq 67 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 66 -and $taskBaselinePanel -eq 71)
+    ($taskFrozen.nativeBuild -eq 67 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 66 -and $taskBaselinePanel -eq 71) -or
+    ($taskFrozen.nativeBuild -eq 68 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 67 -and $taskBaselinePanel -eq 71)
 if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne 8 -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild
 $taskExpected=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
