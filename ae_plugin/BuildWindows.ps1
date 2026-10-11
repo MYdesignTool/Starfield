@@ -23,6 +23,7 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
     $taskModules=@('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')
     if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldModel.aex')){$taskModules+='StarfieldModel'}
     if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldMaterial.aex')){$taskModules+='StarfieldMaterial'}
+    if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldMotion.aex')){$taskModules+='StarfieldMotion'}
     foreach ($taskModule in $taskModules) {
         $taskBuiltNative = Join-Path $RepositoryRoot "artifacts\plugin\$Label\$Architecture\$BuildConfiguration\$taskModule.aex"
         $taskInstalledNative = Join-Path $RepositoryRoot "dist\$taskModule.aex"
@@ -101,7 +102,7 @@ $adapterInputs = @(
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\EffectReveal.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',
-    'ae_plugin\NodeModelPiPL.r', 'ae_plugin\NodeMaterialPiPL.r', 'ae_plugin\MaterialLayout.hpp',
+    'ae_plugin\NodeModelPiPL.r', 'ae_plugin\NodeMaterialPiPL.r', 'ae_plugin\MaterialLayout.hpp', 'ae_plugin\NodeMotionPiPL.r',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
@@ -213,6 +214,7 @@ try {
     $taskNodeKinds=@('Emitter', 'Particle', 'Force', 'Transform')
     if($IncludeModelCandidate -or $taskSourceNativeBuild -ge 61){$taskNodeKinds+='Model'}
     if($taskSourceNativeBuild -ge 70){$taskNodeKinds+='Material'}
+    if($taskSourceNativeBuild -ge 72){$taskNodeKinds+='Motion'}
     foreach ($nodeKind in $taskNodeKinds) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"

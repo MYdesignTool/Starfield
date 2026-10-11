@@ -1,5 +1,13 @@
 # Starfield 架构
 
+M3-18 native72/CEP76 candidate adds an independent Motion Circle effect, kind7
+and binding record9, preserving old record readers and CoreABI9. Origin contexts
+are evaluator-local owned numbers; ParticleInstance/Render/snapshot layout is
+unchanged. Circle frame velocity includes analytic pivot/axis derivative terms
+with bounded backwards temporal rates. UI converts owner Speed100 to2*pi rad/s.
+Force precedes Motion in this first author stage; ordered downstream Force and
+different-chain merges remain full M3-18 completion gates (ADR0039).
+
 M3-17's 2026-10-12 deployed ADR0041 slice uses Model → Material → Output and supports
 Material → Particle model input. Material forwards geometry with branch-local
 shading. Legacy Material → Model remains readable. Existing UUID/field alias

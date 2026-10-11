@@ -37,7 +37,7 @@ static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag
 static_assert(STARFIELD_TRANSFORM_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
-enum class NodeEffectKind { emitter, particle, force, transform, model, material };
+enum class NodeEffectKind { emitter, particle, force, transform, model, material, motion };
 
 // Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
 // Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
@@ -56,6 +56,8 @@ constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::transform;
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::model;
 #elif defined(STARFIELD_NODE_KIND_MATERIAL)
 constexpr NodeEffectKind kNodeEffectKind=NodeEffectKind::material;
+#elif defined(STARFIELD_NODE_KIND_MOTION)
+constexpr NodeEffectKind kNodeEffectKind=NodeEffectKind::motion;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
@@ -257,7 +259,7 @@ PF_Err add_node_record(PF_InData* in_data, starfield::adapter::native_nodes::Kin
 PF_Err add_curve_bank(PF_InData* in_data, const char* label, char prefix) noexcept {
     char name[48]{};
     PF_Err error = PF_Err_NONE;
-    const bool visible=prefix=='s' || prefix=='o';
+    const bool visible=prefix=='s' || prefix=='o' || prefix=='m';
     std::snprintf(name, sizeof(name), visible?"%s":"%s Curve Count", label);
     error = add_slider(in_data, name, curve_count_id(prefix), 0.0, particle_layout::curve_points, 0.0,
                        PF_Precision_INTEGER, kNodeConstantFlags,
@@ -499,6 +501,27 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return in_data->inter.register_ui?PF_REGISTER_UI(in_data,&ui):PF_Err_NONE;
 }
 
+PF_Err setup_motion(PF_InData* data,PF_OutData* output) noexcept {
+    namespace m=starfield::adapter::native_nodes::motion_layout;
+    auto e=add_popup(data,"Motion Type",m::disk_id(m::mode),1,1,"Circle",kNodeConstantFlags);if(e)return e;
+    e=add_popup(data,"Origin Type",m::disk_id(m::origin_type),3,1,"Point|Particle Origin|Emitter Origin");if(e)return e;
+    e=add_point2d(data,"Origin XY",m::disk_id(m::origin_xy));if(e)return e;
+    e=add_slider(data,"Origin Z",m::disk_id(m::origin_z),-100000,100000,0);if(e)return e;
+    for(auto control:{std::pair{"Angle X",m::angle},std::pair{"Angle Y",m::angle+1},std::pair{"Angle Z",m::angle+2}}) {
+        e=add_angle(data,control.first,m::disk_id(control.second));if(e)return e;
+    }
+    for(auto control:{std::pair{"Offset X",m::offset},std::pair{"Offset Y",m::offset+1},std::pair{"Offset Z",m::offset+2}}) {
+        e=add_slider(data,control.first,m::disk_id(control.second),-100000,100000,0);if(e)return e;
+    }
+    e=add_slider(data,"Speed",m::disk_id(m::speed),-100000,100000,100);if(e)return e;
+    e=add_slider(data,"Speed Random",m::disk_id(m::speed_random),0,100,0);if(e)return e;
+    e=add_curve_bank(data,"Motion Over Life",'m');if(e)return e;
+    e=add_node_record(data,Kind::motion);if(e)return e;e=add_node_identity(data);if(e)return e;
+    output->num_params=parameter_count(Kind::motion);
+    PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
+    return data->inter.register_ui?PF_REGISTER_UI(data,&ui):PF_Err_NONE;
+}
+
 PF_Err setup_material(PF_InData* data,PF_OutData* output) noexcept {
     namespace m=starfield::adapter::native_nodes::material_layout;
     auto e=add_popup(data,"Color Source",m::disk_id(1),2,1,"Particle Color|Material Color");if(e)return e;
@@ -647,7 +670,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                                               STARFIELD_VERSION_BUG, STARFIELD_VERSION_STAGE,
                                               STARFIELD_VERSION_BUILD);
             out_data->out_flags = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
-                kNodeEffectKind==NodeEffectKind::transform?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
+                (kNodeEffectKind==NodeEffectKind::transform||kNodeEffectKind==NodeEffectKind::motion)?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
             out_data->out_flags2 = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2;
             if (register_node_graph_sync(in_data) != PF_Err_NONE) {
                 std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
@@ -665,6 +688,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 return setup_transform(in_data,out_data);
             } else if constexpr(kNodeEffectKind==NodeEffectKind::material) {
                 return setup_material(in_data,out_data);
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::motion) {
+                return setup_motion(in_data,out_data);
             } else if constexpr(kNodeEffectKind==NodeEffectKind::model) {
                 return setup_model(in_data,out_data);
             } else {
@@ -678,7 +703,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_SEQUENCE_SETDOWN:
             return PF_Err_NONE;
         case PF_Cmd_GLOBAL_SETDOWN:
-            if constexpr(kNodeEffectKind==NodeEffectKind::particle)starfield::adapter::clear_particle_gradient_ui();
+            if constexpr(kNodeEffectKind==NodeEffectKind::particle||kNodeEffectKind==NodeEffectKind::motion)starfield::adapter::clear_particle_gradient_ui();
             return PF_Err_NONE;
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
@@ -693,6 +718,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
             } else if constexpr(kNodeEffectKind==NodeEffectKind::transform)
                 return starfield::adapter::transform_null_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+            else if constexpr(kNodeEffectKind==NodeEffectKind::motion)
+                return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra),true);
             else return PF_Err_NONE;
         case PF_Cmd_RENDER:
             return render_passthrough(in_data, params, output);

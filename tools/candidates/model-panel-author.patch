@@ -1,0 +1,474 @@
+--- a/cep_panel/index.html
++++ b/cep_panel/index.html
+@@ -3,7 +3,7 @@
+ <head>
+   <meta charset="utf-8" />
+   <title>Starfield Node Editor</title>
+-  <link rel="stylesheet" href="css/panel.css?v=75" />
++  <link rel="stylesheet" href="css/panel.css?v=76" />
+ </head>
+ <body>
+   <header class="bar">
+@@ -47,6 +47,9 @@
+           </button>
+           <button type="button" data-node-type="transform" aria-label="Drag Transform onto graph" title="Transform · drag onto graph">
+             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2"/><path d="m12 3-3 3m3-3 3 3m6 6-3-3m3 3-3 3m-6 6-3-3m3 3 3-3m-9-6 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
++          </button>
++          <button type="button" data-node-type="motion" aria-label="Drag Motion onto graph" title="Motion · drag onto graph">
++            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m16 3 4 2-1 4M12 8v4l3 2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+           </button>
+           <button type="button" data-node-type="model" aria-label="Drag Model onto graph" title="Model · drag onto graph">
+             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Zm-9 5 9 5 9-5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+@@ -107,6 +110,7 @@
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="transform">Transform</button>
++    <button type="button" role="menuitem" data-action="addNode" data-node-type="motion">Motion</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="model">Model</button>
+     <button type="button" role="menuitem" data-action="addNode" data-node-type="material">Material</button>
+     <div class="context-menu-separator"></div>
+@@ -115,18 +119,18 @@
+     <button id="disconnectContextAction" type="button" role="menuitem" data-action="disconnect" hidden>Disconnect This Wire</button>
+   </div>
+ 
+-  <script src="js/graph_codec.js?v=75"></script>
+-  <script src="js/graph_layout.js?v=75"></script>
+-  <script src="js/graph_edits.js?v=75"></script>
+-  <script src="js/native_graph_snapshot.js?v=75"></script>
+-  <script src="js/model_assets.js?v=75"></script>
+-  <script src="js/model_graph_transactions.js?v=75"></script>
+-  <script src="js/graph_transactions.js?v=75"></script>
+-  <script src="js/graph_view.js?v=75"></script>
+-    <script src="js/editor_presets.js?v=75"></script>
+-    <script src="js/curve_editor.js?v=75"></script>
+-    <script src="js/gradient_editor.js?v=75"></script>
+-    <script src="js/node_palette.js?v=75"></script>
+-    <script src="js/panel.js?v=75"></script>
++  <script src="js/graph_codec.js?v=76"></script>
++  <script src="js/graph_layout.js?v=76"></script>
++  <script src="js/graph_edits.js?v=76"></script>
++  <script src="js/native_graph_snapshot.js?v=76"></script>
++  <script src="js/model_assets.js?v=76"></script>
++  <script src="js/model_graph_transactions.js?v=76"></script>
++  <script src="js/graph_transactions.js?v=76"></script>
++  <script src="js/graph_view.js?v=76"></script>
++    <script src="js/editor_presets.js?v=76"></script>
++    <script src="js/curve_editor.js?v=76"></script>
++    <script src="js/gradient_editor.js?v=76"></script>
++    <script src="js/node_palette.js?v=76"></script>
++    <script src="js/panel.js?v=76"></script>
+ </body>
+ </html>
+--- a/cep_panel/js/graph_edits.js
++++ b/cep_panel/js/graph_edits.js
+@@ -14,16 +14,18 @@
+         particle: "org.starfieldfx.nodes.particle",
+         force: "org.starfieldfx.nodes.force",
+         transform: "org.starfieldfx.nodes.transform",
++        motion:"org.starfieldfx.nodes.motion",
+         material:"org.starfieldfx.nodes.material",
+         model: "org.starfieldfx.nodes.model",
+         output: "org.starfieldfx.nodes.output"
+     };
+-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, material:1, output: 4 };
++    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, motion:1, model: 1, material:1, output: 4 };
+     var PORTS = {
+         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
+         "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
+         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
+         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
++        "org.starfieldfx.nodes.motion": {input:"1",output:"2"},
+         "org.starfieldfx.nodes.model": { output: "1" },
+         "org.starfieldfx.nodes.material": { input:"2",output:"1" },
+         "org.starfieldfx.nodes.output": { input: "1" }
+@@ -79,6 +81,9 @@
+             {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
+         ],
+         material:[{key:"1",type:3,value:0},{key:"2",type:5,value:[1,1,1]},{key:"3",type:4,value:.5},{key:"4",type:4,value:0},{key:"5",type:4,value:1},{key:"6",type:3,value:1}],
++        motion:[{key:"1",type:3,value:1},{key:"2",type:5,value:[0,0,0]},{key:"3",type:5,value:[0,0,1]},
++            {key:"4",type:4,value:2*Math.PI},{key:"5",type:4,value:0},{key:"13",type:3,value:0},
++            {key:"14",type:5,value:[0,0,0]},{key:"15",type:5,value:[0,0,0]}],
+         model: [
+             {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
+             {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
+@@ -137,6 +142,7 @@
+             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
+         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
+         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
++        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
+         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
+         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
+     };
+@@ -168,6 +174,14 @@
+             var key=String(field.key),type=0;
+             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
+             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
++            if(node.type===prefix+"motion") {
++                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
++                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
++                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
++                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
++                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
++                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
++            }
+             if(node.type===prefix+"material") {
+                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
+                 if(key==="2")for(var channel=0;channel<3;channel++)
+@@ -299,6 +313,19 @@
+             var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
+             if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
+         }
++        // Circle's ordered Force work is a later substage. An Auxiliary emitter
++        // starts a new stream and therefore stops both traversals.
++        function reachesType(start,type,backwards) {
++            var queue=[start],seen={};
++            while(queue.length){var id=queue.pop();if(seen["$"+id])continue;seen["$"+id]=true;
++                var candidate=nodeById(graph,id);if(!candidate || candidate.type===TYPES.emitter)continue;
++                if(candidate.type===type)return true;
++                graph.edges.forEach(function(edge){if((backwards?edge.destinationNode:edge.sourceNode)===id)
++                    queue.push(backwards?edge.sourceNode:edge.destinationNode);});}
++            return false;
++        }
++        if(!modelConnection && reachesType(sourceId,TYPES.motion,true) && reachesType(destinationId,TYPES.force,false))
++            fail("motion_force_stage_pending","Place Force before Motion in this Circle stage.");
+         // Reject a cycle before producing a request. The native validator still checks
+         // the complete graph, including node-specific stage rules and resource limits.
+         var adjacency = {};
+@@ -547,8 +574,8 @@
+             }
+             if (change.remove === true) {
+                 if (found < 0) continue;
+-                if ((node.type !== TYPES.particle) ||
+-                    (change.parameterKey !== "7" && change.parameterKey !== "8")) {
++                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
++                    (node.type===TYPES.particle && ["7","8"].indexOf(change.parameterKey)>=0))) {
+                     fail("invalid_parameter", "only optional over-life curve parameters can be removed");
+                 }
+                 node.parameters.splice(found, 1);
+@@ -594,8 +621,8 @@
+                 if (found < 0) { node.parameters.push({key:"8",type:3,value:value}); continue; }
+             }
+             if (found < 0) {
+-                if ((node.type !== TYPES.particle) ||
+-                    (change.parameterKey !== "7" && change.parameterKey !== "8" && !(node.type===TYPES.particle && change.parameterKey==="13")) ||
++                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
++                    (node.type===TYPES.particle && ["7","8","13"].indexOf(change.parameterKey)>=0)) ||
+                     change.valueType !== 7 || !(value instanceof Uint8Array)) {
+                     fail("missing_parameter", "the requested graph parameter is not present");
+                 }
+--- a/cep_panel/js/graph_view.js
++++ b/cep_panel/js/graph_view.js
+@@ -13,6 +13,7 @@
+         particle: "org.starfieldfx.nodes.particle",
+         force: "org.starfieldfx.nodes.force",
+         transform: "org.starfieldfx.nodes.transform",
++        motion:"org.starfieldfx.nodes.motion",
+         material:"org.starfieldfx.nodes.material",
+         model: "org.starfieldfx.nodes.model",
+         output: "org.starfieldfx.nodes.output"
+@@ -118,6 +119,16 @@
+             "7": {hidden:true},
+             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
+         },
++        motion:{
++            "1":{label:"Motion Type",kind:"popup",choices:["Circle"],values:[1]},
++            "2":{label:"Origin",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
++            "3":{hidden:true},"6":{hidden:true},
++            "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000},
++            "5":{label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
++            "13":{label:"Origin Type",kind:"popup",choices:["Point","Particle Origin","Emitter Origin"],values:[0,1,2]},
++            "14":{label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
++            "15":{label:"Offset",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"}
++        },
+         material:{
+             "1":{label:"Color Source",kind:"popup",choices:["Particle Color","Material Color"],values:[0,1]},
+             "2":{label:"Color",kind:"color"},
+@@ -148,7 +159,7 @@
+             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
+         }
+     };
+-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",material:"Material",
++    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",motion:"Motion", model:"Model",material:"Material",
+                    output: "Output" };
+ 
+     function fail(code, message) {
+@@ -467,11 +478,15 @@
+                         component.displayScale=1;component.value=graphParameter.value[axis];node.params.push(component);
+                     });continue;
+                 }
+-                if (kind === "transform") {
++                if(kind==="motion" && graphParameter.key==="4") {
++                    parameter.displayScale=100/(2*Math.PI);parameter.value=graphParameter.value*parameter.displayScale;
++                    node.params.push(parameter);continue;
++                }
++                if (kind === "transform" || kind === "motion") {
+                     var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
+                     var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
+                     var ta=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
+-                    if (graphParameter.key === "8") {
++                    if (kind==="transform" && graphParameter.key === "8") {
+                         parameter.choices=["None"];parameter.enumValues=[0];
+                         (layerResources || []).forEach(function(resource){
+                             if(Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
+@@ -484,8 +499,8 @@
+                             parameter.enumValues.push(graphParameter.value);selected=parameter.enumValues.length-1; }
+                         parameter.value=selected+1;node.params.push(parameter);continue;
+                     }
+-                    if (graphParameter.key === "1") {
+-                        parameter.kind="point2d";parameter.label="Anchor XY";parameter.key+=":xy";
++                    if ((kind==="transform" && graphParameter.key === "1") || (kind==="motion" && graphParameter.key==="2")) {
++                        parameter.kind="point2d";parameter.label=kind==="motion"?"Origin XY":"Anchor XY";parameter.key+=":xy";
+                         parameter.min=-32768;parameter.max=32767.99998474121;
+                         parameter.channelMin=[parameter.min,parameter.min];parameter.channelMax=[parameter.max,parameter.max];
+                         parameter.originComponent="xy";parameter.canonicalOrigin=graphParameter.value.slice();
+@@ -493,18 +508,19 @@
+                         parameter.value=[tw/2+graphParameter.value[0]*th/ta,th/2-graphParameter.value[1]*th];
+                         node.params.push(parameter);
+                         var tz=viewParameter(node,kind,graphParameter,spec);
+-                        tz.kind="slider";tz.label="Anchor Z";tz.key+=":z";
++                        tz.kind="slider";tz.label=kind==="motion"?"Origin Z":"Anchor Z";tz.key+=":z";
+                         tz.originComponent="z";tz.canonicalOrigin=graphParameter.value.slice();tz.geometry=parameter.geometry;
+                         tz.value=graphParameter.value[2]*th;node.params.push(tz);continue;
+                     }
+-                    if (["2","3","4"].indexOf(graphParameter.key)>=0) {
++                    if ((kind==="transform" && ["2","3","4"].indexOf(graphParameter.key)>=0) ||
++                        (kind==="motion" && ["14","15"].indexOf(graphParameter.key)>=0)) {
+                         [0,1,2].forEach(function(axis){
+                             var component=viewParameter(node,kind,graphParameter,spec);
+                             component.kind="slider";component.key+=":"+axis;
+                             component.label=spec.label+" "+["X","Y","Z"][axis];
+                             component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+-                            component.displayScale=graphParameter.key==="2" ? th*(axis===0?1/ta:axis===1?-1:1) :
+-                                graphParameter.key==="3" ? (axis===1?1:-1) : 1;
++                            component.displayScale=["2","15"].indexOf(graphParameter.key)>=0 ? th*(axis===0?1/ta:axis===1?-1:1) :
++                                ["3","14"].indexOf(graphParameter.key)>=0 ? (axis===1?1:-1) : 1;
+                             component.value=graphParameter.value[axis]*component.displayScale;node.params.push(component);
+                         });continue;
+                     }
+@@ -603,7 +619,14 @@
+                 node.curveParameterKeys={size:"9"};
+                 node.curves={size:decodeCurve(forceCurve && forceCurve.value,0,100,100,100)};
+             }
+-            if (node.curveParameterKeys && kind !== "force") {
++            if(kind==="motion") {
++                var motionOrder=["1","13","2","14","15","4","5"];
++                node.params.sort(function(a,b){return motionOrder.indexOf(a.graphKey)-motionOrder.indexOf(b.graphKey);});
++                var motionCurve=findParameter(source,"6");
++                if(motionCurve && motionCurve.type!==7)fail("invalid_curve","Motion curve must use opaque bytes");
++                node.curveParameterKeys={size:"6"};node.curves={size:decodeCurve(motionCurve && motionCurve.value,0,100,100,100)};
++            }
++            if (node.curveParameterKeys && kind !== "force" && kind!=="motion") {
+                 var sizeEnd = findParameter(source, "4");
+                 var opacityEnd = findParameter(source, "6");
+                 var sizeCurve = findParameter(source, "7");
+--- a/cep_panel/js/node_palette.js
++++ b/cep_panel/js/node_palette.js
+@@ -1,7 +1,7 @@
+ // Pointer-based palette: local preview only until one valid canvas drop.
+ (function (root) {
+     "use strict";
+-    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force", transform: "Transform", model: "Model",material:"Material" };
++    var kinds = { emitter: "Emitter", auxiliary: "Auxiliary", particle: "Particle", force: "Force", transform: "Transform",motion:"Motion", model: "Model",material:"Material" };
+     function create(options) {
+         var palette=options.root, items=options.items, toggle=options.toggle;
+         var viewport=options.viewport, doc=options.document || document, win=options.window || window;
+--- a/cep_panel/js/panel.js
++++ b/cep_panel/js/panel.js
+@@ -7,7 +7,7 @@
+     "use strict";
+ 
+     var REQUEST_TIMEOUT_MS = 8000;
+-    var GATEWAY_BUILD = "native-presets-75";
++    var GATEWAY_BUILD = "native-presets-76";
+     var GATEWAY_READY_TOKEN = "org.starfieldfx.panel/1/" + GATEWAY_BUILD;
+     var openPresetsButton=document.getElementById("openPresets");
+     if(openPresetsButton)openPresetsButton.addEventListener("click",function(){
+@@ -235,11 +235,11 @@
+     }
+ 
+     var NODE_TYPES = {
+-        emitter: true, particle: true, force: true, transform: true, model: true, material:true, output: true
++        emitter: true, particle: true, force: true, transform: true,motion:true, model: true, material:true, output: true
+     };
+     var DEFAULT_NODE_POSITIONS = {
+         emitter: { x: 235, y: 22 }, particle: { x: 235, y: 100 },
+-        force: { x: 235, y: 178 }, transform: {x:235,y:220}, model:{x:90,y:100}, material:{x:90,y:30}, output: { x: 235, y: 256 }
++        force: { x: 235, y: 178 }, transform: {x:235,y:220},motion:{x:235,y:220}, model:{x:90,y:100}, material:{x:90,y:30}, output: { x: 235, y: 256 }
+     };
+ 
+     function positionFor(node, index) {
+@@ -365,7 +365,7 @@
+         var viewportBottom = viewportTop + elements.graphScroll.clientHeight / zoom;
+         var bounds = { left: viewportLeft, top: viewportTop,
+                        right: viewportRight, bottom: viewportBottom };
+-        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd", model:"#8fc4a5",material:"#d3b67d",
++        var colors = { emitter: "#e5aa69", particle: "#b7a0e9", force: "#94a9ed", transform:"#8dc9dd",motion:"#8dc9dd", model:"#8fc4a5",material:"#d3b67d",
+                        output: "#83c9b1" };
+         for (var i = 0; i < state.nodes.length; i++) {
+             if (!isSupportedNode(state.nodes[i])) continue;
+@@ -590,6 +590,7 @@
+         }
+         if (kind === "transform") return "Scale "+shortNumber(graphParameterValue(node,5))+"% · opacity "+shortNumber(graphParameterValue(node,6))+"%";
+         if(kind==="material")return graphParameterValue(node,1)===1?"Material Color":"Particle Color";
++        if(kind==="motion")return "Circle";
+         if(kind==="model")return graphParameterValue(node,13)===1?"OBJ":"Cube";
+         var status = state.frameStatus;
+         if (status && status.available === false) return "Live count unavailable";
+@@ -1115,8 +1116,8 @@
+         elements.inspectorBody.appendChild(grid);
+         if(kind==="particle" && node.gradient && node.colorMode!==0) elements.inspectorBody.appendChild(renderGradientEditor(node));
+         var curves = currentCurveState("size", node.id);
+-        if (kind === "force" && curves) {
+-            elements.inspectorBody.appendChild(renderCurveEditor("size", "Wind and Spin Over Life (%)", curves.size, 100));
++        if ((kind === "force" || kind==="motion") && curves) {
++            elements.inspectorBody.appendChild(renderCurveEditor("size",kind==="motion"?"Motion Over Life (%)":"Wind and Spin Over Life (%)", curves.size, 100));
+             drawCurvePlot("size");
+         }
+         if ((kind === "particle") && curves) {
+--- a/cep_panel/jsx/starfield_gateway.jsx
++++ b/cep_panel/jsx/starfield_gateway.jsx
+@@ -18,7 +18,7 @@
+ (function () {
+     var PROTOCOL = "org.starfieldfx.panel";
+     var VERSION = 1;
+-    var GATEWAY_BUILD = "native-presets-75";
++    var GATEWAY_BUILD = "native-presets-76";
+     var MATCH_NAME = "org.starfieldfx.particle";
+     var MAX_CHANGES = 40;
+     var MAX_REQUEST_BYTES = 262144;
+@@ -43,6 +43,7 @@
+         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
+         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
+         "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
++        "org.starfieldfx.nodes.motion": {kind:"motion",label:"Motion",matchName:"org.starfieldfx.node.motion"},
+         "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"},
+         "org.starfieldfx.nodes.material":{kind:"material",label:"Material",matchName:"org.starfieldfx.node.material"}
+     };
+@@ -439,7 +440,10 @@
+             ageFirst: 970, valueFirst: 980, extraAgeBase: 3400, extraValueBase: 3500 },
+         "Wind and Spin": { effect: "org.starfieldfx.node.force", count: { name: "Wind and Spin Curve Count", diskId: 900 },
+             mode: { name: "Wind and Spin Curve Interpolation", diskId: 3614 }, prefix: "Wind and Spin Curve ", age: " Age",
+-            ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 }
++            ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 },
++        "Motion Over Life": {effect:"org.starfieldfx.node.motion",count:{name:"Motion Over Life",diskId:1713},
++            mode:{name:"Motion Over Life Curve Interpolation",diskId:1714},prefix:"Motion Over Life Curve ",age:" Age",
++            ageFirst:3900,valueFirst:4100,extraAgeBase:3900,extraValueBase:4100}
+     };
+ 
+     function nativeCurveBank(effect, label) {
+@@ -730,6 +734,8 @@
+     }
+ 
+     function materialControl(index){return {name:["Color Source","Color","Roughness","Metallic","Opacity","AE Lights"][index-1],diskId:1600+index};}
++    function motionControl(index){return {name:["Motion Type","Origin Type","Origin XY","Origin Z","Angle X","Angle Y","Angle Z",
++        "Offset X","Offset Y","Offset Z","Speed","Speed Random"][index-1],diskId:1700+index};}
+     function modelControl(index) {
+         var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
+             "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
+@@ -924,6 +930,7 @@
+             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
+         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
+         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
++        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
+         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
+         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
+     };
+@@ -955,6 +962,14 @@
+             var key=String(field.key),type=0;
+             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
+             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
++            if(node.type===prefix+"motion") {
++                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
++                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
++                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
++                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
++                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
++                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
++            }
+             if(node.type===prefix+"material") {
+                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
+                 if(key==="2")for(var channel=0;channel<3;channel++)
+@@ -1015,6 +1030,27 @@
+             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
+                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
+             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
++        } else if(type==="org.starfieldfx.nodes.motion") {
++            var motionGeometry=transformGeometry(layer),motionOrigin=nodeControlValue(effect,motionControl(3));
++            var motionMode=Number(nodeControlValue(effect,motionControl(1))),motionOriginType=Number(nodeControlValue(effect,motionControl(2)));
++            if(motionMode!==1 || Math.floor(motionOriginType)!==motionOriginType || motionOriginType<1 || motionOriginType>3)throw new Error("Invalid Motion mode/origin type.");
++            node.parameters.push({key:"1",type:3,value:1},{key:"13",type:3,value:motionOriginType-1},
++                {key:"2",type:5,value:[(Number(motionOrigin[0])-motionGeometry.width/2)*motionGeometry.aspect/motionGeometry.height,
++                    .5-Number(motionOrigin[1])/motionGeometry.height,Number(nodeControlValue(effect,motionControl(4)))/motionGeometry.height]},
++                {key:"3",type:5,value:[0,0,1]},
++                {key:"14",type:5,value:[-Number(nodeControlValue(effect,motionControl(5))),Number(nodeControlValue(effect,motionControl(6))),-Number(nodeControlValue(effect,motionControl(7)))]},
++                {key:"15",type:5,value:[Number(nodeControlValue(effect,motionControl(8)))*motionGeometry.aspect/motionGeometry.height,
++                    -Number(nodeControlValue(effect,motionControl(9)))/motionGeometry.height,Number(nodeControlValue(effect,motionControl(10)))/motionGeometry.height]},
++                {key:"4",type:4,value:Number(nodeControlValue(effect,motionControl(11)))*(2*Math.PI/100)},
++                {key:"5",type:4,value:Number(nodeControlValue(effect,motionControl(12)))});
++            var motionBank=nativeCurveBank(effect,"Motion Over Life"),motionCount=Number(nodeControlValue(effect,motionBank.controls.count));
++            if(!isFinite(motionCount)||Math.floor(motionCount)!==motionCount||motionCount<0||motionCount>64||motionCount===1)throw new Error("Invalid Motion curve count.");
++            if(motionCount) {
++                var motionBytes=[1,motionCount,Number(nodeControlValue(effect,motionBank.controls.mode)),0];
++                for(var mp=0;mp<motionCount;mp++) {appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,false))));
++                    appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,true))));}
++                node.parameters.push({key:"6",type:7,value:motionBytes});
++            }
+         } else if(type==="org.starfieldfx.nodes.material") {
+             var materialSource=Number(nodeControlValue(effect,materialControl(1)));
+             if(materialSource!==1 && materialSource!==2)throw new Error("Invalid native Material Color Source: "+materialSource);
+@@ -1310,6 +1346,20 @@
+                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
+                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
+                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
++                } else if(type==="org.starfieldfx.nodes.motion") {
++                    var motionGeometry=transformGeometry(layer);
++                    if(key==="1")setNodeControl(effect,motionControl(1),1);
++                    else if(key==="13")setNodeControl(effect,motionControl(2),value+1);
++                    else if(key==="2") {
++                        setNodeControl(effect,motionControl(3),[motionGeometry.width/2+value[0]*motionGeometry.height/motionGeometry.aspect,motionGeometry.height/2-value[1]*motionGeometry.height]);
++                        setNodeControl(effect,motionControl(4),value[2]*motionGeometry.height);
++                    } else if(key==="3")continue; // Derived default axis; angles14 own its author controls.
++                    else if(key==="14" || key==="15")for(var ma=0;ma<3;ma++)setNodeControl(effect,motionControl((key==="14"?5:8)+ma),
++                        value[ma]*(key==="14"?(ma===1?1:-1):motionGeometry.height*(ma===0?1/motionGeometry.aspect:ma===1?-1:1)));
++                    else if(key==="4")setNodeControl(effect,motionControl(11),value*(100/(2*Math.PI)));
++                    else if(key==="5")setNodeControl(effect,motionControl(12),value);
++                    else if(key==="6")writeNodeCurve(effect,"Motion Over Life",value);
++                    else throw new Error("Motion graph parameter is not mapped: "+key);
+                 } else if(type==="org.starfieldfx.nodes.material") {
+                     // Portable enums are zero based; AE popup values are one based.
+                     // Validate before any write and use exact native switch constants.
+@@ -1423,6 +1473,7 @@
+                 }
+             }
+             if (type === "org.starfieldfx.nodes.force" && !nodeParameter(node,"9")) writeNodeCurve(effect,"Wind and Spin",null);
++            if(type==="org.starfieldfx.nodes.motion" && !nodeParameter(node,"6"))writeNodeCurve(effect,"Motion Over Life",null);
+             if (type === "org.starfieldfx.nodes.particle") {
+                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
+                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
+--- a/cep_panel/presets.html
++++ b/cep_panel/presets.html
+@@ -1,5 +1,5 @@
+ <!doctype html>
+-<html lang="en"><head><meta charset="utf-8"><title>Starfield Presets</title><link rel="stylesheet" href="css/presets.css?v=75"></head>
++<html lang="en"><head><meta charset="utf-8"><title>Starfield Presets</title><link rel="stylesheet" href="css/presets.css?v=76"></head>
+ <body>
+   <header><img src="assets/starfield-presets-banner.png" alt="Starfield Presets"><div><h1>Preset Library</h1><p id="target">Select a layer with Starfield in After Effects.</p></div><button id="refresh">Refresh Target</button></header>
+   <div class="search-row"><label for="search">Search</label><input id="search" type="search" placeholder="Search presets and categories" autocomplete="off"><button id="import">Import…</button><button id="save">Save Current…</button></div>
+@@ -7,5 +7,5 @@
+   <main><div id="grid" role="list" aria-label="Preset library"></div><aside id="details"><canvas id="preview" width="420" height="240" aria-label="Preset illustration"></canvas><h2 id="selected-title">Choose a preset</h2><p id="description">Browse a category or search the library. Add keeps the current nodes; Replace creates the selected setup.</p><p id="structure"></p></aside></main>
+   <div id="status" role="status" aria-live="polite">Loading library…</div>
+   <footer><label><input id="render-settings" type="checkbox" checked>Apply Render Settings</label><span id="note">Your current effect stays pinned until Refresh Target.</span><button id="cancel">Cancel</button><button id="replace" disabled>Replace</button><button id="add" class="primary" disabled>Add</button></footer>
+-  <script src="js/graph_codec.js?v=75"></script><script src="js/graph_layout.js?v=75"></script><script src="js/graph_edits.js?v=75"></script><script src="js/graph_view.js?v=75"></script><script src="js/native_graph_snapshot.js?v=75"></script><script src="js/model_assets.js?v=75"></script><script src="js/model_graph_transactions.js?v=75"></script><script src="js/graph_transactions.js?v=75"></script><script src="js/preset_files.js?v=75"></script><script src="js/presets.js?v=75"></script><script src="js/preset_manager.js?v=75"></script>
++  <script src="js/graph_codec.js?v=76"></script><script src="js/graph_layout.js?v=76"></script><script src="js/graph_edits.js?v=76"></script><script src="js/graph_view.js?v=76"></script><script src="js/native_graph_snapshot.js?v=76"></script><script src="js/model_assets.js?v=76"></script><script src="js/model_graph_transactions.js?v=76"></script><script src="js/graph_transactions.js?v=76"></script><script src="js/preset_files.js?v=76"></script><script src="js/presets.js?v=76"></script><script src="js/preset_manager.js?v=76"></script>
+ </body></html>
+--- a/cep_panel/js/preset_manager.js
++++ b/cep_panel/js/preset_manager.js
+@@ -6,7 +6,7 @@
+     // Keep the page and the reason visible when a dependency did not load.
+     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions","StarfieldModelAssets","StarfieldPresetFiles"].filter(function(name){return !window[name];});
+     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
+-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-75",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
++    var cep=window.__adobe_cep__,gatewayBuild="native-presets-76",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
+     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
+     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}

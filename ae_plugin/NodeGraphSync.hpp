@@ -74,13 +74,14 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
     if(edit.records_only)return false; // native control edits require an authored UUID/value
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
-    if (edit.node_kind > 6 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
+    if (edit.node_kind > 7 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
         !native_nodes::authored_parameter(static_cast<native_nodes::Kind>(edit.node_kind),edit.parameter_index) || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
     if(edit.node_kind==4 && (edit.parameter_index>14 || edit.additional_count ||
         edit.value_kind!=(edit.parameter_index==2?ValueKind::point2:ValueKind::scalar)))return false;
     if(edit.node_kind==6 && (edit.additional_count || edit.value_kind!=(edit.parameter_index==2?ValueKind::color:ValueKind::scalar)))return false;
     if(edit.node_kind==5 && (edit.value_kind!=ValueKind::scalar || edit.additional_count))return false;
+    if(edit.node_kind==7 && edit.value_kind!=(edit.parameter_index==native_nodes::motion_layout::origin_xy?ValueKind::point2:ValueKind::scalar))return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
     if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::shape) {
         std::uint32_t shape{};
@@ -102,6 +103,8 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
             field.kind==ValueKind::scalar && field.value==std::array<double,4>{1,0,0,0} &&
             (edit.parameter_index==layout::seed_shift || edit.parameter_index==layout::birth_chance);
         if(field.index<1 || (field.index>layout::last && !cloud_activation && !birth_activation) || static_cast<unsigned>(field.kind)>3)return false;
+        if(edit.node_kind==7 && (!native_nodes::motion_layout::curve_base(edit.parameter_index)||
+            !native_nodes::motion_layout::curve_base(field.index)||field.kind!=ValueKind::scalar))return false;
         for(double value:field.value)if(!std::isfinite(value))return false;
         for(unsigned j=0;j<i;++j)if(edit.additional_fields[j].index==field.index)return false;
     }
@@ -114,13 +117,13 @@ inline bool gradient_bank_parameter(std::uint32_t kind,A_long index) noexcept {
 }
 inline bool age_bank_parameter(std::uint32_t kind,A_long index) noexcept {
     namespace layout=native_nodes::particle_layout;
-    return kind==1 && layout::curve_base(index)!=0;
+    return (kind==1 && layout::curve_base(index)!=0)||(kind==7&&native_nodes::motion_layout::curve_base(index)!=0);
 }
 inline bool capture_age_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
     namespace layout=native_nodes::particle_layout;
     if(!params || !age_bank_parameter(edit.node_kind,edit.parameter_index))return false;
     auto candidate=edit;candidate.additional_count=0;
-    const auto base=layout::curve_base(edit.parameter_index);
+    const auto base=edit.node_kind==7?native_nodes::motion_layout::curve:layout::curve_base(edit.parameter_index);
     if(!params[base] || params[base]->param_type!=PF_Param_FLOAT_SLIDER)return false;
     const auto count=params[base]->u.fs_d.value;
     if(!std::isfinite(count) || std::floor(count)!=count || count<0 || count>layout::curve_points || count==1)return false;

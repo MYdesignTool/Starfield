@@ -51,6 +51,10 @@ constexpr A_long kNodeKind = 5;
 constexpr char kRegistrationName[]="Starfield Material Node Sync";
 constexpr A_long kLastParameterIndex=starfield::adapter::native_nodes::last_parameter_index(starfield::adapter::native_nodes::Kind::material);
 constexpr A_long kNodeKind=6;
+#elif defined(STARFIELD_NODE_KIND_MOTION)
+constexpr char kRegistrationName[]="Starfield Motion Node Sync";
+constexpr A_long kLastParameterIndex=starfield::adapter::native_nodes::last_parameter_index(starfield::adapter::native_nodes::Kind::motion);
+constexpr A_long kNodeKind=7;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

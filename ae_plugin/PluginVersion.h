@@ -6,8 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build 71: downstream Material geometry and stable alias bindings;
-// full nine-module/Core ABI9 pairing with CEP75. See ADR 0041 migration.
-// Numeric Motion work has no public author entry in this test release.
-#define STARFIELD_VERSION_BUILD 71
-#define STARFIELD_VERSION_PACKED 32839 /* 0x8047 */
+// Build72 candidate: independent Motion Circle author/binding9.
+// Full ten-module/Core ABI9 pairing with CEP76; ADR0039.
+#define STARFIELD_VERSION_BUILD 72
+#define STARFIELD_VERSION_PACKED 32840 /* 0x8048 */

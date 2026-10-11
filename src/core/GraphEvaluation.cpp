@@ -656,7 +656,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             transform_plans[particle]=std::make_shared<const TransformBranchPlan>(std::move(value));
             return P::success(transform_plans[particle]);
         };
-        const auto apply_motion_frame=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed)->Result<bool> {
+        const auto apply_motion_frame=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed,
+            MotionCircleOrigins origins)->Result<bool> {
             if(plan)for(auto id:*plan) {
                 if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"ordered Motion cancelled");
                 if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"ordered Motion work limit");
@@ -672,13 +673,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     if(!clock.has_value())return Result<bool>::failure(clock.error());
                     const auto factor=motion_speed_factor(instance,id,seed,c.settings().speed_random_percent);
                     auto moved=apply_circle_state(instance,c,c.settings().radians_per_second*factor*clock.value().integral_seconds,
-                        c.settings().radians_per_second*factor*clock.value().weight);
+                        c.settings().radians_per_second*factor*clock.value().weight,origins);
                     if(!moved.has_value())return moved;
                 } else if(const auto look=look_ats.find(id);look!=look_ats.end()) {
                     auto turned=apply_motion_look_at(instance,look->second,result.sprite_bases);if(!turned.has_value())return turned;
                 } else {
                     const auto index=index_of(id);if(index>=count||!transforms[index])return Result<bool>::failure(ErrorCode::invalid_request,"missing ordered Transform");
                     auto moved=apply_ordered_particle_transform(instance,*transforms[index]);if(!moved.has_value())return moved;
+                    origins.particle=transforms[index]->position(origins.particle);
+                    origins.emitter=transforms[index]->position(origins.emitter);
                 }
             }
             return Result<bool>::success(true);
@@ -873,7 +876,11 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
-                            auto turned=apply_motion_frame(instance,circle_plan.value(),child_settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
+                            auto particle_origin=circle_plan.value()?simulate_particle_at_age(child_settings.value,0,child_id,dimension_context,tf).position:Vec3{};
+                            // child_settings has a zero emitter pivot; add its parent placement.
+                            particle_origin={particle_origin.x+origin.x,particle_origin.y+origin.y,particle_origin.z+origin.z};
+                            auto turned=apply_motion_frame(instance,circle_plan.value(),child_settings.value.seed,
+                                {particle_origin,birth_position});if(!turned.has_value())return R::failure(turned.error());
                             if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
@@ -1128,6 +1135,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 auto& instance = result.particles[branch_targets[i].destination];
                 instance.emitter_id = nodes[plan.emitter]->id;
                 Vec3 birth_position=tf?tf->position(plan.settings.value.emitter_origin):plan.settings.value.emitter_origin;
+                MotionCircleOrigins motion_origins{plan.motion?
+                    simulate_particle_at_age(plan.settings.value,0,instance.id,dimension_context,tf).position:birth_position,birth_position};
                 if(particles[plan.particle]->orient_to==2)
                     birth_position=simulate_particle_at_age(plan.settings.value,0,instance.id,dimension_context,tf).position;
                 if(origins) {
@@ -1138,12 +1147,14 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     if(tf)delta=tf->velocity(delta);
                     instance.position.x+=delta.x;instance.position.y+=delta.y;instance.position.z+=delta.z;
                     birth_position.x+=delta.x;birth_position.y+=delta.y;birth_position.z+=delta.z;
+                    motion_origins.particle={motion_origins.particle.x+delta.x,motion_origins.particle.y+delta.y,motion_origins.particle.z+delta.z};
+                    motion_origins.emitter={motion_origins.emitter.x+delta.x,motion_origins.emitter.y+delta.y,motion_origins.emitter.z+delta.z};
                 }
                 // Particle owns all per-life style curves.
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
                 if(plan.transform)apply_transform_style(instance,*plan.transform);
-                auto turned=apply_motion_frame(instance,plan.motion,plan.settings.value.seed);if(!turned.has_value())return R::failure(turned.error());
+                auto turned=apply_motion_frame(instance,plan.motion,plan.settings.value.seed,motion_origins);if(!turned.has_value())return R::failure(turned.error());
                 if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }

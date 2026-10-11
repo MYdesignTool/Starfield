@@ -1,5 +1,5 @@
 {
-  "identityRevision": 11,
+  "identityRevision": 12,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "scriptBindingPolicy": "PF group/topic entries are presentation markers, not script PropertyGroup containers. Native curve count/mode/knots and the duplicate Particle scalar Opacity resolve from the effect root by exact parameter matchName derived from these disk IDs. Display names, topic paths and mutable indices are not fallbacks. Panel42 / ADR0030.",
   "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main27/index1/disk1631 (Motion Blur appended616..625) ; numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030. Native Transform1/base14 appends disk1401..1414 and binding fields15..26; Core ABI4/snapshot4 require a full paired build47. Existing kind IDs and graph envelope are retained. ADR0032. ADR0033/build52 appends Particle Transfer Mode disk232/stream519 after existing metadata; old streams/IDs unchanged, graph key30 optional Normal, binding v3/snapshot5/Core ABI5; paired native/CEP required.",
@@ -575,6 +575,19 @@
     "inheritedMatrixGraphKey": 7,
     "layerResourceGraphKey": 8,
     "policy": "Constant project-local layer ID; UI captures relative anchor affine; twelve synthetic numeric aliases sample Null and parent motion at render time. Selected resource is always dynamic. Fields are not physical AE parameter indices. ADR0032."
+  },
+  "motionCircle": {
+    "adr":"0039-motion-geometry", "status":"native72/CEP76 candidate; actual AE2023 acceptance remains open",
+    "graphType":"org.starfieldfx.nodes.motion", "schemaVersion":1, "nativeKind":7,
+    "effectMatchName":"org.starfieldfx.node.motion", "piplResource":16016,
+    "modes":["Circle"], "originTypes":["Point","Particle Origin","Emitter Origin"],
+    "speedRule":"Owner2026-10-12: Speed100 = 2*pi radians per second, one revolution per second",
+    "graphKeys":{"mode":1,"origin":2,"legacyAxis":3,"angularRate":4,"speedRandom":5,"overLife":6,"originType":13,"axisAngles":14,"offset":15},
+    "controls":{"motion_type":1701,"origin_type":1702,"origin_xy":1703,"origin_z":1704,"angle_x":1705,"angle_y":1706,"angle_z":1707,
+      "offset_x":1708,"offset_y":1709,"offset_z":1710,"speed":1711,"speed_random":1712,"curve_count":1713,"curve_interpolation":1714},
+    "curveAgeIds":[3900,3963], "curveValueIds":[4100,4163], "baseParameters":142,"totalParameters":219,"bindingVersion":9,
+    "migration":"Append new independent kind7 and binding9; retain readers1..8 and exact old layouts. CoreABI9/snapshots/Render boundary unchanged; full ten-module native/Core/CEP pair required.",
+    "stageLimits":"Force precedes Motion; downstream ordered Force and merges of distinct modifier chains remain pending. Circle controls do not advertise later Light Path or Look At modes."
   },
   "material": {
     "graphType": "org.starfieldfx.nodes.material",

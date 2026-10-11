@@ -130,8 +130,8 @@ void invalid_records(PF_InData& data){
     const auto original=bound_graph();
     for(unsigned length=2;length<original.optional_records[0].size();++length){auto bad=original;bad.optional_records[0].resize(length);
         adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
-    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,9u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
-    {auto current=original;put(current.optional_records[0],2,8,2);adapter::NativeAnimationPlan plan(current,1920,1080,1);CHECK(plan.valid());}
+    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,10u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
+    for(unsigned version:{8u,9u}){auto current=original;put(current.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(current,1920,1080,1);CHECK(plan.valid());}
     for(unsigned kind:{2u,6u,65535u}){auto bad=original;put(bad.optional_records[0],28,kind,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
     for(int index=1;index<=24;++index){if(!layout::binding_field(index))continue;const auto offset=field_offset(index);
         for(unsigned type:{1u,2u,3u}){auto bad=original;put(bad.optional_records[0],offset+2,type,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}

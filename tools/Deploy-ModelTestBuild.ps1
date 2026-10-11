@@ -27,13 +27,16 @@ $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneratio
     ($taskFrozen.nativeBuild -eq 68 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 67 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 69 -and $taskFrozen.panelGeneration -eq 72 -and $taskBaselineBuild -eq 68 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 70 -and $taskFrozen.panelGeneration -eq 73 -and $taskBaselineBuild -eq 69 -and $taskBaselinePanel -eq 72 -and $taskBaselineAbi -eq 8) -or
-    ($taskFrozen.nativeBuild -eq 71 -and $taskFrozen.panelGeneration -eq 75 -and $taskBaselineBuild -eq 70 -and $taskBaselinePanel -eq 74 -and $taskBaselineAbi -eq 9)
-$taskHasMaterial=$taskFrozen.nativeBuild -in @(70,71)
+    ($taskFrozen.nativeBuild -eq 71 -and $taskFrozen.panelGeneration -eq 75 -and $taskBaselineBuild -eq 70 -and $taskBaselinePanel -eq 74 -and $taskBaselineAbi -eq 9) -or
+    ($taskFrozen.nativeBuild -eq 72 -and $taskFrozen.panelGeneration -eq 76 -and $taskBaselineBuild -eq 71 -and $taskBaselinePanel -eq 75 -and $taskBaselineAbi -eq 9)
+$taskHasMaterial=$taskFrozen.nativeBuild -in @(70,71,72)
+$taskHasMotion=$taskFrozen.nativeBuild -eq 72
 $taskExpectedAbi=if($taskHasMaterial){9}else{8}
 if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne $taskExpectedAbi -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild
 $taskExpected=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
 if($taskHasMaterial){$taskExpected+='StarfieldMaterial.aex'}
+if($taskHasMotion){$taskExpected+='StarfieldMotion.aex'}
 if($taskFrozen.files.Count -ne $taskExpected.Count -or @($taskFrozen.files.name | Select-Object -Unique).Count -ne $taskExpected.Count){throw 'Expected the complete distinct native/Core module set.'}
 foreach($taskEntry in $taskFrozen.files){
     if($taskEntry.name -notin $taskExpected -or (Get-FileHash -LiteralPath (Join-Path $taskPrepared ('native-bundle/'+$taskEntry.name))).Hash -ne $taskEntry.hash){throw 'Frozen native pair differs.'}
@@ -49,7 +52,7 @@ $taskCepLink=Assert-ModelJunction $CepJunction $taskPanelRoot
 if(@(Get-ChildItem -LiteralPath $taskPluginDir -Force | Where-Object Name -like 'Starfield*').Count -ne 1){throw 'Unexpected host Starfield entries.'}
 foreach($taskEntry in $taskBaseline.native){if((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash -ne $taskEntry.hash){throw 'Installed native baseline differs.'}}
 if($taskBaselineBuild -eq 60 -and (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldModel.aex'))){throw 'Unexpected installed Model before full promotion.'}
-if($taskBaselineBuild -ge 61 -and (@($taskBaseline.native).Count -ne $(if($taskBaselineBuild -ge 70){9}else{8}) -or @($taskBaseline.panel.files).Count -ne 18 -or
+if($taskBaselineBuild -ge 61 -and (@($taskBaseline.native).Count -ne $(if($taskBaselineBuild -ge 72){10}elseif($taskBaselineBuild -ge 70){9}else{8}) -or @($taskBaseline.panel.files).Count -ne 18 -or
     'StarfieldModel.aex' -notin @($taskBaseline.native.name))){throw 'Incomplete installed Model pair.'}
 if($taskBaselineBuild -ge 70 -and 'StarfieldMaterial.aex' -notin @($taskBaseline.native.name)){throw 'Incomplete installed Material pair.'}
 foreach($taskEntry in $taskBaseline.panel.files){if((Get-FileHash -LiteralPath (Join-Path $taskRepo $taskEntry.path)).Hash -ne $taskEntry.installedHash){throw 'Installed CEP baseline differs.'}}
@@ -94,6 +97,7 @@ Copy-Item -LiteralPath $taskFingerprint -Destination $taskOutputFingerprint -For
 if(Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue){throw 'AE started before publication.'}
 $taskNativeOptions=@{PluginDir=$taskPluginDir;BackupName=$BackupName;IncludeModel=$true;Install=$true}
 if($taskHasMaterial){$taskNativeOptions.IncludeMaterial=$true}
+if($taskHasMotion){$taskNativeOptions.IncludeMotion=$true}
 & (Join-Path $PSScriptRoot 'Deploy-TestBuild.ps1') @taskNativeOptions *> (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-native-deploy.log'))
 if(-not $?){throw 'Native publication failed.'}
 Copy-Item -LiteralPath $taskSavedPanel -Destination (Join-Path $taskBackup 'panel') -Recurse

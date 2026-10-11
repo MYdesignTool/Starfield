@@ -1,5 +1,25 @@
 # 当前工程状态
 
+## M3-18 Circle author candidate — 2026-10-12
+
+native72/CEP76 source candidate adds independent Motion kind7/binding9 and the
+owner-confirmed Point/Particle Origin/Emitter Origin menu. Owner-selected
+Speed100 maps to one turn per second. Canonical pivot/axis derivatives, birth
+origin contexts, shared native/CEP Over Life and guarded control readback are
+implemented. Circle only is advertised; Light Path/Look At, downstream Force
+and distinct-chain merges remain later work. Installed71/75 stays unchanged
+until the frozen ten-module build and pair verification complete.
+
+Working candidate evidence: Circle standard/ASAN2020, ordered frame ASAN4150,
+Motion real registration/binding9 ASAN640,
+seven-kind ES3 record582, panel28, real registration/transaction DOM matrix
+116..117 and dummy71/75→72/76 paired deployment/rollback66 pass. Logs are
+artifacts/motion-circle-author-origin-{tests,asan}.log,
+motion-circle-author-frame-asan.log, motion76-panel-audit.log and
+motion72-deployment-tests-v2.log. First dummy test was denied junction creation
+by the sandbox; the approved repository-only rerun passed. Actual AE acceptance
+remains open; no AE launch/dispatch is authorized by this candidate work.
+
 ## M3-17 native71 / CEP75 deployed — 2026-10-12 00:56+08
 
 Owner reports CEP Material edits fail with heterogeneous effect-stream mismatch;
@@ -35,8 +55,8 @@ One-step undo with AE closed:
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native71-panel75-material-downstream-20261012' -Restore`.
 
 Owner's latest direction is to continue M3-18 after the Material repair and deploy
-completed Motion stages. Circle is the proposed first author stage; reference
-Origin Type choices and Speed calibration are still pending. Preserve Motion/MNT
+completed Motion stages. Circle is the first author stage; the owner has confirmed
+the three Origin Type choices and selected Speed100 as one turn per second. Preserve Motion/MNT
 changes; no extra Particle Shape or Motion mode.
 
 ## native70 / CEP74 deployed — 2026-10-11 23:59+08

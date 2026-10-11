@@ -344,6 +344,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-12 当前卡恢复：Material native71/CEP75阶段源码777bb05已部署并推送。owner确认Circle Speed100一秒一圈、Origin Type为Point/Particle Origin/Emitter Origin；先完成Circle独立Core/原生/CEP作者及配对发布，再继续Light Path/Look At与M3-19。保留MNT在途文件；本卡拥有Motion数字类型、Graph/历史调用、独立原生节点/绑定、schema、候选CEP、构建部署及focused tests。
+
 2026-10-10 有序frame源码8bd5a5c已推送/git archive冻结；IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 x64 Release /MT八目标会话81513实际terminal exit0，motion-frame-sdk-build.log/exit.txt/build-hashes.json及sdk-terminal.json保存八新输出。冻结Circle1842/Look At1377/Path8432再检actual exit0；新26安装hash/selector/runtime核对匹配61/63。没有Motion作者部署，下一步有序Force/外部资源依赖/动画几何导数/参考政策及三模式作者，完整目标active。
 
 2026-10-10 有序Motion/Transform数值候选：逐粒子Q*A*B*Euler及snapshot10迁移先记录ADR0039，普通/历史/Auxiliary按图顺序处理朝向、位移和后置Transform，支持反序Motion与交错/串联Transform。标准/ASAN4141、Circle1842/Look At1377/Path8432、Transform594/Model graph559/Model particle2695实际exit0，motion-frame-*日志保留；前置/无Motion旧分支保持，MNT改动未纳入。下一步本阶段提交冻结完整SDK，然后有序Force、外部资源/动画几何导数、参考政策与三模式作者，安装61/63保持，完整目标active。

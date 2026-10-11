@@ -11,6 +11,7 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
@@ -42,6 +43,14 @@ function createNativeRecordContract() {
             var key=String(field.key),type=0;
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"motion") {
+                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
+                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
+                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
+                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
+                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
+                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+            }
             if(node.type===prefix+"material") {
                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
                 if(key==="2")for(var channel=0;channel<3;channel++)

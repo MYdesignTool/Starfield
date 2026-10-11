@@ -20,6 +20,47 @@ Next work can select one publicly operable Motion stage when the goal resumes.
 
 ## Scope and evidence
 
+### Circle author decisions — 2026-10-12
+
+The owner confirms Origin Type has exactly Point, Particle Origin and Emitter
+Origin, and selects Speed100 = one revolution per second. This unit conversion
+is an owner decision, not a measured claim about the reference. Circle is the
+first operable author stage; Light Path and Look At remain later stages.
+Particle Origin uses the emitted birth position; Emitter Origin uses its birth
+emitter pivot, including Auxiliary parent placement and preceding Transform.
+Point uses Origin XY/Z. Offset XYZ translates the selected pivot in canonical
+coordinates; Angle XYZ rotates the default Z axis. These equations are an
+independent implementation and need AE2023 owner acceptance.
+
+Append optional Motion-local keys13 (origin type),14 (axis Euler angles) and15
+(pivot offset) to schema1, preserving old numeric graph keys1..12. Missing new
+keys retain the previous explicit origin/axis equation. The Render boundary,
+snapshot layout and Core ABI do not change for these options.
+
+Reserve independent native kind7/effect `org.starfieldfx.node.motion`, PiPL16016.
+Circle author streams1..12 use IDs1701..1712; curve count13/ID1713,
+64 interleaved age/value pairs14..141/IDs3900..3963 and4100..4163,
+interpolation142/ID1714. Existing shared metadata follows at143..218, total219.
+Private binding record9 admits kind7; readers retain exact versions1..8 and
+writers keep the old lowest version when no Motion exists. Old adapters reject9.
+Full native/Core/CEP pairing is required. Mode exposes Circle only in this stage;
+future modes append choices without changing IDs or the Circle value1.
+
+Frame geometry velocity uses the analytic derivative of Rodrigues rotation.
+The temporal adapter estimates pivot/axis rates with a backwards interval of
+at most one existing history tick, clipped at birth, projecting the axis secant
+onto the current unit-axis tangent. It never samples future or pre-birth times.
+This is an approximation at the configured30/60/120Hz, with zero geometry rate
+at birth; discrete Origin Type switches do not synthesize an impulse. Constant
+metadata keeps the exact static path. Under the owner's incremental-release
+instruction, Circle's first author stage supports Force before Motion, serial
+Motion and downstream Transform. CEP prevents a new connection that would place
+Force after Motion in the same stream; Core retains its typed rejection as the
+backstop. Ordered downstream Force and distinct-chain merges remain M3-18
+completion gates, before declaring the full three-mode implementation complete.
+This scoped Circle stage supersedes the older all-interactions-before-author
+wording below; the remaining work is retained, not marked complete.
+
 The owner's first Motion stage is exactly Light Path, Circle and Look At.
 Particle Shape remains the six confirmed entries; this task adds no Shape mode.
 M3-17's Model author test release has reached its deployment milestone, with

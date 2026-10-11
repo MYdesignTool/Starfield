@@ -219,6 +219,7 @@ inline constexpr ParameterKey kMotionMode{1},kMotionOrigin{2},kMotionAxis{3},kMo
     kMotionSpeedRandom{5},kMotionOverLife{6};
 inline constexpr ParameterKey kMotionGoal{7},kMotionForward{8};
 inline constexpr ParameterKey kMotionPathPoints{9},kMotionPathSpeed{10},kMotionPathDelay{11},kMotionPathOrient{12};
+inline constexpr ParameterKey kMotionOriginType{13},kMotionAxisAngles{14},kMotionOffset{15};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};

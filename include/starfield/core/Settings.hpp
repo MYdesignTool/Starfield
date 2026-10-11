@@ -165,14 +165,18 @@ struct AgeCurve {
     CurveInterpolation interpolation{CurveInterpolation::linear};
 };
 
-// Numeric Motion contract only. The adapter converts reference-facing Speed
-// into explicit angular units once that mapping is qualified (ADR0039).
+// The adapter converts owner-facing Speed100 to 2*pi radians/second (ADR0039).
+enum class MotionCircleOrigin : std::uint8_t { point=0, particle=1, emitter=2 };
+struct MotionCircleOrigins { Vec3 particle{}, emitter{}; };
+struct MotionCircleGeometryRate { Vec3 pivot_velocity{}, unit_axis_velocity{}; };
 struct MotionCircleSettings {
     Vec3 origin{};
     Vec3 axis{0,0,1};
     double radians_per_second{};
     double speed_random_percent{};
     AgeCurve over_life{};
+    MotionCircleOrigin origin_type{MotionCircleOrigin::point};
+    Vec3 offset{};
 };
 using ParticleMotionPose=std::array<double,4>; // unit quaternion, w/x/y/z
 inline constexpr ParticleMotionPose kIdentityMotionPose{1,0,0,0};

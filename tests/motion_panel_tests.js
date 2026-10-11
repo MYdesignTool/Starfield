@@ -1,0 +1,33 @@
+"use strict";
+const assert=require("node:assert/strict"),path=require("node:path"),fs=require("node:fs");
+const root=process.env.STARFIELD_PANEL_ROOT;if(!root)throw Error("Specify isolated panel root");
+const edits=require(path.resolve(root,"js/graph_edits")),view=require(path.resolve(root,"js/graph_view")),codec=require(path.resolve(root,"js/graph_codec"));
+let checks=0,serial=1;const next=()=>String(serial++).padStart(32,"0"),eq=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=v=>{checks++;assert.ok(v);};
+let g={version:1,nodes:[],edges:[],optionalRecords:[]};
+for(const kind of ["emitter","particle","motion","output"])g=edits.apply(g,{type:"addNode",nodeType:kind},next);
+for(let i=0;i<3;i++)g=edits.apply(g,{type:"connect",from:g.nodes[i].id,to:g.nodes[i+1].id},next);
+const motion=g.nodes[2];eq(edits.nativeRecordSchema(motion),1);eq(g.edges[2].sourcePort,"2");eq(g.edges[1].destinationPort,"1");
+let forceGraph=edits.apply(g,{type:"addNode",nodeType:"force"},()=>"f".repeat(32));
+ok(!edits.canConnect(forceGraph,motion.id,"f".repeat(32),"2","1"));
+ok(edits.canConnect(forceGraph,"f".repeat(32),motion.id,"2","1"));
+const project=()=>view.project(g,null,{width:1920,height:1080,pixelAspect:1}).nodes.find(n=>n.id===motion.id);
+let node=project();eq(node.kind,"motion");eq(node.inputPort,"1");eq(node.outputPort,"2");
+eq(node.params.map(p=>p.label),["Motion Type","Origin Type","Origin XY","Origin Z","Angle X","Angle Y","Angle Z","Offset X","Offset Y","Offset Z","Speed","Speed Random"]);
+eq(node.params.find(p=>p.label==="Origin Type").choices,["Point","Particle Origin","Emitter Origin"]);
+eq(node.params.find(p=>p.label==="Motion Type").choices,["Circle"]);eq(node.params.find(p=>p.label==="Speed").value,100);
+eq(node.params.find(p=>p.label==="Origin XY").value,[960,540]);eq(node.curves.size.points,[{age:0,value:100},{age:1,value:100}]);
+const speed=node.params.find(p=>p.label==="Speed");eq(view.parameterToGraphValue(speed,50),Math.PI);
+eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Origin XY"),[2040,540]),[1,0,0]);
+eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Angle X"),30),[-30,0,0]);
+eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Offset Y"),540),[0,-.5,0]);
+const curve=view.encodeCurve([{age:0,value:25},{age:1,value:75}]);
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"6",valueType:7,value:curve}]},next);
+eq(project().curves.size.points.map(p=>({age:p.age,value:p.value})),[{age:0,value:25},{age:1,value:75}]);
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"6",remove:true}]},next);ok(!g.nodes[2].parameters.some(p=>p.key==="6"));
+for(const [key,value,type] of [["1",0,3],["13",3,3],["5",101,4],["4",1e8,4],["14",[32768,0,0],5]]){
+    const bad=codec.fromHex(codec.toHex(g));bad.nodes[2].parameters.find(p=>p.key===key).value=value;
+    checks++;assert.throws(()=>edits.nativeRecordSchema(bad.nodes[2]),e=>e.code==="invalid_native_node_record");}
+eq(codec.toHex(codec.fromHex(codec.toHex(g))),codec.toHex(g));
+g=edits.apply(g,{type:"deleteNodes",nodeIds:[motion.id]},next);eq(g.edges.length,1);
+eq((fs.readFileSync(path.resolve(root,"index.html"),"utf8").match(/data-node-type="motion"/g)||[]).length,2);
+console.log(`Motion panel: ${checks} checks passed; Circle palette/ports/units/origins/curve persistence and removal`);

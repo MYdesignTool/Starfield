@@ -106,6 +106,19 @@ Result<CompiledMotionCircle> read_motion_circle(const GraphNode& node) {
         const auto* bytes=std::get_if<OpaqueBytes>(raw);
         if(!bytes||!decode_age_curve(*bytes,s.over_life,0,1000))return R::failure(ErrorCode::invalid_request,"invalid Motion Over Life curve");
     }
+    if(const auto* raw=find_value(node,kMotionOriginType)) {
+        const auto* type=std::get_if<std::uint32_t>(raw);
+        if(!type||*type>2)return R::failure(ErrorCode::invalid_request,"invalid Motion Circle origin type");
+        s.origin_type=static_cast<MotionCircleOrigin>(*type);
+    }
+    if(const auto* raw=find_value(node,kMotionOffset)) {
+        const auto* offset=std::get_if<Vec3>(raw);if(!offset)return R::failure(ErrorCode::invalid_request,"invalid Motion Circle offset");s.offset=*offset;
+    }
+    if(const auto* raw=find_value(node,kMotionAxisAngles)) {
+        const auto* angles=std::get_if<Vec3>(raw);
+        if(!angles||!motion_circle_detail::bounded(*angles))return R::failure(ErrorCode::invalid_request,"invalid Motion Circle axis angles");
+        s.axis=motion_pose_detail::euler({0,0,1},*angles);
+    }
     return compile_motion_circle(s);
 }
 double motion_speed_random(const ParticleInstance& p,NodeId motion,std::uint32_t seed) noexcept {
@@ -117,8 +130,9 @@ double motion_speed_random(const ParticleInstance& p,NodeId motion,std::uint32_t
 double motion_speed_factor(const ParticleInstance& p,NodeId motion,std::uint32_t seed,double percent) noexcept {
     return 1-percent/100*motion_speed_random(p,motion,seed);
 }
-Result<bool> apply_circle_state(ParticleInstance& p,const CompiledMotionCircle& c,double angle,double omega) {
-    auto state=c.apply(p.position,p.velocity,angle,omega);
+Result<bool> apply_circle_state(ParticleInstance& p,const CompiledMotionCircle& c,double angle,double omega,
+    MotionCircleOrigins origins={},MotionCircleGeometryRate geometry_rate={}) {
+    auto state=c.apply(p.position,p.velocity,angle,omega,origins,geometry_rate);
     if(!state.has_value())return Result<bool>::failure(state.error());
     p.position=state.value().position;p.velocity=state.value().velocity;return Result<bool>::success(true);
 }

@@ -16,6 +16,7 @@ const legacyKind=process.env.STARFIELD_DOM_LEGACY_KIND || (legacyParticleLabel?"
 const catalogDir=process.env.STARFIELD_NODE_CATALOG_DIR;
 const invalidateCommit=process.env.STARFIELD_DOM_INVALIDATE_COMMIT==="1";
 const reloadOnCommit=process.env.STARFIELD_DOM_RELOAD_ON_COMMIT==="1";
+const hasMotion=process.env.STARFIELD_DOM_MOTION==="1";
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
@@ -106,6 +107,7 @@ if(process.env.STARFIELD_DOM_MATERIAL==="1"){
     g=edits.apply(g,{type:"connect",from:uuid(108),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(110));
     // Exercise the actual new-node default before changing to independent color.
 }
+if(hasMotion)g=edits.apply(g,{type:"addNode",nodeType:"motion"},()=>uuid(111));
 const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[n.id],
     outgoing:g.edges.filter(e=>e.sourceNode===n.id).map(e=>({id:e.id,target:e.destinationNode})).sort((a,b)=>a.id.localeCompare(b.id))});
 api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output && n.type!==edits.types.material).map(n=>{
@@ -128,6 +130,9 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
             material.parameters.find(p=>p.key===String(key)).value=value;
     }
     if(replace)for(const n of nodes)for(const e of n.outgoing)if(e.target===previousModelId)e.target=desired.id;
+    if(hasMotion){const motion=nodes.find(n=>n.type===edits.types.motion);
+        for(const [key,value] of [[13,2],[14,[-30,45,-60]],[15,[.2,-.3,.4]],[4,6*Math.PI],[5,25]])motion.parameters.find(p=>p.key===String(key)).value=value;
+        motion.parameters=motion.parameters.filter(p=>p.key!=="6");motion.parameters.push({key:"6",type:7,value:Array.from(require(path.join(root,"js/graph_view.js")).encodeCurve([{age:0,value:25},{age:1,value:75}]))});}
     for(const node of nodes)node.schemaVersion=edits.nativeRecordSchema(node);
     if(reorderedConnections)for(const node of nodes)node.outgoing=node.outgoing.slice().reverse().map(edge=>({target:edge.target,id:edge.id}));
     const r=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,
@@ -157,6 +162,14 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
             eq(material.properties[name].value,field(key)*(key===6?1:100));
     }
     if(typeof host.SFLD_modelTransactionReady==="function")eq(host.SFLD_modelTransactionReady(),gatewayBuild);
+    if(hasMotion){const motion=items.find(e=>e.matchName==="org.starfieldfx.node.motion"),field=k=>pair.nodes.find(n=>n.type===edits.types.motion).parameters.find(p=>p.key===String(k)).value;
+        eq(motion.properties["Motion Type"].value,1);eq(motion.properties["Origin Type"].value,3);
+        eq(motion.properties["Speed"].value,300);eq(motion.properties["Speed Random"].value,25);
+        eq(motion.properties["Angle X"].value,30);eq(motion.properties["Angle Y"].value,45);eq(motion.properties["Angle Z"].value,60);
+        eq(motion.properties["Offset X"].value,216);eq(motion.properties["Offset Y"].value,324);eq(motion.properties["Offset Z"].value,432);
+        eq(motion.properties["Motion Over Life"].value,2);eq(motion.properties["Motion Over Life Curve 1 Value"].value,75);
+        const read=copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.find(n=>n.type===edits.types.motion);
+        for(const p of read.parameters)eq(p.value,field(p.key));}
     let current=copy(api.snapshot(api.resolve({pinTarget:true,target:{token}})));const model=current.nativeNodes.find(n=>n.id===desired.id);
     eq(model.parameters.find(p=>p.key==="13").value,0);eq(model.modelAsset.revision,0);eq(arbReads,0);
     const effect=items.find(e=>e.matchName==="org.starfieldfx.node.model" && e.properties["Panel Sync Guard"].value!==2 &&

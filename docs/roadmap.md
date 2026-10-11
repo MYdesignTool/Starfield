@@ -1,5 +1,11 @@
 # 开发路线图
 
+2026-10-12 M3-18 Circle author candidate includes the owner-confirmed three
+Origin Type choices and owner-selected Speed100=one turn/second. Independent
+native kind7 and CEP76 controls/curve are ready for frozen native72 ten-module
+qualification and staged paired deployment. Light Path/Look At, ordered Force,
+merges and M3-19 remain active work; this is not completion of the full goal.
+
 2026-10-12 M3-17 native71/CEP75 repair follows the owner's Model → Material → Output
 direction. CEP material edits avoid full asset transactions; native binding spans
 are stable and removed aliases are retired. Legacy attachments remain readable.

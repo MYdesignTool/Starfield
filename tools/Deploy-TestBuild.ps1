@@ -6,13 +6,15 @@ param(
     [switch]$Rollback,
     [switch]$KeepNative,
     [switch]$IncludeModel,
-    [switch]$IncludeMaterial
+    [switch]$IncludeMaterial,
+    [switch]$IncludeMotion
 )
 $ErrorActionPreference = 'Stop'
 if ($Install -and $Rollback) { throw 'Choose one action.' }
 if ($KeepNative -and $Rollback) { throw 'KeepNative belongs to a panel-only installation, not rollback.' }
 if ($IncludeModel -and $KeepNative) { throw 'Model requires a full native/Core/panel paired installation.' }
 if ($IncludeMaterial -and (-not $IncludeModel -or $KeepNative)) { throw 'Material requires a full -IncludeModel native/Core/panel pair.' }
+if($IncludeMotion -and (-not $IncludeMaterial -or $KeepNative)){throw 'Motion requires a complete -IncludeModel -IncludeMaterial native/Core/panel pair.'}
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $destination = (Resolve-Path -LiteralPath $PluginDir).Path
 $bundle = Join-Path $repo 'dist'
@@ -31,9 +33,12 @@ if ($Rollback -and (Test-Path -LiteralPath $recordPath)) {
     $taskRollbackRecord=Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
     if($taskRollbackRecord.modelCandidate){$IncludeModel=$true}
     if($taskRollbackRecord.materialCandidate){$IncludeMaterial=$true}
+    if($taskRollbackRecord.motionCandidate){$IncludeMotion=$true}
 }
 if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldModel.aex'))){$IncludeModel=$true}
 if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMaterial.aex'))){$IncludeMaterial=$true}
+if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMotion.aex'))){$IncludeMotion=$true}
+if(-not $Rollback -and -not $KeepNative -and -not $IncludeMotion -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMotion.aex'))){throw 'Installed Motion requires a complete -IncludeMotion pair; refusing a partial replacement.'}
 if(-not $Rollback -and -not $KeepNative -and -not $IncludeMaterial -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMaterial.aex'))){
     throw 'Installed Material requires a full -IncludeModel -IncludeMaterial pair; refusing a partial replacement.'
 }
@@ -42,6 +47,7 @@ if(-not $Rollback -and -not $KeepNative -and -not $IncludeModel -and (Test-Path 
 }
 if($IncludeModel){$names += 'StarfieldModel.aex'}
 if($IncludeMaterial){$names += 'StarfieldMaterial.aex'}
+if($IncludeMotion){$names += 'StarfieldMotion.aex'}
 # Preserve CEP-only rollback support for the installed pre-Transform bundle.
 if ($KeepNative -and -not (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTransform.aex'))) {
     $names = @($names | Where-Object { $_ -ne 'StarfieldTransform.aex' })
@@ -145,7 +151,7 @@ if ($KeepNative) {
 }
 New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
-    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel;materialCandidate=[bool]$IncludeMaterial}
+    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel;materialCandidate=[bool]$IncludeMaterial;motionCandidate=[bool]$IncludeMotion}
 if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
 foreach ($name in $allowedNames) {
     $target = Join-Path $bundle $name

@@ -1,6 +1,7 @@
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/AgeCurve.hpp"
 #include "starfield/core/MotionCircle.hpp"
+#include "starfield/core/ParticleMotionPose.hpp"
 #include "starfield/core/MotionBlur.hpp"
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -66,7 +67,10 @@ struct Sampler:TemporalGraphSampler {
         if(!proof)return {};for(auto& n:graph.nodes)if(n.id==id){MotionCircleSettings s;
             for(auto& p:n.parameters){if(p.key==kMotionOrigin)s.origin=std::get<Vec3>(p.value);if(p.key==kMotionAxis)s.axis=std::get<Vec3>(p.value);
                 if(p.key==kMotionAngularRate)s.radians_per_second=std::get<double>(p.value);if(p.key==kMotionSpeedRandom)s.speed_random_percent=std::get<double>(p.value);
+                if(p.key==kMotionOriginType)s.origin_type=static_cast<MotionCircleOrigin>(std::get<std::uint32_t>(p.value));
+                if(p.key==kMotionOffset)s.offset=std::get<Vec3>(p.value);
                 if(p.key==kMotionOverLife)check(decode_age_curve(std::get<OpaqueBytes>(p.value),s.over_life,0,1000),"metadata curve");}
+            for(auto& p:n.parameters)if(p.key==kMotionAxisAngles)s.axis=motion_pose_detail::euler({0,0,1},std::get<Vec3>(p.value));
             return s;}return {};
     }
 };
@@ -171,6 +175,37 @@ void auxiliary_and_render() {
     near(linear.particles[0].position,Vec3{.125,.125,0},"Linear shutter documented chord approximation");
     near(evaluate(draw,{1,2}).particles[0].position,Vec3{.25/std::sqrt(2.),.25/std::sqrt(2.),0},"Subframe samples actual circle");
 }
+void author_origins_and_geometry() {
+    auto g=base();attach(g);set(node(g,1),kEmittingMode,std::uint32_t{1});
+    set(node(g,3),kMotionOriginType,std::uint32_t{1});
+    near(evaluate(g).particles[0].position,Vec3{.25,0,0},"Particle Origin leaves stationary emitted position unchanged");
+    set(node(g,3),kMotionOriginType,std::uint32_t{2});
+    near(evaluate(g).particles[0].position,Vec3{.25,0,0},"Emitter Origin uses actual birth pivot");
+    set(node(g,3),kMotionOffset,Vec3{0,.25,0});
+    near(evaluate(g).particles[0].position,Vec3{.5,.25,0},"Offset translates chosen birth pivot");
+    Sampler s(g);same(evaluate(g),temporal(s));s.proof=true;same(evaluate(g),temporal(s));
+    const auto bytes=take(serialize_graph(g,particle_node_registry()));
+    auto restored=take(deserialize_graph(bytes,particle_node_registry()));same(evaluate(g),evaluate(restored));
+    set(node(g,3),kMotionOriginType,std::uint32_t{0});set(node(g,3),kMotionOffset,Vec3{});
+    set(node(g,3),kMotionAxisAngles,Vec3{0,90,0});
+    near(evaluate(g).particles[0].position,Vec3{.25,0,0},"Angle Y rotates orbit axis onto X");
+    set(node(g,3),kMotionAxisAngles,Vec3{});set(node(g,3),kMotionAngularRate,2*pi);
+    near(evaluate(g).particles[0].position,Vec3{.25,0,0},"Speed100 owner mapping completes one turn per second");
+    near(evaluate(g,{1,4}).particles[0].position,Vec3{0,.25,0},"Speed100 quarter second quarter turn");
+    set(node(g,3),kMotionOriginType,std::uint32_t{3});check(!evaluate_particle_graph(g,{1,1},never).has_value(),"invalid origin enum rejects");
+    set(node(g,3),kMotionOriginType,std::uint32_t{0});set(node(g,3),kMotionAngularRate,pi/2);
+    Sampler moving(g);moving.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode)set(n,kMotionOrigin,Vec3{t,0,0});};
+    auto orbit=temporal(moving);near(orbit.particles[0].position,Vec3{1,-.75,0},"animated Point frame geometry");
+    near(orbit.particles[0].velocity,Vec3{1+.75*pi/2,-1,0},"animated pivot derivative contributes velocity");
+    for(auto [key,count]:moving.calls){check(key.second>=0&&key.second<=1,"geometry derivative queries stay inside birth/request");check(count==1,"geometry derivative reuses immutable samples");}
+    Sampler axes(g);axes.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode)set(n,kMotionAxisAngles,Vec3{90*t,0,0});};
+    auto tilted=temporal(axes);near(tilted.particles[0].position,Vec3{0,0,-.25},"animated X angle tilts circle into XZ plane");
+    near(tilted.particles[0].velocity,Vec3{-pi/8,-pi/8,0},"animated axis tangent contributes velocity",.001);
+    MotionCircleSettings numeric;numeric.origin_type=MotionCircleOrigin::particle;
+    auto compiled=take(compile_motion_circle(numeric));
+    check(!compiled.apply({}, {},1,1,{{1e10,0,0},{}}).has_value(),"birth pivot bounds reject before publication");
+    numeric.offset={std::numeric_limits<double>::quiet_NaN(),0,0};check(!compile_motion_circle(numeric).has_value(),"nonfinite offset rejects");
+}
 void failures_and_limits() {
     auto g=base();attach(g);auto original=take(serialize_graph(g,particle_node_registry()));
     struct Interrupt:Cancellation {mutable unsigned calls{};unsigned after{};
@@ -200,6 +235,6 @@ void failures_and_limits() {
     for(auto& worker:workers)worker.join();check(good,"concurrent graph requests deterministic");
 }
 }
-int main()try{curve_math();graph_and_history();topology_force_transform();auxiliary_and_render();failures_and_limits();
+int main()try{curve_math();graph_and_history();topology_force_transform();auxiliary_and_render();author_origins_and_geometry();failures_and_limits();
     std::printf("motion_circle_graph_tests: %u checks passed; graph/history/codec/CPU/Circle only, no AE qualification\n",checks);return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"motion_circle_graph_tests: after %u checks: %s\n",checks,e.what());return 1;}

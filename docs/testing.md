@@ -1,5 +1,19 @@
 # 测试入口
 
+## M3-18 Circle author candidate — 2026-10-12
+
+RunMotionCircleGraphTests.ps1 -Run [-Sanitize]: standard/ASAN2020 passed;
+RunMotionFrameTests.ps1 -Run -Sanitize:4150 passed. Scope includes birth pivots,
+offset/axis angles, animated geometry velocity and ordered Transform regression.
+RunMotionNativeBindingTests.ps1 -Run:636 passed before added curve-bank checks;
+final ASAN run is recorded separately. RunModelPanelAudit.ps1 against isolated
+motion-panel76 passed actual seven registration catalogs,582 record checks,
+ES3 parse18 and wrapper/reload/transaction matrix116..117. Motion panel28 and
+dummy71/75→72/76 paired deployment/rollback66 pass. These do not qualify AE2023.
+Logs: artifacts/motion-circle-author-*.log, motion-native-author-*.log,
+motion76-panel-audit.log, motion72-deployment-tests-v2.log. Full frozen SDK,
+frozen source regression and installed pairing evidence are pending.
+
 ## M3-17 native71 / CEP75 downstream Material deployed — 2026-10-12
 
 Owned source regressions: Material core49 and native registration/binding183

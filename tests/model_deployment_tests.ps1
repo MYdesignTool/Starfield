@@ -1,9 +1,9 @@
-param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64,65,66,67,68,69,70)][int]$InstalledModelBuild=61)
+param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64,65,66,67,68,69,70,71)][int]$InstalledModelBuild=61)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: simulated complete native61/CEP62 deployment and paired rollback under artifacts; add -Run.';exit 0}
-$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 70){74}elseif($InstalledModelBuild -eq 69){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+2}}else{61}
-$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 70){75}elseif($InstalledModelBuild -eq 69){73}elseif($InstalledModelBuild -eq 68){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+3}}else{62}
+$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 71){75}elseif($InstalledModelBuild -eq 70){74}elseif($InstalledModelBuild -eq 69){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+2}}else{61}
+$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 71){76}elseif($InstalledModelBuild -eq 70){75}elseif($InstalledModelBuild -eq 69){73}elseif($InstalledModelBuild -eq 68){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+3}}else{62}
 $taskRoot=Join-Path $taskRepo ('artifacts/deploy-test/model-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
 $taskChecks=0
@@ -18,8 +18,8 @@ New-Item -ItemType Junction -Path (Join-Path $taskPlugin 'Starfield') -Target $t
 New-Item -ItemType Junction -Path $taskCep -Target $taskPanelRoot | Out-Null
 $taskNames=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldHost.aex','StarfieldCore.dll')
 $taskOldNative=@();$taskNewNative=@()
-foreach($taskName in ($taskNames+@('StarfieldModel.aex')+$(if($taskNewBuild -ge 70){@('StarfieldMaterial.aex')}else{@()}))){$taskNew=Join-Path $taskPrepared ('native-bundle/'+$taskName);Write-ModelTest $taskNew ('new-model-pair-'+$taskName);$taskNewNative+=[pscustomobject]@{name=$taskName;hash=(Hash-ModelTest $taskNew)};
-    if(($taskName -ne 'StarfieldMaterial.aex' -or $taskOldBuild -ge 70) -and ($UpgradeInstalledModel -or $taskName -ne 'StarfieldModel.aex')){$taskOld=Join-Path $taskBundle $taskName;Write-ModelTest $taskOld ('old-native'+$taskOldBuild+'-'+$taskName);$taskOldNative+=[pscustomobject]@{name=$taskName;hash=(Hash-ModelTest $taskOld)}}}
+foreach($taskName in ($taskNames+@('StarfieldModel.aex')+$(if($taskNewBuild -ge 70){@('StarfieldMaterial.aex')}else{@()})+$(if($taskNewBuild -ge 72){@('StarfieldMotion.aex')}else{@()}))){$taskNew=Join-Path $taskPrepared ('native-bundle/'+$taskName);Write-ModelTest $taskNew ('new-model-pair-'+$taskName);$taskNewNative+=[pscustomobject]@{name=$taskName;hash=(Hash-ModelTest $taskNew)};
+    if(($taskName -ne 'StarfieldMotion.aex' -or $taskOldBuild -ge 72) -and ($taskName -ne 'StarfieldMaterial.aex' -or $taskOldBuild -ge 70) -and ($UpgradeInstalledModel -or $taskName -ne 'StarfieldModel.aex')){$taskOld=Join-Path $taskBundle $taskName;Write-ModelTest $taskOld ('old-native'+$taskOldBuild+'-'+$taskName);$taskOldNative+=[pscustomobject]@{name=$taskName;hash=(Hash-ModelTest $taskOld)}}}
 $taskOldCore=($taskOldNative | Where-Object name -eq 'StarfieldCore.dll').hash;$taskOldSelector='StarfieldCore-'+$taskOldCore.Substring(0,16)+'.dll'
 Write-ModelTest (Join-Path $taskBundle ('StarfieldRuntime/'+$taskOldSelector)) ([IO.File]::ReadAllText((Join-Path $taskBundle 'StarfieldCore.dll')))
 Write-ModelTest (Join-Path $taskBundle 'StarfieldRuntime/current.txt') $taskOldSelector
@@ -67,6 +67,7 @@ foreach($taskEntry in $taskOldNative){Assert-ModelTest ((Hash-ModelTest (Join-Pa
 foreach($taskEntry in $taskOldPanel){Assert-ModelTest ((Hash-ModelTest (Join-Path $taskRoot $taskEntry.path)) -eq $taskEntry.installedHash) 'Restored CEP61 differs.'}
 Assert-ModelTest ((Test-Path (Join-Path $taskBundle 'StarfieldModel.aex')) -eq [bool]$UpgradeInstalledModel) 'Model existence after rollback differs from baseline.'
 Assert-ModelTest ((Test-Path (Join-Path $taskBundle 'StarfieldMaterial.aex')) -eq ($taskOldBuild -ge 70)) 'Material existence after rollback differs from baseline.'
+Assert-ModelTest ((Test-Path (Join-Path $taskBundle 'StarfieldMotion.aex')) -eq ($taskOldBuild -ge 72)) 'Motion existence after rollback differs from baseline.'
 foreach($taskEntry in $taskNewPanel | Where-Object path -notin $taskOldPanel.path){Assert-ModelTest (-not (Test-Path (Join-Path $taskRoot $taskEntry.path))) 'New helper remains after rollback.'}
 Assert-ModelTest (([IO.File]::ReadAllText((Join-Path $taskBundle 'StarfieldRuntime/current.txt'))).Trim() -eq $taskOldSelector) 'Old selector not restored.'
 Write-Host "model_deployment_tests: $taskChecks checks passed; dummy binaries and sources, no real Adobe paths changed. Fixture: $taskRoot"

@@ -187,7 +187,7 @@ class TemporalEvaluator {
         return P::success({geometry.take_value(),distance,rate});
     }
     Result<bool> apply_motion_frame(ParticleInstance& particle,const Branch& branch,double birth,double now,
-        std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph) {
+        std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph,MotionCircleOrigins origins) {
         using M=Result<bool>;
 
         for(std::size_t index=0;index<branch.motions.size();++index) {
@@ -196,7 +196,8 @@ class TemporalEvaluator {
             if(stage.type_key==kTransformNode){
                 if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"ordered Transform history work limit");
                 auto transform=transform_at(stage,now);if(!transform.has_value())return M::failure(transform.error());
-                auto moved=apply_ordered_particle_transform(particle,transform.value());if(!moved.has_value())return moved;continue;
+                auto moved=apply_ordered_particle_transform(particle,transform.value());if(!moved.has_value())return moved;
+                origins.particle=transform.value().position(origins.particle);origins.emitter=transform.value().position(origins.emitter);continue;
             }
             const auto mode=std::get<std::uint32_t>(*find_value(stage,kMotionMode));
             if(mode==2){auto turned=look_at(particle,stage,now,graph);if(!turned.has_value())return turned;continue;}
@@ -244,7 +245,27 @@ class TemporalEvaluator {
                 }
             }
             if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Motion Circle history work limit");
-            auto moved=apply_circle_state(particle,c,angle,omega);if(!moved.has_value())return moved;
+            MotionCircleGeometryRate geometry_rate;
+            // A bounded backwards interval stays inside the particle's history.
+            // Project the secant onto the current axis tangent to differentiate a unit axis.
+            if(!proof->second&&now>birth) {
+                const auto previous_time=std::max(birth,now-1/hz);
+                auto previous=circle_at(stage,previous_time);if(!previous.has_value())return M::failure(previous.error());
+                const auto& old=previous.value()->settings();const auto& current_settings=c.settings();
+                const auto dt=now-previous_time;
+                const auto pivot=[](const MotionCircleSettings& settings) {
+                    auto v=settings.offset;if(settings.origin_type==MotionCircleOrigin::point)
+                        v={v.x+settings.origin.x,v.y+settings.origin.y,v.z+settings.origin.z};return v;
+                };
+                const auto p=pivot(current_settings),q=pivot(old),u=c.unit_axis(),v=previous.value()->unit_axis();
+                // Origin Type is discrete; switching it does not invent a velocity impulse.
+                if(old.origin_type==current_settings.origin_type)
+                    geometry_rate.pivot_velocity={(p.x-q.x)/dt,(p.y-q.y)/dt,(p.z-q.z)/dt};
+                Vec3 axis_rate{(u.x-v.x)/dt,(u.y-v.y)/dt,(u.z-v.z)/dt};
+                const auto dot=u.x*axis_rate.x+u.y*axis_rate.y+u.z*axis_rate.z;
+                geometry_rate.unit_axis_velocity={axis_rate.x-u.x*dot,axis_rate.y-u.y*dot,axis_rate.z-u.z*dot};
+            }
+            auto moved=apply_circle_state(particle,c,angle,omega,origins,geometry_rate);if(!moved.has_value())return moved;
         }
         return M::success(true);
     }
@@ -637,11 +658,15 @@ public:
                         const auto* tf=branch.transform && branch.transform->combined?&*branch.transform->combined:nullptr;
                         if(tf){instance.position=tf->position(instance.position);instance.velocity=tf->velocity(instance.velocity);}
                         const Vec3 birth_position=instance.position;
+                        auto emitter_origin=own.emitter_origin;
+                        if(auxiliary)emitter_origin={emitter_origin.x+parent.position.x,emitter_origin.y+parent.position.y,emitter_origin.z+parent.position.z};
+                        if(tf)emitter_origin=tf->position(emitter_origin);
                         auto moved=motion(instance,branch,birth,now,own.seed);if(!moved.has_value()) return R::failure(moved.error());
                         apply_particle_style(instance,looks,own.seed);
                         apply_particle_properties(instance,particle_values,own.seed,birth_position,tf);
                         if(branch.transform)apply_transform_style(instance,*branch.transform);
-                        auto turned=apply_motion_frame(instance,branch,birth,now,own.seed,nodes,result);if(!turned.has_value())return R::failure(turned.error());
+                        auto turned=apply_motion_frame(instance,branch,birth,now,own.seed,nodes,result,
+                            {birth_position,emitter_origin});if(!turned.has_value())return R::failure(turned.error());
                         if(particle_values.authored_birth)instance.id=branch_birth_identity(identity,branch.particle->id);
                         Candidate candidate{birth,std::move(instance)};
                         if(kept.size()<cap) kept.push(std::move(candidate));

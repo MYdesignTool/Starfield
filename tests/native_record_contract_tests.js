@@ -11,7 +11,7 @@ vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf
 const api=context.$.global.__SFLD_modelTransactionAPI;eq(api.recordContractId,contract.id);
 const foreign=vm.createContext({});
 const create=kind=>edits.apply({version:1,nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:kind},()=>"1".repeat(32)).nodes[0];
-for(const kind of ["emitter","particle","force","transform","model","material"]){const node=copy(create(kind));
+for(const kind of ["emitter","particle","force","transform","model","material","motion"]){const node=copy(create(kind));
     for(let label=1;label<=edits.schemaVersion(kind);label++){node.schemaVersion=label;
         for(const boundary of [contract.schema,api.recordSchema,edits.nativeRecordSchema])eq(boundary(node),edits.schemaVersion(kind));
         eq(contract.schema(vm.runInContext("("+JSON.stringify(node)+")",foreign)),edits.schemaVersion(kind));eq(node.schemaVersion,label);}
@@ -34,4 +34,4 @@ for(const key of [1,2,3,4,5,6])for(const value of (key===2?[[1,1,-.1],[1,1,1.1]]
 }
 bad(()=>contract.schema(copy(create("output"))));
 eq(contract.array(vm.runInContext("[]",foreign)),true);eq(contract.array({length:0}),false);
-console.log(`native_record_contract_tests: ${checks} checks passed; identical ES3 factory in browser/gateway, all six kinds, cross-realm data and strict wire/layout rejection`);
+console.log(`native_record_contract_tests: ${checks} checks passed; identical ES3 factory in browser/gateway, all seven kinds, cross-realm data and strict wire/layout rejection`);

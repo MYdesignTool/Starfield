@@ -52,8 +52,13 @@
     <TargetName>StarfieldMaterial</TargetName><NodePiPL>NodeMaterialPiPL.r</NodePiPL>
     <NodeKindDefine>STARFIELD_NODE_KIND_MATERIAL</NodeKindDefine>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Motion'">
+    <TargetName>StarfieldMotion</TargetName><NodePiPL>NodeMotionPiPL.r</NodePiPL>
+    <NodeKindDefine>STARFIELD_NODE_KIND_MOTION</NodeKindDefine>
+    <NodeOutFlags>STARFIELD_TRANSFORM_OUT_FLAGS</NodeOutFlags>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(NodePiPL)'==''">
-    <NodeKindError>NodeKind must be Emitter, Particle, Force, Transform, Model, or Material.</NodeKindError>
+    <NodeKindError>NodeKind must be Emitter, Particle, Force, Transform, Model, Material, or Motion.</NodeKindError>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
