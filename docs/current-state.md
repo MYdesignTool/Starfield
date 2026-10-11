@@ -1,5 +1,11 @@
 # 当前工程状态
 
+## CEP70 修正候选（未部署，2026-10-11）
+
+owner明确stage5：Particle59f0e5c664ba89e29834484229eea6c6 schema expected7/actual3。受控旧label3 actual gateway夹具复现原错误；Model最终核对改用与browser nativeRecordSchema一致的完整Particle布局投影，逐项类型/必需字段/重复及未知key检查后才映射7，所有请求值/位置/连接仍核对；准备阶段raw schema保持严格。安装文件声明7，实机为何返回3仍未确认。另一夹具证实gateway重载后transport保留旧API；两个页面按API身份/build配对，显式Model begin重新加载，原生检查点重取匹配API，foreign generation在prepare写入前拒绝，正常poll不反复加载。无ID/schema/ABI/native变更。
+
+transport1435/page脚本36/十DOM模式44或45、asset588/author74/preset583/完整ES3三JSX18/nested15/65-69→70 dummy64通过。当前安装仍65/69；CEP70源码冻结和配对发布继续，Motion/MNT保留，Git push仍待已有授权回复；真实AE验收开放。
+
 ## 当前安装：native65 / CEP69（2026-10-11 10:53+08）
 
 owner新报Saved node identity/layout/connection differs，stage5且两个rollback0。actual gateway完整Emitter/Particle/Force/双Particle分支/Model夹具，保持连接ID和目标，仅改变JSON成员顺序即可复现旧错误；没有证据断定这是AE实机根因。新核对按edge ID/target集合逐项匹配，与authoringStamp/portable graph的无序连接契约一致；count、重复、丢失和端点变化仍拒绝，坐标容差不扩大、identity/schema/参数仍严格核对。错误直接给prepare后或publish后步骤、node UUID、具体字段及有界expected/actual，无需用户再运行报告脚本。

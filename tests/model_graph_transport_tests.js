@@ -138,6 +138,28 @@ for(const phase of ["prepared","published"])for(const [label,mutation] of [
 }
 reset();savedMutation=ns=>{for(const n of ns)n.outgoing=n.outgoing.slice().reverse().map(e=>({target:e.target,id:e.id}));};
 client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true);eq(result.committed,true);eq(restores,0);eq(hostRuns,1);
+// The browser's nativeRecordSchema already projects a complete legacy Particle
+// control layout to schema7. Final verification must use that same contract.
+for(let label=1;label<=7;label++){
+    reset();savedMutation=ns=>{ns.find(n=>n.type===edits.types.particle).schemaVersion=label;};
+    client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(result.committed,true);eq(restores,0);
+    eq(nodes.find(n=>n.type===edits.types.particle).schemaVersion,label,"Raw saved record is not rewritten.");
+}
+for(const [field,mutate] of [
+    ["schemaVersion",n=>n.schemaVersion=8],["schemaVersion",n=>n.schemaVersion=0],["schemaVersion",n=>n.schemaVersion=3.5],
+    ["missing parameter 15",n=>n.parameters=n.parameters.filter(p=>p.key!=="15")],
+    ["parameter 31",n=>n.parameters.find(p=>p.key==="31").type=4],
+    ["parameter 3",n=>n.parameters.push(copy(n.parameters.find(p=>p.key==="3")))],
+    ["parameter 999",n=>n.parameters.push({key:"999",type:4,value:0})],
+    ["parameter 3",n=>n.parameters.find(p=>p.key==="3").value+=10]
+]){
+    reset();savedMutation=ns=>{const n=ns.find(n=>n.type===edits.types.particle);n.schemaVersion=3;mutate(n);};
+    client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);
+    ok(result.error.message.includes("verify published records"));ok(result.error.message.includes(field));
+}
+reset();preparedMutation=ns=>{ns.find(n=>n.type===edits.types.particle).schemaVersion=3;};
+client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(publishes,0);
+ok(result.error.message.includes("verify prepared records"));ok(result.error.message.includes("schemaVersion"));
 let fanout=edits.apply(imported,{type:"addNode",nodeType:"particle"},()=>uuid(8004));
 fanout=edits.apply(fanout,{type:"connect",from:fanout.nodes.find(n=>n.type===edits.types.emitter).id,to:uuid(8004)},()=>uuid(8005));
 fanout=edits.apply(fanout,{type:"connect",from:uuid(8004),to:fanout.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(8006));
@@ -227,4 +249,14 @@ for(const invalid of [[0,2,512,0,0,0,0,0,-1],null,"0|2|512", "0|2|2147483648|0|0
     "2|2|512|0|0|0|0|0|-1","0|8|512|0|0|0|0|0|-1","0|2|512|0|0|0|0|9|-1","0|2|512|0|0|0|0|0|63"]){
     eq(host.SFLD_modelTransactionHostResult(transactionId,invalid),"0");eq(saved.state,"complete");eq(saved.diagnostics.stage,2);
 }
+reset();let queued=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{...plan(cube),assets:[]})));
+eq(queued.ok,true);eq(JSON.parse(host.SFLD_queueModelGraphTransaction(request("queueModelGraphTransaction"))).ok,true);
+eq(host.SFLD_modelTransactionHostClaim(transactionId),"1");eq(host.SFLD_modelTransactionHostBegin(transactionId),"1");guard=1;
+host.__SFLD_modelTransactionAPI={...api,gatewayBuild:"foreign-generation"};
+eq(host.SFLD_modelTransactionHostPrepare(transactionId),"0");eq(writes,0);eq(publishes,0);
+ok(host.__SFLD_modelGraphTransactionV1.message.includes("Model gateway generation changed"));
+ok(host.__SFLD_modelGraphTransactionV1.message.includes(gatewayBuild));
+host.__SFLD_modelTransactionAPI=api;guard=0;
+eq(host.SFLD_modelTransactionHostResult(transactionId,"0|3|516|0|0|0|0|0|-1"),"1");
+eq(JSON.parse(host.SFLD_releaseModelGraphTransaction(request("releaseModelGraphTransaction"))).ok,true);
 console.log(`model_graph_transport_tests: ${checks} checks passed; actual candidate protocol/planner, simulated DOM/native writes; AE qualification open`);

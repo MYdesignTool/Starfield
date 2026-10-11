@@ -88,6 +88,8 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 CEP70候选修复owner精确Particle7/3差异：final核对按既有browser完整控制布局投影，未知schema/缺少必需字段/错误类型/重复和未知key/真实值变化仍拒绝回滚，prepared raw schema不变。API身份/build及显式begin重载处理persistent engine旧闭包；native checkpoints重取同代API，foreign generation写前失败。transport1435/page36/十DOM44或45/asset588/author74/preset583/ES3 18/nested15/65-69→70 dummy64通过；受控legacy label复现原错误，不认定实机为何读3。native65/ABI8保持，冻结及配对部署继续，Motion/MNT与Git待授权状态保留。
+
 2026-10-11 10:53+08 native65/CEP69从本地495f192 git archive冻结/27panel字节重现后发布，fresh AE0、KeepNative、26hash/selector/runtime及paired Restore report通过，备份69→68。native65/ABI8及9200c6b原生身份保持；追加65/68→65/69 dummy64，baseline69重现27安装字节。仅修复已复现的连接文本比较误判并精确报告其他差异，不认定AE实机根因；按owner既有要求暂停等待Model添加复验，完整目标未完成，Git push仍待已有授权请求。
 
 2026-10-11 当前CEP69候选处理stage5记录核对：actual gateway真实非空连接/双Particle分支仅换JSON成员顺序复现旧汇总错误，改为edge ID/target集合匹配并保留count/重复/丢失/端点严格检查；每个节点identity/type/schema/坐标/参数差异分别给expected/actual和prepare后/publish后步骤。transport1089/四DOM各42/export588/author74/preset583/ES3 18/nested prepare15/panel-only dummy64通过，native65/ABI8不变。不能确认实际AE失败原因；冻结和配对部署继续，Motion/MNT保持，Git push仍待已有授权请求。

@@ -1,5 +1,9 @@
 # 测试入口
 
+2026-10-11 M3-17 CEP70：`STARFIELD_PANEL_ROOT=artifacts/prepared/m3-17-panel70-gateway-binding-check/cep_panel`，transport1435通过，完整Particle layout的raw label1..7投影通过且原记录不改写；schema0/8/小数、缺少15、类型错误31、重复3、未知999、改变3值拒绝并整套模拟恢复，prepared schema变化仍不publish；foreign API generation在prepare writes0/publishes0时拒绝。`model_gateway_lifecycle_tests.js`执行真实两页面call()及其生成脚本，36通过；显式begin重载、缺少ready的旧helper、API对象替换和跨generation重新配对，连续poll加载数不增加。native写入/CEP/evalFile均模拟，不认定AE资格。
+
+actual gateway DOM十模式：`STARFIELD_DOM_FULL_GRAPH=0/1`、`STARFIELD_DOM_STALE_GATEWAY_API=1`（旧闭包/新API）、`STARFIELD_DOM_LEGACY_PARTICLE_LABEL=1`（受控旧3标签）和`STARFIELD_DOM_REORDER_CONNECTIONS=1`，各配`STARFIELD_DOM_STABLE_EFFECTS=0/1`；44或45通过。legacy3模式在原CEP69 verifier复现owner完全相同的published schema expected7/actual3，日志`artifacts/m3-17-particle-schema-before-fix.log`。安装文件声明7，AE实机为何返回3仍开放；受控夹具不代表已证明实机原因。asset588/author74/preset files583/三完整JSX ES3 18、nested prepare15、`panel_test_build_deployment_tests.ps1 -Run -InstalledNativeBuild 65 -InstalledPanelGeneration 69`64通过，日志`artifacts/m3-17-gateway-binding-*`。native65/源码9200c6b/ABI8保持，冻结与真实配对发布独立记录。
+
 2026-10-11 M3-17 CEP69：`STARFIELD_PANEL_ROOT` 指向隔离候选，model_graph_transport_tests1089，覆盖prepared/published两步的missing UUID/type/schema/x/y/edge count/edge ID/target/parameter与重复edge失败、模拟整套回滚、prepared失败不得publish，JSON成员和双分支edge slot排序不同可通过。actual gateway DOM默认Model/追加 `STARFIELD_DOM_FULL_GRAPH=1` 双Particle分支图、两种 `STARFIELD_DOM_STABLE_EFFECTS=0/1` 均42；`STARFIELD_DOM_REORDER_CONNECTIONS=1`输入字段顺序变化复现旧失败，新版通过。坐标使用小数，未扩大容差。字段诊断含UUID、步骤、expected/actual，不能据此认定AE根因或资格。
 
 export588/author74/preset file583/ES3完整三JSX18、nested preparation15、native65 panel-only dummy64；日志artifacts/m3-17-stage5-*。首次全图期望节点数未算Force已按实际before count修正。仅CEP改动，native65/ABI8不变。

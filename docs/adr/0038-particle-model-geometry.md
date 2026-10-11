@@ -2,6 +2,39 @@
 
 Status: native65/CEP69 semantic record verification deployed 2026-10-11; AE2023 qualification open. Task M3-17.
 
+### CEP70 Particle projection and gateway lifetime candidate — 2026-10-11
+
+Owner's precise published-record failure is Particle UUID59f0e5c664ba89e29834484229eea6c6,
+portable schema7 versus raw schema3. The installed gateway file declares7; this
+does not establish why the AE engine returned3. An actual gateway fixture with
+a controlled legacy3 projection reproduces the exact error. Browser
+graph_edits.nativeRecordSchema already maps complete native control layouts to
+current portable versions. Model final verification must use that same Particle
+projection rule: integer labels1..7 are accepted only after all required keys,
+known optional keys, unique identities and exact wire types are checked. Every
+requested parameter value, layout and edge is then compared as before. Unknown
+versions, missing required fields, duplicate/unknown keys and changed values
+still reject and restore. Prepared-to-live verification retains exact raw schema
+comparison. No raw record/stamp, saved graph hex, defaults, activation flag,
+parameter ID, persistent schema or ABI is rewritten by this rule.
+
+The persistent script engine has a separate lifecycle gap: the transport closes
+over its initial API, while a gateway reload replaces the public object. A fixture
+with an old captured API and new public gateway exercises that gap. Export the
+gateway build on the private API, check transport readiness by API identity and
+generation on both page callers, and reload the gateway at explicit Model begin.
+Reacquire the current matching API at requests/native target checkpoints;
+foreign generation fails before prepare writes. Ordinary polling reuses the
+paired closures. Sessions remain bounded plain data, so transport re-evaluation
+does not clear or replay an in-flight transaction. This is a demonstrated gap,
+not proof of the owner's actual AE engine cause.
+
+Transport1435, real generated page scripts36, ten actual DOM modes44/45,
+asset588/author74/preset583/full ES3 three-file18, nested preparation15 and
+native65/CEP69→70 dummy paired publication/restoration64 pass. Tests simulate
+native writes/CEP/AE DOM and do not qualify AE2023. Native65/source9200c6b/ABI8
+remain unchanged; CEP70 freeze/publication and owner Model acceptance are pending.
+
 ### CEP69 saved-record verification — 2026-10-11
 
 Owner reports the aggregate identity/layout/connection mismatch at stage5,

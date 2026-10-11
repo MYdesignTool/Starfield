@@ -10,6 +10,8 @@ const copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.fro
 const stableEffects=process.env.STARFIELD_DOM_STABLE_EFFECTS==="1";
 const fullGraph=process.env.STARFIELD_DOM_FULL_GRAPH==="1";
 const reorderedConnections=process.env.STARFIELD_DOM_REORDER_CONNECTIONS==="1";
+const staleGatewayAPI=process.env.STARFIELD_DOM_STALE_GATEWAY_API==="1";
+const legacyParticleLabel=process.env.STARFIELD_DOM_LEGACY_PARTICLE_LABEL==="1";
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
@@ -47,8 +49,17 @@ function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"
 const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
     beginUndoGroup(){undo++;},endUndoGroup(){undo++;},findMenuCommandId:()=>55,executeCommand(){commands++;}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
-vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"),context);
-const api=host.__SFLD_modelTransactionAPI;vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);
+const gatewaySource=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8");
+// The session engine survives CEP reloads. A transport may still close over a
+// previous gateway even after SFLD_ready and the public API have been replaced.
+const oldGatewaySource=gatewaySource.replace('type === "org.starfieldfx.nodes.particle" ? 7',
+    'type === "org.starfieldfx.nodes.particle" ? 3');
+if(staleGatewayAPI || legacyParticleLabel)assert.notEqual(oldGatewaySource,gatewaySource);
+vm.runInContext(staleGatewayAPI || legacyParticleLabel?oldGatewaySource:gatewaySource,context);
+vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);
+if(staleGatewayAPI)vm.runInContext(gatewaySource,context);
+let api=host.__SFLD_modelTransactionAPI;
+if(staleGatewayAPI && typeof host.SFLD_modelTransactionReady==="function")eq(host.SFLD_modelTransactionReady(),"");
 let resolved=api.resolve({pinTarget:true,target:{token}});ok(!resolved.error,JSON.stringify(resolved.error));
 resolved.properties.nodeEffectsReady.setValue(1);resolved.properties.revision.setValue(11);
 let g=fullGraph?require(path.join(root,"js/presets.js")).build("sparks",1080):{version:1,nodes:[],edges:[],optionalRecords:[]};
@@ -70,6 +81,7 @@ function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});co
     const desired=copy(before.nativeNodes.find(n=>n.type===edits.types.model));desired.id=uuid(++transaction);desired.position={x:160.456789123,y:90.567891234};
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
     const nodes=replace?before.nativeNodes.filter(n=>n.type!==edits.types.model).concat([desired]):before.nativeNodes.concat([desired]);
+    for(const node of nodes)node.schemaVersion=edits.nativeRecordSchema(node);
     if(reorderedConnections)for(const node of nodes)node.outgoing=node.outgoing.slice().reverse().map(edge=>({target:edge.target,id:edge.id}));
     const r=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,
         graphHex:codec.toHex(g),nodeManifest:nodes,rendererManifest:before.renderer,assets:[{nodeId:desired.id,source:2,revision:17,bounds,bytes:32}]})));
@@ -89,6 +101,7 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     items.push(backupMain,backupNode);epoch++;
     resolved=api.resolve({pinTarget:true,target:{token}});resolved.properties.guard.setValue(1);
     eq(host.SFLD_modelTransactionHostPrepare(id),"1",host.__SFLD_modelGraphTransactionV1.message);
+    if(typeof host.SFLD_modelTransactionReady==="function")eq(host.SFLD_modelTransactionReady(),gatewayBuild);
     let current=copy(api.snapshot(api.resolve({pinTarget:true,target:{token}})));const model=current.nativeNodes.find(n=>n.id===desired.id);
     eq(model.parameters.find(p=>p.key==="13").value,0);eq(model.modelAsset.revision,0);eq(arbReads,0);
     const effect=items.find(e=>e.matchName==="org.starfieldfx.node.model" && e.properties["Panel Sync Guard"].value!==2 &&
