@@ -1,5 +1,11 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+## native67部署及证据
+
+2026-10-11 14:48+08 native67/packed32835/CoreABI8/CEP71已部署。源码816eb83fc0da5a9757cbf8c1e483bcfb32104380经git archive冻结，完整May2023 x64 Release /MT八目标会话75911实际exit0；冻结ASAN native8802/camera12/Transform60、真实生成JS混合644/Transform168及整套PanelAudit均exit0，dummy66/71→67/71发布与整套恢复61通过。fresh AE0后经Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash、全部27已测CEP文件和selector/runtime独立核对通过。首次Emitter Type绑定覆盖Effect计数缺失/0/999/throw和八UUID不匹配；删除native66未经证实的计数契约假设，改为固定UUID参数名称查找，未找到源与非有限值分开诊断且均回滚。实机stream98失败是否消失仍等待owner自行复测；没有启动AE或执行验收脚本，不能视为客户发布资格。IDs/schema/ABI8保持，Motion/MNT改动保留；Git push仍待已有独立授权回复，部署交接后按owner既有要求暂停。
+
+原生完整构建及面板/ASAN冻结结果、26配对加27完整CEP哈希和整套回滚报告见current-state.md。首次回归中的native66重建表达式fixture误替换了初始化match位置，修正后独立反例通过，旧失败日志保留；全套Transform表达式不再复用旧生成数据，运行器每次重新编译生成。
+
 ## 新建效果重复失败与测试契约缺口
 
 2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。

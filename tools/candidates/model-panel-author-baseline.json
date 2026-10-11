@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Installed native66/Core ABI8/CEP71 from frozen source186cbf3; complete SDK/offline regressions and installed hashes pass. Rounded OBJ rejection is fixed offline; Model edit/performance host gates remain open. Owner chose manual testing and deferred automatic AE dispatch.",
+  "status": "Installed native67/Core ABI8/CEP71 from frozen source816eb83; complete SDK and offline regression gates and installed hashes pass. Named immutable UUID lookup replaces unsupported Effect count gate; fresh-layer stream98 and Model host qualification remain open. Owner selected manual testing; no AE dispatch.",
   "basePanel": 71,
   "files": [
     {
