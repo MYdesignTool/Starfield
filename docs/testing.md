@@ -344,3 +344,5 @@ Cloud native runner 默认只报告，加 -Run 才编译/执行；-Bindings 覆�
 
 2026-10-07 整理修正 Emitter7/Particle7/Force3、插值数组元数据、editor_presets 依赖、Motion Blur fake controls、625 主索引、ARB disk ID 和回滚 bundle 清单。保留有效失败断言；真正的实现失败与 Junction/驱动/工具缺失分开记录，不能删除或跳过失败套件来宣称全绿。
 本次最后结果见 [current-state.md](current-state.md) 与 artifacts/workspace-cleanup-20261007/清理记录.md。实际 AE、GPU 设备和 UI 验收继续按 compatibility-matrix，源测试不关闭宿主 gate。
+
+冻结标准 mixed fixture 增加名称回滚用例后，其聚合 main 在默认1MiB测试栈溢出（实际exit -1073741571）；旧 cmd 的 if errorlevel 1 未捕获负数退出码，后续JS缺文件才拒绝。runner现对标准/ASAN均使用测试exe专属16MiB栈并检查所有非零退出码。生产DLL栈/标志不变。第一冻结89e8507保留失败日志，不作为发布候选；修正版将重新冻结和全量构建。

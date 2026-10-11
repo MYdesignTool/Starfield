@@ -101,3 +101,5 @@ M3-17。CEP70出现另一 UUID 的 schema7/3 错误，owner要求停止逐个报
 `tools/Run-ModelAcceptance.jsx` 执行真实native idle事务、等待retained completion、重读snapshot，并逐字节native export回读资源。只创建临时文件夹/合成/solid，结束删除自身项目项并恢复合成选择，不保存工程；执行中超时保留测试合成，不能拆除native正在持有的对象。结果仅写artifacts。单独运行默认report。生成/CRC及引用重写、成功/失败/忙碌/超时清理和两个JSX ES3自检135通过，仍为替身。
 
 `tools/Run-ModelAcceptance.ps1 -Run -PreparedName model-acceptance-panel71` 启动指定AfterFX.exe，短时抑制脚本错误弹窗后恢复，保留AE运行；ADR0011要求单次明确process-start授权。当前尚无实际AE自动结果。撤销/保存重开、OBJ文件窗口、像素/时间行为、模态时序及GPU硬件gate仍开放，禁止称为可向客户发布。
+
+冻结标准 mixed fixture 增加名称回滚用例后，其聚合 main 在默认1MiB测试栈溢出（实际exit -1073741571）；旧 cmd 的 if errorlevel 1 未捕获负数退出码，后续JS缺文件才拒绝。runner现对标准/ASAN均使用测试exe专属16MiB栈并检查所有非零退出码。生产DLL栈/标志不变。第一冻结89e8507保留失败日志，不作为发布候选；修正版将重新冻结和全量构建。

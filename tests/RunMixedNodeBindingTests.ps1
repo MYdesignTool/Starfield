@@ -18,7 +18,7 @@ try {
         '/D_CRT_SECURE_NO_WARNINGS','/DSTARFIELD_NODE_KIND_EMITTER','/Iinclude','/Iae_plugin',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'))+$taskSources
-    $taskLink=''
+    $taskLink='/link /STACK:16777216'
     # This aggregate fixture keeps many graphs in main's frame. ASAN redzones
     # require a larger test-executable stack; production DLL flags stay intact.
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLink="/link /DEBUG /STACK:16777216 /PDB:$taskDir\tests.pdb"}
@@ -31,13 +31,13 @@ try {
     $taskBatch=@"
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul
-if errorlevel 1 exit /b %errorlevel%
+if not "%errorlevel%"=="0" exit /b %errorlevel%
 cl.exe @$taskDir\compile.rsp $taskLink
-if errorlevel 1 exit /b %errorlevel%
+if not "%errorlevel%"=="0" exit /b %errorlevel%
 $taskDir\tests.exe
-if errorlevel 1 exit /b %errorlevel%
+if not "%errorlevel%"=="0" exit /b %errorlevel%
 cl.exe @$taskDir\transform.rsp $taskTransformLink
-if errorlevel 1 exit /b %errorlevel%
+if not "%errorlevel%"=="0" exit /b %errorlevel%
 $taskDir\transform.exe
 exit /b %errorlevel%
 "@

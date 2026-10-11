@@ -453,3 +453,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 
 - owner 确认 native58 Comp 2 可选择并显示，native59 原生选择器可显示；旧CEP59添加曾拒绝合法 ID44。CEP61包含CEP60明确范围分支；当前节点添加已由owner实机确认修复。背面、八种时间采样、撤销/保存重开及 Source/Masks/Effects gate 继续。
 - native57/CEP57 Cloud 外观、动画、预设、撤销、保存重开及实际 AE GPU/shutter 行为待 owner 验收。既有宿主观察仅覆盖记录的 AE2023.5.0 Build52，不从编译扩展支持版本。
 - Face/Model、Path/Shadow、Texture Source/Masks/Effects stage等剩余 Particle行为仍开放；出生控制实现的host gate保留，PTF按owner决定等待Physics。
+
+冻结标准 mixed fixture 增加名称回滚用例后，其聚合 main 在默认1MiB测试栈溢出（实际exit -1073741571）；旧 cmd 的 if errorlevel 1 未捕获负数退出码，后续JS缺文件才拒绝。runner现对标准/ASAN均使用测试exe专属16MiB栈并检查所有非零退出码。生产DLL栈/标志不变。第一冻结89e8507保留失败日志，不作为发布候选；修正版将重新冻结和全量构建。
