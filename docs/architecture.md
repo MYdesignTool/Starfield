@@ -1,6 +1,6 @@
 # Starfield 架构
 
-M3-18 native72/CEP76 candidate adds an independent Motion Circle effect, kind7
+M3-18 native72/CEP76 deployed stage adds an independent Motion Circle effect, kind7
 and binding record9, preserving old record readers and CoreABI9. Origin contexts
 are evaluator-local owned numbers; ParticleInstance/Render/snapshot layout is
 unchanged. Circle frame velocity includes analytic pivot/axis derivative terms

@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-75";
+    var GATEWAY_BUILD = "native-presets-76";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -43,6 +43,7 @@
         "org.starfieldfx.nodes.particle": { kind: "particle", label: "Particle", matchName: "org.starfieldfx.node.particle" },
         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
         "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
+        "org.starfieldfx.nodes.motion": {kind:"motion",label:"Motion",matchName:"org.starfieldfx.node.motion"},
         "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"},
         "org.starfieldfx.nodes.material":{kind:"material",label:"Material",matchName:"org.starfieldfx.node.material"}
     };
@@ -439,7 +440,10 @@
             ageFirst: 970, valueFirst: 980, extraAgeBase: 3400, extraValueBase: 3500 },
         "Wind and Spin": { effect: "org.starfieldfx.node.force", count: { name: "Wind and Spin Curve Count", diskId: 900 },
             mode: { name: "Wind and Spin Curve Interpolation", diskId: 3614 }, prefix: "Wind and Spin Curve ", age: " Age",
-            ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 }
+            ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 },
+        "Motion Over Life": {effect:"org.starfieldfx.node.motion",count:{name:"Motion Over Life",diskId:1713},
+            mode:{name:"Motion Over Life Curve Interpolation",diskId:1714},prefix:"Motion Over Life Curve ",age:" Age",
+            ageFirst:3900,valueFirst:4100,extraAgeBase:3900,extraValueBase:4100}
     };
 
     function nativeCurveBank(effect, label) {
@@ -730,6 +734,8 @@
     }
 
     function materialControl(index){return {name:["Color Source","Color","Roughness","Metallic","Opacity","AE Lights"][index-1],diskId:1600+index};}
+    function motionControl(index){return {name:["Motion Type","Origin Type","Origin XY","Origin Z","Angle X","Angle Y","Angle Z",
+        "Offset X","Offset Y","Offset Z","Speed","Speed Random"][index-1],diskId:1700+index};}
     function modelControl(index) {
         var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
             "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
@@ -924,6 +930,7 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
@@ -955,6 +962,14 @@ function createNativeRecordContract() {
             var key=String(field.key),type=0;
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"motion") {
+                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
+                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
+                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
+                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
+                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
+                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+            }
             if(node.type===prefix+"material") {
                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
                 if(key==="2")for(var channel=0;channel<3;channel++)
@@ -1015,6 +1030,27 @@ function createNativeRecordContract() {
             var auxiliaryControls = [[24,"Emit Chance"],[25,"Emit Life Start"],[26,"Emit Life End"],
                 [27,"Inherit Velocity"],[28,"Inherit Size"],[29,"Inherit Opacity"],[30,"Inherit Color"]];
             for (var ac = 0; ac < auxiliaryControls.length; ac++) scalar(auxiliaryControls[ac][0], auxiliaryControls[ac][1]);
+        } else if(type==="org.starfieldfx.nodes.motion") {
+            var motionGeometry=transformGeometry(layer),motionOrigin=nodeControlValue(effect,motionControl(3));
+            var motionMode=Number(nodeControlValue(effect,motionControl(1))),motionOriginType=Number(nodeControlValue(effect,motionControl(2)));
+            if(motionMode!==1 || Math.floor(motionOriginType)!==motionOriginType || motionOriginType<1 || motionOriginType>3)throw new Error("Invalid Motion mode/origin type.");
+            node.parameters.push({key:"1",type:3,value:1},{key:"13",type:3,value:motionOriginType-1},
+                {key:"2",type:5,value:[(Number(motionOrigin[0])-motionGeometry.width/2)*motionGeometry.aspect/motionGeometry.height,
+                    .5-Number(motionOrigin[1])/motionGeometry.height,Number(nodeControlValue(effect,motionControl(4)))/motionGeometry.height]},
+                {key:"3",type:5,value:[0,0,1]},
+                {key:"14",type:5,value:[-Number(nodeControlValue(effect,motionControl(5))),Number(nodeControlValue(effect,motionControl(6))),-Number(nodeControlValue(effect,motionControl(7)))]},
+                {key:"15",type:5,value:[Number(nodeControlValue(effect,motionControl(8)))*motionGeometry.aspect/motionGeometry.height,
+                    -Number(nodeControlValue(effect,motionControl(9)))/motionGeometry.height,Number(nodeControlValue(effect,motionControl(10)))/motionGeometry.height]},
+                {key:"4",type:4,value:Number(nodeControlValue(effect,motionControl(11)))*(2*Math.PI/100)},
+                {key:"5",type:4,value:Number(nodeControlValue(effect,motionControl(12)))});
+            var motionBank=nativeCurveBank(effect,"Motion Over Life"),motionCount=Number(nodeControlValue(effect,motionBank.controls.count));
+            if(!isFinite(motionCount)||Math.floor(motionCount)!==motionCount||motionCount<0||motionCount>64||motionCount===1)throw new Error("Invalid Motion curve count.");
+            if(motionCount) {
+                var motionBytes=[1,motionCount,Number(nodeControlValue(effect,motionBank.controls.mode)),0];
+                for(var mp=0;mp<motionCount;mp++) {appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,false))));
+                    appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,true))));}
+                node.parameters.push({key:"6",type:7,value:motionBytes});
+            }
         } else if(type==="org.starfieldfx.nodes.material") {
             var materialSource=Number(nodeControlValue(effect,materialControl(1)));
             if(materialSource!==1 && materialSource!==2)throw new Error("Invalid native Material Color Source: "+materialSource);
@@ -1310,6 +1346,20 @@ function createNativeRecordContract() {
                     else if (Number(key) >= 24 && Number(key) <= 30) setNodeControl(effect,
                         ["Emit Chance","Emit Life Start","Emit Life End","Inherit Velocity","Inherit Size","Inherit Opacity","Inherit Color"][Number(key)-24], value);
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
+                } else if(type==="org.starfieldfx.nodes.motion") {
+                    var motionGeometry=transformGeometry(layer);
+                    if(key==="1")setNodeControl(effect,motionControl(1),1);
+                    else if(key==="13")setNodeControl(effect,motionControl(2),value+1);
+                    else if(key==="2") {
+                        setNodeControl(effect,motionControl(3),[motionGeometry.width/2+value[0]*motionGeometry.height/motionGeometry.aspect,motionGeometry.height/2-value[1]*motionGeometry.height]);
+                        setNodeControl(effect,motionControl(4),value[2]*motionGeometry.height);
+                    } else if(key==="3")continue; // Derived default axis; angles14 own its author controls.
+                    else if(key==="14" || key==="15")for(var ma=0;ma<3;ma++)setNodeControl(effect,motionControl((key==="14"?5:8)+ma),
+                        value[ma]*(key==="14"?(ma===1?1:-1):motionGeometry.height*(ma===0?1/motionGeometry.aspect:ma===1?-1:1)));
+                    else if(key==="4")setNodeControl(effect,motionControl(11),value*(100/(2*Math.PI)));
+                    else if(key==="5")setNodeControl(effect,motionControl(12),value);
+                    else if(key==="6")writeNodeCurve(effect,"Motion Over Life",value);
+                    else throw new Error("Motion graph parameter is not mapped: "+key);
                 } else if(type==="org.starfieldfx.nodes.material") {
                     // Portable enums are zero based; AE popup values are one based.
                     // Validate before any write and use exact native switch constants.
@@ -1423,6 +1473,7 @@ function createNativeRecordContract() {
                 }
             }
             if (type === "org.starfieldfx.nodes.force" && !nodeParameter(node,"9")) writeNodeCurve(effect,"Wind and Spin",null);
+            if(type==="org.starfieldfx.nodes.motion" && !nodeParameter(node,"6"))writeNodeCurve(effect,"Motion Over Life",null);
             if (type === "org.starfieldfx.nodes.particle") {
                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);

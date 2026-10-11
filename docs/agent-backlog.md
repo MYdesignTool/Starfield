@@ -344,6 +344,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-12 01:42+08 Circle阶段发布：源码09b84a2已推送并git archive冻结；完整May2023 /MT十模块双NoPublish实际exit0。冻结Circle ASAN2020、ordered frame ASAN4150、Motion实际注册/binding9 ASAN640、七类注册/DOM/reload/ES3完整审查和dummy配对回滚66通过。fresh AE0后安装native72/packed32840/CoreABI9/CEP76；独立10 native/18 paired/27全CEP及selector/runtime hash、491源码hash、backup9/18匹配。artifacts/m3-18-motion76-installed-proof.json及m3-17-native72 receipts保存证据；备份m3-18-native72-panel76-motion-circle-20261012恢复71/75。Circle仅作者开放，Force须上游；后置Force/异链合并、Light Path/Look At作者、AE2023验收及M3-19保持开放，完整目标active。不启动/调度AE。
+
 2026-10-12 当前卡恢复：Material native71/CEP75阶段源码777bb05已部署并推送。owner确认Circle Speed100一秒一圈、Origin Type为Point/Particle Origin/Emitter Origin；先完成Circle独立Core/原生/CEP作者及配对发布，再继续Light Path/Look At与M3-19。保留MNT在途文件；本卡拥有Motion数字类型、Graph/历史调用、独立原生节点/绑定、schema、候选CEP、构建部署及focused tests。
 
 2026-10-10 有序frame源码8bd5a5c已推送/git archive冻结；IncludeModelCandidate/NoDistPublish/NoRuntimePublish完整May2023 x64 Release /MT八目标会话81513实际terminal exit0，motion-frame-sdk-build.log/exit.txt/build-hashes.json及sdk-terminal.json保存八新输出。冻结Circle1842/Look At1377/Path8432再检actual exit0；新26安装hash/selector/runtime核对匹配61/63。没有Motion作者部署，下一步有序Force/外部资源依赖/动画几何导数/参考政策及三模式作者，完整目标active。

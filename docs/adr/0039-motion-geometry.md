@@ -1,9 +1,9 @@
 # ADR 0039 — Motion geometry and first three modes
 
 Status: numeric geometry and all three numeric graph modes implemented;
-public Motion contract remains proposed,
-M3-18. The native62/CEP64 Model fix also contains the current numeric source,
-but has no public Motion author entry.
+Circle author contract accepted for the staged native72/CEP76 release, M3-18.
+Circle AE2023 qualification, the other two authors and remaining interactions
+stay open. Historical Model releases carried numeric Motion without an author.
 
 ## Owner-approved incremental publication — 2026-10-10
 
@@ -17,6 +17,9 @@ the first-stage mode scope remains Light Path, Circle and Look At.
 
 The owner requested a pause after today's repaired Model build is deployed.
 Next work can select one publicly operable Motion stage when the goal resumes.
+
+The later owner resume supersedes that pause. Circle's author stage deployed
+2026-10-12; complete Motion/Turbulence work remains active.
 
 ## Scope and evidence
 

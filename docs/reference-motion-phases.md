@@ -2,6 +2,8 @@
 
 日期：2026-10-09。owner要求优先完善粒子节点，Motion首批只实现以下三种模式。截图是可见控件证据；具体方程和资源采样行为尚未测量，不能从标签推断为参考轨迹一致。
 
+2026-10-12更新：owner已确认Circle Origin Type完整菜单为Point、Particle Origin、Emitter Origin，并指定Speed100一秒一圈。这是owner选定的速度规则，非原版单位实测。Circle native72/CEP76作者阶段已部署；下方2026-10-09/10的Circle菜单/速度请求已被此回复取代。Light Path/Look At的目标和末端/延迟政策仍待参考。
+
 | 模式 | owner截图的可见控件及默认值 |
 | --- | --- |
 | Light Path | Starting With；Speed100；Speed Random0；Max Delay (Seconds)0.50；Delay Random0；Orient To Path关闭；Motion Over Life |

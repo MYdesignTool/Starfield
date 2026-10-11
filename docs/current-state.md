@@ -1,14 +1,33 @@
 # 当前工程状态
 
-## M3-18 Circle author candidate — 2026-10-12
+## M3-18 Circle native72 / CEP76 deployed — 2026-10-12 01:42+08
 
-native72/CEP76 source candidate adds independent Motion kind7/binding9 and the
+native72/CEP76 adds independent Motion kind7/binding9 and the
 owner-confirmed Point/Particle Origin/Emitter Origin menu. Owner-selected
 Speed100 maps to one turn per second. Canonical pivot/axis derivatives, birth
 origin contexts, shared native/CEP Over Life and guarded control readback are
 implemented. Circle only is advertised; Light Path/Look At, downstream Force
-and distinct-chain merges remain later work. Installed71/75 stays unchanged
-until the frozen ten-module build and pair verification complete.
+and distinct-chain merges remain later work. Source09b84a24d016095d13fa5dc4c10c34933cb81351
+is committed and pushed. Its git archive passes the full unpublished May2023
+x64 Release /MT ten-module SDK build, actual session24329 exit0. Frozen Circle
+ASAN2020, frame ASAN4150, actual Motion registration/binding9 ASAN640, complete
+seven-registration panel/DOM/reload/ES3 audit session27324 exit0 and dummy
+71/75→72/76 paired deployment/restore66 pass. All491 archived source hashes
+remain unchanged; all27 candidate panel files match the frozen preparation.
+
+Fresh AE count0 at01:42:49 preceded standing-authorized deployment through the
+existing two Junctions. Independent10 native,18 paired CEP,27 complete CEP and
+Core selector/runtime hashes match; backup9 native/18 CEP match71/75. Evidence:
+artifacts/prepared/m3-18-native72-motion-circle/{sdk-build,panel-audit-v2,circle-asan,
+frame-asan,native-motion-asan,deployment-tests}.log; before/after/rollback receipts
+artifacts/m3-17-native72-*; independent proof artifacts/m3-18-motion76-installed-proof.json.
+Live recipe normalized76; frozen archive retains the75-to76 delta. Actual
+AE23.5x52 Circle native/CEP edits, animation, curves, undo and reopen remain open.
+No AE was started or dispatched. M3-18 and the complete Motion/Turbulence goal
+remain active.
+
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-18-native72-panel76-motion-circle-20261012' -Restore`.
 
 Working candidate evidence: Circle standard/ASAN2020, ordered frame ASAN4150,
 Motion real registration/binding9 ASAN640,

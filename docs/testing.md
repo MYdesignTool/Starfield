@@ -1,18 +1,25 @@
 # 测试入口
 
-## M3-18 Circle author candidate — 2026-10-12
+## M3-18 Circle native72 / CEP76 deployed — 2026-10-12
 
 RunMotionCircleGraphTests.ps1 -Run [-Sanitize]: standard/ASAN2020 passed;
 RunMotionFrameTests.ps1 -Run -Sanitize:4150 passed. Scope includes birth pivots,
 offset/axis angles, animated geometry velocity and ordered Transform regression.
-RunMotionNativeBindingTests.ps1 -Run:636 passed before added curve-bank checks;
-final ASAN run is recorded separately. RunModelPanelAudit.ps1 against isolated
+RunMotionNativeBindingTests.ps1 -Run [-Sanitize]: final640 passed, including full
+curve-bank capture. RunModelPanelAudit.ps1 against isolated
 motion-panel76 passed actual seven registration catalogs,582 record checks,
 ES3 parse18 and wrapper/reload/transaction matrix116..117. Motion panel28 and
 dummy71/75→72/76 paired deployment/rollback66 pass. These do not qualify AE2023.
-Logs: artifacts/motion-circle-author-*.log, motion-native-author-*.log,
-motion76-panel-audit.log, motion72-deployment-tests-v2.log. Full frozen SDK,
-frozen source regression and installed pairing evidence are pending.
+Frozen09b84a2 independently repeats Circle ASAN2020, frame ASAN4150, actual native
+ASAN640, complete panel audit and dummy paired rollback66 with actual exit0.
+Full May2023 /MT SDK session24329 finishes exit0 with ten modules and both
+NoPublish switches.491 source hashes unchanged. Independent installed10 native,
+18 paired/27 full CEP, selector/runtime and backup9/18 hashes match. Real
+AE23.5x52 editing/animation/curve/undo/reopen acceptance remains open.
+Logs: artifacts/prepared/m3-18-native72-motion-circle/{sdk-build,panel-audit-v2,
+circle-asan,frame-asan,native-motion-asan,deployment-tests}.log; the first frozen
+audit was blocked by sandbox path mapping and is retained as panel-audit.log.
+Evidence: artifacts/m3-18-motion76-installed-proof.json and m3-17-native72 receipts.
 
 ## M3-17 native71 / CEP75 downstream Material deployed — 2026-10-12
 

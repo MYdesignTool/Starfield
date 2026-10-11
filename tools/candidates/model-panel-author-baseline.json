@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Installed native70/Core ABI9/CEP74: native frozen23bb594 retained; CEP patch frozena3829ac passed isolated registration/DOM/ES3 and paired rollback gates. AE2023 Material/color/light acceptance remains open. artifacts/prepared/m3-17-material-panel74-frozen-v2/source.zip retains the tested73-to-74 delta.",
-  "basePanel": 75,
+  "status": "Installed native72/Core ABI9/CEP76 from frozen09b84a2; Circle three-origin author, frozen May2023 ten-module SDK/registration/DOM/ES3/ASAN and paired rollback verified. Actual AE2023 Circle acceptance remains open. artifacts/prepared/m3-18-native72-motion-circle/source.zip retains the tested75-to76 delta.",
+  "basePanel": 76,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "83F879771D7FD7BCF79228127C32A98583CE4EA278EAF51D33BFA4CCB3D092EE"
+      "normalizedSha256": "BCD6A950A30A19F305D5B6C50B1E497028D914E3A9865A8DA8C68E307223F8D3"
     },
     {
       "path": "css/panel.css",
@@ -13,7 +13,7 @@
     },
     {
       "path": "js/graph_edits.js",
-      "normalizedSha256": "90F51DAB7C9626206CFFA1FB07DA73406FC1ADCC9CB8E757B4ECB9965A418042"
+      "normalizedSha256": "2BB49ADF8D47B4ABB0650EB3B95FC38D70E73CA0C4A3A37FAA4887B68A378196"
     },
     {
       "path": "js/native_graph_snapshot.js",
@@ -21,15 +21,15 @@
     },
     {
       "path": "js/graph_view.js",
-      "normalizedSha256": "DCFE05C11686512E3EDD4B23063ADD40144E071076989D4B00D05E9E0B4A049A"
+      "normalizedSha256": "D69E822FBD446CF1E1CA84F7859D42F9BD9576041E3082579E93C122BB0299AD"
     },
     {
       "path": "js/node_palette.js",
-      "normalizedSha256": "28AAB9A3E18B3A7FA509C52C706B079A2218E3CE0B28FF52C133DDB654F9781B"
+      "normalizedSha256": "0F1F91C464F5656D2C475840732E1B41B24CE9C98D67BCFB57F9A189078E6118"
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "926D9F27F498A7655D65F2C1915D83332DC48E8169D5FB4AC9F67D485C33FF24"
+      "normalizedSha256": "6EEF6EBF846AB4E7BA77FD1C4910936E4A33C22D10BC3471B3AE425101F018CE"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "12F56A3D51F4450398F9F6C60BB3B46EA4C84E1864568A2ED28F6461F1F81B0B"
+      "normalizedSha256": "CE8EC655E124D795EBD4FF9028AD29D403576B83440DFE9F504A47ADA60C326A"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "880F7D6EB400DFB8A2D3178FD636DCA11A72E155FDF3195856563638F98A23D5"
+      "normalizedSha256": "0A6F848C5AFF254B041C4B2D1D6B4D35CB25E2608215AC0EF3833E8DDFEE1A2C"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "3363484FB5916B632A4FB69B424BB1979CF9DFA6944B25EFC02AFEFC499D75CD"
+      "normalizedSha256": "87A31955F8C5D9319AE93610761231C695C8CE9A38A5A5F069A43102B5B814AD"
     }
   ]
 }

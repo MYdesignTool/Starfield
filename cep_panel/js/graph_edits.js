@@ -14,16 +14,18 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        motion:"org.starfieldfx.nodes.motion",
         material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, model: 1, material:1, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, motion:1, model: 1, material:1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.motion": {input:"1",output:"2"},
         "org.starfieldfx.nodes.model": { output: "1" },
         "org.starfieldfx.nodes.material": { input:"2",output:"1" },
         "org.starfieldfx.nodes.output": { input: "1" }
@@ -79,6 +81,9 @@
             {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
         ],
         material:[{key:"1",type:3,value:0},{key:"2",type:5,value:[1,1,1]},{key:"3",type:4,value:.5},{key:"4",type:4,value:0},{key:"5",type:4,value:1},{key:"6",type:3,value:1}],
+        motion:[{key:"1",type:3,value:1},{key:"2",type:5,value:[0,0,0]},{key:"3",type:5,value:[0,0,1]},
+            {key:"4",type:4,value:2*Math.PI},{key:"5",type:4,value:0},{key:"13",type:3,value:0},
+            {key:"14",type:5,value:[0,0,0]},{key:"15",type:5,value:[0,0,0]}],
         model: [
             {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
             {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
@@ -137,6 +142,7 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
@@ -168,6 +174,14 @@ function createNativeRecordContract() {
             var key=String(field.key),type=0;
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"motion") {
+                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
+                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
+                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
+                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
+                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
+                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+            }
             if(node.type===prefix+"material") {
                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
                 if(key==="2")for(var channel=0;channel<3;channel++)
@@ -299,6 +313,19 @@ function createNativeRecordContract() {
             var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
             if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
         }
+        // Circle's ordered Force work is a later substage. An Auxiliary emitter
+        // starts a new stream and therefore stops both traversals.
+        function reachesType(start,type,backwards) {
+            var queue=[start],seen={};
+            while(queue.length){var id=queue.pop();if(seen["$"+id])continue;seen["$"+id]=true;
+                var candidate=nodeById(graph,id);if(!candidate || candidate.type===TYPES.emitter)continue;
+                if(candidate.type===type)return true;
+                graph.edges.forEach(function(edge){if((backwards?edge.destinationNode:edge.sourceNode)===id)
+                    queue.push(backwards?edge.sourceNode:edge.destinationNode);});}
+            return false;
+        }
+        if(!modelConnection && reachesType(sourceId,TYPES.motion,true) && reachesType(destinationId,TYPES.force,false))
+            fail("motion_force_stage_pending","Place Force before Motion in this Circle stage.");
         // Reject a cycle before producing a request. The native validator still checks
         // the complete graph, including node-specific stage rules and resource limits.
         var adjacency = {};
@@ -547,8 +574,8 @@ function createNativeRecordContract() {
             }
             if (change.remove === true) {
                 if (found < 0) continue;
-                if ((node.type !== TYPES.particle) ||
-                    (change.parameterKey !== "7" && change.parameterKey !== "8")) {
+                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
+                    (node.type===TYPES.particle && ["7","8"].indexOf(change.parameterKey)>=0))) {
                     fail("invalid_parameter", "only optional over-life curve parameters can be removed");
                 }
                 node.parameters.splice(found, 1);
@@ -594,8 +621,8 @@ function createNativeRecordContract() {
                 if (found < 0) { node.parameters.push({key:"8",type:3,value:value}); continue; }
             }
             if (found < 0) {
-                if ((node.type !== TYPES.particle) ||
-                    (change.parameterKey !== "7" && change.parameterKey !== "8" && !(node.type===TYPES.particle && change.parameterKey==="13")) ||
+                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
+                    (node.type===TYPES.particle && ["7","8","13"].indexOf(change.parameterKey)>=0)) ||
                     change.valueType !== 7 || !(value instanceof Uint8Array)) {
                     fail("missing_parameter", "the requested graph parameter is not present");
                 }

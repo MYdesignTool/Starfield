@@ -13,6 +13,7 @@
         particle: "org.starfieldfx.nodes.particle",
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
+        motion:"org.starfieldfx.nodes.motion",
         material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
@@ -118,6 +119,16 @@
             "7": {hidden:true},
             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
         },
+        motion:{
+            "1":{label:"Motion Type",kind:"popup",choices:["Circle"],values:[1]},
+            "2":{label:"Origin",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
+            "3":{hidden:true},"6":{hidden:true},
+            "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000},
+            "5":{label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "13":{label:"Origin Type",kind:"popup",choices:["Point","Particle Origin","Emitter Origin"],values:[0,1,2]},
+            "14":{label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "15":{label:"Offset",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"}
+        },
         material:{
             "1":{label:"Color Source",kind:"popup",choices:["Particle Color","Material Color"],values:[0,1]},
             "2":{label:"Color",kind:"color"},
@@ -148,7 +159,7 @@
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform", model:"Model",material:"Material",
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",motion:"Motion", model:"Model",material:"Material",
                    output: "Output" };
 
     function fail(code, message) {
@@ -467,11 +478,15 @@
                         component.displayScale=1;component.value=graphParameter.value[axis];node.params.push(component);
                     });continue;
                 }
-                if (kind === "transform") {
+                if(kind==="motion" && graphParameter.key==="4") {
+                    parameter.displayScale=100/(2*Math.PI);parameter.value=graphParameter.value*parameter.displayScale;
+                    node.params.push(parameter);continue;
+                }
+                if (kind === "transform" || kind === "motion") {
                     var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
                     var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
                     var ta=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
-                    if (graphParameter.key === "8") {
+                    if (kind==="transform" && graphParameter.key === "8") {
                         parameter.choices=["None"];parameter.enumValues=[0];
                         (layerResources || []).forEach(function(resource){
                             if(Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
@@ -484,8 +499,8 @@
                             parameter.enumValues.push(graphParameter.value);selected=parameter.enumValues.length-1; }
                         parameter.value=selected+1;node.params.push(parameter);continue;
                     }
-                    if (graphParameter.key === "1") {
-                        parameter.kind="point2d";parameter.label="Anchor XY";parameter.key+=":xy";
+                    if ((kind==="transform" && graphParameter.key === "1") || (kind==="motion" && graphParameter.key==="2")) {
+                        parameter.kind="point2d";parameter.label=kind==="motion"?"Origin XY":"Anchor XY";parameter.key+=":xy";
                         parameter.min=-32768;parameter.max=32767.99998474121;
                         parameter.channelMin=[parameter.min,parameter.min];parameter.channelMax=[parameter.max,parameter.max];
                         parameter.originComponent="xy";parameter.canonicalOrigin=graphParameter.value.slice();
@@ -493,18 +508,19 @@
                         parameter.value=[tw/2+graphParameter.value[0]*th/ta,th/2-graphParameter.value[1]*th];
                         node.params.push(parameter);
                         var tz=viewParameter(node,kind,graphParameter,spec);
-                        tz.kind="slider";tz.label="Anchor Z";tz.key+=":z";
+                        tz.kind="slider";tz.label=kind==="motion"?"Origin Z":"Anchor Z";tz.key+=":z";
                         tz.originComponent="z";tz.canonicalOrigin=graphParameter.value.slice();tz.geometry=parameter.geometry;
                         tz.value=graphParameter.value[2]*th;node.params.push(tz);continue;
                     }
-                    if (["2","3","4"].indexOf(graphParameter.key)>=0) {
+                    if ((kind==="transform" && ["2","3","4"].indexOf(graphParameter.key)>=0) ||
+                        (kind==="motion" && ["14","15"].indexOf(graphParameter.key)>=0)) {
                         [0,1,2].forEach(function(axis){
                             var component=viewParameter(node,kind,graphParameter,spec);
                             component.kind="slider";component.key+=":"+axis;
                             component.label=spec.label+" "+["X","Y","Z"][axis];
                             component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
-                            component.displayScale=graphParameter.key==="2" ? th*(axis===0?1/ta:axis===1?-1:1) :
-                                graphParameter.key==="3" ? (axis===1?1:-1) : 1;
+                            component.displayScale=["2","15"].indexOf(graphParameter.key)>=0 ? th*(axis===0?1/ta:axis===1?-1:1) :
+                                ["3","14"].indexOf(graphParameter.key)>=0 ? (axis===1?1:-1) : 1;
                             component.value=graphParameter.value[axis]*component.displayScale;node.params.push(component);
                         });continue;
                     }
@@ -603,7 +619,14 @@
                 node.curveParameterKeys={size:"9"};
                 node.curves={size:decodeCurve(forceCurve && forceCurve.value,0,100,100,100)};
             }
-            if (node.curveParameterKeys && kind !== "force") {
+            if(kind==="motion") {
+                var motionOrder=["1","13","2","14","15","4","5"];
+                node.params.sort(function(a,b){return motionOrder.indexOf(a.graphKey)-motionOrder.indexOf(b.graphKey);});
+                var motionCurve=findParameter(source,"6");
+                if(motionCurve && motionCurve.type!==7)fail("invalid_curve","Motion curve must use opaque bytes");
+                node.curveParameterKeys={size:"6"};node.curves={size:decodeCurve(motionCurve && motionCurve.value,0,100,100,100)};
+            }
+            if (node.curveParameterKeys && kind !== "force" && kind!=="motion") {
                 var sizeEnd = findParameter(source, "4");
                 var opacityEnd = findParameter(source, "6");
                 var sizeCurve = findParameter(source, "7");
