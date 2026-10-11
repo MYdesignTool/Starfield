@@ -88,6 +88,10 @@ M3-15 源码/配对发布完成，真实 Cloud 与 Texture gate 等待 owner；�
 
 ## M3-17 — Particle Model 几何与资源（2026-10-09）
 
+2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。
+
+2026-10-11 14:27+08 native66/packed32834/CoreABI8/CEP71已部署。源码186cbf3e1a99f989019f040fcb74846ff342213f git archive冻结，May2023 x64 Release /MT完整八目标会话57534实际exit0，冻结mixed-ASAN/native8796/camera12/JS644及整套PanelAudit实际exit0。完整OBJ/Core4145标准-ASAN、控件453/导入20632标准-ASAN、Model模块9434、dummy65/71→66/71整套回滚61通过；small172/owner271自动验收自检通过。fresh AE0后Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash及全部27冻结面板字节、selector/runtime核对通过。owner选择自行测试并稍后反馈，本轮未启动或向AE调度验收。OBJ误拒绝已离线确认修复；Model/Transform内部错误根因及速度改善未据夹具关闭。 部署交接后按owner既有要求保持目标暂停；完整任务未完成，等待统一实测反馈。
+
 2026-10-11继续整体排查：owner确认Model添加可用但慢，编辑出现Model/Transform stream matchName内部校验失败。真实只读test.obj复现第6680行planarity阈值过严，候选1e-6保留原XYZ，2858positions/5600triangles/384480SFMG1字节通过。native66/packed32834/ABI8/CEP71候选按真实布局先排除跨kind数字参数访问；Model/Transform根因仍为假设。新增RunMixedNodeBindingTests及actual expression执行，标准-ASAN native8796/camera12、JS644；控件453/导入20632通过。自动入口补独立entry/ASCII路径及明确现有实例开关、12页真实资源回读和阶段计时，小172/owner271模拟通过。首次授权启动无结果，owner延后其现有AE调度；保持安装65/71，完整SDK冻结构建继续，Motion/MNT不动。
 
 2026-10-11 13:38+08 native65/CEP71从9b77643 git archive冻结27面板字节匹配及冻结回归后发布，fresh process0/KeepNative/26hash/selector/runtime/paired Restore通过，baseline71重现27安装字节。备份恢复65/70，原生9200c6b/ABI8不变。首次单次启动获准并执行但无entry/result；owner延后现有实例再次调度；不再要求owner逐个失败反馈，不关闭真实AE或客户发布gate。Git push仍待此前已有回复，Motion/MNT保持。

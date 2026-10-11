@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Installed native65/Core ABI8/CEP71; owner confirms Model add but reports edit/OBJ failures. Native66 source candidate is under verification. First authorized AE launch produced no result; owner deferred a separate existing-instance run.",
+  "status": "Installed native66/Core ABI8/CEP71 from frozen source186cbf3; complete SDK/offline regressions and installed hashes pass. Rounded OBJ rejection is fixed offline; Model edit/performance host gates remain open. Owner chose manual testing and deferred automatic AE dispatch.",
   "basePanel": 71,
   "files": [
     {

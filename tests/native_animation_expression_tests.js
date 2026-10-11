@@ -7,16 +7,20 @@ function node(firstUuid, uuid, values) {
     const properties = {};
     for(let n = 0; n < 8; n++) properties[firstUuid+n] = {name:`Node UUID ${n}`,value:n === 7 ? uuid : 0};
     Object.keys(values).forEach(key => properties[key] = {get value(){return typeof values[key]==="function" ? values[key]() : values[key];}});
-    const example=expressions.find(text=>text.includes(`fx.param(${firstUuid}).name`));
-    assert.ok(example,"actual generated expression for this registered kind");
-    const count=/fx.numProperties === (\d+) &&/.exec(example);
-    assert.ok(count,"native layout gate precedes any numeric child resolution");
-    const effect = {numProperties:Number(count[1]),param(index){if(!properties[index]) return {value:Number(index)};return properties[index];}};
+    const effect = {param(index){
+        if(typeof index === "string") {
+            const entry=Object.values(properties).find(p=>p.name===index);
+            if(!entry)throw Error("No named metadata: "+index);
+            return entry;
+        }
+        if(!properties[index]) return {value:Number(index)};
+        return properties[index];
+    }};
     Object.defineProperty(effect,"name",{value:"Same display name"}); return effect;
 }
 let frameTime=0;
 const thisProperty={propertyGroup(level){assert.equal(level,1);return {propertyIndex:0};}};
-const emitter = node(102, 1, {4:()=>[250+frameTime*100,500]}), particle = node(510,2,{10:1,11:[0.3,0.5,0.7,1]});
+const emitter = node(102, 1, {1:1,4:()=>[250+frameTime*100,500]}), particle = node(510,2,{10:1,11:[0.3,0.5,0.7,1]});
 const force = node(208,4,{}), duplicate = node(102,777,{4:[999,999]});
 for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[force,duplicate,particle,emitter]]) {
     const parade = {numProperties:effects.length};
@@ -27,13 +31,37 @@ for(frameTime of [0,0.5,1,0]) for(const effects of [[emitter,particle,force],[fo
         /not a function/, "host PropertyGroup objects are not fake JS functions");
     for(const expression of expressions) {
         const match = /result = fx.param\((\d+)\).value(?:\[(\d+)\])?/.exec(expression);
-        const source = expression.includes("fx.param(109).value === 1") ? emitter : expression.includes("fx.param(517).value === 2") ? particle : force;
+        const source = expression.includes('fx.param("Node UUID 7").value === 1') ? emitter : expression.includes('fx.param("Node UUID 7").value === 2') ? particle : force;
         let expected = source.param(Number(match[1])).value;
         if(match[2] !== undefined) expected = expected[Number(match[2])];
         assert.equal(vm.runInNewContext(expression,context),expected,"UUID binding survives effect order and same names");
     }
 }
-const originExpression=expressions.find(expr=>expr.includes("fx.param(109).value === 1") && expr.includes("result = fx.param(4).value[0]"));
+const originExpression=expressions.find(expr=>expr.includes('fx.param("Node UUID 7").value === 1') && expr.includes("result = fx.param(4).value[0]"));
+const initialExpression=expressions.find(expr=>expr.includes('fx.param("Node UUID 7").value === 1') && expr.includes("result = fx.param(1).value;"));
+assert.ok(initialExpression,"actual first Emitter Type binding (renderer stream 98) is covered");
+for(const countMode of [undefined,0,999,"throw"]){
+    const initial=node(102,1,{1:1});let countReads=0;
+    if(countMode!==undefined)Object.defineProperty(initial,"numProperties",{get(){countReads++;if(countMode==="throw")throw Error("Effect count unavailable");return countMode;}});
+    const initialLayer=()=>({numProperties:2});initialLayer.effect=index=>index===1?{}:initial;
+    const ownProperty={propertyGroup:()=>({propertyIndex:1})};
+    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:initialLayer,thisProperty:ownProperty}),1);
+    assert.equal(countReads,0,"new layer binding does not depend on Effect parameter count");
+    // Reproduce native66's extra gate using the generated current expression.
+    const native66=initialExpression.replace('try { match = ','try { match = fx.numProperties === 110 && ')
+        .replace(/fx\.param\("Node UUID (\d)"\)/g,(_,n)=>`fx.param(${102+Number(n)})`);
+    assert.equal(vm.runInNewContext(native66,{thisLayer:initialLayer,thisProperty:ownProperty}),-1099511627776,
+        "native66 gate loses an otherwise valid first source in this host fixture");
+}
+// Every UUID word must agree before opening a numeric source parameter.
+for(let word=0;word<8;word++){
+    const impostor=node(102,1,{1:99});impostor.param(`Node UUID ${word}`).value++;
+    const impostorParam=impostor.param;let numericReads=0;
+    impostor.param=index=>{if(typeof index==="number")numericReads++;return impostorParam(index);};
+    const rejected=()=>({numProperties:1});rejected.effect=()=>impostor;
+    assert.equal(vm.runInNewContext(initialExpression,{thisLayer:rejected,thisProperty}),-1099511627776);
+    assert.equal(numericReads,0,"a partial UUID cannot resolve a source stream");
+}
 const missingLayer=()=>({numProperties:0});missingLayer.effect=()=>{throw new Error("missing effect");};
 assert.equal(vm.runInNewContext(originExpression,{thisLayer:missingLayer,thisProperty}),-1099511627776,"missing UUID cannot turn particle settings into zero");
 const failingEmitter=node(102,1,{4:()=>{throw new Error("Origin XY evaluation failed");}});
@@ -44,26 +72,27 @@ assert.throws(()=>vm.runInNewContext(originExpression,{thisLayer:failingLayer,th
 // Looking at their numeric values while searching creates expression-to-
 // expression dependencies, including a dependency on the current alias itself.
 let unrelatedReads=0;
-const renderer={numProperties:2000,param(index){return {name:`Node Input ${index-98}`,
+const renderer={param(index){if(typeof index==="string")throw Error("Renderer has no node UUID");return {name:`Node Input ${index-98}`,
     get value(){unrelatedReads++;throw new Error("recursive renderer binding evaluated");}};}};
-const unrelated={numProperties:15,param(){return {name:"Animated parameter",get value(){unrelatedReads++;return 0;}};}};
+const unrelated={param(index){if(typeof index==="string")throw Error("No named UUID");return {name:"Animated parameter",get value(){unrelatedReads++;return 0;}};}};
 for(const effects of [[renderer,emitter,particle,force,renderer,unrelated],
     [unrelated,renderer,force,particle,duplicate,emitter]]) {
     const layer=()=>({numProperties:effects.length});layer.effect=index=>effects[index-1];
     for(const expression of expressions) {
-        assert.ok(expression.includes('.name === "Node UUID 0" &&'),"name gate precedes UUID numeric reads");
+        assert.ok(expression.includes('fx.param("Node UUID 0").value'),"identity lookup uses constant metadata names");
+        assert.ok(!expression.includes("fx.numProperties"),"Effect count is not a layout contract");
         assert.notEqual(vm.runInNewContext(expression,{thisLayer:layer,thisProperty}),-1099511627776);
     }
 }
 assert.equal(unrelatedReads,0,"UUID lookup never evaluates renderer or unrelated animated values");
 // Keep a regression demonstrating what the previous generated expressions did.
-const legacy=originExpression.replace(/fx.numProperties === \d+ && /,"").replace(/fx\.param\(\d+\)\.name === "Node UUID 0" && /,"");
+const legacy=originExpression.replace(/fx\.param\("Node UUID (\d)"\)/g,(_,n)=>`fx.param(${102+Number(n)})`);
 const oldLayer=()=>({numProperties:2});oldLayer.effect=index=>index===1?renderer:emitter;
 vm.runInNewContext(legacy,{thisLayer:oldLayer,thisProperty});
 assert.ok(unrelatedReads>0,"legacy lookup reads renderer animation aliases while searching");
 let incompatibleLookups=0;
-const foreignLayouts=[90,100,110,2000].filter(count=>count!==emitter.numProperties).map(count=>({numProperties:count,
-    param(){incompatibleLookups++;throw new Error("cross-kind stream identity mismatch");}}));
+const foreignLayouts=[90,100,110,2000].map(count=>({numProperties:count,
+    param(index){if(typeof index==="string")throw Error("No matching UUID");incompatibleLookups++;throw new Error("cross-kind stream identity mismatch");}}));
 const mixed=()=>({numProperties:foreignLayouts.length+1});mixed.effect=index=>foreignLayouts.concat(emitter)[index-1];
 assert.equal(vm.runInNewContext(originExpression,{thisLayer:mixed,thisProperty}),emitter.param(4).value[0]);
 assert.equal(incompatibleLookups,0,"mixed Model/Transform/renderer layouts are rejected before resolving numeric streams");

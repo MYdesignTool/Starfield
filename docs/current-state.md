@@ -1,10 +1,22 @@
 # 当前工程状态
 
-## 源码候选：native66 / CEP71（未部署）
+## 新建图层绑定修正候选 native67 / CEP71
 
-owner真实OBJ第6680行误拒绝已离线复现并修正，整文件2858顶点/5600三角形、SFMG1 384480字节通过；原文件只读。Model/Transform编辑失败仍是宿主假设，候选按实际效果布局排除跨kind数字参数访问，实际native8796/camera12及生成混合表达式644标准/ASAN通过。控件453/导入20632标准-ASAN与小/真实模型自动验收自检172/271通过。新验收逐页回读12页资源并记录各阶段耗时。完整SDK候选冻结构建继续；不部署或向owner当前AE调度脚本，详见model-transaction-audit.md。
+2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。
 
-## 当前安装：native65 / CEP71（2026-10-11 13:38+08）
+## 当前安装：native66 / CEP71（2026-10-11 14:27+08）
+
+2026-10-11 14:27+08 native66/packed32834/CoreABI8/CEP71已部署。源码186cbf3e1a99f989019f040fcb74846ff342213f git archive冻结，May2023 x64 Release /MT完整八目标会话57534实际exit0，冻结mixed-ASAN/native8796/camera12/JS644及整套PanelAudit实际exit0。完整OBJ/Core4145标准-ASAN、控件453/导入20632标准-ASAN、Model模块9434、dummy65/71→66/71整套回滚61通过；small172/owner271自动验收自检通过。fresh AE0后Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash及全部27冻结面板字节、selector/runtime核对通过。owner选择自行测试并稍后反馈，本轮未启动或向AE调度验收。OBJ误拒绝已离线确认修复；Model/Transform内部错误根因及速度改善未据夹具关闭。
+
+日志及收据：artifacts/m3-17-native66-sdk-{build.log,build-exit.txt,terminal.json}、m3-17-native66-frozen-{mixed-asan,panel-audit}.log、m3-17-native66-deploy-{before,after}.json、m3-17-native66-installed-hashes.json、Check-Model66InstalledPair.ps1。完整快照artifacts/prepared/m3-17-native66-rounded-obj，备份artifacts/disabled/m3-17-native66-panel71-rounded-obj-20261011精确恢复native65/CEP71，旧备份保留。Motion/MNT在途改动保持，Git push仍待此前明确授权请求。部署后交接给owner实测，目标保持暂停。
+
+一步回滚（先关闭AE）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\Project\Code\AE星辰粒子插件Stardust  v1.6.0b\newStardust\tools\Restore-TestBuild.ps1' -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native66-panel71-rounded-obj-20261011' -Restore
+```
+
+## native65 / CEP71 部署记录（2026-10-11 13:38+08）
 
 M3-17按owner要求整体排查：五类control布局投影统一、提交后重取receipt/snapshot、跨realm数组和type/build/contract诊断；native65/ABI8/IDs/持久化schema保持。实际注册数据DOM/协议/资产/预设及原生标准/ASAN回归通过，见 [整体排查](model-transaction-audit.md)。新UUID类型和AE为什么返回3未证实，不能把候选通过当实机已验收。
 

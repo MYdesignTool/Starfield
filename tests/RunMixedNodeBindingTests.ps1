@@ -23,6 +23,10 @@ try {
     # require a larger test-executable stack; production DLL flags stay intact.
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLink="/link /DEBUG /STACK:16777216 /PDB:$taskDir\tests.pdb"}
     [IO.File]::WriteAllLines("$taskDir\compile.rsp",$taskArgs,[Text.Encoding]::ASCII)
+    $taskTransformArgs=@('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/MT','/Iinclude','/Iae_plugin',
+        ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\transform.exe'),'tests\transform_binding_tests.cpp')
+    if($Sanitize){$taskTransformArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\transform-compiler.pdb'),'/link','/DEBUG',('/PDB:'+ $taskDir+'\transform.pdb'))}
+    [IO.File]::WriteAllLines("$taskDir\transform.rsp",$taskTransformArgs,[Text.Encoding]::ASCII)
     $taskBatch=@"
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul
@@ -30,12 +34,16 @@ if errorlevel 1 exit /b %errorlevel%
 cl.exe @$taskDir\compile.rsp $taskLink
 if errorlevel 1 exit /b %errorlevel%
 $taskDir\tests.exe
+if errorlevel 1 exit /b %errorlevel%
+cl.exe @$taskDir\transform.rsp
+if errorlevel 1 exit /b %errorlevel%
+$taskDir\transform.exe
 exit /b %errorlevel%
 "@
     [IO.File]::WriteAllText("$taskDir\compile.cmd",$taskBatch,[Text.Encoding]::ASCII)
     & $env:ComSpec /d /c "$taskDir\compile.cmd"
     if($LASTEXITCODE -ne 0){throw 'Mixed native binding compile/test failed.'}
-    foreach($taskScript in @('tests/native_animation_expression_tests.js','tests/model_transform_expression_tests.js')){
+    foreach($taskScript in @('tests/native_animation_expression_tests.js','tests/model_transform_expression_tests.js','tests/transform_binding_expression_tests.js')){
         & node $taskScript
         if($LASTEXITCODE -ne 0){throw "Generated native expression execution failed: $taskScript"}
     }

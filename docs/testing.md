@@ -1,5 +1,15 @@
 # 测试入口
 
+## native67绑定回归
+
+2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。
+
+入口：`tests/RunMixedNodeBindingTests.ps1 -Run [-Sanitize]`；实际生成79条普通绑定及Model/Transform混合绑定由JS执行。追加八UUID逐字不匹配及缺失源回滚；日志`artifacts/m3-17-native67-mixed*.log`。dummy66/71→67/71完整发布/回滚61通过，未改真实Adobe路径。
+
+2026-10-11 14:27+08 native66/packed32834/CoreABI8/CEP71已部署。源码186cbf3e1a99f989019f040fcb74846ff342213f git archive冻结，May2023 x64 Release /MT完整八目标会话57534实际exit0，冻结mixed-ASAN/native8796/camera12/JS644及整套PanelAudit实际exit0。完整OBJ/Core4145标准-ASAN、控件453/导入20632标准-ASAN、Model模块9434、dummy65/71→66/71整套回滚61通过；small172/owner271自动验收自检通过。fresh AE0后Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash及全部27冻结面板字节、selector/runtime核对通过。owner选择自行测试并稍后反馈，本轮未启动或向AE调度验收。OBJ误拒绝已离线确认修复；Model/Transform内部错误根因及速度改善未据夹具关闭。
+
+复查入口：`powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/Check-Model66InstalledPair.ps1`。冻结SDK终态及八文件hash在m3-17-native66-sdk-terminal.json；所有日志保留在artifacts。未执行本轮真实AE自动脚本，保留Model编辑、OBJ文件窗口、撤销重开及实际性能gate。
+
 2026-10-11 M3-17 native66源码候选：`tests/RunMixedNodeBindingTests.ps1 -Run [-Sanitize]` 补齐实际Model/NativeSync链接依赖，native8796/camera12及actual generated Model/Transform JS644通过；聚合ASAN fixture专用16MiB栈，生产标志不变。控件453/导入20632标准及ASAN通过；Core几何4145，真实只读test.obj解析2858positions/5600triangles并编码384480字节。日志artifacts/m3-17-rounded-obj-*、m3-17-owner-obj-*及m3-17-mixed-node-binding*。自动验收工具修正独立entry、ASCII wrapper、现有实例明确开关，实际mesh12页回读、耗时及有界deadline；small172/owner271模拟-ES3通过，结果不代表AE执行。首次获准启动无entry/result；owner当前自行测试，第二次调度未执行。完整SDK冻结候选仍待完成，当前安装65/71保持。
 
 2026-10-11 13:38+08 native65/CEP71已从9b77643冻结发布，27面板字节匹配已测候选并重跑冻结源contract458/transport2340/asset600/page36/author74/preset583/ordinary gateway/完整ES3 18/验收135。fresh AE0、26hash/selector/runtime及paired Restore report通过，baseline71重现27安装字节、nested19重跑通过；artifacts/m3-17-panel71-*、native65-panel71-record-contract-20261011-{before,after}.json和Check-ModelContractInstalledPair.ps1记录状态。首次授权启动已执行但无entry/result；owner延后现有实例自动调度，没有实际AE结果。新备份整套恢复65/70；native65源9200c6b/ABI8/packed32833保持。

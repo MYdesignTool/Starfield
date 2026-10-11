@@ -1,5 +1,13 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+## 新建效果重复失败与测试契约缺口
+
+2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。
+
+旧native66按计数避开跨kind访问的测试结论仅适用于原桩，不能证明宿主绑定有效；以本节命名查找和独立计数反例替代其实现假设。
+
+2026-10-11 14:27+08 native66/packed32834/CoreABI8/CEP71已部署。源码186cbf3e1a99f989019f040fcb74846ff342213f git archive冻结，May2023 x64 Release /MT完整八目标会话57534实际exit0，冻结mixed-ASAN/native8796/camera12/JS644及整套PanelAudit实际exit0。完整OBJ/Core4145标准-ASAN、控件453/导入20632标准-ASAN、Model模块9434、dummy65/71→66/71整套回滚61通过；small172/owner271自动验收自检通过。fresh AE0后Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash及全部27冻结面板字节、selector/runtime核对通过。owner选择自行测试并稍后反馈，本轮未启动或向AE调度验收。OBJ误拒绝已离线确认修复；Model/Transform内部错误根因及速度改善未据夹具关闭。 备份m3-17-native66-panel71-rounded-obj-20261011恢复65/71；receipt/checker见current-state.md。
+
 native65/CEP71于13:38+08部署：源码9b77643冻结27文件逐字节匹配并重跑关键回归，fresh AE0，26hash/selector/runtime和paired Restore通过；native9200c6b/packed32833/ABI8保持，SDK未重建。baseline71重现27安装面板字节。备份m3-17-native65-panel71-record-contract-20261011恢复65/70。首次授权启动已执行但无entry/result；owner正在自行测试，后续现有实例调度未获授权，保持离线排查。
 
 ## Model编辑及真实OBJ反馈 — 2026-10-11

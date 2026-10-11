@@ -9,7 +9,7 @@
 | M3-13 Texture | owner已确认CEP61节点添加修复；继续背面及采样/持久化gate | 正反面、真实方向/时间采样/阶段依赖与撤销/重开 |
 | M3-15 Cloud | native57/CEP57 作者已部署，等待参考外观与范围确认 | Circles/Aspect/Density 外观、动画、预算与宿主持久化 |
 | M3-16 Birth controls | native60/CEP61构建/配对部署完成；继续AE2023出生控制、动画与持久化验收 | seed影响完整发射源、概率筛选/身份/预算及实际 AE 验收 |
-| M3-17 Model | native65/CEP71于13:38+08冻结部署，27字节/26安装hash/配对回滚通过；整套注册矩阵/协议及原生标准-ASAN通过。owner确认Model可添加但慢，编辑及OBJ仍失败；native66源码修正真实OBJ容差/诊断与typed表达式候选，准备完整SDK。首次授权启动无结果，owner延后现有实例调度；分页资源/计时自检通过，实机及客户发布gate开放 | 默认及资源模型完整作者、材质/持久化与AE2023验收 |
+| M3-17 Model | native66/CEP71已部署；owner新增首次绑定stream98失败，native67命名UUID查找候选及独立计数反例/源缺失回滚回归正在冻结构建，保持CEP71。实际AE根因及完整Model验收开放 | 默认及资源模型完整作者、材质/持久化与AE2023验收 |
 | M3-18 Motion 首批 | 三个数字模式及有序Motion/Transform接入graph/history/Auxiliary，随native62源码构建但无作者入口；owner允许按可操作阶段分批部署，下一次恢复时选择单模式作者及其参考/资源/交互契约，不等三个模式一起完成，见ADR0039 | 三种模式有实际运动/朝向，动画/曲线/原生/CEP/预设/撤销重开与AE2023验收 |
 | M3-19 Turbulence | Motion首批后推进；参考dump提供标签/默认值，枚举和轨迹语义仍需公开指南及实机证据 | 有界独立噪声/影响属性/路径语义、完整作者与AE2023验收 |
 | M3-11 Transform | 原生/CEP 实现与 native54/panel54 配对部署已完成 | 原生/CEP 往返、带动画的 Null、不同图路径、几何、撤销/重开与 shutter 在 AE2023 验收 |

@@ -1,5 +1,9 @@
 # Starfield 架构
 
+2026-10-11 M3-17继续修复owner新建图层首次添加效果失败（stream98/parameter1/verify finite bound value/516）。native66增加的Effect.numProperties布局计数没有AE契约证据，旧JS桩从生成表达式反推正确计数，漏掉缺失/不同/抛错计数。native67候选改用Effect.param("Node UUID 0"…"Node UUID 7")固定常量名称，八字全部匹配后才访问源节点数字参数；主效果自身、其他renderer、不同kind及同名不同UUID均不会打开其动画别名。完整UUID唯一性仍由原生编译保证，source求值错误不吞掉，sentinel与非有限值分别报verify source binding resolved和verify finite bound value，失败仍完整恢复表达式。无IDs/matchName/schema/ABI8迁移，CEP71保持。首个Emitter Type真实生成表达式覆盖计数缺失/0/999/throw，native66 gate在同一夹具返回sentinel，新表达式返回1；不是AE实机根因或验收声明。原生/ASAN及冻结完整构建继续；owner选择自行测试，本轮无AE启动或脚本调度。
+
+2026-10-11 14:27+08 native66/packed32834/CoreABI8/CEP71已部署。源码186cbf3e1a99f989019f040fcb74846ff342213f git archive冻结，May2023 x64 Release /MT完整八目标会话57534实际exit0，冻结mixed-ASAN/native8796/camera12/JS644及整套PanelAudit实际exit0。完整OBJ/Core4145标准-ASAN、控件453/导入20632标准-ASAN、Model模块9434、dummy65/71→66/71整套回滚61通过；small172/owner271自动验收自检通过。fresh AE0后Deploy-ModelTestBuild→Deploy-TestBuild -IncludeModel发布；26配对安装hash及全部27冻结面板字节、selector/runtime核对通过。owner选择自行测试并稍后反馈，本轮未启动或向AE调度验收。OBJ误拒绝已离线确认修复；Model/Transform内部错误根因及速度改善未据夹具关闭。 具体日志及回滚见current-state.md。
+
 2026-10-11 13:38+08 M3-17 native65/CEP71已部署：同一ES3 ordinary control contract嵌入browser规划和AE gateway，用于五类完整布局投影和preflight；Model最终核对调用匹配build/contract API。提交后按plain token重取receipt/snapshot。源码9b77643冻结/27字节匹配、fresh AE0、26hash/selector/runtime/配对回滚通过；schemas/IDs/ABI8及native65保持。实际注册矩阵和标准/ASAN通过，首次获准AE启动未产生结果、owner延后现有实例自动调度；native66源码候选修正OBJ小数导出容差并在数字子流访问前检查完整effect布局，实机Model/Transform错误仍待确认，详见docs/model-transaction-audit.md。
 
 2026-10-10当前配对native62/CEP64修正Model project root ID0：CEP/原生事务、资产传输及OBJ checkpoint允许非负root，0仍须与实际SDK根项匹配；comp/layer保持正值。完整May2023八目标构建及26安装hash/rollback通过，真实AE Model gate保持开放。该源码包含M3-18数字计算层与snapshot10读取/写入能力，但没有Motion原生/CEP作者入口；owner允许未来按可操作模式分批部署，不要求三个作者一起完成。

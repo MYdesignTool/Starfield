@@ -98,7 +98,7 @@ std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 bool lazy_dependencies{};
 std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
-A_long nonfinite_alias=-1;
+A_long nonfinite_alias=-1, unresolved_alias=-1;
 A_long fail_expression = -1;
 bool disable_next_expression{};
 AEGP_LayerSuite9 layers{};
@@ -176,13 +176,14 @@ double evaluated_binding(A_long index, A_long time) {
         dependencies_evaluated[slot]=true;++dependency_generations[slot];
     }
     if(index==nonfinite_alias)return std::numeric_limits<double>::quiet_NaN();
+    if(index==unresolved_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
-    const auto identity=[&](records::Kind kind,unsigned value) {
+    const auto identity=[&](unsigned value) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
-        return expr.find(u"fx.param("+number(records::uuid_first_index(kind)+7)+u").value === "+number(value))!=std::u16string::npos;
+        return expr.find(u"fx.param(\"Node UUID 7\").value === "+number(value))!=std::u16string::npos;
     };
-    std::size_t id = identity(records::Kind::model,6) ? 6 : identity(records::Kind::transform,5) ? 4 : identity(records::Kind::emitter,1) ? 1 : identity(records::Kind::particle,2) ? 2 : 3;
+    std::size_t id = identity(6) ? 6 : identity(5) ? 4 : identity(1) ? 1 : identity(2) ? 2 : 3;
     if(id==4 && expr.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
         const std::u16string marker=u"// Starfield Transform affine entry ";
         const auto first=expr.find(marker)+marker.size(),last=expr.find(u"\n",first);
@@ -1285,6 +1286,16 @@ int main() {
                 "invalid evaluated results are distinguished from host suite failures");
         }
         nonfinite_alias=-1;
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);const char* failed_stage=nullptr;
+            unresolved_alias=matrix_stream;
+            check(bindings.install(transformed,nullptr,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+                failed_stage && std::strcmp(failed_stage,"verify source binding resolved")==0,
+                "missing source identity differs from a nonfinite source value");
+        }
+        unresolved_alias=-1;
+        check(expressions[matrix_stream-kNativeBindingFirstIndex]==u"0" && live_refs==0 && acquisitions==0,
+            "unresolved source restores expressions and releases host references");
         expressions=before_expression_failure;
         temporal_metadata_enabled=true;synthetic_native_reads=0;
         capture_native_temporal_metadata(&renderer_data,transformed,701);
@@ -1545,8 +1556,8 @@ int main() {
         std::ofstream output("artifacts/model-transform-animation-expressions.json");
         output<<"[";bool first=true;unsigned models=0,transforms=0;
         for(const auto& expression:expressions) {
-            const bool is_model=expression.find(u"fx.param(93).value === 6")!=std::u16string::npos;
-            const bool is_transform=expression.find(u"fx.param(89).value === 5")!=std::u16string::npos;
+            const bool is_model=expression.find(u"fx.param(\"Node UUID 7\").value === 6")!=std::u16string::npos;
+            const bool is_transform=expression.find(u"fx.param(\"Node UUID 7\").value === 5")!=std::u16string::npos;
             if(!is_model && !is_transform)continue;
             models+=is_model;transforms+=is_transform;
             if(!first)output<<",";first=false;output<<"\"";

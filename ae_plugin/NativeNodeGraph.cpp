@@ -615,23 +615,19 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
     std::string text = "var count = thisLayer(\"ADBE Effect Parade\").numProperties; var result = -1099511627776;\n";
     text += "var owner = thisProperty.propertyGroup(1).propertyIndex;\n";
     text += "for (var n = 1; n <= count; n++) { if (n === owner) continue; var fx = thisLayer.effect(n); var match = false; try { match = ";
-    const auto first = native_nodes::uuid_first_index(node.kind);
     // Other effects can have animated inputs at these same numeric indices.
     // In particular, the renderer's 98..609 aliases overlap node UUID indices.
-    // Check the metadata property name before reading ANY numeric value, so a
+    // Resolve immutable metadata by name before reading ANY numeric value, so a
     // search never evaluates our own bindings (or another renderer's bindings).
     // Display names of effects remain irrelevant; all eight UUID words follow.
     // Do not resolve a numeric child against another node kind's effect layout.
-    // Exclude incompatible Model/Transform layouts before param(index) while
-    // AE resolves stream identities, not after opening the numeric child.
-    // The count excludes PF input0, as does Effect.numProperties. UUID name and
-    // all words still prove the source identity after this layout gate.
-    text += "fx.numProperties === " + std::to_string(native_nodes::last_parameter_index(node.kind)) + " && ";
-    text += "fx.param(" + std::to_string(first) + ").name === \"Node UUID 0\" && ";
+    // Effect parameter counts are not a native layout contract. All node kinds
+    // register the same constant UUID names; a globally unique full UUID proves
+    // source identity without opening another kind's numeric child streams.
     for (A_long chunk = 0; chunk < 8; ++chunk) {
         if (chunk) text += " && ";
         const unsigned word = (node.id.value.bytes[chunk * 2] << 8u) | node.id.value.bytes[chunk * 2 + 1];
-        text += "fx.param(" + std::to_string(first + chunk) + ").value === " + std::to_string(word);
+        text += "fx.param(\"Node UUID " + std::to_string(chunk) + "\").value === " + std::to_string(word);
     }
     text += "; } catch (unrelatedEffect) {} if (match) { ";
     if(node.kind==Kind::transform && transform_layout::matrix_field(index)) {
@@ -1614,8 +1610,10 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             stage("verify expression enabled");
             ae = tx.suites.stream->AEGP_GetExpressionState(tx.id, change.ref, &enabled);
             if (ae || !enabled) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+            stage("verify source binding resolved");
+            if (value == kNativeBindingUnavailable) return PF_Err_BAD_CALLBACK_PARAM;
             stage("verify finite bound value");
-            if (!std::isfinite(value) || value == kNativeBindingUnavailable) return PF_Err_BAD_CALLBACK_PARAM;
+            if (!std::isfinite(value)) return PF_Err_BAD_CALLBACK_PARAM;
         }
         stage("accepted bindings");
         return PF_Err_NONE;

@@ -65,6 +65,11 @@ const selectedBindings=JSON.parse(fs.readFileSync("artifacts/transform-selected-
 assert.equal(noneBindings.length,12);assert.equal(selectedBindings.length,12);checks+=2;
 function effect(uuid, sourceValue) {
     return {param(index) {
+        if(typeof index==="string") {
+            const metadata=/^Node UUID ([0-7])$/.exec(index);
+            if(!metadata)throw Error("No named metadata");
+            return {name:index,value:Number(metadata[1])===7?uuid:0};
+        }
         if(index>=82 && index<=89)return {name:`Node UUID ${index-82}`,value:index===89?uuid:0};
         assert.equal(index,1);
         selectorReads++;
@@ -72,7 +77,7 @@ function effect(uuid, sourceValue) {
         return sourceValue;
     }};
 }
-const unrelated={param(){return {name:"Other parameter",get value(){throw Error("unrelated numeric read");}};}};
+const unrelated={param(index){if(typeof index==="string")throw Error("No named metadata");return {name:"Other parameter",get value(){throw Error("unrelated numeric read");}};}};
 function complete(bindings, geometry, effects, source) {
     const host=()=>({numProperties:effects.length});Object.assign(host,geometry);
     host.effect=index=>effects[index-1];
