@@ -1,11 +1,11 @@
 # Starfield 架构
 
-M3-17 native69/CEP72 candidate changes CEP graph submission per ADR0040: ordinary
+M3-17 native69/CEP72 deployment changes CEP graph submission per ADR0040: ordinary
 request nonce plus explicit synchronous resident AEGP command, guarded unique-owner
 resolution, versioned generic receiver and atomic saved-stream graph/receipt
 publication. Render still reads owned graph/aliases; no script or idle queue in
 this command. Core ABI8 / persistent schemas / parameter IDs unchanged. Installed
-68/71 remains until release verification; AE2023 acceptance open.
+69/72 passed frozen release/hash gates; AE2023 acceptance remains open. See current-state.md.
 
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 
