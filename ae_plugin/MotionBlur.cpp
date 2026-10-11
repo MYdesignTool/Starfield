@@ -1,5 +1,6 @@
 #include "MotionBlur.hpp"
 #include "Camera.hpp"
+#include "GraphCarrier.hpp"
 #include "EmitterHistory.hpp"
 #include "AE_EffectCB.h"
 #include "Param_Utils.h"
@@ -172,6 +173,8 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
         MotionSample sample;sample.time=times[i];sample.graph=bytes.take_value();
         PF_InData sampled=*data;sampled.current_time=static_cast<A_long>(times[i].value);sampled.time_scale=static_cast<A_u_long>(times[i].scale);
         error=capture_camera(&sampled,sample.camera,v[7]==1?data:nullptr);if(error)return error;
+        const bool materials=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==core::graph_keys::kMaterialNode;});
+        error=capture_lights(&sampled,graph_carrier_plugin_id(),materials,sample.lights);if(error)return error;
         // Output coordinates refer to the nominal layer plane, before AE's later
         // layer transform. Reversing each sample's transform would cancel blur.
         std::copy(std::begin(nominal_camera.image_to_layer),std::end(nominal_camera.image_to_layer),sample.camera.image_to_layer);
@@ -183,6 +186,7 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
 void apply_motion_sample(SfCoreRenderRequest& request,const MotionSample& sample) noexcept {
     request.frame.time_value=sample.time.value;request.frame.time_scale=sample.time.scale;
     request.graph_bytes=sample.graph.data();request.graph_byte_count=sample.graph.size();
+    apply_lights(request,sample.lights);
     request.camera_enabled=sample.camera.camera_enabled;
     std::copy(std::begin(sample.camera.layer_to_view),std::end(sample.camera.layer_to_view),request.layer_to_view);
     std::copy(std::begin(sample.camera.image_to_layer),std::end(sample.camera.image_to_layer),request.image_to_layer);

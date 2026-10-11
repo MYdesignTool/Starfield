@@ -92,13 +92,14 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
         const bool textures = !graph.texture_styles.empty();
         const bool clouds=!graph.cloud_styles.empty();
         const bool models=!graph.model_styles.empty() || std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.shape==4;});
-        const bool affines=std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.motion_affine!=kIdentityMotionAffine;});
+        const bool materials=std::any_of(graph.model_styles.begin(),graph.model_styles.end(),[](const auto& style){return std::any_of(style.instances.begin(),style.instances.end(),[](const auto& i){return i.material.enabled;});});
+        const bool affines=materials||std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.motion_affine!=kIdentityMotionAffine;});
         const bool poses=affines||std::any_of(graph.particles.begin(),graph.particles.end(),[](const auto& p){return p.motion_pose!=kIdentityMotionPose;});
         std::size_t model_bytes=0;
         for(const auto& style:graph.model_styles) {
             if(style.instances.empty() || style.instances.size()>kMaxModelsPerStyle)
                 return R::failure(ErrorCode::invalid_request,"invalid Model group size");
-            model_bytes+=8+144*style.instances.size();
+            model_bytes+=8+(materials?208:144)*style.instances.size();
         }
         const bool extended=has_bases || transfers || textures || clouds || models || poses;
         const std::size_t stride=affines?304:poses?232:200;
@@ -109,7 +110,7 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
         const auto append=[&](std::uint64_t value,unsigned count) {
             for(unsigned i=0;i<count;++i) bytes.push_back(static_cast<std::byte>((value>>(8*i))&255));
         };
-        append(0x8004,2);append(affines?10:poses?9:models?8:clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
+        append(0x8004,2);append(materials?11:affines?10:poses?9:models?8:clouds?7:textures?6:transfers?5:has_bases?4:3,2);append(length,4);
         append(std::bit_cast<std::uint64_t>(time.value),8);append(time.scale,8);
         append(graph.evaluated_nodes.size(),4);append(graph.particles.size(),4);
         if(extended){append(graph.sprite_bases.size(),4);append(0,4);}
@@ -134,12 +135,14 @@ Result<OpaqueBytes> encode_evaluated_particles(const EvaluatedGraph& graph,Ratio
             append(std::bit_cast<std::uint64_t>(style.aspect),8);append(std::bit_cast<std::uint64_t>(style.density),8);
         }
         for(const auto& style:graph.model_styles) {
-            append(8+144*style.instances.size(),4);append(style.instances.size(),4);
+            append(8+(materials?208:144)*style.instances.size(),4);append(style.instances.size(),4);
             for(const auto& instance:style.instances) {
                 if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot encoding cancelled");
                 if(!valid_model_instance(instance))return R::failure(ErrorCode::invalid_request,"invalid snapshot Model transform");
                 for(auto b:instance.resource)append(b,1);
                 for(double value:instance.model_to_particle)append(std::bit_cast<std::uint64_t>(value),8);
+                if(materials){const auto& m=instance.material;append(m.enabled,4);append(m.color_source,4);append(m.ae_lights,4);append(0,4);
+                    for(double value:{m.color.x,m.color.y,m.color.z,m.roughness,m.metallic,m.opacity})append(std::bit_cast<std::uint64_t>(value),8);}
             }
         }
         std::size_t index=0;
@@ -187,27 +190,27 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
         const auto clock=std::bit_cast<std::int64_t>(read(8));const auto scale=read(8);
         const auto nodes=read(4),particles=read(4);
         std::uint64_t bases=0, styles=0, clouds=0, models=0;
-        if(version>=4 && version<=10) {
+        if(version>=4 && version<=11) {
             if(bytes.size()<40)return R::failure(ErrorCode::invalid_request,"short Transform snapshot header");
             bases=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Transform snapshot header reserved field");
         }
-        if (version>=6 && version<=10) {
+        if (version>=6 && version<=11) {
             if(bytes.size()<48)return R::failure(ErrorCode::invalid_request,"short texture snapshot header");
             styles=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero texture snapshot reserved field");
         }
-        if(version>=7 && version<=10) {
+        if(version>=7 && version<=11) {
             if(bytes.size()<56)return R::failure(ErrorCode::invalid_request,"short Cloud snapshot header");
             clouds=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Cloud snapshot reserved field");
         }
-        if(version>=8 && version<=10) {
+        if(version>=8 && version<=11) {
             if(bytes.size()<64)return R::failure(ErrorCode::invalid_request,"short Model snapshot header");
             models=read(4);if(read(4))return R::failure(ErrorCode::invalid_request,"nonzero Model snapshot reserved field");
         }
-        if(version>=9&&version<=10){if(bytes.size()<72||read(4)!=32||read(4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Motion pose snapshot header");}
-        if(version==10){if(bytes.size()<80||read(4)!=72||read(4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Motion affine snapshot header");}
-        const auto stride=version==10?304u:version==9?232u:200u;
-        const auto fixed=(version==10?80:version==9?72:version==8?64:version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+stride*particles;
-        if(tag!=0x8004 || (version<3 || version>10) || length!=bytes.size() || !scale || !time.scale ||
+        if(version>=9&&version<=11){if(bytes.size()<72||read(4)!=32||read(4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Motion pose snapshot header");}
+        if(version>=10){if(bytes.size()<80||read(4)!=72||read(4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Motion affine snapshot header");}
+        const auto stride=version>=10?304u:version==9?232u:200u;
+        const auto fixed=(version>=10?80:version==9?72:version==8?64:version==7?56:version==6?48:version>=4?40:32)+16*nodes+72*bases+24*styles+24*clouds+stride*particles;
+        if(tag!=0x8004 || (version<3 || version>11) || length!=bytes.size() || !scale || !time.scale ||
             static_cast<long double>(clock)*time.scale!=static_cast<long double>(time.value)*scale ||
             nodes>kMaxGraphNodes || particles>kMaxParticleCount || bases>kMaxParticleSpriteBases || styles>kMaxTextureStyles || clouds>kMaxCloudStyles ||
             models>kMaxModelStyles || bytes.size()<fixed || (version<8 && bytes.size()!=fixed))
@@ -220,7 +223,7 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
                 if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot preflight cancelled");
                 if(at>particle_start || particle_start-at<8)return R::failure(ErrorCode::invalid_request,"short Model group header");
                 const auto group_length=read(4),members=read(4);
-                if(!members || members>kMaxModelsPerStyle || group_length!=8+144*members || group_length-8>particle_start-at)
+                if(!members || members>kMaxModelsPerStyle || group_length!=8+(version>=11?208:144)*members || group_length-8>particle_start-at)
                     return R::failure(ErrorCode::invalid_request,"invalid Model group length/count");
                 at+=static_cast<std::size_t>(group_length-8);
             }
@@ -255,6 +258,10 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
                 if(cancellation && cancellation->is_cancelled())return R::failure(ErrorCode::cancelled,"Model snapshot decoding cancelled");
                 for(auto& b:instance.resource)b=static_cast<std::uint8_t>(read(1));
                 for(auto& value:instance.model_to_particle)value=std::bit_cast<double>(read(8));
+                if(version>=11){auto& m=instance.material;const auto enabled=read(4),source=read(4),lights=read(4),reserved=read(4);
+                    if(enabled>1||source>1||lights>1||reserved)return R::failure(ErrorCode::invalid_request,"invalid Material snapshot switches");
+                    m.enabled=enabled!=0;m.color_source=static_cast<std::uint32_t>(source);m.ae_lights=lights!=0;
+                    for(double* value:{&m.color.x,&m.color.y,&m.color.z,&m.roughness,&m.metallic,&m.opacity})*value=std::bit_cast<double>(read(8));}
                 if(!valid_model_instance(instance))return R::failure(ErrorCode::invalid_request,"invalid snapshot Model transform");
             }
         }
@@ -283,7 +290,7 @@ Result<EvaluatedGraph> decode_evaluated_particles(const OpaqueBytes& bytes,Ratio
             const auto limit=read(4);p.sprite_basis_index=static_cast<std::uint32_t>(read(4));p.limit_to_2d=limit!=0;
             if(version>=9){for(auto& component:p.motion_pose)component=std::bit_cast<double>(read(8));
                 if(!valid_particle_motion_pose(p.motion_pose))return R::failure(ErrorCode::invalid_request,"invalid decoded Motion pose");}
-            if(version==10){for(auto& component:p.motion_affine)component=std::bit_cast<double>(read(8));
+            if(version>=10){for(auto& component:p.motion_affine)component=std::bit_cast<double>(read(8));
                 if(!valid_particle_motion_affine(p.motion_affine))return R::failure(ErrorCode::invalid_request,"invalid decoded Motion affine");}
             if(limit>1 || p.sprite_basis_index>bases || p.shape>(version>=8?4u:version>=6?3u:2u) || p.up_axis>2 || p.size_y_pixels<0 || p.feather_percent<0 || p.feather_percent>100 ||
                p.texture_style_index>styles || (p.shape==3 ? !p.texture_style_index : p.texture_style_index!=0) ||

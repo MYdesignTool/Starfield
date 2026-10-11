@@ -27,8 +27,8 @@ Vec3 transform(Vec3 p,const std::array<double,16>& m) noexcept {
 Vec3 interpolate(Vec3 a,Vec3 b,double t) noexcept {
     return {a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t};
 }
-struct ClipVertex {Vec3 screen;double depth{};Vec3 uv;};
-bool finite(const ClipVertex& v) noexcept {return finite(v.screen)&&std::isfinite(v.depth)&&finite(v.uv);}
+struct ClipVertex {Vec3 screen;double depth{};Vec3 uv;Vec3 world{},normal{};};
+bool finite(const ClipVertex& v) noexcept {return finite(v.screen)&&std::isfinite(v.depth)&&finite(v.uv)&&finite(v.world)&&finite(v.normal);}
 double distance(const ClipVertex& v,unsigned plane,const RectI& roi,double near_clip) noexcept {
     switch(plane) {
         case 0:return v.depth-near_clip;
@@ -44,7 +44,7 @@ ClipVertex intersection(ClipVertex a,ClipVertex b,double da,double db) noexcept 
     if(a.screen.x>b.screen.x || (a.screen.x==b.screen.x && (a.screen.y>b.screen.y ||
         (a.screen.y==b.screen.y && a.screen.z>b.screen.z)))) {std::swap(a,b);std::swap(da,db);}
     const double t=std::clamp(da/(da-db),0.,1.);
-    return {interpolate(a.screen,b.screen,t),a.depth+(b.depth-a.depth)*t,interpolate(a.uv,b.uv,t)};
+    return {interpolate(a.screen,b.screen,t),a.depth+(b.depth-a.depth)*t,interpolate(a.uv,b.uv,t),interpolate(a.world,b.world,t),interpolate(a.normal,b.normal,t)};
 }
 bool rectangle_valid(RectI r) noexcept {
     return r.left>=0&&r.top>=0&&r.right>=r.left&&r.bottom>=r.top&&r.right<=32768&&r.bottom<=32768;
@@ -117,10 +117,20 @@ Result<ModelScene> project_model_scene(const ModelGeometryLease& lease,const Mod
     if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model projection cancelled");
     if(scene.region.empty())return R::success(std::move(scene));
     const double sx=double(frame.frame_width)/frame.layer_width,sy=double(frame.frame_height)/frame.layer_height;
+    if(!valid_model_material(input.material) || (input.lighting && !valid_model_lighting(*input.lighting)))
+        return R::failure(ErrorCode::invalid_request,"invalid Model material/lighting");
+    scene.shaded=input.material.enabled;if(input.lighting)scene.lighting=*input.lighting;
+    if(input.material.enabled && input.material.opacity==0)return R::success(std::move(scene));
+    std::array<double,16> model_to_world{};
+    for(unsigned r=0;r<4;++r)for(unsigned c=0;c<4;++c)for(unsigned k=0;k<4;++k)
+        model_to_world[r*4+c]+=input.model_to_layer[r*4+k]*scene.lighting.layer_to_world[k*4+c];
     try {
         for(std::size_t index=0;index<mesh.triangles.size();++index) {
             if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model projection cancelled");
             std::array<ClipVertex,12> a{},b{};std::size_t count=3;
+            const auto& corners=mesh.triangles[index].corners;
+            const auto p0=mesh.positions[corners[0].position].value,p1=mesh.positions[corners[1].position].value,p2=mesh.positions[corners[2].position].value;
+            const auto face=model_shading::unit(model_shading::cross(model_shading::sub(p1,p0),model_shading::sub(p2,p0)));
             for(unsigned corner=0;corner<3;++corner) {
                 const auto& c=mesh.triangles[index].corners[corner];
                 auto point=transform(mesh.positions[c.position].value,input.model_to_layer);
@@ -133,6 +143,8 @@ Result<ModelScene> project_model_scene(const ModelGeometryLease& lease,const Mod
                         sy*(homography[3]*u+homography[4]*v+homography[5]*point.z),
                         homography[6]*u+homography[7]*v+homography[8]*point.z},point.z,uv};
                 } else a[corner]={{sx*point.x,sy*point.y,1},point.z,uv};
+                a[corner].world=model_shading::world(mesh.positions[c.position].value,model_to_world);
+                a[corner].normal=model_shading::normal(c.normal==kMissingModelAttribute?face:mesh.normals[c.normal],model_to_world);
                 if(!finite(a[corner]))return R::failure(ErrorCode::invalid_request,"nonfinite Model projection");
             }
             for(unsigned plane=camera.enabled?0:1;plane<6&&count;++plane) {
@@ -160,15 +172,15 @@ Result<ModelScene> project_model_scene(const ModelGeometryLease& lease,const Mod
             for(std::size_t i=1;i+1<count;++i) {
                 if(scene.triangles.size()>=limits.projected_triangles)
                     return R::failure(ErrorCode::work_limit_exceeded,"Model projected triangle cap exceeded");
-                ModelProjectedTriangle triangle;triangle.source_triangle=static_cast<std::uint32_t>(index);
-                const std::size_t corners[]{0,i,i+1};
+                ModelProjectedTriangle triangle;triangle.source_triangle=static_cast<std::uint32_t>(index);triangle.material=input.material;triangle.inherited_color=input.inherited_color;
+                const std::size_t clipped_corners[]{0,i,i+1};
                 for(unsigned c=0;c<3;++c) {
-                    const auto& v=a[corners[c]];
+                    const auto& v=a[clipped_corners[c]];
                     if(!finite(v)||!(v.screen.z>0))return R::failure(ErrorCode::invalid_request,"invalid clipped Model vertex");
                     const auto iw=1/v.screen.z;
                     triangle.vertices[c]={std::clamp(v.screen.x*iw,double(scene.region.left),double(scene.region.right)),
                         std::clamp(v.screen.y*iw,double(scene.region.top),double(scene.region.bottom)),iw,v.depth*iw,
-                        {v.uv.x*iw,v.uv.y*iw,v.uv.z*iw}};
+                        {v.uv.x*iw,v.uv.y*iw,v.uv.z*iw},model_shading::scale(v.world,iw),model_shading::scale(v.normal,iw)};
                     const auto& p=triangle.vertices[c];
                     if(!std::isfinite(p.reciprocal_w)||!std::isfinite(p.depth_over_w)||!finite(p.texture_over_w))
                         return R::failure(ErrorCode::invalid_request,"nonfinite Model perspective payload");
@@ -193,10 +205,11 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
     for(std::size_t i=0;i<scene.triangles.size();++i) {
         if(i%64==0&&cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model raster validation cancelled");
         auto t=scene.triangles[i];
+        if(!valid_model_material(t.material))return R::failure(ErrorCode::invalid_request,"invalid projected Material");
         if(t.source_triangle>=kMaxModelTriangles)return R::failure(ErrorCode::invalid_request,"invalid Model source triangle");
         for(const auto& v:t.vertices)if(!std::isfinite(v.x)||!std::isfinite(v.y)||v.x<0||v.y<0||v.x>32768||v.y>32768||
             !std::isfinite(v.reciprocal_w)||v.reciprocal_w<=0||v.reciprocal_w>1e250 ||
-            !std::isfinite(v.depth_over_w)||std::abs(v.depth_over_w)>1e250||!finite(v.texture_over_w))
+            !std::isfinite(v.depth_over_w)||std::abs(v.depth_over_w)>1e250||!finite(v.texture_over_w)||!finite(v.world_over_w)||!finite(v.normal_over_w))
                 return R::failure(ErrorCode::invalid_request,"invalid projected Model vertex");
         if(edge(t.vertices[0],t.vertices[1],t.vertices[2].x,t.vertices[2].y)!=0) {
             if(edge(t.vertices[0],t.vertices[1],t.vertices[2].x,t.vertices[2].y)<0)std::swap(t.vertices[1],t.vertices[2]);
@@ -218,7 +231,8 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
             }
         }
     }
-    surface.sample_visits=estimated_work;
+    surface.sample_visits=estimated_work;surface.shaded=scene.shaded;
+    if(!valid_model_lighting(scene.lighting))return R::failure(ErrorCode::invalid_request,"invalid Model lighting");
     if(surface.region.empty())return R::success(std::move(surface));
     const auto width=static_cast<std::size_t>(surface.region.width()),height=static_cast<std::size_t>(surface.region.height());
     if(width*height>limits.surface_pixels)return R::failure(ErrorCode::work_limit_exceeded,"Model surface pixel cap exceeded");
@@ -230,6 +244,8 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
             depths[i].fill(std::numeric_limits<double>::infinity());
         }
         std::vector<unsigned char> masks(width*height,0);
+        std::vector<std::array<std::array<float,4>,4>> shaded;
+        if(scene.shaded)shaded.resize(width*height);
         std::uint64_t work=0;
         for(auto triangle:scene.triangles) {
             if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model rasterization cancelled");
@@ -255,6 +271,15 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
                     const auto index=static_cast<std::size_t>(y-surface.region.top)*width+static_cast<std::size_t>(x-surface.region.left);
                     if(depth<depths[index][s] || (depth==depths[index][s]&&triangle.source_triangle<surface.pixels[index].source_triangle)) {
                         depths[index][s]=depth;
+                        if(scene.shaded){
+                            const auto weighted=[&](Vec3 ModelProjectedVertex::* field){return model_shading::scale(model_shading::add(model_shading::add(model_shading::scale(v[0].*field,wa),model_shading::scale(v[1].*field,wb)),model_shading::scale(v[2].*field,wc)),1/iw);};
+                            const auto position=weighted(&ModelProjectedVertex::world_over_w),normal=weighted(&ModelProjectedVertex::normal_over_w);
+                            const auto view=scene.lighting.camera_enabled?model_shading::sub(scene.lighting.camera_position,position):
+                                Vec3{-scene.lighting.layer_to_world[8],-scene.lighting.layer_to_world[9],-scene.lighting.layer_to_world[10]};
+                            const auto color=model_shading::shade(triangle.material,triangle.inherited_color,position,normal,view,scene.lighting.lights);
+                            const auto opacity=triangle.material.enabled?triangle.material.opacity:1;
+                            shaded[index][s]={static_cast<float>(color.x*opacity),static_cast<float>(color.y*opacity),static_cast<float>(color.z*opacity),static_cast<float>(opacity)};
+                        }
                         auto& p=surface.pixels[index];
                         if(masks[index]==0||depth<p.depth || (depth==p.depth&&triangle.source_triangle<p.source_triangle)) {
                             p.depth=depth;p.source_triangle=triangle.source_triangle;
@@ -268,6 +293,7 @@ Result<ModelSurface> rasterize_model_scene(const ModelScene& scene,const Cancell
         for(std::size_t i=0;i<masks.size();++i) {
             if(i%4096==0&&cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"Model raster finalization cancelled");
             const auto m=masks[i];surface.pixels[i].coverage=.25f*((m&1)+((m>>1)&1)+((m>>2)&1)+((m>>3)&1));
+            if(scene.shaded){auto& p=surface.pixels[i];p.coverage=0;for(const auto& s:shaded[i]){p.coverage+=.25f*s[3];p.premultiplied_color.x+=.25*s[0];p.premultiplied_color.y+=.25*s[1];p.premultiplied_color.z+=.25*s[2];}}
         }
         return R::success(std::move(surface));
     } catch(const std::bad_alloc&) {return R::failure(ErrorCode::allocation_failed,"Model surface allocation failed");}
@@ -290,6 +316,8 @@ Result<std::size_t> composite_model_surface(const ModelSurface& surface,Vec3 col
         const auto& p=surface.pixels[i];if(!std::isfinite(p.coverage)||p.coverage<0||p.coverage>1||
             (p.coverage>0&&(!std::isfinite(p.depth)||p.source_triangle>=kMaxModelTriangles)))
             return R::failure(ErrorCode::invalid_request,"invalid Model source pixel");
+        if(surface.shaded && (!finite(p.premultiplied_color)||p.premultiplied_color.x<0||p.premultiplied_color.y<0||p.premultiplied_color.z<0))
+            return R::failure(ErrorCode::invalid_request,"invalid shaded Model color");
         if(p.coverage>0&&opacity>0) {
             const auto y=static_cast<std::size_t>(surface.region.top-region.top)+i/sw,
                 x=static_cast<std::size_t>(surface.region.left-region.left)+i%sw;
@@ -306,7 +334,8 @@ Result<std::size_t> composite_model_surface(const ModelSurface& surface,Vec3 col
             const auto& p=surface.pixels[static_cast<std::size_t>(y-surface.region.top)*sw+x-surface.region.left];
             const float alpha=static_cast<float>(p.coverage*opacity);if(!(alpha>0))continue;
             auto* d=destination.data()+4*(static_cast<std::size_t>(y-region.top)*width+x-region.left);
-            const float source[]{static_cast<float>(color.x)*alpha,static_cast<float>(color.y)*alpha,static_cast<float>(color.z)*alpha};
+            const auto shaded=surface.shaded?p.premultiplied_color:Vec3{color.x*p.coverage,color.y*p.coverage,color.z*p.coverage};
+            const float source[]{static_cast<float>(shaded.x*opacity),static_cast<float>(shaded.y*opacity),static_cast<float>(shaded.z*opacity)};
             const float remaining=1-alpha;
             if(mode==ParticleTransferMode::stencil)for(unsigned c=0;c<4;++c)d[c]*=remaining;
             else {

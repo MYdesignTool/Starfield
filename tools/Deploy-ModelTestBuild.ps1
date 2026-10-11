@@ -25,11 +25,15 @@ $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneratio
     ($taskFrozen.nativeBuild -eq 66 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 65 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 67 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 66 -and $taskBaselinePanel -eq 71) -or
     ($taskFrozen.nativeBuild -eq 68 -and $taskFrozen.panelGeneration -eq 71 -and $taskBaselineBuild -eq 67 -and $taskBaselinePanel -eq 71) -or
-    ($taskFrozen.nativeBuild -eq 69 -and $taskFrozen.panelGeneration -eq 72 -and $taskBaselineBuild -eq 68 -and $taskBaselinePanel -eq 71)
-if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne 8 -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
+    ($taskFrozen.nativeBuild -eq 69 -and $taskFrozen.panelGeneration -eq 72 -and $taskBaselineBuild -eq 68 -and $taskBaselinePanel -eq 71) -or
+    ($taskFrozen.nativeBuild -eq 70 -and $taskFrozen.panelGeneration -eq 73 -and $taskBaselineBuild -eq 69 -and $taskBaselinePanel -eq 72 -and $taskBaselineAbi -eq 8)
+$taskHasMaterial=$taskFrozen.nativeBuild -eq 70
+$taskExpectedAbi=if($taskHasMaterial){9}else{8}
+if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne $taskExpectedAbi -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild
 $taskExpected=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldModel.aex','StarfieldHost.aex','StarfieldCore.dll')
-if($taskFrozen.files.Count -ne 8 -or @($taskFrozen.files.name | Select-Object -Unique).Count -ne 8){throw 'Expected eight distinct native/Core files.'}
+if($taskHasMaterial){$taskExpected+='StarfieldMaterial.aex'}
+if($taskFrozen.files.Count -ne $taskExpected.Count -or @($taskFrozen.files.name | Select-Object -Unique).Count -ne $taskExpected.Count){throw 'Expected the complete distinct native/Core module set.'}
 foreach($taskEntry in $taskFrozen.files){
     if($taskEntry.name -notin $taskExpected -or (Get-FileHash -LiteralPath (Join-Path $taskPrepared ('native-bundle/'+$taskEntry.name))).Hash -ne $taskEntry.hash){throw 'Frozen native pair differs.'}
 }
@@ -66,7 +70,7 @@ foreach($taskRelative in $taskPaths){
 if([IO.File]::ReadAllText((Join-Path $taskPrepared 'cep_panel/CSXS/manifest.xml')) -notmatch ('ExtensionBundleVersion="0\.1\.0\.'+$taskFrozen.panelGeneration+'"') -or [IO.File]::ReadAllText((Join-Path $taskPrepared 'cep_panel/jsx/starfield_gateway.jsx')) -notmatch ('native-presets-'+$taskFrozen.panelGeneration+'\b')){throw 'Candidate CEP generation differs.'}
 $taskProcesses=@(Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue | Select-Object ProcessName,Id)
 Write-Host ('AE process count: '+$taskProcesses.Count)
-Write-Host ('Complete native'+$taskFrozen.nativeBuild+'/Core ABI8/CEP'+$taskFrozen.panelGeneration+' test pair; actual AE2023 qualification remains open.')
+Write-Host ('Complete native'+$taskFrozen.nativeBuild+'/Core ABI'+$taskExpectedAbi+'/CEP'+$taskFrozen.panelGeneration+' test pair; actual AE2023 qualification remains open.')
 Write-Host "Undo (AE closed): powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir '$taskPluginDir' -BackupName '$BackupName' -Restore"
 if(-not $Install){Write-Host 'Read-only report. Add -Install to publish.';exit 0}
 if($taskProcesses.Count -or (Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue)){throw 'Close AE before publication.'}
@@ -86,7 +90,9 @@ if(Test-Path -LiteralPath $taskOutputFingerprint){Copy-Item -LiteralPath $taskOu
 Copy-Item -LiteralPath $taskFingerprint -Destination $taskOutputFingerprint -Force
 [ordered]@{checkedAt=[DateTimeOffset]::Now.ToString('o');nativeBuild=$taskBaselineBuild;panelGeneration=$taskBaselinePanel;coreAbi=$taskBaselineAbi;native=$taskBaseline.native;panel=$taskPanel;selector=$taskSelector;processes=$taskProcesses;link=$taskLink.Target;cepLink=$taskCepLink.Target} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-deploy-before.json')) -Encoding UTF8
 if(Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue){throw 'AE started before publication.'}
-& (Join-Path $PSScriptRoot 'Deploy-TestBuild.ps1') -PluginDir $taskPluginDir -BackupName $BackupName -IncludeModel -Install *> (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-native-deploy.log'))
+$taskNativeOptions=@{PluginDir=$taskPluginDir;BackupName=$BackupName;IncludeModel=$true;Install=$true}
+if($taskHasMaterial){$taskNativeOptions.IncludeMaterial=$true}
+& (Join-Path $PSScriptRoot 'Deploy-TestBuild.ps1') @taskNativeOptions *> (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-native-deploy.log'))
 if(-not $?){throw 'Native publication failed.'}
 Copy-Item -LiteralPath $taskSavedPanel -Destination (Join-Path $taskBackup 'panel') -Recurse
 $taskPanel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $taskBackup 'panel-snapshot.json') -Encoding UTF8
@@ -105,7 +111,7 @@ try {
     }
     throw
 }
-$taskAfter=[ordered]@{checkedAt=[DateTimeOffset]::Now.ToString('o');nativeBuild=$taskFrozen.nativeBuild;panelGeneration=$taskFrozen.panelGeneration;coreAbi=8;sourceCommit=$taskFrozen.sourceCommit;native=@();panel=$taskPanel;selector=(Get-Content -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime/current.txt') -Raw).Trim();backup=$taskBackup;hostQualification='open';link=$taskLink.Target;cepLink=$taskCepLink.Target}
+$taskAfter=[ordered]@{checkedAt=[DateTimeOffset]::Now.ToString('o');nativeBuild=$taskFrozen.nativeBuild;panelGeneration=$taskFrozen.panelGeneration;coreAbi=$taskExpectedAbi;sourceCommit=$taskFrozen.sourceCommit;native=@();panel=$taskPanel;selector=(Get-Content -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime/current.txt') -Raw).Trim();backup=$taskBackup;hostQualification='open';link=$taskLink.Target;cepLink=$taskCepLink.Target}
 foreach($taskEntry in $taskFrozen.files){$taskHash=(Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash;if($taskHash -ne $taskEntry.hash){throw 'Installed native differs.'};$taskAfter.native+=[pscustomobject]@{name=$taskEntry.name;hash=$taskHash}}
 $taskCoreHash=($taskAfter.native | Where-Object name -eq 'StarfieldCore.dll').hash
 if($taskAfter.selector -ne ('StarfieldCore-'+$taskCoreHash.Substring(0,16)+'.dll') -or (Get-FileHash -LiteralPath (Join-Path $taskBundle ('StarfieldRuntime/'+$taskAfter.selector))).Hash -ne $taskCoreHash){throw 'Published selector differs.'}
@@ -113,4 +119,4 @@ foreach($taskEntry in $taskBaseline.native){if((Get-FileHash -LiteralPath (Join-
 & (Join-Path $PSScriptRoot 'Restore-TestBuild.ps1') -PluginDir $taskPluginDir -BackupName $BackupName *> (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-rollback-report.log'))
 if(-not $?){throw 'Paired rollback report failed.'}
 $taskAfter | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$taskReleaseStem+'-deploy-after.json')) -Encoding UTF8
-Write-Host 'Eight native/Core and eighteen panel hashes verified; paired rollback report passed. AE qualification remains open.'
+Write-Host ($taskExpected.Count.ToString()+' native/Core and eighteen panel hashes verified; paired rollback report passed. AE qualification remains open.')

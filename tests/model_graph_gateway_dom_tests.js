@@ -94,6 +94,12 @@ if(fullGraph){
 }
 g=edits.apply(g,{type:"addNode",nodeType:"model",position:{x:100.123456789,y:50.234567891}},()=>uuid(101));
 if(!fullGraph)g=edits.apply(g,{type:"addNode",nodeType:"output"},()=>uuid(255));
+if(process.env.STARFIELD_DOM_MATERIAL==="1"){
+    g=edits.apply(g,{type:"addNode",nodeType:"material"},()=>uuid(108));
+    g=edits.apply(g,{type:"connect",from:uuid(108),to:uuid(101)},()=>uuid(109));
+    g=edits.apply(g,{type:"connect",from:uuid(101),to:g.nodes.find(n=>n.type===edits.types.output).id},()=>uuid(110));
+    for(const [key,value] of [[1,1],[2,[.2,.4,.8]],[3,.75],[4,.3],[5,.4],[6,1]])g.nodes.find(n=>n.id===uuid(108)).parameters.find(p=>p.key===String(key)).value=value;
+}
 const record=n=>({id:n.id,type:n.type,schemaVersion:n.schemaVersion,parameters:copy(n.parameters),position:layout.resolve(g)[n.id],
     outgoing:g.edges.filter(e=>e.sourceNode===n.id).map(e=>({id:e.id,target:e.destinationNode})).sort((a,b)=>a.id.localeCompare(b.id))});
 api.ensure(layer,realm(g.nodes.filter(n=>n.type!==edits.types.output).map(record)),true,realm([]),false);eq(arbReads,0);
@@ -102,9 +108,11 @@ let transaction=500;
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
     target:{token},transactionId:uuid(transaction),changes:[],...fields});}
 function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});const before=copy(api.snapshot(resolved));
-    const desired=copy(before.nativeNodes.find(n=>n.type===edits.types.model));desired.id=uuid(++transaction);desired.position={x:160.456789123,y:90.567891234};
+    const desired=copy(before.nativeNodes.find(n=>n.type===edits.types.model)),previousModelId=desired.id;desired.id=uuid(++transaction);desired.position={x:160.456789123,y:90.567891234};
+    if(!replace)desired.outgoing=[];
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
     const nodes=replace?before.nativeNodes.filter(n=>n.type!==edits.types.model).concat([desired]):before.nativeNodes.concat([desired]);
+    if(replace)for(const n of nodes)for(const e of n.outgoing)if(e.target===previousModelId)e.target=desired.id;
     for(const node of nodes)node.schemaVersion=edits.nativeRecordSchema(node);
     if(reorderedConnections)for(const node of nodes)node.outgoing=node.outgoing.slice().reverse().map(edge=>({target:edge.target,id:edge.id}));
     const r=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{baseGraphRevision:before.revision,baseRecordStamp:before.recordStamp,

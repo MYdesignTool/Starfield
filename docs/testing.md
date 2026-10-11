@@ -1,5 +1,19 @@
 # 测试入口
 
+## M3-17 Material / direct Model candidate
+
+Isolated panel: artifacts/prepared/m3-17-material-panel73-v4/cep_panel.
+RunMaterialTests.ps1 -Run -Sanitize: 44 Core/pixel/snapshot/ABI prefix checks.
+RunMaterialNativeBindingTests.ps1 -Run -Sanitize: 170 actual registration/binding8/compiler
+checks. RunLightCaptureTests.ps1 -Run: 1104 SDK fake-suite checks across light
+types, timing, active state, falloff enums, failures, cancellation and ownership.
+RunModelPanelAudit.ps1 -Run -PanelRoot <isolated panel>: ES3/shared factory,
+Material authoring and complete registration/DOM transaction matrix.
+model_deployment_tests.ps1 -Run -UpgradeInstalledModel -InstalledModelBuild 69:
+63 dummy pair/hash/full rollback checks. Logs: artifacts/m3-17-material-*.
+RunModelParticleTests.ps1 -Run: 2695 old behavior checks remain passing.
+All are offline checks; AE2023 manual material/light/render acceptance is open.
+
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08
 
 Installed native69/packed32837/CoreABI8/CEP72 from frozen source

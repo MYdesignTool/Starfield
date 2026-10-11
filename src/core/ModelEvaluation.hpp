@@ -1,6 +1,30 @@
 // Included by GraphEvaluation.cpp; numeric Model metadata only, never mesh bytes.
 using ModelValues=std::map<NodeId,ParticleModelInstance>;
 using ModelStyleIndices=std::map<NodeId,std::uint32_t>;
+using MaterialValues=std::map<NodeId,ModelMaterial>;
+Result<ModelMaterial> read_material(const GraphNode& node) {
+    using R=Result<ModelMaterial>;ModelMaterial m;m.enabled=true;
+    if(node.type_key!=kMaterialNode||node.schema_version!=1||node.parameters.size()!=6)
+        return R::failure(ErrorCode::invalid_request,"invalid Material schema");
+    std::array<bool,6> seen{};
+    for(const auto& p:node.parameters){const auto k=p.key.value;
+        if(k<1||k>6||seen[k-1])return R::failure(ErrorCode::invalid_request,"invalid Material key");seen[k-1]=true;
+        if(k==1||k==6){const auto* v=std::get_if<std::uint32_t>(&p.value);if(!v||*v>1)return R::failure(ErrorCode::invalid_request,"invalid Material switch");
+            if(k==1)m.color_source=*v;else m.ae_lights=*v!=0;}
+        else if(k==2){const auto* v=std::get_if<Vec3>(&p.value);if(!v)return R::failure(ErrorCode::invalid_request,"invalid Material color");m.color=*v;}
+        else {const auto* v=std::get_if<double>(&p.value);if(!v)return R::failure(ErrorCode::invalid_request,"invalid Material scalar");
+            if(k==3)m.roughness=*v;else if(k==4)m.metallic=*v;else m.opacity=*v;}
+    }
+    if(!valid_model_material(m))return R::failure(ErrorCode::invalid_request,"Material value outside bounds");return R::success(m);
+}
+Result<bool> attach_materials(const Graph& graph,const MaterialValues& materials,ModelValues& models) {
+    for(const auto& edge:graph.edges)if(const auto found=materials.find(edge.source_node);found!=materials.end()) {
+        if(!models.contains(edge.destination_node)||edge.source_port!=kMaterialOut||edge.destination_port!=kModelMaterialIn)
+            return Result<bool>::failure(ErrorCode::invalid_request,"Material requires Model material input");
+        models.at(edge.destination_node).material=found->second;
+    }
+    return Result<bool>::success(true);
+}
 Result<ParticleModelInstance> read_model(const GraphNode& node) {
     using R=Result<ParticleModelInstance>;
     if(node.type_key!=kModelNode || node.schema_version!=1)return R::failure(ErrorCode::invalid_request,"invalid Model node identity/schema");
@@ -47,8 +71,11 @@ Result<ParticleModelInstance> read_model(const GraphNode& node) {
     return R::success(instance);
 }
 bool is_model_graph_edge(const GraphEdge& edge,const GraphNode& source,const GraphNode& destination) noexcept {
-    return source.type_key==kModelNode && destination.type_key==kParticleNode &&
-        edge.source_port==kModelGeometryOut && edge.destination_port==kParticleModelsIn;
+    return (source.type_key==kModelNode && edge.source_port==kModelGeometryOut &&
+        ((destination.type_key==kParticleNode && edge.destination_port==kParticleModelsIn) ||
+         (destination.type_key==kOutputNode && edge.destination_port==kOutputParticles))) ||
+        (source.type_key==kMaterialNode && destination.type_key==kModelNode &&
+         edge.source_port==kMaterialOut && edge.destination_port==kModelMaterialIn);
 }
 Result<ModelStyleIndices> retain_model_styles(const Graph& graph,const ModelValues& models,EvaluatedGraph& result,
     const Cancellation& cancel) {
@@ -67,4 +94,23 @@ Result<ModelStyleIndices> retain_model_styles(const Graph& graph,const ModelValu
         result.model_styles.push_back(std::move(style));indices.emplace(particle,static_cast<std::uint32_t>(result.model_styles.size()));
     }
     return R::success(std::move(indices));
+}
+Result<EvaluatedGraph> finish_model_output(EvaluatedGraph result,const Graph& graph,const ModelValues& models,
+    const ModelStyleIndices& indices) {
+    using R=Result<EvaluatedGraph>;
+    for(const auto& node:graph.nodes)if(node.type_key==kOutputNode) {
+        const auto found=indices.find(node.id);if(found==indices.end())continue;
+        for(const auto& edge:graph.edges)if(edge.destination_node==node.id && models.contains(edge.source_node)) {
+            if(std::any_of(result.particles.begin(),result.particles.end(),[&](const auto& p){return p.emitter_id==edge.source_node && p.id==UINT64_MAX;}))continue;
+            if(result.particles.size()>=kMaxParticleCount)return R::failure(ErrorCode::work_limit_exceeded,"direct Model output count exceeded");
+            // One geometry group per direct model: do not duplicate the combined group for every edge.
+            ParticleModelStyle style;style.instances.push_back(models.at(edge.source_node));
+            if(result.model_styles.size()>=kMaxModelStyles)return R::failure(ErrorCode::work_limit_exceeded,"direct Model styles exceeded");
+            result.model_styles.push_back(std::move(style));
+            ParticleInstance p;p.emitter_id=edge.source_node;p.id=UINT64_MAX;p.lifetime_seconds=1e30;p.shape=4;
+            p.size_pixels=models.at(edge.source_node).resource==ModelResourceId{}?100:1;p.size_y_pixels=p.size_pixels;p.opacity=1;
+            p.model_style_index=static_cast<std::uint32_t>(result.model_styles.size());result.particles.push_back(p);
+        }
+    }
+    return R::success(std::move(result));
 }

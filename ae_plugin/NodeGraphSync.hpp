@@ -74,11 +74,12 @@ inline bool valid_edit(const NativeEdit& edit) noexcept {
     if(edit.records_only)return false; // native control edits require an authored UUID/value
     bool any = false;
     for (const auto word : edit.uuid) any = any || word != 0;
-    if (edit.node_kind > 5 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
+    if (edit.node_kind > 6 || edit.node_kind == 2 || edit.additional_count>edit.additional_fields.size() ||
         !native_nodes::authored_parameter(static_cast<native_nodes::Kind>(edit.node_kind),edit.parameter_index) || !any ||
         static_cast<std::uint32_t>(edit.value_kind) > 3) return false;
     if(edit.node_kind==4 && (edit.parameter_index>14 || edit.additional_count ||
         edit.value_kind!=(edit.parameter_index==2?ValueKind::point2:ValueKind::scalar)))return false;
+    if(edit.node_kind==6 && (edit.additional_count || edit.value_kind!=(edit.parameter_index==2?ValueKind::color:ValueKind::scalar)))return false;
     if(edit.node_kind==5 && (edit.value_kind!=ValueKind::scalar || edit.additional_count))return false;
     for (const auto value : edit.value) if (!std::isfinite(value)) return false;
     if(edit.node_kind==1 && edit.parameter_index==native_nodes::particle_layout::shape) {

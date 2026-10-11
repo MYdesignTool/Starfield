@@ -19,6 +19,9 @@
 #elif defined(STARFIELD_NODE_KIND_MODEL)
 #define STARFIELD_NODE_NAME "Starfield Model"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.model"
+#elif defined(STARFIELD_NODE_KIND_MATERIAL)
+#define STARFIELD_NODE_NAME "Starfield Material"
+#define STARFIELD_NODE_MATCH "org.starfieldfx.node.material"
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

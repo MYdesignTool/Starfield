@@ -1,5 +1,5 @@
 {
-  "identityRevision": 10,
+  "identityRevision": 11,
   "idPolicy": "Native AE parameter disk IDs are explicit, unique within an effect, and bounded to 1..9999. These IDs are separate from host stream indices and portable graph keys.",
   "scriptBindingPolicy": "PF group/topic entries are presentation markers, not script PropertyGroup containers. Native curve count/mode/knots and the duplicate Particle scalar Opacity resolve from the effect root by exact parameter matchName derived from these disk IDs. Display names, topic paths and mutable indices are not fallbacks. Panel42 / ADR0030.",
   "migrationPolicy": "Development Particle7/base442 and Force3/base140 require fresh effects/graphs, per owner no-compatibility policy. Emitter7/base34, main27/index1/disk1631 (Motion Blur appended616..625) ; numeric Core ABI3/snapshot3 remain unchanged. First8 curve knot IDs retained; extra knots/interpolation use3000-series IDs. Paired binaries and CEP rollback. ADR0030. Native Transform1/base14 appends disk1401..1414 and binding fields15..26; Core ABI4/snapshot4 require a full paired build47. Existing kind IDs and graph envelope are retained. ADR0032. ADR0033/build52 appends Particle Transfer Mode disk232/stream519 after existing metadata; old streams/IDs unchanged, graph key30 optional Normal, binding v3/snapshot5/Core ABI5; paired native/CEP required.",
@@ -575,5 +575,21 @@
     "inheritedMatrixGraphKey": 7,
     "layerResourceGraphKey": 8,
     "policy": "Constant project-local layer ID; UI captures relative anchor affine; twelve synthetic numeric aliases sample Null and parent motion at render time. Selected resource is always dynamic. Fields are not physical AE parameter indices. ADR0032."
+  },
+  "material": {
+    "graphType": "org.starfieldfx.nodes.material",
+    "schemaVersion": 1,
+    "nativeKind": 6,
+    "effectMatchName": "org.starfieldfx.node.material",
+    "baseParameters": 6,
+    "controls": {
+      "color_source": 1601,
+      "color": 1602,
+      "roughness": 1603,
+      "metallic": 1604,
+      "opacity": 1605,
+      "ae_lights": 1606
+    },
+    "migration": "New independent IDs; ADR0041, native70/CoreABI9 paired deployment. Existing IDs untouched."
   }
 }

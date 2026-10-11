@@ -110,9 +110,17 @@ inline constexpr std::uint64_t kMaxModelSourceBytes=64ull*1024ull*1024ull;
 inline constexpr double kMaxModelLocalMatrixCoefficient=1e12,kMaxModelLayerMatrixCoefficient=1e30;
 inline constexpr std::array<double,16> kIdentityModelMatrix{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
 struct ModelResource { ModelResourceId id{}; ModelGeometry geometry; };
+struct ModelMaterial {
+    bool enabled{false};
+    std::uint32_t color_source{0}; // 0 particle, 1 independent
+    Vec3 color{1,1,1};
+    double roughness{.5},metallic{0},opacity{1};
+    bool ae_lights{true};
+};
 struct ParticleModelInstance {
     ModelResourceId resource{}; // zero selects the builtin unit cube
     std::array<double,16> model_to_particle{kIdentityModelMatrix};
+    ModelMaterial material;
 };
 struct ParticleModelStyle { std::vector<ParticleModelInstance> instances; };
 struct ModelLocalSettings {

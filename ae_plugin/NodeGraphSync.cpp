@@ -47,6 +47,10 @@ constexpr char kRegistrationName[] = "Starfield Model Node Sync";
 constexpr A_long kLastParameterIndex = starfield::adapter::native_nodes::last_parameter_index(
     starfield::adapter::native_nodes::Kind::model);
 constexpr A_long kNodeKind = 5;
+#elif defined(STARFIELD_NODE_KIND_MATERIAL)
+constexpr char kRegistrationName[]="Starfield Material Node Sync";
+constexpr A_long kLastParameterIndex=starfield::adapter::native_nodes::last_parameter_index(starfield::adapter::native_nodes::Kind::material);
+constexpr A_long kNodeKind=6;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

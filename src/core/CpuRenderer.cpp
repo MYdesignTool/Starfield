@@ -113,6 +113,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         return OutputResult::failure(validated.error());
     }
     const FrameSpec& frame = validated.value();
+    if(!valid_model_lighting(request.lighting))return OutputResult::failure(ErrorCode::invalid_request,"invalid Model lights");
     if (!valid_camera(request.camera)) return OutputResult::failure(ErrorCode::invalid_request, "invalid camera projection");
     const auto resources=validate_texture_resources(request.texture_sources,request.texture_frames,cancellation);
     if (!resources.has_value()) return OutputResult::failure(resources.error());
@@ -281,9 +282,11 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
         if(particle.shape==4) {
             const ParticleModelInstance implicit{};
             const auto instances=particle.model_style_index ? std::span<const ParticleModelInstance>(evaluated.value().model_styles[particle.model_style_index-1].instances) : std::span<const ParticleModelInstance>(&implicit,1);
-            ModelScene scene;scene.region=roi;
+            ModelScene scene;scene.region=roi;scene.lighting=request.lighting;
             ModelSceneLimits model_limits;
-            model_limits.sample_visits=std::min(model_limits.sample_visits,limits_.max_model_sample_visits-model_sample_visits);
+            const bool lit=std::any_of(instances.begin(),instances.end(),[](const auto& i){return i.material.enabled&&i.material.ae_lights;});
+            const std::uint64_t light_work=lit?1+request.lighting.lights.size():1;
+            model_limits.sample_visits=std::min(model_limits.sample_visits,(limits_.max_model_sample_visits-model_sample_visits)/light_work);
             for(const auto& instance:instances) {
                 const auto& lease=instance.resource==ModelResourceId{} ? *cube : model_sources.at(instance.resource);
                 const auto count=lease.geometry().triangles.size();
@@ -292,7 +295,8 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
                 model_input_triangles+=count;
                 const auto pose=model_particle_matrix(particle,frame,evaluated.value().sprite_bases,instance);
                 if(!pose.has_value())return OutputResult::failure(pose.error());
-                ModelProjection projection{frame,request.camera,pose.value()};
+                ModelProjection projection{frame,request.camera,pose.value(),instance.material,particle.color,&request.lighting};
+                scene.shaded=scene.shaded||instance.material.enabled;
                 auto projected=project_model_scene(lease,projection,cancellation,model_limits);
                 if(!projected.has_value())return OutputResult::failure(projected.error());
                 if(projected.value().triangles.size()>model_limits.projected_triangles-scene.triangles.size())
@@ -302,7 +306,7 @@ Result<RenderOutput> CpuParticleRenderer::render(const RenderRequest& request,
             }
             const auto surface=rasterize_model_scene(scene,cancellation,model_limits);
             if(!surface.has_value())return OutputResult::failure(surface.error());
-            model_sample_visits+=surface.value().sample_visits;
+            model_sample_visits+=surface.value().sample_visits*light_work;
             const auto composed=composite_model_surface(surface.value(),particle.color,particle.opacity,particle.transfer_mode,roi,accumulation,cancellation);
             if(!composed.has_value())return OutputResult::failure(composed.error());
             continue;

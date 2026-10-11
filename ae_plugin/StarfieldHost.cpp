@@ -44,7 +44,7 @@ bool starfield_effect(const char* match) noexcept {
     return !std::strcmp(match,"org.starfieldfx.particle") ||
         !std::strcmp(match,"org.starfieldfx.node.emitter") || !std::strcmp(match,"org.starfieldfx.node.particle") ||
         !std::strcmp(match,"org.starfieldfx.node.force") || !std::strcmp(match,"org.starfieldfx.node.transform") ||
-        !std::strcmp(match,"org.starfieldfx.node.model");
+        !std::strcmp(match,"org.starfieldfx.node.model") || !std::strcmp(match,"org.starfieldfx.node.material");
 }
 A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {

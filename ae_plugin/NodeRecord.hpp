@@ -6,6 +6,7 @@
 #include "ParticleLayout.hpp"
 #include "TransformLayout.hpp"
 #include "ModelLayout.hpp"
+#include "MaterialLayout.hpp"
 #include <array>
 #include <iterator>
 
@@ -19,7 +20,7 @@ inline constexpr A_long kMaxOutgoingEdges = 4;
 inline constexpr A_long kConnectionUuidChunks = 8;
 inline constexpr A_long kConnectionRecordChunks = 16; // destination UUID + edge UUID
 
-enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5 }; // 2 is not a node kind.
+enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5, material=6 }; // 2 is not a node kind.
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
@@ -28,6 +29,7 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5 
         case Kind::force: return 11+particle_layout::curve_span-1;
         case Kind::transform: return transform_layout::last;
         case Kind::model: return model_layout::last;
+        case Kind::material: return material_layout::last;
     }
     return 0;
 }
@@ -195,12 +197,13 @@ enum : A_long {
         kSizeCurveCountId, kOpacityCurveCountId, kSizeCurveInterpolationId, kOpacityCurveInterpolationId,
         kRotationCurveInterpolationId, kColorGradientInterpolationId, kWindSpinCurveInterpolationId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6+material_layout::last> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for(A_long index=1;index<=model_layout::last;++index)ids[count++]=model_layout::disk_id(index);
     for(A_long index=model_layout::author_bounds_first;index<=model_layout::author_bounds_last;++index)
         ids[count++]=model_layout::author_bounds_disk_id(index);
+    for(int i=1;i<=material_layout::last;++i)ids[count++]=material_layout::disk_id(i);
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
         for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
             ids[count++] = connection_uuid_id(slot, chunk);

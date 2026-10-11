@@ -61,7 +61,7 @@ private:
 
 bool render_request_size_valid(const SfCoreRenderRequest* input) noexcept {
     return input && (input->struct_size==sizeof(SfCoreRenderRequest) ||
-        input->struct_size==SF_CORE_ABI7_RENDER_REQUEST_SIZE);
+        input->struct_size==SF_CORE_ABI8_RENDER_REQUEST_SIZE || input->struct_size==SF_CORE_ABI7_RENDER_REQUEST_SIZE);
 }
 
 core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderRequest& input) {
@@ -102,6 +102,23 @@ core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderReques
         return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded, "texture ABI count exceeded");
     if ((input.texture_source_count && !input.texture_sources) || (input.texture_frame_count && !input.texture_frames))
         return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request, "texture ABI array is missing");
+    if(input.struct_size==sizeof(SfCoreRenderRequest)){
+        if(input.light_count>core::kMaxModelLights || (input.light_count&&!input.lights) || input.light_camera_enabled>1)
+            return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"invalid lighting ABI arrays");
+        // Empty tail from older callers preserves identity/default lighting.
+        if(input.light_count||input.light_camera_enabled){
+            std::copy_n(input.lighting_layer_to_world,16,request.lighting.layer_to_world.begin());
+            request.lighting.camera_enabled=input.light_camera_enabled!=0;
+            request.lighting.camera_position={input.lighting_camera_position[0],input.lighting_camera_position[1],input.lighting_camera_position[2]};
+        }
+        for(unsigned i=0;i<input.light_count;++i){const auto& l=input.lights[i];
+            if(l.struct_size!=sizeof(SfModelLight)||l.reserved)return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"invalid lighting ABI size");
+            request.lighting.lights.push_back({static_cast<core::ModelLightType>(l.type),{l.color[0],l.color[1],l.color[2]},
+                {l.position[0],l.position[1],l.position[2]},{l.direction[0],l.direction[1],l.direction[2]},
+                l.intensity,l.cone_degrees,l.cone_feather,l.falloff,l.radius,l.falloff_distance});
+        }
+        if(!core::valid_model_lighting(request.lighting))return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"invalid lighting ABI values");
+    }
     request.texture_sources.reserve(input.texture_source_count);
     for (std::uint32_t i = 0; i < input.texture_source_count; ++i) {
         const auto& s = input.texture_sources[i];
@@ -123,7 +140,7 @@ core::Result<core::RenderRequest> decode_render_request(const SfCoreRenderReques
             {f.pixels, static_cast<std::size_t>(f.pixel_float_count)}});
     }
     // Never read the ABI8 tail of an ABI7-sized request.
-    if(input.struct_size==sizeof(SfCoreRenderRequest)) {
+    if(input.struct_size>=SF_CORE_ABI8_RENDER_REQUEST_SIZE) {
         const auto count=input.model_source_count;
         if(count>core::kMaxModelSources)return core::Result<core::RenderRequest>::failure(core::ErrorCode::work_limit_exceeded,"Model ABI source count exceeded");
         if(count&&!input.model_sources)return core::Result<core::RenderRequest>::failure(core::ErrorCode::invalid_request,"Model ABI source array is missing");
@@ -327,7 +344,7 @@ SfCoreStatus SF_CORE_CALL inspect(const SfCoreInspectRequest* input, SfCoreInspe
 
 extern "C" SF_CORE_EXPORT int32_t SF_CORE_CALL StarfieldCore_GetApi(
     uint32_t abi_version, uint32_t api_struct_size, SfCoreApi* out_api) {
-    if (out_api == nullptr || (abi_version != SF_CORE_ABI_VERSION && abi_version != SF_CORE_LEGACY_ABI_VERSION) || api_struct_size != sizeof(SfCoreApi))
+    if (out_api == nullptr || (abi_version != SF_CORE_ABI_VERSION && abi_version != 8u && abi_version != SF_CORE_LEGACY_ABI_VERSION) || api_struct_size != sizeof(SfCoreApi))
         return 0;
     *out_api = SfCoreApi{sizeof(SfCoreApi), abi_version, render, release_render_result, inspect, prepare_gpu_scene, release_gpu_scene};
     return 1;

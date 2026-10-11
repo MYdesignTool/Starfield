@@ -4,6 +4,7 @@
 #include "starfield/core/Random.hpp"
 #include "starfield/core/ParticleBirth.hpp"
 #include "starfield/core/ModelResources.hpp"
+#include "starfield/core/ModelLighting.hpp"
 #include "starfield/core/MotionCircle.hpp"
 #include "starfield/core/MotionPathTravel.hpp"
 #include "starfield/core/MotionPathPoints.hpp"
@@ -480,7 +481,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::vector<std::optional<ForceValues>> forces(count);
         std::vector<std::optional<ParticleValues>> particles(count);
         std::vector<std::optional<CompiledParticleTransform>> transforms(count);
-        ModelValues models;
+        ModelValues models;MaterialValues materials;
         std::map<NodeId,CompiledMotionCircle> circles;
         std::map<NodeId,MotionLookAtSettings> look_ats;
         std::map<NodeId,MotionPathClockValue> path_clocks;
@@ -543,6 +544,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     auto points=read_motion_path_points(node,cancellation,budget.work);if(!points.has_value())return R::failure(points.error());
                     path_clocks.emplace(node.id,value.take_value());
                 }
+            } else if(node.type_key==kMaterialNode) {
+                auto value=read_material(node);if(!value.has_value())return R::failure(value.error());materials.emplace(node.id,value.take_value());
             } else if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());
                 models.emplace(node.id,value.take_value());
@@ -616,6 +619,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
         CloudStyleMap cloud_indices;
+        auto attached=attach_materials(graph,materials,models);if(!attached.has_value())return R::failure(attached.error());
         auto model_indices=retain_model_styles(graph,models,result,cancellation);
         if(!model_indices.has_value())return R::failure(model_indices.error());
         for (auto index : active_particles) {
@@ -685,7 +689,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         // Keep the graph valid and render transparent until a complete source
         // path is connected again. Structural/type errors are still rejected by
         // validate_graph above.
-        if (active_emitter_count == 0) return R::success(std::move(result));
+        if (active_emitter_count == 0) return finish_model_output(std::move(result),graph,models,model_indices.value());
         if(output_particle_count&&to_seconds(*normalized)>=0)for(std::size_t i=0;i<count;++i)if(active[i]&&path_clocks.contains(nodes[i]->id)) {
             auto value=compile_motion_graph_path(*nodes[i],path_clocks.at(nodes[i]->id).settings,cancellation,budget.work,budget.path_bytes);
             if(!value.has_value())return R::failure(value.error());paths.emplace(nodes[i]->id,value.take_value());
@@ -878,7 +882,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             }
             result.particles.resize(kept.size());
             for (std::size_t i = 0; !kept.empty(); ++i) { result.particles[i] = kept.top().particle; kept.pop(); }
-            return R::success(std::move(result));
+            return finish_model_output(std::move(result),graph,models,model_indices.value());
         }
 
         // An emitter without an active Particle branch is an incomplete graph,
@@ -892,7 +896,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                                       "active Force paths require a connected Particle node");
                 }
             }
-            return R::success(std::move(result));
+            return finish_model_output(std::move(result),graph,models,model_indices.value());
         }
 
         std::sort(active_particles.begin(), active_particles.end(), [&nodes](std::size_t left, std::size_t right) {
@@ -1145,7 +1149,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         }
         budget.work += result.particles.size();
         if (budget.work > 20'000'000) return R::failure(ErrorCode::work_limit_exceeded, "auxiliary evaluation limit exceeded");
-        return R::success(std::move(result));
+        return finish_model_output(std::move(result),graph,models,model_indices.value());
     } catch (const std::bad_alloc&) {
         return R::failure(ErrorCode::allocation_failed, "graph evaluation allocation failed");
     } catch (...) {

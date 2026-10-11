@@ -1,5 +1,23 @@
 # 当前工程状态
 
+## native70 / CEP73 Material candidate — 2026-10-11
+
+Owner reports native69/CEP72 currently produces no errors in their manual tests.
+This is limited evidence; prior undo/reopen/OBJ gates are not inferred from it.
+M3-17 implements direct Model → Output and Material → Model per ADR0041:
+Particle Color or Material Color, roughness, metallic, opacity and AE ambient/
+parallel/point/spot lighting. Old graphs without Material retain unlit color.
+Imported direct geometry keeps native mesh units; builtin direct cube is 100px.
+No complex materials, shadows or texture maps.
+
+Candidate adds Core ABI9, binding8 and Model snapshot11 with legacy readers,
+and StarfieldMaterial.aex / kind6 / disk1601..1606. Complete nine-module native70/
+CEP73 build required. Installed69/72 remains unchanged pending frozen build and
+hash gates. Worktree evidence: Material Core ASAN44, native binding/compiler ASAN170,
+AE light capture1104, old Model particle2695, full panel audit and dummy69/72→
+70/73 publication/full rollback63 passed. Logs: artifacts/m3-17-material-*.
+Actual AE2023 material/light/render qualification remains open.
+
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08
 
 Installed native69/packed32837/CoreABI8/CEP72 from frozen source

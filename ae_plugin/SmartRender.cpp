@@ -11,6 +11,8 @@
 #include "WorldBridge.hpp"
 #include "TextureResources.hpp"
 #include "ModelRenderResources.hpp"
+#include "LightCapture.hpp"
+#include "GraphCarrier.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -181,7 +183,7 @@ struct PreRenderState {
     SfCoreGpuSceneResult gpu_scene{};
     MotionExposure motion;MotionGpuStorage motion_gpu;
     TexturePreparation textures;
-    ModelRenderResources models;
+    ModelRenderResources models;LightStaging lights;
     A_long gpu_world_width{},gpu_world_height{};
     ~PreRenderState() { if(generation && gpu_scene.struct_size==sizeof(gpu_scene)) generation->api().release_gpu_scene(&gpu_scene); }
     std::shared_ptr<const CoreGeneration> generation;
@@ -299,6 +301,7 @@ PF_Err make_request(PF_InData* in_data,PF_OutData* out_data,HostBitDepth depth,c
     request.texture_sources=state.textures.abi_sources.data();
     request.model_source_count=static_cast<std::uint32_t>(state.models.sources.size());
     request.model_sources=state.models.sources.data();
+    apply_lights(request,state.lights);
     const PF_Err camera_error = capture_camera(in_data, request);
     if (camera_error) {
         std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "Starfield camera geometry is unavailable or singular.");
@@ -485,6 +488,19 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         double(state->par.num)/state->par.den,history_cancel,state->textures);error)return error;
     if(const auto error=prepare_model_render_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
         double(state->par.num)/state->par.den,history_cancel,state->models);error)return error;
+    const bool materials=std::any_of(graph->nodes.begin(),graph->nodes.end(),[](const auto& n){return n.type_key==core::graph_keys::kMaterialNode;});
+    if(const auto error=capture_lights(in_data,graph_carrier_plugin_id(),materials,state->lights);error)return error;
+    const auto mix_lights=[&](const LightStaging& lights)->PF_Err {
+        double key[21]{};std::copy_n(lights.layer_to_world,16,key);std::copy_n(lights.camera_position,3,key+16);
+        key[19]=lights.camera_enabled;key[20]=double(lights.lights.size());
+        auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(key),key);if(error)return error;
+        for(const auto& l:lights.lights){double values[17]{double(l.type),double(l.falloff),l.color[0],l.color[1],l.color[2],
+            l.position[0],l.position[1],l.position[2],l.direction[0],l.direction[1],l.direction[2],
+            l.intensity,l.cone_degrees,l.cone_feather,l.radius,l.falloff_distance,0};
+            error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(values),values);if(error)return error;}return PF_Err_NONE;
+    };
+    if(const auto error=mix_lights(state->lights);error)return error;
+    for(const auto& sample:state->motion.samples)if(const auto error=mix_lights(sample.lights);error)return error;
     const double exposure_key[2]{state->motion.enabled?1.0:0.0,state->motion.gain};
     if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(exposure_key),exposure_key);error)return error;
     for(const auto& sample:state->motion.samples) {

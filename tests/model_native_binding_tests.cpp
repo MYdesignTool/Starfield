@@ -130,7 +130,8 @@ void invalid_records(PF_InData& data){
     const auto original=bound_graph();
     for(unsigned length=2;length<original.optional_records[0].size();++length){auto bad=original;bad.optional_records[0].resize(length);
         adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
-    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,8u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
+    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,9u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
+    {auto current=original;put(current.optional_records[0],2,8,2);adapter::NativeAnimationPlan plan(current,1920,1080,1);CHECK(plan.valid());}
     for(unsigned kind:{2u,6u,65535u}){auto bad=original;put(bad.optional_records[0],28,kind,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
     for(int index=1;index<=24;++index){if(!layout::binding_field(index))continue;const auto offset=field_offset(index);
         for(unsigned type:{1u,2u,3u}){auto bad=original;put(bad.optional_records[0],offset+2,type,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
@@ -387,11 +388,16 @@ void ui_capture(PF_InData& data){
     handles.at(imported).back()^=std::byte{1};CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM&&ui_refs==0&&ui_suites==0);
     ui_values[0][layout::source].one_d=1;const auto reads=ui_mesh_reads;
     CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE&&ui_mesh_reads==reads);
-    connect(0,records::model,255,13);CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_BAD_CALLBACK_PARAM);
+    connect(0,records::model,255,13);CHECK(compile_native_node_graph(&data,pointers.data(),graph,found,1)==PF_Err_NONE);
     CHECK(ui_refs==0&&ui_suites==0&&locks==0);data.pica_basicP=nullptr;clear();
 }
 }
-int main(){if(model_controls_fixture_main())return 1;
+#ifdef STARFIELD_MODEL_BINDING_LIBRARY
+int model_native_binding_fixture_main(){
+#else
+int main(){
+#endif
+    if(model_controls_fixture_main())return 1;
     PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;
     PF_InData data{};data.utils=&utils;data.inter.add_param=add;
     try{registration_module(data);animation(data);invalid_records(data);ui_capture(data);CHECK(handles.empty()&&locks==0);

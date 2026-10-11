@@ -1,5 +1,6 @@
 #include "starfield/core/ModelResources.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
+#include "starfield/core/ModelLighting.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -35,7 +36,7 @@ Vec3 rotate(Vec3 v,Vec3 angles) noexcept {
 }
 }
 bool valid_model_instance(const ParticleModelInstance& instance) noexcept {
-    return affine(instance.model_to_particle,kMaxModelLocalMatrixCoefficient);
+    return affine(instance.model_to_particle,kMaxModelLocalMatrixCoefficient) && valid_model_material(instance.material);
 }
 Result<std::array<double,16>> model_local_matrix(const ModelLocalSettings& s,const ModelBounds& bounds) noexcept {
     using R=Result<std::array<double,16>>;

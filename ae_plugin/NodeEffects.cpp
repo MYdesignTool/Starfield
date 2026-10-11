@@ -37,7 +37,7 @@ static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag
 static_assert(STARFIELD_TRANSFORM_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
-enum class NodeEffectKind { emitter, particle, force, transform, model };
+enum class NodeEffectKind { emitter, particle, force, transform, model, material };
 
 // Authored controls animate; topology/identity/curve banks stay constant (ADR 0023).
 // Do not add CANNOT_INTERP: AE chooses interpolation appropriate to each type.
@@ -54,6 +54,8 @@ constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::force;
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::transform;
 #elif defined(STARFIELD_NODE_KIND_MODEL)
 constexpr NodeEffectKind kNodeEffectKind = NodeEffectKind::model;
+#elif defined(STARFIELD_NODE_KIND_MATERIAL)
+constexpr NodeEffectKind kNodeEffectKind=NodeEffectKind::material;
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif
@@ -113,7 +115,7 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
         id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId ||
         id == kEmitChanceId || id == kEmitLifeStartId || id == kEmitLifeEndId ||
         id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId ||
-        (id>=kTransformScaleXId && id<=kTransformParticlesOpacityId)) {
+        (id>=kTransformScaleXId && id<=kTransformParticlesOpacityId) || (id>=1603&&id<=1605)) {
         def.u.fs_d.display_flags = PF_ValueDisplayFlag_PERCENT;
     }
     def.u.fs_d.curve_tolerance = AEFX_AUDIO_DEFAULT_CURVE_TOLERANCE;
@@ -497,6 +499,19 @@ PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
     return in_data->inter.register_ui?PF_REGISTER_UI(in_data,&ui):PF_Err_NONE;
 }
 
+PF_Err setup_material(PF_InData* data,PF_OutData* output) noexcept {
+    namespace m=starfield::adapter::native_nodes::material_layout;
+    auto e=add_popup(data,"Color Source",m::disk_id(1),2,1,"Particle Color|Material Color");if(e)return e;
+    e=add_color(data,"Color",m::disk_id(2));if(e)return e;
+    e=add_slider(data,"Roughness",m::disk_id(3),0,100,50);if(e)return e;
+    e=add_slider(data,"Metallic",m::disk_id(4),0,100,0);if(e)return e;
+    e=add_slider(data,"Opacity",m::disk_id(5),0,100,100);if(e)return e;
+    e=add_checkbox(data,"AE Lights",m::disk_id(6),true);if(e)return e;
+    e=add_node_record(data,Kind::material);if(e)return e;
+    e=add_node_identity(data);if(e)return e;
+    output->num_params=parameter_count(Kind::material);return PF_Err_NONE;
+}
+
 PF_Err setup_model(PF_InData* data,PF_OutData* output) noexcept {
     auto error=starfield::adapter::register_model_author_controls(data);if(error)return error;
     error=add_node_record(data,Kind::model);if(error)return error;
@@ -648,6 +663,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
 
             } else if constexpr(kNodeEffectKind==NodeEffectKind::transform) {
                 return setup_transform(in_data,out_data);
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::material) {
+                return setup_material(in_data,out_data);
             } else if constexpr(kNodeEffectKind==NodeEffectKind::model) {
                 return setup_model(in_data,out_data);
             } else {

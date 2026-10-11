@@ -343,10 +343,11 @@ public:
         if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"temporal graph cancelled");
         std::map<NodeId,const GraphNode*> nodes;
         std::map<NodeId,std::vector<NodeId>> incoming,outgoing,dependencies,dependents;
-        ModelValues models;
+        ModelValues models;MaterialValues materials;
         const GraphNode* output=nullptr;
         for(const auto& node:graph.nodes) {
             nodes[node.id]=&node;
+            if(node.type_key==kMaterialNode) {auto value=read_material(node);if(!value.has_value())return R::failure(value.error());materials.emplace(node.id,value.take_value());}
             if(node.type_key==kModelNode) {
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());models.emplace(node.id,value.take_value());
             }
@@ -393,7 +394,9 @@ public:
         std::size_t active_nodes=0;
         for(const auto& [id,node]:nodes)if(active[id]) {
             ++active_nodes;dependency_degrees[id]=dependencies[id].size();if(!dependency_degrees[id])dependency_ready.push(id);
-            if(node->type_key==kModelNode && now>=0 && cap) {
+            if(node->type_key==kMaterialNode) {auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
+                auto value=read_material(sampled.value());if(!value.has_value())return R::failure(value.error());materials.at(id)=value.take_value();}
+            if(node->type_key==kModelNode) {
                 auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
                 auto value=read_model(sampled.value());if(!value.has_value())return R::failure(value.error());models.at(id)=value.take_value();
             }
@@ -404,6 +407,7 @@ public:
             for(auto destination:dependents[id])if(active[destination] && --dependency_degrees[destination]==0)dependency_ready.push(destination);
         }
         if(result.evaluated_nodes.size()!=active_nodes)return R::failure(ErrorCode::invalid_request,"temporal graph dependency order failed");
+        auto attached=attach_materials(graph,materials,models);if(!attached.has_value())return R::failure(attached.error());
         auto model_indices=retain_model_styles(graph,models,result,cancel);if(!model_indices.has_value())return R::failure(model_indices.error());
         const bool has_transforms=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kTransformNode;});
         const bool has_motions=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kMotionNode;});
@@ -440,7 +444,7 @@ public:
                 for(auto dest:plan_outgoing[index])if(plan_active[dest] && --degrees[dest]==0)ready.push(dest);
             }
         }
-        if(now<0 || !cap) return R::success(std::move(result));
+        if(now<0 || !cap) return finish_model_output(std::move(result),graph,models,model_indices.value());
         std::vector<Branch> branches;
         std::map<NodeId,std::uint64_t> partitions;
         for(const auto& [id,node]:nodes) if(active[id] && node->type_key==kParticleNode) {
@@ -651,7 +655,7 @@ public:
         result.particles.resize(kept.size());
         // Heap pops oldest first; composition order is stable across frames.
         for(std::size_t i=0;!kept.empty();++i) {result.particles[i]=kept.top().particle;kept.pop();}
-        return R::success(std::move(result));
+        return finish_model_output(std::move(result),graph,models,model_indices.value());
     }
 };
 } // namespace

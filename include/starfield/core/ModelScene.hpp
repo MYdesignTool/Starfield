@@ -15,28 +15,38 @@ struct ModelProjection {
     RenderRequest::Camera camera;
     // Affine row-vector OBJ -> full-resolution layer pixels (+Y downward).
     std::array<double,16> model_to_layer{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    ModelMaterial material;
+    Vec3 inherited_color{1,1,1};
+    const ModelLighting* lighting{}; // borrowed during projection only
 };
 struct ModelProjectedVertex {
     double x{},y{},reciprocal_w{1},depth_over_w{};
     Vec3 texture_over_w{};
+    Vec3 world_over_w{},normal_over_w{};
 };
 struct ModelProjectedTriangle {
     std::array<ModelProjectedVertex,3> vertices;
     std::uint32_t source_triangle{};
+    ModelMaterial material;
+    Vec3 inherited_color{1,1,1};
 };
 struct ModelScene {
     RectI region{};
     std::vector<ModelProjectedTriangle> triangles;
+    bool shaded{false};
+    ModelLighting lighting;
 };
 struct ModelSurfacePixel {
     double depth{}; // nearest covered sample; meaningful only when coverage>0
     float coverage{};
     std::uint32_t source_triangle{kMissingModelAttribute};
+    Vec3 premultiplied_color{};
 };
 struct ModelSurface {
     RectI region{};
     std::vector<ModelSurfacePixel> pixels; // tightly packed region
     std::uint64_t sample_visits{}; // candidate samples plus span calculations for this logical group
+    bool shaded{false};
 };
 [[nodiscard]] Result<ModelScene> project_model_scene(const ModelGeometry&,const ModelProjection&,
     const Cancellation&,ModelSceneLimits = {}) noexcept;

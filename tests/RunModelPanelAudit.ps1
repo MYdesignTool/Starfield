@@ -25,6 +25,15 @@ try{
     }
     & powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunModelNativeBindingTests.ps1 -Run *> artifacts/m3-17-full-audit-catalog-model.log
     if($LASTEXITCODE){throw 'Actual Model registration/binding test failed.'}
+    if(Test-Path -LiteralPath (Join-Path $taskPanel 'js/graph_edits.js')){
+        $taskHasMaterial=[IO.File]::ReadAllText((Join-Path $taskPanel 'js/graph_edits.js')).Contains('material:{version:1')
+        if($taskHasMaterial){
+            & powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMaterialNativeBindingTests.ps1 -Run *> artifacts/m3-17-full-audit-catalog-material.log
+            if($LASTEXITCODE){throw 'Actual Material registration/binding test failed.'}
+            $env:STARFIELD_DOM_MATERIAL='1'
+            Run-AuditCommand 'material_panel_tests' { & node tests/material_panel_tests.js }
+        }
+    }
     Remove-Item Env:STARFIELD_TEST_NODE_CATALOG
     Run-AuditCommand 'acceptance-fixtures' { & node tools/prepare_model_acceptance.cjs --prepare $taskPanel artifacts/model-acceptance-panel71 }
     Run-AuditCommand 'acceptance-harness' { & node --expose-internals tests/model_acceptance_harness_tests.js }
@@ -48,7 +57,7 @@ try{
     Run-AuditCommand 'dom-gateway-reloaded-during-commit' { & node tests/model_graph_gateway_dom_tests.js }
     Write-Output "Model panel audit passed; logs: $taskLogRoot; actual AE acceptance remains separate."
 }finally{
-    foreach($taskVariable in @('STARFIELD_PANEL_ROOT','STARFIELD_NODE_CATALOG_DIR','STARFIELD_TEST_NODE_CATALOG','STARFIELD_DOM_FULL_GRAPH','STARFIELD_DOM_STABLE_EFFECTS','STARFIELD_DOM_INVALIDATE_COMMIT','STARFIELD_DOM_LEGACY_KIND','STARFIELD_DOM_REORDER_CONNECTIONS','STARFIELD_DOM_STALE_GATEWAY_API','STARFIELD_DOM_RELOAD_ON_COMMIT')){
+    foreach($taskVariable in @('STARFIELD_PANEL_ROOT','STARFIELD_NODE_CATALOG_DIR','STARFIELD_TEST_NODE_CATALOG','STARFIELD_DOM_FULL_GRAPH','STARFIELD_DOM_STABLE_EFFECTS','STARFIELD_DOM_INVALIDATE_COMMIT','STARFIELD_DOM_LEGACY_KIND','STARFIELD_DOM_REORDER_CONNECTIONS','STARFIELD_DOM_STALE_GATEWAY_API','STARFIELD_DOM_RELOAD_ON_COMMIT','STARFIELD_DOM_MATERIAL')){
         Remove-Item -LiteralPath ('Env:'+ $taskVariable) -ErrorAction SilentlyContinue
     }
     Pop-Location

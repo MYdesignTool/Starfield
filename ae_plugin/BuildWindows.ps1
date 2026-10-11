@@ -22,6 +22,7 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
     # Core update. Verify the complete native pair before touching the selector.
     $taskModules=@('StarfieldParticle','StarfieldEmitter','StarfieldParticleNode','StarfieldForce','StarfieldTransform','StarfieldHost')
     if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldModel.aex')){$taskModules+='StarfieldModel'}
+    if(Test-Path -LiteralPath (Join-Path $RepositoryRoot 'dist/StarfieldMaterial.aex')){$taskModules+='StarfieldMaterial'}
     foreach ($taskModule in $taskModules) {
         $taskBuiltNative = Join-Path $RepositoryRoot "artifacts\plugin\$Label\$Architecture\$BuildConfiguration\$taskModule.aex"
         $taskInstalledNative = Join-Path $RepositoryRoot "dist\$taskModule.aex"
@@ -61,7 +62,7 @@ if (-not $CoreOnly) {
 $adapterInputs = @(
     'include\starfield\core\ParticleBirth.hpp',
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
-    'ae_plugin\Camera.cpp', 'ae_plugin\Camera.hpp',
+    'ae_plugin\Camera.cpp', 'ae_plugin\LightCapture.hpp', 'ae_plugin\LightCapture.cpp', 'ae_plugin\Camera.hpp',
     'ae_plugin\MotionPointCapture.cpp', 'ae_plugin\MotionPointCapture.hpp',
     'ae_plugin\MotionBlur.cpp', 'ae_plugin\MotionBlur.hpp', 'include\starfield\core\MotionBlur.hpp',
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
@@ -100,7 +101,7 @@ $adapterInputs = @(
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\EffectReveal.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',
-    'ae_plugin\NodeModelPiPL.r',
+    'ae_plugin\NodeModelPiPL.r', 'ae_plugin\NodeMaterialPiPL.r', 'ae_plugin\MaterialLayout.hpp',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
@@ -111,7 +112,7 @@ $adapterInputs = @(
     'include\starfield\core\ParticleTransform.hpp',
     'include\starfield\core\ParticleCloud.hpp',
     'include\starfield\core\Random.hpp',
-    'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
+    'include\starfield\core\ModelLighting.hpp', 'include\starfield\core\PluginApi.h', 'include\starfield\core\Render.hpp',
     'include\starfield\core\SequenceCodec.hpp', 'include\starfield\core\Settings.hpp',
     'include\starfield\core\Time.hpp', 'schema\parameters.json',
     'schema\node-parameters.json',
@@ -193,6 +194,7 @@ try {
 
     $taskNodeKinds=@('Emitter', 'Particle', 'Force', 'Transform')
     if($IncludeModelCandidate -or $taskSourceNativeBuild -ge 61){$taskNodeKinds+='Model'}
+    if($taskSourceNativeBuild -ge 70){$taskNodeKinds+='Material'}
     foreach ($nodeKind in $taskNodeKinds) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"

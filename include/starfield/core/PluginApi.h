@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-#define SF_CORE_ABI_VERSION 8u
+#define SF_CORE_ABI_VERSION 9u
 #define SF_CORE_LEGACY_ABI_VERSION 7u
 #if defined(_WIN32)
 #define SF_CORE_CALL __cdecl
@@ -79,6 +79,11 @@ typedef struct SfModelSource {
 /* The graph bytes and callback context are caller-owned during this call only.
  * pixel_format: 0=RGBA8, 1=RGBA16, 2=RGBA32F. Other enum fields follow the
  * values in Render.hpp; unknown values are rejected by the DLL. */
+typedef struct SfModelLight {
+    uint32_t struct_size,type,falloff,reserved;
+    double color[3],position[3],direction[3];
+    double intensity,cone_degrees,cone_feather,radius,falloff_distance;
+} SfModelLight;
 typedef struct SfCoreRenderRequest {
     uint32_t struct_size;
     SfCoreFrame frame;
@@ -97,7 +102,12 @@ typedef struct SfCoreRenderRequest {
     /* ABI8 tail. ABI7 requests end immediately before model_source_count. */
     uint32_t model_source_count;
     const SfModelSource* model_sources;
+    /* ABI9 tail; borrowed numeric lights for this render only. */
+    uint32_t light_count,light_camera_enabled;
+    const SfModelLight* lights;
+    double lighting_layer_to_world[16],lighting_camera_position[3];
 } SfCoreRenderRequest;
+#define SF_CORE_ABI8_RENDER_REQUEST_SIZE ((uint32_t)offsetof(SfCoreRenderRequest, light_count))
 #define SF_CORE_ABI7_RENDER_REQUEST_SIZE ((uint32_t)offsetof(SfCoreRenderRequest, model_source_count))
 
 /* pixels and opaque_handle are owned by this DLL generation. The adapter copies

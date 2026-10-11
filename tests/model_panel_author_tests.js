@@ -26,14 +26,14 @@ equal(Array.from({length:6},(_,i)=>new DataView(value(model,12).buffer).getFloat
 equal(edits.nativeRecordSchema(model),1);
 for(const [from,to,outPort,inPort,allowed] of [
     [emitter,particle,"1","1",true],[model,particle,"1","3",true],[model,particle,"1","1",false],
-    [model,output,"1","1",false],[particle,model,"2","1",false],[particle,particle,"2","3",false],
+    [model,output,"1","1",true],[particle,model,"2","1",false],[particle,particle,"2","3",false],
     [emitter,particle,"1","3",false],[model,emitter,"1","2",false]])
     equal(edits.canConnect(graph,from.id,to.id,outPort,inPort),allowed);
 for(const [from,to] of [[emitter,particle],[model,particle],[particle,output]])graph=edits.apply(graph,{type:"connect",from:from.id,to:to.id},next);
 equal(graph.edges.find(e=>e.sourceNode===model.id).destinationPort,"3");
 equal(codec.fromHex(codec.toHex(graph)).edges.length,3);
 const projected=view.project(graph).nodes.find(n=>n.id===model.id);
-equal(projected.inputPort,null);equal(projected.outputPort,"1");equal(projected.params.length,15);
+equal(projected.inputPort,"2");equal(projected.outputPort,"1");equal(projected.params.length,15);
 equal(projected.params.filter(p=>p.graphKey==="4").map(p=>p.label),["Offset X","Offset Y","Offset Z"]);
 equal(view.project(graph).nodes.find(n=>n.id===particle.id).modelInputPort,"3");
 for(const key of ["1","2","3","12"])reject(()=>edits.apply(graph,{type:"setParameters",changes:[{nodeId:model.id,parameterKey:key,valueType:7,value:[]}]}),/owned by the native import/);

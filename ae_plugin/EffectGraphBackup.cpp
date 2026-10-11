@@ -45,7 +45,7 @@ A_Err EffectGraphBackup::describe(AEGP_EffectRefH effect,Record& record,bool& su
     if(!std::strcmp(match,"org.starfieldfx.particle")){record.kind=-1;record.guard=kGraphSyncGuardId;return 0;}
     for(auto [label,kind]:{std::pair{"org.starfieldfx.node.emitter",native_nodes::Kind::emitter},
         std::pair{"org.starfieldfx.node.particle",native_nodes::Kind::particle},std::pair{"org.starfieldfx.node.force",native_nodes::Kind::force},
-        std::pair{"org.starfieldfx.node.transform",native_nodes::Kind::transform},std::pair{"org.starfieldfx.node.model",native_nodes::Kind::model}}){
+        std::pair{"org.starfieldfx.node.transform",native_nodes::Kind::transform},std::pair{"org.starfieldfx.node.model",native_nodes::Kind::model},std::pair{"org.starfieldfx.node.material",native_nodes::Kind::material}}){
         if(std::strcmp(label,match))continue;record.kind=static_cast<A_long>(kind);record.guard=native_nodes::sync_guard_index(kind);
         record.uuid_first=native_nodes::uuid_first_index(kind);return 0;}
     supported=false;return 0;

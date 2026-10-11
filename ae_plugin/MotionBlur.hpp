@@ -1,5 +1,6 @@
 #pragma once
 #include "Parameters.hpp"
+#include "LightCapture.hpp"
 #include "WorldBridge.hpp"
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/PluginApi.h"
@@ -29,7 +30,7 @@ inline constexpr bool motion_popup(std::size_t i){return i==0 || i==3 || i==7;}
     }
     return PF_Err_NONE;
 }
-struct MotionSample {core::RationalTime time;core::OpaqueBytes graph;SfCoreRenderRequest camera{};};
+struct MotionSample {core::RationalTime time;core::OpaqueBytes graph;SfCoreRenderRequest camera{};LightStaging lights;};
 struct MotionExposure {
     std::array<double,8> values{};
     bool enabled{};

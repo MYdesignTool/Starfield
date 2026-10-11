@@ -4,6 +4,7 @@
 #include "starfield/core/Settings.hpp"
 #include "starfield/core/Time.hpp"
 #include "starfield/core/ParticleTexture.hpp"
+#include "starfield/core/ModelLighting.hpp"
 
 #include <cstddef>
 #include <array>
@@ -179,6 +180,7 @@ struct RenderRequest {
     std::vector<TextureFrameView> texture_frames;
     // Owned immutable numeric geometry, independent of CEP graph synchronization.
     std::vector<ModelResource> model_sources;
+    ModelLighting lighting;
 };
 
 struct RenderOutput {

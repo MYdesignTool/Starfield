@@ -137,6 +137,8 @@ inline Result<EvaluatedGraph> interpolate_motion_particles(const EvaluatedGraph&
                             auto& instance=style.instances[j];
                             for(std::size_t k=0;k<instance.model_to_particle.size();++k)
                                 instance.model_to_particle[k]=std::lerp(instance.model_to_particle[k],other[j].model_to_particle[k],amount);
+                            if(instance.material.enabled && other[j].material.enabled){auto& m=instance.material;const auto& n=other[j].material;
+                                m.color=vector(m.color,n.color);m.roughness=lerp(m.roughness,n.roughness);m.metallic=lerp(m.metallic,n.metallic);m.opacity=lerp(m.opacity,n.opacity);}
                             if(!valid_model_instance(instance))
                                 return R::failure(ErrorCode::invalid_request,"invalid interpolated Model instance");
                         }
