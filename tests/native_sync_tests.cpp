@@ -190,14 +190,6 @@ double evaluated_binding(A_long index, A_long time) {
     if(index==stale_retirement_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
-    const std::u16string stamp=u"// Starfield graph checksum ";
-    if(const auto at=expr.find(stamp);at!=std::u16string::npos) {
-        std::string digits;for(auto c:expr.substr(at+stamp.size(),expr.find(u'\n',at)-at-stamp.size()))digits+=char(c);
-        const auto expected=std::stoul(digits);
-        const auto live=(static_cast<std::uint32_t>(fixtures[0].values[kGraphChecksumHighId].one_d)<<16u) |
-            static_cast<std::uint32_t>(fixtures[0].values[kGraphChecksumLowId].one_d);
-        if(expected!=live)return kNativeBindingStaleGraph;
-    }
     if(expr==u"0")return 0; // A valid authored constant, including handoff reads.
     const auto identity=[&](unsigned value) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
@@ -239,33 +231,6 @@ double evaluated_binding(A_long index, A_long time) {
 #if defined(_MSC_VER)
 __declspec(noinline)
 #endif
-void save_generation_expressions() {
-    std::ofstream output("artifacts/graph-generation-expressions.json");output<<"[";bool first=true;
-    for(const auto& text:expressions)if(text.find(u"// Starfield graph checksum ")!=std::u16string::npos) {
-        if(!first)output<<",";first=false;output<<'"';
-        for(auto c:text){if(c==u'"' || c==u'\\')output<<'\\';if(c==u'\n')output<<"\\n";else if(c==u'\r')output<<"\\r";else output<<char(c);}
-        output<<'"';
-    }output<<"]";check(bool(output) && !first,"actual versioned seven-kind expressions exported");
-}
-#if defined(_MSC_VER)
-__declspec(noinline)
-#endif
-void historical_generation_test(const core::Graph& graph) {
-    auto data=renderer_data;data.current_time=24;data.time_step=1;data.time_scale=24;
-    data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err{
-        *out={};out->param_type=PF_Param_FLOAT_SLIDER;
-        out->u.fs_d.value=index>=kNativeBindingFirstIndex && index<kNativeBindingFirstIndex+kNativeBindingCapacity?kNativeBindingStaleGraph:0;
-        return 0;};
-    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
-    NativeAnimationPlan plan(graph,1920,1080,1);core::GraphNode node;
-    check(plan.valid() && plan.sample(&data,graph.nodes.front().id,node)==PF_Interrupt_CANCEL,"historical node cancels stale expression generation");
-    PF_OutData output{};auto historical=graph;core::NeverCancelled cancellation{};
-    check(capture_emitter_origin_history(&data,&output,historical,1920,1080,cancellation)==PF_Interrupt_CANCEL && !output.return_msg[0],
-        "historical generation cancellation remains cancellation through Core evaluation");
-}
-#if defined(_MSC_VER)
-__declspec(noinline)
-#endif
 void final_refresh_test(const core::Graph& prior,PF_OutData& output) {
     auto& renderer=fixtures[0];
     // Adversarial dependency cache, not an AE emulator. Explicit reinstallation
@@ -284,6 +249,10 @@ void final_refresh_test(const core::Graph& prior,PF_OutData& output) {
     check(expressions[spare]==u"user text" && !expression_enabled[spare],"final retirement sweep preserves non-native expression text");expressions[spare]=spare_text;
     auto refreshed=saved_graph();check(sample_native_node_animation(&checked,refreshed,1920,1080)==0,"refreshed seven-kind graph renders without fallback");
     check(renderer.values[kGraphRevisionId].one_d==revision && renderer.values[kGraphEditReceiptId].one_d==receipt && core::serialize_graph(saved_graph(),core::particle_node_registry()).value()==bytes,"final refresh preserves graph/revision/receipt");
+    renderer.values[kControlSourceId].one_d=kLegacyControlSource;const auto writes=sets;
+    check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && sets==writes,
+        "first-materialization rollback to AE Controls needs no native alias rewrite");
+    renderer.values[kControlSourceId].one_d=kNodeControlSource;
     renderer.values[kGraphSyncGuardId].one_d=0;
     check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==PF_Err_BAD_CALLBACK_PARAM,"unguarded final refresh rejects");renderer.values[kGraphSyncGuardId].one_d=1;
 }
@@ -891,7 +860,6 @@ int main() {
             *output=fixtures[0].params.at(index);
             if(index==kGraphParameterId) output->u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(fixtures[0].values[index].arbH);
             if(index==kControlSourceId) output->u.pd.value=static_cast<A_long>(fixtures[0].values[index].one_d);
-            if(index==kGraphChecksumHighId || index==kGraphChecksumLowId)output->u.fs_d.value=fixtures[0].values[index].one_d;
             return 0;
         }
         *output = {}; output->param_type=PF_Param_FLOAT_SLIDER;
@@ -1395,9 +1363,8 @@ int main() {
         handoff_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err {return 0;};
         unsigned handoff_samples{};
         alias_mutation_hook=[&]{++handoff_samples;auto old=transformed;
-            const auto sampled=sample_native_node_animation(&handoff_data,old,1920,1080);
-            check(sampled==0 || sampled==PF_Interrupt_CANCEL,
-                "in-flight graph samples matching aliases or cancels a different generation");};
+            check(sample_native_node_animation(&handoff_data,old,1920,1080)==0,
+                "in-flight published graph sees finite valid values after each alias mutation");};
         {
             NativeBindingTransaction bindings(&renderer_data,701);
             check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0 &&
@@ -1799,8 +1766,7 @@ int main() {
             sampled_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
                 *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=evaluated_binding(i,t);return 0;};
             sampled_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
-            const auto sampled=sample_native_node_animation(&sampled_data,old,1920,1080);
-            check(sampled==0 || sampled==PF_Interrupt_CANCEL,"publication samples a matching generation or cancels");};
+            check(sample_native_node_animation(&sampled_data,old,1920,1080)==0,"saved graph remains sampleable across explicit deletion publication");};
         check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987656,701,&output)==0 &&
             main.values[kGraphEditReceiptId].one_d==987656 && saved_graph().nodes.size()==1,
             "explicit deletion of every node publishes Output-only without recreating defaults");
@@ -1836,8 +1802,6 @@ int main() {
             "seven-kind native graph publishes actual bindings");
         auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
         final_refresh_test(prior,output);
-        save_generation_expressions();
-        historical_generation_test(prior);
         const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
         check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
         std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);
@@ -1850,10 +1814,9 @@ int main() {
         render_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
         unsigned samples{};
         alias_mutation_hook=[&]{++samples;auto old=prior;
-            const auto old_error=sample_native_node_animation(&render_data,old,1920,1080);
-            check(old_error==0 || old_error==PF_Interrupt_CANCEL,"old seven-kind expression generation samples or cancels");
-            auto live=saved_graph();const auto live_error=sample_native_node_animation(&render_data,live,1920,1080);
-            check(live_error==0 || live_error==PF_Interrupt_CANCEL,"saved seven-kind expression generation samples or cancels");};
+            check(sample_native_node_animation(&render_data,old,1920,1080)==0,"seven-kind in-flight graph never sees a transient sentinel");
+            auto live=saved_graph();check(sample_native_node_animation(&render_data,live,1920,1080)==0,
+                "seven-kind saved graph remains valid at each host mutation");};
         // A receipt-write failure before retirement must leave every expression.
         panel_output_only=true;main.values[kGraphEditCommitId].one_d=987658;fail_set=kGraphEditReceiptId;
         check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,

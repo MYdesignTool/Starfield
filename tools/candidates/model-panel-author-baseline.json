@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Installed native78/Core ABI9 with unchanged accepted CEP81 from frozen78b7c79. Graph/receipt/expression generation checks, historical cancellation, post-publication verification and passive UI/PF provenance are deployed. Frozen May2023 ten-module SDK, alias/lifecycle ASAN and exact native77/CEP81 rollback verified. Owner declines automatic AE acceptance; actual deletion correction remains unconfirmed. Artifacts and hashes are recorded in docs/current-state.md.",
+  "status": "Restored native77/Core ABI9/CEP81 after owner rejected native78 for add-node host_timeout. Ten native and eighteen panel files match original receipt. Failed CRC expression scheme withdrawn from active source. Preparing native79/CEP82 for receipt-query timeout recovery and restored-instance rebind; actual AE behavior remains unqualified. No automatic AE acceptance. See docs/current-state.md.",
   "basePanel": 81,
   "files": [
     {

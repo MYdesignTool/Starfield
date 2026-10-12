@@ -6,7 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build78 candidate: graph/receipt/expression generation coherence.
-// Full ten-module/Core ABI9 pairing with the accepted CEP81; ADR0040.
-#define STARFIELD_VERSION_BUILD 78
-#define STARFIELD_VERSION_PACKED 32846 /* 0x804E */
+// Build79: repair restored-instance dependencies; native77 binding algorithm.
+// Full ten-module/Core ABI9 pairing with CEP82 transport recovery; ADR0040.
+#define STARFIELD_VERSION_BUILD 79
+#define STARFIELD_VERSION_PACKED 32847 /* 0x804F */

@@ -1,5 +1,27 @@
 # 当前工程状态
 
+## M3-17 owner rejects78; restored77/81, preparing79/82 — 2026-10-12 23:18+08
+
+Owner reports adding nodes now fails host_timeout within8s. AE38548 was running;
+owner saved/closed it. Fresh AE0 preceded exact Restore-TestBuild restoration of
+native77/CEP81. Independent proof artifacts/m3-17-native78-restore-proof.json
+matches10 native,18 paired CEP and the original Core selector. Retained responsive
+panel unchanged. Rejected78 source/SDK/logs remain frozen under native78-generation.
+Actual PID38548 has15 PF graph observations all CRC833224704/receipt833224704,
+nodes7, and no successful UI publication/final records. CRC mixture was not observed;
+failed graph-generation hypothesis is withdrawn from active implementation.
+
+Confirmed code gaps: a timed-out readModelGraphTransaction immediately releases
+the applying command; native rollback replaces all effect instances but only the
+success path finalizes bindings. Candidate79/82 uses native77 expressions with
+no self-effect CRC reads, retries only host_timeout receipt reads with1s backoff
+inside the existing5min deadline, never requeues the mutation, and calls the existing
+non-script finalizer under guard1 after restoration. Rebind failure is reported as
+rollback_error and retains guard1. Restoring AE Controls skips native alias writes.
+Journal UI begin/binding/result phases and monotonic clocks allow causal timing.
+Actual AE cancellation/cache mechanism and host correction are not yet proved.
+No automatic AE acceptance/start/stop/dispatch. Motion/Circle and other work preserved.
+
 ## M3-17 native78 / CEP81 generation coherence deployed — 2026-10-12 22:02+08
 
 Frozen/pushed source78b7c79df548bfe45812f4fe349a62cc377a9d6e is installed.

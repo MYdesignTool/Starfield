@@ -1,5 +1,21 @@
 # 测试入口
 
+## M3-17 timeout / restored-instance rebind candidate79/82 — 2026-10-12
+
+Native78 owner add-node regression overrides its offline passing counts. Exact77/81
+restored; graph generation experiment removed from active tests/code. Frozen78
+tests remain reproducible inside its archive and must not qualify the new source.
+`node tests/model_graph_timeout_tests.js` runs the actual candidate factory:61
+checks recover the same receipt after3 transport timeouts, avoid premature release
+and mutation replay, preserve permanent errors and the5min deadline. The original
+77/81 factory demonstrably fails recovery (artifact old-timeout-client-expected-
+failure.log). Candidate JSX/transport2340 and full ES3 parser18 pass. Native alias
+ASAN19889+camera12 and complete transaction ASAN912516 pass, including finalizer
+under guard1 after prepare/asset/commit errors/cancellation and retained guard on
+rebind failure. Accepted panel/client34 and isolated77/81→79/82 restore67 pass.
+Logs: artifacts/m3-17-{restore-finalizer-asan,restore79-alias-asan,restore79-deploy-tests}.log.
+Actual AE behavior remains unqualified; no automatic host execution.
+
 ## M3-17 native78 / retained CEP81 deployed — 2026-10-12
 
 Frozen source78b7c79 actual May2023 SDK81436 exit0 and all510 archive hashes pass;

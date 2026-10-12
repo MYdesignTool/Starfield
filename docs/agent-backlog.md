@@ -2,6 +2,14 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+Owner rejects78: add-node host_timeout. Exact77/81 restored with AE0 after owner
+closed38548. Native78 scheme withdrawn; preserve artifacts as failed evidence.
+Current owned scope adds client receipt-read timeout recovery, EffectGraphBackup
+restore finalization, ModelGraphTransaction failure/cancel path, legacy-mode refresh,
+timed passive UI journal and focused timeout/rollback tests. Prepare79/82 from the
+accepted77 binding algorithm; no new graph/alias generation experiment. Host cause
+and correction remain open. Current installation/evidence is in current-state.md.
+
 78/unchanged CEP81 deployed22:02+08 from pushed/frozen78b7c79, installation and
 exact77/81 paired rollback independently verified. See current-state.md for current
 build/hash/evidence. Generation protocol repair passes offline; owner AE correction

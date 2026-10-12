@@ -134,7 +134,7 @@ ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransa
                 if(!result.error){result.stage=ModelTransactionStage::commit;
                     result.error=cancel.is_cancelled()?PF_Interrupt_CANCEL:plan.commit(plan.context);}
             } catch(const std::bad_alloc&){result.error=PF_Err_OUT_OF_MEMORY;}catch(...){result.error=PF_Err_INTERNAL_STRUCT_DAMAGED;}
-            if(result.error){const auto restored=backup.restore();if(restored)result.rollback_error=restored;}
+            if(result.error){const auto restored=backup.restore(plan.finalize,plan.context);if(restored)result.rollback_error=restored;}
             else {result.committed=true;result.stage=ModelTransactionStage::complete;result.asset_index=-1;result.cleanup_error=backup.discard(plan.finalize,plan.context);}
         }
     }

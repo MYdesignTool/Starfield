@@ -17,6 +17,33 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 owner rejects native78 for add-node host_timeout after8s. Exact77/81
+is restored after owner closes AE38548;10/18/selector hashes match. Actual78 log
+has15 PF graph observations with identical graph/receipt CRC833224704 and nodes7;
+no successful UI publication/final record. This does not support the previous
+generation-mixture hypothesis. Withdraw the CRC expression scheme from active
+source; keep its archive/history. Do not raise the general8s transport timeout as
+a substitute for diagnosis.
+
+Two confirmed lifecycle gaps need repair. queue acknowledgements already recover
+through polling, but readModelGraphTransaction host_timeout immediately calls end,
+which releases/cancels the applying native transaction. Retry that same read with1s
+backoff within the original5min deadline; no second queue/native write. Terminal
+errors and explicit cancellation retain their semantics. A deadline without a
+receipt remains outcome_unknown, never committed/failed by inference. Keep draft
+projection and serial write lock while the result is unresolved.
+
+EffectGraphBackup::restore physically replaces all original instances. Its saved
+names/UUIDs/values do not restore host expression dependencies; success already
+has a finalizer but failure did not. Call the same non-script finalizer after all
+restore mutations while the reconstructed renderer holds guard1. Release only on
+successful rebind; report rollback_error and keep guard1 if rebind fails. Restoring
+legacy AE Controls is a valid no-alias state. No request wire, public ID/type/schema,
+ABI9 change. Retain native77's expression algorithm and preserve prior Motion work.
+The combined false-cancel/stale-restoration explanation is a hypothesis until host
+timing confirms it. Passive UI phase clocks record entry, binding and result, not
+only success; no AE launch, script dispatch or automatic acceptance.
+
 2026-10-12 native77 is rejected by owner for deletion; CEP81 responsiveness is
 accepted. Actual PID24564 journal contains61 normal guard0 frames,6 unavailable
 stream258 frames and14 guard1 cancellations. AEGP final readback does not prove

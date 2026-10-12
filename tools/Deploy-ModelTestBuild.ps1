@@ -34,9 +34,10 @@ $taskPairAllowed=($taskFrozen.nativeBuild -eq 61 -and $taskFrozen.panelGeneratio
     ($taskFrozen.nativeBuild -eq 75 -and $taskFrozen.panelGeneration -eq 79 -and $taskBaselineBuild -eq 74 -and $taskBaselinePanel -eq 78 -and $taskBaselineAbi -eq 9) -or
     ($taskFrozen.nativeBuild -eq 76 -and $taskFrozen.panelGeneration -eq 80 -and $taskBaselineBuild -eq 75 -and $taskBaselinePanel -eq 79 -and $taskBaselineAbi -eq 9) -or
     ($taskFrozen.nativeBuild -eq 77 -and $taskFrozen.panelGeneration -eq 81 -and $taskBaselineBuild -eq 76 -and $taskBaselinePanel -eq 80 -and $taskBaselineAbi -eq 9) -or
-    ($taskFrozen.nativeBuild -eq 78 -and $taskFrozen.panelGeneration -eq 81 -and $taskBaselineBuild -eq 77 -and $taskBaselinePanel -eq 81 -and $taskBaselineAbi -eq 9)
-$taskHasMaterial=$taskFrozen.nativeBuild -in @(70,71,72,73,74,75,76,77,78)
-$taskHasMotion=$taskFrozen.nativeBuild -in @(72,73,74,75,76,77,78)
+    ($taskFrozen.nativeBuild -eq 78 -and $taskFrozen.panelGeneration -eq 81 -and $taskBaselineBuild -eq 77 -and $taskBaselinePanel -eq 81 -and $taskBaselineAbi -eq 9) -or
+    ($taskFrozen.nativeBuild -eq 79 -and $taskFrozen.panelGeneration -eq 82 -and $taskBaselineBuild -eq 77 -and $taskBaselinePanel -eq 81 -and $taskBaselineAbi -eq 9)
+$taskHasMaterial=$taskFrozen.nativeBuild -in @(70,71,72,73,74,75,76,77,78,79)
+$taskHasMotion=$taskFrozen.nativeBuild -in @(72,73,74,75,76,77,78,79)
 $taskExpectedAbi=if($taskHasMaterial){9}else{8}
 if(-not $taskPairAllowed -or $taskFrozen.coreAbi -ne $taskExpectedAbi -or $taskFrozen.buildExitCode -ne 0 -or $taskFrozen.sourceCommit -notmatch '^[0-9a-f]{40}$'){throw 'Invalid complete Model candidate identity/build evidence.'}
 $taskReleaseStem='m3-17-native'+$taskFrozen.nativeBuild

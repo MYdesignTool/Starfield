@@ -640,23 +640,12 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
     return true; // No binding record on bootstrap graphs.
 }
 
-std::u16string binding_expression(const RawNode& node, A_long index, A_long component,
-                                 std::optional<std::uint32_t> checksum) {
+std::u16string binding_expression(const RawNode& node, A_long index, A_long component) {
     // A host expression call site must never visit heterogeneous effect layouts.
     // Resolve the live UUID/kind in native code, then emit a literal reference.
     // Escape every UTF-16 unit: names cannot inject script, including newlines,
     // quotes, backslashes, surrogate pairs and U+2028/U+2029.
-    std::string text="var result = -1099511627776; var fx = null; var match = false;\n";
-    if(checksum) {
-        // Read the renderer's own receipt before looking up any sibling effect.
-        // A cached expression from another graph must not visit a removed source.
-        // The constants also make different graphs different expression programs.
-        text += "// Starfield graph checksum " + std::to_string(*checksum) + "\n";
-        text += "var owner = thisLayer.effect(thisProperty.propertyGroup(1).propertyIndex);\nif (owner.param(\"Graph Checksum High\").value !== " +
-            std::to_string(*checksum >> 16u) + " || owner.param(\"Graph Checksum Low\").value !== " +
-            std::to_string(*checksum & 65535u) + ") { result = -1099511627775; } else {\n";
-    }
-    text += "try { fx = thisLayer.effect(\"";
+    std::string text="var result = -1099511627776; var fx = null; var match = false;\ntry { fx = thisLayer.effect(\"";
     constexpr char hex[]="0123456789abcdef";
     for(auto unit:node.source_name) {
         text+="\\u";for(int shift=12;shift>=0;shift-=4)text+=hex[(unit>>shift)&15];
@@ -679,9 +668,7 @@ std::u16string binding_expression(const RawNode& node, A_long index, A_long comp
         if (node.fields[index].type != node_sync::ValueKind::scalar) text += "[" + std::to_string(component) + "]";
         text += "; ";
     }
-    text += "}\n";
-    if(checksum)text += "}\n";
-    text += "result;";
+    text += "}\nresult;";
     return std::u16string(text.begin(), text.end());
 }
 
@@ -1250,8 +1237,7 @@ void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_by
             ++impl_->checkout_count;
             const auto error=PF_CHECKOUT_PARAM(data,stream,data->current_time,data->time_step,data->time_scale,&value);
             if(error) {impl_->all_constant=false;continue;}
-            const bool ok=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) &&
-                value.u.fs_d.value!=kNativeBindingUnavailable && value.u.fs_d.value!=kNativeBindingStaleGraph;
+            const bool ok=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) && value.u.fs_d.value!=kNativeBindingUnavailable;
             const double scalar=ok?value.u.fs_d.value:0;
             const auto checkin=PF_CHECKIN_PARAM(data,&value);
             if(!ok || checkin) {impl_->all_constant=false;continue;}
@@ -1295,13 +1281,11 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
                 const auto error=PF_CHECKOUT_PARAM(data,index,data->current_time,data->time_step,data->time_scale,&sampled);
                 if(error) return error;
                 const bool valid_value=sampled.param_type==PF_Param_FLOAT_SLIDER &&
-                    std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value!=kNativeBindingUnavailable &&
-                    sampled.u.fs_d.value!=kNativeBindingStaleGraph;
-                const bool stale=sampled.param_type==PF_Param_FLOAT_SLIDER && sampled.u.fs_d.value==kNativeBindingStaleGraph;
+                    std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value!=kNativeBindingUnavailable;
                 const double value=valid_value?sampled.u.fs_d.value:0;
                 const auto checked_in=PF_CHECKIN_PARAM(data,&sampled);
+                if(!valid_value) return PF_Err_BAD_CALLBACK_PARAM;
                 if(checked_in) return checked_in;
-                if(!valid_value) return stale?PF_Interrupt_CANCEL:PF_Err_BAD_CALLBACK_PARAM;
                 field.value[component]=value;
             }
         }
@@ -1543,7 +1527,6 @@ struct NativeBindingTransaction::Impl {
     std::vector<ResourceChange> resources;
     std::unique_ptr<ModelMirrorTransaction> models;
     bool accepted{},force_refresh{};
-    std::optional<std::uint32_t> checksum;
     Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r, AEGP_LayerH owner)
         : data(d), id(i), renderer(r), owner_layer(owner), suites(d) {}
     ~Impl() {
@@ -1587,27 +1570,6 @@ PF_Err NativeBindingTransaction::rollback_model_resources() noexcept {
     return impl_->models?impl_->models->rollback():PF_Err_NONE;
 }
 
-PF_Err NativeBindingTransaction::verify_after_publication(A_long* failed_stream,
-                                                        const char** failed_stage) noexcept {
-    auto& tx=*impl_;
-    if(!tx.checksum)return PF_Err_BAD_CALLBACK_PARAM;
-    const A_Time time{tx.data->current_time,tx.data->time_scale};
-    for(const auto& change:tx.changes)if(!change.retired) {
-        if(failed_stream)*failed_stream=change.index;
-        if(failed_stage)*failed_stage="verify published graph binding";
-        A_Boolean enabled{};auto error=tx.suites.stream->AEGP_GetExpressionState(tx.id,change.ref,&enabled);
-        if(error || !enabled)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
-        AEGP_StreamValue2 value{};
-        error=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,change.ref,AEGP_LTimeMode_LayerTime,&time,FALSE,&value);
-        if(error)return static_cast<PF_Err>(error);
-        const double number=value.val.one_d;
-        error=tx.suites.stream->AEGP_DisposeStreamValue(&value);
-        if(error || !std::isfinite(number) || number==kNativeBindingUnavailable || number==kNativeBindingStaleGraph)
-            return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
-    }
-    return PF_Err_NONE;
-}
-
 PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
                                                         const char** failed_stage) noexcept {
     auto& tx=*impl_;
@@ -1643,7 +1605,7 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
         if(error)return static_cast<PF_Err>(error);
         const auto number=observed.val.one_d;
         const auto disposed=tx.suites.stream->AEGP_DisposeStreamValue(&observed);
-        if(disposed || !std::isfinite(number) || number==kNativeBindingUnavailable || number==kNativeBindingStaleGraph)
+        if(disposed || !std::isfinite(number) || number==kNativeBindingUnavailable)
             return static_cast<PF_Err>(disposed?disposed:PF_Err_BAD_CALLBACK_PARAM);
     }
     stage("retired aliases detached");return PF_Err_NONE;
@@ -1651,8 +1613,7 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
                                         const char** failed_stage, A_long* failed_parameter,
-                                        const core::Graph* previous_graph,bool force_refresh,
-                                        std::optional<std::uint32_t> checksum) noexcept {
+                                        const core::Graph* previous_graph,bool force_refresh) noexcept {
     if (failed_stream) *failed_stream = -1;
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
@@ -1767,7 +1728,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component){
                 occupied[field.slot+component]=true;
-                aliases.push_back({field.slot+component,index,binding_expression(node,index,component,checksum),false,field.value[component]});
+                aliases.push_back({field.slot+component,index,binding_expression(node,index,component),false,field.value[component]});
             }
         }
         // Capture obsolete spans now; detach only after saved graph publication.
@@ -1791,7 +1752,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             ae=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,raw,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
             if(ae)return static_cast<PF_Err>(ae);const double base=value.val.one_d;
             tx.suites.stream->AEGP_DisposeStreamValue(&value);
-            if(!std::isfinite(base) || base==kNativeBindingUnavailable || base==kNativeBindingStaleGraph)continue;
+            if(!std::isfinite(base) || base==kNativeBindingUnavailable)continue;
             A_Boolean enabled{};ae=tx.suites.stream->AEGP_GetExpressionState(tx.id,raw,&enabled);
             if(ae)return static_cast<PF_Err>(ae);
             AEGP_MemHandle handle{};ae=tx.suites.stream->AEGP_GetExpression(tx.id,raw,&handle);
@@ -1870,7 +1831,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     tx.suites.stream->AEGP_DisposeStreamValue(&resolved);
                 }
                 stage("verify finite alias handoff");
-                if(!std::isfinite(change.handoff_value) || change.handoff_value==kNativeBindingUnavailable || change.handoff_value==kNativeBindingStaleGraph)
+                if(!std::isfinite(change.handoff_value) || change.handoff_value==kNativeBindingUnavailable)
                     return PF_Err_BAD_CALLBACK_PARAM;
                 if(change.retired)continue;
                 change.changed = true;
@@ -1920,15 +1881,10 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             if (ae || !enabled) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
             stage("verify source binding resolved");
             if (value == kNativeBindingUnavailable) return PF_Err_BAD_CALLBACK_PARAM;
-            // Before publication the existing receipt deliberately belongs to
-            // the old graph. The source was independently resolved by UUID;
-            // full evaluated validation follows the saved graph write.
-            if(value == kNativeBindingStaleGraph && !checksum)return PF_Err_BAD_CALLBACK_PARAM;
             stage("verify finite bound value");
             if (!std::isfinite(value)) return PF_Err_BAD_CALLBACK_PARAM;
         }
-        tx.checksum=checksum;
-        stage("staged bindings");
+        stage("accepted bindings");
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
@@ -1966,8 +1922,7 @@ PF_Err read_native_lifetime_bindings(const core::Graph& graph,std::vector<Native
 }
 
 PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height,
-                                    A_long* failed_stream, const char** failed_stage, const core::NodeId* node_filter,
-                                    core::NodeId* failed_node) noexcept {
+                                    A_long* failed_stream, const char** failed_stage, const core::NodeId* node_filter) noexcept {
     if (failed_stream) *failed_stream = -1;
     const auto stage = [failed_stage](const char* value) { if (failed_stage) *failed_stage = value; };
     try {
@@ -1985,7 +1940,6 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
         SuiteSet reader(nullptr); // No AEGP acquisition, even during destruction.
         for (auto& raw : nodes) {
             if(node_filter && raw.id!=*node_filter) continue;
-            if(failed_node)*failed_node=raw.id;
             for (auto& field : raw.fields) if (field.present && field.slot >= 0) {
                 for (A_long component = 0; component < component_count(field.type); ++component) {
                     PF_ParamDef sampled{};
@@ -1995,18 +1949,15 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
                         data->current_time, data->time_step, data->time_scale, &sampled);
                     if (error) return error;
                     const bool valid = sampled.param_type == PF_Param_FLOAT_SLIDER &&
-                        std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value != kNativeBindingUnavailable &&
-                        sampled.u.fs_d.value != kNativeBindingStaleGraph;
-                    const bool stale=sampled.param_type==PF_Param_FLOAT_SLIDER && sampled.u.fs_d.value==kNativeBindingStaleGraph;
+                        std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value != kNativeBindingUnavailable;
                     const auto invalid_stage=sampled.param_type!=PF_Param_FLOAT_SLIDER?"parameter type":
                         !std::isfinite(sampled.u.fs_d.value)?"nonfinite parameter value":"binding unavailable";
                     const double value = valid ? sampled.u.fs_d.value : 0;
                     const auto checked_in = PF_CHECKIN_PARAM(data, &sampled);
                     stage("parameter value");
-                    if(checked_in){stage("parameter checkin");return checked_in;}
                     if (!valid) {
-                        stage(stale?"graph generation changed":invalid_stage);
-                        return stale?PF_Interrupt_CANCEL:PF_Err_BAD_CALLBACK_PARAM;
+                        stage(invalid_stage);
+                        return PF_Err_BAD_CALLBACK_PARAM;
                     }
                     stage("parameter checkin");
                     if (checked_in) return checked_in;
@@ -2118,7 +2069,7 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
             if(error){trace.value.error=static_cast<PF_Err>(error);continue;}
             const double number=value.val.one_d;
             suites.stream->AEGP_DisposeStreamValue(&value);
-            if(!std::isfinite(number) || number==kNativeBindingUnavailable || number==kNativeBindingStaleGraph){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
+            if(!std::isfinite(number) || number==kNativeBindingUnavailable){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
             evaluated[slot]=true;++trace.value.evaluated;
         }
     }

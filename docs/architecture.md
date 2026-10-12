@@ -1,5 +1,14 @@
 # Starfield 架构
 
+M3-17 native78 was rejected for add-node timeouts and exact77/CEP81 restored.
+79/82 candidate removes CRC expression reads and adds two bounded repairs: keep
+polling a single transaction after a transport read timeout (original5min deadline,
+1s backoff, no mutation replay); rebind restored effect instances under guard1 before
+render release on failed/canceled graph edits. First materialization may restore AE
+Controls, which requires no native aliases. Failed rebind retains guard and reports
+rollback error. UI journal timestamps identify where slow/failed commands exit.
+This closes confirmed code gaps; AE cause/qualification remains unproven.
+
 M3-17 deployed native78 preserves accepted CEP81 and adds graph generation
 coherence: explicit UI publication uses CRC-stamped alias programs and validates
 all publication stream types before mutation. Programs check their renderer's

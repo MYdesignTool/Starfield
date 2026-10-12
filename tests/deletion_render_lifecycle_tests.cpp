@@ -23,10 +23,6 @@ unsigned frames{},canceled{},normal{},disabled_frames{},alias_reads{},graph_read
 unsigned guarded_bad_bindings{},backup_bad_bindings{};
 std::vector<std::uint8_t> full_graph,empty_graph;
 bool render_enabled{};
-bool stale_expression{},split_receipt{};
-std::uint32_t bytes_checksum(const std::vector<std::uint8_t>& bytes) {
-    std::uint32_t value{};for(unsigned i=0;i<4;++i)value|=std::uint32_t(bytes[24+i])<<(8u*i);return value;
-}
 PF_Handle allocate_render(A_u_longlong size) {
     auto h=reinterpret_cast<PF_Handle>(new int);render_handles[h].resize(static_cast<std::size_t>(size));return h;
 }
@@ -41,17 +37,12 @@ PF_Err render_checkout(PF_ProgPtr,PF_ParamIndex index,A_long,A_long,A_u_long,PF_
     ++param_checkouts;*out={};
     if(index==kControlSourceId){out->param_type=PF_Param_POPUP;out->u.pd.value=kNodeControlSource;}
     else if(index==kGraphSyncGuardId){out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=actor->numbers.at(index);}
-    else if(index==kGraphChecksumHighId || index==kGraphChecksumLowId) {
-        out->param_type=PF_Param_FLOAT_SLIDER;
-        const auto checksum=bytes_checksum(actor->arbitrary.at(kGraphParameterId))^(split_receipt?1u:0u);
-        out->u.fs_d.value=index==kGraphChecksumHighId?checksum>>16u:checksum&65535u;
-    }
     else if(index==kGraphParameterId) {
         ++graph_reads;const auto& bytes=actor->arbitrary.at(index);auto h=allocate_render(bytes.size());
         std::memcpy(lock_render(h),bytes.data(),bytes.size());out->param_type=PF_Param_ARBITRARY_DATA;out->u.arb_d.value=h;
     } else if(index>=kNativeBindingFirstIndex && index<kNativeBindingFirstIndex+kNativeBindingCapacity) {
         ++alias_reads;const auto& source=alias_sources.at(index);out->param_type=PF_Param_FLOAT_SLIDER;
-        out->u.fs_d.value=stale_expression?kNativeBindingStaleGraph:alive(source.first)?source.second:kNativeBindingUnavailable;
+        out->u.fs_d.value=alive(source.first)?source.second:kNativeBindingUnavailable;
     } else if(index==kTimeRemapEnabledId || index==kPreviewEnabledId){out->param_type=PF_Param_CHECKBOX;}
     else if(index==kTimeSamplingHzId || index==kAccelerationId){out->param_type=PF_Param_POPUP;out->u.pd.value=1;}
     else {
@@ -163,21 +154,6 @@ int main(int argc,char** argv) {
         if(static_cast<int>(key)-3==7){std::strcpy(out,"org.starfieldfx.node.motion");return 0;}
         return original_match(key,out);};
     load_graph(argv[1]);install_render_hooks();
-    // Real render entry, independently mixed PF graph/receipt and expression
-    // versions. These are protocol fixtures, not a claim to emulate AE caches.
-    begin_case();render_enabled=false;actor=parade.front();
-    PF_UtilCallbacks stamp_utils{};stamp_utils.host_new_handle=allocate_render;stamp_utils.host_lock_handle=lock_render;
-    stamp_utils.host_unlock_handle=unlock_render;stamp_utils.host_dispose_handle=dispose_render;stamp_utils.host_get_handle_size=size_render;
-    PF_InData stamp_data{};stamp_data.utils=&stamp_utils;stamp_data.width=1920;stamp_data.height=1080;stamp_data.time_scale=24;
-    stamp_data.inter.checkout_param=render_checkout;stamp_data.inter.checkin_param=render_checkin;
-    PF_OutData stamp_out{};std::shared_ptr<const starfield::core::Graph> stamp_graph;
-    auto stamp_aliases=alias_reads;split_receipt=true;
-    CHECK(checkout_render_graph(&stamp_data,&stamp_out,stamp_graph)==PF_Interrupt_CANCEL && !stamp_graph && !stamp_out.return_msg[0] && alias_reads==stamp_aliases);
-    split_receipt=false;stale_expression=true;
-    CHECK(checkout_render_graph(&stamp_data,&stamp_out,stamp_graph)==PF_Interrupt_CANCEL && !stamp_graph && !stamp_out.return_msg[0]);
-    stale_expression=false;
-    CHECK(checkout_render_graph(&stamp_data,&stamp_out,stamp_graph)==0 && stamp_graph && !stamp_out.return_msg[0]);
-    CHECK(param_checkouts==param_checkins && render_handles.empty());actor.reset();
     for(bool appended:{false,true}) {
         begin_case();duplicate_at_end=appended;const auto before=snapshot();
         {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)==0);

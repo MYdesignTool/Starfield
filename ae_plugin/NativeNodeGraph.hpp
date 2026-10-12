@@ -8,9 +8,6 @@
 
 namespace starfield::adapter {
 
-// A different published graph is a canceled frame, never an authored value.
-inline constexpr double kNativeBindingStaleGraph = -1099511627775.0;
-
 namespace node_sync { struct NativeEdit; }
 
 struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}, rate{}; };
@@ -54,10 +51,7 @@ public:
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
                    const char** failed_stage = nullptr, A_long* failed_parameter = nullptr,
-                   const core::Graph* previous_graph = nullptr,bool force_refresh=false,
-                   std::optional<std::uint32_t> checksum = std::nullopt) noexcept;
-    PF_Err verify_after_publication(A_long* failed_stream = nullptr,
-                                   const char** failed_stage = nullptr) noexcept;
+                   const core::Graph* previous_graph = nullptr,bool force_refresh=false) noexcept;
     // Only after the new graph is saved/read back, before removing old sources.
     // Failure leaves rollback armed; an in-flight old graph sees a finite base.
     PF_Err retire_after_publication(A_long* failed_stream = nullptr,
@@ -74,8 +68,7 @@ private:
                                                   A_long width, A_long height,
                                                   A_long* failed_stream = nullptr,
                                                   const char** failed_stage = nullptr,
-                                                  const core::NodeId* node_filter = nullptr,
-                                                  core::NodeId* failed_node = nullptr) noexcept;
+                                                  const core::NodeId* node_filter = nullptr) noexcept;
 
 // Reads per-node records from sibling hidden node effects on the supervised
 // edit path. It must never be called from SmartFX pre-render or render.

@@ -71,6 +71,14 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         context.num_params = static_cast<A_long>(kTotalEffectParameterCount + 1);
         PF_InData* data = &context;
         if(panel_data)context.effect_ref=panel_data->effect_ref;
+        struct ReportCommand {
+            PF_InData* data;node_sync::NativeEdit* edit;double guard;
+            ~ReportCommand(){char message[255]{};
+                std::snprintf(message,sizeof(message),"stage %u stream %ld parameter %ld binding %s",unsigned(edit->stage),
+                    long(edit->stream_index),long(edit->binding_parameter),edit->binding_stage?edit->binding_stage:"none");
+                journal_graph_render(data,guard,edit->status,message,"UI result");}
+        } report{data,edit,panel_data?1.0:0.0};
+        journal_graph_render(data,report.guard,0,"","UI begin");
         // Generic calls can be nested below AE's scripting stack. Keep the
         // bounded parameter bank off that UI thread's stack.
         std::vector<PF_ParamDef> scratch(kTotalEffectParameterCount + 1);
@@ -194,6 +202,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         error = create_graph_parameter(data, graph, &publish.graph);
         if (error) return edit->status = error;
         NativeBindingTransaction bindings(data, plugin_id, edit->renderer, edit->layer);
+        journal_graph_render(data,report.guard,0,"","UI bindings begin");
         edit->stage = node_sync::Stage::animation_bindings;
         std::optional<core::Graph> previous_graph;
         if(scratch[kGraphParameterId].u.arb_d.value){
@@ -201,8 +210,10 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             if(!saved.has_value())return edit->status=PF_Err_BAD_CALLBACK_PARAM;
             previous_graph=saved.take_value();
         }
-        const auto checksum=(static_cast<std::uint32_t>(scratch[kGraphChecksumHighId].u.fs_d.value)<<16u) |
-            static_cast<std::uint32_t>(scratch[kGraphChecksumLowId].u.fs_d.value);
+        error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
+            previous_graph?&*previous_graph:nullptr);
+        if (error) return edit->status = error;
+        journal_graph_render(data,report.guard,0,"","UI bindings end");
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.
         // Do not add continuous/color/point values to this scalar-only contract.
@@ -236,12 +247,6 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             if (ae_error) return edit->status = static_cast<PF_Err>(ae_error);
             publish.read[i] = true;
         }
-        // Validate/capture every publication stream before expression/resource
-        // mutation. A wrong receipt type must fail without writes or union reads.
-        edit->stage=node_sync::Stage::animation_bindings;
-        error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
-            previous_graph?&*previous_graph:nullptr,false,checksum);
-        if (error) return edit->status = error;
         std::size_t written = 0;
         edit->stage = node_sync::Stage::publish_scalars;
         for (; written < graph_slot; ++written) {
@@ -297,8 +302,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         }
         if(!ae_error) {
             edit->stage=node_sync::Stage::animation_bindings;
-            ae_error=bindings.verify_after_publication(&edit->stream_index,&edit->binding_stage);
-            if(!ae_error)ae_error=bindings.retire_after_publication(&edit->stream_index,&edit->binding_stage);
+            ae_error=bindings.retire_after_publication(&edit->stream_index,&edit->binding_stage);
         }
         if (ae_error) {
             bool rollback_failed = bindings.rollback_model_resources()!=PF_Err_NONE;
@@ -314,7 +318,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
         }
         bindings.accept();
-        journal_graph_render(data,panel_data?1:0,0,"","UI publish",checksum,checksum,graph.nodes.size());
+        journal_graph_render(data,report.guard,0,"","UI published");
         if(panel_data)capture_native_temporal_metadata(data,graph,plugin_id);
         edit->revision = revision; edit->status = PF_Err_NONE; edit->accepted = true;
         edit->stage = node_sync::Stage::complete; edit->stream_index = -1;
@@ -334,7 +338,7 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
         auto error=data->pica_basicP->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
         if(error || !streams)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
         struct Release {SPBasicSuite* basic;~Release(){basic->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} suite{data->pica_basicP};
-        const A_Time time{data->current_time,data->time_scale};core::Graph graph;std::uint32_t checksum{};
+        const A_Time time{data->current_time,data->time_scale};core::Graph graph;
         for(auto index:std::array<A_long,3>{kGraphSyncGuardId,kControlSourceId,kGraphParameterId}) {
             AEGP_StreamRefH ref{};error=streams->AEGP_GetNewEffectStreamByIndex(plugin,renderer,index,&ref);
             struct Ref {const AEGP_StreamSuite6* streams;AEGP_StreamRefH value;~Ref(){if(value)streams->AEGP_DisposeStream(value);}} owned{streams,ref};
@@ -344,8 +348,11 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
             AEGP_StreamValue2 value{};error=streams->AEGP_GetNewStreamValue(plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
             if(error)return static_cast<PF_Err>(error);
             struct Value {const AEGP_StreamSuite6* streams;AEGP_StreamValue2* value;~Value(){streams->AEGP_DisposeStreamValue(value);}} held{streams,&value};
+            // A first materialization may roll back to AE Controls. Its saved
+            // renderer has no native graph dependencies to rebind.
+            if(index==kControlSourceId && value.val.one_d==kLegacyControlSource)return PF_Err_NONE;
             if(index==kGraphParameterId) {
-                auto decoded=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH),&checksum);
+                auto decoded=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));
                 if(!decoded.has_value())return PF_Err_BAD_CALLBACK_PARAM;graph=decoded.take_value();
             } else if(value.val.one_d!=(index==kGraphSyncGuardId?1:kNodeControlSource))return PF_Err_BAD_CALLBACK_PARAM;
         }
@@ -354,14 +361,13 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
         // The old compiled dependency can already be invalid after deletion.
         // Freshly resolved UUID sources + the verified saved record provide the
         // finite handoff under guard1; normal rendering never accepts a sentinel.
-        error=bindings.install(graph,&stream,&stage,&parameter,nullptr,true,checksum);
-        if(!error)error=bindings.verify_after_publication(&stream,&stage);
+        error=bindings.install(graph,&stream,&stage,&parameter,nullptr,true);
         if(!error)error=bindings.retire_after_publication(&stream,&stage);
         if(error) {
             if(output)std::snprintf(output->return_msg,sizeof(output->return_msg),"Starfield final bindings: %s (stream %ld, parameter %ld, error %ld).",stage,long(stream),long(parameter),long(error));
             return static_cast<PF_Err>(error);
         }
-        bindings.accept();journal_graph_render(data,1,0,"","UI final",checksum,checksum,graph.nodes.size());return PF_Err_NONE;
+        bindings.accept();return PF_Err_NONE;
     } catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
 
