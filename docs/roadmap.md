@@ -14,7 +14,10 @@ is built and offline-tested but is not graph/resource/AE-interpolation integrati
 or an operable Light Path author; M3-18 remains open.
 The adapter now captures per-light AE-evaluated positions between keys with bounded
 adaptive probes. Its measured probe tolerance is not an exact interpolation proof;
-Core playback/resource/history/cache integration and the author remain next.
+the adapter now captures selected light IDs independently in composition order,
+and Core has an SFPL1 resource plus single-source interpolator. Graph/history/cache
+integration, multi-light displacement/orientation composition and the author remain
+next.
 
 ## Previous stage records (historical)
 

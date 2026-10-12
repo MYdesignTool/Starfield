@@ -2,7 +2,9 @@
 #include "AE_Effect.h"
 #include "AE_GeneralPlug.h"
 #include "MotionPointCapture.hpp"
+#include "starfield/core/MotionLightPathResource.hpp"
 #include "starfield/core/Time.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -31,6 +33,12 @@ struct MotionLightPathTrack {
     std::vector<MotionTimedLayerPoint> samples;
     double maximum_probe_error{};
 };
+struct MotionLightPathTrackSet {
+    // One track per matched source, in the caller's composition order. The total
+    // sample count is bounded across the whole set, not reset for each light.
+    std::vector<MotionLightPathTrack> tracks;
+    std::size_t sample_count{};
+};
 // Read-only metadata for one explicit point light, not a path author or render
 // ABI. Zero keys leaves the default times; equal endpoints do not define a
 // duration. All SDK ownership is callback-local. Failure preserves output.
@@ -48,4 +56,14 @@ struct MotionLightPathTrack {
 [[nodiscard]] PF_Err capture_motion_light_path_track(PF_InData*,AEGP_PluginID,
     std::uint32_t source_layer_id,core::LayerUnits,double max_chord_error,
     const core::Cancellation&,MotionLightPathTrack& output) noexcept;
+// Captures all explicitly selected matching lights independently. IDs are kept
+// in caller order, must be unique, and share one aggregate sample bound. Failure
+// or cancellation leaves output unchanged.
+[[nodiscard]] PF_Err capture_motion_light_path_tracks(PF_InData*,AEGP_PluginID,
+    std::span<const std::uint32_t> source_layer_ids,core::LayerUnits,double max_chord_error,
+    const core::Cancellation&,MotionLightPathTrackSet& output) noexcept;
+// Converts the owned AE snapshot to the host-independent SFPL1 graph resource.
+// Encoded bytes are replaced only after the complete set validates and encodes.
+[[nodiscard]] PF_Err encode_motion_light_path_track_set(const MotionLightPathTrackSet&,
+    const core::Cancellation&,std::vector<std::byte>& output) noexcept;
 }

@@ -91,6 +91,29 @@ under `artifacts/plugin/motion-light-adaptive-track-20261013/` and
 snapshot only; Core serialization, graph/history/shutter/cache dependencies and
 the Light Path author are still open. No AE acceptance or deployment was run.
 
+The adapter now groups explicitly selected matching light IDs into an atomic
+`MotionLightPathTrackSet`, preserving caller/composition order while keeping each
+source's timing and adaptive trajectory separate. Duplicate/zero IDs and empty
+selections fail, with a combined cap of 16,385 samples across at most 256 lights.
+This remains a capture boundary: no track encoding, Core playback, all-light
+displacement combination, graph/history/shutter/cache binding or public author
+has been added. No dedicated set-level tests or AE qualification have been run for
+this addition; it is not deployed.
+
+Core now defines the SFPL1 owned numeric resource and compiles a single source
+track for piecewise-linear playback, including its terminal derivative. It keeps
+exact rational CompTimes and per-source IDs. Resource limits are 256 sources and
+16,385 aggregate samples; parsing rejects malformed/duplicate/trailing data and
+invalid coordinates/times. This playback approximates the captured adaptive sample
+track and does not preserve AE interpolation exactly between samples. Full
+May2023 x64 Release build with both publication switches disabled exits 0 across
+all ten modules. Motion AEX SHA256
+`4296D2DAF1775579E5B8C56DD01A2F36CC34820A6DB28539D2B7B833D308120F`, Particle AEX
+`0A0044205E10E6ACBCDDE6FE3DBF05DEE28CC295603C9893741ABA4DE7EA3E55`, Host AEX
+`B0DB46CC5AAA1E1E19BF783FCDC4E209D2D79DBBAEF95E8045311BEC783C12E7`, Core DLL
+`9CA96D51F5C2A2E0E1F229FE2F75547C3C34C2551306F8468B74BCF6FFA225AB`. New resource
+and multi-source logic have not had dedicated tests; no AE acceptance/deployment.
+
 The high-node-count deletion warning stays deferred. No automatic AE acceptance
 or process action accompanies this Motion work.
 

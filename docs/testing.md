@@ -53,7 +53,10 @@ segment's 1/4, 1/2 and 3/4 times, then bisected until the observed chord deviati
 fits the requested tolerance. It checks retained key times, the sample cap path,
 host callback errors, cancellation, balanced suites and atomic output. Standard
 and ASAN runs each pass 5,773 checks. Probe tolerance is not a proof of the maximum
-continuous error between probes. No AE instance was used.
+continuous error between probes. The multi-light set wrapper added after those runs
+has no dedicated set-level test yet; it reuses the single-light capture path. No AE
+instance was used. The following SFPL1 encoder/decoder and track interpolator were
+compile-checked by the full May2023 SDK build; dedicated runtime tests have not run.
 
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 

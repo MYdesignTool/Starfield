@@ -1,4 +1,5 @@
 #include "MotionLightTiming.hpp"
+#include "MotionLightSources.hpp"
 #include "SPBasic.h"
 #include "starfield/core/MotionGeometry.hpp"
 #include "starfield/core/Render.hpp"
@@ -251,6 +252,66 @@ PF_Err capture_motion_light_path_track(PF_InData* data,AEGP_PluginID plugin,std:
         return PF_Err_BAD_CALLBACK_PARAM;
     output=std::move(result);
     return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
+PF_Err capture_motion_light_path_tracks(PF_InData* data,AEGP_PluginID plugin,
+    std::span<const std::uint32_t> ids,core::LayerUnits units,double max_chord_error,
+    const core::Cancellation& cancel,MotionLightPathTrackSet& output) noexcept try {
+    if(ids.empty()||ids.size()>kMaxMotionLightSources||!std::isfinite(max_chord_error)||
+       max_chord_error<=0||max_chord_error>1e6)return PF_Err_BAD_CALLBACK_PARAM;
+    MotionLightPathTrackSet result;result.tracks.reserve(ids.size());
+    for(std::size_t i=0;i<ids.size();++i) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        if(ids[i]==0)return PF_Err_BAD_CALLBACK_PARAM;
+        for(std::size_t previous=0;previous<i;++previous)
+            if(ids[previous]==ids[i])return PF_Err_BAD_CALLBACK_PARAM;
+        MotionLightPathTrack track;
+        const auto error=capture_motion_light_path_track(data,plugin,ids[i],units,max_chord_error,cancel,track);
+        if(error)return error;
+        if(track.timing.layer_id!=ids[i]||track.samples.size()<2||
+           track.samples.size()>core::kMaxMotionPathSamples-result.sample_count)
+            return PF_Err_BAD_CALLBACK_PARAM;
+        result.sample_count+=track.samples.size();result.tracks.push_back(std::move(track));
+    }
+    if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    output=std::move(result);return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
+PF_Err encode_motion_light_path_track_set(const MotionLightPathTrackSet& tracks,
+    const core::Cancellation& cancel,std::vector<std::byte>& output) noexcept try {
+    if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    if(tracks.tracks.empty()||tracks.tracks.size()>kMaxMotionLightSources||
+       !tracks.sample_count||tracks.sample_count>core::kMaxMotionLightPathResourceSamples)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    core::MotionLightPathResource resource;resource.tracks.reserve(tracks.tracks.size());
+    resource.sample_count=tracks.sample_count;std::size_t samples=0;
+    for(const auto& source:tracks.tracks) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        if(!source.timing.layer_id||source.samples.size()<2||
+           source.samples.size()>core::kMaxMotionLightPathResourceSamples-samples||
+           source.timing.layer_id!=source.samples.front().layer_id)return PF_Err_BAD_CALLBACK_PARAM;
+        core::MotionLightPathSourceTrack track;track.source_layer_id=source.timing.layer_id;
+        track.maximum_probe_error=source.maximum_probe_error;track.samples.reserve(source.samples.size());
+        for(const auto& point:source.samples) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            if(point.layer_id!=track.source_layer_id)return PF_Err_BAD_CALLBACK_PARAM;
+            track.samples.push_back({point.source_comp_time,point.position});
+        }
+        samples+=track.samples.size();resource.tracks.push_back(std::move(track));
+    }
+    if(samples!=tracks.sample_count)return PF_Err_BAD_CALLBACK_PARAM;
+    auto encoded=core::encode_motion_light_path_resource(resource,cancel);
+    if(!encoded.has_value()) {
+        switch(encoded.error().code) {
+            case core::ErrorCode::cancelled:return PF_Interrupt_CANCEL;
+            case core::ErrorCode::allocation_failed:return PF_Err_OUT_OF_MEMORY;
+            default:return PF_Err_BAD_CALLBACK_PARAM;
+        }
+    }
+    if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    output=encoded.take_value();return PF_Err_NONE;
 } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
   catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }

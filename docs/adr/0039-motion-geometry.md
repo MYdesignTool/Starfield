@@ -167,6 +167,27 @@ This owned adapter snapshot still lacks Core serialization, playback interpolati
 graph binding, history/shutter/cache dependencies and a public author. No AE host
 qualification is claimed.
 
+The next adapter seam, `capture_motion_light_path_tracks`, accepts the explicit IDs
+selected by the caller and captures each source independently in that order. IDs
+must be unique and the combined sample count is capped at 16,385 across the set.
+It publishes the complete set atomically. This prepares the confirmed
+all-matching-source policy without assigning lights to particles or combining
+their displacement/orientation yet. Resultant orientation for multiple matches is
+pending the owner's answer; serialization and runtime integration remain open.
+
+The Core `MotionLightPathResource` introduces an owned `SFPL1` packet for that
+handoff: a 24-byte header, 16-byte per-source headers, and 40-byte samples carrying
+the exact rational CompTime and canonical XYZ position. Source IDs and the measured
+probe error are retained. The aggregate resource is capped at 256 sources and
+16,385 samples; malformed counts, duplicate IDs, non-finite/out-of-range values,
+unsorted times and trailing bytes are rejected. `CompiledMotionLightPathTrack`
+evaluates the sampled source curve piecewise-linearly and exposes its terminal
+derivative for continuation. This is playback of the adaptive numeric snapshot,
+not the original AE interpolation function. The complete May2023 x64 no-publish
+build compiles Core, the main adapter and all native modules. No dedicated resource
+tests or AE qualification have run; graph/history/cache/author integration remains
+open.
+
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
 confirms Starting With filters lights by a name prefix. The question on that
 page reports a script input prompt displaying All...; it is evidence about
