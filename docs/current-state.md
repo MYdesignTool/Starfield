@@ -2,6 +2,15 @@
 
 ## M3-18 mapped-time point sampler candidate — 2026-10-12
 
+Owner confirms Circle mode acceptance in deployed73/77. This confirms the mode,
+not previously unreported per-case undo/reopen/animation or downstream Force
+gates. New owner issue: CEP deletion of almost any node shows native animation
+parameter-value error (stream144/error516/delivered params0), though deletion
+appears effective. Prioritize M3-17 deletion transaction correction, preserving
+Motion work. Ordinary gateway and Model prepare both remove effects before graph
+publication; confirmed ordering gap, causal AE timing remains a hypothesis until
+regression/host evidence. Do not mask invalid bindings or suppress dialogs.
+
 MotionPointCapture adds explicit per-source rational composition time, keeping
 the original current-time API. Source matrices are read at mapped time while
 owner inverse remains at current converted PF time; normalized ID/time caching
@@ -17,7 +26,12 @@ cancellation/allocation and output preservation. Inventory/point ASAN8099 passes
 Logs: artifacts/m3-18-motion-timed-points-{tests,asan,inventory-regression}.log.
 First sandbox commands failed before process launch (CreateProcessSecurityEnvironment
 0x80070020); direct approved reruns completed actual exit0. No AE operation.
-Full frozen May2023 SDK verification is next; native73/CEP77 remains installed.
+Sourcefd9b285f5cfe32884b654f77278146f597ff9679 is pushed/git-archive frozen.
+Full May2023 /MT ten-module SDK with both NoPublish switches completes actual
+session21353 exit0; frozen ASAN5656/8099 pass. All500 source hashes unchanged;
+CPP/header fingerprint verified. Evidence: artifacts/prepared/m3-18-motion-timed-points/
+{sdk-build.log,sdk-terminal.json,source-hashes.json,point-capture-asan.log,light-sources-asan.log}.
+native73/CEP77 remains installed; no AE process/script operation or publication.
 
 ## M3-18 timed point-light metadata candidate — 2026-10-12
 
@@ -44,6 +58,12 @@ hashes remain native73/CEP77; proof rechecked09:51:35+08. No new publication or
 AE process/script operation. Continue mapped-time point sampling and native
 resource/history/shutter/cache author integration.
 M3-18 and full goal remain active. This metadata helper is not a Light Path author.
+
+Owner source policy: Light Path uses all matching point lights, each original
+position keyframe timing/interpolation independently; no random/first-only source
+assignment. Look At chooses the currently nearest matching light per particle.
+Path displacement contributions will be computed individually then combined;
+the sum/orientation equation still needs implementation evidence.
 
 ## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12 09:35+08
 

@@ -27,6 +27,15 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ### Owner-confirmed flow and Light Path policy — 2026-10-12
 
+Owner confirms Circle mode acceptance at installed73/77, with a separate generic
+node-deletion animation binding warning now prioritized under M3-17. No inference
+that unspecified undo/reopen/downstream Force cases were individually exercised.
+Owner confirms Light Path uses ALL matching point lights, each original timing/
+interpolation independently. Do not use random/first-only assignment. Look At
+chooses currently nearest matching light per particle. Path displacement will be
+computed separately for each source and combined; define/test its sum and final
+orientation before integration, without claiming this equation was measured.
+
 Mapped-time point seam (unpublished): each request specifies stable composition
 layer ID, local pixel point and exact rational source composition time. Sample
 source layer-to-world at that time (AE supplies interpolation/parent motion),

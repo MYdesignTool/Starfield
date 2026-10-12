@@ -1,5 +1,26 @@
 # 当前任务卡
 
+## M3-17 — node deletion transaction repair (2026-10-12, active priority)
+
+Owner accepts Circle mode but reports CEP deletion of almost any node emits
+Starfield animation parameter-value stream144/error516 while deletion succeeds.
+Ordinary gateway removes effects before native publication; Model prepare does
+the same. Confirm this gap with a reentrant render-at-removal fixture, correct
+both paths and preserve backup/rollback animation state. Own gateway and Model
+transport, relevant clean DOM/transport/transaction fixtures, candidate/build/
+deployment tooling and ADR0040/current-state/testing. Native binding files only
+if evidence requires them. Do not suppress dialogs or accept invalid alias values.
+Preserve Motion/MNT files; return to M3-18 after paired repair delivery.
+
+M3-18 checkpoint: fd9b285 mapped-time sampler pushed/frozen, full May2023 ten-module
+/MT doubleNoPublish SDK session21353 actualexit0, ASAN5656/8099 and500 raw source
+hashes/fingerprint verified. Native73/CEP77 unchanged. Owner confirms all matching
+point lights independently for Light Path and nearest current light for Look At;
+Circle mode accepted. Timed source/resource/history/author and module merges plus
+M3-19 remain full goal requirements. Next resource integration can use the existing
+adapter-side TemporalGraphSampler/evaluated-particle snapshot path; do not assume
+a C ABI bump before inspecting this path.
+
 ## M3-17 native70 / CEP74 authoring patch deployed — 2026-10-11
 
 Material parameter validation/RGBA authoring patch and stale recipe/extension

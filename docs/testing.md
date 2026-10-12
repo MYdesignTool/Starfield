@@ -12,7 +12,10 @@ RunMotionLightSourcesTests -Run -Sanitize8099 passes after adding Time.cpp linka
 Evidence: artifacts/m3-18-motion-timed-points-{tests,asan,inventory-regression}.log.
 Initial sandbox launcher failed before starting any test (0x80070020); direct
 approved reruns completed actual exit0. No actual AE interpolation/selector
-qualification or author mode is claimed; full frozen SDK validation is next.
+qualification or author mode is claimed. Sourcefd9b285's full frozen May2023 /MT
+ten-module SDK with both NoPublish switches completes session21353 actual exit0;
+frozen ASAN5656/8099 and500 unchanged source hashes/CPP-header fingerprint verified.
+Logs/receipts: artifacts/prepared/m3-18-motion-timed-points. No new publication.
 
 ## M3-18 timed point-light metadata seam — 2026-10-12
 
