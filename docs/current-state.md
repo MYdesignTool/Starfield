@@ -41,8 +41,8 @@ owned time/position pairs. It does not sample between keys or integrate original
 interpolation, source dependencies, history or cache identity.
 Light Path/Look At remain unadvertised until those resource and author paths work
 end to end. Next connect these times to per-light MotionPointCapture and temporal
-resource/cache state, including the source's between-key interpolation, then
-implement a complete Light Path author stage.
+resource/cache state and preserve the source's between-key interpolation at each
+mapped time, then implement a complete Light Path author stage.
 
 The latest full May 2023 x64 SDK build completed with exit code 0 using
 `-NoDistPublish -NoRuntimePublish`; it produced nine AEX modules and Core under
@@ -55,6 +55,23 @@ Core SHA256 is `cafaafcfcd53e67a9ce8dde3c7483dda6e783d9df2b5641c0616f62c31a4c0b7
 focused fake-callback suite passes 5,494 checks. This is compile/fake-host
 evidence only; no AE instance or project was opened. MSVC reported the existing
 `NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
+
+2026-10-13 adds `CompiledMotionLightPathClock`, compiled independently for each
+matching point light using its rational first/last key time. Speed100 maps particle
+seconds 1:1 to source composition seconds; the shared Motion Over Life integral and
+an explicit stable Speed Random sample modulate that clock. A caller supplies the
+effective delay, so the nonzero Delay Random distribution is not guessed here.
+The clock exposes exactly Stop and Continue: Stop holds at the last key; Continue
+holds the AE query at that key and reports overshoot time/rate for a later terminal
+velocity resource. Standard and ASAN fixtures pass32 checks each. Full May2023 x64
+SDK build exits0 under both no-publish flags; Motion AEX SHA256
+`B92562719D7C202C008A9A32A5FDCB55D55BE69A9631F2051CD1DAD7E26A9D54`, Particle AEX
+`1373790BDED496D081FA22FC6DD5A6CA1CF70A8626BD637EF2242C013B340491`, Core DLL
+`A2D4213BB6979A283DD01B8D6B156743B656CF57FABF3BF7EEB1309E0D3D7185`. Outputs are in
+`artifacts/plugin/motion-light-path-clock-20261013/` and
+`artifacts/core-dll/motion-light-path-clock-20261013/`. The clock is not yet wired
+to graph evaluation, AE interpolation, resource/cache/history/shutter dependencies
+or a Light Path author; no deployment or AE acceptance was run.
 
 The high-node-count deletion warning stays deferred. No automatic AE acceptance
 or process action accompanies this Motion work.

@@ -10,6 +10,7 @@ add_library(starfield_core STATIC
     src/core/ModelScene.cpp
     src/core/MotionGeometry.cpp
     src/core/MotionPathTravel.cpp
+    src/core/MotionLightPathClock.cpp
     src/core/Graph.cpp
     src/core/GraphConstruction.cpp
     src/core/GraphEvaluation.cpp

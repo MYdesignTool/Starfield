@@ -8,6 +8,10 @@ work. Original deletion errors and remaining Motion/Turbulence scope stay open.
 No automatic acceptance or new repair deployment accompanies this rollback.
 Owner later observes the deletion warning seems confined to graphs with many
 nodes; defer it without inferring a root cause. Main priority resumes M3-18 Motion.
+The 2026-10-13 source-time clock now expresses per-light Speed100=1:1 timing,
+Over Life and Speed Random, plus the two requested end choices. This numeric seam
+is built and offline-tested but is not graph/resource/AE-interpolation integration
+or an operable Light Path author; M3-18 remains open.
 
 ## Previous stage records (historical)
 

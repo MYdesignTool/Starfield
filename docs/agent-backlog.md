@@ -538,6 +538,8 @@ Ordered Force接入拥有src/core/OrderedForce.hpp、MotionEvaluation.hpp、Grap
 
 2026-10-12 后续在途：官方Staff已证实Starting With名前缀输入，见reference-motion-phases。新增只读灯光名字/ID/order/activity inventory及精确UTF16 prefix→IDs seam，May2023标准/ASAN8099；补Light Path当前距离下路径形变速度、出生边界、30/60/120Hz、metadata仅证明clock、乱序及Auxiliary继承，标准/ASAN10336、有序frame ASAN4196通过。源码完整SDK冻结待续；不改native72/CEP76 Circle安装。原生resource/history/shutter/GUID接入、剩余参考政策、ordered Force/merges、两模式作者及M3-19/实际AE gates保持。本卡拥有新MotionLightSources.hpp/.cpp、main工程、TemporalEvaluation、focused runners/tests及本文档。
 
+2026-10-13 延续主体 Motion：新增 per-light Light Path source-time clock。各灯独立使用 AE 关键帧首末 CompTime；Speed100 按秒对秒推进，Motion Over Life 积分与稳定 Speed Random 样本参与时间映射，delay由调用方给定，末端仅 Stop/Continue 两种。Continue返回末端后的时钟量，由后续轨迹资源应用终端速度；尚未定义 Delay Random 非零分布。专项标准/ASAN各32项、完整 May2023 x64 SDK 双NoPublish构建通过。它未接入图求值、AE原曲线插值、资源/缓存/history/shutter或作者；不部署。用户将删除警告暂存为高节点数下的未确认触发条件，M3-17不在本轮改动。
+
 2026-10-12 01:42+08 Circle阶段发布：源码09b84a2已推送并git archive冻结；完整May2023 /MT十模块双NoPublish实际exit0。冻结Circle ASAN2020、ordered frame ASAN4150、Motion实际注册/binding9 ASAN640、七类注册/DOM/reload/ES3完整审查和dummy配对回滚66通过。fresh AE0后安装native72/packed32840/CoreABI9/CEP76；独立10 native/18 paired/27全CEP及selector/runtime hash、491源码hash、backup9/18匹配。artifacts/m3-18-motion76-installed-proof.json及m3-17-native72 receipts保存证据；备份m3-18-native72-panel76-motion-circle-20261012恢复71/75。Circle仅作者开放，Force须上游；后置Force/异链合并、Light Path/Look At作者、AE2023验收及M3-19保持开放，完整目标active。不启动/调度AE。
 
 2026-10-12 当前卡恢复：Material native71/CEP75阶段源码777bb05已部署并推送。owner确认Circle Speed100一秒一圈、Origin Type为Point/Particle Origin/Emitter Origin；先完成Circle独立Core/原生/CEP作者及配对发布，再继续Light Path/Look At与M3-19。保留MNT在途文件；本卡拥有Motion数字类型、Graph/历史调用、独立原生节点/绑定、schema、候选CEP、构建部署及focused tests。

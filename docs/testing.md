@@ -37,6 +37,16 @@ at exit 0 under both no-publish flags; see
 `artifacts/core-dll/motion-light-keyframes-20261013/`. This still does not qualify
 AE behavior.
 
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunMotionLightPathClockTests.ps1 -Run`
+and optionally add `-Sanitize`. The focused fixture exercises per-source
+Light Path time mapping, Speed100 1:1 playback, delay hold/boundary, speed random,
+Over Life integration, independent light ranges and both end choices. Standard and
+ASAN builds pass32 checks each. The caller supplies effective delay; this helper
+does not define nonzero Delay Random or sample AE interpolation. The complete
+May2023 x64 SDK build including this helper passed with both
+`-NoDistPublish -NoRuntimePublish`; output paths and SHA256s are recorded in
+`docs/current-state.md`. No AE process or deployment was involved.
+
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 
 Frozen2b541c5 complete May2023 SDK13576 actualexit0 and510 unchanged archived

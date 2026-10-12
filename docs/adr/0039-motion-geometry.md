@@ -142,6 +142,19 @@ May 2023 x64 SDK build including this helper completed at exit 0 under both
 no-publish flags; its input fingerprint includes MotionLightTiming and
 MotionLightSources. Neither result qualifies AE behavior.
 
+The numeric seam `CompiledMotionLightPathClock` is one instance per matching
+light. It takes that source's rational first/last key times and maps particle age
+through the shared Over Life integral; Speed100 advances source composition time
+1:1, and a caller-provided stable random sample applies Speed Random. The caller
+passes an effective delay, so Delay Random's still-unconfirmed distribution is
+not guessed here. Stop holds the last source time. Continue keeps the AE query at
+the last key and returns elapsed/rate beyond it for a later captured terminal
+velocity. There are exactly two end enum values. Standard and ASAN clock fixtures
+pass32 checks; the full May2023 x64 SDK build including the helper exits0 with both
+no-publish flags. The helper is not yet connected to the graph, AE path interpolation,
+resource snapshots/dependencies, temporal history/shutter, or a public author.
+It must not be represented as a usable Light Path mode.
+
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
 confirms Starting With filters lights by a name prefix. The question on that
 page reports a script input prompt displaying All...; it is evidence about

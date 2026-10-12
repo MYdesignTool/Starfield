@@ -73,6 +73,7 @@
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
     <ClCompile Include="..\src\core\MotionGeometry.cpp" />
     <ClCompile Include="..\src\core\MotionPathTravel.cpp" />
+    <ClCompile Include="..\src\core\MotionLightPathClock.cpp" />
     <ClCompile Include="..\src\core\EmitterHistory.cpp" />
     <ClCompile Include="..\src\core\ModelGeometry.cpp" />
     <ClCompile Include="..\src\core\ModelResources.cpp" />
