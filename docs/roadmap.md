@@ -1,5 +1,10 @@
 # 开发路线图
 
+2026-10-12 native78/retained CEP81 deletion generation protocol stage is deployed;
+exact host correction is unconfirmed. Accepted panel response ordering and Circle
+remain preserved. Current evidence/pair/rollback live in current-state.md. This
+does not close the Motion/Turbulence goal.
+
 M3-18 native73/CEP77 deployed stage removes the Force-after-Motion placement restriction
 through ordered Core processing, history and Auxiliary velocity inheritance.
 Circle Speed displays percentages while retaining100%=one revolution/second.

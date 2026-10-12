@@ -1,6 +1,14 @@
 # 测试入口
 
-## M3-17 native78 / retained CEP81 generation candidate — 2026-10-12
+## M3-17 native78 / retained CEP81 deployed — 2026-10-12
+
+Frozen source78b7c79 actual May2023 SDK81436 exit0 and all510 archive hashes pass;
+frozen alias ASAN29308+camera12, generated expressions144/1272 and complete lifecycle
+426912 checks/7723 render callbacks/0 unexpected errors pass. Lifecycle intentionally
+prints one strict missing-source error, then checks that it was retained; it is not
+an unexpected failure. Frozen logs under artifacts/prepared/m3-17-native78-generation.
+Installed10/18/27/selector and exact77/81 backup10/18 independently match. User-visible
+deletion correction remains an open manual gate; no AE launch/dispatch performed.
 
 Focused working-source evidence: RunAliasHandoffTests -Run -Sanitize passes29308
 native +12 camera checks (m3-17-generation78-alias-asan-v2.log), including current/

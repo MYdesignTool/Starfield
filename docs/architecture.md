@@ -1,6 +1,6 @@
 # Starfield 架构
 
-M3-17 native78 candidate preserves accepted CEP81 and adds graph generation
+M3-17 deployed native78 preserves accepted CEP81 and adds graph generation
 coherence: explicit UI publication uses CRC-stamped alias programs and validates
 all publication stream types before mutation. Programs check their renderer's
 receipt before sibling lookup; PF validates graph/receipt and samples only matching

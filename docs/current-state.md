@@ -1,6 +1,23 @@
 # 当前工程状态
 
-## M3-17 native78 / CEP81 generation coherence candidate — 2026-10-12
+## M3-17 native78 / CEP81 generation coherence deployed — 2026-10-12 22:02+08
+
+Frozen/pushed source78b7c79df548bfe45812f4fe349a62cc377a9d6e is installed.
+Complete May2023 /MT SDK81436 exits0; frozen alias ASAN29308+camera12,
+144 generated programs/1272 checks and full backup/render lifecycle ASAN pass.
+Retained panel/client34 and isolated77/81→78/81 deployment/restore67 pass.
+510 archived source hashes unchanged. Fresh AE0 preceded publication22:02:29+08;
+independent proof22:03:39+08 verifies installed10 native/18 paired/27 full CEP,
+Core selector, frozen510 and backup10/18. No AE start/stop/script dispatch.
+Evidence: artifacts/prepared/m3-17-native78-generation/{source.zip,sdk-build-v2.log,
+sdk-exit-code.txt,alias-asan.log,expression-generation.log,lifecycle-asan.log,
+source-hashes.json,native-bundle/candidate.json}; receipts
+artifacts/m3-17-native78-deploy-{before,after}.json and
+artifacts/m3-17-generation78-installed-proof.json. CEP81 raw files are unchanged.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native78-panel81-generation-20261012' -Restore`.
+Actual AE deletion correction remains unconfirmed; do not call this root-cause
+qualification. Full Motion/Turbulence goal remains unfinished.
 
 Owner accepts CEP81 response/paint ordering and rejects native77 deletion repair.
 Actual native77 journal PID24564 has61 normal guard0 frames,6 guard0 errors at
@@ -8,7 +25,7 @@ stream258, and14 guarded cancellations. Final AEGP binding refresh is therefore
 insufficient. This evidence does not identify the failed node or establish AE's
 cache behavior; old logs contain neither graph CRC nor source UUID.
 
-Candidate closes a concrete protocol gap: graph/receipt have checksums but alias
+This stage closes a concrete protocol gap: graph/receipt have checksums but alias
 programs are unversioned. Explicit UI publication stamps programs with the saved
 graph CRC; a program checks its renderer's receipt before any sibling lookup.
 PF reads graph CRC and both receipt halves, records dependencies and cancels

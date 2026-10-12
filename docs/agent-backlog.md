@@ -2,6 +2,12 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+78/unchanged CEP81 deployed22:02+08 from pushed/frozen78b7c79, installation and
+exact77/81 paired rollback independently verified. See current-state.md for current
+build/hash/evidence. Generation protocol repair passes offline; owner AE correction
+is still unconfirmed. Preserve accepted panel/Circle and all Motion work. No automatic
+AE acceptance requests/runs; no full-goal completion claimed.
+
 Owner accepts CEP81 responsiveness, rejects native77 (guard0/stream258). Actual
 PID24564 evidence:61 normal,6 errors,14 guarded cancellations. Investigate and
 repair graph/receipt/expression generation coherence, preserving accepted panel.
