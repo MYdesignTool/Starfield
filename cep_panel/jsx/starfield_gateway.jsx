@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-77";
+    var GATEWAY_BUILD = "native-presets-78";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -241,7 +241,7 @@
     function transactionBackup(effect) {
         if(!effect)return false;
         var guard=effect.property(effect.matchName===MATCH_NAME?"Panel Graph Sync Guard":"Panel Sync Guard");
-        return !!guard && Number(guard.value)===2;
+        return !!guard && (Number(guard.value)===2 || Number(guard.value)===3);
     }
     function effectCount(layer) {
         if (!layer) return 0;
@@ -1655,6 +1655,24 @@ function createNativeRecordContract() {
         return indices;
     }
 
+    // Originals must remain alive for old render bindings until native graph
+    // publication. Guard3 is excluded from desired inventories but is removed
+    // by the full backup rollback; backup2 is preserved by that rollback.
+    function retireNativeNodeEffects(layer, ids) {
+        var indices=nodeEffectIndices(layer);
+        for(var i=0;i<ids.length;i++){
+            var matches=indices["$"+ids[i]] || [];
+            if(!matches.length)throw new Error("The node to retire is missing: "+ids[i]);
+            for(var j=0;j<matches.length;j++){
+                var effect=layer.property("ADBE Effect Parade").property(matches[j]);
+                var guard=Number(nodeControlValue(effect,"Panel Sync Guard"));
+                if(guard!==0 && guard!==3)throw new Error("The node to retire is busy: "+ids[i]);
+                setNodeControl(effect,"Panel Sync Guard",3);
+                if(Number(nodeControlValue(effect,"Panel Sync Guard"))!==3)throw new Error("The node retirement was not saved: "+ids[i]);
+            }
+        }
+    }
+
     function removeNativeNodeEffects(layer, ids) {
         var indices = nodeEffectIndices(layer), removal = [];
         for (var i = 0; i < ids.length; i++) {
@@ -2106,6 +2124,8 @@ function createNativeRecordContract() {
         } catch (manifestError) {
             return fail("invalid_node_manifest", manifestError.toString());
         }
+        if(removedNodeIds(previousNodes,desiredNodes).length)
+            return fail("node_removal_requires_transaction","Node removal requires the paired full graph transaction.");
         var groupOpen = false;
         var result = null;
         var layer = resolved.target.layer;
@@ -2926,7 +2946,7 @@ function createNativeRecordContract() {
     host.__SFLD_modelTransactionAPI={gatewayBuild:GATEWAY_BUILD,recordContractId:nativeRecords.id,recordSchema:nativeRecords.schema,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
         resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
         validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
-        remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,
+        retire:retireNativeNodeEffects,remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,
         trigger:triggerGraphCarrier,float64:readGraphFloat64};
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };

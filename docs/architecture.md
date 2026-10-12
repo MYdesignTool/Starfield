@@ -1,11 +1,12 @@
 # Starfield 架构
 
-M3-17 deletion candidate74/78 uses full native effect-graph backup for every
+M3-17 deletion stage74/78 deployed11:18+08 uses full native effect-graph backup for every
 removal, including non-Model graphs. Pending original guard3 is excluded from
 authored inventories while the physical source stays alive until publication;
 backup2 retains rollback identity. Verify new graph/aliases before physical
 removal, and restore full state on any failure. Ordinary submit rejects deletion
 before mutation. No ID/type/schema/CoreABI change; ADR0040 defines full pairing.
+Frozen SDK/panel/ASAN/hash/rollback gates pass; actual AE correction remains open.
 
 M3-18 unpublished mapped-time point sampler reads source world matrices at each
 explicit composition time against the current owner frame. Numeric normalized

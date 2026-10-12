@@ -17,7 +17,7 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
-2026-10-12 deletion correction (candidate): ordinary/Model prepare previously
+2026-10-12 deletion correction (native74/CEP78 deployed11:18+08): ordinary/Model prepare previously
 physically removed source effects before graph/binding publication, exposing old
 aliases to missing sources during script-triggered re-render. Owner reports
 parameter-value stream144/error516 though deletion succeeds. This ordering gap
@@ -34,6 +34,10 @@ No parameter ID/type, record schema or CoreABI changes; guard already permits
 signed32 positive values. A complete native74/CEP78 pair is required because old
 native readers do not recognize3. Guard3 is never a successful saved author state.
 Do not suppress dialogs or accept sentinel/missing binding values to hide the gap.
+Frozen41777fc full May2023 ten-module SDK, all-seven panel/delete-render/reload/
+ES3, full backup/Model/asset/Circle/frame ASAN and paired hash/rollback gates pass.
+Actual AE deletion warning correction is not yet confirmed; current-state.md
+records exact receipts, scope and one-step undo.
 
 CEP writes the existing nonce (index41/disk43), then synchronously invokes
 `Starfield Commit Node Graph`. The resident Host finds the unique pending guarded

@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-17 guarded node deletion candidate — 2026-10-12
+## M3-17 guarded node deletion deployed native74 / CEP78 — 2026-10-12
 
 Live77 actual gateway/Model transport with STARFIELD_DOM_DELETE_RENDER=1 fails
 the published-source invariant after removal; isolated78 passes46. Both are fake
@@ -15,7 +15,13 @@ backup-asan,native-model-asan,native-gateway-tests,panel-audit-v2,deployment-tes
 Initial route fixtures used incomplete snapshot and wrong edit name; corrected
 tests use native records/renderer and deleteNodes. Initial audit lacked full
 deletion mock; initial reproduction missed tools-owned extra transport. Preserve
-all logs. Frozen SDK/panel/pair gates and actual AE correction remain pending.
+all logs. Frozen41777fc full May2023 /MT SDK session9803 actualexit0 (ten modules,
+both NoPublish), full panel audit55212 actualexit0, ASAN backup670875/nativeModel9579/
+full Model878567/assetHost150677/Circle2020/frame8438 and dummy rollback67 pass.
+501 source hashes unchanged and all27 panel identical. Installed10/18/27/selector
+and backup10/18 independently verified11:18+08. Frozen logs/terminal receipts:
+artifacts/prepared/m3-17-native74-node-deletion; installed proof:
+artifacts/m3-17-node-deletion78-installed-proof.json. Actual AE correction remains open.
 
 ## M3-18 mapped-time point sampler — 2026-10-12
 

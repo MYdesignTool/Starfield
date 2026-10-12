@@ -2,6 +2,12 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+11:18+08 delivered native74/CEP78 from frozen41777fc: SDK actualsession9803 exit0,
+frozen full panel55212 exit0, full backup/Model/asset/Circle/frame ASAN and dummy
+rollback gates pass;501 source hashes,10/18/27/selector and backup10/18 independently
+verified. No AE start/stop/dispatch. Owner AE correction/undo/reopen still open;
+implementation priority returns to M3-18, full Motion/Turbulence goal active.
+
 Owner accepts Circle mode but reports CEP deletion of almost any node emits
 Starfield animation parameter-value stream144/error516 while deletion succeeds.
 Ordinary gateway removes effects before native publication; Model prepare does

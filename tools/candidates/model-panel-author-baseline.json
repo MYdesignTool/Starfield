@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Installed native73/Core ABI9/CEP77 from frozen56f9e36; ordered Force after Motion and Speed percentages, frozen May2023 ten-module SDK/registration/DOM/ES3/ASAN and paired rollback verified. Actual AE2023 Circle acceptance remains open. artifacts/prepared/m3-18-native73-ordered-force/source.zip retains the tested76-to77 delta.",
-  "basePanel": 77,
+  "status": "Installed native74/Core ABI9/CEP78 from frozen41777fc; full-backup guarded node deletion and post-publication cleanup, frozen May2023 ten-module SDK/registration/DOM/ES3/ASAN and paired rollback verified. Actual AE2023 Circle acceptance remains open. artifacts/prepared/m3-17-native74-node-deletion/source.zip retains the tested77-to78 delta.",
+  "basePanel": 78,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "D033E17BE6AB21D289FC3AAB11A1B007EB91BEAB9BE77F7A665E86388E7FA4A9"
+      "normalizedSha256": "0E4A0C381F5D42CE669D1616974B5B0A61FCC7E1C6D3A6AC436911A4B8157A5A"
     },
     {
       "path": "css/panel.css",
@@ -29,19 +29,19 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "914638DF6E670F551A7E513FDAB85B62DC3AEA153F90233323392F22A5AE3EE3"
+      "normalizedSha256": "100D27C1CC4F44F06ACDC712760C569ABE3BCD9CC36F49EEC3FE68010E6A8648"
     },
     {
       "path": "js/graph_transactions.js",
-      "normalizedSha256": "B5F464EBF61B9B9F9FD618F20AE7AD0D18745E456B1E762270046F09132B7C6A"
+      "normalizedSha256": "12C9ADE1C9ADA24F3E9A100B0CEDEF3ABBDAA2CCBA7AF22C77231950E3EA8ACB"
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "680C411DC79D92AA0393D7C201A6006C21435CA65E11C2C09530DB2CB40F35AC"
+      "normalizedSha256": "DAB03205D4CE02795F4E5759268A2B63FD977B1568DB2C5F4CDCE68D36E03D5A"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "9EB4CB7D99D37BE0A8F130D56771C10BF1843A9138CCDC9103F5D90C58B4A82F"
+      "normalizedSha256": "3463214C6396DA48885C5905AF00DB929D3021E1CDB6282AACF1D6C08898DC90"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "B4FA533CA727A480E1E0459172D3582A8CEB29B10F3E8E43BA602528375742DB"
+      "normalizedSha256": "AEB9BD96CDD4AA1C80241700766A0FC20E62C3FCA8DF23C1C52DB851E07F3193"
     }
   ]
 }

@@ -190,8 +190,9 @@
             var previous=api.snapshot(resolved).nativeNodes;
             step="ensure node effects";
             api.ensure(resolved.target.layer,s.request.nodeManifest,true,previous,true);
-            step="remove previous node effects";
-            api.remove(resolved.target.layer,api.removed(previous,s.request.nodeManifest));
+            step="retire previous node effects";
+            s.removedNodes=api.removed(previous,s.request.nodeManifest);
+            api.retire(resolved.target.layer,s.removedNodes);
             step="read prepared nodes";
             var fresh=target(s,1,false),prepared=api.snapshot(fresh);
             s.preparedNodes=plain(prepared.nativeNodes);s.preparedRenderer=plain(prepared.renderer);return "1";
@@ -215,6 +216,8 @@
             if(!updated.initialized || updated.revision<=s.beforeRevision)throw new Error("Native graph acknowledgement is not current.");
             step="verify published records";
             records(s.request.nodeManifest,updated.nativeNodes,false);renderer(s.request.rendererManifest,updated.renderer);
+            step="remove retired node effects";
+            api.remove(fresh.target.layer,s.removedNodes || []);
             s.result={ok:true,committed:true,operation:"submitGraph",target:{token:fresh.token},snapshot:updated,nonce:receipt.nonce};
             s.state="published";s.assets=[];return "1";
         }catch(error){s.message="Model commit / "+step+": "+error.toString();return "0";}};

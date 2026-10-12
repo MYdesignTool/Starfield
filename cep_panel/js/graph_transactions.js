@@ -268,7 +268,9 @@
                             .sort(function(a,b){return Number(a.key)-Number(b.key);})};
                     }).sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0;});
                 }
-                var needsModelTransaction=JSON.stringify(modelResources(transaction.baseNodeManifest))!==JSON.stringify(modelResources(transaction.nodeManifest)) ||
+                var remainingIds={};transaction.nodeManifest.forEach(function(n){remainingIds[n.id]=true;});
+                var removesNodes=transaction.baseNodeManifest.some(function(n){return !remainingIds[n.id];});
+                var needsModelTransaction=removesNodes || JSON.stringify(modelResources(transaction.baseNodeManifest))!==JSON.stringify(modelResources(transaction.nodeManifest)) ||
                     (authoredEdit.modelAssetsToRestore || []).length>0 || (authoredEdit.modelResourceCopies || []).length>0;
                 if(!needsModelTransaction){call("submitGraph",transaction,confirmed);return;}
                 if(!modelTransactions || !modelAssets){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}

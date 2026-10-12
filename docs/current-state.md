@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## M3-17 deletion transaction native74 / CEP78 candidate — 2026-10-12
+## M3-17 deletion transaction native74 / CEP78 deployed — 2026-10-12 11:18+08
 
 Owner reports native73/CEP77 Circle accepted, but CEP deletion of nearly any node
 shows Starfield animation parameter-value stream144/error516 with delivered0;
@@ -28,9 +28,28 @@ Dummy73/77→74/78 publication/full rollback67 and all27 candidate reproduction
 hashes pass. Logs: artifacts/m3-17-node-deletion-*; full audit v2 succeeds after
 its old fixture assumed ordinary deletion and lacked Model transport. Candidate
 reproduction v1 omitted the tools-owned Model transport; v2 corrects that source,
-retaining both failed logs. No installed files changed; native73/CEP77 remains.
-Next source freeze/full ten-module May2023 SDK/frozen gates and paired deployment.
-M3-17 repair priority; resume M3-18/M3-19 after delivery, full goal remains active.
+retaining both failed logs. Source41777fcfe285c5ff1b5105c2122550c08e8e1323 is pushed/
+git-archive frozen. Full May2023 /MT ten-module SDK with both NoPublish switches
+completes actual session9803 exit0. Frozen backup670875/nativeModel9579/full Model
+transaction878567/assetHost150677/Circle2020/Motion frame8438 ASAN, dummy paired
+rollback67 and full seven-kind panel/delete-render/reload/ES3 audit session55212
+actualexit0 pass. All501 source hashes unchanged, guard header/native inputs in
+fingerprint, all27 frozen/tested CEP files identical. Receipts/logs:
+artifacts/prepared/m3-17-native74-node-deletion/{sdk-build,panel-audit,backup-asan,
+native-model-asan,model-transaction-asan,model-asset-host-asan,circle-asan,
+motion-frame-asan,deployment-tests}.log; sdk-terminal/panel-audit-terminal/
+regression-terminals/source-hashes.json.
+
+Fresh AE0 at11:17:31 preceded standing-authorized publication11:18:01 through
+the existing two Junctions. Independent10 native/18 paired/27 full CEP/selector
+and backup10/18 match; evidence artifacts/m3-17-node-deletion78-installed-proof.json
+and m3-17-native74-deploy-{before,after}.json. Live recipe normalized78, frozen
+source retains77→78 delta. No AE start/stop or script dispatch. Actual AE23.5x52
+deletion warning correction/undo/reopen remain open; Circle mode owner acceptance
+at73/77 retained, no claim that subsequent host correction was tested.
+M3-17 repair delivered; resume M3-18/M3-19, full goal remains active.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native74-panel78-node-deletion-20261012' -Restore`.
 
 ## M3-18 mapped-time point sampler candidate — 2026-10-12
 
