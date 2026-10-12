@@ -18,6 +18,10 @@ Push-Location $taskRepo
 try{
     $env:STARFIELD_PANEL_ROOT=$taskPanel
     $env:STARFIELD_NODE_CATALOG_DIR=(Join-Path $taskRepo 'artifacts')
+    if([IO.File]::ReadAllText((Join-Path $taskPanel 'jsx/starfield_gateway.jsx')).Contains('retire:retireNativeNodeEffects')){
+        $env:STARFIELD_DOM_DELETE_RENDER='1'
+        Run-AuditCommand 'node_deletion_transaction_tests' { & node tests/node_deletion_transaction_tests.js }
+    }
     foreach($taskKind in @('Emitter','Particle','Force','Transform')){
         $env:STARFIELD_TEST_NODE_CATALOG='1'
         & powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 -NodeEffects -NodeKind $taskKind *> ('artifacts/m3-17-full-audit-catalog-'+$taskKind.ToLowerInvariant()+'.log')
@@ -65,7 +69,7 @@ try{
     Run-AuditCommand 'dom-gateway-reloaded-during-commit' { & node tests/model_graph_gateway_dom_tests.js }
     Write-Output "Model panel audit passed; logs: $taskLogRoot; actual AE acceptance remains separate."
 }finally{
-    foreach($taskVariable in @('STARFIELD_PANEL_ROOT','STARFIELD_NODE_CATALOG_DIR','STARFIELD_TEST_NODE_CATALOG','STARFIELD_DOM_FULL_GRAPH','STARFIELD_DOM_STABLE_EFFECTS','STARFIELD_DOM_INVALIDATE_COMMIT','STARFIELD_DOM_LEGACY_KIND','STARFIELD_DOM_REORDER_CONNECTIONS','STARFIELD_DOM_STALE_GATEWAY_API','STARFIELD_DOM_RELOAD_ON_COMMIT','STARFIELD_DOM_MATERIAL','STARFIELD_DOM_MOTION')){
+    foreach($taskVariable in @('STARFIELD_PANEL_ROOT','STARFIELD_NODE_CATALOG_DIR','STARFIELD_TEST_NODE_CATALOG','STARFIELD_DOM_FULL_GRAPH','STARFIELD_DOM_STABLE_EFFECTS','STARFIELD_DOM_INVALIDATE_COMMIT','STARFIELD_DOM_LEGACY_KIND','STARFIELD_DOM_REORDER_CONNECTIONS','STARFIELD_DOM_STALE_GATEWAY_API','STARFIELD_DOM_RELOAD_ON_COMMIT','STARFIELD_DOM_MATERIAL','STARFIELD_DOM_MOTION','STARFIELD_DOM_DELETE_RENDER')){
         Remove-Item -LiteralPath ('Env:'+ $taskVariable) -ErrorAction SilentlyContinue
     }
     Pop-Location

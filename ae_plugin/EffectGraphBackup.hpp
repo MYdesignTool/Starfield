@@ -8,6 +8,9 @@
 
 namespace starfield::adapter {
 inline constexpr double transaction_backup_guard=2;
+// Pending originals remain physically alive until graph/binding publication.
+// Unlike backup2, restore deletes these before reactivating saved authors.
+inline constexpr double transaction_removal_guard=3;
 // UI callback scope only. Caller owns one outer undo group and releases all
 // effect/stream references before calling prepare/restore or ExecuteScript.
 class EffectGraphBackup final {

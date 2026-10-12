@@ -44,7 +44,7 @@ A_Err find_model(const ModelGraphTransactionPlan& plan,const ModelAssetRestore& 
         e=effects->AEGP_GetInstalledKeyFromLayerEffect(raw,&key);if(!e)e=effects->AEGP_GetEffectMatchName(key,match);if(e)return e;
         if(std::strcmp(match,"org.starfieldfx.node.model"))continue;
         double guard{};e=scalar(streams,plan.plugin,raw,native_nodes::sync_guard_index(native_nodes::Kind::model),plan.time,guard);if(e)return e;
-        if(guard==transaction_backup_guard)continue;
+        if(guard==transaction_backup_guard||guard==transaction_removal_guard)continue;
         ModelTransactionId id{};
         for(A_long part=0;part<8;++part){double word{};
             e=scalar(streams,plan.plugin,raw,native_nodes::uuid_first_index(native_nodes::Kind::model)+part,plan.time,word);

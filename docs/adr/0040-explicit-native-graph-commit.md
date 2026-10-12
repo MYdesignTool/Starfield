@@ -17,6 +17,24 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 deletion correction (candidate): ordinary/Model prepare previously
+physically removed source effects before graph/binding publication, exposing old
+aliases to missing sources during script-triggered re-render. Owner reports
+parameter-value stream144/error516 though deletion succeeds. This ordering gap
+is confirmed statically; exact AE callback timing remains unqualified.
+All graph deletions use the existing full native EffectGraphBackup transaction,
+even without Model assets. Reserve transient node guard3 for pending removal,
+distinct from backup2 (which rollback preserves). Native/CEP node inventories and
+asset selection exclude3, while original effects/animation remain alive. Publish
+and verify the desired graph/retired aliases, then remove original IDs. Any failure
+including partial removal returns to the native full backup restore. Ordinary
+submitGraph refuses removal before mutation so direct callers cannot bypass this
+contract. Source edits/additions retain ordinary fast commits when no assets change.
+No parameter ID/type, record schema or CoreABI changes; guard already permits
+signed32 positive values. A complete native74/CEP78 pair is required because old
+native readers do not recognize3. Guard3 is never a successful saved author state.
+Do not suppress dialogs or accept sentinel/missing binding values to hide the gap.
+
 CEP writes the existing nonce (index41/disk43), then synchronously invokes
 `Starfield Commit Node Graph`. The resident Host finds the unique pending guarded
 renderer across the open project, independently of selection. It rejects ambiguity,

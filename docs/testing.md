@@ -1,5 +1,22 @@
 # 测试入口
 
+## M3-17 guarded node deletion candidate — 2026-10-12
+
+Live77 actual gateway/Model transport with STARFIELD_DOM_DELETE_RENDER=1 fails
+the published-source invariant after removal; isolated78 passes46. Both are fake
+DOM render hooks, not reproduced AE callbacks. All seven deletion types use full
+backup routing35. Model actual compiler/binding ASAN9579 includes guard3 exclusion;
+complete effect backup ASAN670875 includes guard3 originals/partial removal with
+full values/animation/ARB restore. Full registration/panel/reload/ES3 audit v2
+session76421 actualexit0 adds the deletion hook to all wrapper/reload cases118..119.
+Dummy73/77→74/78 full deployment/restore67 and27 reproduced panel hashes pass.
+Evidence: artifacts/m3-17-node-deletion-{old77-reproduction,dom,routing-tests-v3,
+backup-asan,native-model-asan,native-gateway-tests,panel-audit-v2,deployment-tests}.log.
+Initial route fixtures used incomplete snapshot and wrong edit name; corrected
+tests use native records/renderer and deleteNodes. Initial audit lacked full
+deletion mock; initial reproduction missed tools-owned extra transport. Preserve
+all logs. Frozen SDK/panel/pair gates and actual AE correction remain pending.
+
 ## M3-18 mapped-time point sampler — 2026-10-12
 
 RunMotionPointCaptureTests.ps1 -Run [-Sanitize] passes5656 with actual May2023

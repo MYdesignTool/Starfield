@@ -156,7 +156,7 @@ bool export_target(Target& target,std::vector<std::uint8_t>& copy) {
         const bool renderer=!std::strcmp(match,"org.starfieldfx.particle"),model=!std::strcmp(match,"org.starfieldfx.node.model");
         if(renderer || model){double guard{};
             if(!read_guard(streams.value,effect,time,renderer?kGraphSyncGuardId:native_nodes::sync_guard_index(native_nodes::Kind::model),guard))return false;
-            if(guard==transaction_backup_guard)continue;
+            if(guard==transaction_backup_guard||guard==transaction_removal_guard)continue;
             if(guard!=0)return false;
             if(renderer)++renderers;
             if(model && read_uuid(streams.value,effect,time,target)){if(model_index!=-1)return false;model_index=index;}}

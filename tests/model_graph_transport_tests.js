@@ -43,7 +43,7 @@ api.ensure=(layer,desired,writeExisting,previous,defer)=>{writes++;if(defer){pre
         nodes=copy(desired).map(n=>{if(n.type===edits.types.model){const old=previous.find(p=>p.id===n.id);return old?{...copy(old),position:n.position,outgoing:n.outgoing}:manifest(cube).find(p=>p.type===edits.types.model) && {...copy(manifest(cube).find(p=>p.type===edits.types.model)),id:n.id,position:n.position,outgoing:n.outgoing};}return n;});
     }else{commits++;if(failedCommit)throw new Error("commit failure");for(const n of desired){if(n.type===edits.types.model && n.parameters.find(p=>p.key==="13").value===1){
         ok(nativeMeshes[n.id]);eq(nativeMeshes[n.id].revision,n.parameters.find(p=>p.key==="2").value);}}nodes=copy(desired);}};
-api.remove=()=>{};api.writeRenderer=(resolved,r)=>{renderer=copy(r);};api.nonce=()=>66;
+api.retire=()=>{};api.remove=()=>{};api.writeRenderer=(resolved,r)=>{renderer=copy(r);};api.nonce=()=>66;
 api.trigger=()=>{publishes++;revision++;if(badSaved)nodes[0].position.x+=10;if(savedMutation)savedMutation(nodes);return realm({ok:true,nonce:66});};
 function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line==="0")return;
     eq(host.__SFLD_modelGraphTransactionV1.state,"queued");

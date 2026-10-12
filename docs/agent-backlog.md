@@ -8,9 +8,21 @@ Ordinary gateway removes effects before native publication; Model prepare does
 the same. Confirm this gap with a reentrant render-at-removal fixture, correct
 both paths and preserve backup/rollback animation state. Own gateway and Model
 transport, relevant clean DOM/transport/transaction fixtures, candidate/build/
-deployment tooling and ADR0040/current-state/testing. Native binding files only
-if evidence requires them. Do not suppress dialogs or accept invalid alias values.
+deployment tooling and ADR0040/current-state/testing. Guard3 integration owns
+EffectGraphBackup.hpp, NativeNodeGraph.cpp, ModelAssetHost.cpp, ModelGraphTransaction.cpp,
+graph_transactions.js and a new node_deletion_transaction_tests.js; backup/native
+fixtures gain pending-removal rollback/filter checks. No ID/schema/CoreABI change.
+Do not suppress dialogs or accept invalid alias values.
 Preserve Motion/MNT files; return to M3-18 after paired repair delivery.
+
+Candidate74/78 implements guard3 pending originals, full backup routing for every
+deletion and post-publication physical cleanup; ordinary direct deletion rejects
+before mutation. Live77 missing-source render hook reproduced exit1;78 DOM46,
+all-kind routing35, nativeModel ASAN9579, fullBackup ASAN670875, seven-registration/
+complete panel audit session76421 exit0, dummy73/77→74/78 rollback67 and27 reproduced
+hashes pass. Frozen SDK/paired publication next; live73/77 kept. First audit and
+candidate reproduction failed from obsolete fixture/missing extra transport;
+corrected v2 logs preserved. Full goal active, actual AE deletion correction open.
 
 M3-18 checkpoint: fd9b285 mapped-time sampler pushed/frozen, full May2023 ten-module
 /MT doubleNoPublish SDK session21353 actualexit0, ASAN5656/8099 and500 raw source

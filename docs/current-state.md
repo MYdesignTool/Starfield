@@ -1,5 +1,37 @@
 # 当前工程状态
 
+## M3-17 deletion transaction native74 / CEP78 candidate — 2026-10-12
+
+Owner reports native73/CEP77 Circle accepted, but CEP deletion of nearly any node
+shows Starfield animation parameter-value stream144/error516 with delivered0;
+deletion appears applied. The latter is ordinary SmartFX delivered-array count,
+not proof the registered stream is missing. Both ordinary submit and Model prepare
+physically removed source effects before graph publication. A render-at-removal
+fixture reproduces a missing published source on live77 (exit1) and passes78.
+The exact AE callback timing remains a hypothesis; do not suppress diagnostics.
+
+All deletions now route through existing complete native backup, with no Model
+assets required. Guard3 marks pending originals (distinct from preserved backup2),
+excluded by compiler/alias source/asset and CEP inventories. Originals/animation
+stay until new graph publication/verification, then physical removal. Partial
+removal failure uses full native restore. Direct ordinary removals reject before
+mutation; additions and parameter edits retain the ordinary path. No ID/type/
+schema/CoreABI9 changes, guard already permits signed32 values. Old native73 does
+not understand3; only publish complete native74/packed32842/CEP78 pairing.
+
+Working actual native Model ASAN9579, full backup ASAN670875 (guard3 and partial
+physical deletion restoration), seven-kind client routing35, DOM replacement/
+render-at-removal46 and full seven-registration/transaction/reload/ES3 audit
+session76421 actualexit0 pass. Native gateway original add/copy/curve/preset/
+rollback/delete-all coverage passes with complete deletion backup simulation.
+Dummy73/77→74/78 publication/full rollback67 and all27 candidate reproduction
+hashes pass. Logs: artifacts/m3-17-node-deletion-*; full audit v2 succeeds after
+its old fixture assumed ordinary deletion and lacked Model transport. Candidate
+reproduction v1 omitted the tools-owned Model transport; v2 corrects that source,
+retaining both failed logs. No installed files changed; native73/CEP77 remains.
+Next source freeze/full ten-module May2023 SDK/frozen gates and paired deployment.
+M3-17 repair priority; resume M3-18/M3-19 after delivery, full goal remains active.
+
 ## M3-18 mapped-time point sampler candidate — 2026-10-12
 
 Owner confirms Circle mode acceptance in deployed73/77. This confirms the mode,

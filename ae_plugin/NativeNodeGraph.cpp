@@ -732,6 +732,7 @@ PF_Err resolve_binding_sources(SuiteSet& suites,AEGP_PluginID id,AEGP_LayerH own
         Kind kind{};const char* type{};std::uint16_t schema{};if(!decode_node_kind(match,kind,type,schema))continue;
         double guard{};if(!read_one_d(suites,id,raw,native_nodes::sync_guard_index(kind),time,guard))return PF_Err_BAD_CALLBACK_PARAM;
         if(guard==transaction_backup_guard){if(has_backups)*has_backups=true;continue;}
+        if(guard==transaction_removal_guard)continue;
         core::Uuid128 uuid{};if(!read_uuid(suites,id,raw,native_nodes::uuid_first_index(kind),time,uuid))return PF_Err_BAD_CALLBACK_PARAM;
         for(auto& node:nodes)if(node.id==core::NodeId{uuid}) {
             if(node.kind!=kind || !node.source_name.empty() || names.back().empty())return PF_Err_BAD_CALLBACK_PARAM;
@@ -1373,7 +1374,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             double transaction_guard{};
             if(!read_one_d(suites,plugin_id,effect.value,native_nodes::sync_guard_index(kind),time,transaction_guard))
                 return PF_Err_BAD_CALLBACK_PARAM;
-            if(transaction_guard==transaction_backup_guard)continue;
+            if(transaction_guard==transaction_backup_guard||transaction_guard==transaction_removal_guard)continue;
             found_node_effects = true;
             if (graph.nodes.size() >= core::kMaxGraphNodes - 1u) return PF_Err_BAD_CALLBACK_PARAM;
 

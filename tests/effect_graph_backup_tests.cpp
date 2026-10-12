@@ -163,6 +163,18 @@ void success_tests(){
     {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(edge)==0);for(const auto& p:parade)if(p->kind>=0 && p->numbers.at(guard(p->kind))==2){UUID output{};output.back()=0xff;CHECK(uuid(*p)!=output);CHECK(uuid(*p)!=UUID{});}CHECK(backup.discard()==0);}no_owned();
 }
 void preflight_tests(){
+    for(unsigned removed=0;removed<=5;++removed){reset();const auto saved=snapshot();
+        {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)==0);
+            unsigned erased{};
+            for(auto it=parade.begin();it!=parade.end();){auto& p=*it;
+                if(p->kind>=0&&p->numbers.at(guard(p->kind))!=transaction_backup_guard){
+                    p->numbers[guard(p->kind)]=transaction_removal_guard;
+                    if(erased++<removed){it=parade.erase(it);continue;}
+                }++it;
+            }
+            CHECK(backup.restore()==0);equals(saved);no_refs();
+        }no_owned();
+    }
     for(const char* missing:{kAEGPEffectSuite,kAEGPStreamSuite,kAEGPDynamicStreamSuite,kAEGPMemorySuite}){reset();missing_suite=missing;const auto saved=snapshot();{EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)!=0);}equals(saved);no_owned();}
     for(unsigned case_id=0;case_id<10;++case_id){reset();
         switch(case_id){case 0:parade[2]->numbers[guard(5)]=1;break;case 1:parade[2]->numbers[guard(5)]=2;break;

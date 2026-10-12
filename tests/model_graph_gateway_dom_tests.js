@@ -18,6 +18,11 @@ const invalidateCommit=process.env.STARFIELD_DOM_INVALIDATE_COMMIT==="1";
 const reloadOnCommit=process.env.STARFIELD_DOM_RELOAD_ON_COMMIT==="1";
 const hasMotion=process.env.STARFIELD_DOM_MOTION==="1";
 let checks=0,epoch=0,arbReads=0,commands=0,undo=0,rejectCommit=false,commits=0,staleReads=0;
+const deletionRender=process.env.STARFIELD_DOM_DELETE_RENDER==="1";
+let publishedBindings=[],missingRenderBindings=0,physicalRemovals=0;
+const rawUuid=e=>Array.from({length:8},(_,i)=>e.properties["Node UUID "+i].value.toString(16).padStart(4,"0")).join("");
+function renderAtRemoval(){if(deletionRender)for(const id of publishedBindings)
+    if(!items.some(e=>e.matchName!==renderer.matchName&&rawUuid(e)===id))missingRenderBindings++;}
 const eq=(a,b,m)=>{checks++;assert.deepEqual(a,b,m);},ok=v=>{checks++;assert.ok(v);};
 const renderer={matchName:"org.starfieldfx.particle",name:"Starfield",properties:mainControls()},items=[renderer];
 function fresh(captured){if(captured!==epoch){staleReads++;throw new ReferenceError("Object is invalid");}}
@@ -41,7 +46,7 @@ function wrap(raw){
         get numProperties(){fresh(captured());return ordered.length;},property(key){fresh(captured());
             if(key==="Model Mesh" || key==="org.starfieldfx.node.model-1503"){arbReads++;throw new Error("CUSTOM_VALUE forbidden");}
             const p=raw.properties[key] || (typeof key==="number"?ordered[key-1]:null);return p?property(p,captured()):null;},
-        remove(){fresh(captured());items.splice(items.indexOf(raw),1);epoch++;}};
+        remove(){fresh(captured());renderAtRemoval();items.splice(items.indexOf(raw),1);epoch++;physicalRemovals++;renderAtRemoval();}};
     if(stableEffects)raw.wrapper=wrapped;
     return wrapped;}
 function modelControls(){const properties=nodeControls();
@@ -73,6 +78,7 @@ const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{a
     executeCommand(id){commands++;if(id!==99)return;
         commits++;const resolved=api.resolve({pinTarget:true,target:{token}}),value=Number(resolved.properties.commit.value);
         resolved.properties.receipt.setValue(rejectCommit?-value:value);if(!rejectCommit)resolved.properties.revision.setValue(Number(resolved.properties.revision.value)+1);
+        if(deletionRender&&!rejectCommit)publishedBindings=copy(api.snapshot(resolved)).nativeNodes.map(n=>n.id);
         if(invalidateCommit)epoch++;
         if(reloadOnCommit){vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;}}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
@@ -118,6 +124,7 @@ let transaction=500;
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,
     target:{token},transactionId:uuid(transaction),changes:[],...fields});}
 function begin(replace){resolved=api.resolve({pinTarget:true,target:{token}});const before=copy(api.snapshot(resolved));
+    if(deletionRender)publishedBindings=before.nativeNodes.map(n=>n.id);
     const desired=copy(before.nativeNodes.find(n=>n.type===edits.types.model)),previousModelId=desired.id;desired.id=uuid(++transaction);desired.position={x:160.456789123,y:90.567891234};
     if(!replace)desired.outgoing=[];
     for(const [key,value] of [[1,Array.from(Buffer.from(desired.id,"hex"))],[2,17],[12,Array.from(raw)],[13,1],[5,[0,45,0]]])desired.parameters.find(p=>p.key===String(key)).value=value;
@@ -227,4 +234,5 @@ pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransac
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
 eq(staleReads,0,"No cached invalid Property may be used after native backup/add/remove.");
+if(deletionRender){ok(physicalRemovals>0);eq(missingRenderBindings,0,"No render-at-removal may resolve a deleted published source.");}
 console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; effect wrapper identity ${stableEffects?"reused":"fresh"}; ${fullGraph?"Emitter/Particle/Model connections":"Model only"}, fractional layout; native writes simulated, no AE qualification`);

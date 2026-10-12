@@ -67,7 +67,7 @@ const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toStri
 function graphFromEffects() {
     const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={};
     const fixture=require("./native_snapshot_fixture.js");
-    for(const effect of items.filter(effect=>effect!==renderer)) {
+    for(const effect of items.filter(effect=>effect!==renderer && ![2,3].includes(effect.properties["Panel Sync Guard"].value))) {
         const c=effect.properties,v=name=>clone(c[name].value),id=readUuid(c,"Node UUID ");
         const kind=effect.matchName.split(".").pop(),node=edits.apply({version:1,nodes:[],edges:[],optionalRecords:[]},
             {type:"addNode",nodeType:kind},()=>id).nodes[0];
@@ -176,7 +176,26 @@ const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleI
 const presets=require(path.join(panelRoot,"js/presets.js"));
 const transactionEdits=Object.assign({},edits,{apply:(graph,edit,nextId)=>edit.type==="applyPreset"?
     presets.apply(graph,edit,nextId):edits.apply(graph,edit,nextId)});
-const client=transactions.create({codec,edits:transactionEdits,idFactory:()=>uuid(next++),call:(op,fields,cb)=>{
+const client=transactions.create({codec,edits:transactionEdits,idFactory:()=>uuid(next++),
+modelTransactions:{apply(transaction,assets,callback){
+    // Mock the separately tested native full EffectGraphBackup; preserve raw
+    // property aliasing, curves and the renderer object across indexed edits.
+    assert.equal(assets.length,0);
+    const saved=structuredClone(items),oldRevision=revision,api=exported.__SFLD_modelTransactionAPI;
+    const request={pinTarget:true,target:{token:"p5-c17-l29"}};undo.begins++;
+    try{if(beforeSubmit){const change=beforeSubmit;beforeSubmit=null;change();}
+        let current=api.resolve(request);current.properties.guard.setValue(1);
+        const previous=api.snapshot(current).nativeNodes,removed=api.removed(previous,transaction.nodeManifest);
+        api.ensure(layer,transaction.nodeManifest,true,previous,true);api.retire(layer,removed);
+        current=api.resolve(request);api.writeRenderer(current,transaction.rendererManifest);
+        const nonce=api.nonce(current.properties.commit,current.properties.receipt),receipt=api.trigger(current,"Test native full transaction","delete",nonce,false);
+        if(!receipt.ok)throw new Error("Rejected native graph commit");
+        api.remove(layer,removed);current=api.resolve(request);current.properties.guard.setValue(0);
+        callback({ok:true,committed:true,target:request.target,snapshot:api.snapshot(current)});
+    }catch(error){items.splice(0,items.length);Object.assign(renderer,saved[0]);items.push(renderer,...saved.slice(1));epoch++;revision=oldRevision;
+        callback({ok:false,error:{code:"graph_commit_failed",message:String(error)}});
+    }finally{undo.ends++;}
+}},call:(op,fields,cb)=>{
     if(op==="submitGraph"&&beforeSubmit){const change=beforeSubmit;beforeSubmit=null;change();}
     cb(invoke(op,fields));
 }});
