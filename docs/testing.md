@@ -1,5 +1,22 @@
 # 测试入口
 
+## M3-18 light-source / animated-path candidate — 2026-10-12
+
+`tests/RunMotionLightSourcesTests.ps1 -Run [-Sanitize]` standard/ASAN8099:
+actual May2023 suite signatures, Unicode ownership/prefix selection, comp/time
+conversion, existing numeric point capture, every callback failure, cancellation,
+allocation/cleanup failures, names/identity/order and size limits. It runs only
+fake SDK callbacks and does not start AE or qualify a render selector.
+`tests/RunMotionPathGraphTests.ps1 -Run [-Sanitize]` standard/ASAN10336:
+new fixed-distance geometry rate at30/60/120Hz, partial birth, zero birth,
+clamped moving endpoint, reverse/repeat, constant clock vs moving geometry,
+Auxiliary inherited velocity and existing graph/storage/work/failure cases.
+`tests/RunMotionFrameTests.ps1 -Run -Sanitize`4196 passes.
+Logs under artifacts/m3-18-motion-light-sources-*-v3.log,
+motion-path-geometry-*-v2.log and motion-light-frame-asan.log. Full frozen SDK
+and native/history/resource author integration remain pending. Installed
+Circle native72/CEP76 hashes are unchanged; this is no new author deployment.
+
 ## M3-18 Circle native72 / CEP76 deployed — 2026-10-12
 
 RunMotionCircleGraphTests.ps1 -Run [-Sanitize]: standard/ASAN2020 passed;

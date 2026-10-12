@@ -205,7 +205,25 @@ class TemporalEvaluator {
                 auto state=path_history(particle,*nodes.at(id),birth,now,seed);if(!state.has_value())return M::failure(state.error());
                 const auto path=state.take_value();
                 if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Light Path query work limit");
-                auto moved=path.path->apply_at_distance(particle,path.distance,path.rate,graph.sprite_bases);if(!moved.has_value())return moved;continue;
+                auto moved=path.path->apply_at_distance(particle,path.distance,path.rate,graph.sprite_bases);if(!moved.has_value())return moved;
+                // A clock proof certifies speed/curve/delay, not path geometry.
+                // Differentiate geometry at fixed distance so an animated path
+                // contributes to the velocity inherited by Auxiliary particles.
+                if(path.distance!=0&&now>birth){
+                    if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"Light Path geometry rate work limit");
+                    const auto previous_time=std::max(birth,now-1/hz);
+                    auto previous=path_at(stage,previous_time);if(!previous.has_value())return M::failure(previous.error());
+                    auto current_sample=path.path->travel_at_distance(path.distance,0);
+                    auto previous_sample=previous.value()->travel_at_distance(path.distance,0);
+                    if(!current_sample.has_value())return M::failure(current_sample.error());
+                    if(!previous_sample.has_value())return M::failure(previous_sample.error());
+                    const auto p=current_sample.value().displacement,q=previous_sample.value().displacement;
+                    const auto dt=now-previous_time;
+                    particle.velocity={particle.velocity.x+(p.x-q.x)/dt,
+                        particle.velocity.y+(p.y-q.y)/dt,particle.velocity.z+(p.z-q.z)/dt};
+                    if(!motion_circle_detail::bounded(particle.velocity))return M::failure(ErrorCode::invalid_request,"Light Path geometry velocity exceeds bounds");
+                }
+                continue;
             }
             if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"Motion Circle history cancelled");
             auto proof=constant_circles.find(id);

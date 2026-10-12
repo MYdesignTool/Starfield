@@ -23,6 +23,46 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ## Scope and evidence
 
+### Next light-source and animated-path seam — 2026-10-12
+
+The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
+confirms Starting With filters lights by a name prefix. The question on that
+page reports a script input prompt displaying All...; it is evidence about
+the reference UI, not authorization to execute a reference script. This removes
+the need to infer a dropdown menu. Exact-case UTF-16 prefix matching and empty
+prefix=all are independent matcher decisions; original case/empty sentinel,
+eligible light kinds/activity, Light Path units/delay/end behavior and Look At
+selection among multiple matches still need reference/owner confirmation.
+
+`MotionLightSources` reads the owner's composition at converted PF time using
+the May2023 PFInterface1/Layer9/Memory1 suites. It returns owned UTF-16 names,
+stable layer IDs, composition indices and activity flags, in composition order.
+It neither selects a public Motion mode nor constructs a target/path. Up to256
+lights/4096 name units are bounded; invalid identities/order/name handles,
+duplicate IDs, missing callbacks, cancellation, allocation and cleanup errors
+preserve the caller's output. Every acquired suite and name handle has callback-
+local cleanup; no layer edits, script execution, caches, idle hook or SDK handle
+retention is added. The separate prefix matcher performs no host calls and
+returns stable IDs; selected IDs feed the existing explicit point-capture seam.
+
+Temporal numeric Light Path now adds a geometry velocity term to its path-clock
+velocity: at fixed current travel distance, difference the current and previous
+path displacement over a backward interval <=one history tick, clipped at
+birth. Clock metadata certifies only speed/curve/delay; it does not certify path
+points. Static geometry yields zero added rate; a moving clamped endpoint can
+still have geometry velocity. Zero travel/birth has zero geometry term. This
+is a30/60/120Hz approximation of the existing relative-displacement equation,
+not a claim about original endpoint/absolute-path behavior. It is charged to
+the existing work/storage/cancellation budget and preserves immutable leases.
+Auxiliary children inherit this full numeric velocity at their own birth time.
+
+No public parameter IDs, graph schema, snapshot, Core C ABI or selector/flag
+change accompanies this seam. Neither Light Path nor Look At is advertised by
+native72/CEP76. Before author publication, wire immutable source snapshots and
+historical samples through native bindings, pre-render/shutter state and cache
+GUID/dependencies; qualify the selected suite callbacks on AE2023. A source
+inventory alone is not that integration and does not qualify a host.
+
 ### Circle author decisions — 2026-10-12
 
 The owner confirms Origin Type has exactly Point, Particle Origin and Emitter

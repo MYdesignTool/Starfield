@@ -1,5 +1,20 @@
 # 当前工程状态
 
+## M3-18 next light-source / animated-path candidate — 2026-10-12
+
+Current owned source adds read-only MotionLightSources inventory/prefix selection
+and the missing temporal Light Path geometry velocity, including Auxiliary
+inheritance. Official Staff confirms Starting With is a name-prefix input;
+Light Path end/units/delay and Look At multi-target policies remain open.
+Standard/ASAN inventory8099 and numeric Path10336, ordered frame ASAN4196 pass;
+first failing logs preserve incorrect test coordinate and zero-birth expected
+division diagnoses. See ADR0039 and artifacts/m3-18-motion-light-sources-*-v3.log,
+motion-path-geometry-*-v2.log, motion-light-frame-asan.log. The source is not yet
+frozen through a full SDK build. Installed native72/CEP76 remains the Circle
+pair from09b84a2, independently hash-verified after this work. No new modes,
+IDs/schema/ABI/flags, host edits or AE process/script operations are introduced.
+Keep M3-18/complete goal active; integrate resource/history/dependencies next.
+
 ## M3-18 Circle native72 / CEP76 deployed — 2026-10-12 01:42+08
 
 native72/CEP76 adds independent Motion kind7/binding9 and the

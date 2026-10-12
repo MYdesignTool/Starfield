@@ -87,7 +87,7 @@ void graph(){auto plain=base(),g=plain;attach(g,path());auto old=evaluate(plain)
     same(r,evaluate(take(deserialize_graph(take(serialize_graph(g,particle_node_registry())),particle_node_registry()))));
     Sampler s(g);same(r,temporal(s));check(s.proof_calls==1,"metadata queried once");
     for(auto [key,count]:s.calls)check(count==1,"one numeric node sample per time");
-    Sampler proved(g);proved.proof=true;same(r,temporal(proved));check(proved.calls.size()==1,"constant clock removes midpoint sampling");
+    Sampler proved(g);proved.proof=true;same(r,temporal(proved));check(proved.calls.size()==2,"constant clock removes midpoint sampling but does not certify geometry");
     set(node(g,3),kMotionPathDelay,.5);r=evaluate(g);for(unsigned i=0;i<r.particles.size();++i){auto age=old.particles[i].age_seconds;
         near(r.particles[i].position.y,old.particles[i].position.y+.4*std::max(0.,age-.5),"delay displacement");
         near(r.particles[i].velocity.y,old.particles[i].velocity.y+(age>=.5?.4:0),"delay derivative");}
@@ -127,6 +127,46 @@ void history(){auto g=base();attach(g,path());Sampler s(g);s.change=[](GraphNode
             while(t<1){const auto end=std::min(1.,(std::floor(t*frequency+1e-8)+1)/frequency);const auto mid=(t+end)/2;integral+=(.2+.3*mid*mid)*(end-t);t=end;}
             near(value.particles[i].position.y,p.position.y+integral,"absolute lattice partial birth/delay interval");}
     }
+}
+void animated_geometry(){
+    auto control=base();set(node(control,1),kBirthRate,1.);set(node(control,1),kEmittingMode,std::uint32_t{1});
+    auto g=control;attach(g,path());
+    const auto moving=[](GraphNode& n,double t){if(n.type_key==kMotionNode)set(n,kMotionPathPoints,
+        points({{5+t,7-t,9},{5+t+10*std::cos(t),7-t+10*std::sin(t),9}}));};
+    for(unsigned frequency:{30u,60u,120u})for(bool clock_proof:{false,true}){
+        set(node(g,255),kTimeSamplingHz,frequency);Sampler sampler(g);sampler.proof=clock_proof;
+        for(auto time:{RationalTime{0,1},RationalTime{13,1000},RationalTime{3,4},RationalTime{5,4},RationalTime{3,4}}){
+            const auto now=double(time.value)/time.scale;sampler.calls.clear();
+            sampler.change=[&](GraphNode& n,double t){check(t>=0&&t<=now,"geometry never samples before birth or after request");moving(n,t);};
+            const auto value=temporal(sampler,time),plain=evaluate(control,time);check(value.particles.size()==1&&plain.particles.size()==1,"single moving-path particle");
+            const auto& p=value.particles[0];const auto& original=plain.particles[0];const auto distance=.4*now;
+            near(p.position,Vec3{original.position.x+distance*std::cos(now),original.position.y+distance*std::sin(now),original.position.z},"animated path displacement");
+            const auto dt=std::min(now,1./frequency);Vec3 geometry{};
+            if(dt>0)geometry={distance*(std::cos(now)-std::cos(now-dt))/dt,distance*(std::sin(now)-std::sin(now-dt))/dt,0};
+            near(p.velocity,Vec3{original.velocity.x+.4*std::cos(now)+geometry.x,original.velocity.y+.4*std::sin(now)+geometry.y,original.velocity.z},"fixed-distance geometry derivative",1e-8);
+            const auto again=temporal(sampler,time);near(again.particles[0].velocity,p.velocity,"reverse/repeated frame velocity");
+        }
+    }
+    auto endpoint=control;attach(endpoint,path(3,4));Sampler capped(endpoint);capped.proof=true;
+    capped.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode)set(n,kMotionPathPoints,points({{3*t,5,7},{3*t,6+t,7}}));};
+    auto value=temporal(capped);auto plain=evaluate(control);near(value.particles[0].position,Vec3{plain.particles[0].position.x,plain.particles[0].position.y+2,plain.particles[0].position.z},"clamped endpoint moves with shape");
+    near(value.particles[0].velocity,Vec3{.1,.8,.05},"clamped endpoint still has geometry velocity",1e-8);
+    Sampler invalid(g);invalid.proof=true;invalid.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode&&t<1)set(n,kMotionPathPoints,OpaqueBytes{std::byte{1}});};
+    auto failed=evaluate_temporal_particle_graph(g,{1,1},never,{},invalid);check(!failed.has_value()&&failed.error().code==ErrorCode::invalid_request,"previous geometry errors are preserved");
+    struct Flag final:Cancellation{bool stop{};bool is_cancelled()const noexcept override{return stop;}} flag;
+    Sampler cancelled(g);cancelled.proof=true;cancelled.change=[&](GraphNode& n,double t){if(n.type_key==kMotionNode&&t<1)flag.stop=true;};
+    failed=evaluate_temporal_particle_graph(g,{1,1},flag,{},cancelled);check(!failed.has_value()&&failed.error().code==ErrorCode::cancelled,"previous geometry cancellation is preserved");
+    auto child_emitter=node(g,1);child_emitter.id=nid(4);set(child_emitter,kEmittingMode,std::uint32_t{0});set(child_emitter,kAuxiliarySource,std::uint32_t{1});set(child_emitter,kBirthRate,2.);
+    set(child_emitter,kInheritVelocity,100.);set(child_emitter,kEmitterOrigin,Vec3{});set(child_emitter,kVelocity,Vec3{});
+    auto child_particle=node(g,2);child_particle.id=nid(5);g.nodes.push_back(child_emitter);g.nodes.push_back(child_particle);
+    g.edges.push_back({eid(30),nid(3),kMotionParticlesOut,nid(4),kEmitterParents});g.edges.push_back({eid(31),nid(4),kEmitterParticles,nid(5),kParticleParticlesIn});g.edges.push_back({eid(32),nid(5),kParticleParticlesOut,nid(255),kOutputParticles});
+    Sampler auxiliary_sampler(g);auxiliary_sampler.proof=true;auxiliary_sampler.change=moving;value=temporal(auxiliary_sampler);
+    unsigned children{};for(const auto& p:value.particles)if(p.emitter_id==nid(4)){
+        ++children;const auto birth=1-p.age_seconds,dt=std::min(birth,1./120),distance=.4*birth;
+        Vec3 geometry{};if(dt>0)geometry={distance*(std::cos(birth)-std::cos(birth-dt))/dt,distance*(std::sin(birth)-std::sin(birth-dt))/dt,0};
+        near(p.velocity,Vec3{.1+.4*std::cos(birth)+geometry.x,
+            -.2+.4*std::sin(birth)+geometry.y,.05},"Auxiliary inherits full animated-path velocity",1e-8);
+    }check(children>0,"animated-path Auxiliary exists");
 }
 void orientation(){auto g=base();attach(g,path());set(node(g,3),kMotionPathOrient,std::uint32_t{1});set(node(g,3),kMotionForward,Vec3{1,0,0});
     set(node(g,2),kParticleShape,std::uint32_t{1});set(node(g,2),kParticleAngles,Vec3{45,30,75});auto r=evaluate(g);
@@ -203,5 +243,5 @@ void failures(){auto g=base();attach(g,path());const auto original=take(serializ
     for(auto& t:threads)t.join();check(good,"concurrent requests deterministic");
 }
 }
-int main()try{packet();graph();history();orientation();auxiliary();rendering();failures();std::printf("motion_path_graph_tests: %u checks passed; explicit numeric path/history, no AE/reference qualification\n",checks);return 0;}
+int main()try{packet();graph();history();animated_geometry();orientation();auxiliary();rendering();failures();std::printf("motion_path_graph_tests: %u checks passed; explicit numeric path/history, no AE/reference qualification\n",checks);return 0;}
 catch(const std::exception& e){std::fprintf(stderr,"motion_path_graph_tests after %u checks: %s\n",checks,e.what());return 1;}

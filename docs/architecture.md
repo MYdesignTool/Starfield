@@ -1,5 +1,13 @@
 # Starfield 架构
 
+M3-18's next unpublished seam inventories light names/IDs/order/activity as
+owned AE-adapter values. Prefix selection returns IDs for the existing numeric
+point capture; target/path/activity policies remain at the author boundary.
+Temporal Light Path adds bounded backwards fixed-distance geometry velocity
+to its clock velocity, including Auxiliary birth inheritance. Resource snapshots,
+native binding/history/shutter/cache GUID dependencies and the remaining two
+authors are still required. No SDK object enters Core or Render.hpp (ADR0039).
+
 M3-18 native72/CEP76 deployed stage adds an independent Motion Circle effect, kind7
 and binding record9, preserving old record readers and CoreABI9. Origin contexts
 are evaluator-local owned numbers; ParticleInstance/Render/snapshot layout is

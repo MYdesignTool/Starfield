@@ -1,5 +1,10 @@
 # 开发路线图
 
+M3-18 next candidate advances shared light inventory/name-prefix selection and
+animated-path velocity. Light Path/Look At source snapshots and native/history/
+cache integration, remaining reference policies and public authors are next;
+numeric/helper checks do not close these requirements or M3-19.
+
 2026-10-12 M3-18 deployed Circle author includes the owner-confirmed three
 Origin Type choices and owner-selected Speed100=one turn/second. Independent
 native kind7 and CEP76 controls/curve passed the frozen native72 ten-module
