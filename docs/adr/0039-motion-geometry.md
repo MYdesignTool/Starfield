@@ -122,6 +122,22 @@ shutter/cache contracts before advertising Light Path.
 
 ### Next light-source and animated-path seam — 2026-10-12
 
+2026-10-13 implementation increment: `capture_motion_light_timing` can optionally
+return the sorted, deduplicated union of every position keyframe's composition
+time across separated XYZ followers. The metadata-only call retains its prior
+first/last-only behavior and does not allocate. Requested keyframe lists are
+bounded to the existing 256-point path geometry capacity; over-cap sources fail
+explicitly instead of silently dropping authored times. These timestamps are
+sampling inputs only. They do not approximate source interpolation, provide
+position samples or establish external-light render/cache dependencies. Light Path
+and Look At remain unadvertised. The owner defers the deletion warning after
+observing it only in graphs with many nodes; that observation establishes no cause.
+The full May 2023 x64 SDK build for this increment completed with exit code 0 under
+both no-publish flags. A focused fake-May2023 callback run passes 4,118 checks for
+the bounded sorted/deduplicated union, separated XYZ followers, allocation failure
+and output preservation. This does not qualify AE behavior; the high-node-count
+warning remains deferred.
+
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
 confirms Starting With filters lights by a name prefix. The question on that
 page reports a script input prompt displaying All...; it is evidence about

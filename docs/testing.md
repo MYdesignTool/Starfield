@@ -16,6 +16,21 @@ Owned implementations/fixtures/helpers are restored to release1a6cf73. Removed79
 timeout and78 generation fixtures are reproducible only in their historical
 commits/archives; the commands below for those withdrawn proposals are historical.
 Accepted CEP81 response/Circle remain; original deletion errors are unresolved.
+Owner observes the deletion warning seems limited to graphs with many nodes;
+defer it as an unconfirmed trigger. The Light Path timing increment has fake-host
+unit evidence only and is not a released/qualified mode. A full May 2023 x64 SDK build
+of the timing increment completed with exit code 0 using
+`-NoDistPublish -NoRuntimePublish`; outputs are under
+`artifacts/plugin/motion-light-timing-20261013/` and
+`artifacts/core-dll/motion-light-timing-20261013/`. This is compile evidence only;
+no automatic AE acceptance was run. The build reported the existing
+`NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
+
+2026-10-13 opt-in keyframe-time union increment: `RunMotionLightTimingTests.ps1 -Run`
+passes 4,118 fake-May2023 callback checks, including sorted/deduplicated
+CompTime union across separated XYZ, the 256-keyframe bound, allocation failure,
+and preservation of caller output. The test does not launch AE or qualify host
+behavior. Full SDK build evidence is recorded above.
 
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 

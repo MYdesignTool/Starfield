@@ -6,6 +6,8 @@ installed hashes match the original pair. Native78/79 repair directions are
 withdrawn. Preserve accepted panel responsiveness/Circle and all other Motion
 work. Original deletion errors and remaining Motion/Turbulence scope stay open.
 No automatic acceptance or new repair deployment accompanies this rollback.
+Owner later observes the deletion warning seems confined to graphs with many
+nodes; defer it without inferring a root cause. Main priority resumes M3-18 Motion.
 
 ## Previous stage records (historical)
 

@@ -18,12 +18,39 @@ receipt reuse and failure restoration, accepted Circle and other Motion work rem
 Unrelated dirty/untracked files were preserved. Original deletion errors remain
 unresolved; this rollback does not qualify a fix or claim that node addition was
 retested. No build, test suite, automatic AE acceptance, launch/stop or script dispatch.
+Owner's follow-up observation is that the deletion warning seems to occur only
+when the graph contains many nodes. Defer this as an unconfirmed trigger for later
+M3-17 investigation; no cause or fix is established.
 
 Evidence: `artifacts/m3-17-native79-owner-rollback.log` and
 `artifacts/m3-17-native79-owner-rejection-restore-proof.json`.
 Executed recovery (AE closed):
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native79-panel82-timeout-restore-20261012' -Restore`.
 The entries below describe previous attempts, not the current deployed pair.
+
+## M3-18 Motion continued — Light Path resource timing foundation — 2026-10-13
+
+The source already contains numeric Circle/Light Path/Look At and ordered graph/
+history evaluation, plus bounded light inventory, mapped-time point capture and
+first/last position-keyframe metadata. Circle is the only accepted author stage.
+Current increment extends the timing adapter with an opt-in, bounded union of
+actual CompTime position keyframe instants across separated XYZ streams; the old
+metadata-only call remains allocation-free. It does not yet sample positions or
+integrate original interpolation, source dependencies, history or cache identity.
+Light Path/Look At remain unadvertised until those resource and author paths work
+end to end. Next connect these times to per-light MotionPointCapture and temporal
+resource/cache state, then implement a complete Light Path author stage.
+
+The full May 2023 x64 SDK build for this source completed with exit code 0 using
+`-NoDistPublish -NoRuntimePublish`; outputs are under
+`artifacts/plugin/motion-light-timing-20261013/` and
+`artifacts/core-dll/motion-light-timing-20261013/`. The build includes all native
+modules and Core, and does not qualify AE behavior. The focused fake-callback
+timing suite passes 4,118 checks; no AE instance or project was opened. MSVC
+reported the existing `NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
+
+The high-node-count deletion warning stays deferred. No automatic AE acceptance
+or process action accompanies this Motion work.
 
 ## M3-17 native79 / CEP82 deployed — 2026-10-12 23:56+08
 

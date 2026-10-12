@@ -15,6 +15,10 @@ iteration of those proposals. Original deletion errors remain unresolved; this
 card and the full Motion/Turbulence goal are not completed by rollback.
 Current pairing and rollback evidence: docs/current-state.md.
 
+Owner's follow-up observation: deletion warnings seem limited to graphs with many
+nodes. Defer the issue for later investigation; it is not reproduced or assigned
+a root cause. Continue the main M3-18 Motion task below.
+
 ## M3-17 — previous deletion repair attempts (historical)
 
 79/82 deployed23:56+08 from pushed/frozen2b541c5; installed and exact recovered
@@ -498,7 +502,21 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 导入源码da76183冻结完整May2023 /MT八目标通过（显式IncludeModelCandidate/双NoPublish），实际Windows对话框/按钮路由编译；日志artifacts/m3-17-model-import-build.log。十八安装哈希保持native60/CEP61，未部署Model；继续Particle菜单/隔离CEP和预设完整作者，Motion首批在粒子阶段之后。
 
-## M3-18 — Motion 首批（计算层开发中）
+## M3-18 — Motion 首批（活动优先级）
+
+Owner resumed the main task after deferring M3-17's high-node-count deletion
+warning. Numeric Circle/Light Path/Look At and ordered graph/history foundations
+exist; Circle is the only accepted author stage. Current work extends the owned
+MotionLightTiming adapter to return an opt-in bounded union of actual CompTime
+position-keyframe instants, including separated XYZ followers, while preserving
+the allocation-free metadata-only path. This is a prerequisite only: connect
+these instants to per-light MotionPointCapture and temporal resource/cache state,
+then expose one complete Light Path author stage. Do not advertise partial modes.
+The full May 2023 x64 SDK build completed with exit code 0 under both no-publish
+flags; see artifacts/plugin/motion-light-timing-20261013 and
+artifacts/core-dll/motion-light-timing-20261013. No automatic AE acceptance
+request or run. The focused fake-callback timing suite passes 4,118
+checks for sorted/deduplicated separated-XYZ keyframe union and bounded failures.
 
 Mapped-time point sampling owns ae_plugin/MotionPointCapture.hpp/.cpp and tests/motion_point_capture_tests.cpp, RunMotionPointCaptureTests.ps1/RunMotionLightSourcesTests.ps1 dependency lines. Keep the current-time API unchanged; add explicit source composition time per request, owner frame at current converted PF time, cache by source identity/time and owned normalized output. ADR0039 records the seam before code changes; no author/ID/ABI/flags or deployment until timed resource integration is complete.
 

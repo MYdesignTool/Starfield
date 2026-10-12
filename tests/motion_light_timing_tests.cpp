@@ -8,8 +8,8 @@
 #include <iostream>
 #include <limits>
 #include <new>
-namespace {std::atomic<unsigned> allocations{};}
-void* operator new(std::size_t n){++allocations;if(auto* p=std::malloc(n?n:1))return p;throw std::bad_alloc{};}
+namespace {std::atomic<unsigned> allocations{};bool fail_allocation{};}
+void* operator new(std::size_t n){++allocations;if(fail_allocation){fail_allocation=false;throw std::bad_alloc{};}if(auto* p=std::malloc(n?n:1))return p;throw std::bad_alloc{};}
 void operator delete(void* p)noexcept{std::free(p);}
 void operator delete(void* p,std::size_t)noexcept{std::free(p);}
 using namespace starfield::adapter;using namespace starfield::core;
@@ -23,7 +23,7 @@ unsigned calls{},fail_at{},active_suites{},acquired{},released{},active_refs{},d
 bool leader=true,separated{},no_owner{},no_comp{},no_source{},wrong_comp{},wrong_id{},failed_leader{},failed_follower{};
 int null_ref=-1,bad_follower=-1;AEGP_ObjectType object_type=AEGP_ObjectType_LIGHT;AEGP_LightType light_type=AEGP_LightType_POINT;
 AEGP_StreamType stream_type=AEGP_StreamType_ThreeD_SPATIAL;
-std::array<A_long,4> counts{};std::array<A_Time,4> starts{},ends{};
+std::array<A_long,4> counts{};std::array<A_Time,4> starts{},ends{};std::array<std::array<A_Time,256>,4> key_times{};
 AEGP_LayerH owner(){return reinterpret_cast<AEGP_LayerH>(1);}AEGP_LayerH source(){return reinterpret_cast<AEGP_LayerH>(2);}
 AEGP_CompH comp(unsigned n=42){return reinterpret_cast<AEGP_CompH>(static_cast<std::uintptr_t>(n));}
 unsigned index(AEGP_StreamRefH h){return static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(h)-1);}
@@ -32,7 +32,7 @@ AEGP_StreamRefH create_ref(unsigned i){if(static_cast<int>(i)==null_ref)return n
 void reset(){
     calls=fail_at=active_suites=acquired=released=active_refs=disposed=cleanup_calls=cleanup_fail=null_suite=0;
     leader=true;separated=no_owner=no_comp=no_source=wrong_comp=wrong_id=failed_leader=failed_follower=false;
-    null_ref=bad_follower=-1;object_type=AEGP_ObjectType_LIGHT;light_type=AEGP_LightType_POINT;stream_type=AEGP_StreamType_ThreeD_SPATIAL;
+    null_ref=bad_follower=-1;object_type=AEGP_ObjectType_LIGHT;light_type=AEGP_LightType_POINT;stream_type=AEGP_StreamType_ThreeD_SPATIAL;fail_allocation=false;key_times={};
     counts={4,2,0,3};starts={A_Time{30,60},A_Time{-15,30},A_Time{},A_Time{4,1}};ends={A_Time{180,60},A_Time{9,6},A_Time{},A_Time{20,5}};
     basic={};basic.AcquireSuite=[](const char* name,int32 version,const void** out)->A_Err {
         if(auto e=step())return e;unsigned id{};
@@ -63,7 +63,8 @@ void reset(){
     };
     keys={};keys.AEGP_GetStreamNumKFs=[](AEGP_StreamRefH h,A_long* out)->A_Err {CHECK(active_refs&(1u<<index(h)));if(auto e=step())return e;*out=counts[index(h)];return 0;};
     keys.AEGP_GetKeyframeTime=[](AEGP_StreamRefH h,AEGP_KeyframeIndex key,AEGP_LTimeMode mode,A_Time* out)->A_Err {
-        const auto i=index(h);CHECK(mode==AEGP_LTimeMode_CompTime&&key>=0&&key<counts[i]);CHECK(key==0||key==counts[i]-1);if(auto e=step())return e;*out=key==0?starts[i]:ends[i];return 0;
+        const auto i=index(h);CHECK(mode==AEGP_LTimeMode_CompTime&&key>=0&&key<counts[i]);if(auto e=step())return e;
+        *out=key==0?starts[i]:key==counts[i]-1?ends[i]:key_times[i][static_cast<std::size_t>(key)];return 0;
     };
     data={};data.effect_ref=reinterpret_cast<PF_ProgPtr>(7);data.pica_basicP=&basic;
 }
@@ -88,6 +89,23 @@ void modes(){
     for(unsigned axis=1;axis<=3;++axis){reset();separated=true;counts.fill(0);counts[axis]=1;starts[axis]={static_cast<A_long>(axis),2};CHECK(run(out)==0);CHECK(out.position_keyframes==1);CHECK(compare(out.first_keyframe,{axis,2})==0&&compare(out.first_keyframe,out.last_keyframe)==0);balanced();}
     reset();separated=true;counts.fill(0);CHECK(run(out)==0);CHECK(out.separated&&out.position_keyframes==0);time(out.first_keyframe,{0,1});time(out.last_keyframe,{0,1});balanced();
 }
+void keyframe_time_lists(){
+    reset();counts[0]=4;starts[0]={6,2};key_times[0][1]={2,2};key_times[0][2]={4,2};ends[0]={8,2};
+    MotionLightTiming out{};CHECK(capture_motion_light_timing(&data,17,1001,never,out,true)==PF_Err_NONE);
+    CHECK(out.keyframe_times.size()==4);time(out.keyframe_times[0],{1,1});time(out.keyframe_times[1],{2,1});
+    time(out.keyframe_times[2],{3,1});time(out.keyframe_times[3],{4,1});time(out.first_keyframe,{1,1});time(out.last_keyframe,{4,1});balanced();
+
+    reset();separated=true;counts={0,4,3,2};starts[1]={0,1};ends[1]={3,1};key_times[1][1]={1,1};key_times[1][2]={2,1};
+    starts[2]={1,1};ends[2]={4,1};key_times[2][1]={2,1};starts[3]={0,1};ends[3]={4,1};
+    CHECK(capture_motion_light_timing(&data,17,1001,never,out,true)==PF_Err_NONE);CHECK(out.separated&&out.position_keyframes==9);
+    CHECK(out.keyframe_times.size()==5);for(std::size_t i=0;i<5;++i)time(out.keyframe_times[i],{static_cast<std::int64_t>(i),1});balanced();
+
+    reset();counts[0]=257;auto unchanged=sentinel();CHECK(capture_motion_light_timing(&data,17,1001,never,unchanged,true)==PF_Err_BAD_CALLBACK_PARAM);
+    CHECK(same(unchanged,sentinel()));balanced();
+
+    reset();counts[0]=2;starts[0]={0,1};ends[0]={1,1};unchanged=sentinel();fail_allocation=true;
+    CHECK(capture_motion_light_timing(&data,17,1001,never,unchanged,true)==PF_Err_OUT_OF_MEMORY);CHECK(same(unchanged,sentinel()));balanced();
+}
 void failures(){
     for(bool split:{false,true}){
         reset();separated=split;ends[3]={25,5};auto out=sentinel();CHECK(run(out)==0);const auto baseline=calls;
@@ -108,4 +126,4 @@ void failures(){
     for(unsigned test=0;test<3;++test){reset();out=sentinel();if(test==0)data.pica_basicP=nullptr;else if(test==1)basic.AcquireSuite=nullptr;else basic.ReleaseSuite=nullptr;CHECK(run(out)==PF_Err_BAD_CALLBACK_PARAM);preserved(out);}
 }
 }
-int main(){modes();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}
+int main(){modes();keyframe_time_lists();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}

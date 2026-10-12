@@ -2,6 +2,8 @@
 #include "SPBasic.h"
 #include "starfield/core/Render.hpp"
 #include <array>
+#include <algorithm>
+#include <new>
 #include <utility>
 
 namespace starfield::adapter {
@@ -38,7 +40,7 @@ struct Streams {
 };
 }
 PF_Err capture_motion_light_timing(PF_InData* data,AEGP_PluginID plugin,std::uint32_t id,
-    const core::Cancellation& cancel,MotionLightTiming& output) noexcept {
+    const core::Cancellation& cancel,MotionLightTiming& output,bool include_keyframe_times) noexcept try {
     if(!data||!data->effect_ref||plugin<=0||!id||id>0x7fffffffu||!data->pica_basicP||
        !data->pica_basicP->AcquireSuite||!data->pica_basicP->ReleaseSuite)return PF_Err_BAD_CALLBACK_PARAM;
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
@@ -89,9 +91,29 @@ PF_Err capture_motion_light_timing(PF_InData* data,AEGP_PluginID plugin,std::uin
         if(count<0)return PF_Err_BAD_CALLBACK_PARAM;
         if(!count)return 0;
         A_Time first{},last{};
-        e=keys->AEGP_GetKeyframeTime(ref,0,AEGP_LTimeMode_CompTime,&first);if(e)return e;
-        if(count==1)last=first;
-        else{e=keys->AEGP_GetKeyframeTime(ref,count-1,AEGP_LTimeMode_CompTime,&last);if(e)return e;}
+        if(include_keyframe_times) {
+            // Match the path geometry's existing 256-control-point bound. Fail
+            // explicitly instead of silently dropping authored keyframe times.
+            if(count>256)return PF_Err_BAD_CALLBACK_PARAM;
+            for(A_long index=0;index<count;++index) {
+                if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+                A_Time key{};e=keys->AEGP_GetKeyframeTime(ref,index,AEGP_LTimeMode_CompTime,&key);if(e)return e;
+                auto instant=core::make_rational(key.value,key.scale);if(!instant)return PF_Err_BAD_CALLBACK_PARAM;
+                const auto position=std::lower_bound(result.keyframe_times.begin(),result.keyframe_times.end(),*instant,
+                    [](core::RationalTime a,core::RationalTime b){return core::compare(a,b)<0;});
+                if(position==result.keyframe_times.end()||core::compare(*position,*instant)!=0) {
+                    if(result.keyframe_times.size()==256)return PF_Err_BAD_CALLBACK_PARAM;
+                    result.keyframe_times.insert(position,*instant);
+                }
+            }
+            if(result.keyframe_times.empty())return PF_Err_BAD_CALLBACK_PARAM;
+            first={static_cast<A_long>(result.keyframe_times.front().value),static_cast<A_u_long>(result.keyframe_times.front().scale)};
+            last={static_cast<A_long>(result.keyframe_times.back().value),static_cast<A_u_long>(result.keyframe_times.back().scale)};
+        } else {
+            e=keys->AEGP_GetKeyframeTime(ref,0,AEGP_LTimeMode_CompTime,&first);if(e)return e;
+            if(count==1)last=first;
+            else{e=keys->AEGP_GetKeyframeTime(ref,count-1,AEGP_LTimeMode_CompTime,&last);if(e)return e;}
+        }
         auto a=core::make_rational(first.value,first.scale),b=core::make_rational(last.value,last.scale);
         if(!a||!b||(count>1&&core::compare(*a,*b)==0))return PF_Err_BAD_CALLBACK_PARAM;
         if(core::compare(*a,*b)>0)std::swap(a,b); // composition-time range, including reversed time mapping
@@ -113,5 +135,6 @@ PF_Err capture_motion_light_timing(PF_InData* data,AEGP_PluginID plugin,std::uin
     error=suites.close();if(error)return static_cast<PF_Err>(error);
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
     output=result;return PF_Err_NONE;
-}
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
