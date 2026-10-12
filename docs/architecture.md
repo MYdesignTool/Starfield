@@ -1,5 +1,11 @@
 # Starfield 架构
 
+M3-18 unpublished mapped-time point sampler reads source world matrices at each
+explicit composition time against the current owner frame. Numeric normalized
+times leave the adapter with points; per-call caches key both identity and time.
+The old current-time API remains. This is sampling infrastructure, not an author
+or Core resource/ABI addition; native history/shutter/dependency integration follows.
+
 M3-18 unpublished MotionLightTiming seam reads a point light's position keyframe
 range, with separated follower timing and owned rational metadata. Only adapter
 code sees Stream/Keyframe/Light suites; callback-local refs release before atomic

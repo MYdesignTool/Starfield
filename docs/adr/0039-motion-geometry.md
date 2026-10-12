@@ -27,6 +27,18 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ### Owner-confirmed flow and Light Path policy — 2026-10-12
 
+Mapped-time point seam (unpublished): each request specifies stable composition
+layer ID, local pixel point and exact rational source composition time. Sample
+source layer-to-world at that time (AE supplies interpolation/parent motion),
+while owner inverse is sampled once at current PF→composition time. Canonical
+coordinates retain existing PAR/Z conventions. Cache matrices by ID plus normalized
+time, not ID alone; owner source uses identity only when requested/current instants
+match. Normalize and reject times that cannot be represented by AE's signed32
+value/unsigned32 positive scale before host calls. Maximum256 requests, atomic
+owned point/time output, callback-local suites and existing cancellation/error
+behavior. Preserve current-time API results. Source policy, clock/end modes,
+resource snapshot/history/shutter/dependencies and author remain integration gates.
+
 Timed point-light metadata seam (unpublished): resolve one explicit stable source
 ID inside the owner's composition, require ObjectType_LIGHT/LightType_POINT,
 read its Position stream and first/last keyframe times in CompTime. Separated XYZ

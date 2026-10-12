@@ -1,5 +1,19 @@
 # 测试入口
 
+## M3-18 mapped-time point sampler — 2026-10-12
+
+RunMotionPointCaptureTests.ps1 -Run [-Sanitize] passes5656 with actual May2023
+headers/fake callbacks. Both current and mapped API cases cover identity/time
+conversion, current owner versus historical source/self, ID/time cache separation
+and rational equivalence, nonlinear source sampling, affine/PAR/reflection,
+256 unique times, AE32-bit time boundary/reduction/rejection, complete callback/
+release failure scans, cancellation through success, allocation and atomic output.
+RunMotionLightSourcesTests -Run -Sanitize8099 passes after adding Time.cpp linkage.
+Evidence: artifacts/m3-18-motion-timed-points-{tests,asan,inventory-regression}.log.
+Initial sandbox launcher failed before starting any test (0x80070020); direct
+approved reruns completed actual exit0. No actual AE interpolation/selector
+qualification or author mode is claimed; full frozen SDK validation is next.
+
 ## M3-18 timed point-light metadata seam — 2026-10-12
 
 RunMotionLightTimingTests.ps1 -Run [-Sanitize]: standard/ASAN4108 passes using

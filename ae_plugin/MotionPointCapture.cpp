@@ -7,6 +7,8 @@
 #include <array>
 #include <cmath>
 #include <new>
+#include <limits>
+#include <type_traits>
 
 namespace starfield::adapter {
 namespace {
@@ -34,20 +36,30 @@ transform_binding::Matrix column_matrix(const A_Matrix4& source) noexcept {
     for(unsigned r=0;r<4;++r)for(unsigned c=0;c<4;++c)result[r*4+c]=source.mat[c][r];
     return result;
 }
+std::optional<A_Time> host_time(core::RationalTime time) noexcept {
+    const auto normalized=core::make_rational(time.value,time.scale);
+    if(!normalized||normalized->value<std::numeric_limits<A_long>::min()||
+       normalized->value>std::numeric_limits<A_long>::max()||
+       normalized->scale>std::numeric_limits<A_u_long>::max())return {};
+    return A_Time{static_cast<A_long>(normalized->value),static_cast<A_u_long>(normalized->scale)};
 }
-PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
-    std::span<const MotionLayerPointRequest> requests,const core::Cancellation& cancellation,
-    std::vector<MotionLayerPoint>& output) noexcept {
+template<class Request,class Point>
+PF_Err capture_points(PF_InData* data,core::LayerUnits units,
+    std::span<const Request> requests,const core::Cancellation& cancellation,
+    std::vector<Point>& output) noexcept {
+    constexpr bool timed=std::is_same_v<Request,MotionTimedLayerPointRequest>;
     if(!data || !data->effect_ref || !data->time_scale || !data->pica_basicP ||
        !data->pica_basicP->AcquireSuite || !data->pica_basicP->ReleaseSuite ||
        !std::isfinite(units.layer_width) || units.layer_width<=0 ||
        !std::isfinite(units.layer_height) || units.layer_height<=0 ||
        !std::isfinite(units.pixel_aspect_ratio) || units.pixel_aspect_ratio<=0 || requests.size()>kMaxMotionPointRequests)
         return PF_Err_BAD_CALLBACK_PARAM;
-    for(const auto& request:requests)
+    for(const auto& request:requests){
         if(!request.layer_id || request.layer_id>0x7fffffff || !bounded(request.local_pixels))return PF_Err_BAD_CALLBACK_PARAM;
+        if constexpr(timed)if(!host_time(request.source_comp_time))return PF_Err_BAD_CALLBACK_PARAM;
+    }
     if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
-    if(requests.empty()){std::vector<MotionLayerPoint>{}.swap(output);return PF_Err_NONE;}
+    if(requests.empty()){std::vector<Point>{}.swap(output);return PF_Err_NONE;}
     try {
         Suites suites{data->pica_basicP};
         auto error=suites.basic->AcquireSuite(kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1,reinterpret_cast<const void**>(&suites.pf));
@@ -75,12 +87,16 @@ PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
         transform_binding::Matrix identity{};identity[0]=identity[5]=identity[10]=identity[15]=1;
         const auto owner_check=transform_binding::relative_anchor_affine(identity,owner_matrix,{});
         if(!owner_check.has_value())return PF_Err_BAD_CALLBACK_PARAM;
-        struct CachedSource {std::uint32_t id;transform_binding::PixelAffine relative;};
+        struct CachedSource {std::uint32_t id;A_Time time;transform_binding::PixelAffine relative;};
         std::array<CachedSource,kMaxMotionPointRequests> cache{};std::size_t cached{};
-        std::vector<MotionLayerPoint> result;result.reserve(requests.size());
+        std::vector<Point> result;result.reserve(requests.size());
         for(const auto& request:requests) {
             if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
-            auto found=std::find_if(cache.begin(),cache.begin()+cached,[&](const auto& value){return value.id==request.layer_id;});
+            auto source_time=time;
+            if constexpr(timed){const auto converted=host_time(request.source_comp_time);if(!converted)return PF_Err_BAD_CALLBACK_PARAM;source_time=*converted;}
+            auto found=std::find_if(cache.begin(),cache.begin()+cached,[&](const auto& value){
+                return value.id==request.layer_id&&value.time.value==source_time.value&&value.time.scale==source_time.scale;
+            });
             if(found==cache.begin()+cached){
                 AEGP_LayerH source{};A_Matrix4 source_world{};
                 error=suites.layer->AEGP_GetLayerFromLayerID(comp,static_cast<AEGP_LayerIDVal>(request.layer_id),&source);
@@ -91,13 +107,14 @@ PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
                 if(!error)error=suites.layer->AEGP_GetLayerParentComp(source,&source_comp);
                 if(error)return static_cast<PF_Err>(error);
                 if(actual!=static_cast<AEGP_LayerIDVal>(request.layer_id) || source_comp!=comp)return PF_Err_BAD_CALLBACK_PARAM;
-                if(source==owner)source_world=owner_world;
-                else {error=suites.layer->AEGP_GetLayerToWorldXform(source,&time,&source_world);if(error)return static_cast<PF_Err>(error);}
-                if(source==owner)cache[cached++]={request.layer_id,{1,0,0,0,0,1,0,0,0,0,1,0}};
+                const bool same_frame=source==owner&&core::compare({source_time.value,source_time.scale},{time.value,time.scale})==0;
+                if(same_frame)source_world=owner_world;
+                else {error=suites.layer->AEGP_GetLayerToWorldXform(source,&source_time,&source_world);if(error)return static_cast<PF_Err>(error);}
+                if(same_frame)cache[cached++]={request.layer_id,source_time,{1,0,0,0,0,1,0,0,0,0,1,0}};
                 else {
                     auto relative=transform_binding::relative_anchor_affine(column_matrix(source_world),owner_matrix,{});
                     if(!relative.has_value())return PF_Err_BAD_CALLBACK_PARAM;
-                    cache[cached++]={request.layer_id,relative.value()};
+                    cache[cached++]={request.layer_id,source_time,relative.value()};
                 }
             }
             const auto& matrix=found->relative;const auto p=request.local_pixels;
@@ -107,6 +124,7 @@ PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
             const auto position=core::layer_point_to_world(pixel.x,pixel.y,pixel.z,units);
             if(!bounded(position))return PF_Err_BAD_CALLBACK_PARAM;
             result.push_back({request.layer_id,position});
+            if constexpr(timed)result.back().source_comp_time={source_time.value,source_time.scale};
         }
         if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
         error=suites.close();if(error)return static_cast<PF_Err>(error);
@@ -114,5 +132,16 @@ PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
         output.swap(result);return PF_Err_NONE;
     }catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}
     catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+}
+PF_Err capture_motion_layer_points(PF_InData* data,core::LayerUnits units,
+    std::span<const MotionLayerPointRequest> requests,const core::Cancellation& cancel,
+    std::vector<MotionLayerPoint>& output) noexcept {
+    return capture_points(data,units,requests,cancel,output);
+}
+PF_Err capture_motion_timed_layer_points(PF_InData* data,core::LayerUnits units,
+    std::span<const MotionTimedLayerPointRequest> requests,const core::Cancellation& cancel,
+    std::vector<MotionTimedLayerPoint>& output) noexcept {
+    return capture_points(data,units,requests,cancel,output);
 }
 }

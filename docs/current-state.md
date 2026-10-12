@@ -1,5 +1,24 @@
 # 当前工程状态
 
+## M3-18 mapped-time point sampler candidate — 2026-10-12
+
+MotionPointCapture adds explicit per-source rational composition time, keeping
+the original current-time API. Source matrices are read at mapped time while
+owner inverse remains at current converted PF time; normalized ID/time caching
+avoids reusing a source's matrix across different samples. Same-owner identity
+is used only at the same instant. Only owned normalized times/points escape;
+invalid or AE-unrepresentable time rejects before host calls. No author/ID/ABI/
+flag or installed-pair change. Timed clock/end modes/resource history/dependencies
+and public Light Path/Look At remain integration work; full goal stays active.
+Standard/ASAN5656 pass, including all legacy point cases, different/equal mapped
+times, nonlinear fake trajectory, current owner vs historical self, affine/PAR/
+reflection,256 unique times, exact time boundaries, all callback/release failures,
+cancellation/allocation and output preservation. Inventory/point ASAN8099 passes.
+Logs: artifacts/m3-18-motion-timed-points-{tests,asan,inventory-regression}.log.
+First sandbox commands failed before process launch (CreateProcessSecurityEnvironment
+0x80070020); direct approved reruns completed actual exit0. No AE operation.
+Full frozen May2023 SDK verification is next; native73/CEP77 remains installed.
+
 ## M3-18 timed point-light metadata candidate — 2026-10-12
 
 MotionLightTiming is a read-only explicit source-ID seam for AE point lights.

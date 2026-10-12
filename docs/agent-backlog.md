@@ -344,6 +344,10 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+Mapped-time point sampling owns ae_plugin/MotionPointCapture.hpp/.cpp and tests/motion_point_capture_tests.cpp, RunMotionPointCaptureTests.ps1/RunMotionLightSourcesTests.ps1 dependency lines. Keep the current-time API unchanged; add explicit source composition time per request, owner frame at current converted PF time, cache by source identity/time and owned normalized output. ADR0039 records the seam before code changes; no author/ID/ABI/flags or deployment until timed resource integration is complete.
+
+Mapped sampler标准/ASAN5656、inventory/point ASAN8099通过；current/historical self、ID+time缓存、nonlinear fake源、仿射/PAR/镜像、256时间、AE32边界/归一化及全失败/取消/分配原子性覆盖。首次sandbox launcher在进程开始前报0x80070020，direct批准执行actual exit0；完整SDK冻结继续，不调用AE或改安装73/77。
+
 Next owned seam: ae_plugin/MotionLightTiming.hpp/.cpp, main project and focused tests/RunMotionLightTimingTests.ps1/motion_light_timing_tests.cpp. Read-only explicit point-light identity → first/last composition position-keyframe times, including separated XYZ followers, owned rational metadata and callback-local disposal. No source/path assignment, author, persistent ID/ABI or host flags until timed sampling/history/dependencies are complete. ADR0039 defines this before implementation.
 
 2026-10-12 timed point-light metadata标准/ASAN4108及inventory/point ASAN8099通过，零/单/分离XYZ/逆序comp端点、所有SDK失败/清理/取消与返回失败owned stream覆盖，无分配。当前源码完整SDK冻结待验证；原时长与实际插值采样/资源历史/依赖/作者继续，安装73/77不变，不宣布Light Path可用。
