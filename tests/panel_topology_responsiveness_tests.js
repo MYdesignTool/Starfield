@@ -22,7 +22,7 @@ function harness(fail=false,hidden=false) {
     const win={StarfieldGraphCodec:codec,StarfieldGraphEdits:edits,StarfieldGraphView:view,
         StarfieldGraphTransactions:{create(options){return transactions.create({...options,idFactory:()=>id(99),
             modelTransactions:{apply(tx,meshes,cb){call("modelApply",tx,cb);}}});}},
-        requestAnimationFrame(fn){frames.push(fn);},setTimeout(fn,delay){timers.push({fn,delay});}};
+        requestAnimationFrame(fn){assert.equal(this,win,"rAF requires its Window receiver");frames.push(fn);},setTimeout(fn,delay){timers.push({fn,delay});}};
     const context=vm.createContext({window:win,document:{hidden},state,nodePositions:projected.positions,topologyPreview:null,
         graphTransactionClient:null,refreshEpoch:0,refreshInFlight:false,nodePalette:{refresh(){}},call,
         render(){trace.push("paint-state:"+state.nodes.length);},showError(c){trace.push("error:"+c);},clearBanner(){},
@@ -59,5 +59,14 @@ for(const hidden of [false,true]) {
 {
     const h=harness();h.edit({type:"addNode",nodeType:"unknown"});
     check(!h.state.pending && h.state.graph===h.oldGraph && !h.pending.length,"invalid edit never previews or mutates host");
+}
+{
+    const h=harness();let scheduled,result,called=0;
+    const client=transactions.create({codec,edits,idFactory:()=>id(90),call(){called++;},
+        scheduleSubmit(fn){scheduled=fn;throw Error("scheduler failed after queueing");}});
+    client.apply({type:"addNode",nodeType:"force"},r=>{result=r;},h.state.targetToken,8,
+        {ok:true,target:{token:h.state.targetToken},snapshot:h.state.graphSnapshot});
+    check(result.error.code==="graph_preview_failed","scheduler failure reports a failed draft");
+    scheduled();check(called===0,"a rejected deferred draft never submits later");
 }
 console.log(`panel_topology_responsiveness_tests: ${checks} checks passed; actual panel/client, immediate projection, paint before host, receipt reuse, rollback, hidden progress and single submission; no AE run`);

@@ -291,11 +291,13 @@
                     }catch(error){callback(failure("invalid_model_transaction",error.message || String(error)));}
                 });
                 }
+                var submissionAllowed=true;
                 try {
                     if (options.onPlanned) options.onPlanned(updated, base);
-                    if (options.scheduleSubmit) options.scheduleSubmit(submitPrepared);
+                    if (options.scheduleSubmit) options.scheduleSubmit(function(){if(submissionAllowed)submitPrepared();});
                     else submitPrepared();
                 } catch (previewError) {
+                    submissionAllowed=false;
                     callback(failure("graph_preview_failed", previewError.message || String(previewError)));
                 }
             }

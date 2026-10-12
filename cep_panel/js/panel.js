@@ -876,7 +876,7 @@
         topologyPreview=null;render(state);
     }
     function afterTopologyPaint(submit) {
-        var frame=window.requestAnimationFrame || function(fn){window.setTimeout(fn,16);};
+        function frame(fn){if(window.requestAnimationFrame)window.requestAnimationFrame(fn);else window.setTimeout(fn,16);}
         var sent=false;
         function once(){if(sent)return;sent=true;submit();}
         // A second frame lets Chromium paint the local edit before evalScript
