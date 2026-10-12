@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Restored native77/Core ABI9/CEP81 after owner rejected native78 for add-node host_timeout. Ten native and eighteen panel files match original receipt. Failed CRC expression scheme withdrawn from active source. Preparing native79/CEP82 for receipt-query timeout recovery and restored-instance rebind; actual AE behavior remains unqualified. No automatic AE acceptance. See docs/current-state.md.",
-  "basePanel": 81,
+  "status": "Installed native79/Core ABI9/CEP82 from frozen2b541c5. Rejected native78 CRC expressions withdrawn; native77 binding algorithm retained. Same-transaction timeout recovery and guarded restored-instance rebind deployed. Complete SDK, focused frozen checks, installed pair and exact native77/CEP81 rollback verified. AE correction remains unconfirmed; no automatic host execution. See docs/current-state.md.",
+  "basePanel": 82,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "F0C390F93FFFA2631D6140A8D5AB0217CA771723FF98382D08CE6D5C4FBDF84F"
+      "normalizedSha256": "7CA69F41674A0F63E58963E5AED0A3CA7F6737334E2FCAE68AE003425B977716"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "240142F48872B8BCD7BA3A1AF45045E21CCAA2CD642A2AA17435DFF337ADECA4"
+      "normalizedSha256": "84963E8014A3660169E3F555D4ECAAA0C21B6DFB8CFA71638D1B4F7DDBBB51B7"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "40ED775944A35A69DB896667DEED05E0867D90F8F72AAB093B0204011B27302B"
+      "normalizedSha256": "FDDEE5F03C9FFB91279285F6EFD2D676E7BA6BC4844C0A9FD44F5A4F4A6B466D"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "4DA7047325F5197FA7F4482B7A8F75120C0145D3CD8D4140B3D8CE557E3029CD"
+      "normalizedSha256": "BC935291EDBE0A3AE7347E7FFA222971F5D0ADFC2370496DF0C29CF5D80F6BB5"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "7092C3F33E69867A62F8DF31A8F96999045A68740C20B217B0CA5FD45988B2E6"
+      "normalizedSha256": "F0FECBAE4FD470BE24319640EBE30050E48020FAE4DFFD35F41DB86C3828AED5"
     }
   ]
 }

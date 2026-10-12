@@ -1,5 +1,29 @@
 # 当前工程状态
 
+## M3-17 native79 / CEP82 deployed — 2026-10-12 23:56+08
+
+Frozen/pushed source2b541c5098986863aef5d316afd0493397891629 installed23:56:33+08.
+May2023 complete ten-module SDK13576 actualexit0, frozen alias ASAN19889+camera12,
+complete transaction ASAN912516, timeout-client61, actual CEP transport2340/ES3_18,
+retained responsive panel34 and dummy77/81→79/82 restore67 pass.510 archived source
+hashes unchanged. Fresh AE0 preceded publication. Independent proof23:58:28+08
+matches10 native/18 paired/27 full CEP/selector/frozen510/backup10+18. Packed32847,
+CoreABI9 and released IDs/schema unchanged. No AE launch/stop/script dispatch.
+Source78 scheme is withdrawn; its failed source/logs remain archived. Changes:
+native77 expressions, same-transaction receipt timeout recovery with1s backoff and
+original5min deadline, restored-instance rebind under guard1, legacy restore bypass,
+timed UI-stage journal. These close proven code gaps; original deletion correction
+and actual AE timings remain unconfirmed. Circle/panel acceptance preserved; full
+Motion/Turbulence goal remains unfinished.
+
+Evidence: artifacts/prepared/m3-17-native79-timeout-restore/{source.zip,
+sdk-build.log,sdk-exit-code.txt,alias-asan.log,restore-transaction-asan.log,
+source-hashes.json,native-bundle/candidate.json}; transport/parser/panel tool exit0
+recorded on the same frozen source. Receipts artifacts/m3-17-native79-deploy-
+{before,after}.json and m3-17-timeout-restore79-installed-proof.json. Exact undo
+to the recovered native77/CEP81 with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native79-panel82-timeout-restore-20261012' -Restore`.
+
 ## M3-17 owner rejects78; restored77/81, preparing79/82 — 2026-10-12 23:18+08
 
 Owner reports adding nodes now fails host_timeout within8s. AE38548 was running;

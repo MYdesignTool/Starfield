@@ -60,6 +60,14 @@
             function read(){if(finished || expired())return;
                 options.call("readModelGraphTransaction",fields(),function(response){
                     if(finished)return;if(!response || !response.ok || response.transactionId!==id){
+                        // A CEP transport timeout does not prove that the native
+                        // command failed. Keep the draft locked and recover the
+                        // same transaction receipt; releasing here cancels a
+                        // command which may still be applying the graph.
+                        if(response && response.error && response.error.code==="host_timeout"){
+                            lastMessage="Waiting for the existing host transaction response.";
+                            if(!expired())schedule(read,1000);return;
+                        }
                         error(response && response.error?response:failure("model_transaction_outcome_unknown","No final Model graph response. Refresh before retrying."));return;}
                     lastState=response.state;lastMessage=response.message || response.notificationError || "";
                     if(response.state==="complete"){end(response.result || failure("model_transaction_outcome_unknown","The completed transaction has no result."));return;}

@@ -2,6 +2,12 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+79/82 deployed23:56+08 from pushed/frozen2b541c5; installed and exact recovered
+77/81 rollback independently match. See current-state.md for current evidence.
+CRC experiment removed. Timeout recovery and restoration finalization are tested
+code corrections; actual AE deletion correction is unconfirmed. Keep this task
+active, preserve Motion work, no automatic acceptance requests/runs.
+
 Owner rejects78: add-node host_timeout. Exact77/81 restored with AE0 after owner
 closed38548. Native78 scheme withdrawn; preserve artifacts as failed evidence.
 Current owned scope adds client receipt-read timeout recovery, EffectGraphBackup

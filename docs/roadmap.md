@@ -1,9 +1,10 @@
 # 开发路线图
 
-2026-10-12 native78/retained CEP81 deletion generation protocol stage is deployed;
-exact host correction is unconfirmed. Accepted panel response ordering and Circle
-remain preserved. Current evidence/pair/rollback live in current-state.md. This
-does not close the Motion/Turbulence goal.
+2026-10-12 owner rejects native78's add-node timeout regression; exact77/81 was
+restored before deployed79/82 replaced it.79 uses the77 binding algorithm plus
+receipt-read recovery/restoration rebind; actual deletion correction is unconfirmed.
+Accepted panel response/Circle and Motion work stay preserved. Current evidence,
+pair and rollback live in current-state.md; Motion/Turbulence goal remains unfinished.
 
 M3-18 native73/CEP77 deployed stage removes the Force-after-Motion placement restriction
 through ordered Core processing, history and Auxiliary velocity inheritance.

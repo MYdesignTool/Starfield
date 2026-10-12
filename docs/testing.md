@@ -1,6 +1,12 @@
 # 测试入口
 
-## M3-17 timeout / restored-instance rebind candidate79/82 — 2026-10-12
+## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
+
+Frozen2b541c5 complete May2023 SDK13576 actualexit0 and510 unchanged archived
+source hashes pass. Frozen alias19889+camera12 and complete transaction912516 ASAN
+pass; same frozen candidate's timeout61/transport2340/ES3_18/panel34 exit0. Installed
+10/18/27/selector and exact recovered77/81 rollback10/18 independently match.
+Actual owner AE behavior remains open; no automatic host run.
 
 Native78 owner add-node regression overrides its offline passing counts. Exact77/81
 restored; graph generation experiment removed from active tests/code. Frozen78
