@@ -47,6 +47,14 @@ May2023 x64 SDK build including this helper passed with both
 `-NoDistPublish -NoRuntimePublish`; output paths and SHA256s are recorded in
 `docs/current-state.md`. No AE process or deployment was involved.
 
+`tests/RunMotionLightTimingTests.ps1 -Run [-Sanitize]` now also covers
+`capture_motion_light_path_track`: a nonlinear fake light is sampled at each
+segment's 1/4, 1/2 and 3/4 times, then bisected until the observed chord deviation
+fits the requested tolerance. It checks retained key times, the sample cap path,
+host callback errors, cancellation, balanced suites and atomic output. Standard
+and ASAN runs each pass 5,773 checks. Probe tolerance is not a proof of the maximum
+continuous error between probes. No AE instance was used.
+
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 
 Frozen2b541c5 complete May2023 SDK13576 actualexit0 and510 unchanged archived

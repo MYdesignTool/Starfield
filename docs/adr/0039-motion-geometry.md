@@ -155,6 +155,18 @@ no-publish flags. The helper is not yet connected to the graph, AE path interpol
 resource snapshots/dependencies, temporal history/shutter, or a public author.
 It must not be represented as a usable Light Path mode.
 
+The adapter's next value is `MotionLightPathTrack`: starting from each light's own
+AE-evaluated keyframe positions, it queries the host at quarter/mid/three-quarter
+CompTimes and recursively bisects intervals whose observed deviation from a linear
+chord exceeds the caller's tolerance. The sample count is capped by the existing
+16,385-point path bound, and exact rational probe times are required. The reported
+`maximum_probe_error` is only the largest accepted probe deviation; it does not
+prove the continuous maximum between probes. Standard/ASAN fake-host suites each
+pass 5,773 checks and the full May2023 x64 build exits 0 with both no-publish flags.
+This owned adapter snapshot still lacks Core serialization, playback interpolation,
+graph binding, history/shutter/cache dependencies and a public author. No AE host
+qualification is claimed.
+
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
 confirms Starting With filters lights by a name prefix. The question on that
 page reports a script input prompt displaying All...; it is evidence about

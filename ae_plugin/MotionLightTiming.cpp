@@ -1,8 +1,10 @@
 #include "MotionLightTiming.hpp"
 #include "SPBasic.h"
+#include "starfield/core/MotionGeometry.hpp"
 #include "starfield/core/Render.hpp"
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <new>
 #include <utility>
 
@@ -38,6 +40,17 @@ struct Streams {
     }
     ~Streams(){(void)close();}
 };
+std::optional<core::RationalTime> interpolate_time(core::RationalTime a,core::RationalTime b,
+    std::int64_t numerator,std::int64_t denominator) noexcept {
+    const auto delta=core::subtract(b,a);if(!delta)return {};
+    const auto part=core::multiply(*delta,{numerator,denominator});if(!part)return {};
+    const auto value=core::add(a,*part);if(!value)return {};
+    return core::make_rational(value->value,value->scale);
+}
+double point_distance(core::Vec3 a,core::Vec3 b) noexcept {
+    return std::hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+}
+struct TrackSegment {MotionTimedLayerPoint left,right;};
 }
 PF_Err capture_motion_light_timing(PF_InData* data,AEGP_PluginID plugin,std::uint32_t id,
     const core::Cancellation& cancel,MotionLightTiming& output,bool include_keyframe_times) noexcept try {
@@ -154,6 +167,88 @@ PF_Err capture_motion_light_keyframes(PF_InData* data,AEGP_PluginID plugin,std::
     if(error)return error;
     if(result.positions.size()!=result.timing.keyframe_times.size())return PF_Err_BAD_CALLBACK_PARAM;
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    output=std::move(result);
+    return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
+PF_Err capture_motion_light_path_track(PF_InData* data,AEGP_PluginID plugin,std::uint32_t id,
+    core::LayerUnits units,double max_chord_error,const core::Cancellation& cancel,
+    MotionLightPathTrack& output) noexcept try {
+    if(!std::isfinite(max_chord_error)||max_chord_error<=0||max_chord_error>1e6)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    MotionLightKeyframes keys;
+    auto error=capture_motion_light_keyframes(data,plugin,id,units,cancel,keys);
+    if(error)return error;
+    if(keys.positions.size()<2||keys.positions.size()>core::kMaxMotionPathSamples)
+        return PF_Err_BAD_CALLBACK_PARAM;
+
+    MotionLightPathTrack result;result.timing=std::move(keys.timing);result.samples=std::move(keys.positions);
+    std::vector<TrackSegment> active;active.reserve(result.samples.size()-1);
+    for(std::size_t i=1;i<result.samples.size();++i)
+        active.push_back({result.samples[i-1],result.samples[i]});
+    constexpr std::array<std::int64_t,3> probe_numerators{1,2,3};
+    while(!active.empty()) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        if(active.size()>core::kMaxMotionPathSamples)return PF_Err_BAD_CALLBACK_PARAM;
+        std::vector<MotionTimedLayerPointRequest> requests;requests.reserve(active.size()*3);
+        for(const auto& segment:active)for(const auto numerator:probe_numerators) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            const auto instant=interpolate_time(segment.left.source_comp_time,segment.right.source_comp_time,numerator,4);
+            if(!instant||core::compare(segment.left.source_comp_time,*instant)>=0||
+               core::compare(*instant,segment.right.source_comp_time)>=0)return PF_Err_BAD_CALLBACK_PARAM;
+            requests.push_back({id,{},*instant});
+        }
+        std::vector<MotionTimedLayerPoint> probes;probes.reserve(requests.size());
+        for(std::size_t offset=0;offset<requests.size();offset+=kMaxMotionPointRequests) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            const auto count=std::min(kMaxMotionPointRequests,requests.size()-offset);
+            std::vector<MotionTimedLayerPoint> batch;
+            error=capture_motion_timed_layer_points(data,units,
+                std::span<const MotionTimedLayerPointRequest>(requests).subspan(offset,count),cancel,batch);
+            if(error)return error;
+            if(batch.size()!=count)return PF_Err_BAD_CALLBACK_PARAM;
+            probes.insert(probes.end(),batch.begin(),batch.end());
+        }
+
+        std::vector<TrackSegment> refined;refined.reserve(active.size()*2);
+        std::vector<MotionTimedLayerPoint> inserted;inserted.reserve(active.size());
+        for(std::size_t i=0;i<active.size();++i) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            const auto& segment=active[i];double maximum_error=0;
+            for(std::size_t probe=0;probe<3;++probe) {
+                const auto fraction=double(probe+1)/4.;
+                const auto& point=probes[i*3+probe];
+                const core::Vec3 linear{
+                    segment.left.position.x+(segment.right.position.x-segment.left.position.x)*fraction,
+                    segment.left.position.y+(segment.right.position.y-segment.left.position.y)*fraction,
+                    segment.left.position.z+(segment.right.position.z-segment.left.position.z)*fraction};
+                const auto deviation=point_distance(point.position,linear);
+                if(!std::isfinite(deviation))return PF_Err_BAD_CALLBACK_PARAM;
+                maximum_error=std::max(maximum_error,deviation);
+            }
+            if(maximum_error<=max_chord_error) {
+                result.maximum_probe_error=std::max(result.maximum_probe_error,maximum_error);
+                continue;
+            }
+            if(result.samples.size()+inserted.size()+1>core::kMaxMotionPathSamples)
+                return PF_Err_BAD_CALLBACK_PARAM;
+            const auto midpoint=probes[i*3+1];
+            inserted.push_back(midpoint);
+            refined.push_back({segment.left,midpoint});refined.push_back({midpoint,segment.right});
+        }
+        result.samples.insert(result.samples.end(),inserted.begin(),inserted.end());
+        active=std::move(refined);
+    }
+    if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    std::sort(result.samples.begin(),result.samples.end(),[](const auto& a,const auto& b){
+        return core::compare(a.source_comp_time,b.source_comp_time)<0;
+    });
+    for(std::size_t i=1;i<result.samples.size();++i)
+        if(result.samples[i].layer_id!=id||core::compare(result.samples[i-1].source_comp_time,result.samples[i].source_comp_time)>=0)
+            return PF_Err_BAD_CALLBACK_PARAM;
+    if(result.samples.front().layer_id!=id||result.maximum_probe_error>max_chord_error)
+        return PF_Err_BAD_CALLBACK_PARAM;
     output=std::move(result);
     return PF_Err_NONE;
 } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}

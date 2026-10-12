@@ -73,6 +73,24 @@ SDK build exits0 under both no-publish flags; Motion AEX SHA256
 to graph evaluation, AE interpolation, resource/cache/history/shutter dependencies
 or a Light Path author; no deployment or AE acceptance was run.
 
+The adapter now also builds an owned per-light `MotionLightPathTrack`. It starts
+with the original keyframe-time samples, asks AE for world-space positions at each
+interval's quarter, midpoint and three-quarter CompTimes, and bisects intervals
+whose sampled deviation from the linear chord exceeds the caller-supplied tolerance.
+Subdivision is bounded by `kMaxMotionPathSamples`; over-cap or unrepresentable
+times fail instead of silently truncating. `maximum_probe_error` records the largest
+accepted probe deviation, not a mathematical bound at every unsampled instant.
+Standard and ASAN May2023 fake-callback fixtures each pass 5,773 checks, including a
+curved source, tolerance, cancellation, cleanup and atomic failure. Full May2023 x64
+SDK build exits0 under both no-publish flags; Motion AEX SHA256
+`3B0FF8CFE630CAA784D52BA8FE38A3CBAD3F3F83ECCF4D9ED366C11B912EDADC`, Particle AEX
+`D352CD5645FCCFF17011B1F4EE285D3E9DA6E822C3D4453B24D463C28DB4D24F`, Core DLL
+`20CD2CB68DD312F2C8516900784D7E9E5D9E63290F2E0681CE4C9DE65AC0E284`; outputs are
+under `artifacts/plugin/motion-light-adaptive-track-20261013/` and
+`artifacts/core-dll/motion-light-adaptive-track-20261013/`. This remains an adapter
+snapshot only; Core serialization, graph/history/shutter/cache dependencies and
+the Light Path author are still open. No AE acceptance or deployment was run.
+
 The high-node-count deletion warning stays deferred. No automatic AE acceptance
 or process action accompanies this Motion work.
 

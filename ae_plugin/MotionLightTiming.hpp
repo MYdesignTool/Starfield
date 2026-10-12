@@ -23,6 +23,14 @@ struct MotionLightKeyframes {
     // This is keyframe data only; it does not approximate between-key interpolation.
     std::vector<MotionTimedLayerPoint> positions;
 };
+struct MotionLightPathTrack {
+    MotionLightTiming timing;
+    // AE-evaluated source positions at the authored key times and adaptive
+    // subdivision times. Adjacent samples are linearized to the caller's
+    // requested probe tolerance; this remains an owned numeric snapshot.
+    std::vector<MotionTimedLayerPoint> samples;
+    double maximum_probe_error{};
+};
 // Read-only metadata for one explicit point light, not a path author or render
 // ABI. Zero keys leaves the default times; equal endpoints do not define a
 // duration. All SDK ownership is callback-local. Failure preserves output.
@@ -34,4 +42,10 @@ struct MotionLightKeyframes {
 [[nodiscard]] PF_Err capture_motion_light_keyframes(PF_InData*,AEGP_PluginID,
     std::uint32_t source_layer_id,core::LayerUnits,const core::Cancellation&,
     MotionLightKeyframes& output) noexcept;
+// Samples the host-evaluated position curve independently for one point light.
+// Each accepted segment is checked at its 1/4, 1/2 and 3/4 times; intervals over
+// max_chord_error are bisected until bounded by that tolerance or the sample cap.
+[[nodiscard]] PF_Err capture_motion_light_path_track(PF_InData*,AEGP_PluginID,
+    std::uint32_t source_layer_id,core::LayerUnits,double max_chord_error,
+    const core::Cancellation&,MotionLightPathTrack& output) noexcept;
 }

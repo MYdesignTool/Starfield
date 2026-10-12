@@ -21,7 +21,7 @@ AEGP_PFInterfaceSuite1 pf{};AEGP_LayerSuite9 layer{};AEGP_LightSuite2 light{};
 AEGP_StreamSuite6 stream{};AEGP_DynamicStreamSuite4 dynamic{};AEGP_KeyframeSuite5 keys{};
 SPBasicSuite basic{};PF_InData data{};
 unsigned calls{},fail_at{},active_suites{},acquired{},released{},active_refs{},disposed{},cleanup_calls{},cleanup_fail{},null_suite{};
-bool leader=true,separated{},no_owner{},no_comp{},no_source{},wrong_comp{},wrong_id{},failed_leader{},failed_follower{};
+bool leader=true,separated{},no_owner{},no_comp{},no_source{},wrong_comp{},wrong_id{},failed_leader{},failed_follower{},quadratic_position{};
 int null_ref=-1,bad_follower=-1;AEGP_ObjectType object_type=AEGP_ObjectType_LIGHT;AEGP_LightType light_type=AEGP_LightType_POINT;
 AEGP_StreamType stream_type=AEGP_StreamType_ThreeD_SPATIAL;
 std::array<A_long,4> counts{};std::array<A_Time,4> starts{},ends{};std::array<std::array<A_Time,256>,4> key_times{};
@@ -32,7 +32,7 @@ A_Err step(){return ++calls==fail_at?77:0;}
 AEGP_StreamRefH create_ref(unsigned i){if(static_cast<int>(i)==null_ref)return nullptr;CHECK(!(active_refs&(1u<<i)));active_refs|=1u<<i;return reinterpret_cast<AEGP_StreamRefH>(static_cast<std::uintptr_t>(i+1));}
 void reset(){
     calls=fail_at=active_suites=acquired=released=active_refs=disposed=cleanup_calls=cleanup_fail=null_suite=0;
-    leader=true;separated=no_owner=no_comp=no_source=wrong_comp=wrong_id=failed_leader=failed_follower=false;
+    leader=true;separated=no_owner=no_comp=no_source=wrong_comp=wrong_id=failed_leader=failed_follower=quadratic_position=false;
     null_ref=bad_follower=-1;object_type=AEGP_ObjectType_LIGHT;light_type=AEGP_LightType_POINT;stream_type=AEGP_StreamType_ThreeD_SPATIAL;fail_allocation=false;key_times={};
     counts={4,2,0,3};starts={A_Time{30,60},A_Time{-15,30},A_Time{},A_Time{4,1}};ends={A_Time{180,60},A_Time{9,6},A_Time{},A_Time{20,5}};
     basic={};basic.AcquireSuite=[](const char* name,int32 version,const void** out)->A_Err {
@@ -54,7 +54,7 @@ void reset(){
     layer.AEGP_GetLayerToWorldXform=[](AEGP_LayerH h,const A_Time* time,A_Matrix4* out)->A_Err {
         CHECK((h==owner()||h==source())&&time&&time->scale);if(auto e=step())return e;std::memset(out,0,sizeof(*out));
         for(unsigned axis=0;axis<4;++axis)out->mat[axis][axis]=1;
-        if(h==source())out->mat[3][0]=double(time->value)/time->scale;return 0;
+        if(h==source()){const auto t=double(time->value)/time->scale;out->mat[3][0]=quadratic_position?t*t:t;}return 0;
     };
     layer.AEGP_GetLayerObjectType=[](AEGP_LayerH h,AEGP_ObjectType* out)->A_Err {CHECK(h==source());if(auto e=step())return e;*out=object_type;return 0;};
     light={};light.AEGP_GetLightType=[](AEGP_LayerH h,AEGP_LightType* out)->A_Err {CHECK(h==source());if(auto e=step())return e;*out=light_type;return 0;};
@@ -146,6 +146,31 @@ void keyframe_positions(){
     for(unsigned fail=1;fail<=baseline;++fail){reset();counts[0]=3;starts[0]={0,1};key_times[0][1]={1,1};ends[0]={2,1};
         out=sentinel_path();const auto prior=out;fail_at=fail;CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,out)==77);CHECK(same_path(out,prior));balanced();}
 }
+void adaptive_path_track(){
+    reset();quadratic_position=true;counts[0]=2;starts[0]={0,1};ends[0]={2,1};
+    MotionLightPathTrack out;out.timing=sentinel();out.samples={{999,{6,7,8},{5,2}}};out.maximum_probe_error=9;
+    const LayerUnits units{2,2,1};constexpr double tolerance=.02;
+    CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,never,out)==PF_Err_NONE);
+    CHECK(out.timing.layer_id==1001&&out.timing.keyframe_times.size()==2&&out.samples.size()>2);
+    CHECK(out.samples.front().layer_id==1001&&compare(out.samples.front().source_comp_time,{0,1})==0);
+    CHECK(out.samples.back().layer_id==1001&&compare(out.samples.back().source_comp_time,{2,1})==0);
+    CHECK(out.maximum_probe_error<=tolerance);balanced();
+    for(std::size_t i=1;i<out.samples.size();++i){
+        const auto a=to_seconds(out.samples[i-1].source_comp_time),b=to_seconds(out.samples[i].source_comp_time),mid=(a+b)/2;
+        const auto actual=mid*mid/2-.5;
+        const auto chord=(out.samples[i-1].position.x+out.samples[i].position.x)/2;
+        CHECK(std::abs(actual-chord)<=tolerance+1e-10);
+    }
+
+    reset();quadratic_position=true;counts[0]=2;starts[0]={0,1};ends[0]={2,1};
+    MotionLightPathTrack prior;prior.timing=sentinel();prior.samples={{999,{6,7,8},{5,2}}};prior.maximum_probe_error=9;
+    out=prior;fail_at=1;CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,never,out)==77);
+    CHECK(out.timing.layer_id==prior.timing.layer_id&&out.samples.size()==prior.samples.size()&&out.samples[0].position.x==6&&out.maximum_probe_error==9);balanced();
+
+    reset();quadratic_position=true;counts[0]=2;starts[0]={0,1};ends[0]={2,1};out=prior;
+    Stop stop(0);CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,stop,out)==PF_Interrupt_CANCEL);
+    CHECK(out.timing.layer_id==prior.timing.layer_id&&out.samples.size()==prior.samples.size()&&out.maximum_probe_error==9);balanced();
+}
 void failures(){
     for(bool split:{false,true}){
         reset();separated=split;ends[3]={25,5};auto out=sentinel();CHECK(run(out)==0);const auto baseline=calls;
@@ -166,4 +191,4 @@ void failures(){
     for(unsigned test=0;test<3;++test){reset();out=sentinel();if(test==0)data.pica_basicP=nullptr;else if(test==1)basic.AcquireSuite=nullptr;else basic.ReleaseSuite=nullptr;CHECK(run(out)==PF_Err_BAD_CALLBACK_PARAM);preserved(out);}
 }
 }
-int main(){modes();keyframe_time_lists();keyframe_positions();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}
+int main(){modes();keyframe_time_lists();keyframe_positions();adaptive_path_track();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}
