@@ -27,6 +27,20 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ### Owner-confirmed flow and Light Path policy — 2026-10-12
 
+Timed point-light metadata seam (unpublished): resolve one explicit stable source
+ID inside the owner's composition, require ObjectType_LIGHT/LightType_POINT,
+read its Position stream and first/last keyframe times in CompTime. Separated XYZ
+uses all three follower streams; first=min(firsts), last=max(lasts), count=sum of
+follower counts. Each separated follower must be OneD. Normalize endpoint order
+in composition time (including reversed time mapping). Zero keys is explicit
+count0 with default0/1 times; a single
+instant has equal endpoints. The caller decides whether such a source has a
+usable trajectory. This reads timings only, not a spatial spline or interpolation
+approximation. Only owned rational values escape; all stream refs/suites are
+released before atomic output publication, including failed acquisitions that
+returned an owned stream. Original timing/interpolation sampling, source selection,
+history/shutter/cache dependencies and author binding remain later integration.
+
 Ordered Force implementation contract: a consecutive Force block combines its
 independent fields in the current stream frame, then maps the incoming trajectory
 around its owned particle-birth position. Let A(t) and B(t) be displacement and

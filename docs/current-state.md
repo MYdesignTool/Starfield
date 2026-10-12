@@ -1,5 +1,22 @@
 # 当前工程状态
 
+## M3-18 timed point-light metadata candidate — 2026-10-12
+
+MotionLightTiming is a read-only explicit source-ID seam for AE point lights.
+It reads first/last Position keyframe times in composition time, unions separated
+XYZ follower ranges and copies only normalized rational values/counts. It handles
+zero/single instants explicitly and reversed endpoint mapping. Callback-local
+streams and six suites are released before output publication. No interpolation,
+path construction, assignment policy, author or persistent ID/ABI/flag changes.
+Timed position sampling/history/shutter/dependency/author integration remain next.
+Standard/ASAN4108 checks pass with actual May2023 headers/fake callbacks: all
+callback failures, cancellation, returned stream on failed acquisition, cleanup
+failures, absent callbacks/suites, invalid identities/types/times, separated
+followers and no allocations. Existing inventory/point ASAN8099 passes.
+Evidence: artifacts/m3-18-motion-light-timing-{tests-v2,asan-v2,inventory-regression}.log.
+Full frozen SDK validation is next; installed native73/CEP77 stays unchanged.
+M3-18 and full goal remain active. This metadata helper is not a Light Path author.
+
 ## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12 09:35+08
 
 Owner confirms edge-order evaluation and percentages (Circle100%=one turn/sec).

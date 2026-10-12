@@ -46,6 +46,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="MotionPointCapture.cpp" />
     <ClCompile Include="MotionLightSources.cpp" />
+    <ClCompile Include="MotionLightTiming.cpp" />
     <ClCompile Include="LightCapture.cpp" /><ClCompile Include="MotionBlur.cpp" />
     <ClCompile Include="EffectMain.cpp" />
     <ClCompile Include="PresetsUI.cpp" />

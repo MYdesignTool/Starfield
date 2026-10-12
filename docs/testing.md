@@ -1,5 +1,18 @@
 # 测试入口
 
+## M3-18 timed point-light metadata seam — 2026-10-12
+
+RunMotionLightTimingTests.ps1 -Run [-Sanitize]: standard/ASAN4108 passes using
+actual May2023 suite declarations with fake callbacks. Scope: stable source/comp
+identity, Point-only eligibility, ordinary and separated XYZ position keyframe
+ranges, exact rational/negative/reversed endpoints, zero/single/large keyframe
+counts, no allocation, every callback failure, cancellation through success,
+returned refs on failed acquisition, all stream/suite cleanup failures, null
+suites/refs and missing callbacks. Inventory/point capture ASAN8099 also passes.
+Logs: artifacts/m3-18-motion-light-timing-{tests-v2,asan-v2,inventory-regression}.log.
+This reads times only; timed interpolation/author/AE selector qualification remains
+open. Installed native73/CEP77 is not changed by these fixtures.
+
 ## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12
 
 RunMotionFrameTests.ps1 -Run [-Sanitize] passes8438 (standard tests-v3,

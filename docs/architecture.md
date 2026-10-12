@@ -1,5 +1,10 @@
 # Starfield 架构
 
+M3-18 unpublished MotionLightTiming seam reads a point light's position keyframe
+range, with separated follower timing and owned rational metadata. Only adapter
+code sees Stream/Keyframe/Light suites; callback-local refs release before atomic
+output publication. This is not timed path sampling or a resource/ABI addition.
+
 M3-18 native73/CEP77 deployed stage implements Force blocks after Motion in graph edge
 order, including static/history evaluation and Auxiliary inheritance. Deferred
 Force is excluded from prefix simulation so it is applied once. Consecutive Force
