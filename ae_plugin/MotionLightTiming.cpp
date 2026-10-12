@@ -134,7 +134,28 @@ PF_Err capture_motion_light_timing(PF_InData* data,AEGP_PluginID plugin,std::uin
     error=owned.close();if(error)return static_cast<PF_Err>(error);
     error=suites.close();if(error)return static_cast<PF_Err>(error);
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
-    output=result;return PF_Err_NONE;
+    output=std::move(result);return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
+PF_Err capture_motion_light_keyframes(PF_InData* data,AEGP_PluginID plugin,std::uint32_t id,
+    core::LayerUnits units,const core::Cancellation& cancel,MotionLightKeyframes& output) noexcept try {
+    MotionLightKeyframes result;
+    auto error=capture_motion_light_timing(data,plugin,id,cancel,result.timing,true);
+    if(error)return error;
+    if(result.timing.keyframe_times.size()<2)return PF_Err_BAD_CALLBACK_PARAM;
+    std::vector<MotionTimedLayerPointRequest> requests;
+    requests.reserve(result.timing.keyframe_times.size());
+    for(const auto time:result.timing.keyframe_times) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        requests.push_back({id,{},time});
+    }
+    error=capture_motion_timed_layer_points(data,units,requests,cancel,result.positions);
+    if(error)return error;
+    if(result.positions.size()!=result.timing.keyframe_times.size())return PF_Err_BAD_CALLBACK_PARAM;
+    if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+    output=std::move(result);
+    return PF_Err_NONE;
 } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
   catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }

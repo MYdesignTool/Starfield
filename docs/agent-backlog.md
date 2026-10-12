@@ -509,14 +509,14 @@ warning. Numeric Circle/Light Path/Look At and ordered graph/history foundations
 exist; Circle is the only accepted author stage. Current work extends the owned
 MotionLightTiming adapter to return an opt-in bounded union of actual CompTime
 position-keyframe instants, including separated XYZ followers, while preserving
-the allocation-free metadata-only path. This is a prerequisite only: connect
-these instants to per-light MotionPointCapture and temporal resource/cache state,
-then expose one complete Light Path author stage. Do not advertise partial modes.
-The full May 2023 x64 SDK build completed with exit code 0 under both no-publish
-flags; see artifacts/plugin/motion-light-timing-20261013 and
-artifacts/core-dll/motion-light-timing-20261013. No automatic AE acceptance
-request or run. The focused fake-callback timing suite passes 4,118
-checks for sorted/deduplicated separated-XYZ keyframe union and bounded failures.
+the allocation-free metadata-only path. A per-light helper now feeds those exact
+times to `MotionPointCapture` and returns owned keyframe-time/position pairs.
+Connect this to temporal source interpolation, graph resource/cache state and a
+complete Light Path author stage. Do not advertise partial modes. The 5,494-check
+fake-callback suite passes for time union, timed key positions and bounded
+failures. The full May 2023 x64 SDK build now passes at exit 0 with both no-publish
+flags and fingerprints MotionLightSources/Timing; outputs and hashes are recorded
+in docs/current-state.md. Do not run automatic AE acceptance.
 
 Mapped-time point sampling owns ae_plugin/MotionPointCapture.hpp/.cpp and tests/motion_point_capture_tests.cpp, RunMotionPointCaptureTests.ps1/RunMotionLightSourcesTests.ps1 dependency lines. Keep the current-time API unchanged; add explicit source composition time per request, owner frame at current converted PF time, cache by source identity/time and owned normalized output. ADR0039 records the seam before code changes; no author/ID/ABI/flags or deployment until timed resource integration is complete.
 

@@ -26,11 +26,16 @@ of the timing increment completed with exit code 0 using
 no automatic AE acceptance was run. The build reported the existing
 `NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
 
-2026-10-13 opt-in keyframe-time union increment: `RunMotionLightTimingTests.ps1 -Run`
-passes 4,118 fake-May2023 callback checks, including sorted/deduplicated
-CompTime union across separated XYZ, the 256-keyframe bound, allocation failure,
-and preservation of caller output. The test does not launch AE or qualify host
-behavior. Full SDK build evidence is recorded above.
+2026-10-13 keyframe capture increment: `RunMotionLightTimingTests.ps1 -Run` passes
+5,494 fake-May2023 callback checks. It covers sorted/deduplicated CompTime union
+across separated XYZ, sampling the light origin at each original key time,
+identity-relative point conversion, the 256-keyframe bound, injected callback and
+allocation failures, and output preservation. The test does not launch AE or
+qualify host behavior. The latest full SDK build includes this helper and completed
+at exit 0 under both no-publish flags; see
+`artifacts/plugin/motion-light-keyframes-20261013/` and
+`artifacts/core-dll/motion-light-keyframes-20261013/`. This still does not qualify
+AE behavior.
 
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 

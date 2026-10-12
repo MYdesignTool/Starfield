@@ -3,6 +3,7 @@
 #include "starfield/core/Render.hpp"
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -46,9 +47,15 @@ void reset(){
     };
     basic.ReleaseSuite=[](const char*,int32)->A_Err {CHECK(active_suites>0);--active_suites;++released;return ++cleanup_calls==cleanup_fail?88:0;};
     pf={};pf.AEGP_GetEffectLayer=[](PF_ProgPtr effect,AEGP_LayerH* out)->A_Err {CHECK(effect==data.effect_ref);if(auto e=step())return e;*out=no_owner?nullptr:owner();return 0;};
+    pf.AEGP_ConvertEffectToCompTime=[](PF_ProgPtr effect,A_long,A_u_long,A_Time* out)->A_Err {CHECK(effect==data.effect_ref);if(auto e=step())return e;*out={0,1};return 0;};
     layer={};layer.AEGP_GetLayerParentComp=[](AEGP_LayerH h,AEGP_CompH* out)->A_Err {CHECK(h==owner()||h==source());if(auto e=step())return e;*out=no_comp?nullptr:comp(wrong_comp&&h==source()?43:42);return 0;};
     layer.AEGP_GetLayerFromLayerID=[](AEGP_CompH h,AEGP_LayerIDVal id,AEGP_LayerH* out)->A_Err {CHECK(h==comp()&&id==1001);if(auto e=step())return e;*out=no_source?nullptr:source();return 0;};
     layer.AEGP_GetLayerID=[](AEGP_LayerH h,AEGP_LayerIDVal* out)->A_Err {CHECK(h==source());if(auto e=step())return e;*out=wrong_id?1002:1001;return 0;};
+    layer.AEGP_GetLayerToWorldXform=[](AEGP_LayerH h,const A_Time* time,A_Matrix4* out)->A_Err {
+        CHECK((h==owner()||h==source())&&time&&time->scale);if(auto e=step())return e;std::memset(out,0,sizeof(*out));
+        for(unsigned axis=0;axis<4;++axis)out->mat[axis][axis]=1;
+        if(h==source())out->mat[3][0]=double(time->value)/time->scale;return 0;
+    };
     layer.AEGP_GetLayerObjectType=[](AEGP_LayerH h,AEGP_ObjectType* out)->A_Err {CHECK(h==source());if(auto e=step())return e;*out=object_type;return 0;};
     light={};light.AEGP_GetLightType=[](AEGP_LayerH h,AEGP_LightType* out)->A_Err {CHECK(h==source());if(auto e=step())return e;*out=light_type;return 0;};
     stream={};stream.AEGP_GetNewLayerStream=[](AEGP_PluginID plugin,AEGP_LayerH h,AEGP_LayerStream which,AEGP_StreamRefH* out)->A_Err {
@@ -66,7 +73,7 @@ void reset(){
         const auto i=index(h);CHECK(mode==AEGP_LTimeMode_CompTime&&key>=0&&key<counts[i]);if(auto e=step())return e;
         *out=key==0?starts[i]:key==counts[i]-1?ends[i]:key_times[i][static_cast<std::size_t>(key)];return 0;
     };
-    data={};data.effect_ref=reinterpret_cast<PF_ProgPtr>(7);data.pica_basicP=&basic;
+    data={};data.effect_ref=reinterpret_cast<PF_ProgPtr>(7);data.pica_basicP=&basic;data.time_scale=1;
 }
 struct Never:Cancellation{bool is_cancelled()const noexcept override{return false;}}never;
 struct Stop:Cancellation{mutable unsigned calls{};unsigned limit;explicit Stop(unsigned n):limit(n){}bool is_cancelled()const noexcept override{return calls++>=limit;}};
@@ -106,6 +113,39 @@ void keyframe_time_lists(){
     reset();counts[0]=2;starts[0]={0,1};ends[0]={1,1};unchanged=sentinel();fail_allocation=true;
     CHECK(capture_motion_light_timing(&data,17,1001,never,unchanged,true)==PF_Err_OUT_OF_MEMORY);CHECK(same(unchanged,sentinel()));balanced();
 }
+bool same_path(const MotionLightKeyframes& a,const MotionLightKeyframes& b) {
+    if(!same(a.timing,b.timing)||a.timing.keyframe_times.size()!=b.timing.keyframe_times.size()||a.positions.size()!=b.positions.size())return false;
+    for(std::size_t i=0;i<a.timing.keyframe_times.size();++i)
+        if(compare(a.timing.keyframe_times[i],b.timing.keyframe_times[i])!=0)return false;
+    for(std::size_t i=0;i<a.positions.size();++i) {
+        const auto& x=a.positions[i];const auto& y=b.positions[i];
+        if(x.layer_id!=y.layer_id||compare(x.source_comp_time,y.source_comp_time)!=0||
+           x.position.x!=y.position.x||x.position.y!=y.position.y||x.position.z!=y.position.z)return false;
+    }
+    return true;
+}
+MotionLightKeyframes sentinel_path() {
+    MotionLightKeyframes value;value.timing=sentinel();value.timing.keyframe_times={{-1,7},{5,2}};
+    value.positions={{999,{1,2,3},{-1,7}},{999,{4,5,6},{5,2}}};return value;
+}
+void keyframe_positions(){
+    reset();counts[0]=3;starts[0]={0,1};key_times[0][1]={1,1};ends[0]={2,1};
+    MotionLightKeyframes out{};const LayerUnits units{2,2,1};
+    CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,out)==PF_Err_NONE);
+    CHECK(out.timing.layer_id==1001&&out.positions.size()==3);
+    for(std::size_t i=0;i<3;++i){CHECK(out.positions[i].layer_id==1001);time(out.positions[i].source_comp_time,{static_cast<std::int64_t>(i),1});}
+    CHECK(std::abs(out.positions[0].position.x+0.5)<1e-12);CHECK(std::abs(out.positions[1].position.x)<1e-12);
+    CHECK(std::abs(out.positions[2].position.x-0.5)<1e-12);balanced();
+
+    reset();counts[0]=1;auto unchanged=sentinel_path();const auto before=unchanged;
+    CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,unchanged)==PF_Err_BAD_CALLBACK_PARAM);CHECK(same_path(unchanged,before));balanced();
+
+    reset();counts[0]=3;starts[0]={0,1};key_times[0][1]={1,1};ends[0]={2,1};
+    out=sentinel_path();CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,out)==PF_Err_NONE);const auto baseline=calls;
+    CHECK(baseline>0&&out.positions.size()==3);
+    for(unsigned fail=1;fail<=baseline;++fail){reset();counts[0]=3;starts[0]={0,1};key_times[0][1]={1,1};ends[0]={2,1};
+        out=sentinel_path();const auto prior=out;fail_at=fail;CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,out)==77);CHECK(same_path(out,prior));balanced();}
+}
 void failures(){
     for(bool split:{false,true}){
         reset();separated=split;ends[3]={25,5};auto out=sentinel();CHECK(run(out)==0);const auto baseline=calls;
@@ -126,4 +166,4 @@ void failures(){
     for(unsigned test=0;test<3;++test){reset();out=sentinel();if(test==0)data.pica_basicP=nullptr;else if(test==1)basic.AcquireSuite=nullptr;else basic.ReleaseSuite=nullptr;CHECK(run(out)==PF_Err_BAD_CALLBACK_PARAM);preserved(out);}
 }
 }
-int main(){modes();keyframe_time_lists();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}
+int main(){modes();keyframe_time_lists();keyframe_positions();failures();std::cout<<"Motion light timing: "<<checks<<" checks passed; fake May2023 callbacks, no AE qualification\n";}

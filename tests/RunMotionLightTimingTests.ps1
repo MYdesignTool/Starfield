@@ -11,7 +11,7 @@ try {
         '/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'),'tests\motion_light_timing_tests.cpp',
-        'ae_plugin\MotionLightTiming.cpp','src\core\Time.cpp')
+        'ae_plugin\MotionLightTiming.cpp','ae_plugin\MotionPointCapture.cpp','src\core\Time.cpp','src\core\Geometry.cpp')
     $taskLinkArgs=''
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs="/link /DEBUG /PDB:$taskDir\tests.pdb"}
     [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDir\compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))

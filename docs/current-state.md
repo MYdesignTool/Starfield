@@ -35,19 +35,26 @@ history evaluation, plus bounded light inventory, mapped-time point capture and
 first/last position-keyframe metadata. Circle is the only accepted author stage.
 Current increment extends the timing adapter with an opt-in, bounded union of
 actual CompTime position keyframe instants across separated XYZ streams; the old
-metadata-only call remains allocation-free. It does not yet sample positions or
-integrate original interpolation, source dependencies, history or cache identity.
+metadata-only call remains allocation-free. A per-light capture helper now
+samples the AE-evaluated layer origin at every original keyframe time and returns
+owned time/position pairs. It does not sample between keys or integrate original
+interpolation, source dependencies, history or cache identity.
 Light Path/Look At remain unadvertised until those resource and author paths work
 end to end. Next connect these times to per-light MotionPointCapture and temporal
-resource/cache state, then implement a complete Light Path author stage.
+resource/cache state, including the source's between-key interpolation, then
+implement a complete Light Path author stage.
 
-The full May 2023 x64 SDK build for this source completed with exit code 0 using
-`-NoDistPublish -NoRuntimePublish`; outputs are under
-`artifacts/plugin/motion-light-timing-20261013/` and
-`artifacts/core-dll/motion-light-timing-20261013/`. The build includes all native
-modules and Core, and does not qualify AE behavior. The focused fake-callback
-timing suite passes 4,118 checks; no AE instance or project was opened. MSVC
-reported the existing `NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
+The latest full May 2023 x64 SDK build completed with exit code 0 using
+`-NoDistPublish -NoRuntimePublish`; it produced nine AEX modules and Core under
+`artifacts/plugin/motion-light-keyframes-20261013/` and
+`artifacts/core-dll/motion-light-keyframes-20261013/`. Its input fingerprint
+includes MotionLightSources and MotionLightTiming. Motion AEX SHA256 is
+`f822a9be075dc0fca814d31fd11c5fec7e3c66cd2fbb056abc2cb7a2465bbcf4`; Particle
+AEX SHA256 is `28db100e89bb383e93beb9de21adcbb1e88b6a44533ce72e35f7ae64a0840fb7`;
+Core SHA256 is `cafaafcfcd53e67a9ce8dde3c7483dda6e783d9df2b5641c0616f62c31a4c0b7`. The
+focused fake-callback suite passes 5,494 checks. This is compile/fake-host
+evidence only; no AE instance or project was opened. MSVC reported the existing
+`NativeNodeGraph.cpp` C4456 shadowed-`count` warning.
 
 The high-node-count deletion warning stays deferred. No automatic AE acceptance
 or process action accompanies this Motion work.

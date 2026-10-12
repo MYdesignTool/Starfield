@@ -132,11 +132,15 @@ sampling inputs only. They do not approximate source interpolation, provide
 position samples or establish external-light render/cache dependencies. Light Path
 and Look At remain unadvertised. The owner defers the deletion warning after
 observing it only in graphs with many nodes; that observation establishes no cause.
-The full May 2023 x64 SDK build for this increment completed with exit code 0 under
-both no-publish flags. A focused fake-May2023 callback run passes 4,118 checks for
-the bounded sorted/deduplicated union, separated XYZ followers, allocation failure
-and output preservation. This does not qualify AE behavior; the high-node-count
-warning remains deferred.
+The per-light keyframe helper now combines that list with `MotionPointCapture` to
+evaluate the light layer origin at each exact CompTime key. It returns owned
+time/position pairs and preserves the prior output on errors. It does not sample
+between keys, preserve the source interpolation curve, or establish render/cache
+dependencies. The fake-May2023 callback suite passes 5,494 checks for time union,
+split XYZ, timed source matrices, failure cleanup and atomic output. A full
+May 2023 x64 SDK build including this helper completed at exit 0 under both
+no-publish flags; its input fingerprint includes MotionLightTiming and
+MotionLightSources. Neither result qualifies AE behavior.
 
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)
 confirms Starting With filters lights by a name prefix. The question on that
