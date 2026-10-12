@@ -5,6 +5,9 @@
 #include "AE_Macros.h"
 #include "GraphCarrier.hpp"
 #include "NativeNodeGraph.hpp"
+#include "EffectGraphBackup.hpp"
+#include "PluginVersion.h"
+#include "GraphRenderJournal.hpp"
 #include "Param_Utils.h"
 #include "WorldBridge.hpp"
 
@@ -896,9 +899,9 @@ bool flat_render_override_active() noexcept {
     return graph_parameter_disabled();
 }
 
-PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
+static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_data,
                              std::shared_ptr<const core::Graph>& graph,
-                             A_long* control_source, A_long reference_width, A_long reference_height) noexcept {
+                             A_long* control_source, A_long reference_width, A_long reference_height,double& observed_guard) noexcept {
     graph.reset();
     if (control_source) *control_source = -1;
     if (!in_data || !in_data->inter.checkout_param || !in_data->inter.checkin_param) return PF_Err_BAD_CALLBACK_PARAM;
@@ -915,6 +918,21 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
             if (!converted.has_value()) return graph_error(out_data, converted.error());
             graph = std::make_shared<const core::Graph>(converted.take_value());
         } else if (source.value.u.pd.value == kNodeControlSource) {
+            // An edit and its disabled full-backup copy do not present a
+            // complete graph/alias/resource state. Cancel this frame rather
+            // than reading half-applied author data or reporting bad bindings.
+            // Checkout also records the dependency that changes on release.
+            CheckedParameter guard(in_data);
+            err=guard.checkout(kGraphSyncGuardId);
+            if(err)return err;
+            if(guard.value.param_type==PF_Param_FLOAT_SLIDER)observed_guard=guard.value.u.fs_d.value;
+            if(guard.value.param_type!=PF_Param_FLOAT_SLIDER || !std::isfinite(guard.value.u.fs_d.value) ||
+                (guard.value.u.fs_d.value!=0 && guard.value.u.fs_d.value!=transaction_backup_guard && guard.value.u.fs_d.value!=1))
+                return PF_Err_BAD_CALLBACK_PARAM;
+            if(guard.value.u.fs_d.value!=0) {
+                if(out_data)out_data->return_msg[0]=0;
+                return PF_Interrupt_CANCEL;
+            }
             CheckedParameter stored(in_data);
             err = stored.checkout(kGraphParameterId);
             if (err != PF_Err_NONE) return err;
@@ -928,8 +946,8 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
                                                &failed_binding, &failed_stage);
             if (err) {
                 if (out_data) std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                    "Starfield animation: %s failed (stream %ld, error %ld, delivered params %ld).",
-                    failed_stage, static_cast<long>(failed_binding), static_cast<long>(err),
+                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, delivered params %ld).",
+                    failed_stage, STARFIELD_VERSION_BUILD, guard.value.u.fs_d.value, static_cast<long>(failed_binding), static_cast<long>(err),
                     static_cast<long>(in_data->num_params));
                 return err;
             }
@@ -978,6 +996,14 @@ PF_Err checkout_render_graph(PF_InData* in_data, PF_OutData* out_data,
         return PF_Err_NONE;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
+}
+
+PF_Err checkout_render_graph(PF_InData* in_data,PF_OutData* out_data,std::shared_ptr<const core::Graph>& graph,
+    A_long* control_source,A_long reference_width,A_long reference_height) noexcept {
+    double guard=-1;
+    const auto result=checkout_render_graph_impl(in_data,out_data,graph,control_source,reference_width,reference_height,guard);
+    journal_graph_render(in_data,guard,result,result && out_data?out_data->return_msg:"");
+    return result;
 }
 
 PF_Err capture_controls(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],

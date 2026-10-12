@@ -1,5 +1,29 @@
 # 测试入口
 
+## M3-17 complete deletion/render lifecycle candidate76 / CEP80 — 2026-10-12
+
+Run `tests/RunAliasHandoffTests.ps1 -Run [-Sanitize]` first; it exports the actual
+seven-kind compiled/bound graph under artifacts. Then run
+`tests/RunDeletionRenderLifecycleTests.ps1 -Run [-Sanitize]`. The new fixture
+uses actual EffectGraphBackup and render checkout, including disabled duplicates,
+after every scalar/duplicate/delete/flag/name/reorder mutation. Individual seven
+kind removals, delete all, both duplicate positions and partial-removal rollback
+pass426896 ASAN checks (7722 callbacks,7624 canceled,97 normal,3180 backup).
+Strict guard0 missing-source negative remains an error. Unmodified75 render entry
+fails7624 callbacks in the same fixture, with1628 guarded/1516 backup missing
+bindings. Logs: artifacts/m3-17-render-quiescence-{lifecycle-asan-v2,
+old75-reproduction-v2}.log. These simulate SDK callbacks, not actual AE scheduling.
+
+`node tests/deletion_acceptance_harness_tests.js` passes17 with actual ES3
+readNativeJournal/renderAcceptanceFrame functions: build identity, complete-line
+offsets, cancellation, errors despite suppressed dialogs, failed output, queue
+isolation and activity. Legacy Model harness172 passes. Full panel/DOM/reload/ES3
+audit and dummy75/79→76/80 paired rollback67 pass. Render journal is enabled only
+by full unpublished `BuildWindows.ps1 -RenderJournal`, its artifacts configuration
+is fingerprinted; default builds disable it. Frozen SDK and actual host gates are
+still pending at this source checkpoint. Prepared16-case host launch needs the
+separate ADR0011 permission, not another owner diagnostic script.
+
 ## M3-17 alias handoff deployed75 / CEP79 — 2026-10-12
 
 `tests/RunAliasHandoffTests.ps1 -Run` and `-Run -Sanitize` execute actual native

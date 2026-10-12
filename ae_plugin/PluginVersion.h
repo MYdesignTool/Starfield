@@ -6,7 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build75 candidate: finite alias handoff and post-publication retirement.
-// Full ten-module/Core ABI9 pairing with CEP79; ADR0040.
-#define STARFIELD_VERSION_BUILD 75
-#define STARFIELD_VERSION_PACKED 32843 /* 0x804B */
+// Build76 candidate: transaction/backup render quiescence and developer journal.
+// Full ten-module/Core ABI9 pairing with CEP80; ADR0040.
+#define STARFIELD_VERSION_BUILD 76
+#define STARFIELD_VERSION_PACKED 32844 /* 0x804C */

@@ -2,6 +2,22 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+Owner reports75/79 still fails (stream268). Keep this card active; Motion work
+preserved. New owned scope: Parameters.cpp transaction render entry, precise
+NativeNodeGraph animation value diagnostics, actual backup/render lifecycle
+fixture + runner, native_sync_tests graph artifact output only, version/build/
+deployment and ADR0040/evidence docs. Full backup retains an old-bound renderer
+copy through physical removal; current render entry ignores guard1/2. Define
+explicit canceled frames during mutation/backup, normal strict guard0 rendering
+after release, and test all renderers after every lifecycle mutation. Exact AE
+scheduling remains a hypothesis; do not announce root cause/host qualification
+from simulation alone.
+
+Own GraphRenderJournal.hpp and BuildWindows explicit confined/fingerprinted
+-RenderJournal configuration, plus prepared AE deletion acceptance/log checks.
+Default logging disabled; no host environment/registry changes. The automated
+host run remains separately authorized under ADR0011 after concrete preparation.
+
 75/79 delivered13:54+08 from frozen/pushed82c460f. Full ten-module May2023 /MT
 SDK57889 actualexit0, frozen alias/transaction/Motion ASAN, seven-kind complete
 panel67471 actualexit0;502 source hashes,10/18/27/selector and backup10/18 match.

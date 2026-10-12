@@ -1,5 +1,35 @@
 # 当前工程状态
 
+## M3-17 render lifecycle native76 / CEP80 candidate — 2026-10-12
+
+Owner disproves75/79 deletion correction: stream268/error516/delivered0 still
+appears. Return to M3-17; preserve Motion work. Full EffectGraphBackup retains
+an old-bound renderer duplicate until cleanup. The old render entry ignores
+guard1/2 and may read half-applied originals or retired sources in a disabled
+backup. This is a confirmed source/coverage gap; actual AE callback scheduling
+remains a hypothesis. Native76 cancels guarded frames before graph/aliases/
+history/resources, checks the guard dependency, and retains strict guard0 errors.
+No public IDs/types/schema/CoreABI9 change; packed32844, full ten-module76/CEP80.
+
+Actual backup + render-entry lifecycle ASAN426896 passes:7722 callbacks,7624
+canceled,97 normal,3180 disabled-backup callbacks, zero unexpected errors and
+zero guarded missing bindings. All seven individual removals, delete all, both
+duplicate insertion orders and partial-removal restore are exercised. Unmodified
+native75 render entry in the same lifecycle fails7624 callbacks, including1516
+backup missing bindings (actual exit1). This is offline reproduction, not AE
+reproduction. Working alias ASAN17828+camera12, panel/DOM/reload/ES3 audit,
+dummy75/79→76/80 paired publish/rollback67, legacy acceptance harness172 and
+new native-journal/render harness17 pass. Logs artifacts/m3-17-render-quiescence-*.
+
+The explicit development -RenderJournal SDK build logs bounded render results
+under the frozen checkout artifacts; default builds disable logging. A prepared
+16-case AE acceptance creates only temporary test project items, renders one
+frame after each complete transaction, reads native errors despite suppressed
+test dialogs, and cleans its own items. It rejects an existing render queue before
+mutation. AE launch/dispatch remains separately authorized under ADR0011; no AE
+process action has occurred. Installed pair remains75/79 pending frozen build
+and publication. Actual cancellation/retry, deletion/undo/reopen gates remain open.
+
 ## M3-17 native75 / CEP79 alias handoff deployed — 2026-10-12 13:54+08
 
 Owner reports74/78 deletion still raises parameter-value warnings, e.g.258/516;

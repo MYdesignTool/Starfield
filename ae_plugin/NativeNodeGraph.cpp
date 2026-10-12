@@ -1908,10 +1908,15 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
                     if (error) return error;
                     const bool valid = sampled.param_type == PF_Param_FLOAT_SLIDER &&
                         std::isfinite(sampled.u.fs_d.value) && sampled.u.fs_d.value != kNativeBindingUnavailable;
+                    const auto invalid_stage=sampled.param_type!=PF_Param_FLOAT_SLIDER?"parameter type":
+                        !std::isfinite(sampled.u.fs_d.value)?"nonfinite parameter value":"binding unavailable";
                     const double value = valid ? sampled.u.fs_d.value : 0;
                     const auto checked_in = PF_CHECKIN_PARAM(data, &sampled);
                     stage("parameter value");
-                    if (!valid) return PF_Err_BAD_CALLBACK_PARAM;
+                    if (!valid) {
+                        stage(invalid_stage);
+                        return PF_Err_BAD_CALLBACK_PARAM;
+                    }
                     stage("parameter checkin");
                     if (checked_in) return checked_in;
                     field.value[component] = value;

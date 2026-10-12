@@ -7,6 +7,7 @@ param(
     [switch]$NoRuntimePublish,
     [switch]$NoDistPublish,
     [switch]$IncludeModelCandidate,
+    [switch]$RenderJournal,
     [string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'),
     [string]$NvrtcPath = 'artifacts\gpu-build\nvrtc-12.4.127\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll',
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
@@ -39,6 +40,23 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $taskSourceVersion=[regex]::Match([IO.File]::ReadAllText((Join-Path $repositoryRoot 'ae_plugin/PluginVersion.h')),'#define STARFIELD_VERSION_BUILD\s+(\d+)')
 if(-not $taskSourceVersion.Success){throw 'Native build version is unavailable.'}
 $taskSourceNativeBuild=[int]$taskSourceVersion.Groups[1].Value
+if($RenderJournal -and ($CoreOnly -or -not $NoDistPublish -or -not $NoRuntimePublish)) {
+    throw 'RenderJournal requires a full unpublished build with both NoPublish switches.'
+}
+$taskJournalConfig=Join-Path $repositoryRoot 'artifacts/graph-render-journal-config.hpp'
+if(-not $CoreOnly) {
+    New-Item -ItemType Directory -Path (Split-Path -Parent $taskJournalConfig) -Force | Out-Null
+    $taskJournalText='// Generated development configuration: logging disabled.'
+    if($RenderJournal) {
+        $taskJournalPath=[IO.Path]::GetFullPath((Join-Path $repositoryRoot ('artifacts/graph-render-journal-'+$taskSourceNativeBuild+'.jsonl')))
+        if(-not $taskJournalPath.StartsWith($repositoryRoot+'\artifacts\',[StringComparison]::OrdinalIgnoreCase)){throw 'Journal path escapes repository artifacts.'}
+        $taskJournalEscaped=$taskJournalPath.Replace('\','\\').Replace('"','\"')
+        $taskJournalEscaped=[regex]::Replace($taskJournalEscaped,'[^\x20-\x7e]',{param($m)'\u'+([int][char]$m.Value).ToString('x4')})
+        $taskJournalText='#define STARFIELD_GRAPH_RENDER_JOURNAL_FILE L"'+$taskJournalEscaped+'"'
+        Write-Host "Developer render journal (no AE process action): $taskJournalPath"
+    }
+    [IO.File]::WriteAllText($taskJournalConfig,$taskJournalText+[Environment]::NewLine,[Text.Encoding]::ASCII)
+}
 if($taskSourceNativeBuild -ge 61 -and -not $CoreOnly -and -not $NoDistPublish){
     throw 'Model full builds require -NoDistPublish; publish the complete native/Core/CEP pair through Deploy-ModelTestBuild.ps1.'
 }
@@ -160,6 +178,7 @@ foreach($taskHeaders in @('ae_plugin','include/starfield/core','src/core')) {
         Where-Object {$_.Extension -in @('.h','.hpp')} |
         ForEach-Object {$_.FullName.Substring($repositoryRoot.Length+1)})
 }
+if(Test-Path -LiteralPath $taskJournalConfig){$adapterInputs+='artifacts\graph-render-journal-config.hpp'}
 $adapterInputs=@($adapterInputs | Sort-Object -Unique)
 $adapterFingerprint = ($adapterInputs | ForEach-Object {
     $path = Join-Path $repositoryRoot $_

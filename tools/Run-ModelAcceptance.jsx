@@ -21,11 +21,16 @@
         for(var i=0;i<run.created.length;i++)if(run.created[i]===item.id)return item;run.created.push(item.id);return item;}
     function ownedItem(id){for(var i=1;i<=app.project.numItems;i++)if(app.project.item(i).id===id)return app.project.item(i);return null;}
     function nativeActive(){var s=host[modelKey];return s && s.id===run.id && (s.state==="executing" || s.state==="applying" || s.state==="receiving");}
-    function finish(error){run.running=false;run.status=error?"failed":"passed";run.error=error?String(error):"";run.finished=(new Date()).getTime();
+    function finish(error){
+        if(fixture && fixture.nativeJournal){try{readNativeJournal();if(!error && (!run.nativeJournal || !run.nativeJournal.frames))error="No native render journal activity observed.";
+            if(!error && run.nativeJournal.errors.length)error="Native render failures: "+JSON.stringify(run.nativeJournal.errors);
+        }catch(journalError){if(!error)error=String(journalError);}}
+        run.running=false;run.status=error?"failed":"passed";run.error=error?String(error):"";run.finished=(new Date()).getTime();
         if(run.task)app.cancelTask(run.task);
         if(nativeActive()){run.cleanup="Deferred: native transaction still owns the temporary test composition.";}
         else{try{if(run.id && host[modelKey] && host[modelKey].id===run.id)request("releaseModelGraphTransaction",{});
             if(activeAsset)request("releaseModelAsset",{assetId:activeAsset.id});
+            if(run.renderItem){run.renderItem.remove();run.renderItem=null;}
             for(var i=run.created.length-1;i>=0;i--){var item=ownedItem(run.created[i]);if(item)item.remove();}
             if(previous && previous instanceof CompItem){previous.openInViewer();for(var s=0;s<selection.length;s++){try{selection[s].layer.selected=selection[s].selected;}catch(ignored){}}}
             run.cleanup="Temporary test items removed; previous composition and layer selection restored.";
@@ -33,6 +38,31 @@
         if(suppressed){app.endSuppressDialogs(false);suppressed=false;}write();}
     function later(){run.task=app.scheduleTask("$.global.__SFLD_modelAcceptanceTick()",250,false);}
     function snapshot(){return checkReply(request("getGraphSnapshot",{})).snapshot;}
+    function readNativeJournal(){
+        if(!fixture.nativeJournal)return;
+        var f=new File(fixture.nativeJournal);if(!f.exists)return;
+        f.encoding="UTF-8";if(!f.open("r"))throw new Error("Cannot read native render journal.");
+        var text,end;try{if(!f.seek(run.nativeJournalOffset,0))throw new Error("Cannot seek native journal.");text=f.read();end=f.tell();}finally{f.close();}
+        // A writer can still be closing its final line. Re-read a partial tail.
+        if(text && text.charAt(text.length-1)!=="\n")return;
+        run.nativeJournalOffset=end;
+        var lines=text.split("\n");for(var n=0;n<lines.length;n++)if(lines[n]) {
+            var row=JSON.parse(lines[n]);if(row.nativeBuild!==fixture.nativeBuild)throw new Error("Native journal build differs.");
+            run.nativeJournal.frames++;if(row.canceled)run.nativeJournal.canceled++;
+            else if(row.result!==0 && run.nativeJournal.errors.length<50)run.nativeJournal.errors.push(row);
+        }
+    }
+    function renderAcceptanceFrame(){
+        if(!fixture.renderFrames)return;
+        if(app.project.renderQueue.numItems!==0)throw new Error("An existing render queue prevents isolated acceptance.");
+        var rq=app.project.renderQueue.items.add(comp);run.renderItem=rq;
+        try{rq.timeSpanStart=1;rq.timeSpanDuration=1/comp.frameRate;rq.render=true;
+            var output=new File(new File(config.result).parent.fsName+"/case-"+run.index+".avi");
+            rq.outputModule(1).file=output;app.project.renderQueue.render();
+            if(rq.status!==RQItemStatus.DONE || !output.exists || output.length===0)throw new Error("Acceptance frame did not render completely.");
+            readNativeJournal();if(run.nativeJournal.errors.length)throw new Error("Native render failed during deletion lifecycle.");
+        }finally{rq.remove();run.renderItem=null;}
+    }
     function u32(bytes,offset,value){for(var b=0;b<4;b++)bytes[offset+b]=(value>>>(8*b))&255;}
     function materialize(step){var result=JSON.parse(JSON.stringify(step)),bytes=[];
         for(var i=0;i<result.graphHex.length;i+=2)bytes.push(parseInt(result.graphHex.substr(i,2),16));
@@ -50,7 +80,7 @@
             observed.push({id:actual.id,type:actual.type,schemaVersion:actual.schemaVersion});}
         return observed;}
     function exportNext(){var step=run.step;
-        if(assetIndex>=step.assets.length){run.cases.push({name:step.name,ok:true,revision:run.saved.revision,nodes:verify(step,run.saved),assetReadbacks:assetIndex,
+        if(assetIndex>=step.assets.length){renderAcceptanceFrame();run.cases.push({name:step.name,ok:true,revision:run.saved.revision,nodes:verify(step,run.saved),assetReadbacks:assetIndex,
             elapsedMilliseconds:(new Date()).getTime()-run.stepStarted,prepareMilliseconds:run.queuedAt-run.stepStarted,
             queueAndCommitMilliseconds:run.committedAt-run.queuedAt,readbackMilliseconds:(new Date()).getTime()-run.committedAt});run.index++;run.phase="begin";write();later();return;}
         var asset=step.assets[assetIndex];activeAsset={id:run.id.substr(0,28)+("000"+assetIndex).slice(-4),expected:asset,page:0};
@@ -87,6 +117,10 @@
     try{
         var file=new File(config.fixture);file.encoding="UTF-8";if(!file.open("r"))throw new Error("Missing acceptance fixtures.");try{fixture=JSON.parse(file.read());}finally{file.close();}
         if(fixture.gatewayBuild!==config.gatewayBuild || fixture.version!==1)throw new Error("Acceptance fixture generation differs.");
+        if(fixture.renderFrames){if(!fixture.nativeJournal || fixture.nativeBuild!==76)throw new Error("Missing paired native journal contract.");
+            if(app.project.renderQueue.numItems!==0)throw new Error("An existing render queue prevents isolated acceptance.");
+            var journal=new File(fixture.nativeJournal);run.nativeJournalOffset=journal.exists?journal.length:0;
+            run.nativeJournal={frames:0,canceled:0,errors:[]};}
         if(fixture.deadlineMilliseconds!==undefined && (typeof fixture.deadlineMilliseconds!=="number" || !isFinite(fixture.deadlineMilliseconds) || fixture.deadlineMilliseconds<120000 || fixture.deadlineMilliseconds>600000 || Math.floor(fixture.deadlineMilliseconds)!==fixture.deadlineMilliseconds))throw new Error("Invalid bounded acceptance deadline.");
         $.evalFile(new File(config.repo+"/cep_panel/jsx/starfield_gateway.jsx"));$.evalFile(new File(config.repo+"/cep_panel/jsx/model_transaction_transport.jsx"));
         if(host.SFLD_modelTransactionReady()!==config.gatewayBuild)throw new Error("Installed gateway/transport generation differs.");

@@ -991,7 +991,7 @@ int main() {
     A_long missing_stream=-1;
     auto unresolved_graph=animated_graph;
     check(sample_native_node_animation(&renderer_data,unresolved_graph,1920,1080,&missing_stream,&failed_stage)==PF_Err_BAD_CALLBACK_PARAM &&
-          missing_stream==kNativeBindingFirstIndex && std::strcmp(failed_stage,"parameter value")==0,
+          missing_stream==kNativeBindingFirstIndex && std::strcmp(failed_stage,"binding unavailable")==0,
           "unresolved expression output cannot silently zero particle settings");
 
     // Real UI metadata reader and native static preparation, using ParamUtils
@@ -1755,6 +1755,11 @@ int main() {
         check(seven_error==0,
             "seven-kind native graph publishes actual bindings");
         auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
+        const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
+        check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
+        std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);
+        lifecycle_file.write(reinterpret_cast<const char*>(lifecycle_bytes.value().data()),lifecycle_bytes.value().size());
+        check(bool(lifecycle_file),"actual compiler graph saved for full backup/render lifecycle test");lifecycle_file.close();
         const auto baseline_text=expressions;const auto baseline_enabled=expression_enabled;
         auto render_data=renderer_data;render_data.num_params=0;
         render_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* out)->PF_Err {

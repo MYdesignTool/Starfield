@@ -17,6 +17,41 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 owner reports75/79 still raises parameter-value stream268/error516.
+The install mutation tests do not include the full EffectGraphBackup lifecycle.
+The duplicated renderer retains the old graph and aliases through physical
+deletion/backup cleanup. Disabling its ACTIVE flag is not a render-entry contract;
+checkout_render_graph currently ignores guard1/2 entirely. In addition, original
+renderer resources/graph can be halfway changed while guard1 is held. These are
+confirmed code/coverage gaps; which callback AE actually schedules is still a
+hypothesis, not a reproduced host defect.
+
+Define render quiescence for the existing renderer guard:0 samples normally;
+1 (authored edit) and2 (private full backup) return PF_Interrupt_CANCEL before
+graph/aliases/history/resources are sampled. This is an explicit canceled frame,
+not successful empty pixels, suppression of dialogs or acceptance of bad aliases.
+Check out/check in the guard so AE tracks its dependency; clearing it after
+complete publication/restore permits a new frame from the final saved state.
+Unknown/nonfinite guard values and all normal guard0 binding failures remain
+errors. No persistent ID/type/schema/ABI change. Add a full lifecycle fixture
+using real EffectGraphBackup and checkout_render_graph, sampling every renderer,
+including disabled copies, after every mutation; prove old source failure and
+normal rendering after commit/rollback. Actual AE scheduling/cancellation must
+be qualified separately. Native error messages also identify the compiled build,
+guard and value failure category, without changing strict guard0 validation.
+
+Developer-only observation: explicit full unpublished BuildWindows -RenderJournal
+generates an ASCII configuration header under that frozen checkout's artifacts,
+fingerprinted as an AEX input, with a log path confined to its artifacts folder.
+Default full builds generate a disabled configuration; CoreOnly preserves the
+prior input and still requires an exact fingerprint. Parameters' render wrapper
+appends bounded JSON lines (build/PID/effect identity/time/guard/result/message)
+only in that opted-in candidate. No registry/environment/host-folder write or
+SDK handle retention. Log errors cannot change rendering. The AE acceptance
+wrapper reads only new lines, verifies actual render activity and fails on native
+errors; suppressing test dialogs is not accepted as evidence of zero errors.
+This is test-build instrumentation, with no public control/ID/schema/ABI change.
+
 2026-10-12 owner reports native74/CEP78 still raises parameter-value errors on
 deletion (different alias streams, screenshot stream258). Physical removal
 ordering was necessary but did not cover expression mutation: install disables

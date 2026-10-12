@@ -1,5 +1,14 @@
 # Starfield 架构
 
+M3-17 candidate76/CEP80 follows the owner's failed75/79 deletion retest. Renderer
+guard0 remains strict; guard1 (edit) and2 (private backup) cancel render checkout
+before graph, aliases and resources. Guard checkout records the release dependency.
+This covers original and disabled backup renderers throughout physical deletion
+and rollback. Full backup/render lifecycle reproduces old75 missing-source errors
+and passes the new entry; actual AE scheduling/cancellation remains unqualified.
+Optional confined development render journal supports automated host evidence.
+ADR0040 owns this contract; IDs/schema/CoreABI9 unchanged, Motion work preserved.
+
 M3-17 native75/CEP79 deployed13:54+08 repairs the separate alias mutation window left
 by74/78. Keep obsolete expressions until saved graph verification, then detach
 before physical removal. Validate the old evaluated alias and install a finite
