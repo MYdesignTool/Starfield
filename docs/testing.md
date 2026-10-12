@@ -11,7 +11,12 @@ returned refs on failed acquisition, all stream/suite cleanup failures, null
 suites/refs and missing callbacks. Inventory/point capture ASAN8099 also passes.
 Logs: artifacts/m3-18-motion-light-timing-{tests-v2,asan-v2,inventory-regression}.log.
 This reads times only; timed interpolation/author/AE selector qualification remains
-open. Installed native73/CEP77 is not changed by these fixtures.
+open. Frozen45cc03d repeats ASAN4108/8099; full May2023 /MT ten-module SDK
+session74341 completed actual exit0 with both NoPublish switches. All500 source
+hashes unchanged; new CPP/header appear in compiled-input fingerprint. Evidence:
+artifacts/prepared/m3-18-motion-light-timing/{sdk-build.log,sdk-terminal.json,
+source-hashes.json,timing-asan.log,light-sources-asan.log}. Installed73/77 pair,
+all27 CEP, selector and backup10/18 rechecked unchanged09:51:35+08.
 
 ## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12
 

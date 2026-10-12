@@ -348,6 +348,8 @@ Next owned seam: ae_plugin/MotionLightTiming.hpp/.cpp, main project and focused 
 
 2026-10-12 timed point-light metadata标准/ASAN4108及inventory/point ASAN8099通过，零/单/分离XYZ/逆序comp端点、所有SDK失败/清理/取消与返回失败owned stream覆盖，无分配。当前源码完整SDK冻结待验证；原时长与实际插值采样/资源历史/依赖/作者继续，安装73/77不变，不宣布Light Path可用。
 
+45cc03d已推送并git archive冻结：完整May2023 /MT十模块双NoPublish会话74341实际exit0，冻结ASAN4108/8099通过，500 raw源码hash及新CPP/header/Main指纹核对通过。SDK证据artifacts/prepared/m3-18-motion-light-timing/sdk-terminal.json；09:51:35+08独立安装73/77的10/18/27/selector/backup10/18 hash均未变。继续映射时间位置采样/原生资源历史/依赖/三模式作者，不发布helper或关闭完整目标。
+
 2026-10-12 09:35+08 native73/CEP77发布：56f9e36已推送并git archive冻结，完整May2023 /MT十模块双NoPublish实际会话90542 exit0；冻结standard/ASAN8438、native643、Circle2020、numeric Path10336、dummy配对回滚67和七类注册/DOM/reload/ES3会话55843 exit0通过。496源码hash未变，新OrderedForce.hpp进入fingerprint；fresh AE0后发布，独立10 native/18 paired/27全CEP/selector及backup10/18 hash匹配。证据artifacts/m3-18-ordered-force77-installed-proof.json及m3-17-native73 receipts；备份m3-18-native73-panel77-ordered-force-20261012恢复72/76。live recipe77/frozen保留76→77 delta，不启动/调度AE。不同链合并/Particle前置模块/timed point-light/Look At/M3-19及实际AE验收继续；本卡/完整目标active。
 
 2026-10-12 ordered Force候选native73/CEP77：标准/实际ASAN8438、native643、Circle2020、numeric Path10336通过，dummy72/76→73/77发布/完整回滚67通过，隔离面板27 hashes重现。包含CPU pixels/GPU scene位置及反序节点/边验证。v3 asan命名日志误用标准switch，不计为ASAN证据；v4显式-Sanitize通过。下一步源码冻结完整SDK/七类注册面板验收及配对发布；安装72/76保持。异链合并/Particle前置模块/timed light/Look At/M3-19和实际AE验收仍开放。

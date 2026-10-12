@@ -14,7 +14,16 @@ callback failures, cancellation, returned stream on failed acquisition, cleanup
 failures, absent callbacks/suites, invalid identities/types/times, separated
 followers and no allocations. Existing inventory/point ASAN8099 passes.
 Evidence: artifacts/m3-18-motion-light-timing-{tests-v2,asan-v2,inventory-regression}.log.
-Full frozen SDK validation is next; installed native73/CEP77 stays unchanged.
+Source45cc03dbe18c237da41fe8e2a1c4ddfe49f06fc4 is pushed and git-archive frozen.
+Full May2023 /MT ten-module SDK with both NoPublish switches completed actual
+session74341 exit0. Frozen ASAN4108/8099 pass, all500 raw source hashes remain
+unchanged, and MotionLightTiming.cpp/.hpp are in the compiled-input fingerprint.
+Receipts/logs: artifacts/prepared/m3-18-motion-light-timing/{sdk-build.log,
+sdk-terminal.json,source-hashes.json,timing-asan.log,light-sources-asan.log}.
+Independent installed10 native/18 paired/27 full CEP/selector and backup10/18
+hashes remain native73/CEP77; proof rechecked09:51:35+08. No new publication or
+AE process/script operation. Continue mapped-time point sampling and native
+resource/history/shutter/cache author integration.
 M3-18 and full goal remain active. This metadata helper is not a Light Path author.
 
 ## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12 09:35+08
