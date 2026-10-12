@@ -1,6 +1,6 @@
 # Starfield 架构
 
-M3-17 candidate76/CEP80 follows the owner's failed75/79 deletion retest. Renderer
+M3-17 deployed76/CEP80 (15:27+08) follows the owner's failed75/79 deletion retest. Renderer
 guard0 remains strict; guard1 (edit) and2 (private backup) cancel render checkout
 before graph, aliases and resources. Guard checkout records the release dependency.
 This covers original and disabled backup renderers throughout physical deletion

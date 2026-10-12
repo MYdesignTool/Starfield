@@ -2,6 +2,14 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+76/80 deployed15:27+08 from pushed/frozen f7f9a05. Actual May2023 ten-module
+SDK62024 exit0, frozen alias17828+camera12/lifecycle426896 ASAN, full panel88342
+exit0/dummy rollback67,507 unchanged source hashes and installed10/18/27/selector+
+backup10/18 match. Enabled development journal probe/lifecycle agree with terminal
+evidence. Backup m3-17-native76-panel80-render-quiescence-20261012 restores75/79.
+Prepared16-case automatic AE deletion/render acceptance is ready; separate launch
+authorization pending. No AE process/script action; actual host gates open.
+
 Owner reports75/79 still fails (stream268). Keep this card active; Motion work
 preserved. New owned scope: Parameters.cpp transaction render entry, precise
 NativeNodeGraph animation value diagnostics, actual backup/render lifecycle

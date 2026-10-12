@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "status": "Installed native75/Core ABI9/CEP79 from frozen82c460f; finite alias handoff and post-publication retirement, frozen ten-module May2023 SDK/ASAN/seven-kind panel/deploy and rollback verified. Owner accepted Circle at73/77; actual AE deletion correction/undo/reopen remain open. artifacts/prepared/m3-17-native75-alias-handoff/source.zip retains the tested78-to79 delta.",
-  "basePanel": 79,
+  "status": "Installed native76/Core ABI9/CEP80 from frozen f7f9a05; full backup render quiescence and confined development render journal. Frozen May2023 ten-module SDK, ASAN lifecycle, seven-kind panel audit and paired rollback verified. Owner disproves75/79; actual AE cancellation/deletion/undo/reopen remain open. artifacts/prepared/m3-17-native76-render-quiescence/source.zip retains the tested79-to80 delta.",
+  "basePanel": 80,
   "files": [
     {
       "path": "index.html",
-      "normalizedSha256": "94926EE0D261F22A00B1A3AD2A27A308C0BF62A84407A81C08695A641F3A4025"
+      "normalizedSha256": "58DB668579A905115E8E7ED47540D6DDD05434846445C9B8E2ACD21BFFAA7955"
     },
     {
       "path": "css/panel.css",
@@ -29,7 +29,7 @@
     },
     {
       "path": "js/panel.js",
-      "normalizedSha256": "86CC55DE302D5A7AF1042609CFA29CDA76E21BE84D99BB8B12A0AC663436442B"
+      "normalizedSha256": "2E34ADF9CD1D898857138AD305C85D6E07B132BEF9BF717A7E6D164A8546062D"
     },
     {
       "path": "js/graph_transactions.js",
@@ -37,11 +37,11 @@
     },
     {
       "path": "jsx/starfield_gateway.jsx",
-      "normalizedSha256": "401C997FEFDD9699111512139701051AC1C17BD701A80683DEF8D2E9A093A404"
+      "normalizedSha256": "6EC639E04E8A2B5047EAF6060AAF3C0FF87302908A1D440E33C5DC97E5CDB303"
     },
     {
       "path": "presets.html",
-      "normalizedSha256": "83C5918FC1080FC7D602B0CF1A59367E21155D410FEAD7A0EE2C1AFFCDE2FF26"
+      "normalizedSha256": "9CC7ACCBB7DD0705A67EE9B5B85B88648833B4373F39473292CDBBE19D4F487B"
     },
     {
       "path": "js/presets.js",
@@ -49,7 +49,7 @@
     },
     {
       "path": "js/preset_manager.js",
-      "normalizedSha256": "FEEDE4B9713DEA730FA439A7A79200BB56CF8ACB59482E05A16F89350FD1C755"
+      "normalizedSha256": "72362A9482835C0CA51EAB118687078CF38AA3F5890D4505247E6A2FA99CD40F"
     }
   ]
 }

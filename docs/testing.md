@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-17 complete deletion/render lifecycle candidate76 / CEP80 — 2026-10-12
+## M3-17 complete deletion/render lifecycle deployed76 / CEP80 — 2026-10-12
 
 Run `tests/RunAliasHandoffTests.ps1 -Run [-Sanitize]` first; it exports the actual
 seven-kind compiled/bound graph under artifacts. Then run
@@ -20,9 +20,17 @@ offsets, cancellation, errors despite suppressed dialogs, failed output, queue
 isolation and activity. Legacy Model harness172 passes. Full panel/DOM/reload/ES3
 audit and dummy75/79→76/80 paired rollback67 pass. Render journal is enabled only
 by full unpublished `BuildWindows.ps1 -RenderJournal`, its artifacts configuration
-is fingerprinted; default builds disable it. Frozen SDK and actual host gates are
-still pending at this source checkpoint. Prepared16-case host launch needs the
-separate ADR0011 permission, not another owner diagnostic script.
+is fingerprinted; default builds disable it. Frozen build/regressions pass from
+f7f9a05: actual May2023 /MT ten-module SDK62024 exit0;
+alias ASAN17828+camera12/22597, lifecycle426896/63153, full seven-kind panel/
+DOM/reload/ES3 audit88342 and dummy paired rollback67 pass. All507 source hashes
+unchanged and all27 tested CEP identical. Enabled journal probe checks build/
+cancel/null/escaping; lifecycle journal7722/canceled7624/normal97/intentional
+guard0 error1 matches actual terminal evidence. Logs/receipts/proofs under
+artifacts/prepared/m3-17-native76-render-quiescence. Fresh AE0 preceded15:27+08
+deployment; installed10/18/27/selector and rollback10/18 independently match.
+Actual host gates remain open. Prepared16-case host launch needs separate
+ADR0011 permission, not another owner diagnostic script.
 
 ## M3-17 alias handoff deployed75 / CEP79 — 2026-10-12
 

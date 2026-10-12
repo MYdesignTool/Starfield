@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## M3-17 render lifecycle native76 / CEP80 candidate — 2026-10-12
+## M3-17 render lifecycle native76 / CEP80 deployed — 2026-10-12 15:27+08
 
 Owner disproves75/79 deletion correction: stream268/error516/delivered0 still
 appears. Return to M3-17; preserve Motion work. Full EffectGraphBackup retains
@@ -27,8 +27,24 @@ under the frozen checkout artifacts; default builds disable logging. A prepared
 frame after each complete transaction, reads native errors despite suppressed
 test dialogs, and cleans its own items. It rejects an existing render queue before
 mutation. AE launch/dispatch remains separately authorized under ADR0011; no AE
-process action has occurred. Installed pair remains75/79 pending frozen build
-and publication. Actual cancellation/retry, deletion/undo/reopen gates remain open.
+process action has occurred. Source f7f9a052b3f6fb33d06d8651ca5c2af6f1e35ed2 is
+pushed/git-archive frozen. Full May2023 /MT ten-module SDK with both NoPublish
+and -RenderJournal completes actual session62024 exit0. Frozen alias ASAN17828+
+camera12 (22597), lifecycle ASAN426896 (63153), full seven-kind panel/DOM/reload/
+ES3 audit (88342) and dummy paired rollback67 pass. Enabled journal probe checks
+build/cancel/null/escaping; actual lifecycle journal matches7722 callbacks and
+only the one intentional strict guard0 failure. All507 source hashes unchanged;
+new header/generated config in fingerprint and all27 tested CEP identical.
+Logs/terminal/proofs at artifacts/prepared/m3-17-native76-render-quiescence.
+
+Fresh AE0 allowed publication15:27:03+08 through existing Junctions. Independent
+10 native/18 paired/27 full CEP/selector and backup10/18 match15:27:16+08:
+artifacts/m3-17-render-quiescence80-installed-proof.json and
+m3-17-native76-deploy-{before,after}.json. Live recipe normalized80; frozen source
+retains79→80. Backup75/79 retained. No AE start/stop/dispatch; actual cancellation/
+retry, deletion/undo/reopen gates remain open. M3-17 stays active for host evidence.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native76-panel80-render-quiescence-20261012' -Restore`.
 
 ## M3-17 native75 / CEP79 alias handoff deployed — 2026-10-12 13:54+08
 
