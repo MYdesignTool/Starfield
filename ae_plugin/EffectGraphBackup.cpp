@@ -171,8 +171,12 @@ A_Err EffectGraphBackup::prepare(const std::array<std::uint8_t,16>& operation,st
         if(e){const auto cleanup=delete_backups();if(cleanup)rollback_error_=cleanup;const auto reset=release_guard();if(reset)rollback_error_=reset;prepared_=false;return e;}
     }return 0;
 }
-A_Err EffectGraphBackup::discard() noexcept {
-    if(!prepared_)return bad;prepared_=false;const auto cleanup=delete_backups();const auto reset=release_guard();return cleanup?cleanup:reset;
+A_Err EffectGraphBackup::discard(A_Err (*finalize)(void*),void* context) noexcept {
+    if(!prepared_)return bad;prepared_=false;auto cleanup=delete_backups();
+    // No physical mutation follows the final refresh. Keep the renderer guarded
+    // until bindings have been checked against the surviving effect parade.
+    if(!cleanup && finalize)try{cleanup=finalize(context);}catch(...){cleanup=PF_Err_INTERNAL_STRUCT_DAMAGED;}
+    const auto reset=release_guard();return cleanup?cleanup:reset;
 }
 A_Err EffectGraphBackup::restore() noexcept {
     if(!prepared_)return bad;prepared_=false;

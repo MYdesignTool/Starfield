@@ -1,4 +1,5 @@
 #include "ModelTransactionHost.hpp"
+#include "GraphBindingRefreshRequest.hpp"
 #include "UiExclusionHost.hpp"
 #include "ModelGraphTransaction.hpp"
 #include "ScriptDiagnostic.hpp"
@@ -24,10 +25,11 @@ unsigned script_depth{};
 unsigned result_losses{},result_rejections{};bool result_absent{};
 struct Memory {std::string text;bool locked{};};
 AEGP_UtilitySuite6 utility{};AEGP_MemorySuite1 memory{};AEGP_ProjSuite6 projects{};
-AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};AEGP_LayerSuite9 layers{};SPBasicSuite basic{};
+AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};AEGP_LayerSuite9 layers{};AEGP_EffectSuite4 effects{};SPBasicSuite basic{};
+unsigned final_refreshes{},refresh_refs{};
 template<class T>T opaque(std::uintptr_t value){return reinterpret_cast<T>(value);}
 AEGP_MemHandle mem(std::string text){++handles;return reinterpret_cast<AEGP_MemHandle>(new Memory{std::move(text)});}
-void clean(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(script_depth==0);}
+void clean(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(script_depth==0);CHECK(refresh_refs==0);}
 std::string arguments(const std::string& body,const char* name){const std::string marker=std::string(name)+"(";
     const auto start=body.find(marker),end=body.rfind("):'0')");CHECK(start!=std::string::npos && end!=std::string::npos);
     return body.substr(start+marker.size(),end-start-marker.size());}
@@ -37,7 +39,7 @@ void reset(){stop_model_transaction_host();clean();initialize_ui_exclusion();ini
     available=continue_ok=prepare_ok=commit_ok=true;
     script_error=unterminated=oversize=reenter=bad_project=bad_comp=bad_layer=change_after_prepare=bad_hex=short_page=stop_in_prepare=committed_warning=unique_assets=false;
     lost_request=lost_claim=lost_begin=false;script_calls=executor_calls=prepares=commits=results=pages=claims=requests=0;
-    result_losses=result_rejections=0;result_absent=false;}
+    result_losses=result_rejections=final_refreshes=0;result_absent=false;}
 void drain(){queue_model_graph_transaction();unsigned passes{};while(step_model_transaction_host()){CHECK(++passes<300);clean();}clean();}
 void initialize(){
     utility.AEGP_IsScriptingAvailable=[](A_Boolean* out)->A_Err{*out=available;return 0;};
@@ -86,11 +88,22 @@ void initialize(){
     comps.AEGP_GetCompFromItem=[](AEGP_ItemH,AEGP_CompH* out)->A_Err{*out=opaque<AEGP_CompH>(2);return 0;};
     layers.AEGP_GetLayerFromLayerID=[](AEGP_CompH,A_long id,AEGP_LayerH* out)->A_Err{CHECK(id==303);*out=bad_layer?nullptr:opaque<AEGP_LayerH>(3);return 0;};
     layers.AEGP_GetLayerCurrentTime=[](AEGP_LayerH,AEGP_LTimeMode mode,A_Time* out)->A_Err{CHECK(mode==AEGP_LTimeMode_LayerTime);*out={12,24};return 0;};
+    effects.AEGP_GetLayerNumEffects=[](AEGP_LayerH h,A_long* out)->A_Err{CHECK(h==opaque<AEGP_LayerH>(3));*out=1;return 0;};
+    effects.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID p,AEGP_LayerH,A_long i,AEGP_EffectRefH* out)->A_Err{CHECK(p==7 && i==0);++refresh_refs;*out=opaque<AEGP_EffectRefH>(44);return 0;};
+    effects.AEGP_GetInstalledKeyFromLayerEffect=[](AEGP_EffectRefH,AEGP_InstalledEffectKey* key)->A_Err{*key=1;return 0;};
+    effects.AEGP_GetEffectMatchName=[](AEGP_InstalledEffectKey,A_char* out)->A_Err{std::strcpy(out,"org.starfieldfx.particle");return 0;};
+    effects.AEGP_DisposeEffect=[](AEGP_EffectRefH h)->A_Err{CHECK(h==opaque<AEGP_EffectRefH>(44) && refresh_refs--==1);return 0;};
+    effects.AEGP_EffectCallGeneric=[](AEGP_PluginID p,AEGP_EffectRefH h,const A_Time* time,PF_Cmd cmd,void* extra)->A_Err{
+        auto& r=*static_cast<GraphBindingRefreshRequest*>(extra);CHECK(script_depth==0 && !ui_exclusion_available());
+        CHECK(p==7 && h==opaque<AEGP_EffectRefH>(44) && time->value==12 && time->scale==24 && cmd==PF_Cmd_COMPLETELY_GENERAL);
+        CHECK(r.magic==0x53465231 && r.version==1 && r.bytes==sizeof(r) && r.renderer==h && r.plugin==7 && r.layer==opaque<AEGP_LayerH>(3));
+        ++final_refreshes;r.acknowledged=1;r.status=0;return 0;};
     basic.AcquireSuite=[](const char* name,int version,const void** out)->SPErr{
         CHECK(version>0);if(missing_suite==name)return 1;
         if(!std::strcmp(name,kAEGPUtilitySuite))*out=&utility;else if(!std::strcmp(name,kAEGPMemorySuite))*out=&memory;
         else if(!std::strcmp(name,kAEGPProjSuite))*out=&projects;else if(!std::strcmp(name,kAEGPItemSuite))*out=&items;
         else if(!std::strcmp(name,kAEGPCompSuite))*out=&comps;else if(!std::strcmp(name,kAEGPLayerSuite))*out=&layers;
+        else if(!std::strcmp(name,kAEGPEffectSuite))*out=&effects;
         else return 1;++suites;return 0;};
     basic.ReleaseSuite=[](const char*,int)->SPErr{CHECK(suites-- >0);return 0;};
 }
@@ -105,7 +118,10 @@ ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransa
         CHECK(a.source==2 && a.revision==17);for(auto b:a.mesh)CHECK(b==0xaa);}
     ModelGraphTransactionResult result;result.stage=ModelTransactionStage::prepare;result.error=plan.prepare(plan.context);
     if(!result.error){result.stage=ModelTransactionStage::commit;result.error=plan.is_cancelled(plan.context)?PF_Interrupt_CANCEL:plan.commit(plan.context);}
-    if(!result.error){result.committed=true;result.stage=ModelTransactionStage::complete;result.cleanup_error=committed_warning?516:0;}
+    if(!result.error){result.committed=true;result.stage=ModelTransactionStage::complete;CHECK(plan.finalize!=nullptr);
+        const auto before=final_refreshes,scripts=script_calls;result.cleanup_error=plan.finalize(plan.context);
+        CHECK(result.cleanup_error==0 && final_refreshes==before+1 && script_calls==scripts && refresh_refs==0);
+        if(committed_warning)result.cleanup_error=516;}
     return result;
 }
 }

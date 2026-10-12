@@ -19,4 +19,9 @@ namespace starfield::adapter {
 [[nodiscard]] PF_Err commit_panel_graph(PF_InData*, AEGP_EffectRefH,
     AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*) noexcept;
 
+// Final parade only, guard1 held. Reacquires aliases, reinstalls and verifies
+// source dependencies without republishing graph/nonce or reading stale aliases.
+[[nodiscard]] PF_Err refresh_panel_graph_bindings(PF_InData*,AEGP_EffectRefH,
+    AEGP_LayerH,AEGP_PluginID,PF_OutData*) noexcept;
+
 } // namespace starfield::adapter

@@ -1,5 +1,28 @@
 # 测试入口
 
+## M3-17 final parade / responsive panel candidate77 / CEP81 — 2026-10-12
+
+`node --expose-internals tests/panel_topology_responsiveness_tests.js` executes
+actual panel/client functions:32 checks for immediate projection, paint before
+host submission, cached receipt reuse, immediate confirmed revision, add/delete,
+Model route, error restore/selection, hidden/throttled progress and one submission.
+`node tests/panel_graph_transaction_tests.js` passes. Existing viewport pan and
+minimap remain usable while host writes are serialized. Automatic AE acceptance
+requests/runs are withdrawn per owner; offline tests do not qualify AE behavior.
+
+RunAliasHandoffTests -Run -Sanitize passes18125+camera12: saved graph refresh
+reinstalls unchanged text after an adversarial stale dependency, verifies strict
+missing binding before repair, requires guard1 and preserves graph/revision/nonce.
+The cache fixture is a hypothesis, not AE emulation. RunModelGraphTransactionTests
+-Run -Sanitize897638 checks final callback after backup removal/before release,
+including committed cleanup failure; RunModelTransactionHostTests ASAN9594670
+checks actual separate SFR1 message, unique target, no extra script call and release.
+ES3 18 and dummy76/80→77/81 paired rollback67 pass. Logs artifacts/m3-17-final-parade-*.
+Initial enum initializer failed compilation; initial test variable hid a global.
+Monolithic native test ASAN stack overflow was removed by isolating the new test
+locals in a helper; actual standard and ASAN now pass. Preserve failed logs.
+Frozen SDK/build/installed checks continue; actual host correction remains manual.
+
 ## M3-17 complete deletion/render lifecycle deployed76 / CEP80 — 2026-10-12
 
 Run `tests/RunAliasHandoffTests.ps1 -Run [-Sanitize]` first; it exports the actual

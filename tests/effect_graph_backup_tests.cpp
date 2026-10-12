@@ -209,15 +209,29 @@ void restore_failure_tests(){
         CHECK(backup.discard()!=0);CHECK(parade[1]->arbitrary.contains(99));CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==0);
         CHECK(std::count_if(parade.begin(),parade.end(),[](const Ptr& p){return p->kind>=-1 && p->numbers.at(guard(p->kind))==2;})==1);no_refs();}no_owned();}
 }
+void final_parade_tests(){
+    for(bool fails:{false,true}) {
+        reset();unsigned final_calls{};std::pair<unsigned*,bool> context{&final_calls,fails};
+        {EffectGraphBackup backup(&basic,7,layer());CHECK(backup.prepare(operation)==0);
+            const auto result=backup.discard([](void* ptr)->A_Err {
+                auto& state=*static_cast<std::pair<unsigned*,bool>*>(ptr);++*state.first;no_refs();
+                for(const auto& p:parade)if(p->kind>=-1)CHECK(p->numbers.at(guard(p->kind))!=transaction_backup_guard);
+                CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==1);
+                return state.second?injected:0;
+            },&context);
+            CHECK(result==(fails?injected:0));}
+        CHECK(final_calls==1 && parade[1]->numbers.at(kGraphSyncGuardId)==0);no_owned();
+    }
+}
 #ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
 struct Transaction {
     std::vector<std::uint8_t> bytes;
     std::vector<ModelAssetRestore> assets;
     std::vector<UUID> ids;
-    unsigned starts{},ends{},depth{},prepares{},commits{},generics{},written{};
+    unsigned starts{},ends{},depth{},prepares{},commits{},generics{},written{},finalizes{};
     unsigned cancel_phase{},generic_fail_at{};
     bool start_fail{},end_fail{},prepare_fail{},commit_fail{},prepare_throw{},commit_throw{},unacknowledged{},local_failure{},
-        wrong_target{},duplicate_target{},busy_target{},silent_revision{};
+        wrong_target{},duplicate_target{},busy_target{},silent_revision{},finalize_fail{};
     ModelGraphTransactionPlan plan() {ModelGraphTransactionPlan p;p.basic=&basic;p.plugin=7;p.layer=layer();p.time={12,24};p.id=operation;p.desired_ids=ids;p.assets=assets;p.context=this;
         p.prepare=[](void* context)->A_Err{auto& t=*static_cast<Transaction*>(context);++t.prepares;CHECK(t.depth==1);no_refs();
             // The actual gateway callback will do these structural/ordinary edits.
@@ -228,6 +242,9 @@ struct Transaction {
             if(t.prepare_throw)throw std::bad_alloc();return t.prepare_fail?injected:0;};
         p.commit=[](void* context)->A_Err{auto& t=*static_cast<Transaction*>(context);++t.commits;CHECK(t.depth==1);no_refs();
             if(t.commit_throw)throw std::runtime_error("commit exception");return t.commit_fail?injected:0;};
+        p.finalize=[](void* context)->A_Err{auto& t=*static_cast<Transaction*>(context);++t.finalizes;CHECK(t.depth==1);no_refs();
+            for(const auto& p:parade)if(p->kind>=-1)CHECK(p->numbers.at(guard(p->kind))!=transaction_backup_guard);
+            CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==1);return t.finalize_fail?injected:0;};
         p.is_cancelled=[](void* context) noexcept->std::int32_t{const auto& t=*static_cast<Transaction*>(context);
             return t.cancel_phase==1 || (t.cancel_phase==2 && t.prepares) || (t.cancel_phase==3 && t.written>=1) || (t.cancel_phase==4 && t.written==t.assets.size());};return p;}
 };
@@ -281,11 +298,12 @@ void transaction_tests(){
     {auto t=make_transaction();t.commit_fail=true;inject("delete",1);const auto r=run(t);CHECK(!r.committed && r.error==injected && r.rollback_error==injected);}
     {auto t=make_transaction();inject("delete",1);const auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==injected && t.commits==1);}
     {auto t=make_transaction();t.end_fail=true;const auto r=run(t);CHECK(r.committed && r.error==0 && r.undo_error==injected);}
+    {auto t=make_transaction();t.finalize_fail=true;const auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==injected && t.finalizes==1);}
     transaction=nullptr;
 }
 #endif
 }
-int main(){initialize();success_tests();preflight_tests();prepare_failure_tests();restore_failure_tests();
+int main(){initialize();success_tests();preflight_tests();prepare_failure_tests();restore_failure_tests();final_parade_tests();
 #ifdef STARFIELD_MODEL_GRAPH_TRANSACTION_TEST
     transaction_tests();std::cout<<"Model whole-graph transaction: "<<checks<<" checks, 0 failures (actual backup/SFMG1, fake May2023 callbacks)\n";
 #else

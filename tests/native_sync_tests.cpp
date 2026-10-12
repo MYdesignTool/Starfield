@@ -106,7 +106,7 @@ std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 bool lazy_dependencies{};
 std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
-A_long nonfinite_alias=-1, unresolved_alias=-1;
+A_long nonfinite_alias=-1, unresolved_alias=-1, stale_dependency_alias=-1;
 A_long fail_expression = -1;
 unsigned expression_clear_count{};
 bool disable_next_expression{};
@@ -186,6 +186,7 @@ double evaluated_binding(A_long index, A_long time) {
     }
     if(index==nonfinite_alias)return std::numeric_limits<double>::quiet_NaN();
     if(index==unresolved_alias)return kNativeBindingUnavailable;
+    if(index==stale_dependency_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
     if(expr==u"0")return 0; // A valid authored constant, including handoff reads.
@@ -225,6 +226,27 @@ double evaluated_binding(A_long index, A_long time) {
     if(birth_animation_test && id==2 && source==records::particle_layout::birth_chance)return value.one_d+time;
     return (id==2 && source==5) || (id==3 && source==1) ? value.one_d+time :
         (id==2 && source==8) ? 100.0-time : (id==2 && source==2) ? 2.0+time/24.0 : value.one_d;
+}
+#if defined(_MSC_VER)
+__declspec(noinline)
+#endif
+void final_refresh_test(const core::Graph& prior,PF_OutData& output) {
+    auto& renderer=fixtures[0];
+    // Adversarial dependency cache, not an AE emulator. Explicit reinstallation
+    // is required even when the expression text still names the same live source.
+    stale_dependency_alias=kNativeBindingFirstIndex;
+    auto unavailable=prior;auto checked=renderer_data;
+    checked.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+        *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=evaluated_binding(i,t);return 0;};
+    checked.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+    check(sample_native_node_animation(&checked,unavailable,1920,1080)==PF_Err_BAD_CALLBACK_PARAM,"stale final dependency remains a strict render failure");
+    const auto revision=renderer.values[kGraphRevisionId].one_d,receipt=renderer.values[kGraphEditReceiptId].one_d;
+    const auto bytes=core::serialize_graph(prior,core::particle_node_registry()).value();
+    check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && stale_dependency_alias==-1,"final refresh rebuilds unchanged dependencies");
+    auto refreshed=saved_graph();check(sample_native_node_animation(&checked,refreshed,1920,1080)==0,"refreshed seven-kind graph renders without fallback");
+    check(renderer.values[kGraphRevisionId].one_d==revision && renderer.values[kGraphEditReceiptId].one_d==receipt && core::serialize_graph(saved_graph(),core::particle_node_registry()).value()==bytes,"final refresh preserves graph/revision/receipt");
+    renderer.values[kGraphSyncGuardId].one_d=0;
+    check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==PF_Err_BAD_CALLBACK_PARAM,"unguarded final refresh rejects");renderer.values[kGraphSyncGuardId].one_d=1;
 }
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -401,7 +423,9 @@ int main() {
         auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
         if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
         if(!*text)++expression_clear_count;
-        expressions[index] = reinterpret_cast<const char16_t*>(text);sample_after_alias_mutation(); return 0;
+        expressions[index] = reinterpret_cast<const char16_t*>(text);
+        if(*text && index+kNativeBindingFirstIndex==stale_dependency_alias)stale_dependency_alias=-1;
+        sample_after_alias_mutation(); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
         if(enabled && disable_next_expression) { enabled=FALSE;disable_next_expression=false; }
@@ -1755,6 +1779,7 @@ int main() {
         check(seven_error==0,
             "seven-kind native graph publishes actual bindings");
         auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
+        final_refresh_test(prior,output);
         const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
         check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
         std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);

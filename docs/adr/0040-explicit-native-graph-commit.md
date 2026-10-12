@@ -17,6 +17,25 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 owner reports native76 guard0 unavailable binding stream258; real
+journal confirms guarded cancellations and failures after guard release. No more
+automatic AE acceptance requests/runs per owner; keep manual host gates open and
+continue development. Panel validated edits project immediately and yield for
+paint before host submission. Failed commits restore the previous canvas; pending
+state never certifies a saved graph. Host writes remain serialized.
+
+Publication currently verifies aliases before physical retirement/backup cleanup.
+Add an explicit final binding refresh after all structural removals and before
+renderer guard release. Resolve fresh effect/stream refs from the final parade,
+reinstall literal source expressions against the saved graph and verify enabled,
+finite, resolved output. The saved graph/IDs/nonce/schema/CoreABI stay unchanged.
+Use a separate version1 private GraphBindingRefreshRequest magic rather than
+changing the released graph commit request. Full77/CEP81 pairing is required.
+No script/modal/idle dispatch is added to this finalizer. Cleanup failures remain
+reported committed-state failures under the existing full-backup contract.
+AE cached reference behavior is a hypothesis; adversarial post-removal tests
+must be labeled accordingly, not represented as host reproduction.
+
 2026-10-12 owner reports75/79 still raises parameter-value stream268/error516.
 The install mutation tests do not include the full EffectGraphBackup lifecycle.
 The duplicated renderer retains the old graph and aliases through physical

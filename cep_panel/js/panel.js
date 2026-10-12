@@ -852,13 +852,48 @@
         else call("getGraphSnapshot", { target: { token: targetToken } }, received);
     }
 
+    var topologyPreview = null;
+    function previewTopologyGraph(graph, snapshot) {
+        var view = window.StarfieldGraphView.project(graph, null, snapshot.geometry, snapshot.layerResources);
+        topologyPreview = {graph:state.graph,nodes:state.nodes,edges:state.edges,positions:nodePositions,
+            graphMode:state.graphMode,topologyReady:state.topologyReady,layoutPersistence:state.layoutPersistence,
+            selectedNodeId:state.selectedNodeId,selectedNodeIds:JSON.parse(JSON.stringify(state.selectedNodeIds))};
+        state.graph=graph;state.nodes=view.nodes;state.edges=view.edges;nodePositions=view.positions;
+        state.graphMode=true;state.topologyReady=true;state.layoutPersistence=true;
+        render(state);
+    }
+    function restoreTopologyPreview() {
+        if (!topologyPreview) return;
+        nodePositions=topologyPreview.positions;
+        Object.keys(topologyPreview).forEach(function(key){if(key!=="positions")state[key]=topologyPreview[key];});
+        topologyPreview=null;render(state);
+    }
+    function confirmTopologySnapshot(snapshot) {
+        var graph=window.StarfieldGraphCodec.fromHex(snapshot.graphHex);
+        var view=window.StarfieldGraphView.project(graph,null,snapshot.geometry,snapshot.layerResources);
+        state.graph=graph;state.nodes=view.nodes;state.edges=view.edges;nodePositions=view.positions;
+        state.graphSnapshot=snapshot;state.graphMode=true;state.topologyReady=true;state.layoutPersistence=true;
+        topologyPreview=null;render(state);
+    }
+    function afterTopologyPaint(submit) {
+        var frame=window.requestAnimationFrame || function(fn){window.setTimeout(fn,16);};
+        var sent=false;
+        function once(){if(sent)return;sent=true;submit();}
+        // A second frame lets Chromium paint the local edit before evalScript
+        // begins a potentially synchronous AE command. Hidden panels still progress.
+        if(document.hidden){window.setTimeout(once,0);return;}
+        window.setTimeout(once,100); // A panel hidden between frames still submits.
+        frame(function(){frame(function(){window.setTimeout(once,0);});});
+    }
     function getGraphTransactionClient() {
         if (!graphTransactionClient && window.StarfieldGraphTransactions && window.StarfieldGraphCodec &&
             window.StarfieldGraphEdits) {
             graphTransactionClient = window.StarfieldGraphTransactions.create({
                 call: call,
                 codec: window.StarfieldGraphCodec,
-                edits: window.StarfieldGraphEdits
+                edits: window.StarfieldGraphEdits,
+                onPlanned: previewTopologyGraph,
+                scheduleSubmit: afterTopologyPaint
             });
         }
         return graphTransactionClient;
@@ -899,19 +934,26 @@
                 state.pending = false;
                 if (nodePalette) nodePalette.refresh();
                 if (!result || !result.ok) {
+                    restoreTopologyPreview();
                     var error = result && result.error || { code: "graph_edit_failed", message: "The graph transaction failed." };
                     showError(error.code, error.message, true);
                     refresh(false, false);
                     return;
                 }
+                try { confirmTopologySnapshot(result.snapshot); }
+                catch (confirmationError) {
+                    topologyPreview=null;
+                    showError("graph_snapshot_unconfirmed",confirmationError.message || String(confirmationError),true);
+                    refresh(false,false);return;
+                }
                 var completion=result.diagnostics,completionWarning=completion && (completion.cleanupError || completion.undoError || completion.notificationPending);
                 if(completionWarning)showError("graph_applied_with_warning","The graph was applied, but After Effects reported a completion issue. Refresh before continuing.",true);
                 else clearBanner(true);
                 refresh(false, false);
-            });
+            }, targetToken, snapshotResponse.snapshot.revision, snapshotResponse);
         }
         if (state.graphMode && state.graphSnapshot) {
-            commitMappedEdit({ ok: true, snapshot: state.graphSnapshot });
+            commitMappedEdit({ ok: true, target:{token:targetToken}, snapshot: state.graphSnapshot });
         } else {
             loadGraphSnapshot(targetToken, commitMappedEdit);
         }

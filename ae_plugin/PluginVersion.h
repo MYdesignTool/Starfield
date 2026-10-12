@@ -6,7 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build76 candidate: transaction/backup render quiescence and developer journal.
-// Full ten-module/Core ABI9 pairing with CEP80; ADR0040.
-#define STARFIELD_VERSION_BUILD 76
-#define STARFIELD_VERSION_PACKED 32844 /* 0x804C */
+// Build77 candidate: final-parade dependency refresh and immediate CEP draft.
+// Full ten-module/Core ABI9 pairing with CEP81; ADR0040.
+#define STARFIELD_VERSION_BUILD 77
+#define STARFIELD_VERSION_PACKED 32845 /* 0x804D */

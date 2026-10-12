@@ -318,6 +318,43 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
 PF_Err commit_native_graph_edit(node_sync::NativeEdit* edit,AEGP_PluginID plugin_id,PF_OutData* output) noexcept {
     return commit_graph_streams(edit,plugin_id,output);
 }
+PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
+    AEGP_PluginID plugin,PF_OutData* output) noexcept {
+    if(!data || !data->utils || !data->pica_basicP || !renderer || !layer || !plugin || !data->time_scale)return PF_Err_BAD_CALLBACK_PARAM;
+    try {
+        const AEGP_StreamSuite6* streams{};
+        auto error=data->pica_basicP->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
+        if(error || !streams)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        struct Release {SPBasicSuite* basic;~Release(){basic->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} suite{data->pica_basicP};
+        const A_Time time{data->current_time,data->time_scale};core::Graph graph;
+        for(auto index:std::array<A_long,3>{kGraphSyncGuardId,kControlSourceId,kGraphParameterId}) {
+            AEGP_StreamRefH ref{};error=streams->AEGP_GetNewEffectStreamByIndex(plugin,renderer,index,&ref);
+            struct Ref {const AEGP_StreamSuite6* streams;AEGP_StreamRefH value;~Ref(){if(value)streams->AEGP_DisposeStream(value);}} owned{streams,ref};
+            if(error || !ref)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamType type{};error=streams->AEGP_GetStreamType(ref,&type);
+            if(error || type!=(index==kGraphParameterId?AEGP_StreamType_ARB:AEGP_StreamType_OneD))return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamValue2 value{};error=streams->AEGP_GetNewStreamValue(plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+            if(error)return static_cast<PF_Err>(error);
+            struct Value {const AEGP_StreamSuite6* streams;AEGP_StreamValue2* value;~Value(){streams->AEGP_DisposeStreamValue(value);}} held{streams,&value};
+            if(index==kGraphParameterId) {
+                auto decoded=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));
+                if(!decoded.has_value())return PF_Err_BAD_CALLBACK_PARAM;graph=decoded.take_value();
+            } else if(value.val.one_d!=(index==kGraphSyncGuardId?1:kNodeControlSource))return PF_Err_BAD_CALLBACK_PARAM;
+        }
+        A_long stream=-1,parameter=-1;const char* stage="final binding refresh";
+        NativeBindingTransaction bindings(data,plugin,renderer,layer);
+        // The old compiled dependency can already be invalid after deletion.
+        // Freshly resolved UUID sources + the verified saved record provide the
+        // finite handoff under guard1; normal rendering never accepts a sentinel.
+        error=bindings.install(graph,&stream,&stage,&parameter,nullptr,true);
+        if(error) {
+            if(output)std::snprintf(output->return_msg,sizeof(output->return_msg),"Starfield final bindings: %s (stream %ld, parameter %ld, error %ld).",stage,long(stream),long(parameter),long(error));
+            return static_cast<PF_Err>(error);
+        }
+        bindings.accept();return PF_Err_NONE;
+    } catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+
 PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
                          A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output) noexcept {
     if(!data || !data->utils || !data->pica_basicP || !renderer || !layer || !plugin_id ||

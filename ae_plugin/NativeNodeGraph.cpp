@@ -1604,7 +1604,7 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
                                         const char** failed_stage, A_long* failed_parameter,
-                                        const core::Graph* previous_graph) noexcept {
+                                        const core::Graph* previous_graph,bool force_refresh) noexcept {
     if (failed_stream) *failed_stream = -1;
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
@@ -1641,6 +1641,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         stage("resolve unique literal binding sources");
         bool has_backups=false;
         if(const auto result=resolve_binding_sources(tx.suites,tx.id,binding_owner,tx.memory,nodes,&has_backups);result)return result;
+        if(!force_refresh) {
         // Resource slots belong to the renderer: SmartFX cannot checkout a sibling
         // Particle effect's PF_LAYER parameter. Clear only the former occupied tail.
         std::vector<AEGP_LayerIDVal> resource_ids;
@@ -1704,6 +1705,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 slot<static_cast<A_long>(resource_ids.size())?resource_ids[slot]:0);result)return result;
         tx.models=std::make_unique<ModelMirrorTransaction>(tx.data,tx.id,tx.renderer,tx.owner_layer);
         if(const auto result=tx.models->install(graph,failed_stream,failed_stage);result)return result;
+        } // Final dependency refresh does not copy or reparse unchanged assets.
         struct Alias {A_long slot,parameter;std::u16string expression;bool retired;double source_value;};
         std::vector<Alias> aliases;
         std::array<bool,kNativeBindingCapacity> occupied{};
@@ -1764,7 +1766,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     if (ae) return static_cast<PF_Err>(ae);
                 }
                 const auto& desired = alias.expression;
-                if(!change.retired && change.previous==desired && change.enabled && !identities_changed && !has_backups)continue;
+                if(!force_refresh && !change.retired && change.previous==desired && change.enabled && !identities_changed && !has_backups)continue;
                 // Snapshot values only for aliases we will actually mutate.
                 // An unchanged, enabled expression was checked against the exact
                 // freshly compiled node identity and source parameter above.

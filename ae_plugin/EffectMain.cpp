@@ -10,6 +10,8 @@
 #include "Diagnostics.hpp"
 #include "GraphCarrier.hpp"
 #include "GraphCommitRequest.hpp"
+#include "GraphBindingRefreshRequest.hpp"
+#include "NativeGraphCommit.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "PluginFlags.h"
@@ -135,6 +137,12 @@ PF_Err dispatch(PF_Cmd cmd,
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
         case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra && *static_cast<const std::uint32_t*>(extra)==0x53465231) {
+                auto& request=*static_cast<starfield::adapter::GraphBindingRefreshRequest*>(extra);
+                if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;
+                request.acknowledged=1;
+                return request.status=starfield::adapter::refresh_panel_graph_bindings(in_data,request.renderer,request.layer,request.plugin,out_data);
+            }
             if(extra && *static_cast<const std::uint32_t*>(extra)==0x53464731) {
                 auto& request=*static_cast<starfield::adapter::GraphCommitRequest*>(extra);
                 if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;

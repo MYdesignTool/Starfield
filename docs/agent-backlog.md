@@ -2,6 +2,19 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+Owner rejects76/80 (native76, guard0, stream258, unavailable binding). Actual
+development journal confirms guard1 cancellation followed by guard0 errors.
+Owner directs: no automatic AE acceptance requests/runs; development must continue.
+Prior launch request is withdrawn. Host qualification stays manual, not a blocker.
+Panel responsiveness is first priority: immediately project a validated local edit,
+yield for paint before host submission, restore on failure, preserve serialized
+host writes and allow viewport interaction. Own panel.js/graph_transactions.js,
+candidate baseline and a focused responsiveness fixture on this card.
+Also own post-structural binding refresh in native graph commit/backup/Model
+transaction UI adapter and focused lifecycle tests. Current publication verifies
+bindings before retired sources and backup copies are removed; no final parade
+verification exists. AE reference/cache invalidation is still a hypothesis.
+
 76/80 deployed15:27+08 from pushed/frozen f7f9a05. Actual May2023 ten-module
 SDK62024 exit0, frozen alias17828+camera12/lifecycle426896 ASAN, full panel88342
 exit0/dummy rollback67,507 unchanged source hashes and installed10/18/27/selector+

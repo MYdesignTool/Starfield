@@ -1,5 +1,16 @@
 # Starfield 架构
 
+M3-17 candidate77/CEP81 adds a final-parade dependency refresh after source and
+backup removals, before renderer guard release. A separate private version1 SFR1
+UI request preserves the existing graph commit wire. Saved graph/nonce/IDs/schema/
+CoreABI9 remain unchanged; unchanged Model/Texture resources are not copied or
+parsed again. Errors remain strict and finalization failures use cleanup diagnostics.
+CEP immediately projects validated edits, paints before host submission, reuses
+the cached planning receipt and adopts the confirmed receipt before background
+refresh. Failed drafts restore the prior canvas. Viewport interaction stays local;
+host writes are serialized. Owner declines automatic AE acceptance; continue work
+with manual host gates open. Reference-cache causality remains a hypothesis.
+
 M3-17 deployed76/CEP80 (15:27+08) follows the owner's failed75/79 deletion retest. Renderer
 guard0 remains strict; guard1 (edit) and2 (private backup) cancel render checkout
 before graph, aliases and resources. Guard checkout records the release dependency.

@@ -1,5 +1,36 @@
 # 当前工程状态
 
+## M3-17 follow-up after76/80 owner failure — 2026-10-12
+
+Owner screenshot: native76, guard0, stream258/error516/binding unavailable.
+Read-only actual journal PID44532 contains14 guard1 cancellations,76 successful
+guard0 samples and3 guard0 failures. Thus guard quiescence works in that run but
+does not settle post-transaction bindings. No further automatic AE acceptance:
+owner explicitly declines future requests/runs and asks development to continue;
+the previous launch request is withdrawn. No AE process action occurred.
+Prioritize immediate panel projection/paint before host operations, with failure
+restore and serialized host writes. Keep M3-17 active, preserve Motion work.
+Actual reference/cache invalidation after final structural deletion remains a
+hypothesis. Current code verifies aliases before source/backup removal, not after.
+
+Candidate77/CEP81 corrects the missing final step: after all structural removals,
+while guard1 remains held, reacquire the unique renderer and refresh saved graph
+aliases through a separate private version1 SFR1 generic request. Rebuild even
+unchanged expression text, verify enabled/resolved/finite output, and retain strict
+normal-render failures. Saved graph/nonce/public IDs/schema/CoreABI9 unchanged;
+skip unchanged Model/Texture resource installation. Failure uses the existing
+committed cleanup diagnostic contract. This source fix is not host qualification.
+Panel projects the validated edit before host submission, yields for paint, reuses
+the cached planning receipt (removing an extra snapshot roundtrip), adopts confirmed
+receipt immediately and restores failed drafts. Writes serialize; viewport/select
+remain usable. Working actual panel/client32 and transaction tests, native binding
+ASAN18125+camera12, full backup/Model ASAN897638, Host final-message ASAN9594670,
+ES3 18 and dummy76/80→77/81 paired rollback67 pass. Earlier enum initializer
+compile error, test variable/position corrections and monolithic ASAN stack failure
+are retained; an isolated test helper passes ASAN with unchanged product code.
+Freeze/full SDK/pair publication next. No AE process/script action or launch request.
+
+
 ## M3-17 render lifecycle native76 / CEP80 deployed — 2026-10-12 15:27+08
 
 Owner disproves75/79 deletion correction: stream268/error516/delivered0 still

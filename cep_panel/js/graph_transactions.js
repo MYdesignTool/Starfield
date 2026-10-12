@@ -260,6 +260,7 @@
                     callback({ ok: true, operation: "submitGraph", target: committed.target,
                                snapshot: saved, graphHex: saved.graphHex,committed:committed.committed,diagnostics:committed.diagnostics });
                 }
+                function submitPrepared() {
                 // Mesh-preserving edits need no copied effect parade or asset
                 // upload. Only Model identity/resource changes own that transaction.
                 function modelResources(nodes) {
@@ -289,6 +290,14 @@
                             revision:asset.revision,bounds:asset.bounds.slice(),meshHex:asset.meshHex});});submitModel();
                     }catch(error){callback(failure("invalid_model_transaction",error.message || String(error)));}
                 });
+                }
+                try {
+                    if (options.onPlanned) options.onPlanned(updated, base);
+                    if (options.scheduleSubmit) options.scheduleSubmit(submitPrepared);
+                    else submitPrepared();
+                } catch (previewError) {
+                    callback(failure("graph_preview_failed", previewError.message || String(previewError)));
+                }
             }
             // Reuse only the immediate planning receipt. The host independently
             // rereads native records and checks revision/stamp before mutation.

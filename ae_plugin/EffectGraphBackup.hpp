@@ -24,7 +24,7 @@ public:
     A_Err restore() noexcept;
     // After publication, deletion failures leave marked, disabled backups and
     // must be reported as cleanup failures, not as an unapplied graph edit.
-    A_Err discard() noexcept;
+    A_Err discard(A_Err (*finalize)(void*)=nullptr,void* context=nullptr) noexcept;
     A_Err rollback_error() const noexcept {return rollback_error_;}
 private:
     struct Record {

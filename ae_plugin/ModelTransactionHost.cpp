@@ -1,5 +1,7 @@
 #include "ModelTransactionHost.hpp"
 #include "ModelGraphTransaction.hpp"
+#include "GraphBindingRefreshRequest.hpp"
+#include "Parameters.hpp"
 #include "UiExclusionHost.hpp"
 #include "ScriptDiagnostic.hpp"
 #include <algorithm>
@@ -144,6 +146,32 @@ A_Err invoke(const char* name) {
 }
 A_Err prepare(void*){return invoke("SFLD_modelTransactionHostPrepare");}
 A_Err commit(void*){return invoke("SFLD_modelTransactionHostCommit");}
+A_Err finalize(void*) {
+    AEGP_LayerH layer{};A_Time time{};
+    if(!target(layer,time) || layer!=session.target)return PF_Err_BAD_CALLBACK_PARAM;
+    Suite<AEGP_EffectSuite4> effects(kAEGPEffectSuite,kAEGPEffectSuiteVersion4);
+    if(!effects.value)return PF_Err_BAD_CALLBACK_PARAM;
+    A_long count{};auto error=effects.value->AEGP_GetLayerNumEffects(layer,&count);
+    if(error || count<1 || count>4096)return error?error:PF_Err_BAD_CALLBACK_PARAM;
+    unsigned renderers{};
+    struct Ref {const AEGP_EffectSuite4* effects;AEGP_EffectRefH value;~Ref(){if(value)effects->AEGP_DisposeEffect(value);}} found{effects.value,nullptr};
+    for(A_long index=0;index<count;++index) {
+        AEGP_EffectRefH ref{};error=effects.value->AEGP_GetLayerEffectByIndex(plugin,layer,index,&ref);
+        Ref held{effects.value,ref};
+        if(error || !ref)return error?error:PF_Err_BAD_CALLBACK_PARAM;
+        AEGP_InstalledEffectKey key{};char match[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+        error=effects.value->AEGP_GetInstalledKeyFromLayerEffect(ref,&key);
+        if(!error)error=effects.value->AEGP_GetEffectMatchName(key,match);
+        if(error)return error;if(std::strcmp(match,"org.starfieldfx.particle"))continue;
+        if(++renderers!=1)return PF_Err_BAD_CALLBACK_PARAM;
+        found.value=ref;held.value=nullptr;
+    }
+    if(renderers!=1)return PF_Err_BAD_CALLBACK_PARAM;
+    GraphBindingRefreshRequest request;request.plugin=plugin;request.renderer=found.value;request.layer=layer;
+    auto result=effects.value->AEGP_EffectCallGeneric(plugin,found.value,&time,PF_Cmd_COMPLETELY_GENERAL,&request);
+    if(!result && (request.acknowledged!=1 || request.status))result=request.acknowledged!=1?PF_Err_BAD_CALLBACK_PARAM:request.status;
+    return result;
+}
 void notify_result() {
     session.notify_after=std::chrono::steady_clock::now()+std::chrono::milliseconds(250);
     const auto& result=session.outcome;
@@ -171,7 +199,7 @@ void apply() {
     if(!target(plan.layer,plan.time) || !id(session.id,plan.id)){failed(PF_Err_BAD_CALLBACK_PARAM);return;}
     session.target=plan.layer;std::vector<ModelAssetRestore> assets;assets.reserve(session.assets.size());
     for(auto& asset:session.assets){asset.restore.mesh=asset.bytes;assets.push_back(asset.restore);}
-    plan.desired_ids=session.desired;plan.assets=assets;plan.prepare=prepare;plan.commit=commit;plan.is_cancelled=cancelled;
+    plan.desired_ids=session.desired;plan.assets=assets;plan.prepare=prepare;plan.commit=commit;plan.finalize=finalize;plan.is_cancelled=cancelled;
     // Fence the entire executor, including its backup writes before prepare.
     // Polling/reloading must never discard a session while rollback is possible.
     if(invoke("SFLD_modelTransactionHostBegin")){failed(PF_Err_BAD_CALLBACK_PARAM);return;}
