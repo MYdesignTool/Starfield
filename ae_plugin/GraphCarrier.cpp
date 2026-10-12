@@ -101,12 +101,27 @@ PF_Err commit_graph_request(PF_InData* data, PF_OutData* output, PF_ParamDef* pa
                 static_cast<long>(failed_binding), static_cast<long>(failed_parameter), failed_stage, static_cast<long>(error));
             return reject(output, params, nonce, reason, error);
         }
+        // Legacy callback publication uses delivered definitions. Keep an exact
+        // local restore in case post-publication alias retirement fails.
+        const auto old_graph=*params[kGraphParameterId];
+        const auto old_source=*params[kControlSourceId];
+        const auto old_revision=*params[kGraphRevisionId];
+        const auto old_crc_high=*params[kGraphChecksumHighId];
+        const auto old_crc_low=*params[kGraphChecksumLowId];
         error = write_graph_snapshot(data, params, graph);
         if (error) { data->utils->host_dispose_handle(replacement); return reject(output, params, nonce, "numeric graph receipt failed", error); }
         params[kGraphParameterId]->u.arb_d.value = replacement;
         params[kGraphParameterId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
         params[kControlSourceId]->u.pd.value = kNodeControlSource;
         params[kControlSourceId]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
+        error=bindings.retire_after_publication(&failed_binding,&failed_stage);
+        if(error) {
+            *params[kGraphParameterId]=old_graph;*params[kControlSourceId]=old_source;
+            *params[kGraphRevisionId]=old_revision;*params[kGraphChecksumHighId]=old_crc_high;
+            *params[kGraphChecksumLowId]=old_crc_low;
+            data->utils->host_dispose_handle(replacement);
+            return reject(output,params,nonce,"post-publication alias retirement failed",error);
+        }
         bindings.accept();
         capture_native_temporal_metadata(data,graph,graph_carrier_plugin_id());
         set_numeric(params, kGraphEditReceiptId, nonce);

@@ -17,6 +17,32 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 owner reports native74/CEP78 still raises parameter-value errors on
+deletion (different alias streams, screenshot stream258). Physical removal
+ordering was necessary but did not cover expression mutation: install disables
+and clears aliases, writes the unavailable sentinel, and retires old spans
+before the new graph is saved. Rollback restores the sentinel base before
+re-enabling the original expression. Both expose an invalid value to the still
+published graph. This is a source ordering defect; the exact AE callback timing
+remains a hypothesis until host evidence.
+
+The next correction keeps retired expressions live through graph publication
+and saved-value verification, then detaches them before deleting originals.
+Active expression replacement uses a finite handoff: evaluate any previously
+published alias while its source is still present, validate it, write that
+resolved value beneath the enabled expression, then disable/replace/re-enable
+the expression. A new unused alias uses its independently compiled source value.
+No sentinel is written into a span used by the published graph. Source resolution
+and final expression evaluation remain mandatory; invalid old/new bindings still
+fail rather than becoming zero. Retired aliases retain their validated resolved
+value as the disabled base, protecting an already checked-out old graph without
+keeping a dependency on the removed effect. Rollback restores expression text
+and enabled state before restoring the exact old base. Retirement failure uses
+the same graph/scalar/alias rollback as publication failure. No ID/schema/ABI
+change. Test reentrant sampling at every expression/value mutation, retirement
+after publication, partial failures and rollback; do not infer AE qualification
+from fixtures.
+
 2026-10-12 deletion correction (native74/CEP78 deployed11:18+08): ordinary/Model prepare previously
 physically removed source effects before graph/binding publication, exposing old
 aliases to missing sources during script-triggered re-render. Owner reports

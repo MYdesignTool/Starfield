@@ -1,5 +1,30 @@
 # 测试入口
 
+## M3-17 alias handoff candidate75 / CEP79 — 2026-10-12
+
+`tests/RunAliasHandoffTests.ps1 -Run` and `-Run -Sanitize` execute actual native
+compiler/binding/publication/playback,17826 checks +12 camera, zero failures.
+Test reentrant render after each SetStreamValue/SetExpression/SetExpressionState:
+retired spans remain enabled before publication, active replacement has finite
+handoff, post-publication retirement and receipt failures restore saved graph,
+expressions/enabled states/exact bases. All seven kinds and an in-flight old graph
+are included; invalid prior evaluated values still reject. Source74's unmodified
+install algorithm with a no-op new-method compatibility shim fails5071 checks,
+actualexit1, in the same fixture. This is offline source evidence, not AE timing.
+Logs artifacts/m3-17-alias-handoff-seven-kinds-{tests-v3,asan-v1}.log and
+old74-reproduction-v2.log. First reproduction command used a forward-slash batch
+path and did not run; v2 is actual. First Cloud runner omitted LightCapture and
+did not link; the new owned runner links real LightCapture. Initial fake constant
+expression/curve-age fixture corrections retained; counts above are final.
+
+Model binding ASAN9579/controls453 and full transaction ASAN878567 pass; full
+seven-registration/CEP/reload/DOM/ES3 audit session8095 completed exit0. Dummy
+74/78→75/79 publication/full restore67 passes, with absolute path confinement
+under artifacts/deploy-test. Approval first misread the truncated sandbox path
+as an Adobe directory; read-only path evidence and confinement resolved it on
+re-review. No actual host installation/process operation in these tests.
+SDK freeze/publication/hash/AE gates still pending; live74/78 unchanged.
+
 ## M3-17 guarded node deletion deployed native74 / CEP78 — 2026-10-12
 
 Live77 actual gateway/Model transport with STARFIELD_DOM_DELETE_RENDER=1 fails

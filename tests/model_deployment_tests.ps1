@@ -1,9 +1,9 @@
-param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64,65,66,67,68,69,70,71,72,73)][int]$InstalledModelBuild=61)
+param([switch]$Run,[switch]$UpgradeInstalledModel,[ValidateSet(61,62,63,64,65,66,67,68,69,70,71,72,73,74)][int]$InstalledModelBuild=61)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: simulated complete native61/CEP62 deployment and paired rollback under artifacts; add -Run.';exit 0}
-$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 73){77}elseif($InstalledModelBuild -eq 72){76}elseif($InstalledModelBuild -eq 71){75}elseif($InstalledModelBuild -eq 70){74}elseif($InstalledModelBuild -eq 69){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+2}}else{61}
-$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 73){78}elseif($InstalledModelBuild -eq 72){77}elseif($InstalledModelBuild -eq 71){76}elseif($InstalledModelBuild -eq 70){75}elseif($InstalledModelBuild -eq 69){73}elseif($InstalledModelBuild -eq 68){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+3}}else{62}
+$taskOldBuild=if($UpgradeInstalledModel){$InstalledModelBuild}else{60};$taskOldGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 74){78}elseif($InstalledModelBuild -eq 73){77}elseif($InstalledModelBuild -eq 72){76}elseif($InstalledModelBuild -eq 71){75}elseif($InstalledModelBuild -eq 70){74}elseif($InstalledModelBuild -eq 69){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+2}}else{61}
+$taskNewBuild=if($UpgradeInstalledModel){$InstalledModelBuild+1}else{61};$taskNewGeneration=if($UpgradeInstalledModel){if($InstalledModelBuild -eq 74){79}elseif($InstalledModelBuild -eq 73){78}elseif($InstalledModelBuild -eq 72){77}elseif($InstalledModelBuild -eq 71){76}elseif($InstalledModelBuild -eq 70){75}elseif($InstalledModelBuild -eq 69){73}elseif($InstalledModelBuild -eq 68){72}elseif($InstalledModelBuild -ge 65){71}else{$InstalledModelBuild+3}}else{62}
 $taskRoot=Join-Path $taskRepo ('artifacts/deploy-test/model-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
 $taskChecks=0
@@ -13,6 +13,14 @@ function Hash-ModelTest([string]$taskPath){return (Get-FileHash -LiteralPath $ta
 foreach($taskTool in @('Deploy-TestBuild.ps1','Deploy-ModelTestBuild.ps1','Restore-TestBuild.ps1')){New-Item -ItemType Directory -Path (Join-Path $taskRoot 'tools') -Force | Out-Null;Copy-Item -LiteralPath (Join-Path $taskRepo ('tools/'+$taskTool)) -Destination (Join-Path $taskRoot ('tools/'+$taskTool))}
 $taskPrepared=Join-Path $taskRoot 'artifacts/prepared/model-test';$taskBundle=Join-Path $taskRoot 'dist';$taskPanelRoot=Join-Path $taskRoot 'cep_panel'
 $taskPlugin=Join-Path $taskRoot 'artifacts/deploy-test/host';$taskCep=Join-Path $taskRoot 'artifacts/deploy-test/panel-link'
+$taskIsolatedPrefix=[IO.Path]::GetFullPath((Join-Path $taskRepo 'artifacts/deploy-test'))+'\'
+foreach($taskPath in @($taskRoot,$taskPlugin,$taskCep,$taskBundle,$taskPanelRoot,$taskPrepared)) {
+    if(-not [IO.Path]::GetFullPath($taskPath).StartsWith($taskIsolatedPrefix,[StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Dummy deployment path escapes repository artifacts/deploy-test.'
+    }
+}
+Write-Host "Isolated dummy plugin directory: $taskPlugin"
+Write-Host "Isolated dummy CEP link: $taskCep"
 New-Item -ItemType Directory -Path $taskPlugin,$taskPanelRoot,$taskBundle -Force | Out-Null
 New-Item -ItemType Junction -Path (Join-Path $taskPlugin 'Starfield') -Target $taskBundle | Out-Null
 New-Item -ItemType Junction -Path $taskCep -Target $taskPanelRoot | Out-Null

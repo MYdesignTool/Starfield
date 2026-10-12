@@ -32,6 +32,7 @@
 #include <unordered_map>
 #include <vector>
 #include <thread>
+#include <functional>
 
 int run_camera_capture_tests();
 namespace {
@@ -51,6 +52,8 @@ A_long wrong_type = -1;
 bool corrupt_receipt{};
 bool panel_publish{};
 bool panel_output_only{};
+std::function<void()> alias_mutation_hook;
+void sample_after_alias_mutation() {if(alias_mutation_hook)alias_mutation_hook();}
 struct Memory { std::vector<std::byte> bytes; };
 std::unordered_map<PF_Handle, std::unique_ptr<Memory>> handles;
 PF_Handle allocate(A_u_longlong count) {
@@ -71,7 +74,8 @@ struct Fixture {
     std::vector<AEGP_StreamVal2> values;
     std::vector<PF_ParamDef> params;
 };
-std::array<Fixture, 7> fixtures;
+std::array<Fixture, 9> fixtures;
+bool all_kinds_present{};
 bool transform_present{};
 bool model_present{};
 bool cloud_animation_test{};
@@ -184,11 +188,12 @@ double evaluated_binding(A_long index, A_long time) {
     if(index==unresolved_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
+    if(expr==u"0")return 0; // A valid authored constant, including handoff reads.
     const auto identity=[&](unsigned value) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
         return expr.find(u"fx.param(\"Node UUID 7\").value === "+number(value))!=std::u16string::npos;
     };
-    std::size_t id = identity(6) ? 6 : identity(5) ? 4 : identity(1) ? 1 : identity(2) ? 2 : 3;
+    std::size_t id = identity(8) ? 8 : identity(7) ? 7 : identity(6) ? 6 : identity(5) ? 4 : identity(1) ? 1 : identity(2) ? 2 : 3;
     if(id==4 && expr.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
         const std::u16string marker=u"// Starfield Transform affine entry ";
         const auto first=expr.find(marker)+marker.size(),last=expr.find(u"\n",first);
@@ -211,6 +216,7 @@ double evaluated_binding(A_long index, A_long time) {
         int component=expr[component_marker+8]-u'0';
         if(id==1 && source==4) return component ? value.two_d.y : value.two_d.x + time;
         if(id==4 && source==2)return component ? value.two_d.y : value.two_d.x;
+        if(id==8 && source==records::motion_layout::origin_xy)return component?value.two_d.y:value.two_d.x;
         return component==0 ? value.color.redF*(1.0-time/48.0) : component==1 ? value.color.greenF : value.color.blueF;
     }
     if(cloud_animation_test && id==2 && source>=records::particle_layout::cloud_circles && source<=records::particle_layout::cloud_density)
@@ -301,7 +307,7 @@ int main() {
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr source, AEGP_EffectRefH* ref)->A_Err {
         *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
     };
-    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = panel_output_only?1:model_present?7:transform_present?5:4; return 0; };
+    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = panel_output_only?1:all_kinds_present?9:model_present?7:transform_present?5:4; return 0; };
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
@@ -369,6 +375,7 @@ int main() {
                 corrupt_receipt = false; fixtures[0].values[key.index].one_d += 1;
             }
         }
+        if(key.index==kGraphParameterId || key.index>=kNativeBindingFirstIndex)sample_after_alias_mutation();
         return 0;
     };
     stream.AEGP_DisposeStreamValue = [](AEGP_StreamValue2* value)->A_Err {
@@ -394,11 +401,12 @@ int main() {
         auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
         if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
         if(!*text)++expression_clear_count;
-        expressions[index] = reinterpret_cast<const char16_t*>(text); return 0;
+        expressions[index] = reinterpret_cast<const char16_t*>(text);sample_after_alias_mutation(); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
         if(enabled && disable_next_expression) { enabled=FALSE;disable_next_expression=false; }
-        expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;return 0;
+        expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;
+        sample_after_alias_mutation();return 0;
     };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
     {
@@ -1298,18 +1306,42 @@ int main() {
             [](const auto& bytes){return bytes.size()>=2 && bytes[0]==std::byte{2} && bytes[1]==std::byte{0x80};}),retired.optional_records.end());
         const auto retirement_text=expressions;
         const auto retirement_enabled=expression_enabled;
+        const auto retirement_base=main.values;
+        // Execute actual numeric playback after EVERY host expression/value
+        // mutation, retaining a graph checked out before publication. This
+        // catches the disabled-expression sentinel gap missed by remove hooks.
+        auto handoff_data=renderer_data;handoff_data.num_params=0;
+        handoff_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
+            *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=evaluated_binding(i,t);return 0;
+        };
+        handoff_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err {return 0;};
+        unsigned handoff_samples{};
+        alias_mutation_hook=[&]{++handoff_samples;auto old=transformed;
+            check(sample_native_node_animation(&handoff_data,old,1920,1080)==0,
+                "in-flight published graph sees finite valid values after each alias mutation");};
         {
             NativeBindingTransaction bindings(&renderer_data,701);
             check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0 &&
-                expressions[matrix_stream-kNativeBindingFirstIndex].empty() &&
-                !expression_enabled[matrix_stream-kNativeBindingFirstIndex],
-                "removed node bindings are disabled and cleared before acceptance");
+                expressions==retirement_text && expression_enabled==retirement_enabled,
+                "removed node bindings remain live before graph publication");
+            check(bindings.retire_after_publication()==0 && expressions[matrix_stream-kNativeBindingFirstIndex].empty() &&
+                !expression_enabled[matrix_stream-kNativeBindingFirstIndex],"published graph permits retired alias detachment");
         }
         check(expressions==retirement_text && expression_enabled==retirement_enabled,
             "unaccepted alias retirement restores exact expression text and enabled states");
+        for(A_long i=kNativeBindingFirstIndex;i<kTotalEffectParameterCount;++i)
+            check(main.values[i].one_d==retirement_base[i].one_d,"rollback restores exact alias base after restoring expressions");
         {
             NativeBindingTransaction bindings(&renderer_data,701);
-            check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0,"alias retirement can commit");bindings.accept();
+            check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0,"retirement failure fixture prepared");
+            fail_set=matrix_stream;
+            check(bindings.retire_after_publication()==PF_Err_OUT_OF_MEMORY,"partial retirement rejects rather than accepting missing bindings");
+        }
+        check(expressions==retirement_text && expression_enabled==retirement_enabled,"partial retirement rollback restores original expressions");
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(retired,nullptr,nullptr,nullptr,&transformed)==0 && bindings.retire_after_publication()==0,
+                "alias retirement can commit after publication");bindings.accept();
         }
         {
             NativeBindingTransaction bindings(&renderer_data,701);
@@ -1317,6 +1349,7 @@ int main() {
         }
         check(expressions==retirement_text && expression_enabled==retirement_enabled,
             "retired alias spans can be reused without stale expression state");
+        check(handoff_samples>0,"actual alias mutations exercised reentrant playback");alias_mutation_hook={};
         const auto before_expression_failure=expressions;
         expressions[matrix_stream-kNativeBindingFirstIndex]=u"0";
         {
@@ -1681,12 +1714,79 @@ int main() {
         check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987655,701,&output)!=0 && sets==before_writes,
             "transaction backup guard cannot publish a graph command");
         main.values[kGraphSyncGuardId].one_d=1;main.values[kGraphEditCommitId].one_d=987656;panel_output_only=true;
+        unsigned publication_samples{};
+        alias_mutation_hook=[&]{++publication_samples;auto old=saved_graph();
+            auto sampled_data=renderer_data;sampled_data.num_params=0;
+            sampled_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
+                *output={};output->param_type=PF_Param_FLOAT_SLIDER;output->u.fs_d.value=evaluated_binding(i,t);return 0;};
+            sampled_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+            check(sample_native_node_animation(&sampled_data,old,1920,1080)==0,"saved graph remains sampleable across explicit deletion publication");};
         check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987656,701,&output)==0 &&
             main.values[kGraphEditReceiptId].one_d==987656 && saved_graph().nodes.size()==1,
             "explicit deletion of every node publishes Output-only without recreating defaults");
+        check(publication_samples>0,"explicit publisher exercised render at graph and alias writes");alias_mutation_hook={};
         panel_output_only=false;main.values[kGraphSyncGuardId].one_d=0;panel_publish=false;
         model_present=transform_present=false;
         check(live_refs==0 && acquisitions==0,"explicit graph command releases borrowed stream values and suites");
+    }
+    {
+        // Include real Material/Motion records as well as Emitter, Particle,
+        // Force, Transform and Model in a single saved alias publication.
+        using namespace core::graph_keys;
+        model_present=transform_present=all_kinds_present=panel_publish=true;
+        for(auto [index,kind]:{std::pair{7,records::Kind::material},std::pair{8,records::Kind::motion}}) {
+            auto& f=fixtures[index];f.values.resize(records::parameter_count(kind));f.params.resize(f.values.size());
+            for(auto& p:f.params)p.param_type=PF_Param_FLOAT_SLIDER;
+            uuid(index,records::uuid_first_index(kind),index);
+        }
+        fixtures[7].name="org.starfieldfx.node.material";
+        fixtures[7].values[1].one_d=1;fixtures[7].values[2].color={1,1,1,1};
+        fixtures[7].values[3].one_d=50;fixtures[7].values[5].one_d=100;fixtures[7].values[6].one_d=1;
+        fixtures[8].name="org.starfieldfx.node.motion";
+        auto& m=fixtures[8].values;namespace ml=records::motion_layout;
+        m[ml::mode].one_d=1;m[ml::origin_type].one_d=1;m[ml::origin_xy].two_d={960,540};
+        m[ml::speed].one_d=100;m[ml::curve].one_d=2;
+        m[ml::curve+2].one_d=100;m[ml::curve+3].one_d=1;m[ml::curve+4].one_d=100;
+        connection(4,records::Kind::transform,8,14);connection(8,records::Kind::motion,255,18);
+        main.values[kGraphSyncGuardId].one_d=1;main.values[kGraphEditCommitId].one_d=987657;
+        PF_OutData output{};
+        const auto seven_error=commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987657,701,&output);
+        if(seven_error)std::printf("Seven-kind diagnostic: %d %s\n",seven_error,output.return_msg);
+        check(seven_error==0,
+            "seven-kind native graph publishes actual bindings");
+        auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
+        const auto baseline_text=expressions;const auto baseline_enabled=expression_enabled;
+        auto render_data=renderer_data;render_data.num_params=0;
+        render_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+            *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=evaluated_binding(i,t);return 0;};
+        render_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+        unsigned samples{};
+        alias_mutation_hook=[&]{++samples;auto old=prior;
+            check(sample_native_node_animation(&render_data,old,1920,1080)==0,"seven-kind in-flight graph never sees a transient sentinel");
+            auto live=saved_graph();check(sample_native_node_animation(&render_data,live,1920,1080)==0,
+                "seven-kind saved graph remains valid at each host mutation");};
+        // A receipt-write failure before retirement must leave every expression.
+        panel_output_only=true;main.values[kGraphEditCommitId].one_d=987658;fail_set=kGraphEditReceiptId;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
+            "seven-kind deletion publication failure rejects");
+        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
+            "seven-kind failed publication keeps original aliases and graph");
+        // A detach failure AFTER new graph verification restores graph+aliases.
+        fail_expression=0;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
+            "seven-kind post-publication retirement failure rejects");
+        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
+            "seven-kind failed retirement restores graph and exact expressions");
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)==0 && saved_graph().nodes.size()==1,
+            "seven-kind deletion completes post-publication retirement");
+        check(samples>0,"seven-kind reentrant mutation callbacks executed");alias_mutation_hook={};
+        // Invalid evaluated source values are still errors before any handoff.
+        const auto before_invalid=sets;unresolved_alias=kNativeBindingFirstIndex;
+        NativeBindingTransaction invalid(&renderer_data,701);const char* stage{};
+        check(invalid.install(saved_graph(),nullptr,&stage,nullptr,&prior)==PF_Err_BAD_CALLBACK_PARAM && sets==before_invalid &&
+            stage && !std::strcmp(stage,"verify finite alias handoff"),"missing old binding cannot become a numeric fallback");
+        unresolved_alias=-1;
+        panel_output_only=all_kinds_present=model_present=transform_present=panel_publish=false;main.values[kGraphSyncGuardId].one_d=0;
     }
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.

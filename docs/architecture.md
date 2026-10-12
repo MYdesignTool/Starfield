@@ -1,5 +1,15 @@
 # Starfield 架构
 
+M3-17 native75/CEP79 candidate repairs the separate alias mutation window left
+by74/78. Keep obsolete expressions until saved graph verification, then detach
+before physical removal. Validate the old evaluated alias and install a finite
+base beneath its enabled expression before replacement. Rollback rebuilds the
+old dependency before restoring its exact base. In-flight old graph sampling
+does not see a sentinel during these mutations; unavailable/nonfinite sources
+and final bindings still reject. Seven-kind actual native mutation-hook fixtures
+pass and the74 algorithm fails. ADR0040 owns the full pairing; SDK/publication
+and AE2023 acceptance remain separate gates. Motion work is preserved.
+
 M3-17 deletion stage74/78 deployed11:18+08 uses full native effect-graph backup for every
 removal, including non-Model graphs. Pending original guard3 is excluded from
 authored inventories while the physical source stays alive until publication;

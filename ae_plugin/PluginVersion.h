@@ -6,7 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build74 candidate: guarded node retirement before physical deletion.
-// Full ten-module/Core ABI9 pairing with CEP78; ADR0040.
-#define STARFIELD_VERSION_BUILD 74
-#define STARFIELD_VERSION_PACKED 32842 /* 0x804A */
+// Build75 candidate: finite alias handoff and post-publication retirement.
+// Full ten-module/Core ABI9 pairing with CEP79; ADR0040.
+#define STARFIELD_VERSION_BUILD 75
+#define STARFIELD_VERSION_PACKED 32843 /* 0x804B */

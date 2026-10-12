@@ -2,6 +2,24 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+Owner confirms74/78 still reports animation parameter-value errors (stream258;
+streams vary across deleted kinds). Return to this card before Motion resource
+integration; no new Motion edits made. Own NativeBindingTransaction install/
+post-publication retirement/rollback, NativeGraphCommit and legacy GraphCarrier
+call sites, actual native_sync_tests fixture and release documentation/tooling.
+Keep retired sources and expressions through publication; finite validated alias
+handoffs prevent old graph samples seeing a sentinel during replacement/restore.
+ADR0040 defines this before implementation. Actual AE timing remains a hypothesis.
+
+75/79 candidate passes actual native standard/ASAN17826 +12 camera, all seven
+kinds with render-after-every-alias-write and in-flight old graph; old74 algorithm
+reproduces5071 failures in the same fixture. Publication/retirement failure and
+exact rollback bases/expressions covered. Model ASAN9579, transaction878567,
+seven-registration/full panel audit8095 actualexit0 and dummy74/78→75/79 full
+rollback67 pass. Owned RunAliasHandoffTests links actual LightCapture; earlier
+Cloud runner linker/fixture failures preserved. Freeze/full SDK/pair publish
+continue; owner host gate open, Motion goal remains active.
+
 11:18+08 delivered native74/CEP78 from frozen41777fc: SDK actualsession9803 exit0,
 frozen full panel55212 exit0, full backup/Model/asset/Circle/frame ASAN and dummy
 rollback gates pass;501 source hashes,10/18/27/selector and backup10/18 independently

@@ -1,5 +1,32 @@
 # 当前工程状态
 
+## M3-17 native75 / CEP79 alias handoff candidate — 2026-10-12
+
+Owner reports74/78 deletion still raises parameter-value warnings, e.g.258/516;
+deletion applies and streams vary by kind. Return to M3-17; no new Motion resource
+edits. The prior physical removal correction missed install/rollback expression
+gaps: an old published graph sees a sentinel while its alias is disabled/cleared,
+and obsolete spans were detached before new graph publication. Native75 keeps
+retired aliases live through publication/readback, then detaches before physical
+removal. Active replacement and rollback preserve a validated finite handoff;
+invalid source/final expression values still reject, with no sentinel fallback.
+ADR0040 defines the ordering. No IDs/schema/CoreABI9 change; full ten-module75/
+packed32843/CEP79 pair required. Actual AE callback timing/host correction remains
+open. Installed74/78 retained pending frozen build and standing-authorized publish.
+
+Working standard and actual ASAN17826 native checks +12 camera checks pass with
+real NativeBindingTransaction/compiler/publisher/playback and fake May2023 SDK.
+After every value/text/enabled mutation, both checked-out old graph and saved
+graph sample; all seven kinds, receipt failure and retirement failure restore
+graph/expressions/bases. Unmodified74 installation algorithm in the same fixture
+fails5071 checks (exit1); compatibility no-op supplies only the new post-publication
+method because74 already retired during install. This proves the source gap, not
+actual AE reproduction. Full Model transaction ASAN878567, Model module/binding
+ASAN9579, seven-registration/panel/DOM/reload/ES3 audit and dummy74/78→75/79 full
+publish/rollback67 pass. New focused runner links actual LightCapture omitted by
+the old Cloud runner; v1 linker and initial fixture curve-age errors are retained.
+Logs artifacts/m3-17-alias-handoff-*; frozen SDK/pair checks next.
+
 ## M3-17 deletion transaction native74 / CEP78 deployed — 2026-10-12 11:18+08
 
 Owner reports native73/CEP77 Circle accepted, but CEP deletion of nearly any node

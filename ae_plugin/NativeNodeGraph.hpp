@@ -52,6 +52,10 @@ public:
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
                    const char** failed_stage = nullptr, A_long* failed_parameter = nullptr,
                    const core::Graph* previous_graph = nullptr) noexcept;
+    // Only after the new graph is saved/read back, before removing old sources.
+    // Failure leaves rollback armed; an in-flight old graph sees a finite base.
+    PF_Err retire_after_publication(A_long* failed_stream = nullptr,
+                                  const char** failed_stage = nullptr) noexcept;
     void accept() noexcept;
     [[nodiscard]] PF_Err rollback_model_resources() noexcept;
 private:

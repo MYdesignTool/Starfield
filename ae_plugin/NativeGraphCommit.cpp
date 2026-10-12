@@ -289,6 +289,10 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
                 if (ae_error) break;
             }
         }
+        if(!ae_error) {
+            edit->stage=node_sync::Stage::animation_bindings;
+            ae_error=bindings.retire_after_publication(&edit->stream_index,&edit->binding_stage);
+        }
         if (ae_error) {
             bool rollback_failed = bindings.rollback_model_resources()!=PF_Err_NONE;
             while (written > 0) {

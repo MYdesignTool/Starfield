@@ -1508,6 +1508,7 @@ struct NativeBindingTransaction::Impl {
         std::u16string previous;
         A_Boolean enabled{};
         double previous_value{};
+        double handoff_value{};
         A_long index{-1};
         A_long parameter{-1};
         bool changed{};
@@ -1539,10 +1540,16 @@ struct NativeBindingTransaction::Impl {
         }
         for (auto& change : changes) {
             if (!accepted && change.changed) {
-                AEGP_StreamValue2 value{}; value.streamH = change.ref; value.val.one_d = change.previous_value;
+                // Restore the original dependency while the disabled base stays
+                // finite. The original base can be a sentinel underneath an
+                // enabled expression; restore it only after that expression.
+                AEGP_StreamValue2 value{}; value.streamH = change.ref; value.val.one_d = change.handoff_value;
                 suites.stream->AEGP_SetStreamValue(id, change.ref, &value);
+                suites.stream->AEGP_SetExpressionState(id, change.ref, FALSE);
                 suites.stream->AEGP_SetExpression(id, change.ref, reinterpret_cast<const A_UTF16Char*>(change.previous.c_str()));
                 suites.stream->AEGP_SetExpressionState(id, change.ref, change.enabled);
+                value.val.one_d = change.previous_value;
+                suites.stream->AEGP_SetStreamValue(id, change.ref, &value);
             }
             if (change.ref) suites.stream->AEGP_DisposeStream(change.ref);
         }
@@ -1560,6 +1567,39 @@ NativeBindingTransaction::~NativeBindingTransaction() = default;
 void NativeBindingTransaction::accept() noexcept { impl_->accepted = true; if(impl_->models)impl_->models->accept(); }
 PF_Err NativeBindingTransaction::rollback_model_resources() noexcept {
     return impl_->models?impl_->models->rollback():PF_Err_NONE;
+}
+
+PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
+                                                        const char** failed_stage) noexcept {
+    auto& tx=*impl_;
+    const auto stage=[&](const char* value){if(failed_stage)*failed_stage=value;};
+    for(auto& change:tx.changes)if(change.retired && !change.changed) {
+        if(failed_stream)*failed_stream=change.index;
+        change.changed=true; // Include partially failed writes in rollback.
+        AEGP_StreamValue2 value{};value.streamH=change.ref;value.val.one_d=change.handoff_value;
+        stage("write retired alias handoff");
+        auto error=tx.suites.stream->AEGP_SetStreamValue(tx.id,change.ref,&value);
+        if(error)return static_cast<PF_Err>(error);
+        stage("disable retired expression");
+        error=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
+        if(error)return static_cast<PF_Err>(error);
+        stage("clear retired expression");
+        error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
+        if(error)return static_cast<PF_Err>(error);
+        A_Boolean enabled=TRUE;
+        stage("verify retired expression disabled");
+        error=tx.suites.stream->AEGP_GetExpressionState(tx.id,change.ref,&enabled);
+        if(error || enabled)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_StreamValue2 observed{};const A_Time time{tx.data->current_time,tx.data->time_scale};
+        stage("verify finite retired alias handoff");
+        error=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,change.ref,AEGP_LTimeMode_LayerTime,&time,FALSE,&observed);
+        if(error)return static_cast<PF_Err>(error);
+        const auto number=observed.val.one_d;
+        const auto disposed=tx.suites.stream->AEGP_DisposeStreamValue(&observed);
+        if(disposed || !std::isfinite(number) || number==kNativeBindingUnavailable)
+            return static_cast<PF_Err>(disposed?disposed:PF_Err_BAD_CALLBACK_PARAM);
+    }
+    stage("retired aliases detached");return PF_Err_NONE;
 }
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
@@ -1664,23 +1704,26 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 slot<static_cast<A_long>(resource_ids.size())?resource_ids[slot]:0);result)return result;
         tx.models=std::make_unique<ModelMirrorTransaction>(tx.data,tx.id,tx.renderer,tx.owner_layer);
         if(const auto result=tx.models->install(graph,failed_stream,failed_stage);result)return result;
-        struct Alias {A_long slot,parameter;std::u16string expression;bool retired;};
+        struct Alias {A_long slot,parameter;std::u16string expression;bool retired;double source_value;};
         std::vector<Alias> aliases;
         std::array<bool,kNativeBindingCapacity> occupied{};
+        std::array<bool,kNativeBindingCapacity> previously_occupied{};
+        for(const auto& node:previous_nodes)for(const auto& field:node.fields)
+            if(field.present && field.slot>=0)for(A_long c=0;c<component_count(field.type);++c)
+                previously_occupied[field.slot+c]=true;
         for(const auto& node:nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component){
                 occupied[field.slot+component]=true;
-                aliases.push_back({field.slot+component,index,binding_expression(node,index,component),false});
+                aliases.push_back({field.slot+component,index,binding_expression(node,index,component),false,field.value[component]});
             }
         }
-        // Old aliases must stop evaluating before their node disappears. Reuse
-        // the same rollback machinery as active aliases; never scan arbitrary
-        // user streams or alter an unowned slot.
+        // Capture obsolete spans now; detach only after saved graph publication.
+        // Never scan arbitrary user streams or alter an unowned slot.
         for(const auto& node:previous_nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component)
-                if(!occupied[field.slot+component])aliases.push_back({field.slot+component,index,u"",true});
+                if(!occupied[field.slot+component])aliases.push_back({field.slot+component,index,u"",true,field.value[component]});
         }
         tx.changes.reserve(kNativeBindingCapacity);
         for(const auto& alias:aliases) {
@@ -1721,8 +1764,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     if (ae) return static_cast<PF_Err>(ae);
                 }
                 const auto& desired = alias.expression;
-                if(change.previous==desired && (change.retired?!change.enabled:change.enabled) &&
-                    (change.retired || (!identities_changed && !has_backups)))continue;
+                if(!change.retired && change.previous==desired && change.enabled && !identities_changed && !has_backups)continue;
                 // Snapshot values only for aliases we will actually mutate.
                 // An unchanged, enabled expression was checked against the exact
                 // freshly compiled node identity and source parameter above.
@@ -1733,7 +1775,28 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 if (ae) return static_cast<PF_Err>(ae);
                 change.previous_value = previous.val.one_d;
                 tx.suites.stream->AEGP_DisposeStreamValue(&previous);
+                change.handoff_value=alias.source_value;
+                if(previously_occupied[alias.slot]) {
+                    // The old graph still owns this span. Its evaluated source,
+                    // rather than the normally sentinel base, must survive the
+                    // temporary expression gap. Do not repair invalid bindings
+                    // by accepting zero or an unavailable value.
+                    AEGP_StreamValue2 resolved{};
+                    stage("read published alias handoff");
+                    ae=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,change.ref,AEGP_LTimeMode_LayerTime,&sample_time,FALSE,&resolved);
+                    if(ae)return static_cast<PF_Err>(ae);
+                    change.handoff_value=resolved.val.one_d;
+                    tx.suites.stream->AEGP_DisposeStreamValue(&resolved);
+                }
+                stage("verify finite alias handoff");
+                if(!std::isfinite(change.handoff_value) || change.handoff_value==kNativeBindingUnavailable)
+                    return PF_Err_BAD_CALLBACK_PARAM;
+                if(change.retired)continue;
                 change.changed = true;
+                AEGP_StreamValue2 handoff{};handoff.streamH=change.ref;handoff.val.one_d=change.handoff_value;
+                stage("write alias handoff");
+                ae=tx.suites.stream->AEGP_SetStreamValue(tx.id,change.ref,&handoff);
+                if(ae)return static_cast<PF_Err>(ae);
                 // Drop the compiled dependency before an alias changes source.
                 // Merely overwriting enabled text can retain a stale effect layout.
                 stage("disable previous expression");
@@ -1742,11 +1805,6 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 stage("clear previous expression");
                 ae=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
                 if(ae)return static_cast<PF_Err>(ae);
-                AEGP_StreamValue2 sentinel{}; sentinel.streamH = change.ref; sentinel.val.one_d = kNativeBindingUnavailable;
-                stage("write alias sentinel");
-                ae = tx.suites.stream->AEGP_SetStreamValue(tx.id, change.ref, &sentinel);
-                if (ae) return static_cast<PF_Err>(ae);
-                if(change.retired)continue;
                 stage("write expression");
                 ae = tx.suites.stream->AEGP_SetExpression(tx.id, change.ref, reinterpret_cast<const A_UTF16Char*>(desired.c_str()));
                 if (!ae) {
