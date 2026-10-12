@@ -30,6 +30,16 @@ compile error, test variable/position corrections and monolithic ASAN stack fail
 are retained; an isolated test helper passes ASAN with unchanged product code.
 Freeze/full SDK/pair publication next. No AE process/script action or launch request.
 
+Unshipped frozen2532799 ten-module SDK71343 completed exit0. Retain it for
+comparison; the final77/81 candidate also refreshes retired reserved-bank slots
+after structural edits, preserving exact finite handoff and non-native text.
+A disabled `value;`→empty text transition avoids relying on an identical-write
+invalidation guarantee. New adversarial old-frame cache test passes alongside
+active alias refresh (working ASAN19889+camera12 before the additional text-
+preservation assertion). No sentinel/zero fallback. Freeze final source separately;
+do not publish the earlier unshipped bundle. Actual AE cache behavior stays a
+hypothesis; no automatic acceptance or further launch requests.
+
 
 ## M3-17 render lifecycle native76 / CEP80 deployed — 2026-10-12 15:27+08
 

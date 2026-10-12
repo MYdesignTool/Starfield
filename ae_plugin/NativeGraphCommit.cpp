@@ -347,6 +347,7 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
         // Freshly resolved UUID sources + the verified saved record provide the
         // finite handoff under guard1; normal rendering never accepts a sentinel.
         error=bindings.install(graph,&stream,&stage,&parameter,nullptr,true);
+        if(!error)error=bindings.retire_after_publication(&stream,&stage);
         if(error) {
             if(output)std::snprintf(output->return_msg,sizeof(output->return_msg),"Starfield final bindings: %s (stream %ld, parameter %ld, error %ld).",stage,long(stream),long(parameter),long(error));
             return static_cast<PF_Err>(error);

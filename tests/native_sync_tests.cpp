@@ -106,7 +106,7 @@ std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 bool lazy_dependencies{};
 std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
-A_long nonfinite_alias=-1, unresolved_alias=-1, stale_dependency_alias=-1;
+A_long nonfinite_alias=-1, unresolved_alias=-1, stale_dependency_alias=-1,stale_retirement_alias=-1;
 A_long fail_expression = -1;
 unsigned expression_clear_count{};
 bool disable_next_expression{};
@@ -187,6 +187,7 @@ double evaluated_binding(A_long index, A_long time) {
     if(index==nonfinite_alias)return std::numeric_limits<double>::quiet_NaN();
     if(index==unresolved_alias)return kNativeBindingUnavailable;
     if(index==stale_dependency_alias)return kNativeBindingUnavailable;
+    if(index==stale_retirement_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
     if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
     if(expr==u"0")return 0; // A valid authored constant, including handoff reads.
@@ -242,11 +243,26 @@ void final_refresh_test(const core::Graph& prior,PF_OutData& output) {
     check(sample_native_node_animation(&checked,unavailable,1920,1080)==PF_Err_BAD_CALLBACK_PARAM,"stale final dependency remains a strict render failure");
     const auto revision=renderer.values[kGraphRevisionId].one_d,receipt=renderer.values[kGraphEditReceiptId].one_d;
     const auto bytes=core::serialize_graph(prior,core::particle_node_registry()).value();
+    const auto spare=kNativeBindingCapacity-1;const auto spare_text=expressions[spare];
+    expressions[spare]=u"user text";expression_enabled[spare]=FALSE;
     check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && stale_dependency_alias==-1,"final refresh rebuilds unchanged dependencies");
+    check(expressions[spare]==u"user text" && !expression_enabled[spare],"final retirement sweep preserves non-native expression text");expressions[spare]=spare_text;
     auto refreshed=saved_graph();check(sample_native_node_animation(&checked,refreshed,1920,1080)==0,"refreshed seven-kind graph renders without fallback");
     check(renderer.values[kGraphRevisionId].one_d==revision && renderer.values[kGraphEditReceiptId].one_d==receipt && core::serialize_graph(saved_graph(),core::particle_node_registry()).value()==bytes,"final refresh preserves graph/revision/receipt");
     renderer.values[kGraphSyncGuardId].one_d=0;
     check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==PF_Err_BAD_CALLBACK_PARAM,"unguarded final refresh rejects");renderer.values[kGraphSyncGuardId].one_d=1;
+}
+#if defined(_MSC_VER)
+__declspec(noinline)
+#endif
+void final_retirement_test(const core::Graph& prior,PF_InData& render_data,PF_OutData& output) {
+    auto& renderer=fixtures[0];
+    stale_retirement_alias=kNativeBindingFirstIndex;auto old=prior;
+    check(sample_native_node_animation(&render_data,old,1920,1080)==PF_Err_BAD_CALLBACK_PARAM,"adversarial old frame retains retired dependency");
+    const auto base=renderer.values[kNativeBindingFirstIndex].one_d;
+    check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && stale_retirement_alias==-1 &&
+        renderer.values[kNativeBindingFirstIndex].one_d==base && expressions[0].empty() && !expression_enabled[0],"final refresh restamps retirement with exact handoff");
+    old=prior;check(sample_native_node_animation(&render_data,old,1920,1080)==0,"old frame reads finite final retirement handoffs");
 }
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -423,8 +439,10 @@ int main() {
         auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
         if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
         if(!*text)++expression_clear_count;
+        const bool text_changed=expressions[index]!=reinterpret_cast<const char16_t*>(text);
         expressions[index] = reinterpret_cast<const char16_t*>(text);
         if(*text && index+kNativeBindingFirstIndex==stale_dependency_alias)stale_dependency_alias=-1;
+        if(text_changed && index+kNativeBindingFirstIndex==stale_retirement_alias)stale_retirement_alias=-1;
         sample_after_alias_mutation(); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
@@ -1810,6 +1828,7 @@ int main() {
         check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)==0 && saved_graph().nodes.size()==1,
             "seven-kind deletion completes post-publication retirement");
         check(samples>0,"seven-kind reentrant mutation callbacks executed");alias_mutation_hook={};
+        final_retirement_test(prior,render_data,output);
         // Invalid evaluated source values are still errors before any handoff.
         const auto before_invalid=sets;unresolved_alias=kNativeBindingFirstIndex;
         NativeBindingTransaction invalid(&renderer_data,701);const char* stage{};

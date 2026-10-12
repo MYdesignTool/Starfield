@@ -36,6 +36,16 @@ reported committed-state failures under the existing full-backup contract.
 AE cached reference behavior is a hypothesis; adversarial post-removal tests
 must be labeled accordingly, not represented as host reproduction.
 
+Final refresh also restamps previously retired slots within the reserved alias
+bank: finite bases with empty/disabled text or the exact native expression prefix.
+Preserve that validated base; leave sentinel slots and non-native text untouched.
+Use a disabled, dependency-free `value;` text transition then clear it, since an
+identical empty/disabled write has no documented cache invalidation guarantee.
+An adversarial old-frame fixture requires an actual text change and verifies
+finite old-graph sampling afterward. No source fallback or zero substitution.
+The first unshipped frozen77/81 source2532799 is retained; final candidate adds
+this retired-span coverage before publication. No ABI/schema/version migration.
+
 2026-10-12 owner reports75/79 still raises parameter-value stream268/error516.
 The install mutation tests do not include the full EffectGraphBackup lifecycle.
 The duplicated renderer retains the old graph and aliases through physical

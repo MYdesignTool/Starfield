@@ -31,6 +31,7 @@
 #include <new>
 #include <numbers>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -1525,7 +1526,7 @@ struct NativeBindingTransaction::Impl {
     struct ResourceChange {AEGP_StreamRefH ref{};AEGP_LayerIDVal previous{};bool count{},changed{};};
     std::vector<ResourceChange> resources;
     std::unique_ptr<ModelMirrorTransaction> models;
-    bool accepted{};
+    bool accepted{},force_refresh{};
     Impl(PF_InData* d, AEGP_PluginID i, AEGP_EffectRefH r, AEGP_LayerH owner)
         : data(d), id(i), renderer(r), owner_layer(owner), suites(d) {}
     ~Impl() {
@@ -1584,6 +1585,14 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
         error=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
         if(error)return static_cast<PF_Err>(error);
         stage("clear retired expression");
+        if(tx.force_refresh) {
+            // Make an actual text transition even when retirement previously
+            // left empty/disabled text. A same-text write has no invalidation
+            // guarantee. This temporary expression stays disabled and owns no
+            // source dependency; its final state is still empty/disabled.
+            error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u"value;"));
+            if(error)return static_cast<PF_Err>(error);
+        }
         error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
         if(error)return static_cast<PF_Err>(error);
         A_Boolean enabled=TRUE;
@@ -1609,6 +1618,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
     stage("decode binding record");
+    if(force_refresh && previous_graph)return PF_Err_BAD_CALLBACK_PARAM;
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
@@ -1619,6 +1629,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 return std::none_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& old){
                     return node.id==old.id && node.kind==old.kind;});}));
         auto& tx = *impl_;
+        tx.force_refresh=force_refresh;
         stage("acquire binding suites");
         auto error = tx.suites.acquire(); if (error) return error;
         A_Err ae = tx.suites.basic->AcquireSuite(kAEGPMemorySuite, kAEGPMemorySuiteVersion1,
@@ -1726,6 +1737,35 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component)
                 if(!occupied[field.slot+component])aliases.push_back({field.slot+component,index,u"",true,field.value[component]});
+        }
+        if(force_refresh)for(A_long slot=0;slot<kNativeBindingCapacity;++slot)if(!occupied[slot]) {
+            // A retired alias has a finite handoff beneath empty, disabled text.
+            // Restamp it AFTER final parade edits so an in-flight old graph does
+            // not retain the removed source dependency. Never change user text
+            // or an untouched sentinel slot; only the reserved alias bank is read.
+            AEGP_StreamRefH raw{};
+            ae=tx.suites.stream->AEGP_GetNewEffectStreamByIndex(tx.id,tx.renderer,kNativeBindingFirstIndex+slot,&raw);
+            StreamRef ref(tx.suites.stream,raw);if(ae || !raw)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamType type{};ae=tx.suites.stream->AEGP_GetStreamType(raw,&type);
+            if(ae || type!=AEGP_StreamType_OneD)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamValue2 value{};const A_Time time{tx.data->current_time,tx.data->time_scale};
+            ae=tx.suites.stream->AEGP_GetNewStreamValue(tx.id,raw,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+            if(ae)return static_cast<PF_Err>(ae);const double base=value.val.one_d;
+            tx.suites.stream->AEGP_DisposeStreamValue(&value);
+            if(!std::isfinite(base) || base==kNativeBindingUnavailable)continue;
+            A_Boolean enabled{};ae=tx.suites.stream->AEGP_GetExpressionState(tx.id,raw,&enabled);
+            if(ae)return static_cast<PF_Err>(ae);
+            AEGP_MemHandle handle{};ae=tx.suites.stream->AEGP_GetExpression(tx.id,raw,&handle);
+            if(ae)return static_cast<PF_Err>(ae);
+            bool empty=true,native_text=false;
+            if(handle) {
+                void* text{};ae=tx.memory->AEGP_LockMemHandle(handle,&text);
+                if(!ae){empty=text && *static_cast<const char16_t*>(text)==0;
+                    native_text=text && std::u16string_view(static_cast<const char16_t*>(text)).starts_with(u"var result = -1099511627776; var fx = null; var match = false;");
+                    tx.memory->AEGP_UnlockMemHandle(handle);}
+                tx.memory->AEGP_FreeMemHandle(handle);if(ae)return static_cast<PF_Err>(ae);
+            }
+            if(native_text || (!enabled && empty))aliases.push_back({slot,-1,u"",true,base});
         }
         tx.changes.reserve(kNativeBindingCapacity);
         for(const auto& alias:aliases) {
