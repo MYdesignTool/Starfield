@@ -424,6 +424,7 @@ void apply_particle_style(ParticleInstance& particle, const ParticleValues& appe
 #include "TransformEvaluation.hpp"
 #include "ModelEvaluation.hpp"
 #include "MotionEvaluation.hpp"
+#include "OrderedForce.hpp"
 
 bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
     const auto& from = source.type_key;
@@ -658,10 +659,24 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         };
         const auto apply_motion_frame=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed,
             MotionCircleOrigins origins)->Result<bool> {
-            if(plan)for(auto id:*plan) {
+            if(plan)for(std::size_t stage=0;stage<plan->size();++stage) {
+                const auto id=(*plan)[stage];
                 if(cancellation.is_cancelled())return Result<bool>::failure(ErrorCode::cancelled,"ordered Motion cancelled");
                 if(++budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"ordered Motion work limit");
-                if(const auto found=paths.find(id);found!=paths.end()) {
+                const auto node_index=index_of(id);
+                if(node_index<count&&forces[node_index]){
+                    std::vector<ForceValues> fields;
+                    do {
+                        const auto force_index=index_of((*plan)[stage]);fields.push_back(*forces[force_index]);
+                        if(stage+1==plan->size())break;
+                        const auto next=index_of((*plan)[stage+1]);if(next>=count||!forces[next])break;
+                        ++stage;
+                    }while(true);
+                    auto settings=ordered_force_settings(instance,seed,fields);if(!settings.has_value())return Result<bool>::failure(settings.error());
+                    if(!charge_ordered_force(settings.value(),budget.work))return Result<bool>::failure(ErrorCode::work_limit_exceeded,"ordered Force response work limit");
+                    auto moved=apply_ordered_force_response(instance,origins.particle,
+                        static_ordered_force_response(settings.value(),instance,dimension_context));if(!moved.has_value())return moved;
+                } else if(const auto found=paths.find(id);found!=paths.end()) {
                     const auto& clock=path_clocks.at(id);budget.work+=clock.clock.segment_count();
                     if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Light Path clock work limit");
                     auto travel=clock.distance_rate(instance.age_seconds,instance.lifetime_seconds,motion_speed_random(instance,id,seed));
@@ -792,7 +807,8 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     while (!stack.empty()) {
                         const auto current = stack.back(); stack.pop_back();
                         if (visited[current]) continue; visited[current] = true;
-                        if (forces[current] && (!tf_plan || std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[current]->id)!=tf_plan->force_nodes.end())) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; settings.forces.push_back(motion_for_emitter(forces[current]->motion, nodes[emitter]->id));force_ids.push_back(nodes[current]->id); }
+                        const bool ordered_force=circle_plan.value()&&std::find(circle_plan.value()->begin(),circle_plan.value()->end(),nodes[current]->id)!=circle_plan.value()->end();
+                        if (forces[current] && !ordered_force && (!tf_plan || std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[current]->id)!=tf_plan->force_nodes.end())) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; settings.forces.push_back(motion_for_emitter(forces[current]->motion, nodes[emitter]->id));force_ids.push_back(nodes[current]->id); }
                         for (const auto destination : outgoing[current]) if (active[destination] && !emitters[destination]) stack.push_back(destination);
                     }
                     auto validated_settings = validate_settings(settings);
@@ -1001,6 +1017,9 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             auto planned=transform_plan(particle_index);if(!planned.has_value())return R::failure(planned.error());
             const auto tf_plan=planned.value();
             auto circle_plan=motion_plan(particle_index);if(!circle_plan.has_value())return R::failure(circle_plan.error());
+            if(circle_plan.value())branch_forces.erase(std::remove_if(branch_forces.begin(),branch_forces.end(),[&](auto force){
+                return std::find(circle_plan.value()->begin(),circle_plan.value()->end(),nodes[force]->id)!=circle_plan.value()->end();
+            }),branch_forces.end());
             if(tf_plan)branch_forces.erase(std::remove_if(branch_forces.begin(),branch_forces.end(),[&](auto force) {
                 return std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[force]->id)==tf_plan->force_nodes.end();
             }),branch_forces.end());

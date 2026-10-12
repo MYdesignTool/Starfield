@@ -1,5 +1,12 @@
 # 开发路线图
 
+M3-18 native73/CEP77 candidate removes the Force-after-Motion placement restriction
+through ordered Core processing, history and Auxiliary velocity inheritance.
+Circle Speed displays percentages while retaining100%=one revolution/second.
+Frozen SDK/panel pairing and deployment are next. Distinct-chain merges,
+pre-Particle processors, timed point-light Light Path, Look At and Turbulence remain
+requirements of the active goal; this stage does not close them.
+
 2026-10-12 owner clarifies edge-ordered modular processing with no Force/Motion
 placement rule. Implement ordered Force/branch merges and timed AE point-light
 trajectories (Speed percentages, original keyframe duration, Stop/Continue,

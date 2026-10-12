@@ -161,9 +161,7 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Motion context planning cancelled");
         if(!terminal[at]||context_at[at]==count)continue;auto context=context_at[at];
         const auto& type=nodes[at]->type_key;
-        if(context && type==kForceNode)
-            return R::failure(ErrorCode::invalid_request,"Force after Motion requires ordered-force integration");
-        if(type==kMotionNode||(context&&type==kTransformNode)){
+        if(type==kMotionNode||(context&&(type==kTransformNode||type==kForceNode))){
             contexts.push_back({context,nodes[at]->id});context=contexts.size()-1;}
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {

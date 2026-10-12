@@ -1,5 +1,32 @@
 # 当前工程状态
 
+## M3-18 ordered Force native73 / CEP77 candidate — 2026-10-12
+
+Owner confirms edge-order evaluation and percentages (Circle100%=one turn/sec).
+This candidate implements Force after Motion/Transform rather than bypassing
+validation: static and temporal response blocks, branch-local birth anchors,
+drag mapping and Auxiliary inheritance. Deferred forces are removed from prefix
+simulation to prevent double application. No ID/schema/CoreABI changes.
+Native sliders and CEP Speed display percent; isolated CEP77 removes the
+temporary Force-after-Motion guard. Live installed pair remains72/76 until a
+fresh AE0 deployment and hash proof. Different-chain merges, pre-Particle
+processors, timed point-light Light Path, Look At and Turbulence remain open.
+
+Working standard8438 and actual ASAN8438 frame checks pass, including analytic
+force response, all30/60/120Hz histories, reversed node/edge arrays, animated
+gravity, curves/random, serial/sandwiched force blocks, downstream transforms,
+CPU pixels/GPU scene preparation, Auxiliary velocities, snapshot byte round
+trips and cancellation/allocation/concurrent requests. Native ASAN643,
+Circle ASAN2020, numeric Path ASAN10336, dummy72/76→73/77 full deployment/rollback67
+pass; all27 isolated panel files reproduce exactly. Logs:
+artifacts/m3-18-ordered-force-{tests-v3,asan-v4,native-asan,circle-asan,path-asan,
+deployment-tests}.log. The v3 log labelled asan used the standard runner switch;
+v4 explicitly uses -Sanitize and provides the ASAN evidence. Complete seven-kind
+registration/transaction DOM/reload/ES3 panel audit passed, actual session39438
+exit0 (artifacts/m3-18-ordered-force-panel-audit.log). Frozen SDK and publication
+are pending; AE2023 qualification remains open.
+M3-18 and the complete goal remain active.
+
 ## M3-18 next light-source / animated-path candidate — 2026-10-12
 
 Current owned source adds read-only MotionLightSources inventory/prefix selection

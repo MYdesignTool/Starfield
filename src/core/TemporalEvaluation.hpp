@@ -186,6 +186,55 @@ class TemporalEvaluator {
         }
         return P::success({geometry.take_value(),distance,rate});
     }
+    Result<bool> ordered_force(ParticleInstance& particle,Vec3 origin,std::span<const NodeId> ids,
+        double birth,double now,std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes) {
+        using M=Result<bool>;
+        std::vector<ForceValues> fields;fields.reserve(ids.size());
+        const auto settings_at=[&](double time)->Result<Settings>{
+            fields.clear();
+            for(auto id:ids){auto field=force_at(*nodes.at(id),time);if(!field.has_value())return Result<Settings>::failure(field.error());fields.push_back(field.take_value());}
+            return ordered_force_settings(particle,seed,fields);
+        };
+        if(now<=birth){auto checked=settings_at(now);if(!checked.has_value())return M::failure(checked.error());return M::success(true);}
+        OrderedForceResponse response;Vec3 physical_velocity{};
+        double basis_position=0,basis_velocity=1,t=birth;bool has_drag=false;
+        while(t<now){
+            if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"ordered Force history cancelled");
+            if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"ordered Force history work limit");
+            const auto end=std::min(now,(std::floor(t*hz+1e-8)+1)/hz);
+            if(!(end>t))return M::failure(ErrorCode::invalid_time,"ordered Force history did not advance");
+            auto sampled=settings_at((t+end)/2);if(!sampled.has_value())return M::failure(sampled.error());
+            auto physical=sampled.value(),spin=sampled.take_value();
+            if(!charge_ordered_force(physical,work,4))return M::failure(ErrorCode::work_limit_exceeded,"ordered Force curve work limit");
+            for(auto& force:physical.forces)force.spin_radius=0;
+            spin.gravity={};spin.linear_drag=0;for(auto& force:spin.forces){force.gravity={};force.wind={};}
+            const auto a0=t-birth,a1=end-birth,dt=end-t,drag=physical.linear_drag;
+            has_drag=has_drag||drag!=0;
+            const auto decay=std::exp(-drag*dt);
+            const auto a=drag>1e-10?-std::expm1(-drag*dt)/drag:dt;
+            const auto p0=simulate_particle_at_age(physical,a0,particle.id,dimensions);
+            const auto p1=simulate_particle_at_age(physical,a1,particle.id,dimensions);
+            const auto s0=simulate_particle_at_age(spin,a0,particle.id,dimensions);
+            const auto s1=simulate_particle_at_age(spin,a1,particle.id,dimensions);
+            response.displacement={response.displacement.x+physical_velocity.x*a+p1.position.x-p0.position.x-p0.velocity.x*a+s1.position.x-s0.position.x,
+                response.displacement.y+physical_velocity.y*a+p1.position.y-p0.position.y-p0.velocity.y*a+s1.position.y-s0.position.y,
+                response.displacement.z+physical_velocity.z*a+p1.position.z-p0.position.z-p0.velocity.z*a+s1.position.z-s0.position.z};
+            physical_velocity={physical_velocity.x*decay+p1.velocity.x-p0.velocity.x*decay,
+                physical_velocity.y*decay+p1.velocity.y-p0.velocity.y*decay,physical_velocity.z*decay+p1.velocity.z-p0.velocity.z*decay};
+            basis_position+=basis_velocity*a;basis_velocity*=decay;t=end;
+            if(!motion_circle_detail::bounded(response.displacement)||!motion_circle_detail::bounded(physical_velocity))
+                return M::failure(ErrorCode::invalid_request,"ordered Force history state exceeds bounds");
+        }
+        auto endpoint=settings_at(now);if(!endpoint.has_value())return M::failure(endpoint.error());
+        auto spin=endpoint.take_value();spin.gravity={};spin.linear_drag=0;
+        for(auto& force:spin.forces){force.gravity={};force.wind={};}
+        if(!charge_ordered_force(spin,work))return M::failure(ErrorCode::work_limit_exceeded,"ordered Force endpoint work limit");
+        const auto field_velocity=simulate_particle_at_age(spin,particle.age_seconds,particle.id,dimensions).velocity;
+        response.velocity={physical_velocity.x+field_velocity.x,physical_velocity.y+field_velocity.y,physical_velocity.z+field_velocity.z};
+        response.damping_weight=has_drag?basis_position/particle.age_seconds:1;
+        response.damping_rate=has_drag?(basis_velocity-response.damping_weight)/particle.age_seconds:0;
+        return apply_ordered_force_response(particle,origin,response);
+    }
     Result<bool> apply_motion_frame(ParticleInstance& particle,const Branch& branch,double birth,double now,
         std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes,const EvaluatedGraph& graph,MotionCircleOrigins origins) {
         using M=Result<bool>;
@@ -193,6 +242,13 @@ class TemporalEvaluator {
         for(std::size_t index=0;index<branch.motions.size();++index) {
             const auto id=branch.motions[index];const auto& stage=*nodes.at(id);
             if(cancel.is_cancelled())return M::failure(ErrorCode::cancelled,"ordered Motion history cancelled");
+            if(stage.type_key==kForceNode){
+                const auto first=index;
+                while(index+1<branch.motions.size()&&nodes.at(branch.motions[index+1])->type_key==kForceNode)++index;
+                auto moved=ordered_force(particle,origins.particle,
+                    std::span<const NodeId>(branch.motions).subspan(first,index-first+1),birth,now,seed,nodes);
+                if(!moved.has_value())return moved;continue;
+            }
             if(stage.type_key==kTransformNode){
                 if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"ordered Transform history work limit");
                 auto transform=transform_at(stage,now);if(!transform.has_value())return M::failure(transform.error());
@@ -503,6 +559,9 @@ public:
                 auto planned=plan_motion_chain(plan_nodes,plan_incoming,plan_outgoing,plan_active,plan_order,
                     plan_indices.at(id),plan_indices.at(output->id),cancel,work);
                 if(!planned.has_value())return R::failure(planned.error());base.motions=planned.take_value();
+                base.forces.erase(std::remove_if(base.forces.begin(),base.forces.end(),[&](const auto* force){
+                    return std::find(base.motions.begin(),base.motions.end(),force->id)!=base.motions.end();
+                }),base.forces.end());
             }
             std::sort(base.forces.begin(),base.forces.end(),[](auto a,auto b){return a->id<b->id;});
             if(has_transforms) {

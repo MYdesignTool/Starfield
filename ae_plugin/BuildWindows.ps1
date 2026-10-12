@@ -127,7 +127,7 @@ $adapterInputs = @(
     'include\starfield\core\MotionCurveClock.hpp', 'include\starfield\core\MotionPathTravel.hpp',
     'include\starfield\core\MotionPathPoints.hpp',
     'src\core\MotionPathTravel.cpp',
-    'src\core\MotionEvaluation.hpp',
+    'src\core\MotionEvaluation.hpp', 'src\core\OrderedForce.hpp',
     'ae_plugin\ModelGeometryParameter.cpp', 'ae_plugin\ModelGeometryParameter.hpp',
     'ae_plugin\ModelMirrorParameter.cpp', 'ae_plugin\ModelMirrorParameter.hpp',
     'ae_plugin\ModelMirrorTransaction.cpp', 'ae_plugin\ModelMirrorTransaction.hpp',

@@ -8,7 +8,7 @@ for(const kind of ["emitter","particle","motion","output"])g=edits.apply(g,{type
 for(let i=0;i<3;i++)g=edits.apply(g,{type:"connect",from:g.nodes[i].id,to:g.nodes[i+1].id},next);
 const motion=g.nodes[2];eq(edits.nativeRecordSchema(motion),1);eq(g.edges[2].sourcePort,"2");eq(g.edges[1].destinationPort,"1");
 let forceGraph=edits.apply(g,{type:"addNode",nodeType:"force"},()=>"f".repeat(32));
-ok(!edits.canConnect(forceGraph,motion.id,"f".repeat(32),"2","1"));
+ok(edits.canConnect(forceGraph,motion.id,"f".repeat(32),"2","1"));
 ok(edits.canConnect(forceGraph,"f".repeat(32),motion.id,"2","1"));
 const project=()=>view.project(g,null,{width:1920,height:1080,pixelAspect:1}).nodes.find(n=>n.id===motion.id);
 let node=project();eq(node.kind,"motion");eq(node.inputPort,"1");eq(node.outputPort,"2");

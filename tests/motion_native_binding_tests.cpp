@@ -17,6 +17,9 @@ int main(){
         CHECK(registered[m::mode-1].u.pd.value==1&&registered[m::mode-1].u.pd.num_choices==1);
         CHECK(registered[m::origin_type-1].u.pd.num_choices==3&&registered[m::origin_type-1].u.pd.value==1);
         CHECK(registered[m::speed-1].u.fs_d.value==100&&registered[m::speed_random-1].u.fs_d.value==0);
+        CHECK(registered[m::speed-1].u.fs_d.display_flags&PF_ValueDisplayFlag_PERCENT);
+        CHECK(registered[m::speed_random-1].u.fs_d.display_flags&PF_ValueDisplayFlag_PERCENT);
+        CHECK(registered[m::speed-1].u.fs_d.valid_max==100000&&registered[m::speed-1].u.fs_d.slider_max==200);
         CHECK(registered[m::curve-1].ui_flags&PF_PUI_CONTROL);
         CHECK(registered[142].uu.id==400&&registered[209].uu.id==600&&registered[217].uu.id==608);
         std::array<PF_ParamDef,219> curve_params{};std::array<PF_ParamDef*,219> curve_pointers{};

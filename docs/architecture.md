@@ -1,8 +1,15 @@
 # Starfield 架构
 
+M3-18 native73/CEP77 candidate implements Force blocks after Motion in graph edge
+order, including static/history evaluation and Auxiliary inheritance. Deferred
+Force is excluded from prefix simulation so it is applied once. Consecutive Force
+fields combine in the current stream frame; ADR0039 defines drag's trajectory
+mapping. No public ID, persistent schema or CoreABI change. Different-chain merges
+and processors before Particle remain implementation work. Deployment pending.
+
 2026-10-12 owner confirms edge order (upstream→downstream), independent of canvas
 placement/effect list. Compatible processing modules must compose in arbitrary
-order. Force-after-Motion and distinct-chain rejection remain implementation
+order. Distinct-chain rejection remains implementation
 debt, not the target architecture. Light Path author must use AE point-light
 position keyframe timing/interpolation at Speed100%=original duration, with
 Stop/Continue and fixed Max Delay at Delay Random0. Circle100% retains one turn

@@ -1,5 +1,20 @@
 # 测试入口
 
+## M3-18 ordered Force native73 / CEP77 candidate — 2026-10-12
+
+RunMotionFrameTests.ps1 -Run [-Sanitize] passes8438 (standard tests-v3,
+actual ASAN asan-v4). New cases cover closed-form drag/fields,30/60/120Hz and
+partial/reverse histories, animation/curves/random, downstream Transform,
+reversed node/edge arrays, CPU pixels and GPU scene center, Auxiliary velocity,
+atomic cancellation/allocation and four-thread repeatability. The v3 asan-labelled
+log accidentally used a standard runner switch and is not ASAN evidence.
+RunMotionNativeBindingTests -Run -Sanitize643, Circle ASAN2020, Path ASAN10336
+pass. Dummy model_deployment_tests72/76→73/77 passes67; isolated panel77
+reproduces all27 hashes. Evidence under artifacts/m3-18-ordered-force-*.log.
+Complete seven-kind registration/transaction DOM/reload/ES3 panel audit passes
+(session39438 exit0, ordered-force-panel-audit.log). Frozen SDK/deployment gates
+remain pending; these do not qualify AE.
+
 ## M3-18 light-source / animated-path candidate — 2026-10-12
 
 `tests/RunMotionLightSourcesTests.ps1 -Run [-Sanitize]` standard/ASAN8099:

@@ -344,6 +344,10 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-12 ordered Force候选native73/CEP77：标准/实际ASAN8438、native643、Circle2020、numeric Path10336通过，dummy72/76→73/77发布/完整回滚67通过，隔离面板27 hashes重现。包含CPU pixels/GPU scene位置及反序节点/边验证。v3 asan命名日志误用标准switch，不计为ASAN证据；v4显式-Sanitize通过。下一步源码冻结完整SDK/七类注册面板验收及配对发布；安装72/76保持。异链合并/Particle前置模块/timed light/Look At/M3-19和实际AE验收仍开放。
+
+Ordered Force接入拥有src/core/OrderedForce.hpp、MotionEvaluation.hpp、GraphEvaluation.cpp、TemporalEvaluation.hpp及focused motion_frame_tests；公式与静态/历史响应先记录ADR0039。保留既有无Motion/前置Force分支；后置Force从这些分支剥离后按实际连线阶段计算，禁止只删除reject或重复应用。面板guard仅在Core及冻结配对验证完成后移除；不同链合并/Particle前置处理器/timed light/完整目标继续保留为后续要求。
+
 2026-10-12 owner最新：沿图连线upstream→downstream，任意兼容module组合；禁止以固定Force/Motion相对顺序代替真实组合实现。Circle100%仍一秒一圈；Light Path按AE点光源position关键帧时段100%=原时长1:1，末端Stop/Continue，Delay Random0=固定Max Delay。下一步要实现有序Force/分支合并和timed point-light capture/历史/作者，不能将多个静态灯光B-spline当作此需求。621ee37共享inventory/partial geometry源已推送冻结，完整May2023十目标双NoPublish会话37022实际exit0；495源码hash、十输出和新CPP/header/main指纹匹配，冻结ASAN8099/10336通过。安装72/76独立10/18/27及selector/backup hashes未变。SDK证据artifacts/prepared/m3-18-motion-light-geometry/sdk-terminal.json；本卡/完整目标active。
 
 2026-10-12 后续在途：官方Staff已证实Starting With名前缀输入，见reference-motion-phases。新增只读灯光名字/ID/order/activity inventory及精确UTF16 prefix→IDs seam，May2023标准/ASAN8099；补Light Path当前距离下路径形变速度、出生边界、30/60/120Hz、metadata仅证明clock、乱序及Auxiliary继承，标准/ASAN10336、有序frame ASAN4196通过。源码完整SDK冻结待续；不改native72/CEP76 Circle安装。原生resource/history/shutter/GUID接入、剩余参考政策、ordered Force/merges、两模式作者及M3-19/实际AE gates保持。本卡拥有新MotionLightSources.hpp/.cpp、main工程、TemporalEvaluation、focused runners/tests及本文档。

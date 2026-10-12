@@ -104,8 +104,58 @@ void graph(){auto g=ordered();auto r=evaluate(g);auto prefix=base();ParticleTran
     auto once=basic;set(node(once,1),kBirthRate,1.);set(node(once,1),kEmittingMode,std::uint32_t{1});auto first=evaluate(once,{0,1}),end=evaluate(once);auto linear=take(interpolate_motion_particles(first,end,0,1,.5,100,never));auto exact=evaluate(once,{1,2});
     Sampler subframe(once);same(exact,temporal(subframe,{1,2}));bool differs=false;for(unsigned i=0;i<9;++i)differs=differs||std::abs(linear.particles[0].motion_affine[i]-exact.particles[0].motion_affine[i])>1e-6;check(differs,"Linear affine chord remains explicit approximation to actual subframe");
     auto many=basic;set(node(many,1),kBirthRate,5000.);set(node(many,255),kParticleCount,std::uint32_t{6000});auto population=evaluate(many);check(population.particles.size()==5001&&population.sprite_bases.empty(),"5001 frames without shared slots");check(population.particles.front().motion_affine!=population.particles.back().motion_affine,"individual affine frames");
-    auto unsupported=basic;attach(unsupported,{nid(5),kForceNode,3,{{kGravity,Vec3{}},{kLinearDrag,0.}}});auto failure=evaluate_particle_graph(unsupported,{1,1},never);check(!failure.has_value()&&failure.error().code==ErrorCode::invalid_request,"ordered Force is explicit remaining gate");
-    Sampler rejected(unsupported);check(!evaluate_temporal_particle_graph(unsupported,{1,1},never,{},rejected).has_value(),"temporal ordered Force gate");
+    auto zero_force=basic;attach(zero_force,{nid(5),kForceNode,3,{{kGravity,Vec3{}},{kLinearDrag,0.}}});same(evaluate(basic),evaluate(zero_force));
+    Sampler accepted(zero_force);same(evaluate(basic),temporal(accepted));
+}
+GraphNode force(unsigned id,Vec3 gravity,double drag=0,Vec3 wind={},double spin=0){return {nid(id),kForceNode,3,{{kGravity,gravity},{kLinearDrag,drag},{kWind,wind},{kSpin,spin},{kSpinFrequency,1.},{kSpinResist,0.},{kSpinDelay,0.}}};}
+void ordered_forces(){
+    auto control=base();set(node(control,1),kBirthRate,1.);set(node(control,1),kEmittingMode,std::uint32_t{1});
+    auto moved=control;attach(moved,circle(3));const Vec3 gravity{.3,-.2,.1},wind{.1,.05,-.02};
+    const auto origin=evaluate(control,{0,1}).particles[0].position;
+    for(double drag:{0.,1e-8,.2,2.})for(unsigned frequency:{30u,60u,120u}){
+        auto g=moved;set(node(g,255),kTimeSamplingHz,frequency);attach(g,force(4,gravity,drag,wind,.02));
+        for(auto time:{RationalTime{0,1},RationalTime{13,1000},RationalTime{1,2},RationalTime{1,1},RationalTime{1,2}}){
+            auto plain=evaluate(moved,time),actual=evaluate(g,time);Sampler sampled(g);same(actual,temporal(sampled,time));
+            auto p=plain.particles[0];const auto age=p.age_seconds,z=drag*age;
+            const auto a=drag>0?-std::expm1(-z)/drag:age;
+            const auto b=drag>1e-5?(age-a)/drag:age*age*(.5-z/6+z*z/24-z*z*z/120);
+            const auto f=age>0?a/age:1;
+            const auto df=age>0?(std::exp(-z)-f)/age:0;
+            const Vec3 delta{p.position.x-origin.x,p.position.y-origin.y,p.position.z-origin.z};
+            const auto cs=std::cos(2*std::numbers::pi*age),sn=std::sin(2*std::numbers::pi*age);
+            const Vec3 spin=age>0?Vec3{.02*(cs-1),.02*sn,0}:Vec3{};
+            const Vec3 spin_v=age>0?Vec3{-.02*2*std::numbers::pi*sn,.02*2*std::numbers::pi*cs,0}:Vec3{};
+            p.position={origin.x+f*delta.x+(gravity.x+wind.x)*b+spin.x,origin.y+f*delta.y+(gravity.y+wind.y)*b+spin.y,origin.z+f*delta.z+(gravity.z+wind.z)*b};
+            p.velocity={f*p.velocity.x+df*delta.x+(gravity.x+wind.x)*a+spin_v.x,
+                f*p.velocity.y+df*delta.y+(gravity.y+wind.y)*a+spin_v.y,f*p.velocity.z+df*delta.z+(gravity.z+wind.z)*a};same(p,actual.particles[0]);
+        }
+    }
+    auto gravity_first=control;attach(gravity_first,force(4,gravity));attach(gravity_first,circle(3));
+    auto gravity_last=moved;attach(gravity_last,force(4,gravity));const auto a=evaluate(gravity_first),b=evaluate(gravity_last);
+    check(std::abs(a.particles[0].position.x-b.particles[0].position.x)>1e-4,"Force/Circle order is implemented and distinct");
+    auto serial=moved;attach(serial,force(4,gravity,.2,wind));attach(serial,force(5,{-.05,.1,0},.3,{}));
+    auto combined=moved;attach(combined,force(4,{.25,-.1,.1},.5,wind));same(evaluate(serial),evaluate(combined));Sampler repeated(serial);same(evaluate(serial),temporal(repeated));
+    auto suffix=gravity_last;attach(suffix,transform(5,settings()));auto expected=evaluate(gravity_last);const auto tf=take(compile_particle_transform(settings()));
+    for(auto& p:expected.particles)take(apply_ordered_particle_transform(p,tf));same(expected,evaluate(suffix));Sampler transformed(suffix);same(evaluate(suffix),temporal(transformed));
+    auto shuffled=suffix;std::reverse(shuffled.nodes.begin(),shuffled.nodes.end());std::reverse(shuffled.edges.begin(),shuffled.edges.end());same(evaluate(suffix),evaluate(shuffled));Sampler reshuffled(shuffled);same(evaluate(suffix),temporal(reshuffled));
+    auto sandwich=gravity_first;attach(sandwich,force(5,{-.05,.1,0}));Sampler layered(sandwich);same(evaluate(sandwich),temporal(layered));
+    auto curves=moved;auto fnode=force(4,gravity,.3,wind,.02);AgeCurve curve;curve.count=3;curve.points[0]={0,20};curve.points[1]={.5,90};curve.points[2]={1,40};
+    for(auto interpolation:{CurveInterpolation::linear,CurveInterpolation::hold,CurveInterpolation::bezier,CurveInterpolation::draw}){
+        curve.interpolation=interpolation;set(fnode,kWindSpinCurve,encode_age_curve(curve));auto g=curves;attach(g,fnode);Sampler s(g);same(evaluate(g),temporal(s));
+    }
+    auto random=curves;set(fnode,kGravityRandom,50.);attach(random,fnode);Sampler r(random);same(evaluate(random),temporal(r));
+    Sampler animated(gravity_last);animated.change=[](GraphNode& n,double t){if(n.type_key==kForceNode)set(n,kGravity,Vec3{0,t,0});};
+    auto result=temporal(animated);const auto incoming=evaluate(moved);const double dt=1./30;double px=0,vx=0;
+    for(unsigned i=0;i<30;++i){const auto force=(i+.5)*dt;px+=vx*dt+.5*force*dt*dt;vx+=force*dt;}
+    near(result.particles[0].position.y,incoming.particles[0].position.y+px,"animated ordered gravity history");near(result.particles[0].velocity.y,incoming.particles[0].velocity.y+vx,"animated ordered gravity velocity");
+    const auto bytes=take(serialize_graph(suffix,particle_node_registry()));same(evaluate(suffix),evaluate(take(deserialize_graph(bytes,particle_node_registry()))));
+    auto auxiliary_graph=gravity_last;auto emitter=node(control,1);emitter.id=nid(8);set(emitter,kEmittingMode,std::uint32_t{0});set(emitter,kAuxiliarySource,std::uint32_t{1});set(emitter,kBirthRate,2.);set(emitter,kEmitterOrigin,Vec3{});set(emitter,kVelocity,Vec3{});set(emitter,kInheritVelocity,100.);
+    auto child=node(control,2);child.id=nid(9);auxiliary_graph.nodes.push_back(emitter);auxiliary_graph.nodes.push_back(child);
+    auxiliary_graph.edges.push_back({eid(90),nid(4),kForceParticlesOut,nid(8),kEmitterParents});auxiliary_graph.edges.push_back({eid(91),nid(8),kEmitterParticles,nid(9),kParticleParticlesIn});auxiliary_graph.edges.push_back({eid(92),nid(9),kParticleParticlesOut,nid(255),kOutputParticles});
+    Sampler children(auxiliary_graph);same(evaluate(auxiliary_graph),temporal(children));
+    unsigned count{};for(const auto& p:evaluate(auxiliary_graph).particles)if(p.emitter_id==nid(8)){
+        ++count;const auto birth=1-p.age_seconds;const auto parent=evaluate(gravity_last,{static_cast<std::int64_t>(birth*1000+.5),1000});near(p.velocity,parent.particles[0].velocity,"Auxiliary inherits post-Motion Force velocity");
+    }check(count>0,"ordered Force Auxiliary children exist");
 }
 void put(OpaqueBytes& bytes,std::size_t offset,std::uint64_t value,unsigned count){for(unsigned i=0;i<count;++i)bytes[offset+i]=std::byte((value>>(8*i))&255);}
 void snapshots(){auto g=base();attach(g,look(3));attach(g,transform(4,settings()));auto r=evaluate(g);auto bytes=take(encode_evaluated_particles(r,{1,1}));check(std::to_integer<unsigned>(bytes[2])==10,"nonidentity affine snapshot10");
@@ -136,6 +186,9 @@ void rendering(){RenderRequest request;request.frame.layer_width=request.frame.l
     auto g=base();set(node(g,1),kBirthRate,1.);set(node(g,1),kEmittingMode,std::uint32_t{1});set(node(g,1),kEmitterOrigin,Vec3{});set(node(g,1),kVelocity,Vec3{});attach(g,look(3));ParticleTransformSettings rotate;rotate.rotation_degrees={0,0,90};attach(g,transform(4,rotate));request.graph=std::make_shared<const Graph>(g);
     auto image=take(CpuParticleRenderer{}.render(request,never));auto alpha=[&](unsigned x,unsigned y){float a;std::memcpy(&a,image.pixels.data()+y*image.row_bytes+x*16+12,4);return a;};check(alpha(34,32)>.5f&&alpha(32,35)==0,"CPU uses baked affine orientation");
     auto scene=take(prepare_sprite_scene(request,never));check(scene.sprites.size()==1,"GPU prepares ordered affine sprite");near(std::abs(scene.sprites[0].inverse_ax),1./3,"GPU long inverse axis",1e-6);near(std::abs(scene.sprites[0].inverse_by),2./3,"GPU short inverse axis",1e-6);
+    attach(g,force(5,{.25,0,0}));request.graph=std::make_shared<const Graph>(g);
+    image=take(CpuParticleRenderer{}.render(request,never));check(alpha(42,32)>.5f&&alpha(34,32)==0,"CPU renders Force after Motion/Transform at its ordered center");
+    scene=take(prepare_sprite_scene(request,never));check(scene.sprites.size()==1,"GPU prepares ordered Force sprite");near(scene.sprites[0].x,40,"GPU post-Motion Force center",1e-6);
     ParticleInstance p;p.shape=4;p.size_pixels=2;p.size_y_pixels=2;p.motion_affine=shear;p.motion_pose={std::cos(.2),0,0,std::sin(.2)};p.sprite_basis_index=1;const ParticleSpriteBasis basis{1,.1,0,0,2,0,0,0,-1};auto m=take(model_particle_matrix(p,request.frame,{&basis,1}));auto combined=mul(shear,basis);p.motion_affine=kIdentityMotionAffine;auto expected=take(model_particle_matrix(p,request.frame,{&combined,1}));for(unsigned i=0;i<16;++i)near(m[i],expected[i],"Model Q A B numeric matrix");
     request.camera.enabled=true;request.camera.focal_x=request.camera.focal_y=100;request.camera.center_x=request.camera.center_y=32;request.camera.image_to_layer={1,0,0,0,1,0,0,0,1};const auto c=std::sqrt(.5);
     request.camera.layer_to_view={c,0,-c,0,0,1,0,0,c,0,c,0,-32*c,-32,100+32*c,1};const auto grid=sprite_geometry::make_grid(request.frame);ParticleInstance facing;facing.shape=1;facing.size_pixels=facing.size_y_pixels=20;facing.opacity=1;facing.rotation_degrees={0,-90,0};sprite_geometry::Sprite reference;
@@ -146,11 +199,11 @@ void auxiliary(){auto g=base();set(node(g,1),kEmittingMode,std::uint32_t{1});att
     auto r=evaluate(g);Sampler s(g);same(r,temporal(s));unsigned children=0;auto parent_graph=g;parent_graph.nodes.erase(parent_graph.nodes.end()-2,parent_graph.nodes.end());parent_graph.edges.resize(parent_graph.edges.size()-3);
     for(auto& p:r.particles)if(p.emitter_id==nid(4)){++children;const auto birth=1-p.age_seconds;auto parent=evaluate(parent_graph,{std::int64_t(std::round(birth*1000)),1000}).particles[0];near(p.position,{parent.position.x+parent.velocity.x*p.age_seconds,parent.position.y+parent.velocity.y*p.age_seconds,parent.position.z+parent.velocity.z*p.age_seconds},"Auxiliary inherits ordered parent center/velocity");}check(children>=2,"Auxiliary ordered prefix exercised");
 }
-void failures(){auto g=ordered();const auto original=take(serialize_graph(g,particle_node_registry()));bool success=false;
+void failures(){auto g=ordered();attach(g,force(10,{.02,-.01,.005},.2,{.03,0,0},.01));const auto original=take(serialize_graph(g,particle_node_registry()));bool success=false;
     struct Stop:Cancellation{mutable unsigned n{};unsigned bound;explicit Stop(unsigned b):bound(b){}bool is_cancelled()const noexcept override{return n++>=bound;}};
     for(bool temporal_scope:{false,true}){success=false;for(unsigned i=0;i<3000;++i){Sampler s(g);Stop cancel(i);auto r=temporal_scope?evaluate_temporal_particle_graph(g,{1,1},cancel,{},s):evaluate_particle_graph(g,{1,1},cancel);if(r.has_value()){success=true;break;}check(r.error().code==ErrorCode::cancelled,"whole evaluation cancellation typed");}check(success,"cancel reaches success");
         success=false;for(unsigned n=1;n<3000;++n){Sampler s(g);fail_allocation=allocations.load()+n;auto r=temporal_scope?evaluate_temporal_particle_graph(g,{1,1},never,{},s):evaluate_particle_graph(g,{1,1},never);fail_allocation=0;if(r.has_value()){success=true;break;}check(r.error().code==ErrorCode::allocation_failed,"whole frame allocation typed");}check(success,"allocation reaches success");}
     check(original==take(serialize_graph(g,particle_node_registry())),"failure leaves source graph unchanged");const auto reference=take(encode_evaluated_particles(evaluate(g),{1,1}));std::atomic<bool> okay{true};std::thread jobs[4];for(auto& job:jobs)job=std::thread([&]{for(unsigned n=0;n<10;++n){auto r=evaluate_particle_graph(g,{1,1},never);if(!r.has_value()){okay=false;return;}auto bytes=encode_evaluated_particles(r.value(),{1,1});if(!bytes.has_value()||bytes.value()!=reference)okay=false;}});for(auto& job:jobs)job.join();check(okay,"concurrent independent graph requests");
 }
 }
-int main()try{primitive();graph();snapshots();rendering();auxiliary();failures();std::printf("motion_frame_tests: %u checks passed; ordered numeric Motion/Transform and snapshot10; AE qualification remains open\n",checks);return 0;}catch(const std::exception& e){std::fprintf(stderr,"Motion frame after %u checks: %s\n",checks,e.what());return 1;}
+int main()try{primitive();graph();ordered_forces();snapshots();rendering();auxiliary();failures();std::printf("motion_frame_tests: %u checks passed; ordered numeric Motion/Transform/Force and snapshot10; AE qualification remains open\n",checks);return 0;}catch(const std::exception& e){std::fprintf(stderr,"Motion frame after %u checks: %s\n",checks,e.what());return 1;}

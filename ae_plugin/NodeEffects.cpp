@@ -95,6 +95,7 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
             case kSizeId: case kSizeYId: case kEmitterParticleSizeId: case kBirthRateId:
             case kSeedId: case kEmitterSizeXId: case kEmitterSizeYId: case kEmitterSizeZId:
             case kEmissionSpeedId: def.u.fs_d.slider_max = 100.0f; break;
+            case 1711: def.u.fs_d.slider_min=-200.0f;def.u.fs_d.slider_max=200.0f;break;
             case kForceGravityId: case kWindXId: case kWindYId: case kWindZId:
                 def.u.fs_d.slider_min = -100.0f; def.u.fs_d.slider_max = 100.0f; break;
             case kSpinId: def.u.fs_d.slider_max = 100.0f; break;
@@ -117,7 +118,7 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
         id == kEmissionSpeedRandomId || id == kSizeOverLifeId || id == kOpacityOverLifeId ||
         id == kEmitChanceId || id == kEmitLifeStartId || id == kEmitLifeEndId ||
         id == kInheritVelocityId || id == kInheritSizeId || id == kInheritOpacityId || id == kInheritColorId ||
-        (id>=kTransformScaleXId && id<=kTransformParticlesOpacityId) || (id>=1603&&id<=1605)) {
+        (id>=kTransformScaleXId && id<=kTransformParticlesOpacityId) || (id>=1603&&id<=1605) || id==1711 || id==1712) {
         def.u.fs_d.display_flags = PF_ValueDisplayFlag_PERCENT;
     }
     def.u.fs_d.curve_tolerance = AEFX_AUDIO_DEFAULT_CURVE_TOLERANCE;

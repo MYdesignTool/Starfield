@@ -25,6 +25,29 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ### Owner-confirmed flow and Light Path policy — 2026-10-12
 
+Ordered Force implementation contract: a consecutive Force block combines its
+independent fields in the current stream frame, then maps the incoming trajectory
+around its owned particle-birth position. Let A(t) and B(t) be displacement and
+velocity of a unit initial velocity under the block's drag, and X(t),V(t) its
+zero-initial-velocity gravity/wind/spin response. Set f=A/t, f'=(B-f)/t. Output is
+birth+f*(input-birth)+X and f*input_velocity+f'*(input-birth)+V. At birth use f=1
+and X=V=0. This equals the existing physical trajectory for linear input, and
+provides a defined modular frame operation for Motion/Transform input without
+reinterpreting their completed displacement as a new full-age initial velocity.
+Different placements can yield different results because operations follow
+edges; no placement is rejected solely for being after Motion. Consecutive
+Force fields retain the existing combined gravity/drag/random/curve semantics.
+
+Static blocks use the existing analytic particle/age-curve response. Temporal
+blocks solve drag and gravity/wind response per absolute history interval with
+midpoint control values, using exact frozen-control response differences over
+that interval. Spin uses its displacement difference separately so animated
+controls do not teleport past particles or feed spin into physical drag. This
+also includes the existing curve slope in endpoint spin velocity. The frame
+operation and histories remain bounded/cancellable and AE-independent; this
+is an independent equation requiring AE2023 acceptance, not a measured claim
+about a reference damping implementation. No serialized ID/schema/ABI changes.
+
 The owner confirms computation follows edges upstream to downstream. Canvas
 coordinates and AE effect-list order do not determine evaluation order. All
 compatible particle-processing modules must compose in arbitrary order; the
