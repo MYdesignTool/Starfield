@@ -249,10 +249,6 @@ void final_refresh_test(const core::Graph& prior,PF_OutData& output) {
     check(expressions[spare]==u"user text" && !expression_enabled[spare],"final retirement sweep preserves non-native expression text");expressions[spare]=spare_text;
     auto refreshed=saved_graph();check(sample_native_node_animation(&checked,refreshed,1920,1080)==0,"refreshed seven-kind graph renders without fallback");
     check(renderer.values[kGraphRevisionId].one_d==revision && renderer.values[kGraphEditReceiptId].one_d==receipt && core::serialize_graph(saved_graph(),core::particle_node_registry()).value()==bytes,"final refresh preserves graph/revision/receipt");
-    renderer.values[kControlSourceId].one_d=kLegacyControlSource;const auto writes=sets;
-    check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && sets==writes,
-        "first-materialization rollback to AE Controls needs no native alias rewrite");
-    renderer.values[kControlSourceId].one_d=kNodeControlSource;
     renderer.values[kGraphSyncGuardId].one_d=0;
     check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==PF_Err_BAD_CALLBACK_PARAM,"unguarded final refresh rejects");renderer.values[kGraphSyncGuardId].one_d=1;
 }

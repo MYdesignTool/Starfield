@@ -1,5 +1,30 @@
 # 当前工程状态
 
+## M3-17 按 owner 要求回退至 native77 / CEP81 — 2026-10-13 00:20+08
+
+Owner reports native79/CEP82 still cannot add nodes and requests rollback.
+Fresh read-only AE process count was0. The official paired restore recovered
+native77/CEP81 from `m3-17-native79-panel82-timeout-restore-20261012`;
+independent hashes match the original352562d receipt:10 native modules,
+18 paired CEP sources, all27 panel files and selected Core
+`StarfieldCore-A322F880AB2269F2.dll`. Packed32845/CoreABI9. The rejected79/82
+ten-module/eighteen-source pair remains retained in that backup's candidate folders.
+
+Active implementation, version, candidate helper, deployment allowlist and owned
+fixtures were restored to release baseline1a6cf73. Native78 generation coherence
+and native79 timeout/restoration proposals are withdrawn; their commits and frozen
+archives remain historical evidence. CEP81's accepted immediate draft paint,
+receipt reuse and failure restoration, accepted Circle and other Motion work remain.
+Unrelated dirty/untracked files were preserved. Original deletion errors remain
+unresolved; this rollback does not qualify a fix or claim that node addition was
+retested. No build, test suite, automatic AE acceptance, launch/stop or script dispatch.
+
+Evidence: `artifacts/m3-17-native79-owner-rollback.log` and
+`artifacts/m3-17-native79-owner-rejection-restore-proof.json`.
+Executed recovery (AE closed):
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native79-panel82-timeout-restore-20261012' -Restore`.
+The entries below describe previous attempts, not the current deployed pair.
+
 ## M3-17 native79 / CEP82 deployed — 2026-10-12 23:56+08
 
 Frozen/pushed source2b541c5098986863aef5d316afd0493397891629 installed23:56:33+08.

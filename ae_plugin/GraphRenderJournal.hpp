@@ -12,7 +12,7 @@
 namespace starfield::adapter {
 // Only explicit, confined development builds enable this journal. It observes
 // the result, never drives host state, retains SDK handles or changes the result.
-inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error,const char* message,const char* phase=nullptr) noexcept {
+inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error,const char* message) noexcept {
 #if defined(STARFIELD_GRAPH_RENDER_JOURNAL_FILE) && defined(_WIN32)
     try {
         static std::mutex mutex;std::lock_guard lock(mutex);
@@ -28,13 +28,10 @@ inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error
             if(c=='"' || c=='\\'){std::fputc('\\',file);std::fputc(c,file);}
             else if(c<32)std::fprintf(file,"\\u%04x",static_cast<unsigned>(c));else std::fputc(c,file);
         }
-        std::fputc('"',file);
-        std::fprintf(file,",\"clockMs\":%llu",static_cast<unsigned long long>(GetTickCount64()));
-        if(phase)std::fprintf(file,",\"phase\":\"%s\"",phase);
-        std::fputs("}\n",file);
+        std::fputs("\"}\n",file);
     } catch(...) {} // Diagnostic I/O must not fail a render or hide its result.
 #else
-    (void)data;(void)guard;(void)error;(void)message;(void)phase;
+    (void)data;(void)guard;(void)error;(void)message;
 #endif
 }
 }

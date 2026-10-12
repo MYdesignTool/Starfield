@@ -1,5 +1,22 @@
 # 测试入口
 
+## M3-17 owner rollback verification — 2026-10-13
+
+Native79/CEP82 still failed node addition in the owner's AE and is rejected.
+Its passing offline counts do not establish a working host implementation.
+No tests, builds or automatic AE acceptance were run for the rollback.
+Official Restore-TestBuild restored77/81 after fresh AE0. Independent read-only
+hash verification matches10 native modules,18 paired sources,27 full panel files
+and the original Core selector/shadow DLL against the77 installation receipt and
+frozen panel. Rejected79 binaries10/paired sources18 remain retained and verified.
+Evidence: artifacts/m3-17-native79-owner-rollback.log and
+artifacts/m3-17-native79-owner-rejection-restore-proof.json.
+
+Owned implementations/fixtures/helpers are restored to release1a6cf73. Removed79
+timeout and78 generation fixtures are reproducible only in their historical
+commits/archives; the commands below for those withdrawn proposals are historical.
+Accepted CEP81 response/Circle remain; original deletion errors are unresolved.
+
 ## M3-17 timeout / restored-instance rebind deployed79/82 — 2026-10-12
 
 Frozen2b541c5 complete May2023 SDK13576 actualexit0 and510 unchanged archived

@@ -1,5 +1,15 @@
 # Starfield 架构
 
+Current implementation and installed pairing are restored to native77/CEP81
+(release1a6cf73, frozen352562d) on the owner's2026-10-13 rollback request.
+Native79 still failed node addition. The78 generation-coherence and79 timeout/
+restoration proposals below are withdrawn from active source, including their
+helper and fixture changes. Accepted CEP81 draft paint/receipt handling and Circle,
+plus unrelated Motion work, are preserved. The original deletion failure is still
+unresolved; no host acceptance is inferred from rollback or historical simulations.
+
+## Previous implementation attempts (historical)
+
 M3-17 native78 was rejected for add-node timeouts and exact77/CEP81 restored.
 Deployed79/82 removes CRC expression reads and adds two bounded repairs: keep
 polling a single transaction after a transport read timeout (original5min deadline,

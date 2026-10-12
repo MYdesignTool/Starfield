@@ -4,7 +4,6 @@
 #include "Parameters.hpp"
 #include "MotionBlur.hpp"
 #include "NativeTemporalCache.hpp"
-#include "GraphRenderJournal.hpp"
 #include "SPBasic.h"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -71,14 +70,6 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         context.num_params = static_cast<A_long>(kTotalEffectParameterCount + 1);
         PF_InData* data = &context;
         if(panel_data)context.effect_ref=panel_data->effect_ref;
-        struct ReportCommand {
-            PF_InData* data;node_sync::NativeEdit* edit;double guard;
-            ~ReportCommand(){char message[255]{};
-                std::snprintf(message,sizeof(message),"stage %u stream %ld parameter %ld binding %s",unsigned(edit->stage),
-                    long(edit->stream_index),long(edit->binding_parameter),edit->binding_stage?edit->binding_stage:"none");
-                journal_graph_render(data,guard,edit->status,message,"UI result");}
-        } report{data,edit,panel_data?1.0:0.0};
-        journal_graph_render(data,report.guard,0,"","UI begin");
         // Generic calls can be nested below AE's scripting stack. Keep the
         // bounded parameter bank off that UI thread's stack.
         std::vector<PF_ParamDef> scratch(kTotalEffectParameterCount + 1);
@@ -202,7 +193,6 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         error = create_graph_parameter(data, graph, &publish.graph);
         if (error) return edit->status = error;
         NativeBindingTransaction bindings(data, plugin_id, edit->renderer, edit->layer);
-        journal_graph_render(data,report.guard,0,"","UI bindings begin");
         edit->stage = node_sync::Stage::animation_bindings;
         std::optional<core::Graph> previous_graph;
         if(scratch[kGraphParameterId].u.arb_d.value){
@@ -213,7 +203,6 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
             previous_graph?&*previous_graph:nullptr);
         if (error) return edit->status = error;
-        journal_graph_render(data,report.guard,0,"","UI bindings end");
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.
         // Do not add continuous/color/point values to this scalar-only contract.
@@ -318,7 +307,6 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
         }
         bindings.accept();
-        journal_graph_render(data,report.guard,0,"","UI published");
         if(panel_data)capture_native_temporal_metadata(data,graph,plugin_id);
         edit->revision = revision; edit->status = PF_Err_NONE; edit->accepted = true;
         edit->stage = node_sync::Stage::complete; edit->stream_index = -1;
@@ -348,9 +336,6 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
             AEGP_StreamValue2 value{};error=streams->AEGP_GetNewStreamValue(plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
             if(error)return static_cast<PF_Err>(error);
             struct Value {const AEGP_StreamSuite6* streams;AEGP_StreamValue2* value;~Value(){streams->AEGP_DisposeStreamValue(value);}} held{streams,&value};
-            // A first materialization may roll back to AE Controls. Its saved
-            // renderer has no native graph dependencies to rebind.
-            if(index==kControlSourceId && value.val.one_d==kLegacyControlSource)return PF_Err_NONE;
             if(index==kGraphParameterId) {
                 auto decoded=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));
                 if(!decoded.has_value())return PF_Err_BAD_CALLBACK_PARAM;graph=decoded.take_value();

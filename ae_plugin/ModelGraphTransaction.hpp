@@ -24,8 +24,7 @@ struct ModelGraphTransactionPlan {
     // commit means its native graph receipt and resulting snapshot were checked.
     A_Err (*prepare)(void*){};
     A_Err (*commit)(void*){};
-    // After successful cleanup OR restoration, before renderer guard release.
-    // Restored effects are fresh instances; both paths need rebind. No script.
+    // After all backup removals and before renderer guard release; no script.
     A_Err (*finalize)(void*){};
     std::int32_t (*is_cancelled)(void*) noexcept {};
 };

@@ -17,6 +17,24 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+### 2026-10-13: withdraw native78/79 proposals; restore77/81
+
+The owner reports79/82 still cannot add nodes and directs rollback. Restore the
+deployed pair and owned active implementation to native77/CEP81 (release1a6cf73,
+frozen352562d), preserving accepted panel responsiveness, Circle and other Motion
+work. Official paired restoration with AE0 and independent10/18/27/selector hash
+verification are recorded in current-state.md. No test/host execution accompanies
+the rollback. The original deletion error remains unresolved; neither this
+rollback nor previous simulations establish the AE cause or a successful repair.
+
+Withdraw the78 CRC-generation scheme and79 receipt-timeout/restoration-finalizer
+changes from active source and fixtures. Do not deploy another iteration of this
+direction. Retain their commits, frozen archives and host failures for review.
+The following78/79 proposals are historical and no longer current decisions;
+native77's original explicit command and responsive panel contracts remain.
+
+### Previous proposals and evidence (historical)
+
 2026-10-12 owner rejects native78 for add-node host_timeout after8s. Exact77/81
 is restored after owner closes AE38548;10/18/selector hashes match. Actual78 log
 has15 PF graph observations with identical graph/receipt CRC833224704 and nodes7;

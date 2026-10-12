@@ -19,10 +19,8 @@ try {
         '/DSTARFIELD_NODE_KIND_EMITTER','/D_CRT_SECURE_NO_WARNINGS','/Iinclude','/Iae_plugin',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'))+$taskSources
-    # The monolithic fake-SDK main retains full parameter banks plus ASAN stack
-    # redzones. This changes only the offline fixture executable's stack reserve.
-    $taskLinkArgs='/link /STACK:8388608'
-    if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs+=" /DEBUG /PDB:$taskDir\tests.pdb"}
+    $taskLinkArgs=''
+    if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs="/link /DEBUG /PDB:$taskDir\tests.pdb"}
     [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDir\compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))
     $taskBatch=@"
 @echo off

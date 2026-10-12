@@ -1,6 +1,21 @@
 # 当前任务卡
 
-## M3-17 — node deletion transaction repair (2026-10-12, active priority)
+## M3-17 — node deletion repair withdrawn; owner rollback complete (2026-10-13)
+
+Owner rejects79/82: node addition still fails, and asks to roll back rather than
+continue this direction. Native77/CEP81 is restored with AE0;10 native/18 paired/
+27 full panel/selector hashes match the original352562d receipt. Owned active
+implementation and fixtures are restored to1a6cf73, including candidate/deployment
+versioning. Accepted CEP81 response and Circle/Motion work remain; other workspace
+changes are untouched. No build/tests/automatic AE acceptance/process action.
+
+Withdraw the78 graph-generation and79 timeout/restoration proposals. Preserve
+their Git commits, frozen source and failed host evidence. Do not prepare another
+iteration of those proposals. Original deletion errors remain unresolved; this
+card and the full Motion/Turbulence goal are not completed by rollback.
+Current pairing and rollback evidence: docs/current-state.md.
+
+## M3-17 — previous deletion repair attempts (historical)
 
 79/82 deployed23:56+08 from pushed/frozen2b541c5; installed and exact recovered
 77/81 rollback independently match. See current-state.md for current evidence.

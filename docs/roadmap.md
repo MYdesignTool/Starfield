@@ -1,5 +1,14 @@
 # 开发路线图
 
+2026-10-13 owner rejects native79/CEP82 because node addition still fails and
+requests rollback. Native77/CEP81 and corresponding active source are restored;
+installed hashes match the original pair. Native78/79 repair directions are
+withdrawn. Preserve accepted panel responsiveness/Circle and all other Motion
+work. Original deletion errors and remaining Motion/Turbulence scope stay open.
+No automatic acceptance or new repair deployment accompanies this rollback.
+
+## Previous stage records (historical)
+
 2026-10-12 owner rejects native78's add-node timeout regression; exact77/81 was
 restored before deployed79/82 replaced it.79 uses the77 binding algorithm plus
 receipt-read recovery/restoration rebind; actual deletion correction is unconfirmed.

@@ -281,7 +281,7 @@ void transaction_tests(){
         switch(which){case 0:t.prepare_fail=true;break;case 1:t.commit_fail=true;break;case 2:t.prepare_throw=true;break;case 3:t.commit_throw=true;break;
             case 4:t.generic_fail_at=1;break;case 5:t.generic_fail_at=2;break;case 6:t.unacknowledged=true;break;case 7:t.wrong_target=true;break;
             case 8:t.duplicate_target=true;break;case 9:t.busy_target=true;break;case 10:t.silent_revision=true;break;case 11:t.local_failure=true;break;}
-        const auto r=run(t);CHECK(!r.committed && r.error!=0 && r.rollback_error==0);equals(before);CHECK(t.starts==1 && t.ends==1 && t.finalizes==1);
+        const auto r=run(t);CHECK(!r.committed && r.error!=0 && r.rollback_error==0);equals(before);CHECK(t.starts==1 && t.ends==1);
         if(which==11)CHECK(r.asset_rollback_error==512);}
     for(unsigned phase=1;phase<=4;++phase){auto t=make_transaction();const auto before=snapshot();t.cancel_phase=phase;const auto r=run(t);
         CHECK(!r.committed && r.error==PF_Interrupt_CANCEL && r.rollback_error==0);equals(before);if(phase==1)CHECK(t.starts==0);}
@@ -299,9 +299,6 @@ void transaction_tests(){
     {auto t=make_transaction();inject("delete",1);const auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==injected && t.commits==1);}
     {auto t=make_transaction();t.end_fail=true;const auto r=run(t);CHECK(r.committed && r.error==0 && r.undo_error==injected);}
     {auto t=make_transaction();t.finalize_fail=true;const auto r=run(t);CHECK(r.committed && r.error==0 && r.cleanup_error==injected && t.finalizes==1);}
-    {auto t=make_transaction();t.commit_fail=true;t.finalize_fail=true;const auto r=run(t);
-        CHECK(!r.committed && r.error==injected && r.rollback_error==injected && t.finalizes==1);
-        CHECK(parade[1]->numbers.at(kGraphSyncGuardId)==1);}
     transaction=nullptr;
 }
 #endif

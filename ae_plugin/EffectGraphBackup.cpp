@@ -178,7 +178,7 @@ A_Err EffectGraphBackup::discard(A_Err (*finalize)(void*),void* context) noexcep
     if(!cleanup && finalize)try{cleanup=finalize(context);}catch(...){cleanup=PF_Err_INTERNAL_STRUCT_DAMAGED;}
     const auto reset=release_guard();return cleanup?cleanup:reset;
 }
-A_Err EffectGraphBackup::restore(A_Err (*finalize)(void*),void* context) noexcept {
+A_Err EffectGraphBackup::restore() noexcept {
     if(!prepared_)return bad;prepared_=false;
     // Validate every required backup before deleting any surviving author effect.
     for(std::size_t i=0;i<count_;++i){AEGP_EffectRefH raw{};A_long slot{};auto e=find(records_[i],true,raw,slot);Ref ref{effects_,raw};if(e)return rollback_error_=e;}
@@ -203,12 +203,7 @@ A_Err EffectGraphBackup::restore(A_Err (*finalize)(void*),void* context) noexcep
     for(std::size_t i=0;i<count_;++i)if(records_[i].kind>=0){auto& record=records_[i];record.backup=record.original;
         AEGP_EffectRefH raw{};A_long slot{};e=find(record,true,raw,slot);Ref ref{effects_,raw};if(!e)e=write_scalar(raw,record.guard,0);if(e)return rollback_error_=e;record.created=false;}
     for(std::size_t i=0;i<count_;++i)if(records_[i].kind<0){auto& record=records_[i];AEGP_EffectRefH raw{};A_long slot{};e=find(record,true,raw,slot);Ref ref{effects_,raw};
-        if(!e)e=write_scalar(raw,record.guard,1);if(e)return rollback_error_=e;record.created=false;}
-    // Every source UUID/name/order is restored and no structural mutation or
-    // borrowed ref survives into the callback. Renderer remains guarded if
-    // rebind fails; never expose a falsely restored dependency graph.
-    if(finalize)try{e=finalize(context);}catch(...){e=PF_Err_INTERNAL_STRUCT_DAMAGED;}
-    if(e)return rollback_error_=e;
-    return rollback_error_=release_guard();
+        if(!e)e=write_scalar(raw,record.guard,0);if(e)return rollback_error_=e;record.created=false;}
+    return 0;
 }
 }
