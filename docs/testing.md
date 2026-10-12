@@ -1,5 +1,23 @@
 # 测试入口
 
+## M3-17 native78 / retained CEP81 generation candidate — 2026-10-12
+
+Focused working-source evidence: RunAliasHandoffTests -Run -Sanitize passes29308
+native +12 camera checks (m3-17-generation78-alias-asan-v2.log), including current/
+historical stale-generation cancellation, exact rollback and receipt-type-before-
+write validation. Earlier iteration failed the type-before-write assertion; fixed
+by capture ordering. The large fake-SDK main's ASAN executable needs8MiB reserved
+stack; runner changes only the test executable, not production modules.
+`node tests/graph_binding_generation_tests.js` executes144 actual generated
+programs,1272 checks: differing high/low CRC rejects before source lookup, matching
+CRC missing/changed UUID remains unavailable, matching valid sources evaluate.
+No AE cache emulation claim. Full backup/render lifecycle source fixture passes
+with independently split graph/receipt and stale expression cases; later complete
+native78 frozen build evidence is recorded below when available.
+Native77 PID24564 manual log has61 successes,6 strict failures,14 cancellations;
+simulations do not override this failure. Retained panel/client34 and isolated
+dummy77/81→78/81 deployment/restore67 pass. No automatic AE acceptance/process action.
+
 ## M3-17 final parade / responsive panel deployed77 / CEP81 — 2026-10-12
 
 Final frozen352562d logs/receipts under artifacts/prepared/m3-17-native77-final-parade-v2:

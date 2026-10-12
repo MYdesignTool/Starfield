@@ -937,18 +937,43 @@ static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_dat
             err = stored.checkout(kGraphParameterId);
             if (err != PF_Err_NONE) return err;
             if (stored.value.param_type != PF_Param_ARBITRARY_DATA) return PF_Err_BAD_CALLBACK_PARAM;
-            auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value);
+            std::uint32_t checksum{};
+            auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value,&checksum);
             if (!decoded.has_value()) return graph_error(out_data, decoded.error());
+            // AE's render project may deliver a graph, its static receipt and
+            // animated aliases from different publication boundaries. Check the
+            // receipt through PF, recording the same render dependencies as the
+            // expressions. Never consult the UI project's AEGP view here.
+            CheckedParameter high(in_data),low(in_data);
+            if((err=high.checkout(kGraphChecksumHighId)) || (err=low.checkout(kGraphChecksumLowId)))return err;
+            const auto valid_half=[](const PF_ParamDef& value){return value.param_type==PF_Param_FLOAT_SLIDER &&
+                std::isfinite(value.u.fs_d.value) && value.u.fs_d.value>=0 && value.u.fs_d.value<=65535 &&
+                std::floor(value.u.fs_d.value)==value.u.fs_d.value;};
+            if(!valid_half(high.value) || !valid_half(low.value))return PF_Err_BAD_CALLBACK_PARAM;
+            const auto receipt=(static_cast<std::uint32_t>(high.value.u.fs_d.value)<<16u) |
+                static_cast<std::uint32_t>(low.value.u.fs_d.value);
+            journal_graph_render(in_data,observed_guard,0,"","PF graph",checksum,receipt,decoded.value().nodes.size());
+            if(receipt!=checksum) {
+                if(out_data)out_data->return_msg[0]=0;
+                return PF_Interrupt_CANCEL;
+            }
             core::Graph sampled = decoded.take_value();
             A_long failed_binding = -1;
+            core::NodeId failed_node{};
             const char* failed_stage = "unknown";
             err = sample_native_node_animation(in_data, sampled, reference_width, reference_height,
-                                               &failed_binding, &failed_stage);
+                                               &failed_binding, &failed_stage,nullptr,&failed_node);
             if (err) {
+                if(err==PF_Interrupt_CANCEL) {
+                    if(out_data)out_data->return_msg[0]=0;
+                    return err;
+                }
+                char identity[33]{};constexpr char digits[]="0123456789abcdef";
+                for(unsigned i=0;i<16;++i){identity[2*i]=digits[failed_node.value.bytes[i]>>4];identity[2*i+1]=digits[failed_node.value.bytes[i]&15];}
                 if (out_data) std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, delivered params %ld).",
+                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, graph %08x, node %s).",
                     failed_stage, STARFIELD_VERSION_BUILD, guard.value.u.fs_d.value, static_cast<long>(failed_binding), static_cast<long>(err),
-                    static_cast<long>(in_data->num_params));
+                    static_cast<unsigned>(checksum),identity);
                 return err;
             }
             graph = std::make_shared<const core::Graph>(std::move(sampled));

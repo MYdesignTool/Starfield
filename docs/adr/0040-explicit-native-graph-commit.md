@@ -17,6 +17,41 @@ claim that AE's exact failure has been reproduced.
 
 ## Decision
 
+2026-10-12 native77 is rejected by owner for deletion; CEP81 responsiveness is
+accepted. Actual PID24564 journal contains61 normal guard0 frames,6 unavailable
+stream258 frames and14 guard1 cancellations. AEGP final readback does not prove
+PF uses the same graph/expression generation. Existing programs carry source UUID
+but no graph identity, so the renderer cannot distinguish stale programs from a
+missing current source. That protocol gap is confirmed; exact AE cache causality
+is not. Earlier adversarial simulations did not establish host correction.
+
+Native78 reuses the existing CRC halves and codec header; IDs/types/schema/ABI9
+stay unchanged. Explicit command-generated expressions carry their graph CRC and
+first resolve their own renderer through propertyGroup(1).propertyIndex, then
+check its CRC halves before visiting a sibling. This uses documented expression
+hierarchy/index APIs; it does not enumerate heterogeneous effects. Different
+graphs produce different programs. A dedicated stale-generation sentinel returns
+PF_Interrupt_CANCEL, not zero/valid pixels. PF also checks codec CRC against both
+checked-out halves before any aliases, registering publication dependencies.
+Historical node/rate/lifetime sampling propagates cancellation through Core.
+Matching-generation unavailable/nonfinite/invalid types and checkin errors stay
+strict. A fully old coherent render snapshot is not proven by this protocol to
+have a live source; that host possibility stays open and must not be hidden.
+
+Before publication, a staged program may return only its known stale marker while
+the old receipt is retained. All publication streams are typed/captured before any
+alias/resource mutation. After saved graph/receipts are verified, require enabled,
+finite, resolved, non-stale bindings before retirement/acceptance, and again after
+parade cleanup. Restore graph/receipts and exact expression/base state on failure.
+Legacy delivered-param carrier retains its older unversioned path; explicit SFG1
+and SFR1 paths are the deployed gateway contract. No released request wire changes.
+Upgrade existing aliases on the next authored command; no load-time script/migration
+is introduced. UI publish/final and PF graph journal records include CRC/node count;
+strict failures include node UUID. No owner diagnostic script is required.
+
+Reference: Adobe's official expression reference, propertyGroup/propertyIndex and
+effect(index): https://helpx.adobe.com/after-effects/desktop/work-with-expressions/expression-language-reference/expression-language-reference.html
+
 2026-10-12 owner reports native76 guard0 unavailable binding stream258; real
 journal confirms guarded cancellations and failures after guard release. No more
 automatic AE acceptance requests/runs per owner; keep manual host gates open and

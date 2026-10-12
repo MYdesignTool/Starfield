@@ -101,6 +101,7 @@ public:
         core::GraphNode value;
         ++trace.node_samples;
         error=plan.sample(&sampled,id,value,&stream);
+        if(error==PF_Interrupt_CANCEL)return R::failure(core::ErrorCode::cancelled,"historical graph generation changed");
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical node parameter checkout/conversion failed");
         if(nodes.size()>=4096) nodes.clear();
         nodes.emplace(key,value);return R::success(std::move(value));
@@ -117,11 +118,14 @@ public:
         stream=found->rate;PF_ParamDef value{};
         ++trace.checkouts;
         error=PF_CHECKOUT_PARAM(&sampled,stream,sampled.current_time,sampled.time_step,sampled.time_scale,&value);
+        if(error==PF_Interrupt_CANCEL)return R::failure(core::ErrorCode::cancelled,"historical rate checkout cancelled");
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical rate checkout failed");
         const bool valid=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) &&
-            value.u.fs_d.value!=kNativeBindingUnavailable;
+            value.u.fs_d.value!=kNativeBindingUnavailable && value.u.fs_d.value!=kNativeBindingStaleGraph;
+        const bool stale=value.param_type==PF_Param_FLOAT_SLIDER && value.u.fs_d.value==kNativeBindingStaleGraph;
         const double number=valid?value.u.fs_d.value:0;
         error=PF_CHECKIN_PARAM(&sampled,&value);
+        if(stale && !error){error=PF_Interrupt_CANCEL;return R::failure(core::ErrorCode::cancelled,"historical rate graph generation changed");}
         if(error || !valid) {if(!error) error=PF_Err_BAD_CALLBACK_PARAM;return R::failure(core::ErrorCode::invalid_request,"historical rate value/checkin failed");}
         if(rates.size()>=64) rates.clear();
         rates.emplace(key,number);return R::success(number);
@@ -138,9 +142,13 @@ public:
         stream=found->stream;PF_ParamDef value{};
         ++trace.checkouts;
         error=PF_CHECKOUT_PARAM(&sampled,stream,sampled.current_time,sampled.time_step,sampled.time_scale,&value);
+        if(error==PF_Interrupt_CANCEL)return R::failure(core::ErrorCode::cancelled,"historical Life checkout cancelled");
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical Life checkout failed");
-        const bool valid=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) && value.u.fs_d.value!=kNativeBindingUnavailable;
+        const bool valid=value.param_type==PF_Param_FLOAT_SLIDER && std::isfinite(value.u.fs_d.value) &&
+            value.u.fs_d.value!=kNativeBindingUnavailable && value.u.fs_d.value!=kNativeBindingStaleGraph;
+        const bool stale=value.param_type==PF_Param_FLOAT_SLIDER && value.u.fs_d.value==kNativeBindingStaleGraph;
         const double number=valid?value.u.fs_d.value:0;error=PF_CHECKIN_PARAM(&sampled,&value);
+        if(stale && !error){error=PF_Interrupt_CANCEL;return R::failure(core::ErrorCode::cancelled,"historical Life graph generation changed");}
         if(error || !valid) {if(!error) error=PF_Err_BAD_CALLBACK_PARAM;return R::failure(core::ErrorCode::invalid_request,"historical Life value/checkin failed");}
         return R::success(number);
     }

@@ -6,7 +6,7 @@
 #define STARFIELD_VERSION_MINOR 1
 #define STARFIELD_VERSION_BUG 0
 #define STARFIELD_VERSION_STAGE 0 /* PF_Stage_DEVELOP */
-// Build77 candidate: final-parade dependency refresh and immediate CEP draft.
-// Full ten-module/Core ABI9 pairing with CEP81; ADR0040.
-#define STARFIELD_VERSION_BUILD 77
-#define STARFIELD_VERSION_PACKED 32845 /* 0x804D */
+// Build78 candidate: graph/receipt/expression generation coherence.
+// Full ten-module/Core ABI9 pairing with the accepted CEP81; ADR0040.
+#define STARFIELD_VERSION_BUILD 78
+#define STARFIELD_VERSION_PACKED 32846 /* 0x804E */

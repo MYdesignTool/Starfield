@@ -205,13 +205,18 @@ core::Result<core::Graph> graph_from_controls(const core::Settings& settings) {
         core::EdgeId{emitter_to_particle}, core::EdgeId{particle_to_force}, core::EdgeId{force_to_output});
 }
 
-core::Result<core::Graph> read_graph_parameter(PF_InData* data, PF_ArbitraryH handle) {
+core::Result<core::Graph> read_graph_parameter(PF_InData* data, PF_ArbitraryH handle, std::uint32_t* checksum) {
     const LockedBytes value(data, handle);
     if (!value.valid()) return core::Result<core::Graph>::failure(core::ErrorCode::invalid_request, "graph parameter handle is invalid");
     auto decoded = core::deserialize_graph(value.bytes(), core::particle_node_registry());
     if (!decoded.has_value()) return core::Result<core::Graph>::failure(
         decoded.error().code == core::SequenceErrorCode::allocation_failed ? core::ErrorCode::allocation_failed : core::ErrorCode::invalid_request,
         decoded.error().detail);
+    if (checksum) {
+        *checksum = 0;
+        for (unsigned i = 0; i < 4; ++i)
+            *checksum |= std::to_integer<std::uint32_t>(value.bytes()[24 + i]) << (8u * i);
+    }
     return core::Result<core::Graph>::success(decoded.take_value());
 }
 

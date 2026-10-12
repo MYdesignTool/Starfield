@@ -1,5 +1,27 @@
 # 当前工程状态
 
+## M3-17 native78 / CEP81 generation coherence candidate — 2026-10-12
+
+Owner accepts CEP81 response/paint ordering and rejects native77 deletion repair.
+Actual native77 journal PID24564 has61 normal guard0 frames,6 guard0 errors at
+stream258, and14 guarded cancellations. Final AEGP binding refresh is therefore
+insufficient. This evidence does not identify the failed node or establish AE's
+cache behavior; old logs contain neither graph CRC nor source UUID.
+
+Candidate closes a concrete protocol gap: graph/receipt have checksums but alias
+programs are unversioned. Explicit UI publication stamps programs with the saved
+graph CRC; a program checks its renderer's receipt before any sibling lookup.
+PF reads graph CRC and both receipt halves, records dependencies and cancels
+mixed generations. A separate stale-generation value cancels current/historical
+sampling and is never an authored value or a successful blank render. Matching
+generation missing sources/nonfinite values remain strict errors. Publication
+captures/types all receipt streams before alias mutation, then verifies evaluated
+bindings after graph publication; rollback remains exact. UI publish/final and PF
+graph observations include CRC/count, failures include node UUID. Confined journal
+only; no AEGP render-thread reads, public IDs/schema/CoreABI9 change. CEP81 remains
+unchanged. No automatic AE acceptance/start/stop/dispatch. Exact host cause and
+correction remain open; this is a version-coherence repair, not host qualification.
+
 ## M3-17 native77 / CEP81 deployed — 2026-10-12 20:44+08
 
 Frozen source352562dfb7e8f46266e075598e1378a92c09430a is pushed. Final active

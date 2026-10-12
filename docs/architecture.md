@@ -1,5 +1,14 @@
 # Starfield 架构
 
+M3-17 native78 candidate preserves accepted CEP81 and adds graph generation
+coherence: explicit UI publication uses CRC-stamped alias programs and validates
+all publication stream types before mutation. Programs check their renderer's
+receipt before sibling lookup; PF validates graph/receipt and samples only matching
+generations. Stale-generation reads cancel, including temporal Core propagation;
+matching-generation unavailable/nonfinite data still fail. UI/PF journal provenance
+includes CRC/count and failed UUID. No public IDs/schema/ABI change or render-thread
+AEGP access. Native77 deletion failed on owner AE; exact AE caching remains unknown.
+
 M3-17 deployed77/CEP81 (20:44+08, frozen352562d) adds final active/retired dependency refresh after source and
 backup removals, before renderer guard release. A separate private version1 SFR1
 UI request preserves the existing graph commit wire. Saved graph/nonce/IDs/schema/

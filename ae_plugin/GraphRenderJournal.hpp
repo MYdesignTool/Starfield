@@ -1,5 +1,7 @@
 #pragma once
 #include "PluginVersion.h"
+#include <cstddef>
+#include <cstdint>
 #if __has_include("../artifacts/graph-render-journal-config.hpp")
 #include "../artifacts/graph-render-journal-config.hpp"
 #endif
@@ -12,7 +14,8 @@
 namespace starfield::adapter {
 // Only explicit, confined development builds enable this journal. It observes
 // the result, never drives host state, retains SDK handles or changes the result.
-inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error,const char* message) noexcept {
+inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error,const char* message,
+    const char* phase=nullptr,std::uint32_t graph=0,std::uint32_t receipt=0,std::size_t nodes=0) noexcept {
 #if defined(STARFIELD_GRAPH_RENDER_JOURNAL_FILE) && defined(_WIN32)
     try {
         static std::mutex mutex;std::lock_guard lock(mutex);
@@ -28,10 +31,12 @@ inline void journal_graph_render(const PF_InData* data,double guard,PF_Err error
             if(c=='"' || c=='\\'){std::fputc('\\',file);std::fputc(c,file);}
             else if(c<32)std::fprintf(file,"\\u%04x",static_cast<unsigned>(c));else std::fputc(c,file);
         }
-        std::fputs("\"}\n",file);
+        std::fputc('"',file);
+        if(phase)std::fprintf(file,",\"phase\":\"%s\",\"graphCRC\":%u,\"receiptCRC\":%u,\"nodes\":%zu",phase,graph,receipt,nodes);
+        std::fputs("}\n",file);
     } catch(...) {} // Diagnostic I/O must not fail a render or hide its result.
 #else
-    (void)data;(void)guard;(void)error;(void)message;
+    (void)data;(void)guard;(void)error;(void)message;(void)phase;(void)graph;(void)receipt;(void)nodes;
 #endif
 }
 }

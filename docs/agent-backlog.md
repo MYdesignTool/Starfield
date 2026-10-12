@@ -2,6 +2,17 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+Owner accepts CEP81 responsiveness, rejects native77 (guard0/stream258). Actual
+PID24564 evidence:61 normal,6 errors,14 guarded cancellations. Investigate and
+repair graph/receipt/expression generation coherence, preserving accepted panel.
+Extend owned files to GraphParameter.cpp/.hpp raw checksum extraction, generation
+checks in Parameters/NativeNodeGraph/NativeGraphCommit, historical cancellation in
+EmitterHistoryCapture, confined journal provenance, generation expression tests,
+alias/lifecycle fixtures and runner; complete native78/unchanged CEP81 pairing and
+version/build/deployment/evidence docs. No automatic AE acceptance or process action.
+Unversioned alias programs are a demonstrated contract gap; mixed AE snapshots
+and source-reference caching are hypotheses until passive host evidence confirms.
+
 77/81 delivered20:44+08 from pushed/frozen352562d. Final active+retired refresh
 and immediate canvas/receipt reuse/restoration deployed. SDK64912 exit0, frozen
 native19888+camera12/Model897638 ASAN, panel/client34/full panel93287 exit0/dummy
