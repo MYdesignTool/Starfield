@@ -2,6 +2,13 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+75/79 delivered13:54+08 from frozen/pushed82c460f. Full ten-module May2023 /MT
+SDK57889 actualexit0, frozen alias/transaction/Motion ASAN, seven-kind complete
+panel67471 actualexit0;502 source hashes,10/18/27/selector and backup10/18 match.
+Backup m3-17-native75-panel79-alias-handoff-20261012 restores74/78. No AE process/
+script operation; actual correction/undo/reopen open. Return implementation to
+M3-18, preserve Circle acceptance and full Motion/Turbulence goal.
+
 Owner confirms74/78 still reports animation parameter-value errors (stream258;
 streams vary across deleted kinds). Return to this card before Motion resource
 integration; no new Motion edits made. Own NativeBindingTransaction install/

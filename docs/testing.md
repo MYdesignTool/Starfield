@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-17 alias handoff candidate75 / CEP79 — 2026-10-12
+## M3-17 alias handoff deployed75 / CEP79 — 2026-10-12
 
 `tests/RunAliasHandoffTests.ps1 -Run` and `-Run -Sanitize` execute actual native
 compiler/binding/publication/playback,17826 checks +12 camera, zero failures.
@@ -23,7 +23,15 @@ seven-registration/CEP/reload/DOM/ES3 audit session8095 completed exit0. Dummy
 under artifacts/deploy-test. Approval first misread the truncated sandbox path
 as an Adobe directory; read-only path evidence and confinement resolved it on
 re-review. No actual host installation/process operation in these tests.
-SDK freeze/publication/hash/AE gates still pending; live74/78 unchanged.
+Frozen82c460f actual May2023 /MT ten-module SDK57889 exit0 with both NoPublish;
+alias ASAN17826+camera12/transaction878567/Motion native643 and full seven-kind
+panel audit67471 actualexit0 pass.502 source hashes unchanged and new header/
+publisher/carrier fingerprint verified;27 working/frozen/deployed CEP hashes
+match. Fresh AE0 allowed13:54+08 publication75/79. Independent installed10/18/27/
+selector and rollback10/18 match; receipts/source hashes/logs at
+artifacts/prepared/m3-17-native75-alias-handoff and
+artifacts/m3-17-alias-handoff79-installed-proof.json. Actual AE correction/undo/
+reopen still open; no AE process/script operation.74/78 paired backup retained.
 
 ## M3-17 guarded node deletion deployed native74 / CEP78 — 2026-10-12
 

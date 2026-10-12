@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## M3-17 native75 / CEP79 alias handoff candidate — 2026-10-12
+## M3-17 native75 / CEP79 alias handoff deployed — 2026-10-12 13:54+08
 
 Owner reports74/78 deletion still raises parameter-value warnings, e.g.258/516;
 deletion applies and streams vary by kind. Return to M3-17; no new Motion resource
@@ -12,7 +12,7 @@ removal. Active replacement and rollback preserve a validated finite handoff;
 invalid source/final expression values still reject, with no sentinel fallback.
 ADR0040 defines the ordering. No IDs/schema/CoreABI9 change; full ten-module75/
 packed32843/CEP79 pair required. Actual AE callback timing/host correction remains
-open. Installed74/78 retained pending frozen build and standing-authorized publish.
+open. Installed75/79 from frozen82c460f;74/78 retained as the paired rollback.
 
 Working standard and actual ASAN17826 native checks +12 camera checks pass with
 real NativeBindingTransaction/compiler/publisher/playback and fake May2023 SDK.
@@ -25,7 +25,23 @@ actual AE reproduction. Full Model transaction ASAN878567, Model module/binding
 ASAN9579, seven-registration/panel/DOM/reload/ES3 audit and dummy74/78→75/79 full
 publish/rollback67 pass. New focused runner links actual LightCapture omitted by
 the old Cloud runner; v1 linker and initial fixture curve-age errors are retained.
-Logs artifacts/m3-17-alias-handoff-*; frozen SDK/pair checks next.
+Logs artifacts/m3-17-alias-handoff-*. Source82c460f7d22348eb0eb46501935c4d65a8f66e66
+is pushed/git-archive frozen. Full May2023 /MT ten-module SDK, both NoPublish,
+actual session57889 exit0. Frozen alias ASAN17826+camera12 (99686), transaction
+ASAN878567 (18581), Motion registration ASAN643 (97597), full seven-kind panel/
+reload/ES3/delete DOM audit67471 actualexit0 pass.502 raw source hashes unchanged,
+new header/publisher/carrier inputs in fingerprint and all27 tested CEP identical.
+Logs/terminal/source-hashes under artifacts/prepared/m3-17-native75-alias-handoff.
+
+Fresh AE0 preceded standing-authorized publication13:54:04+08 via existing two
+Junctions. Independent10 native/18 paired/27 full CEP/selector plus backup10/18
+match at13:54:18+08; artifacts/m3-17-alias-handoff79-installed-proof.json and
+m3-17-native75-deploy-{before,after}.json. Live recipe normalized79; frozen source
+retains78→79. No AE start/stop or script dispatch. Actual AE deletion correction/
+undo/reopen remain open; Circle owner acceptance at73/77 is retained. Resume
+M3-18/M3-19 independent work; full goal stays active.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native75-panel79-alias-handoff-20261012' -Restore`.
 
 ## M3-17 deletion transaction native74 / CEP78 deployed — 2026-10-12 11:18+08
 

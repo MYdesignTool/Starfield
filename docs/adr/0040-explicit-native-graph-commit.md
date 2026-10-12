@@ -26,7 +26,7 @@ re-enabling the original expression. Both expose an invalid value to the still
 published graph. This is a source ordering defect; the exact AE callback timing
 remains a hypothesis until host evidence.
 
-The next correction keeps retired expressions live through graph publication
+The native75/CEP79 correction keeps retired expressions live through graph publication
 and saved-value verification, then detaches them before deleting originals.
 Active expression replacement uses a finite handoff: evaluate any previously
 published alias while its source is still present, validate it, write that
@@ -42,6 +42,11 @@ the same graph/scalar/alias rollback as publication failure. No ID/schema/ABI
 change. Test reentrant sampling at every expression/value mutation, retirement
 after publication, partial failures and rollback; do not infer AE qualification
 from fixtures.
+
+Frozen82c460f full May2023 ten-module SDK, seven-kind mutation-hook ASAN and
+complete panel audit pass; deployed13:54+08 with fresh AE0,10/18/27/selector and
+backup10/18 independently matched.74/78 rollback remains. Actual AE correction/
+undo/reopen are open; source/receipts/one-step rollback in current-state.md.
 
 2026-10-12 deletion correction (native74/CEP78 deployed11:18+08): ordinary/Model prepare previously
 physically removed source effects before graph/binding publication, exposing old
