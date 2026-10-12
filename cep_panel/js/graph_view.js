@@ -123,7 +123,7 @@
             "1":{label:"Motion Type",kind:"popup",choices:["Circle"],values:[1]},
             "2":{label:"Origin",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
             "3":{hidden:true},"6":{hidden:true},
-            "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000},
+            "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000,unit:"%"},
             "5":{label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "13":{label:"Origin Type",kind:"popup",choices:["Point","Particle Origin","Emitter Origin"],values:[0,1,2]},
             "14":{label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},

@@ -2,6 +2,8 @@
 
 Status: numeric geometry and all three numeric graph modes implemented;
 Circle author contract accepted for the staged native72/CEP76 release, M3-18.
+native73/CEP77 adds ordered downstream Force and percentage units; frozen SDK/
+panel/paired deployment/rollback gates passed2026-10-12. Actual AE acceptance open.
 Circle AE2023 qualification, the other two authors and remaining interactions
 stay open. Historical Model releases carried numeric Motion without an author.
 
@@ -50,9 +52,10 @@ about a reference damping implementation. No serialized ID/schema/ABI changes.
 
 The owner confirms computation follows edges upstream to downstream. Canvas
 coordinates and AE effect-list order do not determine evaluation order. All
-compatible particle-processing modules must compose in arbitrary order; the
-current Force-after-Motion restriction is temporary and must be removed by
-implementing its ordered behavior, rather than merely bypassing validation.
+compatible particle-processing modules must compose in arbitrary order;
+native73 implements the downstream Force behavior and removes native72's temporary
+Force-after-Motion restriction. Remaining placements and branch merges still need
+their actual ordered behavior, rather than merely bypassing validation.
 Distinct-chain merges must likewise preserve branch-local computations. Graph
 cycles and incompatible port value kinds remain structural errors.
 

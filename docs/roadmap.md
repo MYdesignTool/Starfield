@@ -1,9 +1,10 @@
 # 开发路线图
 
-M3-18 native73/CEP77 candidate removes the Force-after-Motion placement restriction
+M3-18 native73/CEP77 deployed stage removes the Force-after-Motion placement restriction
 through ordered Core processing, history and Auxiliary velocity inheritance.
 Circle Speed displays percentages while retaining100%=one revolution/second.
-Frozen SDK/panel pairing and deployment are next. Distinct-chain merges,
+Frozen ten-module May2023 SDK/panel pairing and deployment passed at09:35+08.
+Actual AE2023 acceptance remains open. Distinct-chain merges,
 pre-Particle processors, timed point-light Light Path, Look At and Turbulence remain
 requirements of the active goal; this stage does not close them.
 

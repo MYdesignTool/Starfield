@@ -1,11 +1,13 @@
 # Starfield 架构
 
-M3-18 native73/CEP77 candidate implements Force blocks after Motion in graph edge
+M3-18 native73/CEP77 deployed stage implements Force blocks after Motion in graph edge
 order, including static/history evaluation and Auxiliary inheritance. Deferred
 Force is excluded from prefix simulation so it is applied once. Consecutive Force
 fields combine in the current stream frame; ADR0039 defines drag's trajectory
 mapping. No public ID, persistent schema or CoreABI change. Different-chain merges
-and processors before Particle remain implementation work. Deployment pending.
+and processors before Particle remain implementation work. Frozen ten-module
+May2023 build, panel audit and paired hash/rollback gates passed; AE2023 acceptance
+remains open (current-state.md).
 
 2026-10-12 owner confirms edge order (upstream→downstream), independent of canvas
 placement/effect list. Compatible processing modules must compose in arbitrary

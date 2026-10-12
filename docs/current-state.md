@@ -1,6 +1,6 @@
 # 当前工程状态
 
-## M3-18 ordered Force native73 / CEP77 candidate — 2026-10-12
+## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12 09:35+08
 
 Owner confirms edge-order evaluation and percentages (Circle100%=one turn/sec).
 This candidate implements Force after Motion/Transform rather than bypassing
@@ -8,8 +8,8 @@ validation: static and temporal response blocks, branch-local birth anchors,
 drag mapping and Auxiliary inheritance. Deferred forces are removed from prefix
 simulation to prevent double application. No ID/schema/CoreABI changes.
 Native sliders and CEP Speed display percent; isolated CEP77 removes the
-temporary Force-after-Motion guard. Live installed pair remains72/76 until a
-fresh AE0 deployment and hash proof. Different-chain merges, pre-Particle
+temporary Force-after-Motion guard. Installed pair is now73/77 from frozen
+56f9e368fa4946fd8d254a261b13d451e4b98e1e. Different-chain merges, pre-Particle
 processors, timed point-light Light Path, Look At and Turbulence remain open.
 
 Working standard8438 and actual ASAN8438 frame checks pass, including analytic
@@ -23,8 +23,23 @@ artifacts/m3-18-ordered-force-{tests-v3,asan-v4,native-asan,circle-asan,path-asa
 deployment-tests}.log. The v3 log labelled asan used the standard runner switch;
 v4 explicitly uses -Sanitize and provides the ASAN evidence. Complete seven-kind
 registration/transaction DOM/reload/ES3 panel audit passed, actual session39438
-exit0 (artifacts/m3-18-ordered-force-panel-audit.log). Frozen SDK and publication
-are pending; AE2023 qualification remains open.
+exit0 (artifacts/m3-18-ordered-force-panel-audit.log). The git-archive freeze
+repeats standard/ASAN8438, native643, Circle2020, numeric Path10336, dummy rollback67
+and full seven-kind panel audit (session55843 exit0). Full May2023 /MT ten-module
+SDK with both NoPublish switches finishes actual session90542 exit0;496 source
+hashes remain unchanged and the fingerprint includes OrderedForce.hpp.
+
+Fresh AE0 at09:34:51 preceded standing-authorized deployment at09:35:08 through
+the existing two Junctions. Independent10 native/18 paired CEP/27 complete CEP,
+runtime selector and backup10 native/18 CEP hashes match. Evidence:
+artifacts/prepared/m3-18-native73-ordered-force/{sdk-build,panel-audit,frame-standard,
+frame-asan,native-motion-asan,circle-asan,path-asan,deployment-tests}.log and
+sdk-terminal.json/regression-terminals.json; artifacts/m3-18-ordered-force77-installed-proof.json
+and m3-17-native73-deploy-{before,after}.json. Live recipe normalized77; frozen
+archive retains the76→77 delta. No AE process started/stopped or script dispatched.
+AE23.5x52 downstream Force/native/CEP edits, animation, undo/reopen acceptance
+remains open. One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-18-native73-panel77-ordered-force-20261012' -Restore`.
 M3-18 and the complete goal remain active.
 
 ## M3-18 next light-source / animated-path candidate — 2026-10-12

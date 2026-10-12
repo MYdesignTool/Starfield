@@ -313,19 +313,6 @@ function createNativeRecordContract() {
             var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
             if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
         }
-        // Circle's ordered Force work is a later substage. An Auxiliary emitter
-        // starts a new stream and therefore stops both traversals.
-        function reachesType(start,type,backwards) {
-            var queue=[start],seen={};
-            while(queue.length){var id=queue.pop();if(seen["$"+id])continue;seen["$"+id]=true;
-                var candidate=nodeById(graph,id);if(!candidate || candidate.type===TYPES.emitter)continue;
-                if(candidate.type===type)return true;
-                graph.edges.forEach(function(edge){if((backwards?edge.destinationNode:edge.sourceNode)===id)
-                    queue.push(backwards?edge.sourceNode:edge.destinationNode);});}
-            return false;
-        }
-        if(!modelConnection && reachesType(sourceId,TYPES.motion,true) && reachesType(destinationId,TYPES.force,false))
-            fail("motion_force_stage_pending","Place Force before Motion in this Circle stage.");
         // Reject a cycle before producing a request. The native validator still checks
         // the complete graph, including node-specific stage rules and resource limits.
         var adjacency = {};

@@ -344,6 +344,8 @@ Model资源桥候选已接入manifest30/main1012与SFMR1 selector入口、Native
 
 ## M3-18 — Motion 首批（计算层开发中）
 
+2026-10-12 09:35+08 native73/CEP77发布：56f9e36已推送并git archive冻结，完整May2023 /MT十模块双NoPublish实际会话90542 exit0；冻结standard/ASAN8438、native643、Circle2020、numeric Path10336、dummy配对回滚67和七类注册/DOM/reload/ES3会话55843 exit0通过。496源码hash未变，新OrderedForce.hpp进入fingerprint；fresh AE0后发布，独立10 native/18 paired/27全CEP/selector及backup10/18 hash匹配。证据artifacts/m3-18-ordered-force77-installed-proof.json及m3-17-native73 receipts；备份m3-18-native73-panel77-ordered-force-20261012恢复72/76。live recipe77/frozen保留76→77 delta，不启动/调度AE。不同链合并/Particle前置模块/timed point-light/Look At/M3-19及实际AE验收继续；本卡/完整目标active。
+
 2026-10-12 ordered Force候选native73/CEP77：标准/实际ASAN8438、native643、Circle2020、numeric Path10336通过，dummy72/76→73/77发布/完整回滚67通过，隔离面板27 hashes重现。包含CPU pixels/GPU scene位置及反序节点/边验证。v3 asan命名日志误用标准switch，不计为ASAN证据；v4显式-Sanitize通过。下一步源码冻结完整SDK/七类注册面板验收及配对发布；安装72/76保持。异链合并/Particle前置模块/timed light/Look At/M3-19和实际AE验收仍开放。
 
 Ordered Force接入拥有src/core/OrderedForce.hpp、MotionEvaluation.hpp、GraphEvaluation.cpp、TemporalEvaluation.hpp及focused motion_frame_tests；公式与静态/历史响应先记录ADR0039。保留既有无Motion/前置Force分支；后置Force从这些分支剥离后按实际连线阶段计算，禁止只删除reject或重复应用。面板guard仅在Core及冻结配对验证完成后移除；不同链合并/Particle前置处理器/timed light/完整目标继续保留为后续要求。

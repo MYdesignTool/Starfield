@@ -1,6 +1,6 @@
 # 测试入口
 
-## M3-18 ordered Force native73 / CEP77 candidate — 2026-10-12
+## M3-18 ordered Force native73 / CEP77 deployed — 2026-10-12
 
 RunMotionFrameTests.ps1 -Run [-Sanitize] passes8438 (standard tests-v3,
 actual ASAN asan-v4). New cases cover closed-form drag/fields,30/60/120Hz and
@@ -12,8 +12,14 @@ RunMotionNativeBindingTests -Run -Sanitize643, Circle ASAN2020, Path ASAN10336
 pass. Dummy model_deployment_tests72/76→73/77 passes67; isolated panel77
 reproduces all27 hashes. Evidence under artifacts/m3-18-ordered-force-*.log.
 Complete seven-kind registration/transaction DOM/reload/ES3 panel audit passes
-(session39438 exit0, ordered-force-panel-audit.log). Frozen SDK/deployment gates
-remain pending; these do not qualify AE.
+(session39438 exit0, ordered-force-panel-audit.log). Frozen56f9e36 repeats all
+above gates at actual exit0; frame standard/ASAN8438 and panel session55843 exit0.
+Full May2023 /MT ten-module SDK session90542 exit0 uses both NoPublish switches;
+496 archived source hashes unchanged, new OrderedForce.hpp fingerprint present.
+Installed10 native/18 paired CEP/27 complete CEP/selector and backup10/18 hashes
+match. Logs/terminal receipts under artifacts/prepared/m3-18-native73-ordered-force;
+installed proof artifacts/m3-18-ordered-force77-installed-proof.json and
+m3-17-native73-deploy-before/after.json. These do not qualify actual AE2023 behavior.
 
 ## M3-18 light-source / animated-path candidate — 2026-10-12
 
