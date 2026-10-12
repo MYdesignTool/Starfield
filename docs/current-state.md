@@ -1,5 +1,38 @@
 # 当前工程状态
 
+## M3-17 native77 / CEP81 deployed — 2026-10-12 20:44+08
+
+Frozen source352562dfb7e8f46266e075598e1378a92c09430a is pushed. Final active
+and retired dependency refresh runs after all physical removals under guard1;
+preserve exact finite handoffs and non-native text. Immediate validated draft
+projection/paint, cached planning receipt, immediate confirmed receipt and failed
+draft restoration are deployed. Writes serialize; viewport/selection stay local.
+No public IDs/types/schema/CoreABI9 changes; packed32845, complete ten-module77/81.
+Owner declines automatic AE acceptance/requests; prior launch request withdrawn.
+No AE start/stop/script dispatch. Actual deletion correction stays a manual gate,
+and does not hold further development. Circle owner acceptance at73/77 retained.
+
+Final source git-archive freeze: artifacts/prepared/m3-17-native77-final-parade-v2.
+May2023 /MT SDK64912 actualexit0, both NoPublish and confined -RenderJournal;
+frozen native ASAN19888+camera12/28018, complete Model transaction897638,
+actual panel/client34, seven-kind panel/DOM/reload/ES3 audit93287 actualexit0 and
+dummy76/80→77/81 paired rollback67 pass. Host final-message ASAN passes from the
+unchanged prior source; SDK compiles the actual final message in the complete pair.
+509 raw source hashes unchanged; refresh/journal headers and generated config in
+fingerprint. Earlier unshipped2532799 build retained as comparison, not installed.
+Adversarial dependency caches are simulations, not AE reproduction.
+
+Fresh AE0 preceded publication20:44:10+08. Independent installed10 native/18
+paired/27 full CEP/selector and backup10/18 match20:44:18+08; receipts
+artifacts/m3-17-native77-deploy-{before,after}.json and
+m3-17-final-parade81-installed-proof.json. To preserve an exact76/80 backup,
+the two edited source panel files were saved under source-panel-before-publication
+and temporarily restored from hash-verified76/80 before paired publication.
+Git/frozen candidate retained all new source. Live recipe normalized81; frozen
+source retains80→81. No parent/registry/host-wide switch changes.
+One-step undo with AE closed:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/Restore-TestBuild.ps1 -PluginDir 'D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins' -BackupName 'm3-17-native77-panel81-final-parade-20261012' -Restore`.
+
 ## M3-17 follow-up after76/80 owner failure — 2026-10-12
 
 Owner screenshot: native76, guard0, stream258/error516/binding unavailable.

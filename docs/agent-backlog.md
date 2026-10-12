@@ -2,6 +2,15 @@
 
 ## M3-17 — node deletion transaction repair (2026-10-12, active priority)
 
+77/81 delivered20:44+08 from pushed/frozen352562d. Final active+retired refresh
+and immediate canvas/receipt reuse/restoration deployed. SDK64912 exit0, frozen
+native19888+camera12/Model897638 ASAN, panel/client34/full panel93287 exit0/dummy
+rollback67 and509 unchanged sources pass. Installed10/18/27/selector and backup
+10/18 independently match. Backup m3-17-native77-panel81-final-parade-20261012
+restores76/80. No AE process/script action; no automatic acceptance request per
+owner. Manual host correction gate stays open without holding further development.
+Preserve Motion/Turbulence work; full goal remains unfinished.
+
 Owner rejects76/80 (native76, guard0, stream258, unavailable binding). Actual
 development journal confirms guard1 cancellation followed by guard0 errors.
 Owner directs: no automatic AE acceptance requests/runs; development must continue.

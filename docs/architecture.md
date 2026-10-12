@@ -1,6 +1,6 @@
 # Starfield 架构
 
-M3-17 candidate77/CEP81 adds a final-parade dependency refresh after source and
+M3-17 deployed77/CEP81 (20:44+08, frozen352562d) adds final active/retired dependency refresh after source and
 backup removals, before renderer guard release. A separate private version1 SFR1
 UI request preserves the existing graph commit wire. Saved graph/nonce/IDs/schema/
 CoreABI9 remain unchanged; unchanged Model/Texture resources are not copied or

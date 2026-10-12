@@ -1,6 +1,17 @@
 # 测试入口
 
-## M3-17 final parade / responsive panel candidate77 / CEP81 — 2026-10-12
+## M3-17 final parade / responsive panel deployed77 / CEP81 — 2026-10-12
+
+Final frozen352562d logs/receipts under artifacts/prepared/m3-17-native77-final-parade-v2:
+May2023 /MT ten-module SDK64912 actualexit0, native ASAN19888+camera12/28018,
+Model whole transaction897638, panel/client34 (includes rAF receiver and rejected
+deferred callback protection), full seven-kind panel/DOM/reload/ES3 audit93287
+actualexit0 and dummy rollback67 pass.509 raw source hashes unchanged; generated
+journal config and private refresh header in fingerprint. Installed10/18/27/
+selector and backup10/18 match20:44+08. Old unshipped frozen2532799 is retained.
+Retired alias cache fixture requires a real disabled `value;`→empty text transition;
+exact finite handoff and non-native text remain unchanged. No source fallback or
+zero substitution. No automatic AE acceptance per owner; actual host gate is manual.
 
 `node --expose-internals tests/panel_topology_responsiveness_tests.js` executes
 actual panel/client functions:32 checks for immediate projection, paint before
