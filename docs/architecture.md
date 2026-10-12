@@ -1,5 +1,13 @@
 # Starfield 架构
 
+2026-10-12 owner confirms edge order (upstream→downstream), independent of canvas
+placement/effect list. Compatible processing modules must compose in arbitrary
+order. Force-after-Motion and distinct-chain rejection remain implementation
+debt, not the target architecture. Light Path author must use AE point-light
+position keyframe timing/interpolation at Speed100%=original duration, with
+Stop/Continue and fixed Max Delay at Delay Random0. Circle100% retains one turn
+per second. ADR0039 records the updated contract and staged migration gates.
+
 M3-18's next unpublished seam inventories light names/IDs/order/activity as
 owned AE-adapter values. Prefix selection returns IDs for the existing numeric
 point capture; target/path/activity policies remain at the author boundary.

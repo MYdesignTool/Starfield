@@ -5,12 +5,24 @@
 Current owned source adds read-only MotionLightSources inventory/prefix selection
 and the missing temporal Light Path geometry velocity, including Auxiliary
 inheritance. Official Staff confirms Starting With is a name-prefix input;
-Light Path end/units/delay and Look At multi-target policies remain open.
+Owner now confirms Light Path is an AE point-light position-keyframe trajectory,
+Speed100%=original first-to-last keyframe duration, end stop/continue and fixed
+Max Delay when Delay Random0. Circle100% still means one turn/second. Processing
+must follow graph edges with arbitrary compatible module order. See ADR0039;
+the existing Force-after-Motion rejection must be implemented away, not bypassed.
+Look At multi-target policy remains open. Timed-light author integration is next.
 Standard/ASAN inventory8099 and numeric Path10336, ordered frame ASAN4196 pass;
 first failing logs preserve incorrect test coordinate and zero-birth expected
 division diagnoses. See ADR0039 and artifacts/m3-18-motion-light-sources-*-v3.log,
-motion-path-geometry-*-v2.log, motion-light-frame-asan.log. The source is not yet
-frozen through a full SDK build. Installed native72/CEP76 remains the Circle
+motion-path-geometry-*-v2.log, motion-light-frame-asan.log.
+Source621ee37158c77dabf9ec272243398c5fdf2652f6 is pushed/git-archive frozen.
+Full unpublished May2023 /MT ten-module SDK session37022 completed actual exit0;
+frozen inventory ASAN8099 and Path ASAN10336 pass. All495 source hashes are
+unchanged; new CPP/header/main project appear in the compiled-input fingerprint.
+Evidence: artifacts/prepared/m3-18-motion-light-geometry/{sdk-build,light-sources-asan,
+path-geometry-asan}.log and sdk-terminal.json/source-hashes.json. This checkpoint
+is shared infrastructure; the timed point-light trajectory is not yet an author.
+Installed native72/CEP76 remains the Circle
 pair from09b84a2, independently hash-verified after this work. No new modes,
 IDs/schema/ABI/flags, host edits or AE process/script operations are introduced.
 Keep M3-18/complete goal active; integrate resource/history/dependencies next.

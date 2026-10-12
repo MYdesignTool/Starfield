@@ -1,5 +1,7 @@
 # Motion 分阶段参考
 
+2026-10-12 owner新增明确规则：沿连线从上游到下游计算，所有兼容处理节点允许任意组合，不按画布Y/AE效果列表顺序，不应要求Force必须在Motion上游。所有Motion Speed为百分比；Circle100%即此前一秒一圈，不改数值。Light Path由AE点光源的位置关键帧定义，100%按第一到最后关键帧的原时长1:1播放；不是由多盏静态灯光位置推断的Spline。末端两种选择为停下/沿方向继续；Delay Random0、Max Delay0.5让所有粒子延迟0.5秒。这些规则取代下方相应的历史待确认项；Look At多目标与随机delay/静止末端细节尚未给定。
+
 日期：2026-10-09。owner要求优先完善粒子节点，Motion首批只实现以下三种模式。截图是可见控件证据；具体方程和资源采样行为尚未测量，不能从标签推断为参考轨迹一致。
 
 2026-10-12更新：owner已确认Circle Origin Type完整菜单为Point、Particle Origin、Emitter Origin，并指定Speed100一秒一圈。这是owner选定的速度规则，非原版单位实测。Circle native72/CEP76作者阶段已部署；下方2026-10-09/10的Circle菜单/速度请求已被此回复取代。Light Path/Look At的目标和末端/延迟政策仍待参考。

@@ -23,6 +23,42 @@ The later owner resume supersedes that pause. Circle's author stage deployed
 
 ## Scope and evidence
 
+### Owner-confirmed flow and Light Path policy — 2026-10-12
+
+The owner confirms computation follows edges upstream to downstream. Canvas
+coordinates and AE effect-list order do not determine evaluation order. All
+compatible particle-processing modules must compose in arbitrary order; the
+current Force-after-Motion restriction is temporary and must be removed by
+implementing its ordered behavior, rather than merely bypassing validation.
+Distinct-chain merges must likewise preserve branch-local computations. Graph
+cycles and incompatible port value kinds remain structural errors.
+
+Motion Speed values are percentages. Circle100%=one turn/second, so its existing
+100-to2*pi conversion remains numerically correct; expose the percentage unit.
+Light Path100% maps particle travel elapsed time to the original interval from
+the first to last position keyframe of an AE point light. This is a timed light
+trajectory, not a spline inferred from several static lights. Capture keyframe
+times and actual sampled positions/interpolation in the AE adapter; Core must
+receive owned numeric timing/trajectory values. A generic numeric B-spline/path
+and explicit-distance API remains valid internal infrastructure, but does not
+by itself satisfy the new author policy. Preserve original interpolation/time
+behavior at100%; higher/lower percentages rescale its clock. Motion Over Life
+and stable Speed Random modulate this clock rather than impose pixel/sec units.
+
+Expose exactly two owner-requested end behaviors: stop at the final keyframe,
+or continue along the terminal direction. Delay Random0/Max Delay0.5 means every
+particle waits0.5 seconds. This confirms the zero-random baseline; the random
+distribution and stationary terminal-tangent fallback still need an explicit
+independent contract. Point-light eligibility is now confirmed for Light Path.
+Prefix filtering is confirmed by Staff; Look At multi-target assignment remains
+open. No extra Motion modes or Particle Shapes are added.
+
+These latest owner decisions supersede older open Light Path source/units/end/
+zero-random-delay questions and the Circle percentage-label uncertainty. The
+installed72/76 Circle stage keeps its numerical speed rule; later paired work
+must remove placement restrictions and complete the timed source/history/
+shutter/cache contracts before advertising Light Path.
+
 ### Next light-source and animated-path seam — 2026-10-12
 
 The [official Staff answer](https://superluminal.tv/question/motion-node-starting-with)

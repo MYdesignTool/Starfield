@@ -1,5 +1,10 @@
 # 开发路线图
 
+2026-10-12 owner clarifies edge-ordered modular processing with no Force/Motion
+placement rule. Implement ordered Force/branch merges and timed AE point-light
+trajectories (Speed percentages, original keyframe duration, Stop/Continue,
+fixed delay baseline); a spatial spline alone does not satisfy Light Path.
+
 M3-18 next candidate advances shared light inventory/name-prefix selection and
 animated-path velocity. Light Path/Look At source snapshots and native/history/
 cache integration, remaining reference policies and public authors are next;

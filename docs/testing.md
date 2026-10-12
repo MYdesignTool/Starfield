@@ -13,8 +13,12 @@ clamped moving endpoint, reverse/repeat, constant clock vs moving geometry,
 Auxiliary inherited velocity and existing graph/storage/work/failure cases.
 `tests/RunMotionFrameTests.ps1 -Run -Sanitize`4196 passes.
 Logs under artifacts/m3-18-motion-light-sources-*-v3.log,
-motion-path-geometry-*-v2.log and motion-light-frame-asan.log. Full frozen SDK
-and native/history/resource author integration remain pending. Installed
+motion-path-geometry-*-v2.log and motion-light-frame-asan.log. Source621ee37's
+full frozen May2023 /MT ten-module SDK session37022 completed actual exit0;
+frozen ASAN8099/10336 repeat and495 unchanged source hashes verified. Receipts:
+artifacts/prepared/m3-18-motion-light-geometry/{sdk-build.log,sdk-terminal.json,
+source-hashes.json}. Native/history/timed-light resource author integration
+remains pending; this numeric path is not the complete owner timed-light policy. Installed
 Circle native72/CEP76 hashes are unchanged; this is no new author deployment.
 
 ## M3-18 Circle native72 / CEP76 deployed — 2026-10-12
