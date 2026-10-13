@@ -24,6 +24,7 @@ add_library(starfield_core STATIC
     src/core/Settings.cpp
     src/core/SpriteScene.cpp
     src/core/Time.cpp
+    src/core/TurbulenceNoise.cpp
 )
 
 # The AE adapter loads this DLL by versioned filename; it never links an import
@@ -63,6 +64,9 @@ if(BUILD_TESTING)
     add_executable(starfield_motion_look_at_graph_tests tests/motion_look_at_graph_tests.cpp)
     target_link_libraries(starfield_motion_look_at_graph_tests PRIVATE starfield_core)
     add_test(NAME starfield_motion_look_at_graph_tests COMMAND starfield_motion_look_at_graph_tests)
+    add_executable(starfield_turbulence_noise_tests tests/turbulence_noise_tests.cpp)
+    target_link_libraries(starfield_turbulence_noise_tests PRIVATE starfield_core)
+    add_test(NAME starfield_turbulence_noise_tests COMMAND starfield_turbulence_noise_tests)
     add_executable(starfield_motion_circle_graph_tests tests/motion_circle_graph_tests.cpp)
     target_link_libraries(starfield_motion_circle_graph_tests PRIVATE starfield_core)
     add_test(NAME starfield_motion_circle_graph_tests COMMAND starfield_motion_circle_graph_tests)
