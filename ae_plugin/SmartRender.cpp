@@ -12,19 +12,26 @@
 #include "TextureResources.hpp"
 #include "ModelRenderResources.hpp"
 #include "LightCapture.hpp"
+#include "MotionLightSources.hpp"
+#include "MotionLightTiming.hpp"
+#include "MotionPointCapture.hpp"
 #include "GraphCarrier.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
+#include "starfield/core/MotionLookAtTargets.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <limits>
+#include <string>
+#include <string_view>
 
 // Geometry contract (ADR 0005). AE_Effect.h documents in_data->width/height as the
 // full-resolution layer size and says every layer size is "automatically adjusted
@@ -63,6 +70,168 @@ struct PreparationTimer {
         std::lock_guard lock(timing_mutex);preparation_timings=value;
     }
 };
+
+std::string motion_light_name_preview(std::u16string_view value,std::size_t max_chars=40) {
+    std::string result;result.reserve(std::min(value.size(),max_chars));
+    for(std::size_t index=0;index<value.size()&&result.size()<max_chars;++index) {
+        const auto ch=value[index];
+        if(ch>=0x20&&ch<=0x7e&&ch!='\\'&&ch!='\'')result.push_back(static_cast<char>(ch));
+        else if(ch=='\\'||ch=='\''){result.push_back('\\');result.push_back(static_cast<char>(ch));}
+        else if(ch>=0xd800&&ch<=0xdbff&&index+1<value.size()&&value[index+1]>=0xdc00&&value[index+1]<=0xdfff) {
+            result.push_back('?');++index;
+        } else result.push_back('?');
+    }
+    if(value.size()>max_chars&&result.size()+3<=max_chars)result.append("...");
+    return result;
+}
+
+void report_motion_light_source_mismatch(PF_OutData* out_data,
+    const MotionLightSourceInventoryStats& inventory,
+    std::span<const MotionLightSource> sources,std::u16string_view prefix) {
+    if(!out_data)return;
+    std::size_t name_matches{},point_matches{};
+    const MotionLightSource* first_light{};
+    for(const auto& source:sources) {
+        if(!first_light)first_light=&source;
+        if(source.name.starts_with(prefix)) {
+            ++name_matches;
+            if(source.light_type==AEGP_LightType_POINT)++point_matches;
+        }
+    }
+    const auto prefix_preview=motion_light_name_preview(prefix,36);
+    const auto name_preview=first_light?motion_light_name_preview(first_light->name,36):std::string{"<none>"};
+    std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
+        "Starfield Light Path diag: comp=%u AV=%u Light=%u Point=%u Other=%u; match=%zu PointMatch=%zu; prefix='%s'; first='%s'",
+        inventory.composition_layers,inventory.av_layers,inventory.light_layers,inventory.point_light_layers,
+        inventory.other_layers,name_matches,point_matches,prefix_preview.c_str(),name_preview.c_str());
+}
+
+PF_Err prepare_motion_light_resources(PF_InData* data,PF_OutData* out_data,PF_PreRenderExtra* extra,
+    core::Graph& graph,core::LayerUnits units,const core::Cancellation& cancel) noexcept try {
+    constexpr double max_probe_error_pixels=.5;
+    if(!std::isfinite(units.layer_height)||units.layer_height<=0||
+       !std::isfinite(units.pixel_aspect_ratio)||units.pixel_aspect_ratio<=0)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    const auto tolerance=max_probe_error_pixels/units.layer_height;
+    std::map<std::u16string,std::vector<std::byte>> resource_by_prefix;
+    std::map<std::u16string,std::vector<std::byte>> look_at_targets_by_prefix;
+    for(auto& node:graph.nodes) {
+        if(node.type_key!=core::graph_keys::kMotionNode)continue;
+        const core::ParameterValue* mode_value=nullptr;
+        const std::string* prefix=nullptr;
+        for(const auto& parameter:node.parameters) {
+            if(parameter.key==core::graph_keys::kMotionMode)mode_value=&parameter.value;
+            else if(parameter.key==core::graph_keys::kMotionPathStartingWith)
+                prefix=std::get_if<std::string>(&parameter.value);
+        }
+        const auto* mode=mode_value?std::get_if<std::uint32_t>(mode_value):nullptr;
+        if(!mode)return PF_Err_BAD_CALLBACK_PARAM;
+        if(*mode==2) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            std::u16string wide_prefix;
+            if(prefix) {
+                const auto converted=motion_light_prefix_to_utf16(*prefix,wide_prefix);
+                if(converted)return converted;
+            }
+            auto found=look_at_targets_by_prefix.find(wide_prefix);
+            if(found==look_at_targets_by_prefix.end()) {
+                std::vector<MotionLightSource> sources;
+                auto error=capture_motion_light_sources(data,graph_carrier_plugin_id(),cancel,sources);
+                if(error)return error;
+                std::vector<std::uint32_t> ids;
+                error=select_motion_light_source_ids(sources,wide_prefix,ids);
+                if(error)return error;
+                std::vector<MotionLayerPointRequest> requests;requests.reserve(ids.size());
+                for(const auto id:ids)requests.push_back({id,{}});
+                std::vector<MotionLayerPoint> points;
+                error=capture_motion_layer_points(data,units,requests,cancel,points);
+                if(error)return error;
+                if(points.size()!=ids.size())return PF_Err_BAD_CALLBACK_PARAM;
+                std::vector<core::MotionLookAtTarget> targets;targets.reserve(points.size());
+                for(std::size_t index=0;index<points.size();++index)
+                    targets.push_back({ids[index],points[index].position});
+                auto encoded=core::encode_motion_look_at_targets(targets,cancel);
+                if(!encoded.has_value())return encoded.error().code==core::ErrorCode::cancelled?
+                    PF_Interrupt_CANCEL:encoded.error().code==core::ErrorCode::allocation_failed?
+                    PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM;
+                found=look_at_targets_by_prefix.emplace(std::move(wide_prefix),encoded.take_value()).first;
+            }
+            const auto& bytes=found->second;
+            if(!extra||!extra->cb||!extra->cb->GuidMixInPtr||bytes.size()>std::numeric_limits<A_u_long>::max())
+                return PF_Err_BAD_CALLBACK_PARAM;
+            auto error=extra->cb->GuidMixInPtr(data->effect_ref,static_cast<A_u_long>(bytes.size()),bytes.data());
+            if(error)return error;
+            const auto existing=std::find_if(node.parameters.begin(),node.parameters.end(),[](const auto& parameter){
+                return parameter.key==core::graph_keys::kMotionLookAtTargets;
+            });
+            core::OpaqueBytes resource(bytes.begin(),bytes.end());
+            if(existing==node.parameters.end())node.parameters.push_back({core::graph_keys::kMotionLookAtTargets,std::move(resource)});
+            else existing->value=std::move(resource);
+            continue;
+        }
+        if(*mode!=0)continue;
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        std::u16string wide_prefix;
+        if(prefix) {
+            const auto converted=motion_light_prefix_to_utf16(*prefix,wide_prefix);
+            if(converted)return converted;
+        }
+        auto found=resource_by_prefix.find(wide_prefix);
+        if(found==resource_by_prefix.end()) {
+            std::vector<MotionLightSource> sources;
+            MotionLightSourceInventoryStats inventory;
+            auto error=capture_motion_light_sources(data,graph_carrier_plugin_id(),cancel,sources,&inventory);
+            if(error)return error;
+            std::vector<std::uint32_t> ids;
+            error=select_motion_point_light_source_ids(sources,wide_prefix,ids);
+            if(error)return error;
+            if(ids.empty()) {
+                report_motion_light_source_mismatch(out_data,inventory,sources,wide_prefix);
+                return PF_Err_BAD_CALLBACK_PARAM;
+            }
+            MotionLightPathTrackSet tracks;
+            error=capture_motion_light_path_tracks(data,graph_carrier_plugin_id(),ids,units,tolerance,cancel,tracks);
+            if(error)return error;
+            bool has_movement=false;
+            for(const auto& track:tracks.tracks) {
+                if(track.samples.size()<2)continue;
+                const auto origin=track.samples.front().position;
+                for(std::size_t sample=1;sample<track.samples.size();++sample) {
+                    const auto point=track.samples[sample].position;
+                    if(std::hypot(point.x-origin.x,point.y-origin.y,point.z-origin.z)>1e-9) {
+                        has_movement=true;break;
+                    }
+                }
+                if(has_movement)break;
+            }
+            if(!has_movement) {
+                if(out_data)std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
+                    "Starfield Motion Light Path: matched Point Light layers, but sampled no changing Position path. Check that a matched light has Position keyframes with different values.");
+                return PF_Err_BAD_CALLBACK_PARAM;
+            }
+            std::vector<std::byte> bytes;
+            error=encode_motion_light_path_track_set(tracks,cancel,bytes);
+            if(error)return error;
+            if(!extra||!extra->cb||!extra->cb->GuidMixInPtr||bytes.size()>std::numeric_limits<A_u_long>::max())
+                return PF_Err_BAD_CALLBACK_PARAM;
+            error=extra->cb->GuidMixInPtr(data->effect_ref,static_cast<A_u_long>(bytes.size()),bytes.data());
+            if(error)return error;
+            found=resource_by_prefix.emplace(std::move(wide_prefix),std::move(bytes)).first;
+        }
+        const auto& bytes=found->second;
+        if(!extra||!extra->cb||!extra->cb->GuidMixInPtr||bytes.size()>std::numeric_limits<A_u_long>::max())
+            return PF_Err_BAD_CALLBACK_PARAM;
+        const auto existing=std::find_if(node.parameters.begin(),node.parameters.end(),[](const auto& parameter){
+            return parameter.key==core::graph_keys::kMotionPathLightResource;
+        });
+        core::OpaqueBytes resource(bytes.begin(),bytes.end());
+        if(existing==node.parameters.end())node.parameters.push_back({core::graph_keys::kMotionPathLightResource,std::move(resource)});
+        else existing->value=std::move(resource);
+    }
+    return PF_Err_NONE;
+} catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
+  catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
 struct ExecutionTimer {
     PreparationTimer::Clock::time_point start{PreparationTimer::Clock::now()};
     SmartRenderTiming value;
@@ -420,8 +589,16 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     core::Graph frame_graph=*graph;
     HostCancellation history_cancel(in_data);
     const auto history_start=PreparationTimer::Clock::now();
+    auto units_height=input_result.ref_height>0?input_result.ref_height:in_data->height;
+    auto units_width=input_result.ref_width>0?input_result.ref_width:in_data->width;
+    PF_RationalScale units_par=input_result.par;
+    if(units_par.den==0||units_par.num<=0)units_par=PF_RationalScale{1,1};
+    const core::LayerUnits motion_units{double(std::max<A_long>(1,units_width)),
+        double(std::max<A_long>(1,units_height)),double(units_par.num)/units_par.den};
+    const auto light_path_error=prepare_motion_light_resources(in_data,out_data,extra,frame_graph,motion_units,history_cancel);
+    if(light_path_error)return light_path_error;
     MotionExposure motion;
-    auto history_error=prepare_motion_exposure(in_data,out_data,frame_graph,input_result.ref_width,input_result.ref_height,history_cancel,motion);
+    auto history_error=prepare_motion_exposure(in_data,out_data,frame_graph,motion_units,history_cancel,motion);
     if(!history_error && !motion.enabled)history_error=capture_emitter_origin_history(in_data,out_data,frame_graph,
         input_result.ref_width,input_result.ref_height,history_cancel);
     timer.value.history_ms=PreparationTimer::elapsed(history_start);
@@ -500,7 +677,15 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
             error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(values),values);if(error)return error;}return PF_Err_NONE;
     };
     if(const auto error=mix_lights(state->lights);error)return error;
-    for(const auto& sample:state->motion.samples)if(const auto error=mix_lights(sample.lights);error)return error;
+    for(const auto& sample:state->motion.samples) {
+        if(const auto error=mix_lights(sample.lights);error)return error;
+        if(!sample.motion_resource_key.empty()) {
+            if(sample.motion_resource_key.size()>std::numeric_limits<A_u_long>::max())return PF_Err_BAD_CALLBACK_PARAM;
+            const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,
+                static_cast<A_u_long>(sample.motion_resource_key.size()),sample.motion_resource_key.data());
+            if(error)return error;
+        }
+    }
     const double exposure_key[2]{state->motion.enabled?1.0:0.0,state->motion.gain};
     if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(exposure_key),exposure_key);error)return error;
     for(const auto& sample:state->motion.samples) {

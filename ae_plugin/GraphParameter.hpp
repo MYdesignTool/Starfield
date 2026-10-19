@@ -21,7 +21,8 @@ inline constexpr A_long kNodeControlSource = 2;
 [[nodiscard]] core::Result<core::Graph> graph_from_controls(const core::Settings& settings);
 [[nodiscard]] core::Result<core::Graph> read_graph_parameter(PF_InData* in_data, PF_ArbitraryH handle);
 [[nodiscard]] PF_Err create_graph_parameter(PF_InData* in_data, const core::Graph& graph,
-                                           PF_ArbitraryH* output) noexcept;
+                                           PF_ArbitraryH* output,
+                                           std::uint32_t* checksum = nullptr) noexcept;
 [[nodiscard]] PF_Err graph_arbitrary_callback(PF_InData* in_data, PF_ArbParamsExtra* extra) noexcept;
 
 } // namespace starfield::adapter

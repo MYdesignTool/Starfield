@@ -8,6 +8,7 @@
 #include "ModelLayout.hpp"
 #include "MaterialLayout.hpp"
 #include "MotionLayout.hpp"
+#include "TurbulenceLayout.hpp"
 #include <array>
 #include <iterator>
 
@@ -21,7 +22,7 @@ inline constexpr A_long kMaxOutgoingEdges = 4;
 inline constexpr A_long kConnectionUuidChunks = 8;
 inline constexpr A_long kConnectionRecordChunks = 16; // destination UUID + edge UUID
 
-enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5, material=6, motion=7 }; // 2 is not a node kind.
+enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5, material=6, motion=7, turbulence=8 }; // 2 is not a node kind.
 
 [[nodiscard]] constexpr A_long base_parameter_count(Kind kind) noexcept {
     switch (kind) {
@@ -32,16 +33,22 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5,
         case Kind::model: return model_layout::last;
         case Kind::material: return material_layout::last;
         case Kind::motion: return motion_layout::last;
+        case Kind::turbulence: return turbulence_layout::last;
     }
     return 0;
 }
 [[nodiscard]] constexpr A_long binding_field_count(Kind kind) noexcept {
     return kind==Kind::transform?transform_layout::compensation_last:
         kind==Kind::model?model_layout::bounds_last:
-        kind==Kind::particle?particle_layout::birth_enabled:base_parameter_count(kind);
+        kind==Kind::particle?particle_layout::birth_enabled:
+        kind==Kind::motion?motion_layout::last:base_parameter_count(kind);
 }
 [[nodiscard]] constexpr bool authored_parameter(Kind kind,A_long index) noexcept {
     if(kind==Kind::model)return index==model_layout::source || index==model_layout::revision || model_layout::animated(index);
+    if(kind==Kind::motion)return (index>=1&&index<=12)||motion_layout::curve_base(index)!=0||index==motion_layout::path_prefix_length||
+        index==motion_layout::path_max_delay||index==motion_layout::path_delay_random||
+        index==motion_layout::path_orient||index==motion_layout::path_end_behavior;
+    if(kind==Kind::turbulence)return index>=1&&index<=turbulence_layout::last;
     return index>0 && (index<=base_parameter_count(kind) || (kind==Kind::particle &&
         (index==particle_layout::transfer || (index>=particle_layout::texture_front && index<=particle_layout::texture_perspective) ||
          (index>=particle_layout::cloud_circles && index<=particle_layout::cloud_density) || index==particle_layout::cloud_enabled ||
@@ -149,22 +156,26 @@ enum : A_long {
 }
 [[nodiscard]] constexpr A_long curve_count_id(char bank) noexcept {
     if(bank=='m')return motion_layout::disk_id(motion_layout::curve);
+    if(bank=='t')return turbulence_layout::disk_id(turbulence_layout::curve);
     return bank == 's' ? disk_ids::kSizeCurveCountId : bank == 'o' ? disk_ids::kOpacityCurveCountId : bank == 'w' ? disk_ids::kWindSpinCurveCountId : bank=='r'?disk_ids::kRotationCurveCountId:0;
 }
 [[nodiscard]] constexpr A_long curve_age_id(char bank, A_long point) noexcept {
     if(bank=='m')return point>=0&&point<particle_layout::curve_points?motion_layout::disk_id(motion_layout::curve+1+point*2):0;
+    if(bank=='t')return point>=0&&point<particle_layout::curve_points?turbulence_layout::disk_id(turbulence_layout::curve+1+point*2):0;
     if((bank!='s' && bank!='o' && bank!='r' && bank!='w') || point<0 || point>=particle_layout::curve_points)return 0;
     if(point<8)return (bank=='s'?disk_ids::kSizeCurveAgeFirstId:bank=='o'?disk_ids::kOpacityCurveAgeFirstId:bank=='w'?disk_ids::kWindSpinCurveAgeFirstId:bank=='r'?disk_ids::kRotationCurveAgeFirstId:0)+point;
     return (bank=='s'?3000:bank=='o'?3200:bank=='r'?3400:bank=='w'?3700:0)+point;
 }
 [[nodiscard]] constexpr A_long curve_value_id(char bank, A_long point) noexcept {
     if(bank=='m')return point>=0&&point<particle_layout::curve_points?motion_layout::disk_id(motion_layout::curve+2+point*2):0;
+    if(bank=='t')return point>=0&&point<particle_layout::curve_points?turbulence_layout::disk_id(turbulence_layout::curve+2+point*2):0;
     if((bank!='s' && bank!='o' && bank!='r' && bank!='w') || point<0 || point>=particle_layout::curve_points)return 0;
     if(point<8)return (bank=='s'?disk_ids::kSizeCurveValueFirstId:bank=='o'?disk_ids::kOpacityCurveValueFirstId:bank=='w'?disk_ids::kWindSpinCurveValueFirstId:bank=='r'?disk_ids::kRotationCurveValueFirstId:0)+point;
     return (bank=='s'?3100:bank=='o'?3300:bank=='r'?3500:bank=='w'?3800:0)+point;
 }
 [[nodiscard]] constexpr A_long curve_interpolation_id(char bank) noexcept {
-    if(bank=='m')return motion_layout::disk_id(motion_layout::last);
+    if(bank=='m')return motion_layout::disk_id(motion_layout::curve_last);
+    if(bank=='t')return turbulence_layout::disk_id(turbulence_layout::curve_last);
     return bank=='s'?disk_ids::kSizeCurveInterpolationId:bank=='o'?disk_ids::kOpacityCurveInterpolationId:
         bank=='r'?disk_ids::kRotationCurveInterpolationId:bank=='w'?disk_ids::kWindSpinCurveInterpolationId:0;
 }
@@ -203,7 +214,7 @@ enum : A_long {
         kSizeCurveCountId, kOpacityCurveCountId, kSizeCurveInterpolationId, kOpacityCurveInterpolationId,
         kRotationCurveInterpolationId, kColorGradientInterpolationId, kWindSpinCurveInterpolationId
     };
-    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6+material_layout::last+motion_layout::last> ids{};
+    std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6+material_layout::last+motion_layout::last+turbulence_layout::last> ids{};
     std::size_t count = 0;
     for (auto id : fixed) ids[count++] = id;
     for(A_long index=1;index<=model_layout::last;++index)ids[count++]=model_layout::disk_id(index);
@@ -211,6 +222,7 @@ enum : A_long {
         ids[count++]=model_layout::author_bounds_disk_id(index);
     for(int i=1;i<=material_layout::last;++i)ids[count++]=material_layout::disk_id(i);
     for(int i=1;i<=motion_layout::last;++i)ids[count++]=motion_layout::disk_id(i);
+    for(int i=1;i<=turbulence_layout::last;++i)ids[count++]=turbulence_layout::disk_id(i);
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
         for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
             ids[count++] = connection_uuid_id(slot, chunk);

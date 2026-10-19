@@ -13,6 +13,7 @@ using Notify=void(*)() noexcept;
 Begin begin{};End end{};
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     if(message==WM_APP){
+        CHECK(starfield::adapter::ui_transaction_active()==blocked);
         CHECK(GetCurrentThreadId()==static_cast<DWORD>(wp));
         {starfield::adapter::EffectUiExclusion scope;CHECK(bool(scope)==!blocked);}
         const auto token=begin();CHECK((token==0)==blocked);if(token)end(token);
@@ -38,12 +39,14 @@ int wmain(int argc,wchar_t** argv) {
     end=std::bit_cast<End>(GetProcAddress(module,"SFLD_EndUiExclusionV1"));CHECK(initialize && stop && begin && end);
     {starfield::adapter::EffectUiExclusion uninitialized;CHECK(!uninitialized);}
     initialize();
+    CHECK(!starfield::adapter::ui_transaction_active());
     WNDCLASSW type{};type.lpfnWndProc=window_proc;type.hInstance=GetModuleHandleW(nullptr);type.lpszClassName=L"StarfieldUiExclusionTest";
     CHECK(RegisterClassW(&type));
     const auto window=CreateWindowExW(0,type.lpszClassName,L"",0,0,0,0,0,HWND_MESSAGE,nullptr,type.hInstance,nullptr);CHECK(window);
     pump(window);
     for(const auto* location:{"Presets executeCommand","Presets alert","OBJ chooser","Editor preset chooser","Texture source chooser"}) {
         (void)location;starfield::adapter::EffectUiExclusion modal;CHECK(modal);blocked=true;
+        CHECK(starfield::adapter::ui_transaction_active());
         for(unsigned i=0;i<16;++i)pump(window);
         {starfield::adapter::EffectUiExclusion nested;CHECK(!nested);}
         const auto token=begin();CHECK(token==0);
@@ -57,6 +60,11 @@ int wmain(int argc,wchar_t** argv) {
     pump(window);
     {starfield::adapter::EffectUiExclusion scope;CHECK(scope);stop();CHECK(begin()==0);}
     CHECK(begin()==0);initialize();pump(window);
+    const auto source_active=std::bit_cast<bool(*)() noexcept>(GetProcAddress(module,"SFLD_SourceUiExclusionActiveV1"));
+    CHECK(source_active);CHECK(!source_active());
+    {starfield::adapter::EffectUiExclusion scope(true);CHECK(scope);CHECK(source_active());CHECK(begin()==0);}
+    CHECK(!source_active());
+    {starfield::adapter::EffectUiExclusion scope;CHECK(scope);CHECK(!source_active());}
     CHECK(messages==84);CHECK(DestroyWindow(window));CHECK(UnregisterClassW(type.lpszClassName,type.hInstance));
     CHECK(FreeLibrary(module));
     {starfield::adapter::EffectUiExclusion unloaded;CHECK(!unloaded);}

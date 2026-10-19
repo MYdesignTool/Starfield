@@ -15,17 +15,19 @@
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
         motion:"org.starfieldfx.nodes.motion",
+        turbulence:"org.starfieldfx.nodes.turbulence",
         material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
     };
-    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, motion:1, model: 1, material:1, output: 4 };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, motion:1, turbulence:1, model: 1, material:1, output: 4 };
     var PORTS = {
         "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
         "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
         "org.starfieldfx.nodes.force": { input: "1", output: "2" },
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
         "org.starfieldfx.nodes.motion": {input:"1",output:"2"},
+        "org.starfieldfx.nodes.turbulence": {input:"1",output:"2"},
         "org.starfieldfx.nodes.model": { output: "1" },
         "org.starfieldfx.nodes.material": { input:"2",output:"1" },
         "org.starfieldfx.nodes.output": { input: "1" }
@@ -82,8 +84,17 @@
         ],
         material:[{key:"1",type:3,value:0},{key:"2",type:5,value:[1,1,1]},{key:"3",type:4,value:.5},{key:"4",type:4,value:0},{key:"5",type:4,value:1},{key:"6",type:3,value:1}],
         motion:[{key:"1",type:3,value:1},{key:"2",type:5,value:[0,0,0]},{key:"3",type:5,value:[0,0,1]},
-            {key:"4",type:4,value:2*Math.PI},{key:"5",type:4,value:0},{key:"13",type:3,value:0},
-            {key:"14",type:5,value:[0,0,0]},{key:"15",type:5,value:[0,0,0]}],
+            {key:"4",type:4,value:2*Math.PI},{key:"5",type:4,value:0},{key:"8",type:5,value:[1,0,0]},{key:"11",type:4,value:.5},
+            {key:"12",type:3,value:0},{key:"13",type:3,value:0},{key:"14",type:5,value:[0,0,0]},
+            {key:"15",type:5,value:[0,0,0]},{key:"17",type:4,value:100},{key:"18",type:3,value:0},
+            {key:"19",type:6,value:""},{key:"20",type:4,value:0}],
+        turbulence:[{key:"1",type:5,value:[0,0,0]},{key:"2",type:4,value:50},{key:"3",type:4,value:15},
+            {key:"4",type:3,value:3},{key:"5",type:4,value:0},{key:"6",type:5,value:[0,0,0]},
+            {key:"7",type:7,value:defaultTurbulenceCurve()},{key:"8",type:3,value:0},{key:"9",type:3,value:0},
+            {key:"10",type:3,value:0},{key:"11",type:4,value:100},{key:"12",type:4,value:100},
+            {key:"13",type:4,value:0},{key:"14",type:3,value:0},{key:"15",type:4,value:0},
+            {key:"16",type:4,value:0},{key:"17",type:4,value:0},{key:"18",type:4,value:0},
+            {key:"19",type:4,value:0},{key:"20",type:4,value:100},{key:"21",type:4,value:0}],
         model: [
             {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
             {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
@@ -118,6 +129,12 @@
         return bytes;
     }
 
+    function defaultTurbulenceCurve() {
+        var bytes=new Uint8Array(36),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;view.setFloat64(12,100,true);view.setFloat64(20,1,true);view.setFloat64(28,100,true);
+        return bytes;
+    }
+
     function fail(code, message) {
         var result = new Error(message);
         result.code = code;
@@ -142,7 +159,8 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
-        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"11":4,"12":3,"13":3,"14":5,"15":5,"17":4,"18":3,"19":6,"20":4},optional:{"6":7,"8":5}},
+        turbulence:{version:1,required:{"1":5,"2":4,"3":4,"4":3},optional:{"5":4,"6":5,"7":7,"8":3,"9":3,"10":3,"11":4,"12":4,"13":4,"14":3,"15":4,"16":4,"17":4,"18":4,"19":4,"20":4,"21":4}},
         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
@@ -159,6 +177,8 @@ function createNativeRecordContract() {
         if(field.type===4)return typeof value==="number" && isFinite(value);
         if(field.type===5){if(!array(value) || value.length!==3)return false;
             for(var axis=0;axis<3;axis++)if(typeof value[axis]!=="number" || !isFinite(value[axis]))return false;return true;}
+        if(field.type===6){if(typeof value!=="string" || value.indexOf("\u0000")>=0)return false;
+            try{return encodeURIComponent(value).replace(/%[0-9a-f]{2}/gi,"x").length<=128;}catch(ignored){return false;}}
         if(field.type===7){var tag=Object.prototype.toString.call(value);
             if(!array(value) && tag!=="[object Uint8Array]")return false;
             if(!integer(value.length,0,24576))return false;
@@ -175,12 +195,17 @@ function createNativeRecordContract() {
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
             if(node.type===prefix+"motion") {
-                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
+                if(key==="1" && !integer(field.value,0,2))invalid(node,"unsupported Motion mode");
                 if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
                 if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
                 if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
                 if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
                 if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+                if(key==="11" && (field.value<0 || field.value>1000000))invalid(node,"invalid Light Path Max Delay");
+                if(key==="12" && !integer(field.value,0,1))invalid(node,"invalid Light Path Orient To Path");
+                if(key==="17" && (field.value<0 || field.value>100000))invalid(node,"invalid Light Path Speed");
+                if(key==="18" && !integer(field.value,0,1))invalid(node,"invalid Light Path end behavior");
+                if(key==="20" && (field.value<0 || field.value>100))invalid(node,"invalid Light Path Delay Random");
             }
             if(node.type===prefix+"material") {
                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
@@ -188,6 +213,19 @@ function createNativeRecordContract() {
                     if(field.value[channel]<0 || field.value[channel]>1)invalid(node,"material color must be in 0..1");
                 if((key==="3" || key==="4" || key==="5") && (field.value<0 || field.value>1))
                     invalid(node,"material parameter "+key+" must be in 0..1");
+            }
+            if(node.type===prefix+"turbulence") {
+                if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
+                if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
+                if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
+                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
+                if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
+                if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");
+                if((key==="12" || key==="13") && (field.value<0 || field.value>100))invalid(node,"Turbulence amount outside 0..100");
+                if(key>="15" && key<="19" && (field.value < -100 || field.value > 100))invalid(node,"Turbulence property offset outside -100..100");
+                if(key==="20" && (field.value<=0 || field.value>100000))invalid(node,"invalid Noise Scale");
+                if(key==="21" && Math.abs(field.value)>100000)invalid(node,"invalid Fractal Evolution");
             }
             found[key]=true;
         }
@@ -339,6 +377,18 @@ function createNativeRecordContract() {
             var height = Number(edit.layerHeightPixels) || 1;
             if (!(height > 0) || !isFinite(height)) fail("invalid_geometry", "Emitter layer height must be positive.");
             node.parameters.filter(function (p) { return p.key === "12"; })[0].value = 100 / height;
+        }
+        if (node.type === TYPES.turbulence) {
+            // These graph fields are stored in layer-height-relative world
+            // units. Convert the pixel-valued AE defaults before they reach
+            // the gateway, which multiplies them by the same height on write.
+            var turbulenceHeight = Number(edit.layerHeightPixels) || 1;
+            if (!(turbulenceHeight > 0) || !isFinite(turbulenceHeight))
+                fail("invalid_geometry", "Turbulence layer height must be positive.");
+            for (var ti = 0; ti < node.parameters.length; ti++) {
+                var parameter = node.parameters[ti];
+                if (parameter.key === "2" || parameter.key === "11") parameter.value /= turbulenceHeight;
+            }
         }
         graph.nodes.push(node);
         var fallback = layout.derive(graph)[id];
@@ -620,6 +670,16 @@ function createNativeRecordContract() {
                 fail("parameter_type_mismatch", "graph parameter edits must preserve the value type");
             }
             node.parameters[found].value = value;
+            if(node.type===TYPES.motion && ["1","4","17"].indexOf(change.parameterKey)>=0) {
+                var angular=node.parameters.filter(function(p){return p.key==="4";})[0];
+                var percent=node.parameters.filter(function(p){return p.key==="17";})[0];
+                var motionMode=node.parameters.filter(function(p){return p.key==="1";})[0];
+                if(angular && percent) {
+                    if(change.parameterKey==="17" || (change.parameterKey==="1" && motionMode.value===0))
+                        angular.value=percent.value*(2*Math.PI/100);
+                    else percent.value=Math.max(0,angular.value*(100/(2*Math.PI)));
+                }
+            }
         }
         // Changing the source back to Default removes its parent stream in the
         // same authored transaction, including the saved source-side records.

@@ -10,6 +10,7 @@ class FakeElement {
     constructor(id) {
         this.id = id;
         this.className = "";
+        this.classList = { contains: name => this.className.split(/\s+/).includes(name) };
         this.textContent = "";
         this.innerHTML = "";
         this.value = "";
@@ -153,8 +154,10 @@ for (let i = 0; i < expectedRetryDelays.length; i++) {
 
 assert.strictEqual(stateCalls, 7, "panel should keep discovering until the target becomes available");
 assert.strictEqual(elements.targetLine.textContent, "Comp 1 / Particles", "retry should populate target details");
-assert.strictEqual(elements.banner.className, "banner hidden",
-    "successful discovery should clear the banner: " + elements.banner.textContent);
+assert.strictEqual(elements.banner.className, "banner error",
+    "target discovery alone must not hide a graph initialization failure");
+assert.match(elements.banner.textContent, /graph_modules_missing/,
+    "this discovery fixture has not loaded graph modules yet; retain that error");
 assert.strictEqual(timers.size, 1, "successful discovery leaves only one background poll timer");
 
 function poll(delay) {

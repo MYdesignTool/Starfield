@@ -24,20 +24,11 @@ if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffe
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
 
-# The checkout path contains spaces and non-ASCII characters; the MSVC toolchain in
-# this SDK pipeline is only reliable behind a mapped drive letter (same reason
-# BuildWindows.ps1 maps one for the PiPL tool).
-$driveLetter = @('Z', 'Y', 'X', 'W', 'V') |
-    Where-Object { -not (Test-Path -LiteralPath "$_`:\") } |
-    Select-Object -First 1
-if (-not $driveLetter) { throw 'No free drive letter is available for the temporary build path.' }
-$drive = "${driveLetter}:"
-
-& $env:ComSpec /d /c "subst $drive `"$repositoryRoot`""
-if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
-
+# C++ tests need no PiPL conversion. Relative response-file paths keep the
+# non-ASCII checkout path out of CL arguments without a process-wide drive map.
+Push-Location -LiteralPath $repositoryRoot
 try {
-    $aliasRoot = $drive
+    $aliasRoot = '.'
     $testFolder = if ($TransformBinding) { 'transform-binding-tests' } elseif ($TransformGraph) { 'transform-graph-tests' } elseif ($TransformTransport) { 'transform-transport-tests' } elseif ($ParticleTransform) { 'particle-transform-tests' } elseif ($GradientEditor) { 'gradient-editor-tests' } elseif ($HostBootstrap) { 'host-bootstrap-tests' } elseif ($EmissionCache) { 'emission-cache-tests' } elseif ($Gpu) { 'gpu-tests' } elseif ($EmissionTimeline) { 'emission-timeline-tests' } elseif ($RendererControls) { 'renderer-control-tests' } elseif ($NativeSync) { 'native-sync-tests' } elseif ($CurrentNodes) { 'current-node-tests' } elseif ($NodeEffects) { "node-effect-tests\$NodeKind" } elseif ($Adapter -or $RendererControls) { 'adapter-tests' } else { 'core-tests' }
     $buildDirectory = Join-Path $aliasRoot "artifacts\$testFolder"
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $repositoryRoot "artifacts\$testFolder")
@@ -52,6 +43,9 @@ try {
         'src\core\Graph.cpp',
         'src\core\GraphConstruction.cpp',
         'src\core\GraphEvaluation.cpp',
+        'src\core\TurbulenceNoise.cpp',
+        'src\core\MotionLightPathClock.cpp',
+        'src\core\MotionLightPathResource.cpp',
         'src\core\MotionGeometry.cpp',
         'src\core\MotionPathTravel.cpp',
         'src\core\EmitterHistory.cpp',
@@ -69,7 +63,9 @@ try {
 
     if ($Adapter -or $RendererControls) {
         $sources[0] = 'tests\graph_parameter_tests.cpp'
-        $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp')
+        $sources += @('ae_plugin\GraphParameter.cpp', 'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\MotionBlur.cpp', 'tests\adapter_capture_stubs.cpp')
+        $sources += @('ae_plugin\ModelMirrorParameter.cpp','ae_plugin\MotionLookAtCapture.cpp',
+            'ae_plugin\LightCapture.cpp','ae_plugin\MotionLightSources.cpp','ae_plugin\MotionPointCapture.cpp')
     }
     if ($Gpu) { $sources[0] = 'tests\gpu_render_tests.cpp'; $sources += @('ae_plugin\GpuRender.cpp','ae_plugin\SmartRender.cpp','ae_plugin\WorldBridge.cpp','ae_plugin\NodeEffects.cpp') }
     if ($EmissionCache) { $sources[0] = 'tests\emission_cache_tests.cpp'; $sources += 'ae_plugin\NativeTemporalCache.cpp' }
@@ -83,7 +79,7 @@ try {
         $sources += 'ae_plugin\MotionBlur.cpp'
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp','ae_plugin\ParticleGradientUI.cpp') }
-    if ($Gpu) { $sources += 'ae_plugin\ParticleGradientUI.cpp' }
+    if ($Gpu) { $sources += @('ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\MotionBlur.cpp', 'tests\adapter_capture_stubs.cpp', 'tests\editor_preset_picker_stub.cpp') }
     if ($GradientEditor) { $sources = @('tests\gradient_editor_tests.cpp','ae_plugin\ParticleGradientUI.cpp') }
     if ($HostBootstrap) { $sources = @('tests\host_bootstrap_tests.cpp') }
     if ($ParticleTransform) { $sources = @('tests\particle_transform_tests.cpp','src\core\ParticleTransform.cpp') }
@@ -99,6 +95,7 @@ try {
         '/EHsc',
         '/O2',
         '/DNDEBUG',
+        '/MT',
         "/I `"$aliasRoot\include`"",
         "/Fe:`"$buildDirectory\core_tests.exe`"",
         "/Fo:`"$buildDirectory\\`""
@@ -113,7 +110,7 @@ try {
             "/I `"$aliasRoot\ae_plugin`"", "/I `"$sdkHeaders`"", "/I `"$sdkHeaders\SP`"",
             "/I `"$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Util`"")
     }
-    if ($Gpu) { $responseLines += "/DSTARFIELD_NODE_KIND_EMITTER" }
+    if ($Gpu) { $responseLines += @('/DSTARFIELD_NODE_KIND_EMITTER', '/DSTARFIELD_TEST_GPU') }
     if ($NodeEffects) { $responseLines += "/DSTARFIELD_NODE_KIND_$($NodeKind.ToUpperInvariant())" }
     if ($NativeSync) { $responseLines += '/DSTARFIELD_NODE_KIND_EMITTER' }
     $responseLines += $sources | ForEach-Object { "`"$aliasRoot\$_`"" }
@@ -138,7 +135,7 @@ exit /b %errorlevel%
     $exitCode = $LASTEXITCODE
 }
 finally {
-    & $env:ComSpec /d /c "subst $drive /d" | Out-Null
+    Pop-Location
 }
 
 if ($exitCode -ne 0) { throw "Core self-tests failed with exit code $exitCode" }

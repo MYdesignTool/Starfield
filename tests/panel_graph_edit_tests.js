@@ -1,9 +1,10 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 
 var assert = require("assert");
-var edits = require("../cep_panel/js/graph_edits.js");
-var codec = require("../cep_panel/js/graph_codec.js");
-var layout = require("../cep_panel/js/graph_layout.js");
+var edits = require(panelPath("js/graph_edits.js"));
+var codec = require(panelPath("js/graph_codec.js"));
+var layout = require(panelPath("js/graph_layout.js"));
 
 function uuid(n) { return ("00000000000000000000000000000000" + n.toString(16)).slice(-32); }
 function graph() {
@@ -44,7 +45,7 @@ assert.deepStrictEqual(newParticle.parameters.filter(function (parameter) {
     return parameter.key === "9" || parameter.key === "10";
 }).map(function (parameter) { return parameter.value; }), [0, 0],
 "new Particle nodes include zero-default random variation controls");
-assert.strictEqual(newParticle.schemaVersion, 6, "new Particle nodes use the current node schema");
+assert.strictEqual(newParticle.schemaVersion, 7, "new Particle nodes use the current node schema");
 assert.strictEqual(newParticle.parameters.filter(function (parameter) {
     return parameter.key === "11";
 })[0].value, 2, "new Particle nodes own their lifetime");

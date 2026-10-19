@@ -17,7 +17,7 @@ namespace starfield::adapter {
 // Explicit UI command: compile saved node streams, atomically publish and
 // verify graph plus nonce. Does not rely on USER_CHANGED_PARAM delivery.
 [[nodiscard]] PF_Err commit_panel_graph(PF_InData*, AEGP_EffectRefH,
-    AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*) noexcept;
+    AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*,bool rebuild_disabled=false) noexcept;
 
 // Final parade only, guard1 held. Reacquires aliases, reinstalls and verifies
 // source dependencies without republishing graph/nonce or reading stale aliases.

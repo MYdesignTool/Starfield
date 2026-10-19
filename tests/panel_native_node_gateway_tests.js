@@ -25,6 +25,7 @@ function assertFresh(captured) { if(captured!==epoch) throw new Error("Invalid i
 function wrapProperty(p,captured,isNode) {
     return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,canSetExpression:false,
         get value(){assertFresh(captured);if(isNode)nodePropertyReads++;return clone(p.value);},
+        valueAtTime(time,preExpression){assertFresh(captured);assert.equal(time,0);assert.equal(preExpression,true);return clone(p.value);},
         get expression(){throw new Error("AEGP_CanVaryOverTime: expressions are forbidden on node records");},
         set expression(_){throw new Error("Expression requests are unsupported");},
         setValue(v){assertFresh(captured);p.value=clone(v);} };
@@ -169,8 +170,8 @@ numericNodeVisits=0;
 const fallback=invoke("getGraphSnapshot");
 assert.equal(fallback.ok,true,JSON.stringify(fallback));
 const particleRaw=items.find(e=>e.matchName==="org.starfieldfx.node.particle");
-assert.equal(numericNodeVisits,new Set(Object.values(particleRaw.properties)).size,
-    "all unresolved curve fields share one bounded property traversal per effect/request");
+assert.equal(numericNodeVisits,new Set(Object.values(particleRaw.properties)).size+25,
+    "one bounded layout traversal plus 25 fresh validated field resolutions; no retained Property references");
 hideDirectCurveIds=false;
 const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleId=initial.nodes.find(n=>n.type===edits.types.particle).id;
 const presets=require(path.join(panelRoot,"js/presets.js"));

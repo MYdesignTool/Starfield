@@ -185,6 +185,8 @@ inline constexpr ParticleMotionAffine kIdentityMotionAffine{1,0,0,0,1,0,0,0,1};
 struct MotionLookAtSettings {
     Vec3 goal{}, forward{1,0,0};
     AgeCurve over_life{};
+    std::vector<Vec3> light_targets;
+    bool use_nearest_light{};
 };
 struct MotionCurveClockSample { double integral_seconds{}, weight{}; };
 struct MotionPathTravelSettings {

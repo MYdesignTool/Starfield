@@ -149,9 +149,16 @@ void topology_force_transform() {
     Sampler as(after);same(ordered,temporal(as));
     auto serial=base();attach(serial);attach(serial,5,-pi/2,{.1,0,0});
     near(evaluate(serial).particles[0].position,Vec3{.35,.1,0},"serial Circle order retained");Sampler ss(serial);same(evaluate(serial),temporal(ss));
-    auto ambiguous=base();attach(ambiguous);ambiguous.edges.push_back({eid(99),nid(2),kParticleParticlesOut,nid(255),kOutputParticles});
-    check(!evaluate_particle_graph(ambiguous,{1,1},never).has_value(),"Motion versus plain branch merge rejected");
-    Sampler am(ambiguous);check(!evaluate_temporal_particle_graph(ambiguous,{1,1},never,{},am).has_value(),"temporal ambiguous merge rejected");
+    auto merged=base();attach(merged);merged.edges.push_back({eid(99),nid(2),kParticleParticlesOut,nid(255),kOutputParticles});
+    const auto plain=evaluate(base()),merged_value=evaluate(merged);
+    check(merged_value.particles.size()==plain.particles.size()*2,"Output combines a Motion branch and an unchanged branch");
+    bool saw_plain{},saw_motion{};
+    for(const auto& particle:plain.particles)for(const auto& branch:merged_value.particles)if(branch.age_seconds==particle.age_seconds) {
+        if(branch.position.x==particle.position.x&&branch.position.y==particle.position.y&&branch.position.z==particle.position.z)saw_plain=true;
+        if(std::abs(branch.position.x-particle.position.x)+std::abs(branch.position.y-particle.position.y)>1e-9)saw_motion=true;
+    }
+    check(saw_plain&&saw_motion,"merged routes retain independent branch results");
+    Sampler am(merged);same(merged_value,temporal(am));
 }
 void auxiliary_and_render() {
     auto g=base();attach(g);auto emitter=node(g,1);emitter.id=nid(4);set(emitter,kAuxiliarySource,std::uint32_t{1});

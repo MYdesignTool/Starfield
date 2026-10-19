@@ -1,6 +1,7 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm");
-const presets=require("../cep_panel/js/presets.js"),codec=require("../cep_panel/js/graph_codec.js"),layout=require("../cep_panel/js/graph_layout.js"),edits=require("../cep_panel/js/graph_edits.js"),view=require("../cep_panel/js/graph_view.js"),transactions=require("../cep_panel/js/graph_transactions.js");
+const presets=require(panelPath("js/presets.js")),codec=require(panelPath("js/graph_codec.js")),layout=require(panelPath("js/graph_layout.js")),edits=require(panelPath("js/graph_edits.js")),view=require(panelPath("js/graph_view.js")),transactions=require(panelPath("js/graph_transactions.js"));
 const output="000000000000000000000000000000ff";
 const fixture=require("./native_snapshot_fixture.js");
 const built=presets.catalog.map(p=>presets.build(p.id,1080));

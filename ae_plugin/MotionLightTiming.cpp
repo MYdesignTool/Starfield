@@ -157,7 +157,15 @@ PF_Err capture_motion_light_keyframes(PF_InData* data,AEGP_PluginID plugin,std::
     MotionLightKeyframes result;
     auto error=capture_motion_light_timing(data,plugin,id,cancel,result.timing,true);
     if(error)return error;
-    if(result.timing.keyframe_times.size()<2)return PF_Err_BAD_CALLBACK_PARAM;
+    // A point light without a distinct position-keyframe interval does not
+    // define a Light Path. Preserve that fact as an empty/singleton snapshot so
+    // the multi-source collector can skip it instead of failing the whole
+    // pre-render because Starting With matched a static light too.
+    if(result.timing.keyframe_times.empty()) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        output=std::move(result);
+        return PF_Err_NONE;
+    }
     std::vector<MotionTimedLayerPointRequest> requests;
     requests.reserve(result.timing.keyframe_times.size());
     for(const auto time:result.timing.keyframe_times) {
@@ -181,10 +189,15 @@ PF_Err capture_motion_light_path_track(PF_InData* data,AEGP_PluginID plugin,std:
     MotionLightKeyframes keys;
     auto error=capture_motion_light_keyframes(data,plugin,id,units,cancel,keys);
     if(error)return error;
-    if(keys.positions.size()<2||keys.positions.size()>core::kMaxMotionPathSamples)
+    if(keys.positions.size()>core::kMaxMotionPathSamples)
         return PF_Err_BAD_CALLBACK_PARAM;
 
     MotionLightPathTrack result;result.timing=std::move(keys.timing);result.samples=std::move(keys.positions);
+    if(result.samples.size()<2) {
+        if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+        output=std::move(result);
+        return PF_Err_NONE;
+    }
     std::vector<TrackSegment> active;active.reserve(result.samples.size()-1);
     for(std::size_t i=1;i<result.samples.size();++i)
         active.push_back({result.samples[i-1],result.samples[i]});
@@ -258,7 +271,7 @@ PF_Err capture_motion_light_path_track(PF_InData* data,AEGP_PluginID plugin,std:
 PF_Err capture_motion_light_path_tracks(PF_InData* data,AEGP_PluginID plugin,
     std::span<const std::uint32_t> ids,core::LayerUnits units,double max_chord_error,
     const core::Cancellation& cancel,MotionLightPathTrackSet& output) noexcept try {
-    if(ids.empty()||ids.size()>kMaxMotionLightSources||!std::isfinite(max_chord_error)||
+    if(ids.size()>kMaxMotionLightSources||!std::isfinite(max_chord_error)||
        max_chord_error<=0||max_chord_error>1e6)return PF_Err_BAD_CALLBACK_PARAM;
     MotionLightPathTrackSet result;result.tracks.reserve(ids.size());
     for(std::size_t i=0;i<ids.size();++i) {
@@ -269,8 +282,9 @@ PF_Err capture_motion_light_path_tracks(PF_InData* data,AEGP_PluginID plugin,
         MotionLightPathTrack track;
         const auto error=capture_motion_light_path_track(data,plugin,ids[i],units,max_chord_error,cancel,track);
         if(error)return error;
-        if(track.timing.layer_id!=ids[i]||track.samples.size()<2||
-           track.samples.size()>core::kMaxMotionPathSamples-result.sample_count)
+        if(track.timing.layer_id!=ids[i])return PF_Err_BAD_CALLBACK_PARAM;
+        if(track.samples.size()<2)continue;
+        if(track.samples.size()>core::kMaxMotionPathSamples-result.sample_count)
             return PF_Err_BAD_CALLBACK_PARAM;
         result.sample_count+=track.samples.size();result.tracks.push_back(std::move(track));
     }
@@ -282,8 +296,9 @@ PF_Err capture_motion_light_path_tracks(PF_InData* data,AEGP_PluginID plugin,
 PF_Err encode_motion_light_path_track_set(const MotionLightPathTrackSet& tracks,
     const core::Cancellation& cancel,std::vector<std::byte>& output) noexcept try {
     if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
-    if(tracks.tracks.empty()||tracks.tracks.size()>kMaxMotionLightSources||
-       !tracks.sample_count||tracks.sample_count>core::kMaxMotionLightPathResourceSamples)
+    if(tracks.tracks.size()>kMaxMotionLightSources||
+        tracks.sample_count>core::kMaxMotionLightPathResourceSamples||
+        (tracks.tracks.empty()!=(tracks.sample_count==0)))
         return PF_Err_BAD_CALLBACK_PARAM;
     core::MotionLightPathResource resource;resource.tracks.reserve(tracks.tracks.size());
     resource.sample_count=tracks.sample_count;std::size_t samples=0;

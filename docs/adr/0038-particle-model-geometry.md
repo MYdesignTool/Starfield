@@ -1,4 +1,58 @@
+## M3-20 / zero-count Import OBJ button — 2026-10-18
+
+Owner AE23.5x52 reports `incomplete button delivery (0 / 101)`. That proves
+the delivered-array gate rejects this callback, not that the saved Model layout
+has zero streams. For this explicit button only, checkout/checkin the eight UUID
+fields through PF, then resolve unique full UUID and capture the existing AEGP
+checkpoint (including the real101-stream layout). Never index the optional
+callback params, even when non-null. All checkouts end before the modal dialog.
+After validation, construct owned PF-style inputs from the saved checkpoint for
+the existing verified author transaction; its local num_params describes that
+owned array, not a fabricated host delivery. Source guard/type/identity/time,
+saved graph acknowledgement and rollback remain authoritative. Ordinary native
+edit delivery guards are unchanged. No schema/ID/ABI change or new import mode.
+
+## M3-20 / native89 installed — OBJ import ownership — 2026-10-15
+
+The OBJ chooser holds a generic resident-Host UI exclusion. Its author
+transaction formerly called automatic node sync, which returned NONE immediately
+under that same exclusion and falsely acknowledged publication. The explicit
+import path now passes its noncopyable scope as a local capability to a Model
+Source-only sync entry. Other callbacks remain deferred. An invalid owner,
+partial delivery, missing UUID or renderer guard fails rather than acknowledging
+an empty import. Real NodeGraphSync/compiler/publisher tests exercise the owning
+scope and preserve suppression of unrelated/reentrant callbacks.
+
+Chooser checkpoints resolve the delivered full Model UUID in its owner layer;
+validation resolves that same UUID anew after the chooser. Numeric/mesh state
+remains owned across the modal interval. The author transaction also resolves
+by UUID rather than its potentially stale PF effect binding. It owns copied
+before-values/mesh bytes, releases all source streams and AEGP values before
+graph publication, and reacquires a unique source for verified rollback.
+Incomplete restoration keeps the source guarded and reports an explicit error.
+
+Button deliveries and checkpoint/suite/window failures before the chooser now
+have visible diagnostics. Preserve the registered101-parameter layout (the SDK
+count includes input); do not silently accept an unknown layout or migrate IDs.
+Source IDs, mesh schema, Core ABI9 and graph/render boundaries are unchanged.
+The owner's original no-chooser mechanism still requires post-install host
+acceptance; the confirmed exclusion/publication and borrowed-identity gaps are
+fixed independently of that unknown callback detail.
+
 # ADR 0038 — Particle Model geometry and resources
+
+## M3-20 / CEP92 — default Cube is an ordinary addition — 2026-10-15
+
+A new validated Source Cube / revision0 / zero resource UUID / unit bounds node
+has no external asset to restore. Adding it uses ordinary guarded submitGraph
+with stale-receipt rejection, native publication, saved readback and rollback.
+Duplicating a Cube with no saved Model asset does likewise. Previously identity
+comparison alone routed these operations through full EffectGraphBackup and
+asset transfer despite having zero mesh bytes. Existing Model source/resource
+changes, imported/retained asset copies/restores and every removal retain their
+full transaction/backup path. Identity indexes avoid per-node full-list scans.
+No native asset/ABI/schema/parameter change or host performance claim follows.
+
 
 ## native68／CEP71 deployment — 2026-10-11 18:45+08
 

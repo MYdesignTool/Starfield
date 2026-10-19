@@ -1,32 +1,21 @@
 "use strict";
-const fs=require("fs"),vm=require("vm"),assert=require("assert");
-const context={window:{}};vm.createContext(context);
-vm.runInContext(fs.readFileSync(require("path").join(__dirname,"../cep_panel/js/gradient_editor.js"),"utf8"),context);
-const tools=context.window.StarfieldGradientTools;
-const presets=tools.presets();presets.forEach(p=>assert(tools.valid(p.stops)));
-assert.equal(presets.length,3);assert.equal(tools.paste(),null);
-assert(tools.copy(presets[2].stops));const copy=tools.paste();copy[0].color[0]=0;
-assert.equal(tools.paste()[0].color[0],1);
-const twice=tools.flip(tools.flip(presets[2].stops));assert.equal(JSON.stringify(twice),JSON.stringify(presets[2].stops));
-const invalid=tools.paste();invalid[1].position=0;assert(!tools.valid(invalid));assert(!tools.copy(invalid));
-assert.equal(tools.flip(invalid),null);
-const bad=tools.paste();bad[1].color[0]=NaN;assert(!tools.valid(bad));
-let inset=[{position:.2,color:[1,0,0]},{position:.8,color:[0,0,1]}];
-assert(tools.valid(inset));assert.equal(JSON.stringify(tools.sample(inset,0)),"[1,0,0]");
-assert.equal(JSON.stringify(tools.sample(inset,1)),"[0,0,1]");
-let moved=tools.move(inset,0,.9);assert.equal(moved.index,1);assert.equal(moved.stops[1].color[0],1);
-assert(tools.valid(moved.stops));assert.equal(inset[0].position,.2,"drag does not mutate its input");
-moved=tools.move(moved.stops,1,.8);assert(tools.valid(moved.stops));
-assert(Math.abs(moved.stops[1].position-moved.stops[0].position)>=.001-1e-12);
-assert.equal(tools.move(inset,0,NaN),null);assert.equal(tools.move(inset,2,.5),null);
-assert(tools.insert(inset,0));assert(tools.insert(inset,1));assert.equal(tools.insert(inset,.2),null);
-assert.equal(JSON.stringify(tools.insert(inset,.1).stops[0].color),"[1,0,0]");
-assert.equal(JSON.stringify(tools.flip(inset).map(s=>s.position)),"[0.19999999999999996,0.8]");
-const html=fs.readFileSync(require("path").join(__dirname,"../cep_panel/index.html"),"utf8");
-assert(html.indexOf('js/gradient_editor.js')<html.indexOf('js/panel.js'));
-const schema=JSON.parse(fs.readFileSync(require("path").join(__dirname,"../schema/node-parameters.json"),"utf8"));
-assert.equal(schema.graphAuthoring.particleSchemaVersion,5);
-assert.equal(schema.colorGradient.nativeCountIndex,12);
-assert.equal(schema.colorGradient.nativePositionFirstIndex,13);
-assert.equal(schema.colorGradient.nativeColorFirstIndex,14);
-console.log("Gradient presets, flip, bounded validation, clipboard ownership and startup ordering checks passed.");
+// P-02M retirement boundary; saved gradient/curve codecs are covered separately
+// by particle_gradient_tests and graph/preset/native-gateway regression suites.
+const panelPath=require("./panel_test_paths.cjs");
+const fs=require("node:fs"),assert=require("node:assert/strict");
+const source=fs.readFileSync(panelPath("js/panel.js"),"utf8");
+const html=fs.readFileSync(panelPath("index.html"),"utf8");
+const css=fs.readFileSync(panelPath("css/panel.css"),"utf8");
+assert.ok(!/inspector|numericScrub|curveDrag|function onEdit\(|function applyChanges\(/i.test(source),
+    "retired editor state and callbacks must not return");
+assert.ok(!/call\("setParameters"|type:\s*"setParameters"/.test(source),
+    "the graph panel cannot initiate parameter-edit requests");
+assert.ok(!/inspector|parameter-grid|age-curve|gradient-editor/.test(html+css));
+for(const name of ["curve_editor","gradient_editor","editor_presets"]){
+    assert.ok(!html.includes("js/"+name+".js"));
+    assert.ok(!fs.existsSync(panelPath("js/"+name+".js")),"unused editor script is physically retired: "+name);
+}
+const generator=fs.readFileSync(require("node:path").join(__dirname,"../tools/Generate-EditorPresets.ps1"),"utf8");
+assert.ok(!generator.includes("cep_panel\\js\\editor_presets.js"),"native generation cannot resurrect the CEP script");
+assert.ok(generator.includes("EditorPresetCatalog.hpp"),"native AE editor presets still have their build input");
+console.log("CEP editor retirement checks passed: no DOM/styles/handlers/value-edit requests/helper files or regenerating output; native presets preserved.");

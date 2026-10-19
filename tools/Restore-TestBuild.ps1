@@ -26,12 +26,17 @@ foreach ($taskEntry in $taskRecord.files) {
         -not $taskRetained.StartsWith($taskCandidateRoot,[StringComparison]::OrdinalIgnoreCase)) { throw 'Paired panel path escapes its root.' }
     # Old records predate the existed field and always have a saved source.
     $taskExisted = -not ($taskEntry.PSObject.Properties.Name -contains 'existed') -or [bool]$taskEntry.existed
+    $taskRemoved = ($taskEntry.PSObject.Properties.Name -contains 'removed') -and $taskEntry.removed -eq $true
+    if($taskRemoved -and (-not $taskExisted -or $taskEntry.installedHash -or -not $taskEntry.oldHash)) {
+        throw 'Invalid retired panel source record.'
+    }
     $taskPresent=Test-Path -LiteralPath $taskTarget
     if($taskPresent){
+        if($taskRemoved){throw "Retired panel source reappeared after deployment: $taskTarget"}
         if ((Get-FileHash -LiteralPath $taskTarget -Algorithm SHA256).Hash -ne $taskEntry.installedHash) {
             throw "Panel source changed after deployment; refusing to overwrite: $taskTarget"
         }
-    }elseif($taskEntry.installedHash -or $taskExisted){throw 'Expected paired panel source is missing.'}
+    }elseif(-not $taskRemoved -and ($taskEntry.installedHash -or $taskExisted)){throw 'Expected paired panel source is missing.'}
     if ($taskExisted) {
         if ((Get-FileHash -LiteralPath $taskSaved -Algorithm SHA256).Hash -ne $taskEntry.oldHash) { throw "Saved panel hash mismatch: $taskSaved" }
     } elseif ($taskEntry.oldHash -or (Test-Path -LiteralPath $taskSaved)) { throw 'Unexpected pre-deployment source for a newly added panel file.' }

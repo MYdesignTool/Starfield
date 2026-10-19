@@ -108,4 +108,5 @@ foreach($taskGatewayPath in @('jsx/starfield_gateway.jsx','js/panel.js','js/pres
     nativeRecordContractSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/native_record_contract.js') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
+& (Join-Path $PSScriptRoot 'Assert-PanelContract.ps1') -PanelRoot (Join-Path $taskDestination 'cep_panel')
 Write-Host "Prepared isolated Model author candidate: $taskDestination"

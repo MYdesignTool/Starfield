@@ -32,10 +32,10 @@
       "cppStandard": "c++20"
     },
     {
-      "name": "Appearance",
+      "name": "Transform",
       "intelliSenseMode": "windows-msvc-x64",
       "includePath": ["${starfieldIncludes}"],
-      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_APPEARANCE"],
+      "defines": ["${starfieldDefines}", "STARFIELD_NODE_KIND_TRANSFORM"],
       "cStandard": "c17",
       "cppStandard": "c++20"
     },

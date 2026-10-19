@@ -34,12 +34,12 @@ for(const page of ["panel","preset_manager"]){
  vm.runInContext(source.slice(start,end),scope);
  function call(operation){let response;scope.call(operation,{},r=>response=r);eq(response.ok,true);
      eq(response.bound,engine.__SFLD_modelTransactionAPI.serial);return response;}
- call("beginModelGraphTransaction");eq([gateways,transports],[1,1]);
- call("readModelGraphTransaction");eq([gateways,transports],[1,1]);
- installGateway();call("readModelGraphTransaction");eq([gateways,transports],[2,2]);
- call("readModelGraphTransaction");eq([gateways,transports],[2,2]);
+ call("beginModelGraphTransaction");eq([gateways,transports],[0,1]);
+ call("readModelGraphTransaction");eq([gateways,transports],[0,1]);
+ installGateway();call("readModelGraphTransaction");eq([gateways,transports],[1,2]);
+ call("readModelGraphTransaction");eq([gateways,transports],[1,2]);
  engine.SFLD_ready=()=>"org.starfieldfx.panel/1/old";
- call("readModelGraphTransaction");eq([gateways,transports],[3,3]);
- call("beginModelGraphTransaction");eq([gateways,transports],[4,4]);
+ call("readModelGraphTransaction");eq([gateways,transports],[2,3]);
+ call("beginModelGraphTransaction");eq([gateways,transports],[2,3]);
 }
 console.log(`model_gateway_lifecycle_tests: ${checks} checks passed; real page call bodies/generated scripts, simulated CEP/evalFile; AE qualification open`);

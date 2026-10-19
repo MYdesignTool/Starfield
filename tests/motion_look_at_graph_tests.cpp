@@ -1,11 +1,14 @@
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
 #include "starfield/core/MotionBlur.hpp"
+#include "starfield/core/MotionLookAtTargets.hpp"
 #include "starfield/core/ModelResources.hpp"
 #include "starfield/core/SequenceCodec.hpp"
 #include "starfield/core/SpriteScene.hpp"
 #include "starfield/core/CpuRenderer.hpp"
 #include "../src/core/SpriteGeometry.hpp"
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cstdlib>
@@ -69,6 +72,37 @@ void math(){
     const Vec3 delta{target.goal.x-particle.position.x,target.goal.y-particle.position.y,target.goal.z-particle.position.z};const auto dn=std::hypot(delta.x,delta.y,delta.z);
     near({mapped.x/n,mapped.y/n,mapped.z/n},Vec3{delta.x/dn,delta.y/dn,delta.z/dn},"Look At accounts for authored Euler/shear/reflection");
     near(particle.rotation_degrees,Vec3{45,30,75},"authored angles retained");
+    ParticleInstance nearest;nearest.age_seconds=1;nearest.lifetime_seconds=3;
+    MotionLookAtSettings nearest_settings;nearest_settings.use_nearest_light=true;
+    nearest_settings.light_targets={{0,2,0},{4,0,0}};
+    take(apply_motion_look_at(nearest,nearest_settings,{}));
+    near(take(particle_motion_forward(nearest,nearest_settings.forward,{})),Vec3{0,1,0},"nearest light target selected per particle");
+    nearest={};nearest.age_seconds=1;nearest.lifetime_seconds=3;nearest_settings.light_targets={{0,2,0},{0,-2,0}};
+    take(apply_motion_look_at(nearest,nearest_settings,{}));
+    near(take(particle_motion_forward(nearest,nearest_settings.forward,{})),Vec3{0,1,0},"equal-distance target keeps source order");
+    nearest={};nearest.age_seconds=1;nearest.lifetime_seconds=3;nearest.limit_to_2d=true;
+    nearest_settings.forward={0,1,0};nearest_settings.light_targets={{1,0,100},{2,0,0}};
+    take(apply_motion_look_at(nearest,nearest_settings,{}));
+    near(take(particle_motion_forward(nearest,nearest_settings.forward,{})),Vec3{1,0,0},"2D nearest target compares XY only");
+    nearest={};nearest.age_seconds=1;nearest.lifetime_seconds=3;nearest_settings.light_targets.clear();
+    take(apply_motion_look_at(nearest,nearest_settings,{}));check(nearest.motion_pose==kIdentityMotionPose,"empty matched lights preserve orientation");
+}
+void light_targets(){
+    const std::array<MotionLookAtTarget,2> input{{{31,{1,2,3}},{32,{-4,5,-6}}}};
+    auto bytes=take(encode_motion_look_at_targets(input,never));auto decoded=take(decode_motion_look_at_targets(bytes,never));
+    check(decoded.size()==2&&decoded[0].layer_id==31&&decoded[1].layer_id==32,"target identities roundtrip");
+    near(decoded[0].position,{1,2,3},"first target position roundtrip");near(decoded[1].position,{-4,5,-6},"second target position roundtrip");
+    check(take(encode_motion_look_at_targets({},never)).size()==kMotionLookAtTargetsHeaderBytes,"empty target packet valid");
+    for(std::size_t n=0;n<bytes.size();++n)check(!decode_motion_look_at_targets(std::span<const std::byte>(bytes).first(n),never).has_value(),"truncated target packet rejected");
+    auto bad=bytes;bad[12]=std::byte{1};check(!decode_motion_look_at_targets(bad,never).has_value(),"target reserved header rejected");
+    bad=bytes;bad[kMotionLookAtTargetsHeaderBytes+4]=std::byte{1};
+    check(!decode_motion_look_at_targets(bad,never).has_value(),"target reserved flags rejected");
+    const std::array<MotionLookAtTarget,2> duplicate{{{31,{0,0,0}},{31,{1,0,0}}}};
+    check(!encode_motion_look_at_targets(duplicate,never).has_value(),"duplicate target identity rejected");
+    const std::array<MotionLookAtTarget,1> invalid{{{33,{std::numeric_limits<double>::infinity(),0,0}}}};
+    check(!encode_motion_look_at_targets(invalid,never).has_value(),"nonfinite target rejected");
+    auto oversized=bytes;oversized[8]=std::byte{1};oversized[9]=std::byte{1};
+    check(!decode_motion_look_at_targets(oversized,never).has_value(),"target resource count and length checked");
 }
 void graph(){auto plain=base(),g=plain;attach(g);auto p=evaluate(plain),r=evaluate(g);same_centres(p,r);
     for(auto& particle:r.particles)near(take(particle_motion_forward(particle,{1,0,0},r.sprite_bases)),Vec3{0,1,0},"graph actual forward");
@@ -86,6 +120,17 @@ void graph(){auto plain=base(),g=plain;attach(g);auto p=evaluate(plain),r=evalua
     auto many=base();set(node(many,1),kBirthRate,5000.);set(node(many,255),kParticleCount,std::uint32_t{6000});set(node(many,1),kVelocity,Vec3{.4,-.2,0});attach(many,3,{1,1,0});
     auto population=evaluate(many);check(population.particles.size()==5001&&population.sprite_bases.empty(),"per-particle pose exceeds4096 without shared entries");
     check(population.particles.front().motion_pose!=population.particles.back().motion_pose,"individual orientations");
+    auto nearest=base();attach(nearest);auto& nearest_node=node(nearest,3);
+    std::erase_if(nearest_node.parameters,[](const auto& parameter){return parameter.key==kMotionGoal;});
+    const std::array<MotionLookAtTarget,2> targets{{{41,{0,2,0}},{42,{4,0,0}}}};
+    set(nearest_node,kMotionLookAtTargets,take(encode_motion_look_at_targets(targets,never)));
+    auto nearest_result=evaluate(nearest);near(take(particle_motion_forward(nearest_result.particles[0],{1,0,0},nearest_result.sprite_bases)),
+        Vec3{0,1,0},"graph-backed Look At nearest light");
+    Sampler nearest_sampler(nearest);auto nearest_history=temporal(nearest_sampler);
+    check(nearest_history.particles[0].motion_pose==nearest_result.particles[0].motion_pose,"history preserves frame target resource");
+    auto nearest_bytes=take(serialize_graph(nearest,particle_node_registry()));
+    auto nearest_reloaded=evaluate(take(deserialize_graph(nearest_bytes,particle_node_registry())));
+    check(nearest_reloaded.particles[0].motion_pose==nearest_result.particles[0].motion_pose,"graph target resource roundtrip");
     auto malformed=many;set(node(malformed,3),kMotionForward,Vec3{});check(!evaluate_particle_graph(malformed,{1,1},never).has_value(),"zero authored forward rejected");
     set(node(malformed,3),kMotionForward,Vec3{1,0,0});set(node(malformed,3),kMotionGoal,Vec3{std::numeric_limits<double>::infinity(),0,0});check(!evaluate_particle_graph(malformed,{1,1},never).has_value(),"nonfinite goal rejected");
 }
@@ -167,5 +212,5 @@ void failures(){auto g=base();attach(g);bool completed=false;
         if(r.has_value()){completed=true;break;}check(r.error().code==ErrorCode::allocation_failed,"all allocation failures typed");}check(completed,"fault scan reaches success");}
 }
 }
-int main()try{math();graph();snapshots();mixed_chains();rendering();failures();std::printf("motion_look_at_graph_tests: %u checks passed; numeric goal/pose, CPU/GPU preparation and snapshot9; AE remains open\n",checks);return 0;
+int main()try{math();light_targets();graph();snapshots();mixed_chains();rendering();failures();std::printf("motion_look_at_graph_tests: %u checks passed; static and nearest-light targets, CPU/GPU preparation and snapshot9; AE remains open\n",checks);return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"Look At fixture after %u checks: %s\n",checks,e.what());return 1;}

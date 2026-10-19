@@ -10,6 +10,7 @@
 #include "Diagnostics.hpp"
 #include "GraphCarrier.hpp"
 #include "GraphCommitRequest.hpp"
+#include "GraphRepairRequest.hpp"
 #include "GraphBindingRefreshRequest.hpp"
 #include "NativeGraphCommit.hpp"
 #include "GraphParameter.hpp"
@@ -39,6 +40,7 @@ static_assert(STARFIELD_OUT_FLAGS == (PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_P
 static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_REVEALS_ZERO_ALPHA | PF_OutFlag2_SUPPORTS_SMART_RENDER |
                                        PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG |
                                        PF_OutFlag2_I_MIX_GUID_DEPENDENCIES | PF_OutFlag2_I_USE_3D_CAMERA |
+                                       PF_OutFlag2_I_USE_3D_LIGHTS |
                                        PF_OutFlag2_AUTOMATIC_WIDE_TIME_INPUT | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
 
@@ -137,6 +139,12 @@ PF_Err dispatch(PF_Cmd cmd,
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
         case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra && *static_cast<const std::uint32_t*>(extra)==0x53465232) {
+                auto& request=*static_cast<starfield::adapter::GraphRepairRequest*>(extra);
+                if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;
+                request.acknowledged=1;
+                return request.status=starfield::adapter::repair_selected_graph(in_data,request,out_data);
+            }
             if(extra && *static_cast<const std::uint32_t*>(extra)==0x53465231) {
                 auto& request=*static_cast<starfield::adapter::GraphBindingRefreshRequest*>(extra);
                 if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;

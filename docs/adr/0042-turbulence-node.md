@@ -1,59 +1,107 @@
-# ADR 0042 — Deterministic Turbulence field and node contract
+# ADR 0042 — Turbulence node, staged authoring
 
-Status: M3-19 implementation in progress. This first increment adds only the
-host-independent bounded noise kernel; no Turbulence graph node, native effect,
-CEP control, render behavior, or AE qualification is claimed yet.
+Status: M3-19 first stage retained in the deployed M3-20 native84 / Core ABI9 /
+CEP86 stability pair (ADR0043). The owner
+explicitly deferred Spherical and Spherical 2; this stage exposes only Normal,
+Axis, and One Side. Build and paired deployment are recorded in
+`docs/current-state.md`; manual AE2023 qualification remains open.
 
-## Evidence boundary
+## Scope and evidence
 
-The [official Stardust guide](https://superluminal.tv/user-guide) describes a
-Turbulence node as smooth noise that can affect particle position, color and
-size. It names Normal, Spherical/Spherical 2, Axis/One side axis, axis choice,
-all-particle or feathered-sphere influence, randomized amount, a zero-to-max
-life graph, and noise scale/levels/amplitude/frequency/speed/evolution/offset.
-The local parameter inventory records the public labels and fresh values in
-`artifacts/reference/stardust_effect_parameters.txt`; it records default popup
-values, not the full menu strings. These sources define visible scope only; they
-do not establish the private implementation or exact numerical behavior.
+The reference screenshots establish the visible control labels and popup
+choices. The owner has confirmed that the two Spherical modes can wait. This
+stage therefore registers one independent Turbulence node and does not expose
+those two modes. It retains the screenshot's axis, Infinite/Sphere, All/Noise,
+Over Life, and noise parameter controls.
 
-## Independent numeric foundation
+The screenshots do not define numerical equations, ranges, or the meaning of
+every offset. The mappings below are explicit implementation choices so the
+node is connected end to end. They are not claims about Stardust's private
+implementation. Manual AE2023 review can refine them without changing the
+native node identity or Core ABI.
 
-`TurbulenceNoise` provides deterministic, allocation-free 3D gradient noise with
-quintic interpolation and a normalized multi-octave sum. Each output channel has
-an independent hash domain. Valid inputs always yield finite values in [-1, 1];
-invalid coordinates, frequency, or octave counts fail without changing output.
-The field is a pure function of coordinate, seed, octave count and frequency, so
-random frame order and render-thread scheduling cannot change a sample.
+## Core field and graph order
 
-The initial kernel bounds coordinates to ±1e9, base frequency to (0, 1024], and
-octaves to 1..8. Its values are implementation primitives, not Stardust units.
-The public controls' conversion into coordinate/frequency/time is deliberately
-left to the graph/AE adapter contract and must be recorded before authoring.
+The independent noise kernel is deterministic, allocation-free 3D gradient
+noise with bounded octave count and finite output. Turbulence is a particle
+stream node. It evaluates in upstream-to-downstream edge order, per route, and
+keeps sibling fan-out results isolated. Native time-varying controls are sampled
+at the requested frame. No particle snapshot or Render ABI fields were added.
 
-## Open author/evaluation decisions
+Available modes:
 
-- Confirm the full visible enum labels/order for Turbulence Type, Choose Axis,
-  Turbulence Affect and Affected Properties from the reference UI before fixing
-  public popup values or native stream bindings.
-- Define Position/Scale/Color/Opacity/Rotation/Noise output application and units.
-  The guide names the effects but does not give numeric equations or ranges.
-- Define Normal, Spherical, Spherical 2, Axis and One side axis mappings from
-  visible examples; do not infer that a guessed popup ordinal proves the mapping.
-- Define feathered-sphere distance, spatial scale/frequency conversion, temporal
-  evolution and Fractal Speed, per-particle randomization, and Over Life curve
-  interpolation while preserving arbitrary-time determinism.
-- Integrate the new type through graph validation/evaluation, branch-local
-  upstream-to-downstream ordering, history, native stream bindings, CEP/presets,
-  schema, build and paired deployment. Do not reuse the Force node identity or
-  present an inert node as implemented.
-- Keep evaluation work bounded by existing graph/render budgets and test repeat,
-  reverse-time, animation, multiple branches, Auxiliary inheritance and invalid
-  resource/value paths before AE qualification.
+- **Normal** applies three independent noise channels to XYZ.
+- **Axis** applies one noise channel along the selected X, Y, Z, or Normal axis.
+- **One Side** uses the selected axis and clamps the noise displacement to the
+  positive direction.
 
-## Initial evidence
+For the **Normal** axis option, this implementation uses the particle's current
+velocity direction and falls back to +Z when velocity is zero. Treat that as a
+qualification hypothesis until the owner exercises it in AE.
 
-`RunTurbulenceNoiseTests.ps1 -Run` and `-Run -Sanitize` each pass 21,411 checks.
-They cover deterministic seeds/channels, the full octave range, amplitude bounds,
-continuity across lattice boundaries, nearby samples, input rejection, atomic
-output preservation, and reversed query order. These tests validate only the
-numeric kernel; they do not establish node behavior or AE 2023 compatibility.
+Noise is sampled from particle position relative to the origin, plus offset and
+time drift. Seed identity includes the render seed, particle identity, and node
+identity. The optional Sphere affect uses distance from the origin and a
+smoothstep feather. The reference confirms a feathered sphere control but not
+its exact falloff curve.
+
+## Parameter behavior in this stage
+
+AE pixel positions, offsets, amplitude, and sphere size convert to Core world
+units using layer height; pixel aspect is applied on X. Noise Scale is a
+percentage, with 100 leaving coordinates unchanged. Noise Frequency,
+Fractal Speed, and Fractal Evolution are used directly by the Core field.
+Fractal Evolution adds a coordinate phase in degrees. Randomize applies a
+stable per-particle attenuation from 1 down to `1 - percent / 100`.
+Over Life multiplies the field by a 0–100 curve.
+
+**All** applies the current field to position, particle size, color, opacity,
+and rotation using the Core equations. **Noise** stores the sampled vector on
+the particle for later graph consumers. The current renderer has no separate
+noise consumer, so Noise mode does not change the rendered image by itself.
+The control remains available as the staged graph output contract; this limit
+must be stated in the UI or removed before a customer release if no consumer is
+added.
+
+Offsets and affected-property equations are provisional implementation
+choices because the supplied reference does not specify their arithmetic or
+units. These values and the Noise-only behavior are part of manual acceptance,
+not verified Stardust parity.
+
+## Native and CEP contract
+
+`org.starfieldfx.node.turbulence` is native kind 8, schema 1, PiPL resource
+16017, and binding record version 11. It owns control streams 1–153 and disk
+IDs recorded in `schema/node-parameters.json`. The Over Life curve occupies
+streams 13–142 and disk IDs 4300–4363 for ages, 4400–4463 for values, with
+1813/1814 for count/interpolation. Noise and sphere controls occupy 143–153.
+Older binding readers remain unchanged; Turbulence records require version 11.
+
+The CEP canvas, inspector, curve editor, preset graph defaults, native record
+validation, and ExtendScript read/write paths use the same graph keys. Both
+Spherical choices are rejected by validation and absent from the native and
+panel menus. Graph origin defaults to the layer center in canonical Core world
+coordinates.
+
+The gateway stores pixel-valued Noise Amplitude and Sphere size as values
+relative to the target layer height. New-node defaults must use the same graph
+units before the gateway writes them back to AE controls. The CEP planner now
+normalizes both defaults at node creation; otherwise a 2160-pixel layer turned
+the displayed amplitude default of 50 into an invalid AE value of 108000.
+
+The native binding record is sparse for the Over Life curve. Capture always
+stores its point count, but stores interpolation and age/value streams only when
+the count is nonzero, and stores only the active points. The decoder requires
+the controls read by Turbulence evaluation plus those active curve fields; it
+must not require the unused point bank or interpolation stream for an empty
+curve. This fixes new-node rejection at `decode binding record` without changing
+binding record version11, parameter IDs, or Core ABI9.
+
+## Qualification boundary
+
+Core noise/graph fixtures were run earlier in this M3-19 task; no test suite or
+automatic AE acceptance was run during the noise-amplitude repair. The May2023
+x64 SDK build and paired installation hash checks completed. AE2023 behavior,
+control persistence, animated controls, curve edits, menu mapping, Noise output,
+and each available mode remain for owner-led manual qualification. The
+high-node-count deletion warning remains deferred as requested.

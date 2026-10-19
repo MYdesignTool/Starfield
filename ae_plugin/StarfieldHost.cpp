@@ -8,6 +8,7 @@
 #include "PresetFileHost.hpp"
 #include "UiExclusionHost.hpp"
 #include "GraphCommitRequest.hpp"
+#include "GraphRepairRequest.hpp"
 #include "Parameters.hpp"
 #include <algorithm>
 #include <chrono>
@@ -29,6 +30,7 @@ AEGP_Command model_asset_command{};
 AEGP_Command model_transaction_command{};
 AEGP_Command preset_file_command{};
 AEGP_Command graph_commit_command{};
+AEGP_Command graph_repair_command{};
 bool graph_commit_running{};
 constexpr char reveal_name[]="Starfield Reveal Selected Effect";
 template<class T> struct Suite {
@@ -45,7 +47,7 @@ bool starfield_effect(const char* match) noexcept {
         !std::strcmp(match,"org.starfieldfx.node.emitter") || !std::strcmp(match,"org.starfieldfx.node.particle") ||
         !std::strcmp(match,"org.starfieldfx.node.force") || !std::strcmp(match,"org.starfieldfx.node.transform") ||
         !std::strcmp(match,"org.starfieldfx.node.model") || !std::strcmp(match,"org.starfieldfx.node.material") ||
-        !std::strcmp(match,"org.starfieldfx.node.motion");
+        !std::strcmp(match,"org.starfieldfx.node.motion") || !std::strcmp(match,"org.starfieldfx.node.turbulence");
 }
 A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
@@ -112,8 +114,37 @@ A_Err reveal_menu(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexc
     if(commands && model_transaction_command)(void)commands->AEGP_EnableCommand(model_transaction_command);
     if(commands && preset_file_command)(void)commands->AEGP_EnableCommand(preset_file_command);
     if(commands && graph_commit_command)(void)commands->AEGP_EnableCommand(graph_commit_command);
+    if(commands && graph_repair_command)(void)commands->AEGP_EnableCommand(graph_repair_command);
     return commands && reveal_command?commands->AEGP_EnableCommand(reveal_command):A_Err_NONE;
 }
+A_Err repair_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
+    AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
+    using namespace starfield::adapter;
+    if(command!=graph_repair_command)return A_Err_NONE;
+    if(handled)*handled=TRUE;
+    if(stopped || graph_commit_running || std::this_thread::get_id()!=main_thread)return A_Err_GENERIC;
+    HostUiExclusion exclusion;if(!exclusion)return A_Err_GENERIC;
+    graph_commit_running=true;struct Running{~Running(){graph_commit_running=false;}} running_scope;
+    Suite<AEGP_LayerSuite9> layers(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
+    Suite<AEGP_EffectSuite4> effects(kAEGPEffectSuite,kAEGPEffectSuiteVersion4);
+    Suite<AEGP_UtilitySuite6> utility(kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
+    if(!layers || !effects || !utility)return A_Err_GENERIC;
+    AEGP_LayerH layer{};auto error=layers->AEGP_GetActiveLayer(&layer);
+    if(error || !layer){utility->AEGP_ReportInfo(plugin_id,"Select the original Starfield layer before Repair Selected Graph.");return error?error:A_Err_GENERIC;}
+    A_long count{};error=effects->AEGP_GetLayerNumEffects(layer,&count);if(error || count<1 || count>4224)return error?error:A_Err_GENERIC;
+    AEGP_EffectRefH renderer{};struct Ref{const AEGP_EffectSuite4* s;AEGP_EffectRefH& r;~Ref(){if(r)s->AEGP_DisposeEffect(r);}} held{effects.value,renderer};
+    for(A_long i=0;i<count;++i){AEGP_EffectRefH fx{};error=effects->AEGP_GetLayerEffectByIndex(plugin_id,layer,i,&fx);
+        Ref owned{effects.value,fx};if(error || !fx)return error?error:A_Err_GENERIC;
+        AEGP_InstalledEffectKey key{};char match[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+        error=effects->AEGP_GetInstalledKeyFromLayerEffect(fx,&key);if(!error)error=effects->AEGP_GetEffectMatchName(key,match);if(error)return error;
+        if(!std::strcmp(match,"org.starfieldfx.particle")){if(renderer)return A_Err_GENERIC;renderer=fx;fx=nullptr;}
+    }
+    if(!renderer)return A_Err_GENERIC;
+    GraphRepairRequest request;request.plugin=plugin_id;request.layer=layer;const A_Time zero{0,1};
+    error=effects->AEGP_EffectCallGeneric(plugin_id,renderer,&zero,PF_Cmd_COMPLETELY_GENERAL,&request);
+    if(request.message[0])utility->AEGP_ReportInfo(plugin_id,request.message);
+    return error?error:request.acknowledged?static_cast<A_Err>(request.status):A_Err_GENERIC;
+}catch(...){return A_Err_GENERIC;}
 // One synchronous gateway transaction owns guard=1. Search the project rather
 // than AE selection (native backups may change selection). Never select the first
 // of ambiguous requests, and never execute ExtendScript from this command.
@@ -122,7 +153,7 @@ A_Err commit_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
     using namespace starfield::adapter;
     if(command!=graph_commit_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
-    if(stopped || graph_commit_running || std::this_thread::get_id()!=main_thread)return A_Err_GENERIC;
+    if(stopped || graph_commit_running || SFLD_SourceUiExclusionActiveV1() || std::this_thread::get_id()!=main_thread)return A_Err_GENERIC;
     graph_commit_running=true;
     struct RunningScope{~RunningScope(){graph_commit_running=false;}} running_scope;
     // Model execution already holds the exclusion. Otherwise this scope keeps
@@ -172,8 +203,13 @@ A_Err commit_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
                     if(number(effect,kGraphSyncGuardId,time,guard))return A_Err_GENERIC;
                     if(guard!=1)continue;
                     if(number(effect,kGraphEditCommitId,time,nonce) || number(effect,kGraphEditReceiptId,time,receipt))return A_Err_GENERIC;
-                    if(nonce==receipt)continue; // A repeated command never republishes.
-                    if(nonce<1 || nonce>1000000 || std::floor(nonce)!=nonce || request.renderer)return A_Err_GENERIC;
+                    if(nonce==receipt)continue; // Idle or already published.
+                    if(nonce<1 || nonce>1000000 || std::floor(nonce)!=nonce)return A_Err_GENERIC;
+                    // Rejection also ends this nonce. A failed rollback may
+                    // retain guard=1; it must not poison another renderer's
+                    // command or be implicitly retried/unlocked by this scan.
+                    if(receipt==-nonce)continue;
+                    if(request.renderer)return A_Err_GENERIC;
                     request.renderer=effect;effect=nullptr;request.layer=layer;request.nonce=static_cast<A_long>(nonce);request_time=time;
                 }
             }
@@ -312,7 +348,11 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
        !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_commit_command,commit_node_graph,nullptr) &&
        !commands->AEGP_InsertMenuCommand(graph_commit_command,starfield::adapter::graph_commit_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
         (void)commands->AEGP_EnableCommand(graph_commit_command);
-    if(!error && commands && (reveal_command || model_asset_command || model_transaction_command || preset_file_command || graph_commit_command))
+    if(!error && commands && !commands->AEGP_GetUniqueCommand(&graph_repair_command) &&
+       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_repair_command,repair_node_graph,nullptr) &&
+       !commands->AEGP_InsertMenuCommand(graph_repair_command,starfield::adapter::graph_repair_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
+        (void)commands->AEGP_EnableCommand(graph_repair_command);
+    if(!error && commands && (reveal_command || model_asset_command || model_transaction_command || preset_file_command || graph_commit_command || graph_repair_command))
         (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;
 }

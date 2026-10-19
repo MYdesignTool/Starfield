@@ -1,15 +1,24 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 const assert=require("node:assert/strict"), fs=require("node:fs"), vm=require("node:vm"), path=require("node:path");
-const edits=require("../cep_panel/js/graph_edits.js"), view=require("../cep_panel/js/graph_view.js");
-const snapshot=require("../cep_panel/js/native_graph_snapshot.js"), codec=require("../cep_panel/js/graph_codec.js");
+const edits=require(panelPath("js/graph_edits.js")), view=require(panelPath("js/graph_view.js"));
+const snapshot=require(panelPath("js/native_graph_snapshot.js")), codec=require(panelPath("js/graph_codec.js"));
 const uuid=n=>n.toString(16).padStart(32,"0");let next=10;
 const output={id:uuid(255),type:edits.types.output,schemaVersion:4,parameters:[{key:"1",type:3,value:1000000},{key:"7",type:3,value:30}]};
 assert.equal(edits.types.appearance,undefined,"Appearance is not registered as a node");
-assert.ok(!fs.readFileSync(path.join(__dirname,"../cep_panel/index.html"),"utf8").includes('data-node-type="appearance"'),"Appearance has no creation action");
+assert.ok(!fs.readFileSync(panelPath("index.html"),"utf8").includes('data-node-type="appearance"'),"Appearance has no creation action");
+assert.ok(fs.readFileSync(panelPath("index.html"),"utf8").includes('title="Material · drag onto graph"'),"Material tooltip uses the intended separator");
 let graph={version:1,nodes:[output],edges:[],optionalRecords:[]};
 const add=kind=>{graph=edits.apply(graph,{type:"addNode",nodeType:kind},()=>uuid(next++));return graph.nodes[graph.nodes.length-1];};
 const emitter=add("emitter"), particle=add("particle"), auxiliary=add("auxiliary"), child=add("particle");
-assert.equal(auxiliary.schemaVersion,6);
+const turbulenceGraph=edits.apply(graph,{type:"addNode",nodeType:"turbulence",layerHeightPixels:2160},()=>uuid(200));
+const turbulence=turbulenceGraph.nodes.find(n=>n.id===uuid(200));
+assert.equal(turbulence.parameters.find(p=>p.key==="8").value,0,"new Turbulence defaults to Core Normal");
+assert.equal(turbulence.parameters.find(p=>p.key==="2").value,50/2160,"Noise Amplitude default keeps pixel units");
+const turbulenceMode=view.project(turbulenceGraph,null,{width:3840,height:2160,pixelAspect:1}).nodes.find(n=>n.id===uuid(200)).params.find(p=>p.graphKey==="8");
+assert.equal(turbulenceMode.value,1,"Normal is the first displayed popup choice");
+assert.equal(view.parameterToGraphValue(turbulenceMode,1),0,"Normal popup round trips to Core zero");
+assert.equal(auxiliary.schemaVersion,7);
 assert.equal(emitter.parameters.find(p=>p.key==="17").value,1,"Uniform is the default");
 assert.equal(auxiliary.parameters.find(p=>p.key==="23").value,0,"Auxiliary uses independent Emitting timing");
 assert.deepEqual(view.project(graph,null,{width:3840,height:2160,pixelAspect:1}).nodes.find(n=>n.id===particle.id).params.slice(0,5).map(p=>p.label),
@@ -40,10 +49,10 @@ const unique=(values,label)=>assert.equal(new Set(values).size,values.length,lab
 unique(manifest.parameters.map(p=>p.id),"Main public stream IDs");
 unique(manifest.parameters.map(p=>p.key),"Main public parameter keys");
 const binding=manifest.nativeRenderBindings;
-const registeredIndices=manifest.parameters.map(p=>p.id).concat(manifest.topics.flatMap(t=>[t.index,t.endIndex]),
+const registeredIndices=manifest.parameters.map(p=>p.index===undefined?p.id:p.index).concat(manifest.topics.flatMap(t=>[t.index,t.endIndex]),
     Array.from({length:binding.count},(_,i)=>binding.firstIndex+i));
 unique(registeredIndices,"Main registered indices including topics and aliases");
-assert.deepEqual(registeredIndices.slice().sort((a,b)=>a-b),Array.from({length:615},(_,i)=>i+1),
+assert.deepEqual(registeredIndices.slice().sort((a,b)=>a-b),Array.from({length:625},(_,i)=>i+1),
     "The manifest describes each current main parameter exactly once");
 unique(manifest.parameters.map(p=>p.diskId===undefined?p.id:p.diskId).concat(
     manifest.topics.flatMap(t=>[t.diskId,t.endDiskId]),Array.from({length:binding.count},(_,i)=>binding.firstDiskId+i)),
@@ -63,14 +72,15 @@ assert.equal(projected.nodes.find(n=>n.id===particle.id).params.find(p=>p.graphK
 assert.equal(view.activeEmitterParameters(graph),null,"never present an inaccurate auxiliary live count");
 const changed=edits.apply(graph,{type:"setParameters",changes:[{nodeId:auxiliary.id,parameterKey:"31",valueType:3,value:0}]});
 assert.equal(changed.edges.some(e=>e.destinationNode===auxiliary.id),false,"disabling Auxiliary source disconnects parent stream in same transaction");
-const transactions=require("../cep_panel/js/graph_transactions.js");
+const transactions=require(panelPath("js/graph_transactions.js"));
+const receipt=require("./native_snapshot_fixture.js").receipt;
 const base={initialized:true,graphHex:codec.toHex(graph),geometry:{width:3840,height:2160,pixelAspect:1},revision:1};
 let addedGraph,transactionResult;
 const client=transactions.create({codec,edits,idFactory:()=>uuid(next++),call(operation,fields,callback){
-    if(operation==="getGraphSnapshot") callback({ok:true,snapshot:base});
+    if(operation==="getGraphSnapshot") callback(receipt({ok:true,snapshot:base}));
     else {
         addedGraph=codec.fromHex(fields.graphHex);
-        callback({ok:true,snapshot:{initialized:true,revision:2,graphHex:fields.graphHex}});
+        callback(receipt({ok:true,snapshot:{initialized:true,revision:2,graphHex:fields.graphHex}}));
     }
 }});
 client.apply({type:"addNode",nodeType:"emitter"},result=>{transactionResult=result;});
@@ -97,10 +107,14 @@ for(const [index,name] of [[39,"Graph Revision"],[40,"Panel Graph Sync Guard"],[
 const items=[main,first,second], previouslySelected={selected:true};
 const layer={id:29,name:"Layer",selected:true,selectedProperties:[previouslySelected],property(){return {numProperties:items.length,property:i=>items[i-1]};}};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:17,name:"Comp",numLayers:1,layer:()=>layer});
-const host={};vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../cep_panel/jsx/starfield_gateway.jsx"),"utf8"),{$:{global:host},CompItem,
-    app:{project:{activeItem:comp,rootFolder:{id:5}},beginUndoGroup(){undo++;},endUndoGroup(){undo++;}}});
+layer.containingComp=comp;comp.selectedLayers=[layer];
+const host={};vm.runInNewContext(fs.readFileSync(panelPath("jsx/starfield_gateway.jsx"),"utf8"),{$:{global:host},CompItem,
+    app:{project:{activeItem:comp,rootFolder:{id:5},numItems:1,item:()=>comp},
+        findMenuCommandId:name=>name==="Starfield Reveal Selected Effect"?1:0,executeCommand(){},
+        beginUndoGroup(){undo++;},endUndoGroup(){undo++;}}});
 const select=(nodeId,token="p5-c17-l29")=>JSON.parse(host.SFLD_selectNodeEffect(JSON.stringify({protocol:"org.starfieldfx.panel",version:1,operation:"selectNodeEffect",nodeId,target:{token}})));
-assert.equal(select(auxiliary.id).ok,true);assert.equal(second.selected,true);assert.equal(first.selected,false);
+const selectedAuxiliary=select(auxiliary.id);
+assert.equal(selectedAuxiliary.ok,true,JSON.stringify(selectedAuxiliary));assert.equal(second.selected,true);assert.equal(first.selected,false);
 assert.equal(previouslySelected.selected,false);assert.equal(select(output.id).ok,true);assert.equal(main.selected,true);
 items.reverse();assert.equal(select(emitter.id).ok,true,"effect reorder keeps UUID selection");
 assert.equal(select(uuid(100)).error.code,"missing_node");assert.equal(select(emitter.id,"stale").error.code,"stale_target");

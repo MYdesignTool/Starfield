@@ -14,20 +14,37 @@ const project=()=>view.project(g,null,{width:1920,height:1080,pixelAspect:1}).no
 let node=project();eq(node.kind,"motion");eq(node.inputPort,"1");eq(node.outputPort,"2");
 eq(node.params.map(p=>p.label),["Motion Type","Origin Type","Origin XY","Origin Z","Angle X","Angle Y","Angle Z","Offset X","Offset Y","Offset Z","Speed","Speed Random"]);
 eq(node.params.find(p=>p.label==="Origin Type").choices,["Point","Particle Origin","Emitter Origin"]);
-eq(node.params.find(p=>p.label==="Motion Type").choices,["Circle"]);eq(node.params.find(p=>p.label==="Speed").value,100);
+eq(node.params.find(p=>p.label==="Motion Type").choices,["Circle","Light Path","Look At"]);eq(node.params.find(p=>p.label==="Speed").value,100);
 eq(node.params.find(p=>p.label==="Origin XY").value,[960,540]);eq(node.curves.size.points,[{age:0,value:100},{age:1,value:100}]);
 const speed=node.params.find(p=>p.label==="Speed");eq(view.parameterToGraphValue(speed,50),Math.PI);
 eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Origin XY"),[2040,540]),[1,0,0]);
 eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Angle X"),30),[-30,0,0]);
 eq(view.parameterToGraphValue(node.params.find(p=>p.label==="Offset Y"),540),[0,-.5,0]);
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"1",valueType:3,value:0}]},next);
+node=project();eq(node.params.map(p=>p.label),["Motion Type","Starting With","Speed","Speed Random","Max Delay (Seconds)","Delay Random","Orient To Path","After Path"]);
+eq(node.params.find(p=>p.label==="Starting With").placeholder,"All…");
+eq(node.params.find(p=>p.label==="Speed").value,100);eq(node.params.find(p=>p.label==="Max Delay (Seconds)").value,.5);
+eq(node.params.find(p=>p.label==="Delay Random").value,0);
+const prefix=node.params.find(p=>p.label==="Starting With");eq(view.parameterToGraphValue(prefix,"Lamp 火"),"Lamp 火");
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"19",valueType:6,value:"Lamp 火"}]},next);
+eq(g.nodes[2].parameters.find(p=>p.key==="19").value,"Lamp 火");
+const tooLong=codec.fromHex(codec.toHex(g));tooLong.nodes[2].parameters.find(p=>p.key==="19").value="x".repeat(129);
+checks++;assert.throws(()=>edits.nativeRecordSchema(tooLong.nodes[2]),e=>e.code==="invalid_native_node_record");
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"1",valueType:3,value:1}]},next);node=project();
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"1",valueType:3,value:2}]},next);node=project();
+eq(edits.nativeRecordSchema(g.nodes.find(n=>n.id===motion.id)),1);
+eq(node.params.map(p=>p.label),["Motion Type","Starting With"]);
+eq(node.params.find(p=>p.label==="Motion Type").choices,["Circle","Light Path","Look At"]);
+eq(node.params.find(p=>p.label==="Starting With").value,"Lamp 火");
+g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"1",valueType:3,value:1}]},next);node=project();
 const curve=view.encodeCurve([{age:0,value:25},{age:1,value:75}]);
 g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"6",valueType:7,value:curve}]},next);
 eq(project().curves.size.points.map(p=>({age:p.age,value:p.value})),[{age:0,value:25},{age:1,value:75}]);
 g=edits.apply(g,{type:"setParameters",changes:[{nodeId:motion.id,parameterKey:"6",remove:true}]},next);ok(!g.nodes[2].parameters.some(p=>p.key==="6"));
-for(const [key,value,type] of [["1",0,3],["13",3,3],["5",101,4],["4",1e8,4],["14",[32768,0,0],5]]){
+for(const [key,value,type] of [["1",3,3],["13",3,3],["5",101,4],["4",1e8,4],["14",[32768,0,0],5]]){
     const bad=codec.fromHex(codec.toHex(g));bad.nodes[2].parameters.find(p=>p.key===key).value=value;
     checks++;assert.throws(()=>edits.nativeRecordSchema(bad.nodes[2]),e=>e.code==="invalid_native_node_record");}
 eq(codec.toHex(codec.fromHex(codec.toHex(g))),codec.toHex(g));
 g=edits.apply(g,{type:"deleteNodes",nodeIds:[motion.id]},next);eq(g.edges.length,1);
 eq((fs.readFileSync(path.resolve(root,"index.html"),"utf8").match(/data-node-type="motion"/g)||[]).length,2);
-console.log(`Motion panel: ${checks} checks passed; Circle palette/ports/units/origins/curve persistence and removal`);
+console.log(`Motion panel: ${checks} checks passed; Circle/Light Path/Look At modes, UTF-8 prefix, ports, units, origins, curve persistence and removal`);

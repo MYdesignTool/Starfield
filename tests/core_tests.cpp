@@ -171,7 +171,7 @@ GraphNode make_test_emitter(std::uint8_t id) {
     GraphNode node;
     node.id = NodeId{test_uuid(id)};
     node.type_key = kEmitterNode;
-    node.schema_version = 6;
+    node.schema_version = 7;
     node.parameters = {
         {kBirthRate, 30.0},
         {kSeed, std::uint32_t{1}},
@@ -194,7 +194,7 @@ GraphNode make_test_output(std::uint8_t id, std::uint32_t particle_count = 100) 
 
 GraphNode make_test_particle(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 6, {
+    return GraphNode{NodeId{test_uuid(id)}, kParticleNode, 7, {
         {kColorStart, Vec3{1.0, 1.0, 1.0}}, {kColorEnd, Vec3{1.0, 1.0, 1.0}},
         {kSizeStart, 8.0}, {kSizeEnd, 100.0}, {kOpacityStart, 1.0}, {kOpacityEnd, 100.0},
         {kParticleLifetimeSeconds, 2.0}}};
@@ -202,7 +202,7 @@ GraphNode make_test_particle(std::uint8_t id) {
 
 GraphNode make_test_force(std::uint8_t id) {
     using namespace graph_keys;
-    return GraphNode{NodeId{test_uuid(id)}, kForceNode, 2, {
+    return GraphNode{NodeId{test_uuid(id)}, kForceNode, 3, {
         {kGravity, Vec3{}}, {kLinearDrag, 0.0}}};
 }
 
@@ -1966,7 +1966,7 @@ void test_particle_branches_and_ordered_buffer() {
     branch_opacity_curve.points[0] = AgeCurvePoint{0.0, 100.0};
     branch_opacity_curve.points[1] = AgeCurvePoint{0.5, 50.0};
     branch_opacity_curve.points[2] = AgeCurvePoint{1.0, 25.0};
-    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 6, {
+    graph.nodes.push_back(GraphNode{particle_b, kParticleNode, 7, {
         {kColorStart, Vec3{0.0, 1.0, 0.0}}, {kColorEnd, Vec3{0.0, 0.5, 0.0}},
         {kSizeStart, 9.0}, {kSizeEnd, 25.0}, {kOpacityStart, 0.1}, {kOpacityEnd, 25.0},
         {kParticleLifetimeSeconds, 1.0},
@@ -2034,7 +2034,7 @@ void test_particle_branches_and_ordered_buffer() {
     // An active force path that bypasses Particle is rejected explicitly rather
     // than being silently omitted from the rendered graph.
     Graph force_bypass = graph;
-    force_bypass.nodes.push_back(GraphNode{bypass_force, kForceNode, 2, {
+    force_bypass.nodes.push_back(GraphNode{bypass_force, kForceNode, 3, {
         {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
     force_bypass.edges.push_back(GraphEdge{EdgeId{test_uuid(32)}, emitter, kEmitterParticles,
                                            bypass_force, kForceParticlesIn});
@@ -2051,7 +2051,7 @@ void test_particle_branches_and_ordered_buffer() {
     // A disconnected Force can be active through Output beside a valid Particle
     // branch; reject it rather than accepting the graph and silently dropping it.
     Graph orphan_force = graph;
-    orphan_force.nodes.push_back(GraphNode{bypass_force, kForceNode, 2, {
+    orphan_force.nodes.push_back(GraphNode{bypass_force, kForceNode, 3, {
         {kGravity, Vec3{0.0, -1.0, 0.0}}, {kLinearDrag, 0.0}}});
     orphan_force.edges.push_back(GraphEdge{EdgeId{test_uuid(36)}, bypass_force,
                                            kForceParticlesOut, output, kOutputParticles});
@@ -2061,7 +2061,7 @@ void test_particle_branches_and_ordered_buffer() {
     if (!rejected_orphan_force.has_value()) {
         CHECK(rejected_orphan_force.error().code == ErrorCode::invalid_request);
         CHECK(std::strcmp(rejected_orphan_force.error().detail,
-                          "every active Force path must descend from a Particle node") == 0);
+                          "every active particle modifier path must descend from a Particle node") == 0);
     }
 
 }

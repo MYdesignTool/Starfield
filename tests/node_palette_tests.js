@@ -78,7 +78,7 @@ unknown.items.fire("pointerdown",{target:output,pointerId:1,button:0,buttons:1})
 
 const html=fs.readFileSync(path.join(panelRoot,"index.html"),"utf8");
 const paletteMarkup=html.slice(html.indexOf('<aside id="nodePalette"'),html.indexOf('<div id="graphScroll"'));
-assert.deepStrictEqual(Array.from(paletteMarkup.matchAll(/data-node-type="([^"]+)"/g),x=>x[1]),["emitter","auxiliary","particle","force","transform"]);
+assert.deepStrictEqual(Array.from(paletteMarkup.matchAll(/data-node-type="([^"]+)"/g),x=>x[1]),["emitter","auxiliary","particle","force","transform","motion","turbulence","model","material"]);
 assert.ok(html.indexOf("js/node_palette.js")<html.indexOf("js/panel.js"));
 assert.match(html,/aria-controls="nodePaletteItems" aria-expanded="true"/);
-console.log("node_palette_tests passed: five kinds, default expansion, collapse, drop, cancellation, target guards and no movement writes");
+console.log("node_palette_tests passed: current nine kinds, default expansion, collapse, drop, cancellation, target guards and no movement writes");

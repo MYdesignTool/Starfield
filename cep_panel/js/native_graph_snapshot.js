@@ -55,7 +55,7 @@
             snapshot.checksumMatches = checksum === snapshot.checksum; // diagnostic; decimal JSON may round doubles
             return response;
         } catch (error) {
-            return {ok:false,error:{code:error.code || "invalid_native_node_record",
+            return {ok:false,target:response.target,error:{code:error.code || "invalid_native_node_record",
                 message:error.message || String(error)}};
         }
     }

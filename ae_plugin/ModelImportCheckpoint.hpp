@@ -14,6 +14,8 @@ struct ModelImportCheckpoint {
     std::array<double,101> numbers{};
     core::OpaqueBytes mesh;
 };
-[[nodiscard]] PF_Err capture_model_import_checkpoint(PF_InData*,ModelImportCheckpoint&) noexcept;
+struct ModelImportDiagnostic { const char* stage{"context"}; A_long stream{-1},count{}; };
+[[nodiscard]] PF_Err capture_model_import_checkpoint(PF_InData*,ModelImportCheckpoint&,ModelImportDiagnostic* diagnostic=nullptr,
+    const std::array<std::uint16_t,8>* identity=nullptr) noexcept;
 [[nodiscard]] PF_Err validate_model_import_checkpoint(PF_InData*,const ModelImportCheckpoint&) noexcept;
 }

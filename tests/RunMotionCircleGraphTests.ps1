@@ -4,7 +4,7 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskDir=if($Sanitize){'artifacts\motion-circle-graph-asan'}else{'artifacts\motion-circle-graph-tests'}
 if(-not $Run){Write-Host 'Report: build/run Circle graph, history and renderer fixture with MSVC /MT. Add -Run to act.';exit 0}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','EmitterHistory',
+$taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','CpuRenderer','SpriteScene',
     'ModelGeometry','ModelResources','ModelScene','MotionGeometry','MotionPathTravel') | ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo

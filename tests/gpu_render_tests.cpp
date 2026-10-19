@@ -34,12 +34,12 @@ namespace starfield::adapter {
 CoreGeneration::CoreGeneration(void* m,SfCoreApi api,std::uint64_t id,std::wstring p) noexcept:module_(m),api_(api),cache_identity_(id),path_(std::move(p)) {}
 CoreGeneration::~CoreGeneration() noexcept = default;
 CoreLoadResult acquire_core() noexcept {
-    SfCoreApi api{};StarfieldCore_GetApi(3,sizeof(api),&api);
+    SfCoreApi api{};StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api);
     return {std::make_shared<CoreGeneration>(nullptr,api,42,L"standalone test Core"),{},false};
 }
 PF_Err checkout_render_graph(PF_InData*,PF_OutData*,std::shared_ptr<const core::Graph>& g,A_long*,A_long,A_long) noexcept {g=smart_graph;return 0;}
 PF_Err capture_emitter_origin_history(PF_InData*,PF_OutData*,core::Graph&,A_long,A_long,const core::Cancellation&) noexcept {return 0;}
-PF_Err capture_camera(PF_InData*,SfCoreRenderRequest& r) noexcept {r.camera_enabled=0;return 0;}
+PF_Err capture_camera(PF_InData*,SfCoreRenderRequest& r,const PF_InData*) noexcept {r.camera_enabled=0;return 0;}
 void record_render_geometry(A_long,A_long,A_long,A_long,A_long,A_long,A_long,A_long) noexcept {}
 }
 namespace {
@@ -160,6 +160,9 @@ core::RenderRequest request(unsigned shape,bool camera) {
     set(graph.nodes[1],core::graph_keys::kParticleAngles,core::Vec3{10,5,31});
     set(graph.nodes[1],core::graph_keys::kUpAxis,std::uint32_t{2});
     set(graph.nodes[1],core::graph_keys::kParticleFeather,25.);
+    // This fake SmartFX host has no composition shutter suites. The driver
+    // parity scope exercises the single-frame GPU path explicitly.
+    set(graph.nodes.back(),core::graph_keys::kMotionBlur,std::uint32_t{0});
     core::RenderRequest r;r.settings=core::validate_settings(settings);
     r.graph=std::make_shared<const core::Graph>(std::move(graph));
     r.frame={64,48,64,48,{8,6,48,37},{1,1},{1,30},core::PixelFormat::rgba32f,core::ColorSpace::ae_working_space,core::AlphaMode::straight,1.,core::Quality::full};
@@ -177,8 +180,8 @@ SfCoreGpuSceneResult view(const core::SpriteScene& s) {
     v.sprites=s.sprites.data();v.tile_offsets=s.offsets.data();v.tile_indices=s.indices.data();return v;
 }
 void test_scene_api() {
-    SfCoreApi api{};check(!StarfieldCore_GetApi(2,sizeof(api),&api),"ABI 2 rejected after typed scene API addition");
-    check(StarfieldCore_GetApi(3,sizeof(api),&api)==1 && api.prepare_gpu_scene && api.release_gpu_scene,"ABI 3 requires full CPU/scene API");
+    SfCoreApi api{};check(!StarfieldCore_GetApi(3,sizeof(api),&api),"ABI 3 rejected after shared sprite basis addition");
+    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1 && api.prepare_gpu_scene && api.release_gpu_scene,"current ABI requires full CPU/scene API");
     auto r=request(2,true);const auto bytes=core::serialize_graph(*r.graph,core::particle_node_registry()).value();
     SfCoreRenderRequest input{};input.struct_size=sizeof(input);input.graph_bytes=bytes.data();input.graph_byte_count=bytes.size();
     input.frame={64,48,64,48,{8,6,48,37},1,1,1,30,2,0,0,1,1};
@@ -234,7 +237,7 @@ PF_Err checkout_metadata(PF_ProgPtr,PF_ParamIndex index,A_long id,const PF_Rende
     check(index==0 && (id==0 || (id==1 && req->rect.left==req->rect.right)),"SmartFX main geometry or node input request");
     result->result_rect=req->rect;result->max_result_rect={0,0,64,48};result->ref_width=64;result->ref_height=48;result->par={1,1};return 0;
 }
-PF_Err mix_guid(PF_ProgPtr,A_u_long size,const void*) {check(size==8,"immutable Core generation mixed into cache key");return 0;}
+PF_Err mix_guid(PF_ProgPtr,A_u_long size,const void*) {check(size==8 || size==16,"immutable Core generation and exposure mixed into cache key");return 0;}
 PF_Err checkout_input(PF_ProgPtr,A_long,PF_EffectWorld** value) {++input_checkouts;*value=node_input_world;return 0;}
 PF_Err checkin_input(PF_ProgPtr,A_long) {++input_checkins;return 0;}
 PF_Err checkout_output(PF_ProgPtr,PF_EffectWorld** value) {check(input_checkouts>input_checkins,"input checkout precedes output");*value=smart_world;return 0;}
@@ -402,6 +405,7 @@ void test_backend(PF_GPU_Framework framework) {
 }
 }
 int main() {
+    std::setvbuf(stdout,nullptr,_IONBF,0);
     static_assert(sizeof(SfGpuSprite)==80);
     auto* report=std::fopen("artifacts/gpu-tests/timings.csv","w");if(report){std::fputs("framework,sprites,prepare_ms,dispatch_ms,total_ms,cpu_ms\n",report);std::fclose(report);}
     test_scene_api();

@@ -51,7 +51,8 @@ public:
     NativeBindingTransaction& operator=(const NativeBindingTransaction&) = delete;
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
                    const char** failed_stage = nullptr, A_long* failed_parameter = nullptr,
-                   const core::Graph* previous_graph = nullptr,bool force_refresh=false) noexcept;
+                   const core::Graph* previous_graph = nullptr,bool force_refresh=false,
+                   bool rebuild_disabled=false) noexcept;
     // Only after the new graph is saved/read back, before removing old sources.
     // Failure leaves rollback armed; an in-flight old graph sees a finite base.
     PF_Err retire_after_publication(A_long* failed_stream = nullptr,
@@ -64,11 +65,13 @@ private:
 };
 
 // Render-safe: checks out owned numeric inputs; never calls an AEGP suite.
+struct NativeBindingFailure {core::NodeId node{};A_long parameter{-1},component{-1};};
 [[nodiscard]] PF_Err sample_native_node_animation(PF_InData*, core::Graph&,
                                                   A_long width, A_long height,
                                                   A_long* failed_stream = nullptr,
                                                   const char** failed_stage = nullptr,
-                                                  const core::NodeId* node_filter = nullptr) noexcept;
+                                                  const core::NodeId* node_filter = nullptr,
+                                                  NativeBindingFailure* failure = nullptr) noexcept;
 
 // Reads per-node records from sibling hidden node effects on the supervised
 // edit path. It must never be called from SmartFX pre-render or render.

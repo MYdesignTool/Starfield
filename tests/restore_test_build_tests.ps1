@@ -9,7 +9,7 @@ foreach($taskScript in @('Deploy-TestBuild.ps1','Restore-TestBuild.ps1')) {
 $taskPluginDir=Join-Path $taskRoot 'artifacts\deploy-test\host'
 $taskBundle=Join-Path $taskRoot 'dist'
 New-Item -ItemType Directory -Path $taskPluginDir,$taskBundle -Force | Out-Null
-$taskNames=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldAppearance.aex','StarfieldForce.aex','StarfieldCore.dll')
+$taskNames=@('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldHost.aex','StarfieldCore.dll')
 $taskPrior=@{}
 foreach($taskName in $taskNames) {
     $taskKind=if($taskName -eq 'StarfieldCore.dll') {'core-dll'} else {'plugin'}
@@ -41,4 +41,4 @@ if([IO.File]::ReadAllText($taskTarget) -ne 'old panel' -or
 foreach($taskName in $taskNames) {
     if((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskName)).Hash -ne $taskPrior[$taskName]) {throw 'Previous bundle hash was not restored.'}
 }
-Write-Host 'Paired rollback report, changed-source rejection, candidate retention and six restored bundle hashes passed.'
+Write-Host 'Paired rollback report, changed-source rejection, candidate retention and seven restored bundle hashes passed.'

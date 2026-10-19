@@ -1,6 +1,8 @@
 #include "NativeTemporalUI.hpp"
 #include "NativeTemporalCache.hpp"
 #include "GraphParameter.hpp"
+#include "UiExclusionClient.hpp"
+#include "Parameters.hpp"
 #include "SPBasic.h"
 #include <algorithm>
 #include <chrono>
@@ -73,6 +75,8 @@ void refresh_native_temporal_ui(PF_InData* data,PF_ParamDef* params[],
     if(refreshing || !event || event->e_type!=PF_Event_DRAW || !data || !data->effect_ref || !data->pica_basicP ||
         !params || data->num_params<=kGraphParameterId || !params[kGraphParameterId] ||
         params[kGraphParameterId]->param_type!=PF_Param_ARBITRARY_DATA || !plugin_id)return;
+    if(ui_transaction_active() || data->num_params<=kGraphSyncGuardId || !params[kGraphSyncGuardId] ||
+        params[kGraphSyncGuardId]->param_type!=PF_Param_FLOAT_SLIDER || params[kGraphSyncGuardId]->u.fs_d.value!=0)return;
     std::optional<PF_State> old;
     {std::lock_guard lock(ui_mutex);
         if(ui_thread!=std::this_thread::get_id())return; // Before any SDK operation.

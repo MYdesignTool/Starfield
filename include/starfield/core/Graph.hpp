@@ -193,6 +193,7 @@ inline constexpr const char* kParticleNode = "org.starfieldfx.nodes.particle";
 inline constexpr const char* kForceNode = "org.starfieldfx.nodes.force";
 inline constexpr const char* kTransformNode = "org.starfieldfx.nodes.transform";
 inline constexpr const char* kMotionNode = "org.starfieldfx.nodes.motion";
+inline constexpr const char* kTurbulenceNode = "org.starfieldfx.nodes.turbulence";
 inline constexpr const char* kModelNode = "org.starfieldfx.nodes.model";
 inline constexpr const char* kModelStream = "org.starfieldfx.types.model-stream";
 inline constexpr const char* kMaterialNode = "org.starfieldfx.nodes.material";
@@ -214,12 +215,30 @@ inline constexpr PortKey kForceParticlesIn{1};
 inline constexpr PortKey kForceParticlesOut{2};
 inline constexpr PortKey kTransformParticlesIn{1},kTransformParticlesOut{2};
 inline constexpr PortKey kMotionParticlesIn{1},kMotionParticlesOut{2};
+inline constexpr PortKey kTurbulenceParticlesIn{1},kTurbulenceParticlesOut{2};
+// Canonical Core units: world-space displacement, cycles per world unit, and
+// world units/second for temporal drift. The AE adapter owns visible-unit mapping.
+inline constexpr ParameterKey kTurbulenceOrigin{1},kTurbulenceAmplitude{2},kTurbulenceFrequency{3},
+    kTurbulenceLevels{4},kTurbulenceEvolutionSpeed{5},kTurbulenceOffset{6},kTurbulenceOverLife{7};
+inline constexpr ParameterKey kTurbulenceMode{8},kTurbulenceAxis{9};
+inline constexpr ParameterKey kTurbulenceAffect{10},kTurbulenceSphereSize{11},kTurbulenceSphereFeather{12},
+    kTurbulenceRandomize{13};
+inline constexpr ParameterKey kTurbulenceProperties{14},kTurbulencePositionOffset{15},
+    kTurbulenceScaleOffset{16},kTurbulenceColorOffset{17},kTurbulenceOpacityOffset{18},
+    kTurbulenceRotationOffset{19},kTurbulenceNoiseScale{20},kTurbulenceEvolution{21};
+enum class TurbulenceMode : std::uint32_t { normal=0, spherical=1, spherical2=2, axis=3, one_side_axis=4 };
+enum class TurbulenceAffect : std::uint32_t { all_particles=0, feathered_sphere=1 };
+enum class TurbulenceProperties : std::uint32_t { all=0, noise=1 };
 // Motion's Core numeric units are explicit, not AE/public Speed units.
 inline constexpr ParameterKey kMotionMode{1},kMotionOrigin{2},kMotionAxis{3},kMotionAngularRate{4},
     kMotionSpeedRandom{5},kMotionOverLife{6};
 inline constexpr ParameterKey kMotionGoal{7},kMotionForward{8};
 inline constexpr ParameterKey kMotionPathPoints{9},kMotionPathSpeed{10},kMotionPathDelay{11},kMotionPathOrient{12};
 inline constexpr ParameterKey kMotionOriginType{13},kMotionAxisAngles{14},kMotionOffset{15};
+inline constexpr ParameterKey kMotionPathLightResource{16},kMotionPathSpeedPercent{17},kMotionPathEndBehavior{18},
+    kMotionPathStartingWith{19};
+inline constexpr ParameterKey kMotionPathDelayRandom{20};
+inline constexpr ParameterKey kMotionLookAtTargets{21};
 inline constexpr PortKey kOutputParticles{1};
 inline constexpr ParameterKey kParticleCount{1};
 inline constexpr ParameterKey kBirthRate{2};

@@ -1,6 +1,6 @@
 #pragma once
 #include "PluginVersion.h"
-#if __has_include("../artifacts/graph-render-journal-config.hpp")
+#if !defined(STARFIELD_TEST_NO_JOURNAL) && __has_include("../artifacts/graph-render-journal-config.hpp")
 #include "../artifacts/graph-render-journal-config.hpp"
 #endif
 #if defined(STARFIELD_GRAPH_RENDER_JOURNAL_FILE) && defined(_WIN32)

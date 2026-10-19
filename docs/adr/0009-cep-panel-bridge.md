@@ -1,4 +1,61 @@
+## M3-20 / CEP93 installed — fresh property resolution — 2026-10-15
+
+The AE23.5x52 owner-run failure trace records a newly added Motion UUID with
+native Motion Type1 through named/disk ordinary, time-zero and current getters,
+and guard0, while CEP92's same transaction snapshot reports Core0 (wanted1).
+Native persistence succeeded; the gateway's readback differs. The precise AE
+wrapper/cache implementation remains unknown. Retain this raw evidence under
+artifacts/m3-20-host-identity-20261015/motion-before-rollback.json.
+
+No effect or child Property object belongs in the lookup cache. CEP93 caches
+only kind/layout selectors and numeric paths, reacquires a child and validates
+its name/matchName on every read/write. One bounded fallback traversal supplies
+layout metadata; absent controls do not trigger repeated whole-layout scans.
+Node lookup stores numeric inventory slots, reacquires the requested full UUID
+and validates it after enumeration. Selection reacquires again after clearing
+AE selections. Duplicate/missing identities still fail; no parameter mutation
+is used to reveal a selected effect. All nine node kinds have selection coverage.
+
+CEP92 fails a stale-Property2/fresh1 Motion negative control with actual Core0;
+CEP93 passes the same control with Core1. Shared same-kind wrappers independently
+expose retained effect/child references; positive regressions cover Cube/OBJ,
+multiple Emitters/Particles, mixed kinds, selection, commit invalidation and
+rollback. Fixtures establish code behavior, not post-install AE acceptance.
+
 # ADR 0009: CEP panel bridge through supervised AE parameters
+
+## M3-20 / CEP92 — reuse code, load optional transport on demand — 2026-10-15
+
+Every call checks ready generation/API availability and invokes in the same
+ExtendScript host turn. Matching code is reused rather than reparsed on every
+write; missing/stale generations still reload. parseRequest/reply continue to
+clear request-local Property caches; no SDK/Property lifetime is extended.
+The canvas loads Model assets/full transaction clients on first resource or
+deletion operation. Presets retains its codec-required assets but loads its full
+transaction client on demand. A shared bounded loader serializes module loading,
+coalesces callers, uses the page's generation and rejects failures before host
+mutation. Common graph/receipt codecs remain loaded to validate every graph.
+AE owns native AEX loading/lifetime; no speculative native module unloading or
+per-node DLL restructuring is introduced. Transport timeout remains8s.
+
+
+## P-02M / CEP91 — AE owns node parameter editing — 2026-10-14
+
+The owner retires the entire floating CEP inspector: numeric/text fields, popups,
+color/gradient editing and Over Life curve editing. Clicking a node keeps the
+existing serialized selectNodeEffect request to focus its corresponding native
+effect (Output selects the main renderer). All parameters are edited through AE
+Effect Controls. Editor DOM/styles/handlers/drag state and helper scripts are removed;
+the generator retains native AE preset output but no longer regenerates CEP JS.
+Existing graph/preset codecs and guarded transactions remain for topology, layout
+and presets. Existing gateway value APIs remain for internal/compatibility paths;
+no saved node data or parameter identity changes. Read-only summaries, frame status
+and adaptive inspection still synchronize with AE. Only redundant CEP value edits
+are removed; no measured host speedup or prior Motion/deletion fix is claimed.
+Native88/Core ABI9 remains; CEP generation/cache/ready markers advance to91.
+Publication uses existing Junctions after a fresh zero-AE check,
+Deploy-TestBuild -KeepNative, verified baseline/hash receipts and paired undo.
+
 
 ## P-02L / panel49 - left node palette, 2026-10-06
 

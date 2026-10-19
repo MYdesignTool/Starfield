@@ -3,7 +3,7 @@ const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("n
 const repo=path.join(__dirname,".."),panel=process.env.STARFIELD_PANEL_ROOT || path.join(repo,"cep_panel");
 let checks=0;function eq(a,b){checks++;assert.deepEqual(a,b);}function ok(value){checks++;assert.ok(value);}
 const schema=JSON.parse(fs.readFileSync(path.join(repo,"schema/parameters.json"),"utf8"));
-eq(schema.manifestVersion,29);
+eq(schema.manifestVersion,30); // ADR0038 appended Model mirrors; existing IDs below stay fixed.
 eq(schema.topics.map(t=>[t.label,t.index,t.endIndex]),[["Time Remapping",90,93],["Render Settings",94,97],
     ["Motion Blur",610,619],["Simulation Settings",620,622],["GPU Rendering",623,625]]);
 for(const [id,disk,index] of [[611,1601,621],[614,1611,624],...[617,618,619,620,621,622,623,624].map(id=>[id,1641+id-617,id-6])]){

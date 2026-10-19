@@ -2,9 +2,11 @@
 #include "NativeNodeGraph.hpp"
 #include "NativeTemporalCache.hpp"
 #include "NativeTemporalUI.hpp"
+#include "UiExclusionClient.hpp"
 #include <string>
 #include <fstream>
 #include "NodeRecord.hpp"
+#include "EffectGraphBackup.hpp"
 #include "NodeGraphSync.hpp"
 #include "GraphCarrier.hpp"
 #include "GraphParameter.hpp"
@@ -39,7 +41,7 @@ namespace {
 using namespace starfield::adapter;
 namespace core = starfield::core;
 namespace records = starfield::adapter::native_nodes;
-int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{}, aegp_suite_requests{};
+int checks{}, failures{}, calls{}, sets{}, live_refs{}, acquisitions{}, suite_requests{}, aegp_suite_requests{},opened_streams{};
 int null_pf_layer_queries{};
 void check(bool condition, const char* message) {
     ++checks; if (!condition) { ++failures; std::printf("FAILED: %s\n", message); }
@@ -52,6 +54,14 @@ A_long wrong_type = -1;
 bool corrupt_receipt{};
 bool panel_publish{};
 bool panel_output_only{};
+AEGP_EffectFlags renderer_flags=AEGP_EffectFlags_ACTIVE;
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+bool silent_motion_write{};
+bool silent_motion_guard_release{};
+bool fail_motion_restore{};
+bool motion_lifetime_checks{};
+unsigned motion_stream_epoch{}, stale_motion_accesses{};
+#endif
 std::function<void()> alias_mutation_hook;
 void sample_after_alias_mutation() {if(alias_mutation_hook)alias_mutation_hook();}
 struct Memory { std::vector<std::byte> bytes; };
@@ -85,7 +95,16 @@ Matrix null_world{1,0,0,910,0,1,0,490,0,0,1,0,0,0,0,1};
 Matrix owner_world{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
 core::Vec3 null_anchor{50,50,0};
 int affine_reads{},synthetic_native_reads{};
-struct Ref { std::size_t effect{}; A_long index{}; };
+struct Ref { std::size_t effect{}; A_long index{}; unsigned motion_epoch{}; };
+bool stale_motion_ref(AEGP_StreamRefH ref) {
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+    const auto& key=*reinterpret_cast<Ref*>(ref);
+    if(motion_lifetime_checks && key.effect==8 && key.motion_epoch!=motion_stream_epoch) {
+        ++stale_motion_accesses;return true;
+    }
+#endif
+    return false;
+}
 std::size_t effect_index(AEGP_EffectRefH value) { return reinterpret_cast<std::size_t>(value) - 1; }
 AEGP_EffectRefH effect_ref(std::size_t i) { return reinterpret_cast<AEGP_EffectRefH>(i + 1); }
 AEGP_PFInterfaceSuite1 pf{};
@@ -107,6 +126,7 @@ bool lazy_dependencies{};
 std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
 A_long nonfinite_alias=-1, unresolved_alias=-1, stale_dependency_alias=-1,stale_retirement_alias=-1;
+unsigned absent_source_uuid{};
 A_long fail_expression = -1;
 unsigned expression_clear_count{};
 bool disable_next_expression{};
@@ -195,6 +215,7 @@ double evaluated_binding(A_long index, A_long time) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
         return expr.find(u"fx.param(\"Node UUID 7\").value === "+number(value))!=std::u16string::npos;
     };
+    if(absent_source_uuid && identity(absent_source_uuid))return kNativeBindingUnavailable;
     std::size_t id = identity(8) ? 8 : identity(7) ? 7 : identity(6) ? 6 : identity(5) ? 4 : identity(1) ? 1 : identity(2) ? 2 : 3;
     if(id==4 && expr.find(u"// Starfield Transform affine entry ")!=std::u16string::npos) {
         const std::u16string marker=u"// Starfield Transform affine entry ";
@@ -264,7 +285,234 @@ void final_retirement_test(const core::Graph& prior,PF_InData& render_data,PF_Ou
         renderer.values[kNativeBindingFirstIndex].one_d==base && expressions[0].empty() && !expression_enabled[0],"final refresh restamps retirement with exact handoff");
     old=prior;check(sample_native_node_animation(&render_data,old,1920,1080)==0,"old frame reads finite final retirement handoffs");
 }
-int main() {
+void saved_output_scope_test(const char* path) {
+    // Optional owner fixture stays in ignored artifacts; no project data ships.
+    std::ifstream file(path,std::ios::binary);
+    std::vector<char> bytes((std::istreambuf_iterator<char>(file)),{});
+    auto decoded=core::deserialize_graph(std::span<const std::byte>(reinterpret_cast<const std::byte*>(bytes.data()),bytes.size()),
+        core::particle_node_registry());
+    check(decoded.has_value(),"saved owner graph fixture decodes");if(!decoded.has_value())return;
+    auto graph=decoded.take_value();
+    struct Values {
+        std::array<double,kNativeBindingCapacity> aliases{};
+        std::array<bool,kNativeBindingCapacity> missing{},visited{};
+        core::NodeId missing_node{};A_long first_missing{-1};
+    } values;
+    for(const auto& record:graph.optional_records) {
+        if(record.size()<12 || record[0]!=std::byte{2} || record[1]!=std::byte{0x80})continue;
+        std::size_t at=8;
+        const auto read=[&](unsigned count){std::uint64_t value{};for(unsigned i=0;i<count;++i)
+            value|=std::uint64_t(std::to_integer<unsigned char>(record.at(at++)))<<(8*i);return value;};
+        const auto count=read(4);
+        for(std::uint64_t n=0;n<count;++n) {
+            core::NodeId id;for(auto& byte:id.value.bytes)byte=static_cast<std::uint8_t>(read(1));
+            const auto kind=read(2),fields=read(2);
+            const bool absent=n==count-1; // Last saved Turbulence source is absent in this owner fixture.
+            if(absent){values.missing_node=id;check(kind==8,"saved absent source is Turbulence");}
+            for(std::uint64_t f=0;f<fields;++f) {
+                (void)read(2);const auto type=read(2),slot=read(2);(void)read(2);
+                const unsigned components=type==0?1:type==1?2:3;
+                for(unsigned c=0;c<3;++c) {
+                    const auto number=std::bit_cast<double>(read(8));
+                    if(slot!=0xffff && c<components) {
+                        values.aliases.at(slot+c)=number;values.missing.at(slot+c)=absent;
+                        if(absent && values.first_missing<0)values.first_missing=kNativeBindingFirstIndex+static_cast<A_long>(slot+c);
+                    }
+                }
+            }
+        }
+    }
+    auto data=renderer_data;data.effect_ref=reinterpret_cast<PF_ProgPtr>(&values);data.num_params=0;
+    data.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+        auto& v=*reinterpret_cast<Values*>(ref);const auto slot=index-kNativeBindingFirstIndex;
+        v.visited.at(slot)=true;*out={};out->param_type=PF_Param_FLOAT_SLIDER;
+        out->u.fs_d.value=v.missing.at(slot)?kNativeBindingUnavailable:v.aliases.at(slot);return 0;
+    };
+    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+    auto sampled=graph;A_long stream_index=-1;NativeBindingFailure failure;
+    check(sample_native_node_animation(&data,sampled,1920,1080,&stream_index,nullptr,nullptr,&failure)==0,
+        "actual saved orphan graph remains previewable without its disconnected source");
+    check(std::count(values.visited.begin(),values.visited.end(),true)==69,
+        "saved Output uses only Emitter/Particle's 69 inputs");
+    core::RenderRequest request{};request.settings=core::validate_settings(core::Settings{});
+    request.graph=std::make_shared<const core::Graph>(graph);
+    request.frame={1920,1080,512,288,{0,0,512,288},{1,1},{1,24},core::PixelFormat::rgba8,
+        core::ColorSpace::ae_working_space,core::AlphaMode::premultiplied,1,core::Quality::full};
+    const auto rendered=core::CpuParticleRenderer{}.render(request,core::NeverCancelled{});
+    check(rendered.has_value(),"actual saved Output graph renders through the CPU backend");
+    if(rendered.has_value()) {
+        const auto& pixels=rendered.value().pixels;bool visible=false;
+        for(std::size_t i=3;i<pixels.size();i+=4)visible |= pixels[i]!=std::byte{0};
+        check(visible,"saved Output graph produces visible particle alpha");
+    }
+    std::vector<NativeOriginBinding> origins;std::vector<NativeLifetimeBinding> lifetimes;
+    check(read_native_origin_bindings(graph,origins)==0 && origins.size()==1 &&
+        read_native_lifetime_bindings(graph,lifetimes)==0 && lifetimes.size()==1,"saved history uses the same Output scope");
+    NativeAnimationPlan plan(graph,1920,1080,1);core::GraphNode unused;
+    check(plan.valid() && plan.sample(&data,values.missing_node,unused)==PF_Err_BAD_CALLBACK_PARAM,
+        "history plan excludes saved orphan bindings");
+    auto parked=graph;parked.edges.clear();origins.clear();lifetimes.clear();
+    check(read_native_origin_bindings(parked,origins)==0 && origins.empty() &&
+        read_native_lifetime_bindings(parked,lifetimes)==0 && lifetimes.empty(),"parked birth/lifetime nodes do not enter history");
+    auto no_callbacks=data;no_callbacks.inter.checkout_param=nullptr;no_callbacks.inter.checkin_param=nullptr;
+    check(sample_native_node_animation(&no_callbacks,parked,1920,1080)==0,"empty Output scope needs no host callbacks");
+    core::NodeId particle{},output{};
+    for(const auto& node:graph.nodes) {
+        if(node.type_key==core::graph_keys::kParticleNode)particle=node.id;
+        if(node.type_key==core::graph_keys::kOutputNode)output=node.id;
+    }
+    auto required=graph;std::erase_if(required.edges,[&](const auto& edge){return edge.destination_node==output;});
+    core::EdgeId edge1{},edge2{};edge1.value.bytes[0]=250;edge2.value.bytes[0]=251;
+    required.edges.push_back({edge1,particle,core::graph_keys::kParticleParticlesOut,values.missing_node,core::graph_keys::kTurbulenceParticlesIn});
+    required.edges.push_back({edge2,values.missing_node,core::graph_keys::kTurbulenceParticlesOut,output,core::graph_keys::kOutputParticles});
+    check(sample_native_node_animation(&data,required,1920,1080,&stream_index,nullptr,nullptr,&failure)==PF_Err_BAD_CALLBACK_PARAM &&
+        stream_index==values.first_missing && failure.node==values.missing_node && failure.parameter==5 && failure.component==0,
+        "reachable missing source still fails with exact node/parameter/component context");
+    auto explicit_node=graph;
+    check(sample_native_node_animation(&data,explicit_node,1920,1080,&stream_index,nullptr,&values.missing_node)==PF_Err_BAD_CALLBACK_PARAM,
+        "explicit requested-node sampling still reports missing bindings");
+}
+void saved_missing_model_test(const char* path) {
+    std::ifstream input(path,std::ios::binary);
+    const std::vector<char> raw((std::istreambuf_iterator<char>(input)),{});
+    std::vector<std::byte> bytes;for(auto c:raw)bytes.push_back(static_cast<std::byte>(static_cast<unsigned char>(c)));
+    auto decoded=core::deserialize_graph(bytes,core::particle_node_registry());
+    check(decoded.has_value(),"saved active-Model failure graph decodes");if(!decoded.has_value())return;
+    auto graph=decoded.take_value();
+    struct Samples {std::array<double,kNativeBindingCapacity> values{};std::array<bool,kNativeBindingCapacity> missing{};core::NodeId model{};} samples;
+    for(const auto& record:graph.optional_records) {
+        if(record.size()<12 || record[0]!=std::byte{2} || record[1]!=std::byte{0x80})continue;
+        std::size_t at=8;
+        const auto read=[&](unsigned count){std::uint64_t value{};for(unsigned i=0;i<count;++i)
+            value|=std::uint64_t(std::to_integer<unsigned char>(record.at(at++)))<<(8*i);return value;};
+        const auto count=read(4);
+        for(std::uint64_t n=0;n<count;++n){core::NodeId id;for(auto& byte:id.value.bytes)byte=static_cast<std::uint8_t>(read(1));
+            const auto kind=read(2),fields=read(2);if(kind==5)samples.model=id;
+            for(std::uint64_t f=0;f<fields;++f){(void)read(2);const auto type=read(2),slot=read(2);(void)read(2);
+                const unsigned components=type==0?1:type==1?2:3;
+                for(unsigned c=0;c<3;++c){const auto value=std::bit_cast<double>(read(8));
+                    if(slot!=0xffff && c<components){samples.values.at(slot+c)=value;samples.missing.at(slot+c)=kind==5;}}
+            }
+        }
+        check(at==record.size(),"saved active-Model record is consumed exactly");
+    }
+    auto data=renderer_data;data.effect_ref=reinterpret_cast<PF_ProgPtr>(&samples);data.num_params=0;
+    data.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+        const auto& values=*reinterpret_cast<Samples*>(ref);const auto slot=index-kNativeBindingFirstIndex;
+        *out={};out->param_type=PF_Param_FLOAT_SLIDER;
+        out->u.fs_d.value=values.missing.at(slot)?kNativeBindingUnavailable:values.values.at(slot);return 0;};
+    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+    A_long stream=-1;NativeBindingFailure failure;
+    check(sample_native_node_animation(&data,graph,1920,1080,&stream,nullptr,nullptr,&failure)==PF_Err_BAD_CALLBACK_PARAM &&
+        stream==237 && failure.node==samples.model && failure.parameter==5 && failure.component==0,
+        "actual saved active Model reproduces stream237 instead of supplying a numeric fallback");
+}
+__declspec(noinline) void repair_publication_failure_test(PF_OutData& output) {
+    auto& main=fixtures[0];
+    const auto baseline_text_storage=std::make_unique<decltype(expressions)>(expressions);const auto& baseline_text=*baseline_text_storage;const auto baseline_enabled=expression_enabled;
+        // Repair still uses the actual publisher's rollback before alias retirement.
+        panel_output_only=true;renderer_flags=AEGP_EffectFlags_NONE;
+        main.values[kGraphEditCommitId].one_d=987658;unresolved_alias=kNativeBindingFirstIndex;
+        fail_set=kGraphEditReceiptId;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output,true)!=0,
+            "disabled repair rejects partially failed saved publication");
+        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
+            "disabled repair restores original graph and aliases after publication failure");
+        panel_output_only=false;renderer_flags=AEGP_EffectFlags_ACTIVE;unresolved_alias=-1;
+}
+__declspec(noinline) void repair_bindings_test(const core::Graph& prior) {
+    const auto before_invalid=sets;const char* stage{};
+        {
+            NativeBindingTransaction active_repair(&renderer_data,701);
+            check(active_repair.install(saved_graph(),nullptr,&stage,nullptr,&prior,false,true)!=0 && sets==before_invalid,
+                "repair cannot bypass old handoff while renderer is active");
+        }
+        renderer_flags=AEGP_EffectFlags_NONE;unresolved_alias=kNativeBindingFirstIndex;
+        {
+            NativeBindingTransaction disabled_repair(&renderer_data,701);
+            check(disabled_repair.install(saved_graph(),nullptr,&stage,nullptr,&prior,false,true)==0,
+                "explicit disabled renderer can rebuild after obsolete source disappeared");
+        }
+        {
+            NativeBindingTransaction invalid_new(&renderer_data,701);
+            check(invalid_new.install(prior,nullptr,&stage,nullptr,&prior,false,true)!=0,
+                "disabled repair still rejects an unresolved newly active binding");
+        }
+        renderer_flags=AEGP_EffectFlags_ACTIVE;unresolved_alias=-1;
+}
+__declspec(noinline) void seven_kind_publication_tests() {
+    auto& main=fixtures[0];
+    {
+        // Include real Material/Motion records as well as Emitter, Particle,
+        // Force, Transform and Model in a single saved alias publication.
+        using namespace core::graph_keys;
+        model_present=transform_present=all_kinds_present=panel_publish=true;
+        for(auto [index,kind]:{std::pair{7,records::Kind::material},std::pair{8,records::Kind::motion}}) {
+            auto& f=fixtures[index];f.values.resize(records::parameter_count(kind));f.params.resize(f.values.size());
+            for(auto& p:f.params)p.param_type=PF_Param_FLOAT_SLIDER;
+            uuid(index,records::uuid_first_index(kind),index);
+        }
+        fixtures[7].name="org.starfieldfx.node.material";
+        fixtures[7].values[1].one_d=1;fixtures[7].values[2].color={1,1,1,1};
+        fixtures[7].values[3].one_d=50;fixtures[7].values[5].one_d=100;fixtures[7].values[6].one_d=1;
+        fixtures[8].name="org.starfieldfx.node.motion";
+        auto& m=fixtures[8].values;namespace ml=records::motion_layout;
+        m[ml::mode].one_d=1;m[ml::origin_type].one_d=1;m[ml::origin_xy].two_d={960,540};
+        m[ml::speed].one_d=100;m[ml::curve].one_d=2;
+        m[ml::path_max_delay].one_d=.5;m[ml::path_end_behavior].one_d=1; // Current native popup defaults.
+        m[ml::curve+2].one_d=100;m[ml::curve+3].one_d=1;m[ml::curve+4].one_d=100;
+        connection(4,records::Kind::transform,8,14);connection(8,records::Kind::motion,255,18);
+        main.values[kGraphSyncGuardId].one_d=1;main.values[kGraphEditCommitId].one_d=987657;
+        PF_OutData output{};
+        const auto seven_error=commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987657,701,&output);
+        if(seven_error)std::printf("Seven-kind diagnostic: %d %s\n",seven_error,output.return_msg);
+        check(seven_error==0,
+            "seven-kind native graph publishes actual bindings");
+        auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
+        final_refresh_test(prior,output);
+        const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
+        check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
+        std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);
+        lifecycle_file.write(reinterpret_cast<const char*>(lifecycle_bytes.value().data()),lifecycle_bytes.value().size());
+        check(bool(lifecycle_file),"actual compiler graph saved for full backup/render lifecycle test");lifecycle_file.close();
+        const auto baseline_text_storage=std::make_unique<decltype(expressions)>(expressions);const auto& baseline_text=*baseline_text_storage;const auto baseline_enabled=expression_enabled;
+        repair_publication_failure_test(output);
+        auto render_data=renderer_data;render_data.num_params=0;
+        render_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+            *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=evaluated_binding(i,t);return 0;};
+        render_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+        unsigned samples{};
+        alias_mutation_hook=[&]{++samples;auto old=prior;
+            check(sample_native_node_animation(&render_data,old,1920,1080)==0,"seven-kind in-flight graph never sees a transient sentinel");
+            auto live=saved_graph();check(sample_native_node_animation(&render_data,live,1920,1080)==0,
+                "seven-kind saved graph remains valid at each host mutation");};
+        // A receipt-write failure before retirement must leave every expression.
+        panel_output_only=true;main.values[kGraphEditCommitId].one_d=987658;fail_set=kGraphEditReceiptId;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
+            "seven-kind deletion publication failure rejects");
+        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
+            "seven-kind failed publication keeps original aliases and graph");
+        // A detach failure AFTER new graph verification restores graph+aliases.
+        fail_expression=0;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
+            "seven-kind post-publication retirement failure rejects");
+        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
+            "seven-kind failed retirement restores graph and exact expressions");
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)==0 && saved_graph().nodes.size()==1,
+            "seven-kind deletion completes post-publication retirement");
+        check(samples>0,"seven-kind reentrant mutation callbacks executed");alias_mutation_hook={};
+        final_retirement_test(prior,render_data,output);
+        // Invalid evaluated source values are still errors before any handoff.
+        const auto before_invalid=sets;unresolved_alias=kNativeBindingFirstIndex;
+        NativeBindingTransaction invalid(&renderer_data,701);const char* stage{};
+        check(invalid.install(saved_graph(),nullptr,&stage,nullptr,&prior)==PF_Err_BAD_CALLBACK_PARAM && sets==before_invalid &&
+            stage && !std::strcmp(stage,"verify finite alias handoff"),"missing old binding cannot become a numeric fallback");
+        unresolved_alias=-1;
+        repair_bindings_test(prior);
+        panel_output_only=all_kinds_present=model_present=transform_present=panel_publish=false;main.values[kGraphSyncGuardId].one_d=0;
+    }
+}
+int main(int argc,char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     SPBasicSuite basic{}; basic.AcquireSuite = acquire; basic.ReleaseSuite = release;
     PF_UtilCallbacks utils{}; utils.host_new_handle = allocate; utils.host_lock_handle = lock_handle;
@@ -273,6 +521,8 @@ int main() {
     renderer_data.utils = &utils; renderer_data.width = 1920; renderer_data.height = 1080;
     renderer_data.pixel_aspect_ratio = {1, 1}; renderer_data.time_scale = 24;
     renderer_data.num_params = kTotalEffectParameterCount + 1;
+    if(argc>1)saved_output_scope_test(argv[1]);
+    if(argc>2)saved_missing_model_test(argv[2]);
     renderer_data.inter.add_param = add_param;
     fixtures[0].name = "org.starfieldfx.particle"; fixtures[0].params.resize(1);
     PF_OutData setup{}; check(setup_parameters(&renderer_data, &setup) == 0, "renderer setup succeeds");
@@ -346,10 +596,16 @@ int main() {
         *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
     };
     effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = panel_output_only?1:all_kinds_present?9:model_present?7:transform_present?5:4; return 0; };
+    effect.AEGP_GetEffectFlags=[](AEGP_EffectRefH,AEGP_EffectFlags* flags)->A_Err{*flags=renderer_flags;return 0;};
     effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
-    effect.AEGP_DisposeEffect = [](AEGP_EffectRefH)->A_Err { return 0; };
+    effect.AEGP_DisposeEffect = [](AEGP_EffectRefH ref)->A_Err {
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+        if(motion_lifetime_checks && effect_index(ref)==8)++motion_stream_epoch;
+#endif
+        return 0;
+    };
     dynamic.AEGP_GetNewStreamRefForLayer=[](AEGP_PluginID,AEGP_LayerH,AEGP_StreamRefH* out)->A_Err {
         ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{0,-3});return 0;};
     dynamic.AEGP_GetNewStreamRefByMatchname=[](AEGP_PluginID,AEGP_StreamRefH,const A_char* match,AEGP_StreamRefH* out)->A_Err {
@@ -366,10 +622,16 @@ int main() {
         return PF_Err_BAD_CALLBACK_PARAM;
     };
     stream.AEGP_GetNewEffectStreamByIndex = [](AEGP_PluginID, AEGP_EffectRefH ref, A_long index, AEGP_StreamRefH* out)->A_Err {
+        ++opened_streams;
         if(effect_index(ref)==4 && index>=15 && index<=26)++synthetic_native_reads;
-        ++live_refs; *out = reinterpret_cast<AEGP_StreamRefH>(new Ref{effect_index(ref), index}); return 0;
+        ++live_refs;auto* owned=new Ref{effect_index(ref), index};
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+        owned->motion_epoch=motion_stream_epoch;
+#endif
+        *out=reinterpret_cast<AEGP_StreamRefH>(owned);return 0;
     };
     stream.AEGP_GetStreamType = [](AEGP_StreamRefH ref, AEGP_StreamType* type)->A_Err {
+        if(stale_motion_ref(ref))return PF_Err_BAD_CALLBACK_PARAM;
         const auto& key = *reinterpret_cast<Ref*>(ref);
         if (key.index == wrong_type) { wrong_type = -1; *type = AEGP_StreamType_COLOR; }
         else if((!key.effect && key.index>=kTextureResourceFirstIndex && key.index<kTextureResourceFirstIndex+kTextureResourceCapacity) ||
@@ -381,6 +643,7 @@ int main() {
         return 0;
     };
     stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time* time, A_Boolean pre_expression, AEGP_StreamValue2* out)->A_Err {
+        if(stale_motion_ref(ref))return PF_Err_BAD_CALLBACK_PARAM;
         auto& key = *reinterpret_cast<Ref*>(ref);
         if (!key.effect && key.index == fail_read) { fail_read = -1; return PF_Err_BAD_CALLBACK_PARAM; }
         if (!key.effect && !pre_expression && key.index == fail_evaluated_read) {
@@ -395,11 +658,26 @@ int main() {
         return 0;
     };
     stream.AEGP_SetStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_StreamValue2* value)->A_Err {
+        if(stale_motion_ref(ref))return PF_Err_BAD_CALLBACK_PARAM;
         ++sets; auto& key = *reinterpret_cast<Ref*>(ref);
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+        if(key.effect==8) {
+            check(key.index==records::motion_layout::mode || key.index==records::sync_guard_index(records::Kind::motion) ||
+                (key.index>=143 && key.index<=186),"native Motion author writes only its mode, prefix bank and private guard");
+            if(key.index==fail_set){fail_set=-1;return PF_Err_BAD_CALLBACK_PARAM;}
+            if(key.index==records::motion_layout::mode && value->val.one_d==3 && fail_motion_restore)return PF_Err_BAD_CALLBACK_PARAM;
+            if(key.index==records::motion_layout::mode && silent_motion_write){silent_motion_write=false;return 0;}
+            if(key.index==records::sync_guard_index(records::Kind::motion) && value->val.one_d==0 && silent_motion_guard_release){silent_motion_guard_release=false;return 0;}
+            fixtures[8].values[key.index].one_d=value->val.one_d;return 0;
+        }
+#endif
         check(key.effect == 0, "native compile writes renderer only");
         check(key.index != kGraphEditCommitId && (panel_publish || key.index != kGraphEditReceiptId), "native edit preserves CEP nonce and receipt");
         if (key.index == fail_set) { fail_set = -1; return PF_Err_OUT_OF_MEMORY; }
         if (key.index == kGraphParameterId) {
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+            if(motion_lifetime_checks)++motion_stream_epoch;
+#endif
             if (ignore_graph) { ignore_graph = false; return 0; }
             auto copy = clone(reinterpret_cast<PF_Handle>(value->val.arbH));
             dispose(reinterpret_cast<PF_Handle>(fixtures[0].values[key.index].arbH));
@@ -451,6 +729,275 @@ int main() {
         sample_after_alias_mutation();return 0;
     };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
+    const auto source_scope_module=LoadLibraryW(L"artifacts\\model-ui-exclusion-tests\\paired\\StarfieldHost.aex");
+    check(source_scope_module!=nullptr,"source callback fixture loads the paired resident exclusion");
+    const auto source_scope_initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(source_scope_module,"SFLD_TestInitialize"));
+    check(source_scope_initialize!=nullptr,"source callback fixture initializes the UI thread explicitly");source_scope_initialize();
+#if defined(STARFIELD_MODEL_CALLBACK_TEST)
+    {
+        namespace ml=records::model_layout;
+        auto& model=fixtures[6];model.name="org.starfieldfx.node.model";
+        model.values.resize(records::parameter_count(records::Kind::model));model.params.resize(model.values.size());
+        uuid(6,records::uuid_first_index(records::Kind::model),6);model.values[ml::source].one_d=1;
+        for(A_long i=ml::scale;i<ml::scale+3;++i)model.values[i].one_d=100;
+        connection(2,records::Kind::particle,255,12);connection(6,records::Kind::model,2,15);
+        effect.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* count)->A_Err{*count=5;return 0;};
+        effect.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID,AEGP_LayerH,A_long i,AEGP_EffectRefH* out)->A_Err{*out=effect_ref(i==4?6:i);return 0;};
+        dynamic.AEGP_GetNewStreamRefByIndex=[](AEGP_PluginID,AEGP_StreamRefH,A_long i,AEGP_StreamRefH* out)->A_Err {
+            ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{static_cast<std::size_t>(i==4?6:i),-1});return 0;
+        };
+        std::vector<PF_ParamDef*> delivered(model.params.size());
+        for(std::size_t i=0;i<delivered.size();++i){model.params[i].param_type=PF_Param_FLOAT_SLIDER;
+            model.params[i].u.fs_d.value=model.values[i].one_d;delivered[i]=&model.params[i];}
+        model.params[ml::source].param_type=PF_Param_POPUP;model.params[ml::source].u.pd.value=1;
+        PF_InData source=renderer_data;source.effect_ref=reinterpret_cast<PF_ProgPtr>(effect_ref(3));source.num_params=static_cast<A_long>(delivered.size());
+        PF_UserChangedParamExtra changed{};changed.param_index=ml::source;PF_OutData output{};
+        {
+            EffectUiExclusion owner;check(bool(owner),"actual OBJ modal scope acquires resident Host exclusion");
+            const auto before=suite_requests;
+            check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0 && suite_requests==before,
+                "automatic callback still defers under the OBJ modal scope");
+            check(sync_model_import_graph_parameter(&source,&output,delivered.data(),&changed,owner)==0 &&
+                main.values[kGraphRevisionId].one_d>0,"explicit OBJ owner publishes through real compiler and publisher under its own scope");
+            check(std::get<std::uint32_t>(parameter(saved_graph(),core::graph_keys::kModelNode,core::graph_keys::kModelSource))==0,
+                "owner publication resolves Model UUID despite stale PF binding pointing at Force");
+            const auto revision=main.values[kGraphRevisionId].one_d;
+            auto partial=source;partial.num_params=0;
+            check(sync_model_import_graph_parameter(&partial,&output,reinterpret_cast<PF_ParamDef**>(1),&changed,owner)!=0,
+                "explicit import partial delivery fails before reading the array");
+            model.params[records::uuid_first_index(records::Kind::model)+7].u.fs_d.value=99;
+            check(sync_model_import_graph_parameter(&source,&output,delivered.data(),&changed,owner)!=0 && main.values[kGraphRevisionId].one_d==revision,
+                "missing import UUID fails instead of reporting empty success");
+            model.params[records::uuid_first_index(records::Kind::model)+7].u.fs_d.value=6;
+            EffectUiExclusion nested;check(!nested && sync_model_import_graph_parameter(&source,&output,delivered.data(),&changed,nested)!=0,
+                "an unowned nested scope cannot authorize import publication");
+            auto foreign=changed;foreign.param_index=ml::origin;
+            check(sync_model_import_graph_parameter(&source,&output,delivered.data(),&foreign,owner)!=0,
+                "the import capability cannot bypass other source callbacks");
+        }
+        check(live_refs==0 && acquisitions==0 && !ui_transaction_active(),"actual Model owner path releases every SDK reference and exclusion");
+        std::printf("Model owned callback: %u checks, %u failures (actual NodeGraphSync/compiler/publisher; no AE qualification)\n",checks,failures);
+        return failures?1:0;
+    }
+#endif
+#if defined(STARFIELD_MOTION_CALLBACK_TEST)
+    {
+        namespace ml=records::motion_layout;
+        using namespace core::graph_keys;
+        const auto module=LoadLibraryW(L"artifacts\\model-ui-exclusion-tests\\paired\\StarfieldHost.aex");
+        check(module!=nullptr,"Motion callback fixture loads its private Host exclusion fixture");
+        const auto initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(module,"SFLD_TestInitialize"));
+        check(initialize!=nullptr,"Motion callback fixture has explicit UI-thread initialization");initialize();
+        // Exercise the actual Motion-compiled NodeGraphSync, not a fabricated
+        // NativeEdit or the registration fixture's synchronization stub.
+        auto& motion=fixtures[8];motion.name="org.starfieldfx.node.motion";
+        motion.values.resize(records::parameter_count(records::Kind::motion));
+        motion.params.resize(motion.values.size());
+        uuid(8,records::uuid_first_index(records::Kind::motion),8);
+        motion.values[ml::mode].one_d=3;motion.values[ml::origin_type].one_d=1;
+        motion.values[ml::origin_xy].two_d={960,540};motion.values[ml::speed].one_d=100;
+        motion.values[ml::path_max_delay].one_d=.5;motion.values[ml::path_end_behavior].one_d=1;
+        connection(2,records::Kind::particle,8,12);connection(8,records::Kind::motion,255,18);
+        effect.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID,AEGP_LayerH,A_long index,AEGP_EffectRefH* ref)->A_Err {
+            *ref=effect_ref(index==3?8:index);return 0;
+        };
+        std::vector<PF_ParamDef*> delivered(motion.params.size());
+        for(std::size_t i=0;i<delivered.size();++i) {
+            motion.params[i].param_type=PF_Param_FLOAT_SLIDER;
+            motion.params[i].u.fs_d.value=motion.values[i].one_d;
+            delivered[i]=&motion.params[i];
+        }
+        motion.params[ml::mode].param_type=motion.params[ml::origin_type].param_type=
+            motion.params[ml::path_end_behavior].param_type=PF_Param_POPUP;
+        motion.params[ml::origin_xy].param_type=PF_Param_POINT;
+        motion.params[ml::path_orient].param_type=PF_Param_CHECKBOX;
+        PF_InData source=renderer_data;source.effect_ref=reinterpret_cast<PF_ProgPtr>(effect_ref(8));
+        source.num_params=static_cast<A_long>(delivered.size());
+        PF_UserChangedParamExtra changed{};changed.param_index=ml::mode;
+        PF_OutData output{};
+        for(const auto count:{0,records::parameter_count(records::Kind::force),static_cast<A_long>(delivered.size()-1),static_cast<A_long>(delivered.size()+1)}) {
+            auto invalid=source;invalid.num_params=count;const auto before=suite_requests;
+            check(sync_node_graph_parameter(&invalid,&output,reinterpret_cast<PF_ParamDef**>(1),&changed)==0 && suite_requests==before,
+                "zero, Force, truncated and oversized Motion deliveries defer before touching array or SDK");
+        }
+        auto foreign_source=source;foreign_source.effect_ref=reinterpret_cast<PF_ProgPtr>(effect_ref(3));
+        const auto before_foreign_sets=sets;
+        const auto get_borrowed=pf.AEGP_GetNewEffectForEffect;
+        pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH*)->A_Err {
+            check(false,"Motion supervision must never open its stale PF effect parameter binding");return PF_Err_BAD_CALLBACK_PARAM;
+        };
+        motion.params[ml::mode].u.pd.value=1;
+        check(sync_node_graph_parameter(&foreign_source,&output,delivered.data(),&changed)==0 && sets>before_foreign_sets,
+            "Motion edit resolves a fresh kind+UUID even when its PF effect binding points at a former Force slot");
+        pf.AEGP_GetNewEffectForEffect=get_borrowed;
+        const auto identity_last=records::uuid_first_index(records::Kind::motion)+7;
+        motion.params[identity_last].u.fs_d.value=7;
+        const auto before_stale=sets;
+        check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0 && sets==before_stale,
+            "same-kind stale Motion UUID cannot publish or write a different node");
+        motion.params[identity_last].u.fs_d.value=8;
+        unsigned nested_callbacks{};
+        alias_mutation_hook=[&] {
+            const auto before_sets=sets,before_suites=suite_requests;
+            check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0 && sets==before_sets && suite_requests==before_suites,
+                "nested Motion supervision defers before touching SDK or publishing stale values");
+            PF_UserChangedParamExtra stale_main{};stale_main.param_index=kMaxParticlesId;
+            check(user_changed_param(&renderer_data,&output,nullptr,&stale_main)==0 && suite_requests==before_suites,
+                "nested main supervision defers before reading a stale parameter delivery");
+            check(update_motion_ui(&renderer_data,nullptr)==0 && suite_requests==before_suites,
+                "nested main Motion UI refresh defers before SDK access");
+            ++nested_callbacks;
+        };
+        const auto saved_mode=[] {
+            for(const auto& node:saved_graph().nodes)if(node.type_key==kMotionNode)
+                for(const auto& p:node.parameters)if(p.key==kMotionMode)return std::get<std::uint32_t>(p.value);
+            throw std::runtime_error("saved Motion is missing");
+        };
+        for(int cycle=0;cycle<8;++cycle)for(const auto popup:{1,2,3,1}) {
+            const auto before=motion.values[ml::mode].one_d;
+            motion.params[ml::mode].u.pd.value=popup;
+            check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0,
+                "actual Motion callback accepts each delivered mode with old saved streams");
+            std::uint32_t wanted{};check(ml::core_mode_from_popup(popup,wanted),"valid popup maps to Core");
+            check(saved_mode()==wanted,"actual Motion callback publishes delivered mode rather than previous saved mode");
+            (void)before;
+            check(motion.values[ml::mode].one_d==popup,"native Motion author persists the delivered selector before publication");
+            check(motion.params[ml::mode].uu.change_flags&PF_ChangeFlag_CHANGED_VALUE,
+                "delivered Motion selector is explicitly retained when AE completes the callback");
+            // Simulated AE saves the user's own edit after USER_CHANGED_PARAM.
+            motion.values[ml::mode].one_d=popup;
+        }
+        {
+            motion.params[ml::mode].u.pd.value=2;
+            check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0,"prepare Light Path prefix edit");
+            motion_prefix::Bank previous{},wanted{};
+            check(motion_prefix::encode(L"Light_",wanted),"encode native prefix fixture");
+            for(unsigned i=0;i<wanted.size();++i)motion.params[143+i].u.fs_d.value=wanted[i];
+            {
+                EffectUiExclusion owner;check(bool(owner),"prefix owns existing modal scope");
+                check(sync_motion_prefix_graph_parameter(&source,&output,delivered.data(),previous,owner)==0,
+                    "actual Motion owned prefix callback publishes through compiler and transaction");
+            }
+            const auto saved_prefix=[] {return std::get<std::string>(parameter(saved_graph(),kMotionNode,kMotionPathStartingWith));};
+            check(saved_prefix()=="Light_" && saved_mode()==0,"saved graph contains authored prefix and Light Path mode");
+            for(unsigned i=0;i<wanted.size();++i)check(motion.values[143+i].one_d==wanted[i],"saved source bank matches published prefix");
+            previous=wanted;check(motion_prefix::encode(L"Other_",wanted),"encode replacement prefix");
+            for(unsigned i=0;i<wanted.size();++i)motion.params[143+i].u.fs_d.value=wanted[i];
+            const auto revision=main.values[kGraphRevisionId].one_d;
+            {
+                EffectUiExclusion owner;fail_set=kGraphParameterId;
+                check(sync_motion_prefix_graph_parameter(&source,&output,delivered.data(),previous,owner)!=0,
+                    "prefix graph publication error propagates");
+            }
+            check(saved_prefix()=="Light_" && main.values[kGraphRevisionId].one_d==revision,"failed prefix publication restores graph and revision");
+            for(unsigned i=0;i<previous.size();++i)check(motion.values[143+i].one_d==previous[i],"failed prefix publication restores source bank");
+            check(motion.values[records::sync_guard_index(records::Kind::motion)].one_d==0,"failed prefix publication restores source guard");
+            for(unsigned i=0;i<previous.size();++i)motion.params[143+i].u.fs_d.value=0;
+            {EffectUiExclusion owner;check(sync_motion_prefix_graph_parameter(&source,&output,delivered.data(),previous,owner)==0,"clear prefix via owned callback");}
+            check(saved_prefix().empty(),"empty prefix preserves match-all semantics");
+            motion.params[ml::mode].u.pd.value=1;
+            check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0,"restore Circle fixture");
+        }
+        main.values[kGraphSyncGuardId].one_d=1;
+        alias_mutation_hook={};check(nested_callbacks>0,"actual Motion publication exercises nested callback exclusion");
+        motion.params[ml::mode].u.pd.value=1;
+        const auto before_guarded=sets;
+        check(sync_node_graph_parameter(&source,&output,delivered.data(),&changed)==0 && sets==before_guarded,
+            "saved renderer guard suppresses a delayed Motion callback with delivered guard0");
+        main.values[kNodeEffectsReadyId].one_d=1;
+        panel_publish=true;
+        for(const auto popup:{3,1,2,1}) {
+            motion.values[ml::mode].one_d=popup;
+            const auto nonce=400+popup+static_cast<A_long>(sets%100);
+            main.values[kGraphEditCommitId].one_d=nonce;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),nonce,701,&output)==0,
+                "actual panel publisher accepts each saved Motion mode");
+            std::uint32_t wanted{};ml::core_mode_from_popup(popup,wanted);
+            check(saved_mode()==wanted && motion.values[ml::mode].one_d==popup,
+                "actual panel publisher preserves source mode and publishes the same Core mode");
+        }
+        // The observed owner failure has two authorities: the script can read
+        // authored Circle while a native saved getter still reports Look At.
+        // Float guard5 carries the requested Circle independently of that getter.
+        motion.values[ml::mode].one_d=3;
+        for(const auto silent:{false,true}) {
+            motion.values[ml::mode].one_d=3;
+            motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+            main.values[kGraphEditCommitId].one_d=704;
+            const auto revision=main.values[kGraphRevisionId].one_d;
+            if(silent)silent_motion_guard_release=true;
+            else fail_set=records::sync_guard_index(records::Kind::motion);
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),704,701,&output)!=0 &&
+                main.values[kGraphRevisionId].one_d==revision && saved_mode()==1 &&
+                motion.values[ml::mode].one_d==3 && motion.values[records::sync_guard_index(records::Kind::motion)].one_d==5,
+                "failed or silently discarded source guard release rejects and restores graph/revision/source intent");
+        }
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+        main.values[kGraphEditCommitId].one_d=700;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),700,701,&output)==0 &&
+            saved_mode()==1 && motion.values[ml::mode].one_d==1 &&
+            motion.values[records::sync_guard_index(records::Kind::motion)].one_d==0,
+            "explicit native Circle intent replaces a disagreeing native saved selector and clears after verification");
+        for(const auto silent:{false,true}) {
+            motion.values[ml::mode].one_d=3;
+            motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+            main.values[kGraphEditCommitId].one_d=702;
+            const auto revision=main.values[kGraphRevisionId].one_d;
+            if(silent)silent_motion_write=true;else fail_set=ml::mode;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),702,701,&output)!=0 &&
+                main.values[kGraphRevisionId].one_d==revision && saved_mode()==1 &&
+                motion.values[ml::mode].one_d==3 && motion.values[records::sync_guard_index(records::Kind::motion)].one_d==5,
+                "failed or silently discarded native mode write preserves graph/revision and restores source intent");
+        }
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+        main.values[kGraphEditCommitId].one_d=703;
+        const auto restore_revision=main.values[kGraphRevisionId].one_d;fail_set=kGraphParameterId;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),703,701,&output)!=0 &&
+            main.values[kGraphRevisionId].one_d==restore_revision && saved_mode()==1 && motion.values[ml::mode].one_d==3,
+            "later native graph publication failure restores the already-written source selector");
+        // Existing physical source is retired before the Output-only publication.
+        motion_lifetime_checks=true;
+        motion.values[ml::mode].one_d=3;
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+        main.values[kGraphEditCommitId].one_d=705;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),705,701,&output)==0 &&
+            motion.values[ml::mode].one_d==1 && motion.values[records::sync_guard_index(records::Kind::motion)].one_d==0,
+            "Motion publication reacquires source streams after owner release and graph invalidation");
+        check(stale_motion_accesses==0,"Motion transaction never accesses an expired stream");
+        motion.values[ml::mode].one_d=3;
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=5;
+        main.values[kGraphEditCommitId].one_d=706;
+        fail_motion_restore=true;fail_set=kGraphParameterId;
+        const auto failed_restore=commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),706,701,&output);
+        check(failed_restore==PF_Err_INTERNAL_STRUCT_DAMAGED &&
+            motion.values[records::sync_guard_index(records::Kind::motion)].one_d==1 &&
+            std::strstr(output.return_msg,"rollback"),
+            "source restore failure propagates to panel command and remains guarded");
+        fail_motion_restore=false;
+        motion.values[ml::mode].one_d=1;
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=0;
+        check(stale_motion_accesses==0,"publication and rollback never touch expired Motion streams");
+        motion_lifetime_checks=false;
+        motion.values[records::sync_guard_index(records::Kind::motion)].one_d=transaction_removal_guard;
+        fixtures[1].values[records::sync_guard_index(records::Kind::emitter)].one_d=transaction_removal_guard;
+        fixtures[2].values[records::sync_guard_index(records::Kind::particle)].one_d=transaction_removal_guard;
+        main.values[kGraphEditCommitId].one_d=701;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,701,&output)==0 &&
+            saved_graph().nodes.size()==1,"Motion retirement removes its record and aliases before physical deletion");
+        check(std::none_of(expression_enabled.begin(),expression_enabled.end(),[](auto enabled){return enabled!=0;}),
+            "Motion deletion leaves no enabled source dependency");
+        dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
+        for(auto& p:main.params)if(p.param_type==PF_Param_ARBITRARY_DATA) {
+            if(handles.contains(p.u.arb_d.value))dispose(p.u.arb_d.value);
+            if(handles.contains(p.u.arb_d.dephault))dispose(p.u.arb_d.dephault);
+        }
+        check(FreeLibrary(module)!=0,"Motion callback fixture unloads its private Host module");
+        check(FreeLibrary(source_scope_module)!=0,"source callback fixture unloads its paired resident exclusion");
+        check(live_refs==0 && acquisitions==0 && handles.empty(),"actual Motion callback and publisher release all owned resources");
+        std::printf("Motion native callbacks: %d checks, %d failures. Fake SDK; no AE qualification.\n",checks,failures);
+        return failures?1:0;
+    }
+#endif
     {
         namespace layout=records::particle_layout;
         dynamic_enabled=true;
@@ -605,6 +1152,10 @@ int main() {
     emitter.params[records::sync_guard_index(records::Kind::emitter)].u.fs_d.value = 1;
     check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && sets == before_sets, "CEP guard skips native publication");
     emitter.params[records::sync_guard_index(records::Kind::emitter)].u.fs_d.value = 0;
+    emitter.values[records::sync_guard_index(records::Kind::emitter)].one_d=transaction_removal_guard;
+    check(sync_node_graph_parameter(&node_data,&output,pointers.data(),&changed)==0 && sets==before_sets,
+        "stale guard0 delivery defers publication when saved source is retired under guard3");
+    emitter.values[records::sync_guard_index(records::Kind::emitter)].one_d=0;
     changed.param_index = records::layout_x_index(records::Kind::emitter);
     check(sync_node_graph_parameter(&node_data, &output, pointers.data(), &changed) == 0 && sets == before_sets, "metadata awaits CEP transaction");
     auto life = edit(1, 2, 9); check(direct_edit(life) == 0 && life.accepted, "Particle Life publishes independently");
@@ -634,7 +1185,7 @@ int main() {
         const auto textured=saved_graph();
         const auto bytes=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
         const auto before_revision=main.values[kGraphRevisionId].one_d;
-        const auto before_expressions=expressions;
+        const auto before_expressions_storage=std::make_unique<decltype(expressions)>(expressions);const auto& before_expressions=*before_expressions_storage;
         particle.values[layout::texture_front].layer_id=79;
         auto failed_selection=edit(1,layout::texture_front,0);fail_set=kGraphParameterId;
         check(direct_edit(failed_selection)!=0 && !failed_selection.accepted &&
@@ -808,7 +1359,7 @@ int main() {
     auto animated_graph = saved_graph();
     check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 79,
           "all emitter particle force scalar and vector/color components have bindings");
-    const auto expression_baseline = expressions;
+    const auto expression_baseline_storage=std::make_unique<decltype(expressions)>(expressions);const auto& expression_baseline=*expression_baseline_storage;
     {
         std::ofstream generated("artifacts/native-animation-expressions.json");
         generated << "[";
@@ -826,7 +1377,7 @@ int main() {
         check(bool(generated),"actual generated expressions recorded under artifacts for syntax/identity checks");
     }
     for (A_long i=0; i<67; ++i) expressions[i] = u"0"; // Force a binding rewrite, then fail graph publication.
-    const auto before_failed_binding = expressions;
+    const auto before_failed_binding_storage=std::make_unique<decltype(expressions)>(expressions);const auto& before_failed_binding=*before_failed_binding_storage;
     fail_set = kGraphParameterId;
     auto binding_failure = edit(1, 5, 22);
     main.values[kGraphRevisionId].one_d = 100; // Avoid revision exhaustion for this transaction.
@@ -834,7 +1385,7 @@ int main() {
           "graph publication failure restores all changed binding expressions");
     expressions = expression_baseline;
     expressions[0]=u"0";
-    const auto disabled_expression_baseline=expressions;
+    const auto disabled_expression_baseline_storage=std::make_unique<decltype(expressions)>(expressions);const auto& disabled_expression_baseline=*disabled_expression_baseline_storage;
     disable_next_expression=true;
     auto rejected_binding=edit(1,2,23);
     check(direct_edit(rejected_binding)==PF_Err_BAD_CALLBACK_PARAM &&
@@ -868,6 +1419,35 @@ int main() {
     auto smartfx_graph = animated_graph;
     check(sample_native_node_animation(&renderer_data,smartfx_graph,1920,1080)==0,
           "SmartFX samples registered animation streams without a delivered parameter array");
+    {
+        using namespace core::graph_keys;
+        auto orphan=animated_graph;core::NodeId particle_id{},output_id{};
+        for(const auto& node:orphan.nodes) {
+            if(node.type_key==kParticleNode)particle_id=node.id;
+            if(node.type_key==kOutputNode)output_id=node.id;
+        }
+        std::erase_if(orphan.edges,[&](const auto& edge){return edge.destination_node==output_id || edge.source_node==particle_id;});
+        core::EdgeId route{};route.value.bytes[0]=240;
+        orphan.edges.push_back({route,particle_id,kParticleParticlesOut,output_id,kOutputParticles});
+        const auto texts_storage=std::make_unique<decltype(expressions)>(expressions);const auto& texts=*texts_storage;const auto enabled=expression_enabled;const auto bases=main.values;
+        absent_source_uuid=4;
+        auto sampled=orphan;
+        check(sample_native_node_animation(&renderer_data,sampled,1920,1080)==0,"disconnected deleted Force cannot block Output preview");
+        auto active=animated_graph;
+        check(sample_native_node_animation(&renderer_data,active,1920,1080)==PF_Err_BAD_CALLBACK_PARAM,"active deleted Force remains a strict failure");
+        auto output_only=orphan;output_only.edges.clear();
+        std::erase_if(output_only.nodes,[](const auto& node){return node.type_key!=kOutputNode;});
+        output_only.optional_records.clear();
+        {
+            NativeBindingTransaction bindings(&renderer_data,701);
+            check(bindings.install(output_only,nullptr,nullptr,nullptr,&orphan)==0 && bindings.retire_after_publication()==0,
+                "explicit edit can retire a disconnected missing source using its finite saved value");
+        }
+        check(expressions==texts && expression_enabled==enabled,"orphan retirement rollback preserves exact alias dependencies");
+        for(std::size_t i=kNativeBindingFirstIndex;i<main.values.size();++i)
+            check(main.values[i].one_d==bases[i].one_d,"orphan retirement rollback preserves exact bases");
+        absent_source_uuid=0;
+    }
     const auto suites_before=aegp_suite_requests;
     NativeAnimationPlan animation_plan(animated_graph,1920,1080,1);
     check(animation_plan.valid(),"prepared animation plan decodes bindings once");
@@ -1076,6 +1656,16 @@ int main() {
         if(n.type_key==core::graph_keys::kParticleNode && p.key==core::graph_keys::kParticleLifetimeSeconds)p.value=2.0;
     }
     capture_native_temporal_metadata(&renderer_data,static_graph,1);
+    {
+        const auto baseline_trace=last_native_metadata_trace();
+        auto parked_force=animated_graph;parked_force.edges=static_graph.edges;
+        absent_source_uuid=4;
+        capture_native_temporal_metadata(&renderer_data,parked_force,1);
+        const auto trace=last_native_metadata_trace();
+        check(trace.error==0 && trace.inputs==baseline_trace.inputs && trace.evaluated==trace.inputs,
+            "idle metadata ignores disconnected absent sources and completes instead of retrying forever");
+        absent_source_uuid=0;
+    }
     auto proofs=validated_native_control_proofs(&renderer_data);
     check(!proofs.empty() && std::all_of(proofs.begin(),proofs.end(),[](const auto& p){return p.constant;}),"source metadata certifies genuinely unanimated aliases");
     NativeAnimationPlan constant_plan(static_graph,1920,1080,1);constant_plan.prepare_constants(&renderer_data);
@@ -1140,7 +1730,7 @@ int main() {
     // worker rejection, and no project/event mutation.
     metadata_rate_keys=metadata_life_keys=metadata_life_expression=false;
     remember_native_control_proofs(&renderer_data,{});
-    auto ui_data=renderer_data;ui_data.num_params=kGraphParameterId+1;
+    auto ui_data=renderer_data;ui_data.num_params=kGraphSyncGuardId+1;
     ui_data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* info)->PF_Err {
         check(info && info->events==(PF_CustomEFlag_COMP|PF_CustomEFlag_EFFECT) && !info->comp_ui_width && !info->comp_ui_height,
             "metadata UI registers only zero-sized composition events");return 0;
@@ -1149,12 +1739,36 @@ int main() {
     PF_ArbitraryH ui_graph_handle{};
     check(create_graph_parameter(&ui_data,static_graph,&ui_graph_handle)==0,"UI metadata graph fixture created");
     PF_ParamDef ui_graph_param{};ui_graph_param.param_type=PF_Param_ARBITRARY_DATA;ui_graph_param.u.arb_d.value=ui_graph_handle;
-    std::array<PF_ParamDef*,kGraphParameterId+1> ui_params{};ui_params[kGraphParameterId]=&ui_graph_param;
+    PF_ParamDef ui_guard{};ui_guard.param_type=PF_Param_FLOAT_SLIDER;
+    std::array<PF_ParamDef*,kGraphSyncGuardId+1> ui_params{};ui_params[kGraphParameterId]=&ui_graph_param;ui_params[kGraphSyncGuardId]=&ui_guard;
     PF_EventExtra ui_event{};ui_event.e_type=PF_Event_DO_CLICK;ui_event.evt_out_flags=PF_EO_NEVER_UPDATE;
     initialize_native_temporal_ui();const auto event_suites=suite_requests;
     refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
     check(suite_requests==event_suites,"non-DRAW event performs no metadata SDK access");
     ui_event.e_type=PF_Event_DRAW;const auto ui_writes=sets;
+      if(auto module=LoadLibraryW(L"artifacts\\model-ui-exclusion-tests\\paired\\StarfieldHost.aex")) {
+          const auto initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(module,"SFLD_TestInitialize"));
+          const auto begin=std::bit_cast<std::uint64_t(*)() noexcept>(GetProcAddress(module,"SFLD_BeginUiExclusionV1"));
+          const auto end=std::bit_cast<void(*)(std::uint64_t) noexcept>(GetProcAddress(module,"SFLD_EndUiExclusionV1"));
+          check(initialize && begin && end,"paired UI exclusion test module exports its private seam");
+          if(initialize && begin && end) {
+              initialize();const auto token=begin();check(token && ui_transaction_active(),"native callbacks observe resident Host mutation scope");
+              const auto before=suite_requests;
+              refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+              std::vector<PF_ParamDef*> source_params;for(auto& p:emitter.params)source_params.push_back(&p);
+              PF_UserChangedParamExtra change{};change.param_index=4;PF_OutData changed{};
+              check(sync_node_graph_parameter(&renderer_data,&changed,source_params.data(),&change)==0 && suite_requests==before,
+                  "stale guard0 DRAW and source supervision perform no SDK access during native structural transaction");
+              end(token);check(!ui_transaction_active(),"metadata resumes after the exact mutation token releases");
+          }
+          check(FreeLibrary(module)!=0,"test Host module releases after callback-fence regression");
+      }
+      for(auto guard:{1.0,2.0}) {
+          ui_guard.u.fs_d.value=guard;
+          refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
+          check(suite_requests==event_suites,"guarded DRAW performs no SDK access during effect parade mutation");
+      }
+      ui_guard.u.fs_d.value=0;
     refresh_native_temporal_ui(&ui_data,ui_params.data(),&ui_event,1);
     check(!validated_native_control_proofs(&ui_data).empty(),"UI DRAW automatically captures native animation metadata");
     const auto stable_aegp=aegp_suite_requests;
@@ -1329,7 +1943,11 @@ int main() {
         check(anchor.x==0 && anchor.y==0 && anchor.z==0,
             "native centred Anchor XY and Z0 map to canonical zero");
         check(core::validate_graph(transformed,core::particle_node_registry()).ok(),"new native graph passes current registry");
-        {NativeBindingTransaction bindings(&renderer_data,701);check(bindings.install(transformed)==0,"new synthetic expressions install");bindings.accept();}
+        const auto append_clears=expression_clear_count;
+        {NativeBindingTransaction bindings(&renderer_data,701);check(bindings.install(transformed,nullptr,nullptr,nullptr,&animated_graph)==0,"new synthetic expressions install");bindings.accept();}
+        const auto new_aliases=std::count_if(expressions.begin(),expressions.end(),[](const auto& text){
+            return text.find(u"fx.param(\"Node UUID 7\").value === 5")!=std::u16string::npos;});
+        check(expression_clear_count-append_clears==new_aliases,"pure addition compiles only new aliases and preserves existing dependencies");
         save_transform_expressions("artifacts/transform-none-animation-expressions.json");
         const auto matrix_alias=std::find_if(expressions.begin(),expressions.end(),[](const auto& text) {
             return text.find(u"// Starfield Transform affine entry 0\n")!=std::u16string::npos;
@@ -1346,7 +1964,7 @@ int main() {
         auto retired=transformed;
         retired.optional_records.erase(std::remove_if(retired.optional_records.begin(),retired.optional_records.end(),
             [](const auto& bytes){return bytes.size()>=2 && bytes[0]==std::byte{2} && bytes[1]==std::byte{0x80};}),retired.optional_records.end());
-        const auto retirement_text=expressions;
+        const auto retirement_text_storage=std::make_unique<decltype(expressions)>(expressions);const auto& retirement_text=*retirement_text_storage;
         const auto retirement_enabled=expression_enabled;
         const auto retirement_base=main.values;
         // Execute actual numeric playback after EVERY host expression/value
@@ -1392,7 +2010,7 @@ int main() {
         check(expressions==retirement_text && expression_enabled==retirement_enabled,
             "retired alias spans can be reused without stale expression state");
         check(handoff_samples>0,"actual alias mutations exercised reentrant playback");alias_mutation_hook={};
-        const auto before_expression_failure=expressions;
+        const auto before_expression_failure_storage=std::make_unique<decltype(expressions)>(expressions);const auto& before_expression_failure=*before_expression_failure_storage;
         expressions[matrix_stream-kNativeBindingFirstIndex]=u"0";
         {
             NativeBindingTransaction bindings(&renderer_data,701);A_long failed_stream=-1,failed_parameter=-1;
@@ -1420,6 +2038,7 @@ int main() {
                 "missing source identity differs from a nonfinite source value");
         }
         unresolved_alias=-1;
+
         check(expressions[matrix_stream-kNativeBindingFirstIndex]==u"0" && live_refs==0 && acquisitions==0,
             "unresolved source restores expressions and releases host references");
         expressions=before_expression_failure;
@@ -1481,7 +2100,7 @@ int main() {
         };
         std::vector<CapturedParticleFrame> opening_frames;
         const std::array<core::RationalTime,1> opening_times{{{-1,48}}};PF_OutData opening_output{};
-        check(capture_motion_particles(&renderer_data,&opening_output,transformed,1920,1080,opening_times,core::NeverCancelled{},opening_frames)==0 &&
+        check(capture_motion_particles(&renderer_data,&opening_output,transformed,1920,1080,{},opening_times,core::NeverCancelled{},opening_frames)==0 &&
               opening_frames.size()==1 && opening_frames[0].particles.particles.empty(),
               "selected Null accepts an empty negative opening-shutter sample instead of AE range error");
         check(last_native_history_trace().node_samples==0 && !opening_output.return_msg[0],
@@ -1696,7 +2315,7 @@ int main() {
         output<<"]";
         check(bool(output) && models==14 && transforms>12,"actual mixed Model and Transform expressions recorded");
         check(live_refs==0 && acquisitions==0,"mixed Model/Transform edit releases host references");
-        const auto old_expressions=expressions;
+        const auto old_expressions_storage=std::make_unique<decltype(expressions)>(expressions);const auto& old_expressions=*old_expressions_storage;
         fixtures[1].display_name=fixtures[2].display_name=u"Ambiguous author name";
         auto ambiguous=edit(0,1,fixtures[1].values[1].one_d);
         check(direct_edit(ambiguous)!=0 && !ambiguous.accepted,"duplicate live effect names reject the binding transaction");
@@ -1734,7 +2353,7 @@ int main() {
             main.values[kGraphEditReceiptId].one_d==987654,"explicit command publishes saved receipt without supervised callback");
         auto before_graph=handles.at(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH))->bytes;
         const auto before_revision=main.values[kGraphRevisionId].one_d;
-        const auto before_expressions=expressions;
+        const auto before_expressions_storage=std::make_unique<decltype(expressions)>(expressions);const auto& before_expressions=*before_expressions_storage;
         main.values[kGraphEditCommitId].one_d=987653;
         auto empty_context=renderer_data;empty_context.width=empty_context.height=empty_context.time_scale=0;
         empty_context.effect_ref=nullptr; // explicit borrowed owner replaces PF lookup
@@ -1771,72 +2390,7 @@ int main() {
         model_present=transform_present=false;
         check(live_refs==0 && acquisitions==0,"explicit graph command releases borrowed stream values and suites");
     }
-    {
-        // Include real Material/Motion records as well as Emitter, Particle,
-        // Force, Transform and Model in a single saved alias publication.
-        using namespace core::graph_keys;
-        model_present=transform_present=all_kinds_present=panel_publish=true;
-        for(auto [index,kind]:{std::pair{7,records::Kind::material},std::pair{8,records::Kind::motion}}) {
-            auto& f=fixtures[index];f.values.resize(records::parameter_count(kind));f.params.resize(f.values.size());
-            for(auto& p:f.params)p.param_type=PF_Param_FLOAT_SLIDER;
-            uuid(index,records::uuid_first_index(kind),index);
-        }
-        fixtures[7].name="org.starfieldfx.node.material";
-        fixtures[7].values[1].one_d=1;fixtures[7].values[2].color={1,1,1,1};
-        fixtures[7].values[3].one_d=50;fixtures[7].values[5].one_d=100;fixtures[7].values[6].one_d=1;
-        fixtures[8].name="org.starfieldfx.node.motion";
-        auto& m=fixtures[8].values;namespace ml=records::motion_layout;
-        m[ml::mode].one_d=1;m[ml::origin_type].one_d=1;m[ml::origin_xy].two_d={960,540};
-        m[ml::speed].one_d=100;m[ml::curve].one_d=2;
-        m[ml::curve+2].one_d=100;m[ml::curve+3].one_d=1;m[ml::curve+4].one_d=100;
-        connection(4,records::Kind::transform,8,14);connection(8,records::Kind::motion,255,18);
-        main.values[kGraphSyncGuardId].one_d=1;main.values[kGraphEditCommitId].one_d=987657;
-        PF_OutData output{};
-        const auto seven_error=commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987657,701,&output);
-        if(seven_error)std::printf("Seven-kind diagnostic: %d %s\n",seven_error,output.return_msg);
-        check(seven_error==0,
-            "seven-kind native graph publishes actual bindings");
-        auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
-        final_refresh_test(prior,output);
-        const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
-        check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
-        std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);
-        lifecycle_file.write(reinterpret_cast<const char*>(lifecycle_bytes.value().data()),lifecycle_bytes.value().size());
-        check(bool(lifecycle_file),"actual compiler graph saved for full backup/render lifecycle test");lifecycle_file.close();
-        const auto baseline_text=expressions;const auto baseline_enabled=expression_enabled;
-        auto render_data=renderer_data;render_data.num_params=0;
-        render_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long t,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
-            *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=evaluated_binding(i,t);return 0;};
-        render_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
-        unsigned samples{};
-        alias_mutation_hook=[&]{++samples;auto old=prior;
-            check(sample_native_node_animation(&render_data,old,1920,1080)==0,"seven-kind in-flight graph never sees a transient sentinel");
-            auto live=saved_graph();check(sample_native_node_animation(&render_data,live,1920,1080)==0,
-                "seven-kind saved graph remains valid at each host mutation");};
-        // A receipt-write failure before retirement must leave every expression.
-        panel_output_only=true;main.values[kGraphEditCommitId].one_d=987658;fail_set=kGraphEditReceiptId;
-        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
-            "seven-kind deletion publication failure rejects");
-        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
-            "seven-kind failed publication keeps original aliases and graph");
-        // A detach failure AFTER new graph verification restores graph+aliases.
-        fail_expression=0;
-        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)!=0,
-            "seven-kind post-publication retirement failure rejects");
-        check(expressions==baseline_text && expression_enabled==baseline_enabled && saved_graph().nodes.size()==8,
-            "seven-kind failed retirement restores graph and exact expressions");
-        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987658,701,&output)==0 && saved_graph().nodes.size()==1,
-            "seven-kind deletion completes post-publication retirement");
-        check(samples>0,"seven-kind reentrant mutation callbacks executed");alias_mutation_hook={};
-        final_retirement_test(prior,render_data,output);
-        // Invalid evaluated source values are still errors before any handoff.
-        const auto before_invalid=sets;unresolved_alias=kNativeBindingFirstIndex;
-        NativeBindingTransaction invalid(&renderer_data,701);const char* stage{};
-        check(invalid.install(saved_graph(),nullptr,&stage,nullptr,&prior)==PF_Err_BAD_CALLBACK_PARAM && sets==before_invalid &&
-            stage && !std::strcmp(stage,"verify finite alias handoff"),"missing old binding cannot become a numeric fallback");
-        unresolved_alias=-1;
-        panel_output_only=all_kinds_present=model_present=transform_present=panel_publish=false;main.values[kGraphSyncGuardId].one_d=0;
-    }
+    seven_kind_publication_tests();
     dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
     // PARAMS_SETUP creates its own default arbitrary value.
     for (auto& param : main.params) if (param.param_type == PF_Param_ARBITRARY_DATA) {
@@ -1844,6 +2398,7 @@ int main() {
         if (handles.contains(param.u.arb_d.dephault)) dispose(param.u.arb_d.dephault);
     }
     check(handles.empty(), "all retained graph handles released");
+    check(FreeLibrary(source_scope_module)!=0,"source callback fixture releases its paired resident exclusion");
     std::printf("Native sync: %d checks, %d failures\n", checks, failures);
     failures += run_camera_capture_tests(); return failures ? 1 : 0;
 }

@@ -1,5 +1,174 @@
 # ADR 0040: explicit native graph command and saved publication
 
+## M3-20 / native original-layer repair contract — native91, 2026-10-18
+
+Owner rejects repeated external recovery scripts as the product solution.
+The resident Host will expose an explicit repair-selected-graph command. It
+requires an initialized original renderer with guard1 and an exact terminal
+negative receipt for a valid nonce; all current native author guards must be0.
+It refuses active UI transactions, ambiguous renderers and unknown states.
+Before touching derived state, keep a disabled full-layer backup in one undo
+group. Temporarily disable the original renderer and verify that state before
+allowing unavailable OLD binding handoffs to be replaced using finite record
+values. Such values only bridge disabled derived state; new active bindings
+must still resolve from actual author effects and pass strict post-expression
+verification. Retire obsolete aliases after the newly saved graph is verified.
+Never recreate missing source effects or infer their lost animation.
+
+Repair changes only original derived graph/bindings/resources/receipts/guard,
+preserving its author effects, keyframes, Output controls, flags and effect
+compositing options. Verify saved receipt/revision, restore flags, then unlock;
+failure retains the backup and guard and reports its exact phase. Normal graph
+commit/render handoff requirements are unchanged. This is an explicit native
+repair operation, never startup/polling or automatic adoption of a persisted
+lock. Native request is private and versioned; public IDs/schema/ABI stay fixed.
+
+All mutations, including re-guarding failed final verification, belong to the
+same undo group. A host failure closing that group is reported without an
+additional out-of-group write or a false claim that publication rolled back.
+Failed publication preserves its native diagnostic and attempts to restore
+the terminal rejected request. Disabled backups use guard2. Native91 fake-SDK
+fault injection qualifies coordinator behavior only; host acceptance remains open.
+
+## M3-20 / explicit disabled-copy rebuild after missing active source — 2026-10-18
+
+Host result: owner separately authorized and ran the script. AE23.5x52 reports
+ok=true/complete for disabled copy p0-c1-l71, and owner reports it appears to
+allow node editing. This qualifies this bounded rebuild execution only, not
+all editing, render, undo/reopen or Model chooser behavior. Original and prior
+backup remain; ordinary missing-source/guard policy is unchanged.
+
+Owner-run bounded recovery failed on AE23.5x52 at stream237's finite handoff.
+Saved project CRC29ece35f matches host revision44. Slot139 names Model
+58b80730780d43f28d2af9fc04c8cc64/parameter5; its saved edge reaches Output,
+but the host inventory contains only Emitter, Particle and Motion. The initial
+deletion route is unknown. This active missing source is not ADR0043's parked
+orphan: accepting a saved constant would fabricate its unavailable animation.
+Keep normal publication and rendering strict; do not clear the original guard.
+
+Prepare Rebuild-GraphCopy.jsx as a separately authorized, manual operation.
+Require frozen project/comp/layer names and IDs, CRC/revision, terminal nonce
+790333 or790334, guard1, unchanged native records/Output and idle node guards.
+Reject pending project commands, active Model sessions, prior rebuilt copies
+and animated/expression Output controls before writing. Duplicate the whole
+layer and disable the copy, then replace ONLY that copy's renderer at its old
+index/name/enabled state. Transfer the17 static Output author controls, mark
+the existing nodes initialized, and invoke the existing strict native publisher
+with nonce790335. Its fresh graph has no old missing-source binding to hand off.
+Verify receipt/revision and unchanged node/Output records, then release only
+the copy's guard. Leave the copy disabled, including on failure. No original
+layer/previous backup writes, source recreation, automatic repair or retries.
+
+The copy retains native effect animation through AE's layer duplication. The
+replacement renderer resets its private/derived state and effect compositing
+options; this is explicit recovery scope, not an exact clone of the broken
+renderer. Original stays available for comparison. One undo group; no project
+save/process/configuration actions. ADR0011 requires authorization before owner
+execution; offline fixtures do not qualify AE behavior. No shipping ID, schema,
+ABI, render contract or regular transaction behavior changes.
+
+## M3-20 / explicit bounded failed-transaction recovery — 2026-10-17
+
+The second owner report names Comp 1 / Medium Blue Solid 4 (l70), revision44,
+commit790333/receipt-790333, main guard1 and three idle node effects. Snapshot
+validation passes. The reconstructed JS checksum differs from the saved checksum;
+decimal rounding and native metadata mean this alone proves neither corruption
+nor safe unlocking. The owner also reports failures across newly created comps/
+layers; do not dismiss that observation solely from the current target token.
+
+Keep automatic busy rejection. Prepare tools/Recover-GraphGuard.jsx as an
+explicit owner-run operation scoped to this frozen target, names, exact receipt,
+revision/checksum and unchanged canonical native-node/Output records. Reject any
+active/unknown Model session, pending node guard, changed state, wrong gateway,
+missing command or prior recovery backup before writing. This is not a general
+unlock command and is never invoked by polling, startup or ordinary editing.
+
+After per-action owner authorization (ADR0011), one undo group duplicates the
+whole target layer, disables the copy and gives its renderer backup guard2.
+Re-resolve and revalidate the original, assign a fresh nonce under its existing
+guard1, and execute the existing strict native graph publisher. No authored node
+parameter is overwritten by the script. Verify positive saved receipt, advanced
+revision, initialized snapshot and unchanged node/Output records before releasing
+the original guard. On publication/validation/release failure retain/reapply1
+and keep the backup; never silently retry. Check guard again after undo closure.
+Keep the disabled backup on success too. One undo reverts the grouped operation.
+
+This rebuild deliberately republishes current authoritative node records; it
+does not assert the old arbitrary graph equals them or recover lost pre-failure
+values. The complete layer copy is retained for that uncertainty. No new feature,
+shipped protocol/ID/schema/ABI, automatic unlock, project save or process action.
+1492 offline actual-script checks pass; owner execution failed at stream237
+and retained the backup/guard. Successful recovery/undo acceptance is open.
+Baseline and reports: artifacts/m3-20-guard-recovery-20261017/.
+
+## M3-20 / terminal receipt isolation installed90/99 — 2026-10-17
+
+Owner-run read-only host-report.json (AE23.5x52, CEP98) confirms l70 guard1,
+commit790333, receipt-790333; fresh l71 commit158257, receipt0, ready0.
+The resident command skips successful receipts only, so a rejected guarded
+renderer remains a candidate and conflicts with another renderer. Treat an
+exact negative receipt for a valid nonce as terminal too, without retrying or
+unlocking it. Preserve rejection of multiple pending requests, malformed
+nonces and mismatched negative receipts. The old rollback/guard cause remains
+unresolved; do not clear it or infer safe recovery from terminal status alone.
+
+Owned scope: StarfieldHost.cpp, PluginVersion.h, actual command regression,
+read-only Report-GraphGuard.jsx and its fixture, panel failed-bootstrap display
+and topology/startup fixtures, pairing and checkpoint docs. Native90/CEP99 is
+installed after AE0 checks.35 native standard/ASAN checks,49 panel suites,30 DOM
+variants and full SDK build pass;11 native/25 panel and backup hashes, ABI9 and
+paired rollback preflight verify. Actual AE acceptance remains open.
+Failed initial graph reads must display an empty canvas with the error, not
+the legacy fixed Force chain; retain an already confirmed same-target canvas.
+No new feature, ID, wire/schema/ABI/render change, automatic unlock or AE start.
+Evidence: artifacts/m3-20-guard-owner-20261017/.
+
+## M3-20 / saved guard sampling — 2026-10-17
+
+CEP97 is rejected by the owner: additions report guard1 even immediately after
+a successful deletion. A freshly resolved scripting .value of1 does not prove
+that the native pre-expression saved stream is1. EffectGraphBackup::scalar
+uses AEGP_GetNewStreamValue at zero with pre_expression=TRUE; the script guard
+must use valueAtTime(0,true) to enforce the same hidden, non-animating stream
+contract. Acquisition, release and post-undo checks share that reader; no
+ordinary-value fallback. This is a contract correction, not proof of the
+host's exact mechanism. Native deletion/full backup remains unchanged.
+
+Busy-only readback retains the original decision and fresh indexed/named
+ordinary and zero-time samples, identity metadata, host and gateway. Diagnostic
+failure preserves the busy rejection; no reads clear or retry an unknown guard.
+Regression injection covers ordinary1/saved0 allowing add/move, ordinary0/
+saved1 rejecting edits without commands, and sampler/diagnostic failures.
+Actual CEP98 host acceptance remains open.
+
+## M3-20 / verified script guard ownership — 2026-10-16
+
+Owner confirms Motion addition on CEP96, then canvas move/connect/delete fail
+with graph_transaction_busy. Static review finds ordinary preflight retains the
+guard Property across a full node snapshot, and cleanup writes0 without saved
+verification; missing cleanup targets can still return success. These are code
+gaps, not proof of the current host's exact guard value/cause.
+
+CEP97 uses a plain request-scoped ownership record, freshly resolves the pinned
+guard at acquisition and release, and verifies each write. No guard reference
+crosses snapshot enumeration or native publication. Verify zero again after the
+undo group closes. Cleanup failures are visible and cannot return success.
+Rollback runs only after this call confirms its own guard acquisition (including
+a setter throwing after saving1); a discarded acquisition permits no rollback. A failed
+rollback retains its guard. Apply the same cleanup contract to bootstrap.
+Busy errors include the fresh guard and generation. No automatic unlocking of
+unknown existing guards, no timeout/retry, CRC generation or native finalizer.
+This does not reinstate the withdrawn native78/79 proposals below.
+
+## M3-20 / CEP92 — remove avoidable node-add overhead — 2026-10-15
+
+Matching gateway code is reused after a same-turn generation/API check. Default
+Cube additions with no asset use the ordinary transaction, while deletions and
+resource changes retain full backup/transfer. Optional Model transport loads on
+demand. Native command, strict saved records, rollback and8s timeout remain;
+this is overhead removal, not a timeout increase or an asynchronous write replay.
+
+
 - Status: implementation candidate, AE2023 acceptance open.
 - Task: M3-17, native69 / CEP72; supersedes ADR0019's supervised CEP trigger.
 

@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 if(-not $Run){Write-Output 'Report: compile actual native mixed-node binding transactions with local May2023 SDK fake callbacks, then execute generated expressions in JS fixtures. Add -Run to act; no AE process is started.';exit 0}
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskDir=if($Sanitize){'artifacts\mixed-node-binding-asan-tests'}else{'artifacts\mixed-node-binding-tests'}
-$taskCore=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation',
+$taskCore=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource',
     'MotionGeometry','MotionPathTravel','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture',
     'ModelGeometry','ModelResources','ModelScene','PluginApi','CpuRenderer','SpriteScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
 $taskSources=@('tests\native_sync_tests.cpp','tests\camera_capture_tests.cpp','ae_plugin\NodeGraphSync.cpp','ae_plugin\Camera.cpp',

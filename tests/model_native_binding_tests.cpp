@@ -21,7 +21,8 @@ PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
 AEGP_PluginID node_graph_sync_plugin_id() noexcept {return 1;}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*,bool) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 namespace starfield::adapter {
-PF_Err import_model_obj(PF_InData*,PF_OutData*,PF_ParamDef*[]) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
+unsigned model_import_requests{};
+PF_Err import_model_obj(PF_InData*,PF_OutData*,PF_ParamDef*[]) noexcept{++model_import_requests;return PF_Err_BAD_CALLBACK_PARAM;}
 PF_Err gpu_device_setup(PF_InData*,PF_OutData*,PF_GPUDeviceSetupExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 PF_Err gpu_device_setdown(PF_InData*,PF_GPUDeviceSetdownExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 bool gpu_device_matches(const void*,PF_GPU_Framework,A_u_long) noexcept{return false;}
@@ -42,7 +43,9 @@ PF_Handle ui_author_mesh{};unsigned ui_asset_writes{};
 int ui_write_fail=-1,ui_write_silent=-1,ui_read_after_write=-1,ui_guard_release_mode{};bool ui_rollback_silent{};
 const char* ui_names[]={"org.starfieldfx.node.model","org.starfieldfx.node.emitter","org.starfieldfx.node.particle"};
 unsigned checked_out{},checked_in{},aegp_queries{};int fail_checkout=-1;bool fail_checkin{},bad_numeric{};
-std::array<double,14> pose_aliases{};
+// Motion binding10 adds three animated aliases after the original 12-control
+// prefix; Model continues to use the first 14 slots.
+std::array<double,15> pose_aliases{};
 constexpr unsigned record_header=12,node_header=20,field_bytes=32;
 void append(core::OpaqueBytes& bytes,std::uint64_t v,unsigned count){for(unsigned b=0;b<count;++b)bytes.push_back(static_cast<std::byte>((v>>(8*b))&255));}
 void put(core::OpaqueBytes& bytes,unsigned offset,std::uint64_t v,unsigned count){for(unsigned b=0;b<count;++b)bytes[offset+b]=static_cast<std::byte>((v>>(8*b))&255);}
@@ -66,7 +69,7 @@ core::Graph bound_graph(unsigned source=1,unsigned revision=0){
     graph.optional_records.push_back(bindings(source,revision));return graph;
 }
 PF_Err checkout(PF_ProgPtr,PF_ParamIndex index,A_long time,A_long,A_u_long scale,PF_ParamDef* out){
-    CHECK(index>=adapter::kNativeBindingFirstIndex&&index<adapter::kNativeBindingFirstIndex+14&&scale);++checked_out;
+    CHECK(index>=adapter::kNativeBindingFirstIndex&&index<adapter::kNativeBindingFirstIndex+15&&scale);++checked_out;
     const auto slot=index-adapter::kNativeBindingFirstIndex;if(slot==fail_checkout)return 516;
     out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=bad_numeric?std::numeric_limits<double>::quiet_NaN():pose_aliases.at(slot);
     if(slot==0)out->u.fs_d.value+=double(time)/scale;return PF_Err_NONE;
@@ -89,6 +92,13 @@ void registration_module(PF_InData& data){
     auto restored=take(adapter::read_model_geometry_parameter(&data,created,never));CHECK(restored.positions.size()==8&&restored.triangles.size()==12);
     call.id=1504;created=nullptr;CHECK(EffectMain(PF_Cmd_ARBITRARY_CALLBACK,&data,&output,nullptr,nullptr,&call)==PF_Err_BAD_CALLBACK_PARAM&&!created);
     CHECK(adapter::native_nodes::parameter_count(adapter::native_nodes::Kind::model)==101);
+    PF_UserChangedParamExtra button{};button.param_index=layout::import_obj;const auto delivered_count=data.num_params;
+    data.num_params=101;CHECK(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&output,nullptr,nullptr,&button)==PF_Err_BAD_CALLBACK_PARAM &&
+        adapter::model_import_requests==1); // route the real button to import, not the scalar sync stub
+    data.num_params=0;output.return_msg[0]=0;
+    CHECK(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&output,reinterpret_cast<PF_ParamDef**>(1),nullptr,&button)==PF_Err_BAD_CALLBACK_PARAM &&
+        adapter::model_import_requests==1 && std::strstr(output.return_msg,"incomplete button delivery"));
+    data.num_params=delivered_count;
     for(int axis=0;axis<6;++axis){const auto& field=registered.at(layout::author_bounds_first-1+axis);
         CHECK(field.uu.id==1519+axis&&field.param_type==PF_Param_FLOAT_SLIDER&&field.u.fs_d.dephault==(axis<3?-.5:.5)&&
             (field.ui_flags&PF_PUI_INVISIBLE)&&!adapter::native_nodes::authored_parameter(adapter::native_nodes::Kind::model,95+axis));}
@@ -130,8 +140,8 @@ void invalid_records(PF_InData& data){
     const auto original=bound_graph();
     for(unsigned length=2;length<original.optional_records[0].size();++length){auto bad=original;bad.optional_records[0].resize(length);
         adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
-    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,10u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
-    for(unsigned version:{8u,9u}){auto current=original;put(current.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(current,1920,1080,1);CHECK(plan.valid());}
+    for(unsigned version:{0u,1u,2u,3u,4u,5u,6u,12u}){auto bad=original;put(bad.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
+    for(unsigned version:{8u,9u,10u,11u}){auto current=original;put(current.optional_records[0],2,version,2);adapter::NativeAnimationPlan plan(current,1920,1080,1);CHECK(plan.valid());}
     for(unsigned kind:{2u,6u,65535u}){auto bad=original;put(bad.optional_records[0],28,kind,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}
     for(int index=1;index<=24;++index){if(!layout::binding_field(index))continue;const auto offset=field_offset(index);
         for(unsigned type:{1u,2u,3u}){auto bad=original;put(bad.optional_records[0],offset+2,type,2);adapter::NativeAnimationPlan plan(bad,1920,1080,1);CHECK(!plan.valid());}

@@ -19,6 +19,7 @@ foreach($taskTool in @('Deploy-PanelTestBuild.ps1','Deploy-TestBuild.ps1','Resto
 }
 New-Item -ItemType Directory -Path (Join-Path $taskRoot 'tests') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'tests/extendscript_syntax_tests.js') -Destination (Join-Path $taskRoot 'tests/extendscript_syntax_tests.js')
+Copy-Item -LiteralPath (Join-Path $taskRepo 'tests/extendscript_conditionals.cjs') -Destination (Join-Path $taskRoot 'tests/extendscript_conditionals.cjs')
 $taskLive=Join-Path $taskRoot 'cep_panel';$taskBundle=Join-Path $taskRoot 'dist'
 $taskPlugin=Join-Path $taskRoot 'artifacts/deploy-test/host';$taskCep=Join-Path $taskRoot 'artifacts/deploy-test/cep'
 $taskCandidate=Join-Path $taskRoot 'artifacts/prepared/panel-test/cep_panel'
@@ -62,6 +63,9 @@ $taskGateway=Join-Path $taskCandidate 'jsx/starfield_gateway.jsx'
 Write-PanelTest $taskGateway ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'"; var byte=0;')
 Check-PanelTest ((Invoke-PanelTest 'reserved-word' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -ne 0) 'ES3 reserved word accepted.'
 Check-PanelTest (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'artifacts/disabled/panel-pair'))) 'Invalid syntax created a backup.'
+Write-PanelTest $taskGateway ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'"; var mode=1; var core=mode===1?1:mode===2?0:2;')
+Check-PanelTest ((Invoke-PanelTest 'nested-conditional' 'Deploy-PanelTestBuild.ps1' ($taskArguments+@('-Install'))) -ne 0) 'Unsafe nested conditional accepted.'
+Check-PanelTest (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'artifacts/disabled/panel-pair'))) 'Unsafe conditional created a backup.'
 Write-PanelTest $taskGateway ('var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'";')
 $taskClient=Join-Path $taskCandidate 'js/panel.js'
 Write-PanelTest $taskClient ('var GATEWAY_BUILD = "native-presets-'+$taskBasePanel+'";')

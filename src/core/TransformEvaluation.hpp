@@ -122,6 +122,8 @@ Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphN
 Result<std::uint32_t> retain_transform_basis(EvaluatedGraph& graph,const TransformBranchPlan& plan) {
     if(!plan.combined || plan.combined->particle_basis()==ParticleSpriteBasis{1,0,0,0,1,0,0,0,1})
         return Result<std::uint32_t>::success(0);
+    const auto existing=std::find(graph.sprite_bases.begin(),graph.sprite_bases.end(),plan.combined->particle_basis());
+    if(existing!=graph.sprite_bases.end())return Result<std::uint32_t>::success(static_cast<std::uint32_t>(existing-graph.sprite_bases.begin()+1));
     if(graph.sprite_bases.size()==kMaxParticleSpriteBases)
         return Result<std::uint32_t>::failure(ErrorCode::work_limit_exceeded,"Transform sprite table limit exceeded");
     graph.sprite_bases.push_back(plan.combined->particle_basis());

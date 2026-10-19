@@ -30,6 +30,8 @@ struct ParticleInstance {
     double anchor_x_percent{50},anchor_y_percent{50};
     std::uint32_t up_axis{2};
     Vec3 color{1.0, 1.0, 1.0};
+    // Turbulence output for downstream nodes when Affected Properties is Noise.
+    Vec3 turbulence_noise{};
     Vec3 position{};
     Vec3 velocity{}; // instantaneous world units/s, used by auxiliary inheritance
     // 0 preserves the identity path. Other indices are 1-based into the owning

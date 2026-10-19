@@ -1,12 +1,171 @@
+# Current M3-20 candidate — native Motion prefix authoring — 2026-10-18
+
+ADR0039/0045 restore Starting With using its existing constant numeric bank.
+The custom control opens a native UTF-8 prefix editor with owned modal
+snapshots; the AE parameter label supplies the title, and the control draws
+only its prompt/value to avoid duplicate text. MotionAuthorTransaction persists
+and verifies the bank jointly with graph publication. Static prefix overrides
+never enter numeric animation bindings. Historical Motion sampling retains
+frame-scoped Light Path and Look At resources instead of dropping them while
+rebuilding numeric controls. No render boundary, public ID, persistent schema
+or Core ABI change.
+
+# Previous M3-20 candidate — explicit native repair and owned button input — 2026-10-18
+
+ADR0040 separates normal live graph handoff from an explicit, backed-up repair
+of a verified disabled renderer. Only the latter can replace unavailable old
+bindings with finite record values while rebuilding derived state. New active
+bindings still require actual author evaluation. Resident Host dispatch targets
+the selected layer under its UI exclusion; no idle recovery or persisted-lock
+adoption. No public IDs, sequence schema, Core ABI or render contract change.
+ADR0038 makes Model button delivery optional: checked identity and owned saved
+state cross the dialog boundary; raw callback arrays and SDK handles do not.
+Current source/build/deployment/host gates belong to current-state.md.
+
+# Previous M3-20 investigation — missing active Model — 2026-10-18
+
+Actual saved CRC29ece35f matches host revision44: stream237 references an
+Output-connected Model absent from the current native inventory. The bounded
+republish recovery fails strictly at its old animation handoff. Do not apply
+parked-orphan rules or substitute a recorded constant for this active source.
+ADR0040 defines a separately authorized disabled-copy rebuild with a fresh
+renderer and surviving native author effects. Normal transactions/IDs/ABI and
+installed90/99 remain unchanged; deletion origin and host recovery remain open.
+
+# Installed M3-20 checkpoint — native90 / CEP99 — 2026-10-17
+
+Project-wide explicit command selection treats receipt=nonce and an exact
+receipt=-nonce for a valid request as terminal. Only pending requests participate
+in uniqueness. A rejected renderer may stay guarded after failed rollback;
+skipping it is isolation, never authorization to retry or unlock it. Actual owner
+evidence and regression reproduce its interference with fresh initialization.
+Failed canonical initialization shows no legacy fixed graph; a previously
+confirmed same-target canvas remains visible after transient read failure.
+ADR0040 and current-state.md retain original-lock/Model host gates and evidence.
+
+# Previous M3-20 checkpoint — native89 / CEP98 installed — 2026-10-17
+
+Script-owned renderer guards use zero-time pre-expression saved samples,
+matching EffectGraphBackup::scalar for this non-animating hidden stream.
+No ordinary getter fallback. Busy diagnostics retain the original decision
+and compare fresh named/indexed samples without writing. The CEP97 owner
+failure persists immediately after successful deletion; reader divergence
+is a hypothesis, not a confirmed host cause. ADR0040 records the contract;
+current-state.md owns validation, deployment and remaining Model/AE gates.
+
+# Previous M3-20 checkpoint — native89 / CEP97 installed — 2026-10-16
+
+Guard ownership is request-scoped plain data. Reacquire the pinned renderer
+guard after enumeration/publication; verify acquisition, release and zero after
+undo closure. Ordinary edits/bootstrap share cleanup; only confirmed ownership
+authorizes rollback. Failed rollback retains its guard; unknown guards are not
+automatically cleared. ADR0040 records this contract and its host uncertainty.
+Owner confirms Motion addition on96; canvas editing and Model chooser gates
+remain open. Native89/Core ABI9 and the accepted Motion mapping remain.
+
+# Previous M3-20 checkpoint — native89 / CEP96 installed — 2026-10-16
+
+The owner trace raw1/Core0 identifies the Motion mapping expression, matching
+ExtendScript's reported conditional association. Motion uses explicit enum
+branches; all other direct nested conditionals in shipped JSX are explicitly
+grouped. ES3 syntax gates also reject ungrouped conditional branches. Normal
+Node parsing alone cannot qualify ExtendScript semantics. Native89/Core ABI9
+and strict publication/rollback remain. ADR0045 records evidence and host gates.
+
+# Previous M3-20 checkpoint — native89 / CEP95 installed — 2026-10-16
+
+Owner reproduced the readback discrepancy on94. CEP95 requires direct sampling
+for Motion mode, removes the scalar fallback and consumes the fresh Property
+without another host getter. Request-local plain raw/Core evidence accompanies
+failure diagnostics; saved values are never replaced by the desired mode or a
+later probe. ADR0045 and current-state.md record the unresolved host gate.
+
+# Previous M3-20 checkpoint — native89 / CEP94 installed — 2026-10-16
+
+CEP94 adds failure-only pre-rollback Motion diagnostics under ADR0045. Strict
+comparison remains authoritative; diagnostic values never replace the snapshot.
+Successful comparisons add no host reads. Motion host resolution is still open;
+current-state.md owns the pairing, evidence and undo.
+
+# Previous M3-20 repair — native89 / CEP93 installed — 2026-10-15
+
+AE23.5x52's failure trace places current Motion failure in gateway readback:
+native1/guard0 versus cached snapshot Core0. Cache only layout locators; reacquire
+children and unique full-UUID sources after enumeration/UI mutations. Explicit
+OBJ publication owns its existing UI exclusion capability while unrelated
+callbacks remain deferred. Model checkpoints/rollback resolve current full UUIDs;
+owned mesh/numeric values survive modal/publication phases, SDK refs do not.
+ADR0009/0038/0045 describe these unchanged-ID/ABI9 contracts. Exact deployment
+and open post-install host gates are recorded in current-state.md.
+
 # Starfield 架构
 
-Current implementation and installed pairing are restored to native77/CEP81
-(release1a6cf73, frozen352562d) on the owner's2026-10-13 rollback request.
-Native79 still failed node addition. The78 generation-coherence and79 timeout/
-restoration proposals below are withdrawn from active source, including their
-helper and fixture changes. Accepted CEP81 draft paint/receipt handling and Circle,
-plus unrelated Motion work, are preserved. The original deletion failure is still
-unresolved; no host acceptance is inferred from rollback or historical simulations.
+M3-20 deployed CEP92 (2026-10-15) keeps native88/Core ABI9. Native
+publication is the sole Motion selector writer; scripts stage guard intent only.
+Matching-generation gateways reuse code with request-local caches cleared.
+Asset-free Cube add/duplicate uses ordinary publication; resource changes and
+all deletions keep full backup. Optional Model transport loads on demand.
+Common graph/receipt codecs remain eager for whole-graph validation; AE manages
+AEX lifetime and Output-ancestor sampling remains unchanged. Tests and receipts
+live in artifacts/m3-20-add-path-20261014/; actual AE correction/latency is open.
+
+
+P-02M (2026-10-14) retires the CEP floating parameter inspector. The canvas and
+preset manager remain; clicking a node focuses its native AE Effect Controls,
+where all node values, popups, gradients and curves are edited. CEP91 removes
+editor DOM, styles, event handlers and editor helper script loads. Graph snapshots,
+read-only summaries and guarded topology/layout/preset transactions remain.
+Native88/Core ABI9 is unchanged; previous Motion/deletion host gates stay open.
+
+
+M3-20 resumed2026-10-14: native88 / Core ABI9 / CEP90 is the deployed Motion lifetime
+repair; receipts and installed status are authoritative in current-state.md. New
+features remain paused. ADR0045 now separates numeric transaction state from
+operation-local SDK ownership. Prepare/accept/rollback resolve unique Motion
+UUIDs, reacquire streams after writes and release them before the owning effect.
+Graph/binding publication cannot carry source handles into its next phase.
+Rollback returns an explicit status, verifies restoration and retains a guard on
+failure where identity remains safe. Duplicate/missing identities never authorize
+a numeric-slot write. This addresses the observed native87 crash path without
+claiming AE's precise invalidation trigger has been proven.
+
+Author intent is skipped for unrelated native edits; inactive sources hold no
+transaction entries. Changed-source lookup uses one sorted UUID inventory per
+phase, with linear SDK effect opens. Native graph publication obtains its CRC
+from the same encoded bytes used to allocate the ARB value, removing duplicate
+validation/serialization. IDs, schemas, Core ABI9, Output ancestor scope and
+append reuse are preserved. Failure injection and microbenchmarks are recorded
+in testing.md; AE persistence, deletion and responsiveness remain manual gates.
+
+The rejected pairing was native87 / Core ABI9 / CEP90, deployed2026-10-14 after
+all applicable offline gates and a zero-AE process check, under ADR0045. The
+native UI publisher consumes bounded Motion author intent, persists/verifies the
+source selector and its guard release, and preserves rollback. Source callbacks
+require complete delivery, resolve current kind+UUID rather than a borrowed PF
+parameter binding, and own exclusion with a distinct source-purpose query. All
+current offline gates pass; actual AE mode/deletion cause remains unproven. The
+installed state and deployment receipt are authoritative in current-state.md.
+
+Previous test pairing was native86 / Core ABI9 / CEP89, deployed
+2026-10-13 with UI transaction callback fencing and Motion authoring repair
+(ADR0044), preserving Output scope/orphan retirement/append reuse (ADR0043).
+CEP88 unifies the three-mode record reader, keeps the same-target confirmed
+canvas on failed reads, requires a fresh receipt before editing, and gates
+deployment/preparation on exact embedded contract and cache generations.
+CEP89 explicitly authors Motion selectors, verifies fresh UUID-scoped reads
+and published modes inside the transaction. Native86 supervises nonanimated
+Motion Type/After Path. Ordinary rollback restores graph/bindings before removing
+retired appended additions and holds the guard on failed restore.46 panel suites
+and18 transaction variants pass offline; actual AE qualification remains open.
+The owner confirms84/86 performance improvement. Manual AE2023
+qualification remains open. The independent node exposes Normal, Axis and One
+Side. The owner deferred Spherical and Spherical 2. Deployment hashes and
+rollback are recorded in `docs/current-state.md`.
+The owner has reopened stability investigation and paused new features. A
+disconnected deleted source in the saved project is confirmed; remaining random
+active-binding failures and actual host latency are unqualified.
+Historical rollback and rejected-pair records below do not describe the current
+installed pair; see `docs/current-state.md` for receipts and rollback.
 
 ## Previous implementation attempts (historical)
 
@@ -216,7 +375,7 @@ dispatched; owner chose manual testing. Motion/MNT work preserved; push pending.
 ## 模块和数据流
 
 ```text
-CEP 节点画布 / 属性编辑 / 预设
+CEP 节点画布 / AE 效果定位 / 预设
   -> ExtendScript 普通参数流、UUID、数值 revision/checksum 收据
   -> 原生节点 AEX + StarfieldParticle.aex 图提交与持久化
   -> SmartFX 参数/历史/相机采样，不可变预渲染快照
@@ -232,7 +391,7 @@ CEP 节点画布 / 属性编辑 / 预设
 | Model AEX | 静态 OBJ 数值网格与变换作者、导入检查点；资源传输和预设已接入，AE 宿主验收开放 |
 | StarfieldHost.aex | UI idle 上有界初始化/绑定、Model资产与整笔事务排队；原生文件窗口与UI范围互斥 |
 | StarfieldCore.dll | 纯数值图求值、确定性粒子模拟、CPU 栅格化、GPU 场景准备 |
-| cep_panel/ | 图 UI、曲线/渐变/预设、守卫事务与自适应检查 |
+| cep_panel/ | 图 UI、AE 效果定位、预设、守卫事务与自适应检查；参数/曲线/渐变在 AE 编辑 |
 
 Output 是主渲染效果在画布上的固定终端，没有独立 Output AEX。Auxiliary 使用 Emitter 原生效果的结构选择。Appearance 已退出当前表面。
 

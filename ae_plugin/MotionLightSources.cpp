@@ -11,8 +11,9 @@ struct Suites {
     SPBasicSuite* basic{};
     const AEGP_PFInterfaceSuite1* pf{};
     const AEGP_LayerSuite9* layer{};
+    const AEGP_LightSuite2* light{};
     const AEGP_MemorySuite1* memory{};
-    bool pf_acquired{},layer_acquired{},memory_acquired{};
+    bool pf_acquired{},layer_acquired{},light_acquired{},memory_acquired{};
     A_Err close() noexcept {
         A_Err first{};
         const auto release=[&](bool& acquired,const char* name,A_long version){
@@ -20,6 +21,7 @@ struct Suites {
             const auto error=basic->ReleaseSuite(name,version);if(!first)first=error;
         };
         release(memory_acquired,kAEGPMemorySuite,kAEGPMemorySuiteVersion1);
+        release(light_acquired,kAEGPLightSuite,kAEGPLightSuiteVersion2);
         release(layer_acquired,kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
         release(pf_acquired,kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1);
         return first;
@@ -69,6 +71,8 @@ PF_Err select_motion_light_source_ids(std::span<const MotionLightSource> sources
         const auto& source=sources[i];
         if(!source.layer_id||source.layer_id>0x7fffffffu||source.comp_index>=65536||
            source.name.size()>kMaxMotionLightNameUnits||source.name.find(char16_t{})!=std::u16string::npos||
+           (source.light_type!=AEGP_LightType_PARALLEL&&source.light_type!=AEGP_LightType_SPOT&&
+            source.light_type!=AEGP_LightType_POINT&&source.light_type!=AEGP_LightType_AMBIENT)||
            (i&&source.comp_index<=sources[i-1].comp_index))return PF_Err_BAD_CALLBACK_PARAM;
         for(std::size_t j=0;j<i;++j)if(sources[j].layer_id==source.layer_id)return PF_Err_BAD_CALLBACK_PARAM;
     }
@@ -79,8 +83,56 @@ PF_Err select_motion_light_source_ids(std::span<const MotionLightSource> sources
     }catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}
     catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
+PF_Err select_motion_point_light_source_ids(std::span<const MotionLightSource> sources,
+    std::u16string_view prefix,std::vector<std::uint32_t>& output) noexcept {
+    try {
+        std::vector<std::uint32_t> matched;
+        const auto selected=select_motion_light_source_ids(sources,prefix,matched);
+        if(selected)return selected;
+        std::vector<std::uint32_t> result;result.reserve(matched.size());
+        for(const auto id:matched) {
+            const auto source=std::find_if(sources.begin(),sources.end(),[&](const auto& value){return value.layer_id==id;});
+            if(source==sources.end())return PF_Err_BAD_CALLBACK_PARAM;
+            if(source->light_type==AEGP_LightType_POINT)result.push_back(id);
+        }
+        output.swap(result);return PF_Err_NONE;
+    }catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}
+    catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+}
+PF_Err motion_light_prefix_to_utf16(std::string_view input,std::u16string& output) noexcept try {
+    std::u16string result;result.reserve(std::min(input.size(),kMaxMotionLightNameUnits));
+    for(std::size_t i=0;i<input.size();) {
+        const auto lead=static_cast<unsigned char>(input[i]);std::uint32_t codepoint{};std::size_t count{};
+        if(lead<0x80){codepoint=lead;count=1;}
+        else if(lead>=0xc2&&lead<=0xdf){codepoint=lead&0x1fu;count=2;}
+        else if(lead>=0xe0&&lead<=0xef){codepoint=lead&0x0fu;count=3;}
+        else if(lead>=0xf0&&lead<=0xf4){codepoint=lead&0x07u;count=4;}
+        else return PF_Err_BAD_CALLBACK_PARAM;
+        if(count>input.size()-i)return PF_Err_BAD_CALLBACK_PARAM;
+        for(std::size_t byte=1;byte<count;++byte) {
+            const auto next=static_cast<unsigned char>(input[i+byte]);
+            if((next&0xc0u)!=0x80u)return PF_Err_BAD_CALLBACK_PARAM;
+            codepoint=(codepoint<<6)|(next&0x3fu);
+        }
+        if((count==2&&codepoint<0x80)||(count==3&&codepoint<0x800)||
+           (count==4&&codepoint<0x10000)||codepoint==0||codepoint>0x10ffff||
+           (codepoint>=0xd800&&codepoint<=0xdfff))return PF_Err_BAD_CALLBACK_PARAM;
+        if(codepoint<=0xffff)result.push_back(static_cast<char16_t>(codepoint));
+        else {
+            if(result.size()>kMaxMotionLightNameUnits-2)return PF_Err_BAD_CALLBACK_PARAM;
+            codepoint-=0x10000;
+            result.push_back(static_cast<char16_t>(0xd800+(codepoint>>10)));
+            result.push_back(static_cast<char16_t>(0xdc00+(codepoint&0x3ff)));
+        }
+        if(result.size()>kMaxMotionLightNameUnits)return PF_Err_BAD_CALLBACK_PARAM;
+        i+=count;
+    }
+    output=std::move(result);return PF_Err_NONE;
+} catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}
+  catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 PF_Err capture_motion_light_sources(PF_InData* data,AEGP_PluginID plugin,
-    const core::Cancellation& cancellation,std::vector<MotionLightSource>& output) noexcept {
+    const core::Cancellation& cancellation,std::vector<MotionLightSource>& output,
+    MotionLightSourceInventoryStats* stats) noexcept {
     if(!data||!data->effect_ref||!data->time_scale||plugin<=0||!data->pica_basicP||
        !data->pica_basicP->AcquireSuite||!data->pica_basicP->ReleaseSuite)return PF_Err_BAD_CALLBACK_PARAM;
     if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
@@ -91,10 +143,13 @@ PF_Err capture_motion_light_sources(PF_InData* data,AEGP_PluginID plugin,
         if(!suites.pf||!suites.pf->AEGP_GetEffectLayer||!suites.pf->AEGP_ConvertEffectToCompTime)return PF_Err_BAD_CALLBACK_PARAM;
         error=suites.basic->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,reinterpret_cast<const void**>(&suites.layer));
         if(error)return static_cast<PF_Err>(error);suites.layer_acquired=true;
+        error=suites.basic->AcquireSuite(kAEGPLightSuite,kAEGPLightSuiteVersion2,reinterpret_cast<const void**>(&suites.light));
+        if(error)return static_cast<PF_Err>(error);suites.light_acquired=true;
         if(!suites.layer||!suites.layer->AEGP_GetLayerParentComp||!suites.layer->AEGP_GetCompNumLayers||
            !suites.layer->AEGP_GetCompLayerByIndex||!suites.layer->AEGP_GetLayerObjectType||
            !suites.layer->AEGP_GetLayerID||!suites.layer->AEGP_GetLayerName||!suites.layer->AEGP_IsVideoActive)
             return PF_Err_BAD_CALLBACK_PARAM;
+        if(!suites.light||!suites.light->AEGP_GetLightType)return PF_Err_BAD_CALLBACK_PARAM;
         error=suites.basic->AcquireSuite(kAEGPMemorySuite,kAEGPMemorySuiteVersion1,reinterpret_cast<const void**>(&suites.memory));
         if(error)return static_cast<PF_Err>(error);suites.memory_acquired=true;
         if(!suites.memory||!suites.memory->AEGP_GetMemHandleSize||!suites.memory->AEGP_LockMemHandle||
@@ -109,13 +164,25 @@ PF_Err capture_motion_light_sources(PF_InData* data,AEGP_PluginID plugin,
         error=suites.layer->AEGP_GetCompNumLayers(comp,&count);if(error)return static_cast<PF_Err>(error);
         if(count<0||count>65536)return PF_Err_BAD_CALLBACK_PARAM;
         std::vector<MotionLightSource> result;
+        MotionLightSourceInventoryStats captured{};
+        captured.composition_layers=static_cast<std::uint32_t>(count);
         for(A_long index=0;index<count;++index){
             if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
             AEGP_LayerH layer{};AEGP_ObjectType type{};
             error=suites.layer->AEGP_GetCompLayerByIndex(comp,index,&layer);if(error)return static_cast<PF_Err>(error);
             if(!layer)return PF_Err_BAD_CALLBACK_PARAM;
             error=suites.layer->AEGP_GetLayerObjectType(layer,&type);if(error)return static_cast<PF_Err>(error);
+            if(type==AEGP_ObjectType_AV)++captured.av_layers;
+            else if(type==AEGP_ObjectType_CAMERA)++captured.camera_layers;
+            else if(type==AEGP_ObjectType_LIGHT)++captured.light_layers;
+            else ++captured.other_layers;
             if(type!=AEGP_ObjectType_LIGHT)continue;
+            AEGP_LightType light_type{};error=suites.light->AEGP_GetLightType(layer,&light_type);
+            if(error)return static_cast<PF_Err>(error);
+            if(light_type!=AEGP_LightType_PARALLEL&&light_type!=AEGP_LightType_SPOT&&
+               light_type!=AEGP_LightType_POINT&&light_type!=AEGP_LightType_AMBIENT)
+                return PF_Err_BAD_CALLBACK_PARAM;
+            if(light_type==AEGP_LightType_POINT)++captured.point_light_layers;
             if(result.size()==kMaxMotionLightSources)return PF_Err_BAD_CALLBACK_PARAM;
             AEGP_LayerIDVal id{};AEGP_CompH parent{};A_Boolean active{};
             error=suites.layer->AEGP_GetLayerID(layer,&id);
@@ -125,14 +192,15 @@ PF_Err capture_motion_light_sources(PF_InData* data,AEGP_PluginID plugin,
                 return PF_Err_BAD_CALLBACK_PARAM;
             error=suites.layer->AEGP_IsVideoActive(layer,AEGP_LTimeMode_CompTime,&time,&active);
             if(error)return static_cast<PF_Err>(error);
-            MotionLightSource source{static_cast<std::uint32_t>(id),static_cast<std::uint32_t>(index),{},active!=FALSE};
+            MotionLightSource source{static_cast<std::uint32_t>(id),static_cast<std::uint32_t>(index),
+                static_cast<std::uint32_t>(light_type),{},active!=FALSE};
             error=copy_name(suites,plugin,layer,source.name);if(error)return static_cast<PF_Err>(error);
             result.push_back(std::move(source));
         }
         if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
         error=suites.close();if(error)return static_cast<PF_Err>(error);
         if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
-        output.swap(result);return PF_Err_NONE;
+        output.swap(result);if(stats)*stats=captured;return PF_Err_NONE;
     }catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}
     catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }

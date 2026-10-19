@@ -30,6 +30,7 @@
 #include <map>
 #include <new>
 #include <numbers>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -52,6 +53,7 @@ constexpr char kForceMatchName[] = "org.starfieldfx.node.force";
 constexpr char kTransformMatchName[] = "org.starfieldfx.node.transform";
 constexpr char kMaterialMatchName[]="org.starfieldfx.node.material";
 constexpr char kMotionMatchName[]="org.starfieldfx.node.motion";
+constexpr char kTurbulenceMatchName[]="org.starfieldfx.node.turbulence";
 constexpr char kModelMatchName[] = "org.starfieldfx.node.model";
 
 struct RawField {
@@ -66,8 +68,34 @@ struct RawNode {
     Kind kind{};
     std::array<RawField, particle_layout::birth_enabled+1> fields{};
     std::u16string source_name; // UI binding only; never serialized
+    std::string motion_prefix; // Graph-owned constant; never serialized in the numeric binding record
 };
+
+// Match Core's Output ancestor scope, including geometry/material dependencies.
+// Parked nodes retain their saved values but cannot block an unrelated frame.
+std::set<core::NodeId> output_ancestors(const core::Graph& graph) {
+    std::map<core::NodeId,std::vector<core::NodeId>> dependencies;
+    for(const auto& edge:graph.edges)dependencies[edge.destination_node].push_back(edge.source_node);
+    std::set<core::NodeId> active;
+    std::vector<core::NodeId> pending;
+    for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kOutputNode) {
+        active.insert(node.id);pending.push_back(node.id);
+    }
+    while(!pending.empty()) {
+        const auto id=pending.back();pending.pop_back();
+        const auto found=dependencies.find(id);
+        if(found==dependencies.end())continue;
+        for(const auto source:found->second)if(active.insert(source).second)pending.push_back(source);
+    }
+    return active;
+}
+void retain_output_bindings(const core::Graph& graph,std::vector<RawNode>& nodes) {
+    const auto active=output_ancestors(graph);
+    std::erase_if(nodes,[&](const auto& node){return !active.contains(node.id);});
+}
 constexpr std::uint16_t kBindingRecordTag = 0x8002;
+constexpr std::uint16_t kMotionBindingRecordVersion = 10;
+constexpr std::uint16_t kTurbulenceBindingRecordVersion = 11;
 constexpr A_long component_count(node_sync::ValueKind type) noexcept {
     return type == node_sync::ValueKind::scalar ? 1 : type == node_sync::ValueKind::point2 ? 2 : 3;
 }
@@ -77,6 +105,7 @@ constexpr bool animated_index(Kind kind,A_long index) noexcept {
     if(kind==Kind::material)return native_nodes::material_layout::animated(index);
     if(kind==Kind::model) return model_layout::animated(index);
     if(kind==Kind::motion)return motion_layout::animated(index);
+    if(kind==Kind::turbulence)return native_nodes::turbulence_layout::animated(index);
     return index>=1 && index<=(kind==Kind::emitter?33:10);
 }
 
@@ -158,19 +187,22 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
                 A_long index, const A_Time& time, double& output, bool record = true) noexcept {
     if (suites.playback) {
         std::array<double, 3> sampled{};
-        if (!playback_value(suites, index, node_sync::ValueKind::scalar, sampled)) return false;
-        output = sampled[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+        if (playback_value(suites, index, node_sync::ValueKind::scalar, sampled)) {
+            output = sampled[0];
+            return !record || record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+        }
+        if(record)return false;
     }
 
     if(suites.edit && effect==suites.edited_effect) for(unsigned i=0;i<suites.edit->additional_count;++i) {
         const auto& field=suites.edit->additional_fields[i];if(field.index!=index)continue;
         if(field.kind!=node_sync::ValueKind::scalar)return suites.fail(index);
         suites.edit_applied=true;output = field.value[0];
-        return record_value(suites,index,node_sync::ValueKind::scalar,{output,0.0,0.0});
+        return !record || record_value(suites,index,node_sync::ValueKind::scalar,{output,0.0,0.0});
     }
     if (suites.edit && effect == suites.edited_effect && index == suites.edit->parameter_index) {
         if (suites.edit->value_kind != node_sync::ValueKind::scalar) return suites.fail(index);
-        suites.edit_applied = true; output = suites.edit->value[0]; return record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+        suites.edit_applied = true; output = suites.edit->value[0]; return !record || record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
     }
     AEGP_StreamRefH raw_stream = nullptr;
     A_Err error = suites.stream->AEGP_GetNewEffectStreamByIndex(plugin_id, effect, index, &raw_stream);
@@ -185,6 +217,32 @@ bool read_one_d(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_EffectRefH effec
     if (!std::isfinite(result)) return suites.fail(index);
     output = result;
     return !record || record_value(suites, index, node_sync::ValueKind::scalar, {output, 0.0, 0.0});
+}
+
+bool read_motion_prefix(SuiteSet& suites,AEGP_PluginID plugin_id,AEGP_EffectRefH effect,
+                        const A_Time& time,std::string& output) noexcept {
+    namespace motion=native_nodes::motion_layout;
+    double length_value{};
+    if(!read_one_d(suites,plugin_id,effect,motion::path_prefix_length,time,length_value,false)||
+       !std::isfinite(length_value)||std::floor(length_value)!=length_value||
+       length_value<0||length_value>motion::path_prefix_bytes)return suites.fail(motion::path_prefix_length);
+    const auto length=static_cast<std::size_t>(length_value);
+    std::string bytes;bytes.reserve(length);
+    for(std::size_t chunk=0;chunk<(length+2)/3;++chunk) {
+        double packed_value{};
+        const auto index=motion::path_prefix_data+static_cast<A_long>(chunk);
+        if(!read_one_d(suites,plugin_id,effect,index,time,packed_value,false)||!std::isfinite(packed_value)||
+           std::floor(packed_value)!=packed_value||packed_value<0||packed_value>16777215)
+            return suites.fail(index);
+        const auto packed=static_cast<std::uint32_t>(packed_value);
+        for(unsigned byte=0;byte<3&&bytes.size()<length;++byte) {
+            const auto value=static_cast<unsigned char>((packed>>(byte*8))&0xffu);
+            if(value==0)return suites.fail(index);
+            bytes.push_back(static_cast<char>(value));
+        }
+    }
+    output.swap(bytes);
+    return true;
 }
 
 bool read_layer_resource(SuiteSet& suites, AEGP_PluginID id, AEGP_EffectRefH effect,
@@ -521,7 +579,11 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes,const std::vec
     const bool attachments=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::transform;});
     const bool births=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::particle;});
     const bool models=std::any_of(nodes.begin(),nodes.end(),[](const auto& node){return node.kind==Kind::model;});
-    append_u16(bytes, kBindingRecordTag); append_u16(bytes, std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::motion;})?9:std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::material;})?8:models?7:births?6:attachments?2:1); append_u32(bytes, 0);
+    const std::uint16_t binding_version=std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::turbulence;})?kTurbulenceBindingRecordVersion:
+        std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::motion;})?kMotionBindingRecordVersion:
+        std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.kind==Kind::material;})?std::uint16_t{8}:models?std::uint16_t{7}:
+        births?std::uint16_t{6}:attachments?std::uint16_t{2}:std::uint16_t{1};
+    append_u16(bytes, kBindingRecordTag); append_u16(bytes, binding_version); append_u32(bytes, 0);
     append_u32(bytes, static_cast<std::uint32_t>(nodes.size()));
     for (auto& node : nodes) {
         const auto field_limit = native_nodes::binding_field_count(node.kind);
@@ -539,13 +601,13 @@ core::OpaqueBytes make_binding_record(std::vector<RawNode>& nodes,const std::vec
         for (A_long index = 1; index <= field_limit; ++index) {
             auto& field = node.fields[index]; if (!field.present) continue;
             if (animated_index(node.kind,index) && field.slot<0) {
-                const auto count=component_count(field.type);A_long slot=0;
-                for(;slot+count<=kNativeBindingCapacity;++slot) {
-                    bool free=true;for(A_long c=0;c<count;++c)if(used[slot+c])free=false;
+                const auto components=component_count(field.type);A_long slot=0;
+                for(;slot+components<=kNativeBindingCapacity;++slot) {
+                    bool free=true;for(A_long c=0;c<components;++c)if(used[slot+c])free=false;
                     if(free)break;
                 }
-                if(slot+count>kNativeBindingCapacity)return {};
-                field.slot=slot;for(A_long c=0;c<count;++c)used[slot+c]=true;
+                if(slot+components>kNativeBindingCapacity)return {};
+                field.slot=slot;for(A_long c=0;c<components;++c)used[slot+c]=true;
             }
             append_u16(bytes, static_cast<std::uint16_t>(index));
             append_u16(bytes, static_cast<std::uint16_t>(field.type));
@@ -572,14 +634,14 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             return true;
         };
         std::uint64_t tag{}, version{}, length{}, count{};
-        if (!read(2, tag) || !read(2, version) || (version < 1 || version > 9) || !read(4, length) ||
+        if (!read(2, tag) || !read(2, version) || (version < 1 || version > kTurbulenceBindingRecordVersion) || !read(4, length) ||
             length != bytes.size() || !read(4, count) || count >= core::kMaxGraphNodes) return false;
         for (std::uint64_t n = 0; n < count; ++n) {
             RawNode node;
             std::uint64_t value{};
             for (auto& byte : node.id.value.bytes) { if (!read(1, value)) return false; byte = static_cast<std::uint8_t>(value); }
             std::uint64_t kind{}, fields{};
-            if (!read(2, kind) || (kind > 7 || kind == 2 || (kind==5 && version<7) || (kind==6 && version<8) || (kind==7 && version<9)) || !read(2, fields)) return false;
+            if (!read(2, kind) || (kind > 8 || kind == 2 || (kind==5 && version<7) || (kind==6 && version<8) || (kind==7 && version<9) || (kind==8 && version<kTurbulenceBindingRecordVersion)) || !read(2, fields)) return false;
             node.kind = static_cast<Kind>(kind);
             // Dense Draw banks have 64 age/value pairs. Their constant fields
             // belong in the record but do not consume animation alias slots.
@@ -590,7 +652,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 particle_layout::last : node.kind==Kind::particle && version==3 ?
                 particle_layout::transfer : node.kind==Kind::particle && version==4 ?
                 particle_layout::texture_perspective : node.kind==Kind::particle && version==5 ?
-                particle_layout::cloud_enabled : native_nodes::binding_field_count(node.kind);
+                particle_layout::cloud_enabled : node.kind==Kind::motion && version<kMotionBindingRecordVersion ?
+                motion_layout::curve_last : native_nodes::binding_field_count(node.kind);
             if (fields > static_cast<std::uint64_t>(field_limit)) return false;
             if (std::any_of(nodes.begin(), nodes.end(), [&](const auto& old) {return old.id == node.id;})) return false;
             for (std::uint64_t f = 0; f < fields; ++f) {
@@ -599,7 +662,8 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                     index >= node.fields.size() || node.fields[index].present ||
                     !read(2, type) || type > 3 || !read(2, slot) || !read(2, reserved) || reserved != 0) return false;
                 auto& field = node.fields[index]; field.present = true;
-                if(node.kind==Kind::particle && !native_nodes::authored_parameter(node.kind,static_cast<A_long>(index)))return false;
+                if((node.kind==Kind::particle || node.kind==Kind::motion || node.kind==Kind::turbulence) &&
+                    !native_nodes::authored_parameter(node.kind,static_cast<A_long>(index)))return false;
                 if(node.kind==Kind::particle && index>=particle_layout::transfer && type!=0)return false;
                 field.type = static_cast<node_sync::ValueKind>(type);
                 if(node.kind==Kind::transform && field.type!=(index==transform_layout::anchor_xy ?
@@ -607,6 +671,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 if(node.kind==Kind::model && (!model_layout::binding_field(static_cast<A_long>(index)) ||
                     field.type!=node_sync::ValueKind::scalar))return false;
                 if(node.kind==Kind::motion&&field.type!=(index==motion_layout::origin_xy?node_sync::ValueKind::point2:node_sync::ValueKind::scalar))return false;
+                if(node.kind==Kind::turbulence&&field.type!=(index==native_nodes::turbulence_layout::origin_xy?node_sync::ValueKind::point2:node_sync::ValueKind::scalar))return false;
                 field.slot = slot == 0xffffu ? -1 : static_cast<A_long>(slot);
                 if (field.slot >= 0) {
                     if (!animated_index(node.kind,static_cast<A_long>(index)) ||
@@ -615,7 +680,10 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                         if (used[field.slot + c]) return false;
                         used[field.slot + c] = true;
                     }
-                } else if (animated_index(node.kind,static_cast<A_long>(index))) return false;
+                    } else if (animated_index(node.kind,static_cast<A_long>(index)) &&
+                        !(node.kind==Kind::motion && version<kMotionBindingRecordVersion &&
+                          index>=static_cast<std::uint64_t>(motion_layout::path_max_delay) &&
+                          index<=static_cast<std::uint64_t>(motion_layout::path_orient))) return false;
                 for (auto& scalar : field.value) {
                     if (!read(8, value)) return false;
                     scalar = std::bit_cast<double>(value);
@@ -627,7 +695,43 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
                 if(!attachment_fields(node,offset))return false;
             }
             if(node.kind==Kind::material){for(A_long i=1;i<=6;++i)if(!node.fields[i].present||node.fields[i].type!=(i==2?node_sync::ValueKind::color:node_sync::ValueKind::scalar))return false;}
-            if(node.kind==Kind::motion)for(A_long i=1;i<=motion_layout::curve;++i)if(!node.fields[i].present)return false;
+            if(node.kind==Kind::motion) {
+                for(A_long i=1;i<=motion_layout::curve;++i)if(!node.fields[i].present)return false;
+                // Binding v9 predates the Light Path controls. Materialize their
+                // native defaults so old Circle graphs remain sampleable and
+                // acquire proper aliases on their next edit.
+                const auto seed_legacy=[&](A_long index,double value) {
+                    auto& field=node.fields[index];
+                    if(field.present)return true;
+                    if(version>=kMotionBindingRecordVersion)return false;
+                    field.present=true;field.type=node_sync::ValueKind::scalar;field.slot=-1;
+                    field.value={value,0.0,0.0};return true;
+                };
+                if(!seed_legacy(motion_layout::path_max_delay,.5) ||
+                   !seed_legacy(motion_layout::path_delay_random,0) ||
+                   !seed_legacy(motion_layout::path_orient,0) ||
+                   !seed_legacy(motion_layout::path_end_behavior,1))return false;
+            }
+            if(node.kind==Kind::turbulence) {
+                namespace turbulence=native_nodes::turbulence_layout;
+                // Turbulence's curve bank is sparse: the host only records the
+                // count, interpolation and active point streams. With the
+                // default zero-point curve, none of the 128 point values or
+                // interpolation stream is sampled into this record.
+                for(A_long index=1;index<=turbulence::curve;++index)
+                    if(!node.fields[index].present)return false;
+                for(A_long index=turbulence::noise_scale;index<=turbulence::last;++index)
+                    if(!node.fields[index].present)return false;
+                const auto curve_count=node.fields[turbulence::curve].value[0];
+                if(curve_count<0 || curve_count>core::kMaxAgeCurvePoints ||
+                   std::floor(curve_count)!=curve_count || (curve_count!=0 && curve_count<2))return false;
+                if(curve_count>0) {
+                    if(!node.fields[turbulence::curve_last].present)return false;
+                    const auto active_point_end=turbulence::curve+1+static_cast<A_long>(curve_count)*2;
+                    for(A_long index=turbulence::curve+1;index<active_point_end;++index)
+                        if(!node.fields[index].present)return false;
+                }
+            }
             if(node.kind==Kind::model) {
                 for(A_long index=1;index<=model_layout::bounds_last;++index)
                     if(model_layout::binding_field(index) && (!node.fields[index].present ||
@@ -687,6 +791,7 @@ bool decode_node_kind(const char* match_name, Kind& kind, const char*& type_key,
     }
     if(std::strcmp(match_name,kMaterialMatchName)==0){kind=Kind::material;type_key=core::graph_keys::kMaterialNode;schema=1;return true;}
     if(std::strcmp(match_name,kMotionMatchName)==0){kind=Kind::motion;type_key=core::graph_keys::kMotionNode;schema=1;return true;}
+    if(std::strcmp(match_name,kTurbulenceMatchName)==0){kind=Kind::turbulence;type_key=core::graph_keys::kTurbulenceNode;schema=1;return true;}
     if (std::strcmp(match_name,kModelMatchName)==0) {
         kind=Kind::model;type_key=core::graph_keys::kModelNode;schema=1;return true;
     }
@@ -751,9 +856,66 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
     double scalar = 0.0;
     std::uint32_t integer = 0;
     core::Vec3 vector{};
+    if(kind==Kind::turbulence) {
+        namespace t=native_nodes::turbulence_layout;
+        if(!read_uint(suites,plugin_id,effect,t::mode,time,integer)||integer<1||integer>3)return suites.fail(t::mode);
+        const std::uint32_t mode=integer==1?static_cast<std::uint32_t>(core::graph_keys::TurbulenceMode::normal):
+            integer==2?static_cast<std::uint32_t>(core::graph_keys::TurbulenceMode::axis):
+                static_cast<std::uint32_t>(core::graph_keys::TurbulenceMode::one_side_axis);
+        add_value(node,core::graph_keys::kTurbulenceMode,mode);
+        if(!read_uint(suites,plugin_id,effect,t::axis,time,integer)||integer<1||integer>4)return suites.fail(t::axis);
+        add_value(node,core::graph_keys::kTurbulenceAxis,integer-1);
+        if(!read_uint(suites,plugin_id,effect,t::affect,time,integer)||integer<1||integer>2)return suites.fail(t::affect);
+        add_value(node,core::graph_keys::kTurbulenceAffect,integer-1);
+        if(!read_uint(suites,plugin_id,effect,t::affected_properties,time,integer)||integer<1||integer>2)return suites.fail(t::affected_properties);
+        add_value(node,core::graph_keys::kTurbulenceProperties,integer-1);
+        if(!read_one_d(suites,plugin_id,effect,t::randomize,time,scalar)||scalar<0||scalar>100)return suites.fail(t::randomize);
+        add_value(node,core::graph_keys::kTurbulenceRandomize,scalar);
+        if(!read_two_d(suites,plugin_id,effect,t::origin_xy,time,vector)||
+           !read_one_d(suites,plugin_id,effect,t::origin_z,time,vector.z))return false;
+        add_value(node,core::graph_keys::kTurbulenceOrigin,
+            core::layer_point_to_world(vector.x,vector.y,vector.z+units.layer_height*.5,units));
+        if(!read_one_d(suites,plugin_id,effect,t::noise_amplitude,time,scalar)||scalar<0||scalar>100000)return suites.fail(t::noise_amplitude);
+        add_value(node,core::graph_keys::kTurbulenceAmplitude,scalar/units.layer_height);
+        if(!read_one_d(suites,plugin_id,effect,t::noise_frequency,time,scalar)||scalar<=0||scalar>100000)return suites.fail(t::noise_frequency);
+        add_value(node,core::graph_keys::kTurbulenceFrequency,scalar);
+        if(!read_uint(suites,plugin_id,effect,t::noise_levels,time,integer)||integer<1||integer>8)return suites.fail(t::noise_levels);
+        add_value(node,core::graph_keys::kTurbulenceLevels,integer);
+        if(!read_one_d(suites,plugin_id,effect,t::fractal_speed,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceEvolutionSpeed,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::fractal_evolution,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceEvolution,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::noise_scale,time,scalar)||scalar<=0||scalar>100000)return suites.fail(t::noise_scale);
+        add_value(node,core::graph_keys::kTurbulenceNoiseScale,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::position_offset,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulencePositionOffset,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::scale_offset,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceScaleOffset,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::color_offset,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceColorOffset,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::opacity_offset,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceOpacityOffset,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::rotation_offset,time,scalar))return false;
+        add_value(node,core::graph_keys::kTurbulenceRotationOffset,scalar);
+        if(!read_one_d(suites,plugin_id,effect,t::fractal_offset,time,vector.x)||
+           !read_one_d(suites,plugin_id,effect,t::fractal_offset+1,time,vector.y)||
+           !read_one_d(suites,plugin_id,effect,t::fractal_offset+2,time,vector.z))return false;
+        add_value(node,core::graph_keys::kTurbulenceOffset,
+            core::Vec3{vector.x*units.pixel_aspect_ratio/units.layer_height,-vector.y/units.layer_height,vector.z/units.layer_height});
+        if(!read_one_d(suites,plugin_id,effect,t::sphere_size,time,scalar)||scalar<=0||scalar>100000000)return suites.fail(t::sphere_size);
+        add_value(node,core::graph_keys::kTurbulenceSphereSize,scalar/units.layer_height);
+        if(!read_one_d(suites,plugin_id,effect,t::sphere_feather,time,scalar)||scalar<0||scalar>100)return suites.fail(t::sphere_feather);
+        add_value(node,core::graph_keys::kTurbulenceSphereFeather,scalar);
+        core::OpaqueBytes curve;bool present{};
+        if(!read_curve(suites,plugin_id,effect,t::curve,t::curve+1,time,curve,present))return false;
+        if(present)add_value(node,core::graph_keys::kTurbulenceOverLife,std::move(curve));
+        return true;
+    }
     if(kind==Kind::motion) {
-        if(!read_uint(suites,plugin_id,effect,motion_layout::mode,time,integer)||integer!=1)return suites.fail(motion_layout::mode);
-        add_value(node,kMotionMode,std::uint32_t{1});
+        std::uint32_t core_mode{};
+        if(!read_uint(suites,plugin_id,effect,motion_layout::mode,time,integer)||
+           !motion_layout::core_mode_from_popup(static_cast<int>(integer),core_mode))return suites.fail(motion_layout::mode);
+        add_value(node,kMotionMode,core_mode);
         if(!read_uint(suites,plugin_id,effect,motion_layout::origin_type,time,integer)||integer<1||integer>3)return suites.fail(motion_layout::origin_type);
         add_value(node,kMotionOriginType,integer-1);
         if(!read_two_d(suites,plugin_id,effect,motion_layout::origin_xy,time,vector)||
@@ -765,15 +927,37 @@ bool read_node_parameters(SuiteSet& suites, AEGP_PluginID plugin_id, AEGP_Effect
         // Same canonical angle signs as Particle's Euler author controls.
         add_value(node,kMotionAxisAngles,core::Vec3{-vector.x,vector.y,-vector.z});
         add_value(node,kMotionAxis,core::Vec3{0,0,1});
+        add_value(node,kMotionForward,core::Vec3{1,0,0});
         if(!read_vector(motion_layout::offset))return false;
         add_value(node,kMotionOffset,core::Vec3{vector.x*units.pixel_aspect_ratio/units.layer_height,-vector.y/units.layer_height,vector.z/units.layer_height});
         if(!read_one_d(suites,plugin_id,effect,motion_layout::speed,time,scalar))return false;
         add_value(node,kMotionAngularRate,scalar*(2*std::numbers::pi/100));
+        add_value(node,kMotionPathSpeedPercent,std::max(0.0,scalar));
         if(!read_one_d(suites,plugin_id,effect,motion_layout::speed_random,time,scalar)||scalar<0||scalar>100)return suites.fail(motion_layout::speed_random);
         add_value(node,kMotionSpeedRandom,scalar);
         core::OpaqueBytes curve;bool present{};
         if(!read_curve(suites,plugin_id,effect,motion_layout::curve,motion_layout::curve+1,time,curve,present))return false;
-        if(present)add_value(node,kMotionOverLife,std::move(curve));return true;
+        if(present)add_value(node,kMotionOverLife,std::move(curve));
+        if(!read_one_d(suites,plugin_id,effect,motion_layout::path_max_delay,time,scalar)||scalar<0||scalar>1000000)
+            return suites.fail(motion_layout::path_max_delay);
+        add_value(node,kMotionPathDelay,scalar);
+        if(!read_one_d(suites,plugin_id,effect,motion_layout::path_delay_random,time,scalar)||scalar<0||scalar>100)
+            return suites.fail(motion_layout::path_delay_random);
+        add_value(node,kMotionPathDelayRandom,scalar);
+        if(!read_one_d(suites,plugin_id,effect,motion_layout::path_orient,time,scalar)||(scalar!=0&&scalar!=1))
+            return suites.fail(motion_layout::path_orient);
+        add_value(node,kMotionPathOrient,static_cast<std::uint32_t>(scalar));
+        if(!read_uint(suites,plugin_id,effect,motion_layout::path_end_behavior,time,integer)||integer<1||integer>2)
+            return suites.fail(motion_layout::path_end_behavior);
+        add_value(node,kMotionPathEndBehavior,integer-1);
+        if(suites.playback) {
+            add_value(node,kMotionPathStartingWith,suites.playback->motion_prefix);
+        } else {
+            std::string prefix;
+            if(!read_motion_prefix(suites,plugin_id,effect,time,prefix))return false;
+            add_value(node,kMotionPathStartingWith,std::move(prefix));
+        }
+        return true;
     }
     if(kind==Kind::material){
         if(!read_uint(suites,plugin_id,effect,1,time,integer)||integer<1||integer>2)return suites.fail(1);
@@ -1134,6 +1318,7 @@ core::PortKey source_port(Kind kind) noexcept {
         case Kind::model: return kModelGeometryOut;
         case Kind::material: return kMaterialOut;
         case Kind::motion: return kMotionParticlesOut;
+        case Kind::turbulence: return kTurbulenceParticlesOut;
     }
     return {};
 }
@@ -1148,6 +1333,7 @@ core::PortKey destination_port(Kind kind) noexcept {
         case Kind::model: return kModelMaterialIn;
         case Kind::material: return kMaterialGeometryIn;
         case Kind::motion: return kMotionParticlesIn;
+        case Kind::turbulence: return kTurbulenceParticlesIn;
     }
     return {};
 }
@@ -1167,7 +1353,9 @@ struct NativeAnimationPlan::Impl {
     Impl(const core::Graph& graph,A_long width,A_long height,double aspect)
         :units{double(std::max<A_long>(width,1)),double(std::max<A_long>(height,1)),aspect} {
         decoded=std::isfinite(aspect) && aspect>0 && read_binding_record(graph,nodes);
-        for(const auto& node:graph.nodes) templates.emplace(node.id,node);
+        if(decoded)retain_output_bindings(graph,nodes);
+        const auto active=output_ancestors(graph);
+        for(const auto& node:graph.nodes)if(active.contains(node.id))templates.emplace(node.id,node);
     }
 };
 NativeAnimationPlan::NativeAnimationPlan(const core::Graph& graph,A_long width,A_long height,double aspect)
@@ -1292,12 +1480,29 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
         const auto expected=raw.kind==Kind::emitter?core::graph_keys::kEmitterNode:
             raw.kind==Kind::particle?core::graph_keys::kParticleNode:
             raw.kind==Kind::transform?core::graph_keys::kTransformNode:
-            raw.kind==Kind::motion?core::graph_keys::kMotionNode:raw.kind==Kind::material?core::graph_keys::kMaterialNode:raw.kind==Kind::model?core::graph_keys::kModelNode:core::graph_keys::kForceNode;
+            raw.kind==Kind::motion?core::graph_keys::kMotionNode:raw.kind==Kind::material?core::graph_keys::kMaterialNode:
+            raw.kind==Kind::model?core::graph_keys::kModelNode:raw.kind==Kind::turbulence?core::graph_keys::kTurbulenceNode:core::graph_keys::kForceNode;
         if(output.type_key!=expected) return PF_Err_BAD_CALLBACK_PARAM;
         SuiteSet reader(nullptr);
         reader.playback=&raw;
         output.parameters.clear();
-        return read_node_parameters(reader,0,nullptr,raw.kind,{},impl_->units,output)?PF_Err_NONE:PF_Err_BAD_CALLBACK_PARAM;
+        if(!read_node_parameters(reader,0,nullptr,raw.kind,{},impl_->units,output))return PF_Err_BAD_CALLBACK_PARAM;
+        if(raw.kind==Kind::motion) {
+            // Native history sampling rebuilds authored numeric controls from
+            // the binding bank. Keep frame-scoped resources from the source
+            // graph alongside them; they are captured in Smart Pre-Render,
+            // not represented by native numeric streams.
+            for(const auto key:{core::graph_keys::kMotionPathLightResource,core::graph_keys::kMotionLookAtTargets}) {
+                const auto resource=std::find_if(original->second.parameters.begin(),original->second.parameters.end(),
+                    [&](const auto& parameter){return parameter.key==key;});
+                if(resource==original->second.parameters.end())continue;
+                const auto sampled=std::find_if(output.parameters.begin(),output.parameters.end(),
+                    [&](const auto& parameter){return parameter.key==key;});
+                if(sampled==output.parameters.end())output.parameters.push_back(*resource);
+                else sampled->value=resource->value;
+            }
+        }
+        return PF_Err_NONE;
     } catch(const std::bad_alloc&) {return PF_Err_OUT_OF_MEMORY;}
       catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
@@ -1475,6 +1680,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     else if (node.type_key == core::graph_keys::kModelNode) destination_kind = Kind::model;
                     else if(node.type_key==core::graph_keys::kMaterialNode)destination_kind=Kind::material;
                     else if(node.type_key==core::graph_keys::kMotionNode)destination_kind=Kind::motion;
+                    else if(node.type_key==core::graph_keys::kTurbulenceNode)destination_kind=Kind::turbulence;
                     break;
                 }
             }
@@ -1613,21 +1819,23 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
 
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
                                         const char** failed_stage, A_long* failed_parameter,
-                                        const core::Graph* previous_graph,bool force_refresh) noexcept {
+                                        const core::Graph* previous_graph,bool force_refresh,bool rebuild_disabled) noexcept {
     if (failed_stream) *failed_stream = -1;
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
     stage("decode binding record");
-    if(force_refresh && previous_graph)return PF_Err_BAD_CALLBACK_PARAM;
+    if((force_refresh && previous_graph) || (force_refresh && rebuild_disabled))return PF_Err_BAD_CALLBACK_PARAM;
     try {
         std::vector<RawNode> nodes;
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
         std::vector<RawNode> previous_nodes;
         if(previous_graph && !read_binding_record(*previous_graph,previous_nodes))return PF_Err_BAD_CALLBACK_PARAM;
-        const bool identities_changed=previous_graph && (nodes.size()!=previous_nodes.size() ||
-            std::any_of(nodes.begin(),nodes.end(),[&](const auto& node){
-                return std::none_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& old){
-                    return node.id==old.id && node.kind==old.kind;});}));
+        // Appending a source preserves every existing literal name/UUID binding.
+        // Removing/retyping a source still forces dependency rebuilding.
+        const bool sources_removed=previous_graph &&
+            std::any_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& old){
+                return std::none_of(nodes.begin(),nodes.end(),[&](const auto& node){
+                    return node.id==old.id && node.kind==old.kind;});});
         auto& tx = *impl_;
         tx.force_refresh=force_refresh;
         stage("acquire binding suites");
@@ -1640,6 +1848,15 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
             ae = tx.suites.pf_interface->AEGP_GetNewEffectForEffect(tx.id, tx.data->effect_ref, &tx.renderer);
             tx.owned_renderer = true;
             if (ae || !tx.renderer) return static_cast<PF_Err>(ae ? ae : PF_Err_BAD_CALLBACK_PARAM);
+        }
+        if(rebuild_disabled) {
+            // Only the explicit backed-up repair of a disabled renderer may
+            // replace broken OLD handoffs. New expressions remain strict.
+            stage("verify disabled repair renderer");
+            AEGP_EffectFlags flags{};
+            if(!tx.suites.effect->AEGP_GetEffectFlags)return PF_Err_BAD_CALLBACK_PARAM;
+            ae=tx.suites.effect->AEGP_GetEffectFlags(tx.renderer,&flags);
+            if(ae || (flags&AEGP_EffectFlags_ACTIVE))return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
         }
         stage("resolve unique literal binding sources");
         AEGP_LayerH binding_owner=tx.owner_layer;
@@ -1720,10 +1937,11 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         struct Alias {A_long slot,parameter;std::u16string expression;bool retired;double source_value;};
         std::vector<Alias> aliases;
         std::array<bool,kNativeBindingCapacity> occupied{};
-        std::array<bool,kNativeBindingCapacity> previously_occupied{};
-        for(const auto& node:previous_nodes)for(const auto& field:node.fields)
+        std::array<bool,kNativeBindingCapacity> previously_required{};
+        const auto previous_active=previous_graph?output_ancestors(*previous_graph):std::set<core::NodeId>{};
+        for(const auto& node:previous_nodes)if(previous_active.contains(node.id))for(const auto& field:node.fields)
             if(field.present && field.slot>=0)for(A_long c=0;c<component_count(field.type);++c)
-                previously_occupied[field.slot+c]=true;
+                previously_required[field.slot+c]=true;
         for(const auto& node:nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component){
@@ -1806,7 +2024,7 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                     if (ae) return static_cast<PF_Err>(ae);
                 }
                 const auto& desired = alias.expression;
-                if(!force_refresh && !change.retired && change.previous==desired && change.enabled && !identities_changed && !has_backups)continue;
+                if(!force_refresh && !rebuild_disabled && !change.retired && change.previous==desired && change.enabled && !sources_removed && !has_backups)continue;
                 // Snapshot values only for aliases we will actually mutate.
                 // An unchanged, enabled expression was checked against the exact
                 // freshly compiled node identity and source parameter above.
@@ -1818,8 +2036,8 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 change.previous_value = previous.val.one_d;
                 tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 change.handoff_value=alias.source_value;
-                if(previously_occupied[alias.slot]) {
-                    // The old graph still owns this span. Its evaluated source,
+                if(previously_required[alias.slot] && !rebuild_disabled) {
+                    // The old Output graph consumes this span. Its evaluated source,
                     // rather than the normally sentinel base, must survive the
                     // temporary expression gap. Do not repair invalid bindings
                     // by accepting zero or an unavailable value.
@@ -1894,6 +2112,7 @@ PF_Err read_native_origin_bindings(const core::Graph& graph, std::vector<NativeO
     try {
         std::vector<RawNode> nodes;
         if(!read_binding_record(graph,nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        retain_output_bindings(graph,nodes);
         for(const auto& node:nodes) if(node.kind==Kind::emitter) {
             const auto& xy=node.fields[4];const auto& z=node.fields[5];
             if(!xy.present || xy.type!=node_sync::ValueKind::point2 || xy.slot<0 ||
@@ -1911,6 +2130,7 @@ PF_Err read_native_origin_bindings(const core::Graph& graph, std::vector<NativeO
 PF_Err read_native_lifetime_bindings(const core::Graph& graph,std::vector<NativeLifetimeBinding>& bindings) noexcept {
     try {
         std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        retain_output_bindings(graph,nodes);
         for(const auto& node:nodes) if(node.kind==Kind::particle) {
             const auto& life=node.fields[2];
             if(!life.present || life.slot<0 || life.type!=node_sync::ValueKind::scalar) return PF_Err_BAD_CALLBACK_PARAM;
@@ -1922,13 +2142,16 @@ PF_Err read_native_lifetime_bindings(const core::Graph& graph,std::vector<Native
 }
 
 PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long width, A_long height,
-                                    A_long* failed_stream, const char** failed_stage, const core::NodeId* node_filter) noexcept {
+                                    A_long* failed_stream, const char** failed_stage, const core::NodeId* node_filter,
+                                    NativeBindingFailure* failure) noexcept {
     if (failed_stream) *failed_stream = -1;
+    if(failure)*failure={};
     const auto stage = [failed_stage](const char* value) { if (failed_stage) *failed_stage = value; };
     try {
         std::vector<RawNode> nodes;
         stage("binding record");
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
+        if(!node_filter)retain_output_bindings(graph,nodes);
         if (nodes.empty()) return PF_Err_NONE;
         stage("host callbacks");
         // num_params describes the delivered params[] array. SmartFX has no such
@@ -1940,8 +2163,10 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
         SuiteSet reader(nullptr); // No AEGP acquisition, even during destruction.
         for (auto& raw : nodes) {
             if(node_filter && raw.id!=*node_filter) continue;
-            for (auto& field : raw.fields) if (field.present && field.slot >= 0) {
+            for (A_long index=1;index<static_cast<A_long>(raw.fields.size());++index) {
+                auto& field=raw.fields[index];if(!field.present || field.slot<0)continue;
                 for (A_long component = 0; component < component_count(field.type); ++component) {
+                    if(failure)*failure={raw.id,index,component};
                     PF_ParamDef sampled{};
                     if (failed_stream) *failed_stream = kNativeBindingFirstIndex + field.slot + component;
                     stage("parameter checkout");
@@ -1970,9 +2195,22 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             const auto expected = raw.kind == Kind::emitter ? core::graph_keys::kEmitterNode :
                 raw.kind == Kind::particle ? core::graph_keys::kParticleNode :
                 raw.kind==Kind::transform?core::graph_keys::kTransformNode:
-                raw.kind==Kind::motion?core::graph_keys::kMotionNode:raw.kind==Kind::material?core::graph_keys::kMaterialNode:raw.kind==Kind::model?core::graph_keys::kModelNode:core::graph_keys::kForceNode;
+                raw.kind==Kind::motion?core::graph_keys::kMotionNode:raw.kind==Kind::material?core::graph_keys::kMaterialNode:
+                raw.kind==Kind::model?core::graph_keys::kModelNode:raw.kind==Kind::turbulence?core::graph_keys::kTurbulenceNode:core::graph_keys::kForceNode;
             stage("node type");
             if (node->type_key != expected) return PF_Err_BAD_CALLBACK_PARAM;
+            if(raw.kind==Kind::motion) {
+                const core::NodeParameter* starting_with=nullptr;
+                for(const auto& parameter:node->parameters)if(parameter.key==core::graph_keys::kMotionPathStartingWith) {
+                    if(starting_with)return PF_Err_BAD_CALLBACK_PARAM;
+                    starting_with=&parameter;
+                }
+                if(starting_with) {
+                    const auto* prefix=std::get_if<std::string>(&starting_with->value);
+                    if(!prefix)return PF_Err_BAD_CALLBACK_PARAM;
+                    raw.motion_prefix=*prefix;
+                }
+            }
             node->parameters.clear(); reader.playback = &raw;
             stage("node conversion");
             if (!read_node_parameters(reader, 0, nullptr, raw.kind, {}, units, *node)) return PF_Err_BAD_CALLBACK_PARAM;
@@ -2024,6 +2262,8 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
     } trace;
     if(!data || !data->effect_ref || !data->pica_basicP || !id) return;
     std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes) || nodes.empty())return;
+    retain_output_bindings(graph,nodes);
+    if(nodes.empty()){trace.value.error=PF_Err_NONE;remember_native_control_proofs(data,{});return;}
     SuiteSet suites(data);if(suites.acquire())return;
     struct ExtraSuites {
         SPBasicSuite* basic;const PF_ParamUtilsSuite3* utils{};const AEGP_KeyframeSuite5* keys{};

@@ -48,5 +48,5 @@ foreach($gradient in $catalog.gradients){
 }
 $lines.Add('}; }')
 [IO.File]::WriteAllLines((Join-Path $taskGenerated 'EditorPresetCatalog.hpp'),$lines,[Text.UTF8Encoding]::new($false))
-$js='(function(root){"use strict";root.StarfieldEditorPresets='+($catalog | ConvertTo-Json -Depth 10 -Compress)+';}(typeof window!=="undefined"?window:globalThis));'
-[IO.File]::WriteAllText((Join-Path $taskRoot 'cep_panel\js\editor_presets.js'),$js+"`n",[Text.UTF8Encoding]::new($false))
+# CEP parameter editors are retired. Keep the catalog for native AE editors only;
+# generation must not recreate a dead script in the live CEP Junction target.

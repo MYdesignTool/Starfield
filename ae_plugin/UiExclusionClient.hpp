@@ -7,6 +7,13 @@
 #include <cstdint>
 
 namespace starfield::adapter {
+// Read-only, session-local query; no acquisition, SDK call or message pumping.
+inline bool ui_transaction_active() noexcept {
+    using Query=bool(*)() noexcept;
+    const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return false;
+    const auto query=std::bit_cast<Query>(GetProcAddress(module,"SFLD_UiExclusionActiveV1"));
+    return query && query();
+}
 // Resolve the already loaded resident Host. Never load a library, register a
 // hook, pump messages or probe scripting availability to acquire this scope.
 // A missing or mismatched Host fails closed; publish only the full pairing.
@@ -16,9 +23,9 @@ class EffectUiExclusion final {
     End end_{};
     std::uint64_t token_{};
 public:
-    EffectUiExclusion() noexcept {
+    explicit EffectUiExclusion(bool source=false) noexcept {
         const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return;
-        const auto begin=std::bit_cast<Begin>(GetProcAddress(module,"SFLD_BeginUiExclusionV1"));
+        const auto begin=std::bit_cast<Begin>(GetProcAddress(module,source?"SFLD_BeginSourceUiExclusionV1":"SFLD_BeginUiExclusionV1"));
         end_=std::bit_cast<End>(GetProcAddress(module,"SFLD_EndUiExclusionV1"));
         if(begin && end_)token_=begin();
     }

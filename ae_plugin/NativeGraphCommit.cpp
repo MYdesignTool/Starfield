@@ -4,6 +4,8 @@
 #include "Parameters.hpp"
 #include "MotionBlur.hpp"
 #include "NativeTemporalCache.hpp"
+#include "UiExclusionClient.hpp"
+#include "MotionAuthorTransaction.hpp"
 #include "SPBasic.h"
 #include "starfield/core/SequenceCodec.hpp"
 
@@ -23,6 +25,19 @@ void set_numeric(PF_ParamDef* params[], A_long index, PF_FpLong value) noexcept 
     params[index]->u.fs_d.value = value;
     params[index]->uu.change_flags |= PF_ChangeFlag_CHANGED_VALUE;
 }
+PF_Err write_snapshot_receipt(PF_ParamDef* params[],std::uint32_t checksum,A_long* new_revision) noexcept {
+    if(!params)return PF_Err_BAD_CALLBACK_PARAM;
+    for(const A_long index:{kGraphRevisionId,kGraphChecksumHighId,kGraphChecksumLowId})
+        if(!params[index] || params[index]->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_BAD_CALLBACK_PARAM;
+    const auto old_revision=params[kGraphRevisionId]->u.fs_d.value;
+    if(!std::isfinite(old_revision) || old_revision<0 || old_revision>=kMaxRevision || std::floor(old_revision)!=old_revision)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    set_numeric(params,kGraphRevisionId,old_revision+1);
+    set_numeric(params,kGraphChecksumHighId,checksum>>16u);
+    set_numeric(params,kGraphChecksumLowId,checksum&65535u);
+    if(new_revision)*new_revision=static_cast<A_long>(old_revision+1);
+    return PF_Err_NONE;
+}
 }
 
 PF_Err write_graph_snapshot(PF_InData* data, PF_ParamDef* params[], const core::Graph& graph,
@@ -35,24 +50,18 @@ PF_Err write_graph_snapshot(PF_InData* data, PF_ParamDef* params[], const core::
         const auto encoded = core::serialize_graph(graph, core::particle_node_registry());
         if (!encoded.has_value()) return encoded.error().code == core::SequenceErrorCode::allocation_failed
             ? PF_Err_OUT_OF_MEMORY : PF_Err_BAD_CALLBACK_PARAM;
-        const auto old_revision = params[kGraphRevisionId]->u.fs_d.value;
-        if (!std::isfinite(old_revision) || old_revision < 0.0 || old_revision >= kMaxRevision ||
-            std::floor(old_revision) != old_revision || encoded.value().size() < 32) return PF_Err_BAD_CALLBACK_PARAM;
+        if(encoded.value().size()<32)return PF_Err_BAD_CALLBACK_PARAM;
         std::uint32_t checksum = 0;
         for (unsigned i = 0; i < 4; ++i) {
             checksum |= std::to_integer<std::uint32_t>(encoded.value()[24 + i]) << (8u * i);
         }
-        set_numeric(params, kGraphRevisionId, old_revision + 1.0);
-        set_numeric(params, kGraphChecksumHighId, checksum >> 16u);
-        set_numeric(params, kGraphChecksumLowId, checksum & 65535u);
-        if (new_revision) *new_revision = static_cast<A_long>(old_revision + 1.0);
-        return PF_Err_NONE;
+        return write_snapshot_receipt(params,checksum,new_revision);
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
 
 static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID plugin_id,
-                               PF_OutData* output, PF_InData* panel_data = nullptr, A_long nonce = 0) noexcept {
+                               PF_OutData* output, PF_InData* panel_data = nullptr, A_long nonce = 0,bool rebuild_disabled=false) noexcept {
     if (!edit) return PF_Err_BAD_CALLBACK_PARAM;
     edit->accepted = false; edit->revision = 0; edit->status = PF_Err_BAD_CALLBACK_PARAM;
     edit->stage = node_sync::Stage::context; edit->stream_index = -1;
@@ -180,17 +189,25 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
         publish.read[saved_graph_slot]=true;
         scratch[kGraphParameterId].param_type=PF_Param_ARBITRARY_DATA;
         scratch[kGraphParameterId].u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(publish.old[saved_graph_slot].val.arbH);
+        MotionAuthorTransaction motion_authors(data,plugin_id);
+        const auto publication_result=[&]() -> PF_Err {
+        try {
+        edit->stage=node_sync::Stage::motion_author;edit->stream_index=native_nodes::motion_layout::mode;
+        if(const auto authored=motion_authors.prepare(edit->layer,edit);authored)return edit->status=authored;
         edit->stage = node_sync::Stage::compile; edit->stream_index = -1;
         core::Graph graph;
         bool found = false;
         PF_Err error = compile_native_node_graph(data, pointers.data(), graph, found, plugin_id, edit);
         if (error || (!found && !panel_data)) return edit->status = error ? error : PF_Err_BAD_CALLBACK_PARAM;
-        edit->stage = node_sync::Stage::snapshot;
         A_long revision = 0;
-        error = write_graph_snapshot(data, pointers.data(), graph, &revision);
-        if (error) return edit->status = error;
+        std::uint32_t checksum{};
         edit->stage = node_sync::Stage::allocation;
-        error = create_graph_parameter(data, graph, &publish.graph);
+        error = create_graph_parameter(data, graph, &publish.graph,&checksum);
+        if (error) return edit->status = error;
+        // Derive the receipt from the exact bytes being published. Avoid a
+        // second graph validation/allocation/serialization on every UI edit.
+        edit->stage = node_sync::Stage::snapshot;
+        error = write_snapshot_receipt(pointers.data(),checksum,&revision);
         if (error) return edit->status = error;
         NativeBindingTransaction bindings(data, plugin_id, edit->renderer, edit->layer);
         edit->stage = node_sync::Stage::animation_bindings;
@@ -201,7 +218,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             previous_graph=saved.take_value();
         }
         error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
-            previous_graph?&*previous_graph:nullptr);
+            previous_graph?&*previous_graph:nullptr,false,rebuild_disabled);
         if (error) return edit->status = error;
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.
@@ -293,6 +310,11 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             edit->stage=node_sync::Stage::animation_bindings;
             ae_error=bindings.retire_after_publication(&edit->stream_index,&edit->binding_stage);
         }
+        if(!ae_error) {
+            edit->stage=node_sync::Stage::motion_author;
+            edit->stream_index=native_nodes::motion_layout::mode;
+            ae_error=motion_authors.accept();
+        }
         if (ae_error) {
             bool rollback_failed = bindings.rollback_model_resources()!=PF_Err_NONE;
             while (written > 0) {
@@ -307,10 +329,24 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
         }
         bindings.accept();
-        if(panel_data)capture_native_temporal_metadata(data,graph,plugin_id);
+        // Metadata is optional. The next idle owns a settled effect parade;
+        // reentrant UI reads must not run inside a structural transaction.
+        if(panel_data && !ui_transaction_active())capture_native_temporal_metadata(data,graph,plugin_id);
         edit->revision = revision; edit->status = PF_Err_NONE; edit->accepted = true;
         edit->stage = node_sync::Stage::complete; edit->stream_index = -1;
         return PF_Err_NONE;
+        } catch(const std::bad_alloc&){return edit->status=PF_Err_OUT_OF_MEMORY;}
+        catch(...){return edit->status=PF_Err_INTERNAL_STRUCT_DAMAGED;}
+        }();
+        // Binding rollback has completed before source values are restored.
+        // Surface source restoration failure instead of hiding it in a destructor.
+        if(publication_result && motion_authors.rollback()!=PF_Err_NONE){
+            edit->stage=node_sync::Stage::rollback;edit->accepted=false;
+            if(output)std::snprintf(output->return_msg,sizeof(output->return_msg),
+                "Starfield Motion source rollback failed; source remains guarded where possible.");
+            return edit->status=PF_Err_INTERNAL_STRUCT_DAMAGED;
+        }
+        return publication_result;
     } catch (const std::bad_alloc&) { return edit->status = PF_Err_OUT_OF_MEMORY; }
     catch (...) { return edit->status = PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }
@@ -357,7 +393,7 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
 }
 
 PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
-                         A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output) noexcept {
+                         A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output,bool rebuild_disabled) noexcept {
     if(!data || !data->utils || !data->pica_basicP || !renderer || !layer || !plugin_id ||
         nonce<1 || nonce>1000000)return PF_Err_BAD_CALLBACK_PARAM;
     node_sync::NativeEdit context;
@@ -383,7 +419,7 @@ PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH l
         if(layers)context.basic->ReleaseSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
         if(error)return static_cast<PF_Err>(error);
     }
-    const auto error=commit_graph_streams(&context,plugin_id,output,data,nonce);
+    const auto error=commit_graph_streams(&context,plugin_id,output,data,nonce,rebuild_disabled);
     if(error && output && context.stage==node_sync::Stage::compile && context.compile_stage)
         std::snprintf(output->return_msg,sizeof(output->return_msg),
             "Starfield graph command failed: node compile: %s, effect %ld, stream %ld (error %d).",

@@ -10,7 +10,7 @@ $taskRuntime = Join-Path $taskBundle 'StarfieldRuntime'
 New-Item -ItemType Directory -Path $taskPlugins,$taskTools,$taskRuntime -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'tools\Deploy-TestBuild.ps1') -Destination $taskTools
 $taskScript = Join-Path $taskTools 'Deploy-TestBuild.ps1'
-$taskNames = @('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldHost.aex','StarfieldCore.dll')
+$taskNames = @('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldTransform.aex','StarfieldHost.aex','StarfieldCore.dll')
 $taskPrevious = @('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex','StarfieldForce.aex','StarfieldAppearance.aex','StarfieldCore.dll')
 $taskOldHashes = @{}
 foreach ($taskName in $taskPrevious) {
@@ -43,5 +43,6 @@ foreach ($taskName in $taskPrevious) {
     if ((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskName) -Algorithm SHA256).Hash -ne $taskOldHashes[$taskName]) { throw 'Previous bundle hash differs.' }
 }
 if (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldHost.aex')) { throw 'New module was not undone.' }
+if (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldTransform.aex')) { throw 'New Transform module was not undone.' }
 if ((Get-Content -LiteralPath (Join-Path $taskRuntime 'current.txt') -Raw).Trim() -ne 'old-core.dll') { throw 'Runtime selector not restored.' }
 Write-Host 'Isolated report/install/retired-module/hash/single-junction/rollback checks passed.'

@@ -74,6 +74,15 @@ function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;
     for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
 function call(operation,fields,callback){
+    if(operation==="submitGraph"){
+        // Ordinary command is a fake native publication here. The actual JSX
+        // DOM path is covered by model_graph_gateway_dom_tests.
+        eq(fields.baseGraphRevision,revision);eq(fields.baseRecordStamp,stamp);
+        api.validateNodes(realm(fields.nodeManifest));
+        api.ensure(null,realm(fields.nodeManifest),true,realm(nodes),false);
+        api.writeRenderer(null,fields.rendererManifest);api.trigger();
+        callback(JSON.parse(api.reply(realm({ok:true,target:{token},snapshot:snapshot()}))));return;
+    }
     if(operation==="beginModelAssetExport" || operation==="releaseModelAsset"){callback({ok:true,assetId:fields.assetId});return;}
     if(operation==="readModelAssetPage"){const n=nodes.find(n=>n.id===modelId),asset=nativeMeshes[modelId] || meshAsset;
         callback({ok:true,state:"ready",assetId:fields.assetId,nodeId:modelId,page:0,pageCount:1,bytes:asset.meshHex.length/2,source:n.parameters.find(p=>p.key==="13").value+1,revision:asset.revision,bounds:asset.bounds,hex:asset.meshHex});return;}
@@ -92,7 +101,7 @@ token="p0-c1-l29";reset(presets.build("sparks",1080));const originalTimer=global
 try{global.setTimeout=fn=>tasks.push(fn);
     graphTransactions.create({codec,edits,call}).apply({type:"addNode",nodeType:"model"},r=>{result=r;},token,11,
         {ok:true,target:{token},snapshot:copy(snapshot())});drain();
-    eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(nodes.filter(n=>n.type===edits.types.model).length,1);eq(bytesRead,0);
+    eq(result.ok,true,JSON.stringify(result));eq(hostRuns,0);eq(prepares,0);eq(commits,1);eq(nodes.filter(n=>n.type===edits.types.model).length,1);eq(bytesRead,0);
 }finally{global.setTimeout=originalTimer;}
 reset();client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(bytesRead,meshHex.length/2);
 token="p101-c202-l303";

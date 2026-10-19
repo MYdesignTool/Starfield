@@ -577,17 +577,19 @@
     "policy": "Constant project-local layer ID; UI captures relative anchor affine; twelve synthetic numeric aliases sample Null and parent motion at render time. Selected resource is always dynamic. Fields are not physical AE parameter indices. ADR0032."
   },
   "motionCircle": {
-    "adr":"0039-motion-geometry", "status":"native72/CEP76 candidate; actual AE2023 acceptance remains open",
+    "adr":"0039-motion-geometry", "status":"Circle is the accepted stage; Light Path and Look At authoring are source candidates; actual AE2023 acceptance remains open",
     "graphType":"org.starfieldfx.nodes.motion", "schemaVersion":1, "nativeKind":7,
     "effectMatchName":"org.starfieldfx.node.motion", "piplResource":16016,
-    "modes":["Circle"], "originTypes":["Point","Particle Origin","Emitter Origin"],
+    "modes":["Circle","Light Path","Look At"], "originTypes":["Point","Particle Origin","Emitter Origin"],
     "speedRule":"Owner2026-10-12: Speed100 = 2*pi radians per second, one revolution per second",
-    "graphKeys":{"mode":1,"origin":2,"legacyAxis":3,"angularRate":4,"speedRandom":5,"overLife":6,"originType":13,"axisAngles":14,"offset":15},
+    "graphKeys":{"mode":1,"origin":2,"legacyAxis":3,"angularRate":4,"speedRandom":5,"overLife":6,"goal":7,"forward":8,"maxDelaySeconds":11,"orientToPath":12,"originType":13,"axisAngles":14,"offset":15,"lightPathResource":16,"speedPercent":17,"endBehavior":18,"startingWithUtf8Prefix":19,"delayRandomPercent":20,"lookAtTargetResource":21},
     "controls":{"motion_type":1701,"origin_type":1702,"origin_xy":1703,"origin_z":1704,"angle_x":1705,"angle_y":1706,"angle_z":1707,
-      "offset_x":1708,"offset_y":1709,"offset_z":1710,"speed":1711,"speed_random":1712,"curve_count":1713,"curve_interpolation":1714},
-    "curveAgeIds":[3900,3963], "curveValueIds":[4100,4163], "baseParameters":142,"totalParameters":219,"bindingVersion":9,
-    "migration":"Append new independent kind7 and binding9; retain readers1..8 and exact old layouts. CoreABI9/snapshots/Render boundary unchanged; full ten-module native/Core/CEP pair required.",
-    "stageLimits":"Force precedes Motion; downstream ordered Force and merges of distinct modifier chains remain pending. Circle controls do not advertise later Light Path or Look At modes."
+      "offset_x":1708,"offset_y":1709,"offset_z":1710,"speed":1711,"speed_random":1712,"curve_count":1713,"curve_interpolation":1714,
+      "starting_with_length":1715,"starting_with_bytes":[1716,1758],"max_delay_seconds":1760,"delay_random":1761,"orient_to_path":1762,"end_behavior":1763},
+      "curveAgeIds":[3900,3963], "curveValueIds":[4100,4163], "baseParameters":190,"totalParameters":267,"bindingVersion":10,
+    "migration":"Append new independent kind7 and binding10; retain readers1..9 and exact old layouts. Binding10 extends the Motion field span through 190 and aliases animated Max Delay, Delay Random and Orient To Path. Legacy binding9 supplies the new Light Path control defaults. CoreABI9/snapshots/Render boundary unchanged; full ten-module native/Core/CEP pair required.",
+    "prefixStorage":{"utf8Bytes":128,"packedBytesPerFloat":3,"hiddenNativeStreams":[143,186],"emptyMeans":"All point lights"},
+    "stageLimits":"Light Path native/CEP authoring, Starting With prefix transport and pre-render track capture exist in unpublished source; its path resource uses bounded adaptive piecewise-linear approximation, not exact arbitrary AE interpolation. Look At now exposes the third mode and Starting With in source; pre-render captures matched light positions and Core chooses the nearest target per particle. External-light cache invalidation, full build, deployment and AE2023 qualification remain open."
   },
   "material": {
     "graphType": "org.starfieldfx.nodes.material",
@@ -605,5 +607,43 @@
     },
     "ports": {"geometryInput": 2, "geometryOutput": 1, "maxGeometryInputs": 1},
     "migration": "ADR0041: native71/CEP75 adds Model-to-Material-to-Output geometry flow; schema1 upstream Material-to-Model records remain readable and convert on the next deliberate CEP edit. CoreABI9 and disk IDs1601..1606 unchanged."
+  },
+  "turbulence": {
+    "adr": "0042-turbulence-node",
+    "graphType": "org.starfieldfx.nodes.turbulence",
+    "schemaVersion": 1,
+    "nativeKind": 8,
+    "effectMatchName": "org.starfieldfx.node.turbulence",
+    "piplResource": 16017,
+    "bindingVersion": 11,
+    "nativeParameterRange": [1, 153],
+    "controls": {
+      "mode": {"stream": 1, "diskId": 1801, "choices": ["Normal", "Axis", "One Side"], "popupValues": [1, 2, 3], "graphValues": [0, 3, 4]},
+      "axis": {"stream": 2, "diskId": 1802, "choices": ["Axis X", "Axis Y", "Axis Z", "Normal"]},
+      "affect": {"stream": 3, "diskId": 1803, "choices": ["Infinite", "Sphere"]},
+      "affectedProperties": {"stream": 4, "diskId": 1804, "choices": ["All", "Noise"]},
+      "randomize": {"stream": 5, "diskId": 1805},
+      "originXY": {"stream": 6, "diskId": 1806},
+      "originZ": {"stream": 7, "diskId": 1807},
+      "positionOffset": {"stream": 8, "diskId": 1808},
+      "scaleOffset": {"stream": 9, "diskId": 1809},
+      "colorOffset": {"stream": 10, "diskId": 1810},
+      "opacityOffset": {"stream": 11, "diskId": 1811},
+      "rotationOffset": {"stream": 12, "diskId": 1812},
+      "overLife": {"countStream": 13, "countDiskId": 1813, "ageDiskIds": [4300, 4363], "valueDiskIds": [4400, 4463], "interpolationDiskId": 1814, "points": 64},
+      "noiseScale": {"stream": 143, "diskId": 1945},
+      "noiseLevels": {"stream": 144, "diskId": 1946},
+      "noiseAmplitude": {"stream": 145, "diskId": 1947},
+      "noiseFrequency": {"stream": 146, "diskId": 1948},
+      "fractalSpeed": {"stream": 147, "diskId": 1949},
+      "fractalEvolution": {"stream": 148, "diskId": 1950},
+      "fractalOffsetXYZ": {"streams": [149, 150, 151], "diskIds": [1951, 1952, 1953]},
+      "sphereSize": {"stream": 152, "diskId": 1954},
+      "sphereFeather": {"stream": 153, "diskId": 1955}
+    },
+    "graphKeys": {"origin": 1, "amplitude": 2, "frequency": 3, "levels": 4, "evolutionSpeed": 5, "offset": 6, "overLife": 7, "mode": 8, "axis": 9, "affect": 10, "sphereSize": 11, "sphereFeather": 12, "randomize": 13, "affectedProperties": 14, "positionOffset": 15, "scaleOffset": 16, "colorOffset": 17, "opacityOffset": 18, "rotationOffset": 19, "noiseScale": 20, "evolution": 21},
+    "scope": {"modes": ["Normal", "Axis", "One Side"], "deferredModes": ["Spherical", "Spherical 2"], "axisChoices": ["Axis X", "Axis Y", "Axis Z", "Normal"], "affectedProperties": ["All", "Noise"]},
+    "conversion": "AE positions, offsets, amplitude and sphere size map through layer height into Core world units; Noise Scale is interpreted as percent with 100 meaning unchanged coordinates. Frequency, Fractal Speed and Evolution use the source value directly in the independent Core field. These mappings are implementation choices pending manual AE2023 qualification, not claims of exact Stardust internals.",
+    "status": "Native/CEP source candidate native81/CEP84. No automatic AE acceptance. Noise-only values are stored on the particle for downstream use; current rendering has no separate noise consumer. Normal axis uses current particle velocity direction, falling back to +Z; this interpretation also needs manual qualification."
   }
 }

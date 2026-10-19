@@ -1,48 +1,58 @@
-# Focused deployment/rollback check entirely within the checkout.
+# Single-folder transition/rollback, entirely within an isolated checkout.
+# No dependency on or writes through the real dist/ development installation.
 $ErrorActionPreference = 'Stop'
-$repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$fixture = Join-Path $repo 'artifacts\deploy-test\single-folder-build4'
-$backupName = 'single-folder-build4-check'
-$backup = Join-Path $repo "artifacts\disabled\$backupName"
-$script = Join-Path $repo 'tools\Deploy-TestBuild.ps1'
-$taskShell = Join-Path $PSHOME 'powershell.exe'
-$bundle = Join-Path $repo 'dist'
-$names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNode.aex',
-           'StarfieldAppearance.aex', 'StarfieldForce.aex', 'StarfieldCore.dll')
-if (Test-Path -LiteralPath $fixture) { throw 'Fixture exists; preserve it for inspection.' }
-if (Test-Path -LiteralPath $backup) { throw 'Prior check backup exists.' }
-New-Item -ItemType Directory -Path $fixture -Force | Out-Null
-$priorHashes = @{}
-foreach ($name in $names) {
-    $source = Join-Path $bundle $name
-    Copy-Item -LiteralPath $source -Destination (Join-Path $fixture $name)
-    $priorHashes[$name] = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+$taskRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$taskFixtureRepo = Join-Path $taskRepo ('artifacts\deploy-test\single-folder-' + [Guid]::NewGuid().ToString('N') + '\repo')
+$taskTools = Join-Path $taskFixtureRepo 'tools'
+$taskPlugins = Join-Path $taskFixtureRepo 'artifacts\deploy-test\host'
+$taskBundle = Join-Path $taskFixtureRepo 'dist'
+$taskRuntime = Join-Path $taskFixtureRepo 'artifacts\runtime'
+New-Item -ItemType Directory -Force -Path $taskTools,$taskPlugins,$taskBundle,$taskRuntime | Out-Null
+Copy-Item -LiteralPath (Join-Path $taskRepo 'tools\Deploy-TestBuild.ps1') -Destination $taskTools
+$taskScript = Join-Path $taskTools 'Deploy-TestBuild.ps1'
+$taskNames = @('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex',
+    'StarfieldForce.aex','StarfieldTransform.aex','StarfieldHost.aex','StarfieldCore.dll')
+$taskPrevious = @('StarfieldParticle.aex','StarfieldEmitter.aex','StarfieldParticleNode.aex',
+    'StarfieldAppearance.aex','StarfieldForce.aex','StarfieldCore.dll')
+$taskPrior = @{}
+foreach ($taskName in $taskPrevious) {
+    $taskPath = Join-Path $taskPlugins $taskName
+    [IO.File]::WriteAllText($taskPath, "old $taskName")
+    $taskPrior[$taskName] = (Get-FileHash -LiteralPath $taskPath).Hash
 }
-$thirdParty = Join-Path $fixture 'UnrelatedEffect.aex'
-[IO.File]::WriteAllText($thirdParty, 'untouched')
-New-Item -ItemType Junction -Path (Join-Path $fixture 'StarfieldRuntime') -Target (Join-Path $repo 'artifacts\runtime') | Out-Null
-& $taskShell -NoProfile -ExecutionPolicy Bypass -File $script -PluginDir $fixture -BackupName $backupName
-if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $backup)) { throw 'Report mode modified deployment state.' }
-& $taskShell -NoProfile -ExecutionPolicy Bypass -File $script -PluginDir $fixture -BackupName $backupName -Install
-if ($LASTEXITCODE -ne 0) { throw 'Fixture installation failed.' }
-$entry = Get-Item -LiteralPath (Join-Path $fixture 'Starfield') -Force
-if ($entry.LinkType -ne 'Junction' -or [string]$entry.Target -ne $bundle) { throw 'Single bundle junction missing.' }
-if (@(Get-ChildItem -LiteralPath $fixture -Force | Where-Object Name -Like 'Starfield*').Count -ne 1) { throw 'Loose entries remain.' }
-$runtime = Join-Path $bundle 'StarfieldRuntime'
-if ((Get-Item -LiteralPath $runtime -Force).LinkType) { throw 'Runtime must be an ordinary subdirectory.' }
-$record = Get-Content -LiteralPath (Join-Path $backup 'deployment.json') -Raw | ConvertFrom-Json
-foreach ($entry in $record.files) {
-    if ((Get-FileHash -LiteralPath (Join-Path $bundle $entry.name) -Algorithm SHA256).Hash -ne $entry.installedHash) { throw 'Installed hash mismatch.' }
+foreach ($taskName in $taskNames) {
+    $taskKind = if ($taskName -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
+    $taskSource = Join-Path $taskFixtureRepo "artifacts\$taskKind\2023\x64\Release\$taskName"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $taskSource) | Out-Null
+    [IO.File]::WriteAllText($taskSource, "new $taskName")
 }
-$selected = (Get-Content -LiteralPath (Join-Path $runtime 'current.txt') -Raw).Trim()
-if ($selected -ne $record.runtimeName -or -not (Test-Path -LiteralPath (Join-Path $runtime $selected))) { throw 'Hot runtime selection missing.' }
-& $taskShell -NoProfile -ExecutionPolicy Bypass -File $script -PluginDir $fixture -BackupName $backupName -Rollback
-if ($LASTEXITCODE -ne 0) { throw 'Fixture rollback failed.' }
-if (Test-Path -LiteralPath (Join-Path $fixture 'Starfield')) { throw 'Created junction was not undone.' }
-if ((Get-Item -LiteralPath (Join-Path $fixture 'StarfieldRuntime') -Force).LinkType -ne 'Junction') { throw 'Original runtime junction was not restored.' }
-foreach ($name in $names) {
-    if ((Get-FileHash -LiteralPath (Join-Path $fixture $name) -Algorithm SHA256).Hash -ne $priorHashes[$name]) { throw 'Loose file was not restored.' }
-    if ((Get-FileHash -LiteralPath (Join-Path $bundle $name) -Algorithm SHA256).Hash -ne $priorHashes[$name]) { throw 'Previous bundle file was not restored.' }
+[IO.File]::WriteAllText((Join-Path $taskRuntime 'current.txt'), 'old-core.dll')
+[IO.File]::WriteAllText((Join-Path $taskRuntime 'old-core.dll'), 'old runtime')
+$taskThirdParty = Join-Path $taskPlugins 'UnrelatedEffect.aex'
+[IO.File]::WriteAllText($taskThirdParty,'untouched')
+New-Item -ItemType Junction -Path (Join-Path $taskPlugins 'StarfieldRuntime') -Target $taskRuntime | Out-Null
+$taskBackup = Join-Path $taskFixtureRepo 'artifacts\disabled\check'
+& $taskScript -PluginDir $taskPlugins -BackupName check
+if (Test-Path -LiteralPath $taskBackup) { throw 'Report mode wrote a backup.' }
+& $taskScript -PluginDir $taskPlugins -BackupName check -Install
+$taskLink = Get-Item -LiteralPath (Join-Path $taskPlugins 'Starfield') -Force
+if ($taskLink.LinkType -ne 'Junction' -or [string]$taskLink.Target -ne $taskBundle) { throw 'Single bundle junction missing.' }
+if (@(Get-ChildItem -LiteralPath $taskPlugins -Force | Where-Object Name -Like 'Starfield*').Count -ne 1) { throw 'Loose Starfield entries remain.' }
+if (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldAppearance.aex')) { throw 'Retired Appearance installed.' }
+$taskRecord = Get-Content -LiteralPath (Join-Path $taskBackup 'deployment.json') -Raw | ConvertFrom-Json
+foreach ($taskEntry in $taskRecord.files) {
+    if ($taskEntry.installedHash -and (Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash -ne $taskEntry.installedHash) {
+        throw 'Installed candidate hash mismatch.'
+    }
 }
-if ([IO.File]::ReadAllText($thirdParty) -ne 'untouched') { throw 'Third-party file changed.' }
-Write-Host 'Single-folder report/install/hash/rollback/third-party preservation checks passed.'
+$taskSelected = (Get-Content -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime\current.txt') -Raw).Trim()
+if ($taskSelected -ne $taskRecord.runtimeName) { throw 'Runtime selection mismatch.' }
+if ((Get-Item -LiteralPath (Join-Path $taskBundle 'StarfieldRuntime') -Force).LinkType) { throw 'Bundle runtime is a link.' }
+& $taskScript -PluginDir $taskPlugins -BackupName check -Rollback
+if (Test-Path -LiteralPath (Join-Path $taskPlugins 'Starfield')) { throw 'Created bundle link remains after rollback.' }
+if ((Get-Item -LiteralPath (Join-Path $taskPlugins 'StarfieldRuntime') -Force).LinkType -ne 'Junction') { throw 'Original runtime link not restored.' }
+foreach ($taskName in $taskPrevious) {
+    if ((Get-FileHash -LiteralPath (Join-Path $taskPlugins $taskName)).Hash -ne $taskPrior[$taskName]) { throw 'Original loose file not restored.' }
+}
+if ([IO.File]::ReadAllText($taskThirdParty) -ne 'untouched') { throw 'Unrelated file changed.' }
+Write-Host 'Isolated single-folder report/install/hash/retired-node/rollback checks passed.'

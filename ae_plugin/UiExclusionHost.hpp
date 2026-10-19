@@ -4,7 +4,10 @@
 // Private session-local C seam. The resident Host owns the state; effect DLLs
 // only borrow these functions while a UI callback is active. No host handles.
 extern "C" __declspec(dllexport) std::uint64_t SFLD_BeginUiExclusionV1() noexcept;
+extern "C" __declspec(dllexport) std::uint64_t SFLD_BeginSourceUiExclusionV1() noexcept;
+extern "C" __declspec(dllexport) bool SFLD_SourceUiExclusionActiveV1() noexcept;
 extern "C" __declspec(dllexport) void SFLD_EndUiExclusionV1(std::uint64_t) noexcept;
+extern "C" __declspec(dllexport) bool SFLD_UiExclusionActiveV1() noexcept;
 
 namespace starfield::adapter {
 void initialize_ui_exclusion() noexcept;

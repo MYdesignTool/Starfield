@@ -46,12 +46,14 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="MotionPointCapture.cpp" />
     <ClCompile Include="MotionLightSources.cpp" />
+    <ClCompile Include="MotionLookAtCapture.cpp" />
     <ClCompile Include="MotionLightTiming.cpp" />
     <ClCompile Include="LightCapture.cpp" /><ClCompile Include="MotionBlur.cpp" />
     <ClCompile Include="EffectMain.cpp" />
     <ClCompile Include="PresetsUI.cpp" />
       <ClCompile Include="GraphCarrier.cpp" />
     <ClCompile Include="NativeGraphCommit.cpp" />
+    <ClCompile Include="GraphRepair.cpp" />
     <ClCompile Include="NativeNodeGraph.cpp" />
     <ClCompile Include="NativeTemporalCache.cpp" />
     <ClCompile Include="NativeTemporalUI.cpp" />
@@ -71,6 +73,7 @@
     <ClCompile Include="..\src\core\Graph.cpp" />
     <ClCompile Include="..\src\core\GraphConstruction.cpp" />
     <ClCompile Include="..\src\core\GraphEvaluation.cpp" />
+    <ClCompile Include="..\src\core\TurbulenceNoise.cpp" />
     <ClCompile Include="..\src\core\MotionGeometry.cpp" />
     <ClCompile Include="..\src\core\MotionPathTravel.cpp" />
     <ClCompile Include="..\src\core\MotionLightPathClock.cpp" />

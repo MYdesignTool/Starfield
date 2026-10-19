@@ -1,4 +1,703 @@
+# M3-20 native96 Light Path source diagnosis — 2026-10-19
+
+Evidence: `artifacts/m3-20-lightpath-native96/`. The full May2023 x64 Release
+build succeeds with `-SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel
+2023 -NoDistPublish -NoRuntimePublish`. The focused
+`tests/RunMotionLightSourcesTests.ps1 -Run` passes 8609 checks, including
+composition object-type/point-light counters and preserving prior output/stats
+on capture failure. The owner exercised native96 in AE; the dialog reports one
+captured Point Light named `Point Light 1` and the actual lowercase prefix `p`.
+The case-sensitive mismatch explains the empty selection. Particle following
+after setting uppercase `P` or the exact full name remains a host check.
+
+# M3-20 Motion Starting With restoration — 2026-10-18
+
+Evidence: artifacts/m3-20-motion-prefix-20261018/. Native92 full unpublished
+May2023 SDK build and git diff --check pass; subsequently deployed under AE0.
+
+- `tests/RunMotionAuthorTransactionTests.ps1 -Run [-Sanitize]`:3108 checks.
+  UTF-8/UTF-16 validation, byte limit,44 bank write failure points, source guards,
+  stale/duplicate identity, exact rollback and existing mode lifetime cases.
+- `tests/RunMotionPrefixUiTests.ps1 -Run -Sanitize`:3060 checks. Actual production
+  UI and click dispatch with fake Win32 dialog/SDK; zero-count parameter delivery,
+  owned values, no borrowed handles across modal, cancel, stale UUID/layer/time/
+  prefix, invalid text and undo scope. Publication is stubbed in this UI fixture.
+- `tests/RunCloudNativeSyncTests.ps1 -Run -MotionCallbacks [-Sanitize]`:2172
+  checks. Actual NodeGraphSync/compiler/publisher writes the source bank and graph
+  together; failed graph publication restores prefix, graph/revision and guard.
+  The string stays outside the numeric animation binding record. Runs inside the
+  compiler environment so the ASAN DLL can be found without host environment edits.
+- `tests/RunMotionNativeBindingTests.ps1 -Run`:808 checks. Native registration
+  exposes topic/control while retaining existing IDs, names/count and playback.
+- `tests/RunAliasHandoffTests.ps1 -Run`:20589 native +12 camera checks.
+
+All above pass. AE23.5x52 UI visibility (existing/new effects), path following,
+save/reopen and Undo are still host gates. Owner confirms native91 OBJ import
+works; this does not qualify original-layer repair or the new prefix editor.
+
+# M3-20 native repair / zero-count Model button gates — 2026-10-18
+
+Evidence directory: artifacts/m3-20-native-repair-20261018/.
+Run tests/RunGraphRepairTests.ps1 -Run [-Sanitize]:1992 checks, zero failures.
+Actual GraphRepair.cpp uses fake SDK suites and the paired exclusion fixture;
+fault injection covers every operation in the success path, partial writes,
+silent disable/receipt failure, unknown/pending/busy states and reference/undo
+cleanup. Authored sentinels stay unchanged and no mutation escapes the undo
+group. Publisher internals are stubbed here and tested by the actual native
+binding/publication suite separately. A host rejection of EndUndoGroup is
+reported; no compensating write is made outside the group.
+
+Run tests/RunGraphCommitHostTests.ps1 -Run:56 checks, zero failures. Actual
+resident callback covers selected owner dispatch, no selection, ambiguity,
+reentry/worker/busy refusal and missing native acknowledgement.
+Run tests/RunModelImportUiTests.ps1 -Run -Sanitize:629 checks, zero failures.
+Run tests/RunModelImportTransactionTests.ps1 -Run [-Sanitize]:23027 aggregate
+checks, zero failures, including453 Model controls checks. Actual UI/checkpoint/
+parser/transaction chain covers num_params0/101 with inaccessible callback
+pointer, actual mesh writes, failed graph publication and exact author rollback.
+Win32 chooser and final graph sync are fake; real AE dialog/rendering remain open.
+
+Native91 full unpublished build succeeds with the May2023 SDK, version32859,
+unchanged Core ABI9 and CEP99. No compilation/offline count is AE qualification.
+Run tests/RunAliasHandoffTests.ps1 -Run [-Sanitize]:20589 native +12 camera
+checks. Passes in the default test stack after moving large expression snapshot
+copies to owned heap storage and isolating seven-kind/new repair test frames.
+Initial ASAN stack failures and the temporary8MiB test-only diagnostic are
+retained in the evidence directory; the final runner does not increase the stack
+and no plugin/AE stack setting changed. The optional actual saved-graph inputs
+pass20604 +12 in standard/ASAN. Standalone ASAN execution requires the MSVC
+runtime environment (owner-graph-asan.cmd); a plain PowerShell attempt failed
+before tests with missing-DLL exit -1073741515, not a passing run.
+Run tests/RunCoreTests.ps1 -Adapter:6251 checks pass after updating the private
+binding fixture signature. Its existing serialization microbenchmark is not
+evidence of a new runtime speedup from this repair.
+Deployment verifies11 native/Core hashes/backups,25 unchanged CEP hashes and
+the runtime selector after a fresh AE0 process check. See current-state.md for
+the exact backup and binary-only rollback command.
+Owner test: select the original visible layer, Window > Starfield Repair Selected
+Graph, reselect original/refresh, test add/move/connect/delete, then Model Import
+OBJ/cancel/import. Repair retains a disabled backup; immediate Undo once should
+revert the repair. Verify saved/reopened graph and rendering separately.
+
+# Previous M3-20 missing active Model recovery gates — 2026-10-18
+
+Host evidence received: owner-run Rebuild-GraphCopy.jsx on AE23.5x52 reports
+ok=true/complete, copyTarget p0-c1-l71. Owner observes the disabled copy appears
+editable. No individual edit-operation matrix, render, undo/reopen or Model
+chooser result yet. This is separate from the offline counts below.
+
+`node --expose-internals tests/graph_copy_rebuild_tests.js` exercises actual ES3
+Rebuild-GraphCopy.jsx with original-write prohibition, source animation retained
+in the duplicate, fresh effect references after parade mutations, static Output
+copy, preflight rejection, partial remove/add, missing acknowledgement, failed
+publication, changed records, discarded unlock and undo-close errors. Logs
+and frozen inputs live in
+artifacts/m3-20-guard-recovery-20261017/.
+Current result:19069 assertions, all passing (rebuild-copy-tests.log); prior
+manual-recovery fixture1492 still passes. Actual native runner compiles with the
+May2023 SDK and passes20552 native/12 camera checks. Running its executable with
+the two saved graphs passes20567 native/12 camera checks (native-owner-evidence-tests.log).
+These are offline assertions, not numbers of independent AE scenarios.
+
+inspect-saved-project.cjs reads the owner's saved .aep without writing it and
+uses the shipping structural codec to validate CRC29ece35f and decode slot139.
+saved-project-evidence.json records the source hash, graph edges and actual
+expression. Optional native fixture takes this extracted graph as the second
+argument after the previous parked-orphan fixture. Missing active Model must
+fail at stream237/parameter5, while the disconnected-orphan behavior is retained.
+
+# M3-20 terminal receipt isolation gates — 2026-10-17
+
+Manual recovery tool gate: node --expose-internals
+tests/graph_guard_recovery_tests.js passes1492 checks. Actual ES3 script covers
+exact target/state checks, foreign names, changed controls, all pending node
+guards, active session, unavailable command, prior backup, backup failure,
+rejected/unacknowledged publication, partial nonce write, changed post-publish
+controls, discarded release and undo closure failure/relock. All preflight
+failures write nothing; later failures retain the backup and do not retry.
+Log: artifacts/m3-20-guard-recovery-20261017/recovery-tests.log. Owner AE execution
+failed at stream237 and retained the backup/guard; no successful host recovery
+or undo acceptance. The shipped pair remains90/99.
+
+Installed native90/CEP99. Evidence: artifacts/m3-20-guard-owner-20261017/.
+Run tests/RunGraphCommitHostTests.ps1 -Run (and -Sanitize):35 checks each.
+Actual StarfieldHost command covers the owner's old guard1/commit790333/
+receipt-790333 plus fresh commit158257, both traversal orders, repeat rejection,
+mismatched negative receipt, invalid nonce and existing ambiguity/thread guards.
+Native89 fails3 terminal-isolation cases (native-negative-control.log); fixed
+and ASAN logs pass without changing the rejected renderer's values or guard.
+
+Set STARFIELD_PANEL_ROOT to that evidence directory's cep_panel and run
+node tests/RunPanelTests.cjs:49 suites pass. run-dom.cjs in the same directory
+runs30 variants. panel_topology_responsiveness_tests.js executes actual refresh,
+adoptState and retainGraphOnReadFailure;45 checks cover failed initial canvas,
+preserved error, later success, transient same-target failure and target switch.
+CEP98 fails the legacy-chain negative control. Startup fixture now exposes
+standard classList and asserts discovery cannot hide missing graph modules.
+graph_guard_report_tests.js passes210 checks; all3 JSX files pass32 ES3/conditional
+checks. Full May2023 SDK native90 build succeeds; no AE launch/qualification.
+
+publish.ps1 defaults to a read-only report; -Publish requires AE0 and exact
+frozen candidate/baseline hashes, then uses Deploy-TestBuild. deploy-after.json
+and independent-installed-verification.json verify11 native/Core,25 panel,
+backups, selector and ABI9. Original retained guard recovery and Model chooser
+host behavior are explicitly unqualified; no performance claim from test counts.
+
+# Previous M3-20 saved guard sampling gates — 2026-10-17
+
+Installed native89/CEP98. Evidence: artifacts/m3-20-guard-sampling-20261016/.
+48 panel suites and30 complete DOM variants pass. Set STARFIELD_PANEL_ROOT to
+that directory's cep_panel and run `node tests/RunPanelTests.cjs`; run
+`node artifacts/m3-20-guard-sampling-20261016/run-dom.cjs` for the DOM matrix.
+Two added STARFIELD_DOM_GUARD_SAMPLING=1 cases pass245 checks each (fresh/reused
+wrappers with shared identities, commit invalidation and conditional model).
+Ordinary1/saved0 permits move/add; ordinary0/saved1 rejects without native
+commands or graph changes. Sampler failures never fall back to ordinary reads;
+diagnostic failures preserve busy rejection. Previous guard release/undo-failure
+cases still pass242 checks. CEP97 fails the saved-idle negative control retained
+in negative-cep97.log. All3 shipped JSX files pass the32-check syntax gate.
+Frozen changed fixtures, owner failure, candidate and deployment receipts are
+retained there. No native rebuild or actual AE acceptance/performance claim.
+
+# Previous M3-20 renderer guard gates — 2026-10-16
+
+Evidence: artifacts/m3-20-renderer-guard-20261016/; installed native89/CEP97.
+48 panel suites and28 complete DOM variants pass. Set STARFIELD_PANEL_ROOT to
+this evidence directory's cep_panel and run `node tests/RunPanelTests.cjs`;
+`node artifacts/m3-20-renderer-guard-20261016/run-dom.cjs` runs the DOM matrix.
+STARFIELD_DOM_STALE_GUARD=1 invalidates guard wrappers across node enumeration;
+CEP96 negative control reproduces graph_transaction_busy while97 passes.
+STARFIELD_DOM_GUARD_FAILURES=1 covers discarded acquire/release, an unknown
+busy guard, undo closure relocking, subsequent edits and bootstrap rejection
+without graph/native writes. The combined shared-wrapper/commit-invalidation/
+conditional-model focused fixture passes242 checks (guard-failures-final.log).
+Full JSX syntax/conditional gate passes32 checks; panel pairing gate is97.
+
+No native code changed. Owner confirmed Motion addition on96, not the97 editing
+fix. All mocks remain offline evidence; actual move/connect/delete/add, undo/
+reopen and Model Import OBJ still require owner-run AE validation.
+
+# Previous M3-20 ExtendScript conditional gates — 2026-10-16
+
+Evidence: artifacts/m3-20-motion-conditional-20261016/; installed native89/CEP96.
+48 panel suites/25 DOM variants pass. Set STARFIELD_PANEL_ROOT to this evidence
+directory's cep_panel and run `node tests/RunPanelTests.cjs`; run
+`node artifacts/m3-20-motion-conditional-20261016/run-dom.cjs` for the DOM matrix.
+The final DOM variant enables STARFIELD_EXTENDSCRIPT_CONDITIONAL_MODEL=1 and
+shared wrappers/commit invalidation. The model covers only the reported alternate
+conditional association, not all ExtendScript semantics or actual host execution.
+
+With that variable and `node --expose-internals tests/motion_gateway_roundtrip_tests.js`,
+CEP95 fails first Circle with0 versus1; CEP96 passes22 checks. The owner's actual
+raw1/Core0 trace and direct Adobe report are retained in owner-failure.json.
+extendscript_syntax_tests.js now preserves parentheses in its AST, rejects
+ungrouped nested branches across all3 shipped JSX files, and has negative/grouped
+controls (32 checks). panel_test_build_deployment_tests.ps1 -Run
+-InstalledNativeBuild 70 -InstalledPanelGeneration 95 passes72 isolated checks,
+including rejection before deployment of the exact unsafe Motion expression.
+The fixture copies its new extendscript_conditionals.cjs dependency.
+
+No native code changed. Post96 AE addition/edit/undo/reopen remains owner-led;
+do not equate a modern Node/Acorn ES3 parse with actual legacy-engine semantics.
+
+# Previous M3-20 Motion sampling gates — 2026-10-16
+
+Evidence: artifacts/m3-20-motion-sampling-20261016/; installed native89/CEP95.
+48 panel suites/24 full DOM variants pass. Run tests/RunPanelTests.cjs with
+STARFIELD_PANEL_ROOT pointing to this evidence directory's cep_panel, and run
+`node artifacts/m3-20-motion-sampling-20261016/run-dom.cjs` for DOM variants.
+motion_gateway_roundtrip_tests.js now supplies the required host sampler and
+asserts missing/throwing sampling never accepts an ordinary fallback (22 checks).
+negative-cep94-sampling.log records94's missing expected rejection, while95
+passes. cached-property.log retains the prior stale-Property regression.
+Full DOM verifies exact original sampled raw3/Core2 in pre-rollback evidence,
+rejection of native mode drift and restoration even if diagnostics fail.
+
+owner-failure.json records the actual94/AE23.5x52 discrepancy. Offline tests prove
+the reader contract, not the host's exact branch or95 host acceptance. No native
+code changed or new host qualification is claimed.
+
+# Previous M3-20 Motion evidence gates — 2026-10-16
+
+Evidence: artifacts/m3-20-motion-readback-20261016/; installed native89/CEP94.
+48 panel suites pass in panel-results.json;24 DOM variants pass in dom-results.json.
+Set STARFIELD_PANEL_ROOT to that evidence directory's cep_panel and run
+`node tests/RunPanelTests.cjs`; `node artifacts/m3-20-motion-readback-20261016/run-dom.cjs`
+replays the full DOM variants with retained actual registration catalogs.
+
+motion_readback_diagnostics_tests.js executes the real comparator against stale
+ordinary/fresh sampled values, real mode drift, missing/duplicate UUIDs, foreign
+kinds, missing/throwing getters and failed serialization. Passing comparisons do
+zero host reads and no diagnostic branch writes. Full DOM variants verify evidence
+is captured before removal and rollback restores the previous graph even when the
+diagnostic serializer throws. These tests qualify instrumentation, not Motion in
+AE. Independent installed verification records11/25 matching file hashes and AE0.
+
+# Previous M3-20 identity/import gates — 2026-10-15
+
+Evidence: artifacts/m3-20-host-identity-20261015/; final deployed candidate native89/CEP93.
+47 suites pass in panel-results.json;24 DOM variants pass in dom-results.json.
+Run RunPanelTests.cjs with STARFIELD_PANEL_ROOT pointing at this evidence's
+cep_panel, then run-dom.cjs (actual registration catalogs retained from native88;
+no parameter layout changed). Four new variants use shared same-kind effect
+wrappers with fresh/reused identities and commit invalidation. They exercise
+Cube/OBJ record independence and full-UUID selection for all nine node kinds.
+
+STARFIELD_MOTION_SNAPSHOT_PROPERTIES=1 node tests/motion_gateway_roundtrip_tests.js
+passes with CEP93 and fails CEP92 exactly0 versus1. The host's own
+motion-before-rollback.json records native1/guard0 versus snapshot0 before rollback;
+the fixture models stale Property state, not AE's internal implementation.
+negative-shared-wrappers.log also makes CEP92 reject duplicate identities.
+Do not conflate these negative controls with post-install AE acceptance.
+
+RunModelImportTransactionTests.ps1 -Run [-Sanitize]:21,239 checks pass plus453
+Model controls, both configurations. Source SDK refs must be zero at the
+publication seam, exact meshes/numbers restore on failures, and post-chooser
+validation succeeds even when the borrowed PF parameter binding is rejected.
+RunCloudNativeSyncTests.ps1 -Run -ModelCallbacks:213 actual NodeGraphSync/compiler/
+publisher checks under the real cross-module Host UI exclusion. Automatic and
+foreign/invalid owner callbacks stay excluded; an explicit missing context fails.
+RunCloudNativeSyncTests.ps1 -Run -MotionCallbacks:1,780 checks pass.
+RunModelNativeBindingTests.ps1 -Run:9,583 pass, including actual button dispatch
+and an incomplete-array diagnostic before touching that array. A stale binding
+fixture wrongly classified current compatible11 as unsupported; it now checks
+11 compatibility and rejects12. No binding implementation/schema changed here.
+
+Full BuildWindows.ps1 -IncludeModelCandidate -NoDistPublish -NoRuntimePublish
+succeeds with May2023/2023/x64/Release. Initial new Model fixture's missing physical
+slot remap caused an offline access error, diagnosed with ASAN and corrected in
+the fixture; it was never deployed. Standard and ASAN OBJ tests plus actual source
+sync and current module tests are the final gates. Native89-deploy.log and
+independent-installed-verification.json verify11/25 installed/backup hashes and
+resident selector's host-free ABI9 query. Actual AE addition/import/focus/undo/
+reopen remains unqualified; no claim of a supported AE family follows from build.
+
 # 测试入口
+
+## M3-20 CEP92 — Motion writer / Cube add / optional transport — 2026-10-15
+
+Evidence: `artifacts/m3-20-add-path-20261014/` (task began on14th).
+47 isolated suites pass in panel-tests/results.json. Run with
+STARFIELD_PANEL_ROOT pointing at that directory's cep_panel, then
+`node tests/RunPanelTests.cjs` and `tools/Assert-PanelContract.ps1 -PanelRoot`.
+20 actual gateway/DOM variants pass in dom-results.json: fresh/reused wrappers,
+commit invalidation, legacy records, reordered connections, API replacement,
+deletion at render and delayed Motion scripting setter delivery. Native writes
+are simulated in these DOM tests.47 includes a new optional-loader fixture
+covering cold/coalesced loading, reuse, error/deadline, no Cube asset transaction,
+no host mutation before availability and one full commit after loading.
+
+`run-dom.cjs` also runs CEP91 as an expected failing control. Its actual ordinary
+gateway reports exactly Published Motion Type expected1/actual0 when the fixture
+delivers an old scripted selector value after native acceptance. CEP92 succeeds
+under the same simulated ordering; this does not prove AE's callback cause.
+The existing injected post-publication mismatch still rejects and restores.
+Direct writer tests now assert zero script popup setters, verified intent and
+native-owner three-mode/speed readback. No mode/stale/rollback check is relaxed.
+The Model transport fixture expects ordinary Cube publication rather than a
+zero-asset full backup; imported/restored resources retain their original gates.
+
+`RunMotionAuthorTransactionTests.ps1 -Run`:2,862 checks pass,337 SDK failure
+points; the unchanged native consumer verifies all intent modes and lifetime/
+rollback. Logs: native-author-tests.log. No native rebuild is required.
+Matching-generation write fixtures now assert zero gateway reparse; stale or
+replaced APIs still reload coherently. Production8s timeout is unchanged. No
+actual AE launch, acceptance or measured end-to-end latency improvement.
+
+The tested25-file CEP92 candidate is published through existing Junctions after
+fresh zero-AE checks. All25 installed panel hashes,24 saved CEP91 panel hashes,
+unchanged11 native/Core installed/backup hashes and Core selector verify. CEP92
+contract and paired undo preflight pass; deploy-after.json records the current
+pairing and rollback. No AE test is implied by installation verification.
+
+
+## P-02M CEP91 — AE Effect Controls only — 2026-10-14
+
+Candidate/evidence: `artifacts/p-02m-ae-controls-only-20261014/`. Run:
+
+```powershell
+$env:STARFIELD_PANEL_ROOT=(Resolve-Path 'artifacts/p-02m-ae-controls-only-20261014/cep_panel').Path
+node tests/RunPanelTests.cjs
+& tools/Assert-PanelContract.ps1 -PanelRoot $env:STARFIELD_PANEL_ROOT
+```
+
+46 suites pass; record factories and ready/manifest/cache generations verify CEP91.
+Actual panel DOM fixture has no inspector/editor helpers. Emitter/Particle/Output
+clicks send only selectNodeEffect, never alter graph values/revision, serialize
+in-flight calls and coalesce rapid clicks to the last node. Existing palette,
+topology, rollback, startup, preset and gateway checks pass.
+The first run rejected the obsolete model_particle_shape popupInput fixture;
+its UI section now checks retirement while retaining all shape mapping, codec,
+preset and native gateway rejection/no-write assertions. The obsolete gradient
+UI helper suite now guards full editor retirement (DOM/styles/callbacks/requests,
+physical helper files and regeneration); particle_gradient_tests retains saved
+gradient codec/native bank validation. Native AE preset generation remains.
+No native source changed; no native rebuild/test required. Manual AE2023 gates:
+inspector stays absent; clicks focus matching effects; AE value/curve/gradient
+changes, undo/redo and reopen reflect in the graph. Prior Motion/deletion issues
+and actual host latency remain unqualified.
+
+Isolated `tests/paired_panel_rollback_tests.ps1` and
+`tests/restore_test_build_tests.ps1` pass, including explicit retired-file recovery,
+reappeared/unrecorded-missing source rejection and legacy paired backups. Initial
+rollback exposed a Windows PowerShell UTF8 receipt-read mismatch on this Chinese
+checkout path; explicit UTF8 reads fix it. Post-publication hashes match the tested
+candidate (24 files/3 retirements), all27 backups and unchanged11 native/Core files;
+Core selector, CEP91 contract and read-only paired undo preflight pass.
+
+
+
+## M3-20 Motion lifetime / publication cost — native88 deployed — 2026-10-14
+
+Evidence: `artifacts/m3-20-motion-lifetime-20261014/`. New native88 code, existing
+isolated CEP90 protocol; no new feature/ID/schema/ABI. No AE launch or automatic
+host acceptance. The two negative-control failures reproduce retained-stream
+access in the withdrawn implementation when fake source refs expire on owner
+release/publication. They do not establish AE's exact internal invalidation rule.
+
+- `RunMotionAuthorTransactionTests.ps1 -Run` and `-Run -Sanitize`:2,862 each;
+  337 SDK failure points, reordered/duplicate/missing UUIDs, discarded rollback,
+  per-write/ref-owner invalidation and1/8/128/512-node batches. Peak1 stream ref;
+  5N effect opens across prepare/accept; unrelated native edits make0 SDK calls.
+- `RunCloudNativeSyncTests.ps1 -Run -MotionCallbacks`:1,780; real publisher and
+  actual Motion-compiled callback, expired source refs, explicit failed-restore
+  propagation, three-mode cycles and existing mutation/reentry cases.
+- `RunCoreTests.ps1 -Adapter`:6,251; stored CRC matches actual ARB bytes,
+  failed allocation preserves checksum output, registration/render/receipt gates.
+  `RunCoreTests.ps1 -RendererControls`:829 checks pass.
+  Old fixture signatures/layout/guard checkout and newly registered Model default
+  handle cleanup were updated; actual Model/light implementation dependencies
+  are linked. No rejection, resource-leak or receipt assertion was removed.
+-46 isolated panel suites and18 full DOM variants pass. DOM catalogs use the
+  existing actual registration inventories plus freshly generated Motion output.
+  An initial wrong/missing catalog input was corrected, not production code.
+- Alias/native sync20,552 + camera12; UI exclusion568; deletion426,910 checks
+  across7,722 frames,0 unexpected/guarded/backup errors. Its intentional missing
+  active binding still fails516. Wrapper stderr handling must retain the actual
+  exit code; the expected516 diagnostic is not a suite failure.
+- Motion registration805; Circle2,083; Path10,730; Look At1,494; ordered frame8,846;
+  light sources8,600; timing5,890; SFPL1 resource263. All pass.
+- Full May2023 Release x64 /MT, IncludeModelCandidate and both NoPublish switches:
+  exit0. Byte-only inspection verifies10 AEX identities/packed32856. PiPLtool's
+  existing9020 fallback validated unchanged declarations before resource reuse.
+
+Same-process alternating microbenchmark (5 medians,31 encodes/sample),4/64/256
+nodes: duplicate17.76/329.53/1,288.05us vs single9.01/169.92/637.95us; measured reduction
+49.3%/48.4%/50.5% in final adapter.log. This isolates publication encoding cost,
+not full AE edit latency or render FPS. No claim of global performance gain.
+These gates preceded deployment.11 native/Core and27 panel installed/backup
+hashes and paired rollback preflight subsequently pass; independent selector
+verification confirms the installed Core. No AE host test is implied.
+
+## M3-20 native87 host crash — offline lifetime blind spot — 2026-10-14
+
+Owner report provides a real native87 dump. Matched PE/PDB and x64 unwind
+metadata identify c0000005/read0x8 in AEGP_GetStreamType called by the new
+MotionAuthorTransaction post-publication read. Fake SDK stream references remain
+stable across graph/binding writes; previous offline passing counts therefore do
+not qualify this lifetime in AE.87/90 is rejected and exact86/89 restored. Only
+offline crash analysis and read-only restored hash/runtime/contract checks run;
+no new tests, AE launch or automatic acceptance. Wait for owner instructions.
+
+## M3-20 full Motion path — native87 / CEP90 — 2026-10-14
+
+Offline only; current logs/audit under
+`artifacts/m3-20-motion-native-author-20261014/`. Set process-local
+STARFIELD_PANEL_ROOT to its candidate-panel. The common panel_test_paths.cjs
+also directs legacy fixture module/file reads to that root. No assertions or
+host behavior are weakened; the latest46-suite run replaces an earlier mixed
+candidate/baseline read run. No AE launch or automatic acceptance.
+
+- `node tests/RunPanelTests.cjs`:46 suites,0 failures, including all3 ES3 bridges.
+- Full DOM18 variants: Material/Motion, fresh/reused wrappers, commit invalidation,
+  current/legacy Emitter/Particle/Force, reorder, stale API and gateway reload.
+- `RunCloudNativeSyncTests.ps1 -Run -MotionCallbacks`:1,729 checks. Actual
+  Motion-compiled supervision and native publisher; delayed saved modes, stale PF
+  binding, fresh UUID lookup, partial/foreign delivery, nested callbacks, explicit
+  source intent, failed/discarded mode writes and guard release, publication
+  rollback and retirement. Fake SDK, not AE scheduling.
+- `RunAliasHandoffTests.ps1 -Run`:20,552 native and12 camera checks.
+- `RunModelUiExclusionTests.ps1 -Run`:568 cross-module Windows message checks.
+- `RunDeletionRenderLifecycleTests.ps1 -Run`:426,910 checks /7,722 frames;
+  0 unexpected errors and0 guarded/backup bad bindings. The intentional strict
+  missing-source case still returns516.
+- Motion registration805, Circle2,083, Path10,730, Look At1,494, frame8,846,
+  light sources8,600, light timing5,890 andSFPL1 resource263 checks pass.
+- Full May2023 x64 Release /MT build exits0 with both NoPublish switches.
+  PE byte parsing verifies10 AEX packed32855/identities without executing modules.
+
+Actual AE mode persistence/deletion/project lifecycle remain manual host gates.
+After these gates,87/90 deployed with11/27 installed/backup hashes and paired
+86/89 rollback preflight verified. AE was not launched or automatically exercised.
+
+## M3-20 expanded installed-pair audit — native86 / CEP89 — 2026-10-13
+
+The owner requested broader predeployment regression coverage after the install
+command had completed. The expanded run checks the installed pair; no production
+file changed during it. Logs: `artifacts/m3-20-motion-author-20261013/regression-audit/`.
+
+- All46 `*_tests.js` suites pass. `node tests/RunPanelTests.cjs` independently
+  repeats46/46 with default panel root and explicit bundled-Acorn child option.
+- Full DOM18 variants pass with Material/Motion/full graph/deletion enabled:
+  wrappers fresh/reused x commit invalidation off/on x current/legacy Emitter/
+  Particle/Force records; plus stale API and gateway reload during commit.
+- RunModelUiExclusionTests.ps1 -Run:560 checks, real test DLL/message-only window.
+- RunAliasHandoffTests.ps1 -Run:20,549 native and12 camera checks. Its missing
+  existing Look At capture/link sources were added, with real implementation.
+- RunDeletionRenderLifecycleTests.ps1 -Run:426,910 checks,7,722 frames,7,624
+  cancellations,97 normal frames and one expected strict missing-source failure;
+  3,180 disabled-backup callbacks,0 unexpected errors,0 guarded/backup bad bindings.
+  This recipe likewise links current Look At capture implementations.
+- The initial9 JS failures were individually mapped to obsolete mocks/contracts,
+  documented in current-state.md; rejection/no-write/rollback assertions remain.
+  No AE launch or automatic host acceptance. Actual Motion/Force deletion dialog
+  and host mode reversion cause remain open. Verify complete install/backup hashes
+  and preflight rollback before future handoff; do not infer host support here.
+
+## M3-20 Motion author repair preparation — native86 / CEP89 — 2026-10-13
+
+Offline preparation logs under `artifacts/m3-20-motion-author-20261013/`. Live
+CEP88 was unchanged during preparation;86/89 was subsequently installed after
+owner-close check. No AE launch or automatic acceptance.
+
+- RunMotionNativeBindingTests.ps1 -Run:805 checks; actual SDK registrations now
+  require SUPERVISE on Motion Type/After Path and preserve CANNOT_TIME_VARY.
+- motion_gateway_roundtrip_tests.js with candidate STARFIELD_GATEWAY_SOURCE:
+  18 checks, all modes/speeds and forced Circle authoring when a stale getter
+  reports1 over live native Look At3. Existing native catalog is unchanged by
+  flag-only registration changes.
+- model_graph_gateway_dom_tests.js with candidate STARFIELD_PANEL_ROOT,
+  retained native catalogs, MOTION/FULL_GRAPH/DELETE_RENDER=1:134 checks with
+  fresh wrappers and134 with STABLE_EFFECTS=1. Uses the real ordinary gateway
+  for Look At/Circle/Light Path/Circle changes. Injects mode3 after native
+  publication; rejects before releasing the transaction, restores prior graph,
+  removes the added Motion and checks zero missing published sources at removal.
+  The first repair variant that removed before restoring fails this last check.
+  Native receipt/backup/asset work is simulated.
+- Existing ordinary native gateway passes. Record710, panel40, recovery24 and
+  immediate-response34 checks pass; all three JSX bridges parse as ES3.
+- RunCloudNativeSyncTests.ps1 -Run -Bindings:20,549 native and12 camera checks,
+  zero failures, preserving the transaction fence and Output sampling behavior.
+- Complete May2023 x64 Release build exits0 with NoDistPublish/NoRuntimePublish.
+  Current installed85/88 hashes remain the baseline; candidate86/89 is not AE
+  qualified until owner evidence. Random deletion identity errors remain open.
+
+## M3-20 Motion record reader / canvas recovery — native85 / CEP88 — 2026-10-13
+
+Offline only; logs/candidates under `artifacts/m3-20-motion-record-20261013/`.
+Set process-local STARFIELD_PANEL_ROOT to its candidate-panel for these JS suites.
+
+- native_record_contract_tests.js:710 checks; exact source/factory equivalence,
+  all eight native kinds, three valid Motion modes and strict invalid rejection.
+- motion_panel_tests.js:40 checks, including Look At's actual record reader.
+- `node --expose-internals tests/motion_snapshot_recovery_tests.js`:24 checks;
+  actual snapshot normalizer and panel refresh/edit functions. Reads three-mode
+  graphs, adds Circle with existing Look At, retains same-target canvas on both
+  normalization/snapshot-stage failures, does not retain across different targets,
+  prevents stale-receipt submission and recovers with a valid fresh receipt.
+- `node --expose-internals tests/panel_topology_responsiveness_tests.js`:34 checks.
+- motion_gateway_roundtrip_tests.js:16 checks with the candidate gateway selected
+  by process-local STARFIELD_GATEWAY_SOURCE; actual native registration catalog
+  retained from85, writer/readback executed in an offline host model.
+- Indexed native gateway, edit-planner and current-node suites pass; three JSX
+  files parse as ES3 and all panel JavaScript parses.
+- Baseline87 whole-graph mode2 reproduces the exact unsupported-mode error;
+  contract suite and new read-only deployment invariant reject its stale factory.
+-11 native/Core hashes unchanged;27 panel/backup hashes and paired rollback
+  preflight pass. No native build, AE launch or automatic AE acceptance ran.
+
+Actual host confirmation remains owner-led; prior random deletion dialogs and
+mode1 ->0 reports are not closed by this independent reader fix.
+
+## M3-20 UI callback fence / Motion follow-up — native85 / CEP87 — 2026-10-13
+
+All checks are offline. Logs are under `artifacts/m3-20-followup-20261013/`.
+
+- `tests/RunModelUiExclusionTests.ps1 -Run`:560 checks,0 failures, actual isolated
+  Host/effect DLL query and Windows message-only window, including nested modal
+  message pumping. No AE qualification.
+- `tests/RunCloudNativeSyncTests.ps1 -Run -Bindings`:20,549 native and12 camera
+  checks,0 failures. When the paired exclusion test module is present (built by
+  the preceding command), actual DRAW and source supervision exercise guard0
+  stale deliveries under an active Host transaction and issue zero SDK calls.
+  Delivered guard1/2 DRAW also issues zero SDK calls. Saved retired source guard3
+  suppresses automatic publication rather than failing. Other active failures,
+  Output scope and finite handoff/rollback checks remain strict.
+- `tests/RunMotionNativeBindingTests.ps1 -Run` with process-local
+  `STARFIELD_TEST_NODE_CATALOG=1`:802 checks,0 failures; the current SDK
+  registration catalog feeds the real gateway writer. The historical fixture
+  now connects Motion to Output, matching the84 history-plan ancestor contract.
+- `node tests/motion_gateway_roundtrip_tests.js`:16 checks,0 failures; all three
+  modes, overridden last-used/default popup, percent/radian source, negative
+  Circle speed and return to Circle. Its catalog defaults to the follow-up
+  artifact; an explicit log path is accepted. The baseline86 gateway supplied
+  through process-local `STARFIELD_GATEWAY_SOURCE` fails Speed50 with actual100.
+  It does not reproduce the owner's mode1 ->0 failure.
+- `model_graph_gateway_dom_tests.js` with current panel root, actual catalogs,
+  Motion/full graph/delete-render enabled:115 checks with fresh wrappers and115
+  with reused wrappers,0 failures. It deletes Particle/Force/Transform/Motion in
+  one actual transport/gateway commit, checks survivors/dangling edges, no stale
+  child access and publication before physical removal. Native backup/receipt/
+  asset operations are simulated.
+- Motion panel39 checks; immediate response34 checks; current node panel and
+  reference gateway pass; all three JSX bridges parse as ES3.
+- Full May2023 x64 Release build exits0.11 native/Core /27 panel install and
+  backup hashes, selected Core, existing Junctions and paired rollback preflight
+  pass. No AE launch, automatic acceptance or owner-project mutation.
+
+Actual AE batch/single deletion, mode acknowledgement and revised idle/preview
+timing remain open. Record84 performance improvement as owner evidence only.
+
+## M3-20 Output-scoped stability repair — native84 / CEP86 — 2026-10-13
+
+All following checks are offline; no AE process or automatic acceptance ran.
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunCloudNativeSyncTests.ps1 -Run -Bindings`:
+  20,541 native checks and12 camera checks,0 failures. Includes active missing
+  sources remaining strict, disconnected orphan retirement/rollback, unchanged
+  alias preservation on append and successful idle metadata for a parked absent
+  source. The seven-kind fixture now supplies the current Motion end popup
+  default1; its old zero was an invalid mock native value.
+- `artifacts/cloud-native-binding-tests/tests.exe artifacts/m3-20-stability-20261013/saved-live-graph.sfgr`:
+  20,553 native checks and12 camera checks,0 failures. Reads the exact extracted
+  owner graph; only69 Emitter/Particle aliases are checked out. The orphan
+  remains parked, the saved graph renders visible alpha through the CPU backend,
+  and making that source reachable still fails with its UUID/parameter/component.
+- Negative control: a confined copy of NativeNodeGraph.cpp restores the old
+  all-record frame sampling. The same extracted graph fixture fails four scope
+  checks as expected (20,551 native checks /4 failures in that earlier control
+  revision). It does not represent execution inside AE.
+- `node tests/reference_particle_gateway_tests.js` and
+  `node tests/current_node_panel_tests.js`: pass, including Normal graph/native/
+  panel round trip, pixel-valued amplitude and readable Material tooltip. Old
+  test mocks were updated for the current ensure signature, project enumeration,
+  containingComp and resident effect-reveal command. Registered stream checks
+  use manifest index overrides, preserving fixed public/disk IDs.
+- `node --expose-internals tests/panel_topology_responsiveness_tests.js`:
+  34 checks pass; immediate projection, paint before host submission, saved
+  receipt adoption and failure rollback remain intact. The Node24 internal
+  Acorn parser requires `--expose-internals`.
+- All three JSX bridges parse with Acorn `ecmaVersion:3`.
+- Full May2023 x64 Release SDK build exits0. Installed/backup11 native/Core and
+  27 panel hashes, runtime selector and existing Junctions match. Paired rollback
+  preflight passes. Adobe PiPLtool still exits9020; the build validates its
+  constrained cached conversion and resulting identities/flags/version.
+
+Logs, read-only project evidence, negative control, build and deployment receipts
+are confined to `artifacts/m3-20-stability-20261013/`. Native84 passive render
+logging writes `artifacts/graph-render-journal-84.jsonl`; offline fixture entries
+are retained separately before owner use. Actual AE startup, preview, random
+edit/deletion failures and latency remain open host gates.
+
+## M3-19 Turbulence sparse-curve binding repair — native83 / CEP85 — 2026-10-13
+
+Static review traced the add-node failure to `read_binding_record`: it required
+all fields1–153 even though graph capture intentionally omits the unused curve
+bank for the default zero-point curve. Validation now requires the values read
+by Turbulence evaluation and only requires interpolation/point entries for an
+active curve. Binding record version11 is unchanged. The full May2023 x64
+Release build exited0; all11 installed native/Core hashes match their candidate,
+and the Core selector and AE Junction match the deployed bundle. No tests or
+automatic AE acceptance ran; the owner will qualify the repair in AE2023.
+The local PiPLtool returned9020; the build reused only exact-input cached
+conversions and completed resource identity/version checks.
+Deployment receipt and one-step rollback are in `docs/current-state.md`.
+
+## M3-19 Turbulence new-node default unit repair — native82 / CEP85 — 2026-10-13
+
+The default-unit defect was traced to CEP planning: Noise Amplitude and Sphere
+size are pixel-valued AE controls represented in graph world units relative to
+the target layer height. A 50 amplitude default on a 2160px layer was written
+back as108000. New-node initialization now divides both geometry-relative
+defaults by the snapshot height before committing. The May2023 x64 Release
+full build and post-install hash/runtime checks succeeded; 11 active native/Core
+files and18 CEP sources match the deployed candidate. No tests or automatic AE
+acceptance ran in this repair pass; AE2023 qualification remains owner-led.
+Rollback and receipts are in `docs/current-state.md`.
+
+## M3-19 Turbulence first-stage deployment — 2026-10-13
+
+The earlier Core fixture record remains: `RunTurbulenceNoiseTests.ps1 -Run` and
+`-Run -Sanitize` each passed21,411 checks; `RunTurbulenceGraphTests.ps1 -Run`
+and `-Run -Sanitize` each passed127 checks. Those fixtures cover the field,
+serialization, ordered evaluation and deterministic behavior. No test suite was
+rerun for the deployment continuation.
+
+The complete unpublished May2023 x64 Release build succeeded for Core, the main
+plug-in, all node modules including Turbulence, and the general AEGP. Adobe's
+local PiPLtool still exits9020; the build accepted a cached node conversion only
+after the remaining resource structure matched exactly and rewrote resource ID,
+display name, match name and packed version. The generated RC passed identity,
+flags and version checks. Deployment receipt
+`artifacts/m3-19-turbulence-native81-deploy-after.json` verifies11 native/Core
+hashes,18 CEP hashes, Core selection and paired rollback. AE was not launched;
+no automatic acceptance ran. Manual AE2023 qualification remains owner-led.
+Contract boundaries and implementation hypotheses are in
+`docs/adr/0042-turbulence-node.md`.
+
+## M3-18 Motion three-mode staged deployment — 2026-10-13
+
+The incremental test pair native80 / Core ABI9 / CEP83 is deployed. The
+post-install receipt is `artifacts/m3-18-native80-deploy-after.json`; a separate
+read-only comparison verified all10 native/Core hashes and all18 CEP hashes,
+the selected Core hash, and the retained paired rollback backup
+`m3-18-native80-panel83-motion-20261013`. AE was not launched and no automatic
+acceptance was run; manual AE2023 qualification remains open. Rollback is
+documented in `docs/current-state.md`.
+
+The Look At shutter-sampling adapter and nonempty capture regression are in the
+published native80 candidate (May2023 x64 Core, main and all nine node AEX
+modules; the earlier artifact `m3-18-lookat-sample-resources-20261013` is a
+superseded no-publish build). `RunMotionLightSourcesTests.ps1 -Run` and
+`-Run -Sanitize` each pass8,600 checks. The new fixture captures two matching
+animated lights at different shutter sample times, decodes the resulting target
+packets, checks time-sensitive cache identity and deterministic repeat capture,
+and verifies PF input preservation and balanced suite resources.
+`RunCloudNativeSyncTests.ps1 -Run` passes587 compile/sync checks, and
+`RunMotionLookAtGraphTests.ps1 -Run` passes1,492 graph checks. No AE acceptance
+ran. The earlier no-publish build receipt is
+`artifacts/plugin/m3-18-lookat-sample-resources-20261013/build-hashes.json`;
+the deployed candidate and install receipts are
+`artifacts/prepared/m3-18-motion-native80-panel83-20261013/native-bundle/candidate.json`
+and `artifacts/m3-18-native80-deploy-after.json`.
+
+Current focused standard runs on the working source:
+
+- `RunMotionPathGraphTests.ps1 -Run`: 10,471 Light Path and history checks.
+- `RunMotionLookAtGraphTests.ps1 -Run`: 1,492 checks.
+- `RunMotionLightTimingTests.ps1 -Run`: 5,890 fake-callback checks.
+- `RunMotionLightPathResourceTests.ps1 -Run`: 263 SFPL1 checks.
+- `RunMotionNativeBindingTests.ps1 -Run`: 802 registration/binding/mode-map checks.
+- `STARFIELD_PANEL_ROOT=<cep_panel> node tests/motion_panel_tests.js`: 39 checks.
+
+The native binding fixture checks popup values1/2/3 map to Circle/Light Path/
+Look At Core values1/0/2 and rejects values outside that range. One stale
+two-mode assertion was updated after the third mode was added. The full
+May2023 x64 Release build succeeds at
+`artifacts/plugin/m3-18-motion-full-20261013/` and
+`artifacts/core-dll/m3-18-motion-full-20261013/` with both publication switches
+disabled. The subsequent complete native80 build at
+`artifacts/plugin/m3-18-motion-native80-20261013/` and
+`artifacts/core-dll/m3-18-motion-native80-20261013/` produced the deployed pair.
+PiPLtool exit9020 uses the constrained cached-conversion path for the single
+global flags2 change; the generated resource still passes current flag and
+packed-version guards. No AE acceptance ran.
+
+## M3-18 Look At nearest-light author increment — 2026-10-13
+
+Source implementation added the native/CEP third Motion choice, pre-render
+matching-light position capture, bounded `SFLA` packet and nearest-target Core
+evaluation. The source candidate passed1,492 target/graph checks in standard and
+ASAN builds,39 panel checks,18 JSX ES3 syntax checks and a full May2023 x64 build
+under `artifacts/plugin/m3-18-lookat-author-20261013/` plus its Core artifact
+folder. No AE acceptance ran. A later source edit adds
+`PF_OutFlag2_I_USE_3D_LIGHTS`. The changed Core and main-effect C++ compile
+targets exit0. The full no-publish build
+`BuildWindows.ps1 -ArtifactLabel m3-18-lookat-lights-dependency-20261013 -MSBuildPath 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe' -NoDistPublish -NoRuntimePublish -IncludeModelCandidate`
+fails at PiPL generation because `PiPLtool.exe` returns9020 and no exact-input
+conversion cache exists for the modified flags. No complete AEX candidate was
+produced. Rebuild the paired candidate before publication. External-light cache
+refresh and shutter-time light sampling remain host/resource qualification items.
 
 ## M3-17 owner rollback verification — 2026-10-13
 
@@ -12,7 +711,58 @@ frozen panel. Rejected79 binaries10/paired sources18 remain retained and verifie
 Evidence: artifacts/m3-17-native79-owner-rollback.log and
 artifacts/m3-17-native79-owner-rejection-restore-proof.json.
 
-Owned implementations/fixtures/helpers are restored to release1a6cf73. Removed79
+## M3-18 Light Path source continuation — 2026-10-13
+
+The capture adapter now skips matched point lights with fewer than two distinct
+Position keyframe instants. An empty SFPL1 track set is valid and contributes no
+path displacement. `RunMotionLightTimingTests.ps1 -Run` and `-Run -Sanitize`
+each pass5,890 fake-callback checks; `RunMotionLightPathResourceTests.ps1 -Run`
+passes263; `RunMotionPathGraphTests.ps1 -Run` and `-Run -Sanitize` each pass
+10,471. The timing test runner links the Light Path resource and clock sources.
+No AE process or automatic acceptance was used.
+
+The complete unpublished build exits0:
+`powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1
+-ArtifactLabel m3-18-motion-pipl-cache2-x64-20261013 -MSBuildPath 'C:\Program
+Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe'
+-NoDistPublish -NoRuntimePublish -IncludeModelCandidate`. It produced the Core
+DLL and all nine AEX modules in the matching `artifacts/` folders. PiPLtool exit
+9020 used the exact-input cached conversion path, followed by RC generation and
+current flags/version checks. `-NoDistPublish -NoRuntimePublish` kept the
+candidate out of the installation; no AE action or automatic acceptance ran.
+
+The focused source checks completed in this continuation:
+
+- `RunMotionNativeBindingTests.ps1 -Run`: 798 checks.
+- `RunMotionLightPathResourceTests.ps1 -Run`: 263 checks.
+- `RunMotionPathGraphTests.ps1 -Run`: 10,471 standard and 10,471 ASAN checks.
+- `RunModelNativeBindingTests.ps1 -Run`: 9,580 checks.
+- `node tests/motion_panel_tests.js` with `STARFIELD_PANEL_ROOT` set to
+  `cep_panel`: 36 checks.
+
+All PowerShell test runners that compile `GraphEvaluation.cpp` include the new
+Motion Light Path clock/resource sources. This is an offline source integration
+check only; no AE was started or dispatched.
+
+Use 64-bit MSBuild for the full unpublished build:
+`BuildWindows.ps1 -ArtifactLabel m3-18-motion-binding10-x64msbuild -MSBuildPath
+'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe'
+-NoDistPublish -NoRuntimePublish -IncludeModelCandidate`. Core compiles and links,
+but the full build stops at PiPL generation because the local SDK
+`PiPLtool.exe` fails Windows process startup with an invalid system DLL relocation.
+`BuildPiPL.ps1` now writes relative ASCII arguments to avoid path corruption in
+its generated ASCII batch file. No complete candidate or deployment resulted;
+see `artifacts/m3-18-motion-binding10-x64msbuild-build.log`.
+
+Light Path native/CEP authoring, Starting With prefix transport, binding10 and
+pre-render SFPL1 capture are present in the unpublished source; installed77/81
+predates them. Sampling still uses adaptive probes and piecewise-linear playback.
+The probe checks bound observed deviations, not exact source interpolation over
+every interval. External-light invalidation and host qualification remain open.
+Do not treat these checks as AE qualification or claim the mode ready to publish.
+
+The M3-17 deletion implementation/fixtures/helpers are restored to release1a6cf73.
+Motion source work remains preserved. Removed79
 timeout and78 generation fixtures are reproducible only in their historical
 commits/archives; the commands below for those withdrawn proposals are historical.
 Accepted CEP81 response/Circle remain; original deletion errors are unresolved.
@@ -285,6 +1035,13 @@ installed proof artifacts/m3-18-ordered-force77-installed-proof.json and
 m3-17-native73-deploy-before/after.json. These do not qualify actual AE2023 behavior.
 
 ## M3-18 light-source / animated-path candidate — 2026-10-12
+
+2026-10-13 point-light filter update: `tests/RunMotionLightSourcesTests.ps1 -Run`
+and `-Run -Sanitize` each pass 8,410 checks. Covers AE-reported light type,
+exact UTF-16 prefix filtering, point-only eligibility, composition order, inactive
+matching IDs, empty matches, malformed type, and output preservation on the two
+selector allocation failures. Fake callbacks only; no AE process, project, or
+render qualification.
 
 `tests/RunMotionLightSourcesTests.ps1 -Run [-Sanitize]` standard/ASAN8099:
 actual May2023 suite signatures, Unicode ownership/prefix selection, comp/time

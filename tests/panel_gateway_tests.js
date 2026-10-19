@@ -1,4 +1,5 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 
 // Host-independent regression checks for the ExtendScript gateway. Run with:
 //   node tests/panel_gateway_tests.js
@@ -10,7 +11,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.join(__dirname, "..", "cep_panel", "jsx", "starfield_gateway.jsx"), "utf8");
+const source = fs.readFileSync(panelPath("jsx/starfield_gateway.jsx"), "utf8");
 
 const initialValues = {
     "Max Particles": 1000,
@@ -93,7 +94,7 @@ function createHarness(options = {}) {
         propertyIndex: 1,
         property(name) { return values[name] || null; }
     };
-    const duplicateEffect = { matchName: "org.starfieldfx.particle" };
+    const duplicateEffect = { matchName: "org.starfieldfx.particle",property(){return null;} };
     const effectInstances = options.effectInstances || 1;
     const parade = {
         numProperties: effectInstances,

@@ -4,7 +4,7 @@ const root=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../cep_panel
 const edits=require(path.join(root,"js/graph_edits.js")),view=require(path.join(root,"js/graph_view.js"));
 const presets=require(path.join(root,"js/presets.js")),codec=require(path.join(root,"js/graph_codec.js"));
 let checks=0;const equal=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=x=>{checks++;assert.ok(x);},reject=(f,re)=>{checks++;assert.throws(f,re);};
-let sequence=500;const next=()=>String(sequence++).padStart(32,"0"),clone=x=>JSON.parse(JSON.stringify(x));
+let sequence=500;const next=()=>String(sequence++).padStart(32,"0"),clone=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 let graph=presets.build("sparks",1080),particle=graph.nodes.find(n=>n.type===edits.types.particle);
 function set(key,value){graph=edits.apply(graph,{type:"setParameters",changes:[{nodeId:particle.id,parameterKey:String(key),valueType:3,value}]});particle=graph.nodes.find(n=>n.id===particle.id);}
 set(15,3);set(31,55);set(32,66);set(33,7);set(34,2);set(35,0);set(36,1);

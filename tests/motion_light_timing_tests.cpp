@@ -137,8 +137,10 @@ void keyframe_positions(){
     CHECK(std::abs(out.positions[0].position.x+0.5)<1e-12);CHECK(std::abs(out.positions[1].position.x)<1e-12);
     CHECK(std::abs(out.positions[2].position.x-0.5)<1e-12);balanced();
 
-    reset();counts[0]=1;auto unchanged=sentinel_path();const auto before=unchanged;
-    CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,unchanged)==PF_Err_BAD_CALLBACK_PARAM);CHECK(same_path(unchanged,before));balanced();
+    reset();counts[0]=1;starts[0]={3,1};auto unchanged=sentinel_path();
+    CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,unchanged)==PF_Err_NONE);
+    CHECK(unchanged.timing.layer_id==1001&&unchanged.timing.keyframe_times.size()==1&&unchanged.positions.size()==1);
+    CHECK(compare(unchanged.positions.front().source_comp_time,{3,1})==0);balanced();
 
     reset();counts[0]=3;starts[0]={0,1};key_times[0][1]={1,1};ends[0]={2,1};
     out=sentinel_path();CHECK(capture_motion_light_keyframes(&data,17,1001,units,never,out)==PF_Err_NONE);const auto baseline=calls;
@@ -170,6 +172,19 @@ void adaptive_path_track(){
     reset();quadratic_position=true;counts[0]=2;starts[0]={0,1};ends[0]={2,1};out=prior;
     Stop stop(0);CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,stop,out)==PF_Interrupt_CANCEL);
     CHECK(out.timing.layer_id==prior.timing.layer_id&&out.samples.size()==prior.samples.size()&&out.maximum_probe_error==9);balanced();
+
+    reset();counts[0]=0;out={};
+    CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,never,out)==PF_Err_NONE);
+    CHECK(out.timing.layer_id==1001&&out.timing.position_keyframes==0&&out.samples.empty());balanced();
+
+    reset();counts[0]=1;starts[0]={3,1};out={};
+    CHECK(capture_motion_light_path_track(&data,17,1001,units,tolerance,never,out)==PF_Err_NONE);
+    CHECK(out.timing.layer_id==1001&&out.samples.size()==1);
+    CHECK(compare(out.samples.front().source_comp_time,{3,1})==0);balanced();
+
+    reset();counts[0]=0;std::array<std::uint32_t,1> ids{1001};MotionLightPathTrackSet set{};
+    CHECK(capture_motion_light_path_tracks(&data,17,ids,units,tolerance,never,set)==PF_Err_NONE);
+    CHECK(set.tracks.empty()&&set.sample_count==0);balanced();
 }
 void failures(){
     for(bool split:{false,true}){

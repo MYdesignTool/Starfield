@@ -33,19 +33,20 @@ class Element {
     getContext(){return null;}focus(){}setPointerCapture(){}releasePointerCapture(){}
 }
 const ids=["banner","chain","workspace","graphScroll","graphViewport","graphMinimap","graphEdges","edgePaths","selectionBox","zoomReadout",
-    "inspectorTitle","inspectorMeta","inspectorBody","inspector","inspectorDrag","closeInspector","targetLine","modeLine","revisionLine","resolutionLine",
+    "targetLine","modeLine","revisionLine","resolutionLine",
     "refresh","autoRefresh","targetLock","graphContextMenu","disconnectContextAction","nodePalette","nodePaletteItems","nodePaletteToggle"];
 const elements=Object.fromEntries(ids.map(id=>[id,new Element(id)])),win=new Element("window"),doc=new Element("document"),canvas=new Element("canvas");
 doc.body=new Element("body");doc.hidden=false;doc.getElementById=id=>elements[id];doc.querySelector=()=>canvas;doc.createElement=tag=>new Element("created",tag);
 doc.createElementNS=(namespace,tag)=>doc.createElement(tag);doc.elementFromPoint=()=>canvas;
 elements.graphScroll.appendChild(elements.graphViewport);elements.graphViewport.appendChild(canvas);canvas.appendChild(elements.graphEdges);
 canvas.appendChild(elements.chain);elements.graphEdges.appendChild(elements.edgePaths);elements.graphViewport.appendChild(elements.graphMinimap);
-elements.workspace.appendChild(elements.graphScroll);elements.workspace.appendChild(elements.inspector);elements.inspector.hidden=true;
+elements.workspace.appendChild(elements.graphScroll);
 elements.graphContextMenu.hidden=true;elements.autoRefresh.checked=true;
 const entries={};for(const kind of ["emitter","auxiliary","particle","force"]){const el=new Element(kind,"button");el.setAttribute("data-node-type",kind);elements.nodePaletteItems.appendChild(el);entries[kind]=el;}
 let revision=1,pulseCalls=0,submitCount=0,holdSubmit=false,releaseSubmit=null,denyNext=false,now=1000;
 let holdInspection=false,releaseInspection=null;
 const calls=[],timers=new Map();let timerId=0;
+const selectedEffects=[];let holdSelection=false,releaseSelection=null;
 const probe={};vm.runInNewContext(fs.readFileSync(path.join(panelRoot,"jsx","starfield_gateway.jsx"),"utf8"),{$:{global:probe}});
 const ready=probe.SFLD_ready(),generation=ready.split("/").pop();
 function response(payload){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:generation,...payload});}
@@ -56,6 +57,9 @@ host.SFLD_getPanelState=()=>{calls.push("getPanelState");return response({ok:tru
     revision:"r"+revision,controlSource:"Node Graph",resolution:"name",snapshot:receipt().snapshot});};
 host.SFLD_getGraphSnapshot=()=>{calls.push("getGraphSnapshot");return response(receipt());};
 host.SFLD_getPanelPulse=()=>{pulseCalls++;return response({ok:true,stamp:"pulse"+revision,frameStatus:{available:false,targetToken:"target"}});};
+host.SFLD_selectNodeEffect=text=>{const request=JSON.parse(text);calls.push("selectNodeEffect");
+    assert.equal(request.target.token,"target");selectedEffects.push(request.nodeId);
+    return response({ok:true,operation:"selectNodeEffect",nodeId:request.nodeId});};
 host.SFLD_submitGraph=text=>{
     calls.push("submitGraph");submitCount++;const request=JSON.parse(text);
     assert.equal(request.target.token,"target");assert.equal(request.baseGraphRevision,revision);assert.equal(request.baseRecordStamp,"records-"+revision);
@@ -64,7 +68,8 @@ host.SFLD_submitGraph=text=>{
 };
 win.__adobe_cep__={getSystemPath:()=>"C:/test/cep_panel",evalScript(script,callback){
     const value=vm.runInNewContext(script,host);
-    if(holdSubmit && script.includes("return SFLD_submitGraph")){releaseSubmit=()=>callback(value);}
+    if(holdSelection && script.includes("return SFLD_selectNodeEffect")){releaseSelection=()=>callback(value);}
+    else if(holdSubmit && script.includes("return SFLD_submitGraph")){releaseSubmit=()=>callback(value);}
     else if(holdInspection && script.includes("return SFLD_getPanelState")){releaseInspection=()=>callback(value);}
     else callback(value);
 }};
@@ -78,10 +83,29 @@ const context={window:win,document:doc,Date:Clock,Math,JSON,String,Number,isFini
 vm.runInNewContext(fs.readFileSync(path.join(panelRoot,"js","node_palette.js"),"utf8"),context);
 vm.runInNewContext(fs.readFileSync(path.join(panelRoot,"js","panel.js"),"utf8"),context);
 assert.equal(elements.targetLine.textContent,"Comp / Particles");assert.ok(!entries.particle.disabled,"ready graph enables palette");
+// The real panel runs without an inspector DOM or editor helper scripts.
+const panelHtml=fs.readFileSync(path.join(panelRoot,"index.html"),"utf8");
+assert.ok(!panelHtml.includes('id="inspector"'));
+for(const editor of ["editor_presets","curve_editor","gradient_editor"])
+    assert.ok(!panelHtml.includes('js/'+editor+'.js'),"graph panel does not load retired editors");
+function select(id,event={}){const card=elements.chain.children.find(el=>el.getAttribute("data-node-id")===id);
+    const button=card.querySelector(".node-select");assert.match(button.title,/AE Effect Controls/);button.fire("click",event);}
+const beforeSelection=codec.toHex(graph),selectionCalls=calls.length;
+for(const node of graph.nodes)select(node.id);
+assert.deepEqual(selectedEffects,[uuid(1),uuid(2),uuid(3)],"each click focuses the matching native effect including Output");
+assert.deepEqual(calls.slice(selectionCalls),["selectNodeEffect","selectNodeEffect","selectNodeEffect"],"clicks issue only selection requests");
+holdSelection=true;select(uuid(1));select(uuid(2));select(uuid(3));
+assert.equal(selectedEffects.length,4,"rapid clicks do not overlap host selection calls");
+holdSelection=false;releaseSelection();
+assert.deepEqual(selectedEffects.slice(3),[uuid(1),uuid(3)],"queued selection coalesces to the last clicked node");
+assert.equal(codec.toHex(graph),beforeSelection,"selection never edits parameters or topology");
+assert.equal(submitCount,0);assert.equal(revision,1);
 function poll(){const timer=Array.from(timers).find(([,value])=>value.delay===500||value.delay===2000);assert.ok(timer);timers.delete(timer[0]);now+=timer[1].delay;timer[1].callback();}
 function begin(kind){elements.nodePaletteItems.fire("pointerdown",{target:entries[kind],pointerId:1,button:0,buttons:1,clientX:18,clientY:200});}
 function move(){win.fire("pointermove",{pointerId:1,buttons:1,clientX:300,clientY:320});}
 function drop(){win.fire("pointerup",{pointerId:1,button:0,buttons:0,clientX:300,clientY:320});}
+function submitAfterPaint(){const scheduled=Array.from(timers).find(([,t])=>t.delay===100);
+    assert.ok(scheduled,"host write is scheduled after local projection");timers.delete(scheduled[0]);scheduled[1].callback();}
 function expectedPosition(){const source=graph.nodes.find(node=>node.type===edits.types.emitter),card=elements.chain.children.find(el=>el.getAttribute("data-node-id")===source.id);
     const position=layout.resolve(graph)[source.id],offset={x:parseFloat(card.style.left)-position.x,y:parseFloat(card.style.top)-position.y};
     const match=/translate\(([-\d.]+)px,\s*([-\d.]+)px\) scale\(([-\d.]+)\)/.exec(canvas.style.transform);assert.ok(match,canvas.style.transform);
@@ -90,7 +114,9 @@ function expectedPosition(){const source=graph.nodes.find(node=>node.type===edit
 for(const kind of ["emitter","auxiliary","particle","force"]) {
     const before=graph.nodes.length,prior=new Set(graph.nodes.map(node=>node.id)),position=expectedPosition(),count=submitCount,pulses=pulseCalls;
     begin(kind);for(let i=0;i<20;i++)move();poll();assert.equal(pulseCalls,pulses,"palette drag pauses idle host polling");
-    assert.equal(submitCount,count,"no transaction during movement");drop();assert.equal(submitCount,count+1);
+    assert.equal(submitCount,count,"no transaction during movement");drop();
+    assert.equal(elements.chain.children.length,before+1,"local addition is visible before host submission");
+    assert.equal(submitCount,count,"painting precedes host submission");submitAfterPaint();assert.equal(submitCount,count+1);
     assert.equal(graph.nodes.length,before+1);assert.equal(graph.nodes.filter(node=>node.type===edits.types.output).length,1);
     const added=graph.nodes.find(node=>!prior.has(node.id)),actual=layout.resolve(graph)[added.id];
     assert.ok(Math.abs(actual.x-position.x)<1e-7);assert.ok(Math.abs(actual.y-position.y)<1e-7);
@@ -100,10 +126,10 @@ for(const kind of ["emitter","auxiliary","particle","force"]) {
 }
 begin("particle");move();const beforeCancel=submitCount;doc.fire("keydown",{key:"Escape"});drop();assert.equal(submitCount,beforeCancel);
 poll();assert.ok(pulseCalls>0,"polling resumes after palette cancellation");
-holdSubmit=true;begin("force");move();drop();assert.equal(submitCount,beforeCancel+1);assert.ok(entries.particle.disabled,"pending commit disables palette");
+holdSubmit=true;begin("force");move();drop();submitAfterPaint();assert.equal(submitCount,beforeCancel+1);assert.ok(entries.particle.disabled,"pending commit disables palette");
 begin("particle");move();drop();assert.equal(submitCount,beforeCancel+1,"pending mutation prevents another drop");
 holdSubmit=false;releaseSubmit();assert.ok(!entries.particle.disabled);
-denyNext=true;const oldHex=codec.toHex(graph);begin("particle");move();drop();assert.equal(codec.toHex(graph),oldHex);
+denyNext=true;const oldHex=codec.toHex(graph);begin("particle");move();drop();submitAfterPaint();assert.equal(codec.toHex(graph),oldHex);
 assert.ok(!entries.particle.disabled,"rejected transaction leaves palette usable");
 assert.match(elements.banner.textContent,/stale_graph/);
 // A read already in flight must not make the ready palette feel unresponsive.
@@ -114,7 +140,7 @@ for(const during of [true,false]) {
     const before=submitCount;begin("particle");move();assert.equal(submitCount,before);
     if(during){holdInspection=false;delayedInspection();}
     holdInspection=false;
-    drop();assert.equal(submitCount,before+1,"ready palette can drop while an inspection is pending");
+    drop();submitAfterPaint();assert.equal(submitCount,before+1,"ready palette can drop while an inspection is pending");
     const submittedHex=codec.toHex(graph),renderedCount=elements.chain.children.length;
     if(!during)delayedInspection();
     assert.equal(codec.toHex(graph),submittedHex);assert.equal(elements.chain.children.length,renderedCount,"old inspection cannot replace committed view");

@@ -1,9 +1,10 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 
 var assert = require("assert");
-var codec = require("../cep_panel/js/graph_codec.js");
-var edits = require("../cep_panel/js/graph_edits.js");
-var transactions = require("../cep_panel/js/graph_transactions.js");
+var codec = require(panelPath("js/graph_codec.js"));
+var edits = require(panelPath("js/graph_edits.js"));
+var transactions = require(panelPath("js/graph_transactions.js"));
 var fixture = require("./native_snapshot_fixture.js");
 
 function uuid(n) { return ("00000000000000000000000000000000" + n.toString(16)).slice(-32); }
@@ -16,7 +17,7 @@ function graph() {
     [100, 120, 140].forEach(function (value, i) {
         result.nodes[0].parameters.find(function (p) { return p.key === String(19 + i); }).value = value;
     });
-    return require("../cep_panel/js/graph_layout.js").set(result, {
+    return require(panelPath("js/graph_layout.js")).set(result, {
         [uuid(1)]:{x:0,y:0},[uuid(2)]:{x:0,y:0},[uuid(3)]:{x:0,y:0}
     });
 }

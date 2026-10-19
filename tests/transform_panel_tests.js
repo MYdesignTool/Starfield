@@ -105,7 +105,10 @@ function snapshot(g,revision){const positions=layout.resolve(g);return {initiali
 const client=transactions.create({codec,edits,call(operation,fields,callback){
     if(operation==="getGraphSnapshot")callback({ok:true,target:{token:"target"},snapshot:snapshot(tfGraph,1)});
     else{nodeManifest=fields.nodeManifest;const updated=codec.fromHex(fields.graphHex);callback({ok:true,target:{token:"target"},snapshot:snapshot(updated,2)});}
-}});
+},modelTransactions:{apply(fields,assets,callback){
+    nodeManifest=fields.nodeManifest;const updated=codec.fromHex(fields.graphHex);
+    callback({ok:true,target:{token:"target"},snapshot:snapshot(updated,2)});
+}}});
 let outcome;client.apply({type:"setParameters",changes:[{nodeId:transform.id,parameterKey:"8",valueType:3,value:77}]},response=>outcome=response,"target");
 ok(outcome.ok);equal(nodeManifest[0].parameters.find(p=>p.key==="8").value,77);ok(!nodeManifest[0].parameters.some(p=>p.key==="7"));
 equal(snapshots.normalize({ok:true,snapshot:snapshot(tfGraph,1)}).snapshot.layerResources,resources);

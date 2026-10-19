@@ -149,7 +149,7 @@
                         node.type === "org.starfieldfx.nodes.output" ? ({"2":0,"3":0,"4":0,"5":100})[key] : undefined;
                     if (fallback === undefined || value.type !== (key === "17" || key === "23" || (node.type === "org.starfieldfx.nodes.output" && (key === "2" || key === "4")) ? 3 : 4) || value.value !== fallback)
                         return reject(label+": "+(a?"missing from saved controls":"unexpected saved value"));
-                } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.particle" && (key === "27" || key === "13")) || (node.type === "org.starfieldfx.nodes.force" && key === "9"))) {
+                } else if (a.type === 7 && (key === "7" || key === "8" || (node.type === "org.starfieldfx.nodes.particle" && (key === "27" || key === "13")) || (node.type === "org.starfieldfx.nodes.force" && key === "9") || (kind==="motion" && key==="6"))) {
                     var av = a.value, bv = b.value;
                     if (b.type !== 7 || av.length !== bv.length || av.length < 36 || av[0] !== bv[0] || av[1] !== bv[1] || av[2]!==bv[2] || av[3]!==bv[3])
                         return reject(label+": knot count or encoding differs.");
@@ -263,22 +263,43 @@
                 function submitPrepared() {
                 // Mesh-preserving edits need no copied effect parade or asset
                 // upload. Only Model identity/resource changes own that transaction.
+                var previousIds={},remainingIds={},savedNodes={};
+                transaction.baseNodeManifest.forEach(function(n){previousIds[n.id]=true;});
+                transaction.nodeManifest.forEach(function(n){remainingIds[n.id]=true;});
+                (base.nativeNodes || []).forEach(function(n){savedNodes[n.id]=n;});
+                var restore=(authoredEdit.modelAssetsToRestore || []).slice(),copies=authoredEdit.modelResourceCopies || [];
+                var needed=copies.filter(function(copy){var node=savedNodes[copy.sourceId];
+                    return node && node.modelAsset && node.modelAsset.revision>0;});
                 function modelResources(nodes) {
-                    return nodes.filter(function(node){return node.type==="org.starfieldfx.nodes.model";}).map(function(node){
+                    return nodes.filter(function(node){
+                        if(node.type!=="org.starfieldfx.nodes.model")return false;
+                        // A default Cube has no external asset. Existing Model
+                        // source/resource changes retain full transaction routing.
+                        var source=node.parameters.filter(function(p){return String(p.key)==="13";})[0];
+                        return previousIds[node.id] && remainingIds[node.id] || !source || source.value!==0;
+                    }).map(function(node){
                         return {id:node.id,parameters:node.parameters.filter(function(p){return ["1","2","12","13"].indexOf(String(p.key))>=0;})
                             .sort(function(a,b){return Number(a.key)-Number(b.key);})};
                     }).sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0;});
                 }
-                var remainingIds={};transaction.nodeManifest.forEach(function(n){remainingIds[n.id]=true;});
                 var removesNodes=transaction.baseNodeManifest.some(function(n){return !remainingIds[n.id];});
                 var needsModelTransaction=removesNodes || JSON.stringify(modelResources(transaction.baseNodeManifest))!==JSON.stringify(modelResources(transaction.nodeManifest)) ||
-                    (authoredEdit.modelAssetsToRestore || []).length>0 || (authoredEdit.modelResourceCopies || []).length>0;
+                    restore.length>0 || needed.length>0;
                 if(!needsModelTransaction){call("submitGraph",transaction,confirmed);return;}
-                if(!modelTransactions || !modelAssets){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}
+                if(!modelTransactions || !modelAssets){
+                    if(typeof options.loadModelModules!=="function"){callback(failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;}
+                    var loadingSettled=false;
+                    options.loadModelModules(function(loaded){
+                        if(loadingSettled)return;loadingSettled=true;
+                        if(!loaded || !loaded.ok || !loaded.assets || typeof loaded.assets.create!=="function" ||
+                            !loaded.transactions || typeof loaded.transactions.create!=="function"){
+                            callback(loaded && loaded.error?loaded:failure("model_transaction_unavailable","The paired Model transaction client did not load."));return;
+                        }
+                        modelAssets=loaded.assets;modelTransactions=loaded.transactions;
+                        submitPrepared();
+                    });return;
+                }
                 transaction.target={token:targetToken || response.target && response.target.token};
-                var restore=(authoredEdit.modelAssetsToRestore || []).slice(),copies=authoredEdit.modelResourceCopies || [];
-                var needed=copies.filter(function(copy){var node=(base.nativeNodes || []).filter(function(n){return n.id===copy.sourceId;})[0];
-                    return node && node.modelAsset && node.modelAsset.revision>0;});
                 function submitModel(){(options.modelTransactions || modelTransactions.create({call:options.call,idFactory:idFactory})).apply(transaction,restore,confirmed);}
                 if(!needed.length){submitModel();return;}
                 modelAssets.create({call:options.call,idFactory:idFactory}).collect(base,transaction.target.token,function(exported){

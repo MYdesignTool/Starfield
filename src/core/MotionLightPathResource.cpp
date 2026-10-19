@@ -47,13 +47,22 @@ Vec3 unit(Vec3 a) noexcept {
     const auto length=std::hypot(a.x,a.y,a.z);
     return length>0&&std::isfinite(length)?multiply(a,1/length):Vec3{};
 }
+bool valid_settings(const MotionLightPathSettings& settings) noexcept {
+    const auto& f=settings.forward;
+    return std::isfinite(settings.max_delay_seconds)&&settings.max_delay_seconds>=0&&settings.max_delay_seconds<=1e6&&
+        std::isfinite(settings.delay_random_percent)&&settings.delay_random_percent>=0&&settings.delay_random_percent<=100&&
+        std::isfinite(f.x)&&std::isfinite(f.y)&&std::isfinite(f.z)&&
+        std::abs(f.x)<=kMaxMotionCoordinate&&std::abs(f.y)<=kMaxMotionCoordinate&&std::abs(f.z)<=kMaxMotionCoordinate&&
+        (!settings.orient_to_path||f.x!=0||f.y!=0||f.z!=0);
+}
 }
 
 Result<std::vector<std::byte>> encode_motion_light_path_resource(
     const MotionLightPathResource& resource,const Cancellation& cancel) noexcept try {
     using R=Result<std::vector<std::byte>>;
-    if(resource.tracks.empty()||resource.tracks.size()>kMaxMotionLightPathSources||
-       !resource.sample_count||resource.sample_count>kMaxMotionLightPathResourceSamples)
+    if(resource.tracks.size()>kMaxMotionLightPathSources||
+       resource.sample_count>kMaxMotionLightPathResourceSamples||
+       (resource.tracks.empty()!=(resource.sample_count==0)))
         return R::failure(ErrorCode::invalid_request,"invalid Light Path resource size");
     std::size_t actual_samples=0;
     for(std::size_t i=0;i<resource.tracks.size();++i) {
@@ -104,8 +113,8 @@ Result<MotionLightPathResource> decode_motion_light_path_resource(
        read_u64(bytes,20,4)!=0)return R::failure(ErrorCode::invalid_request,"invalid Light Path resource header");
     const auto track_count=static_cast<std::size_t>(read_u64(bytes,12,4));
     const auto sample_count=static_cast<std::size_t>(read_u64(bytes,16,4));
-    if(!track_count||track_count>kMaxMotionLightPathSources||!sample_count||
-       sample_count>kMaxMotionLightPathResourceSamples)return R::failure(ErrorCode::work_limit_exceeded,"Light Path resource cap exceeded");
+    if(track_count>kMaxMotionLightPathSources||sample_count>kMaxMotionLightPathResourceSamples||
+       (track_count==0)!=(sample_count==0))return R::failure(ErrorCode::work_limit_exceeded,"Light Path resource cap exceeded");
     const auto minimum=kMotionLightPathResourceHeaderBytes+track_count*kMotionLightPathTrackHeaderBytes;
     if(bytes.size()<minimum)return R::failure(ErrorCode::invalid_request,"truncated Light Path track headers");
     MotionLightPathResource result;result.tracks.reserve(track_count);result.sample_count=sample_count;
@@ -192,5 +201,103 @@ Result<MotionLightPathTrackSample> CompiledMotionLightPathTrack::sample(
     const auto position=add(positions_[lower],multiply(delta,fraction));
     if(!bounded(position)||!bounded(velocity))return R::failure(ErrorCode::invalid_request,"Light Path interpolated sample outside bounds");
     return R::success({position,velocity,unit(velocity),false});
+}
+
+Result<CompiledMotionLightPath> compile_motion_light_path(const MotionLightPathResource& resource,
+    const MotionLightPathSettings& settings,const Cancellation& cancel) noexcept try {
+    using R=Result<CompiledMotionLightPath>;
+    if(!valid_settings(settings)||resource.tracks.size()>kMaxMotionLightPathSources||
+       resource.sample_count>kMaxMotionLightPathResourceSamples||
+       (resource.tracks.empty()!=(resource.sample_count==0)))
+        return R::failure(ErrorCode::invalid_request,"invalid Light Path compile request");
+    std::size_t actual_samples=0;
+    CompiledMotionLightPath result;result.settings_=settings;result.sources_.reserve(resource.tracks.size());
+    for(std::size_t i=0;i<resource.tracks.size();++i) {
+        if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Light Path compilation cancelled");
+        const auto& source=resource.tracks[i];
+        if(!valid_track(source,cancel))return R::failure(cancel.is_cancelled()?ErrorCode::cancelled:ErrorCode::invalid_request,
+            "invalid Light Path source track");
+        for(std::size_t previous=0;previous<i;++previous)
+            if(resource.tracks[previous].source_layer_id==source.source_layer_id)
+                return R::failure(ErrorCode::invalid_request,"duplicate Light Path source ID");
+        if(source.samples.size()>kMaxMotionLightPathResourceSamples-actual_samples)
+            return R::failure(ErrorCode::work_limit_exceeded,"Light Path aggregate sample cap exceeded");
+        actual_samples+=source.samples.size();
+        auto track=compile_motion_light_path_track(source,cancel);if(!track.has_value())return R::failure(track.error());
+        auto clock=compile_motion_light_path_clock(source.samples.front().source_comp_time,
+            source.samples.back().source_comp_time,settings.clock);
+        if(!clock.has_value())return R::failure(clock.error());
+        result.sources_.emplace_back(track.take_value(),clock.take_value());
+    }
+    if(actual_samples!=resource.sample_count)return R::failure(ErrorCode::invalid_request,"Light Path aggregate sample count mismatch");
+    return R::success(std::move(result));
+} catch(const std::bad_alloc&) {return Result<CompiledMotionLightPath>::failure(ErrorCode::allocation_failed,"Light Path compilation allocation failed");}
+  catch(...) {return Result<CompiledMotionLightPath>::failure(ErrorCode::internal_failure,"Light Path compilation failed");}
+
+std::size_t CompiledMotionLightPath::storage_bytes() const noexcept {
+    std::size_t bytes=sizeof(*this)+sources_.capacity()*sizeof(Source);
+    for(const auto& source:sources_)bytes+=source.track.storage_bytes();
+    return bytes;
+}
+
+Result<MotionLightPathEvaluation> CompiledMotionLightPath::sample(double age,double lifetime,double random,
+    const Cancellation& cancel) const noexcept {
+    return sample(age,lifetime,settings_.max_delay_seconds,random,cancel);
+}
+
+Result<MotionLightPathEvaluation> CompiledMotionLightPath::sample(double age,double lifetime,double delay,
+    double random,const Cancellation& cancel) const noexcept {
+    using R=Result<MotionLightPathEvaluation>;
+    if(!std::isfinite(delay)||delay<0||delay>1e6||!std::isfinite(random)||random<0||random>1)
+        return R::failure(ErrorCode::invalid_request,"invalid Light Path sample request");
+    if(sources_.empty())return R::success(MotionLightPathEvaluation{});
+    MotionLightPathEvaluation result;result.source_count=sources_.size();
+    for(const auto& source:sources_) {
+        if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Light Path sampling cancelled");
+        const auto clock=source.clock.sample(age,lifetime,delay,random);
+        if(!clock.has_value())return R::failure(clock.error());
+        const auto point=source.track.sample(clock.value().source_time_seconds,
+            clock.value().continuation_seconds,clock.value().continuation_rate);
+        if(!point.has_value())return R::failure(point.error());
+        const auto displacement=subtract(point.value().position,source.track.first_position());
+        const auto rate=clock.value().ended?clock.value().continuation_rate:clock.value().source_time_rate;
+        const auto velocity=multiply(point.value().velocity_per_source_second,rate);
+        result.displacement=add(result.displacement,displacement);
+        result.velocity=add(result.velocity,velocity);
+        if(!clock.value().delayed&&rate!=0)++result.active_source_count;
+        if(!bounded(result.displacement)||!bounded(result.velocity))
+            return R::failure(ErrorCode::invalid_request,"combined Light Path result exceeds bounds");
+    }
+    result.combined_direction=unit(result.velocity);
+    return R::success(result);
+}
+
+Result<MotionLightPathEvaluation> CompiledMotionLightPath::sample_at_source_elapsed(double elapsed,double rate,
+    MotionPathEndBehavior end_behavior,const Cancellation& cancel) const noexcept {
+    using R=Result<MotionLightPathEvaluation>;
+    if(!std::isfinite(elapsed)||elapsed<0||elapsed>1e9||!std::isfinite(rate)||rate<0||rate>1e6||
+       static_cast<unsigned>(end_behavior)>static_cast<unsigned>(MotionPathEndBehavior::continue_direction))
+        return R::failure(ErrorCode::invalid_request,"invalid Light Path elapsed sample");
+    if(sources_.empty())return R::success(MotionLightPathEvaluation{});
+    MotionLightPathEvaluation result;result.source_count=sources_.size();
+    for(const auto& source:sources_) {
+        if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Light Path sampling cancelled");
+        const auto first=source.track.first_source_time(),last=source.track.last_source_time();
+        const auto duration=last-first;
+        double source_time=first,continuation=0,source_rate=rate;
+        if(elapsed<duration)source_time=first+elapsed;
+        else if(end_behavior==MotionPathEndBehavior::stop){source_time=last;source_rate=0;}
+        else {source_time=last;continuation=elapsed-duration;}
+        const auto point=source.track.sample(source_time,continuation,source_rate);
+        if(!point.has_value())return R::failure(point.error());
+        const auto displacement=subtract(point.value().position,source.track.first_position());
+        const auto velocity=multiply(point.value().velocity_per_source_second,source_rate);
+        result.displacement=add(result.displacement,displacement);result.velocity=add(result.velocity,velocity);
+        if(rate!=0&&elapsed<duration)++result.active_source_count;
+        if(rate!=0&&elapsed>=duration&&end_behavior==MotionPathEndBehavior::continue_direction)++result.active_source_count;
+        if(!bounded(result.displacement)||!bounded(result.velocity))
+            return R::failure(ErrorCode::invalid_request,"combined Light Path result exceeds bounds");
+    }
+    result.combined_direction=unit(result.velocity);return R::success(result);
 }
 } // namespace starfield::core

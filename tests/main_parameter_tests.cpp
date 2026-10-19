@@ -16,14 +16,14 @@ void capture_native_temporal_metadata(PF_InData*,const core::Graph&,AEGP_PluginI
 struct NativeBindingTransaction::Impl {};
 NativeBindingTransaction::NativeBindingTransaction(PF_InData*,AEGP_PluginID,AEGP_EffectRefH):impl_(std::make_unique<Impl>()){}
 NativeBindingTransaction::~NativeBindingTransaction()=default;
-PF_Err NativeBindingTransaction::install(const core::Graph&,A_long*,const char**,A_long*) noexcept {return 0;}
+PF_Err NativeBindingTransaction::install(const core::Graph&,A_long*,const char**,A_long*,const core::Graph*,bool,bool) noexcept {return 0;}
 void NativeBindingTransaction::accept() noexcept {}
 PF_Err sample_native_node_animation(PF_InData*,core::Graph&,A_long,A_long,A_long*,const char**,const core::NodeId*) noexcept {return 0;}
 PF_Err compile_native_node_graph(PF_InData*,PF_ParamDef*[],core::Graph&,bool& found,AEGP_PluginID,const node_sync::NativeEdit*) noexcept {
     found=false;return PF_Err_BAD_CALLBACK_PARAM;
 }
 PF_Err capture_camera(PF_InData*,SfCoreRenderRequest&,const PF_InData*) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
-PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,A_long,A_long,std::span<const core::RationalTime>,
+PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,A_long,A_long,std::span<const MotionLookAtTargetResources>,std::span<const core::RationalTime>,
     const core::Cancellation&,std::vector<CapturedParticleFrame>&) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 }
 using namespace starfield;using namespace starfield::adapter;

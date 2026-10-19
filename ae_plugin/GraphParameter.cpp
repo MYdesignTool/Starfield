@@ -215,7 +215,8 @@ core::Result<core::Graph> read_graph_parameter(PF_InData* data, PF_ArbitraryH ha
     return core::Result<core::Graph>::success(decoded.take_value());
 }
 
-PF_Err create_graph_parameter(PF_InData* data, const core::Graph& graph, PF_ArbitraryH* output) noexcept {
+PF_Err create_graph_parameter(PF_InData* data, const core::Graph& graph, PF_ArbitraryH* output,
+                             std::uint32_t* checksum) noexcept {
     if (!output) return PF_Err_BAD_CALLBACK_PARAM;
     *output = nullptr;
     try {
@@ -224,7 +225,13 @@ PF_Err create_graph_parameter(PF_InData* data, const core::Graph& graph, PF_Arbi
             return PF_Err_BAD_CALLBACK_PARAM; // Frame history must never become project data.
         const auto encoded = core::serialize_graph(graph, core::particle_node_registry());
         if (!encoded.has_value()) return codec_error(encoded.error());
-        return copy_bytes(data, encoded.value(), output);
+        const auto error=copy_bytes(data, encoded.value(), output);
+        if(!error && checksum){
+            std::uint32_t value{};
+            for(unsigned i=0;i<4;++i)value|=std::to_integer<std::uint32_t>(encoded.value()[24+i])<<(8u*i);
+            *checksum=value;
+        }
+        return error;
     } catch (const std::bad_alloc&) { return PF_Err_OUT_OF_MEMORY; }
     catch (...) { return PF_Err_INTERNAL_STRUCT_DAMAGED; }
 }

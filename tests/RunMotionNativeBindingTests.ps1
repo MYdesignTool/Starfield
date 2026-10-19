@@ -4,7 +4,7 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: compile/run actual Motion module registration and binding9 playback with local May2023 SDK fake callbacks; add -Run to act.';exit 0}
 $taskDir=if($Sanitize){'artifacts\motion-native-binding-asan-tests'}else{'artifacts\motion-native-binding-tests'}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$taskSources=@('Time','Render','Settings','SequenceCodec','Geometry','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory',
+$taskSources=@('Time','Render','Settings','SequenceCodec','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionGeometry','MotionPathTravel','MotionLightPathClock','MotionLightPathResource','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','ModelGeometry','ModelResources','ModelScene') |
     ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo

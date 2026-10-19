@@ -5,7 +5,9 @@
 #include "NodeEffects.hpp"
 #include "ParticleGradientUI.hpp"
 #include "ParticleLayout.hpp"
+#include "NodeRecord.hpp"
 #include "GradientEditorModel.hpp"
+#include "EditorPresetPicker.hpp"
 #include <adobesdk/DrawbotSuite.h>
 #include <array>
 #include <cstring>
@@ -14,6 +16,22 @@
 #include <fstream>
 #include <functional>
 #include <vector>
+
+// Modal selection is a fake-host seam. Verify the selected payload is published
+// by the real editor; this does not open a Windows dialog or qualify its UI.
+namespace starfield::adapter {
+bool choose_gradient_preset(PF_InData*, core::ColorGradient& value) noexcept {
+    value = gradient_editor::preset(2);
+    return true;
+}
+bool choose_curve_preset(PF_InData*, core::AgeCurve& value) noexcept {
+    value = {};
+    value.count = 2;
+    value.points[0] = {0, 0};
+    value.points[1] = {1, 360};
+    return true;
+}
+}
 
 namespace {
 namespace model=starfield::adapter::gradient_editor;
@@ -54,6 +72,7 @@ void configure() {
     bot.GetSurface=[](DRAWBOT_DrawRef,DRAWBOT_SurfaceRef* output)->SPErr{*output=reference<DRAWBOT_SurfaceRef>();return 0;};
     supplier.NewDefaultFont=[](DRAWBOT_SupplierRef,float,DRAWBOT_FontRef* output)->SPErr{++objects;*output=reference<DRAWBOT_FontRef>();return 0;};
     supplier.NewBrush=[](DRAWBOT_SupplierRef,const DRAWBOT_ColorRGBA* color,DRAWBOT_BrushRef* output)->SPErr{preview_color=*color;++objects;*output=reference<DRAWBOT_BrushRef>();return 0;};
+    supplier.NewPen=[](DRAWBOT_SupplierRef,const DRAWBOT_ColorRGBA*,float,DRAWBOT_PenRef* output)->SPErr{++objects;*output=reference<DRAWBOT_PenRef>();return 0;};
     supplier.NewPath=[](DRAWBOT_SupplierRef,DRAWBOT_PathRef* output)->SPErr{if(drawing_fail)return 1;++objects;*output=reference<DRAWBOT_PathRef>();return 0;};
     supplier.SupportsPixelLayoutBGRA=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=supports_bgra;return query_fail?1:0;};
     supplier.SupportsPixelLayoutARGB=[](DRAWBOT_SupplierRef,DRAWBOT_Boolean* output)->SPErr{*output=supports_argb;return query_fail?1:0;};
@@ -85,6 +104,9 @@ void configure() {
     };
     supplier.ReleaseObject=[](DRAWBOT_ObjectRef)->SPErr{--objects;return 0;};
     path.AddRect=[](DRAWBOT_PathRef,const DRAWBOT_RectF32* bounds)->SPErr{preview_rect=*bounds;++rectangles;check(bounds->width>0 && bounds->height>0,"positive drawing rectangles");return 0;};
+    path.MoveTo=[](DRAWBOT_PathRef,float,float)->SPErr{return 0;};
+    path.LineTo=[](DRAWBOT_PathRef,float,float)->SPErr{return 0;};
+    surface.StrokePath=[](DRAWBOT_SurfaceRef,DRAWBOT_PenRef,DRAWBOT_PathRef)->SPErr{return 0;};
     surface.FillPath=[](DRAWBOT_SurfaceRef,DRAWBOT_BrushRef,DRAWBOT_PathRef,DRAWBOT_FillType)->SPErr{
         if(preview.is_open())preview<<"<rect x='"<<preview_rect.left<<"' y='"<<preview_rect.top<<"' width='"<<preview_rect.width<<"' height='"<<preview_rect.height
             <<"' fill='rgb("<<int(preview_color.red*255)<<","<<int(preview_color.green*255)<<","<<int(preview_color.blue*255)<<")'/>\n";
@@ -109,6 +131,7 @@ PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef* params[],co
     return reject?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
 }
 int main() {
+    std::setvbuf(stdout,nullptr,_IONBF,0);
     using starfield::adapter::particle_gradient_event;
     auto gradient=model::preset(2);check(model::valid(gradient),"independent preset validates");
     const auto original=gradient;model::flip(gradient);model::flip(gradient);
@@ -138,8 +161,12 @@ int main() {
         check(model::insert(gradient,(gradient.stops[slot].position+gradient.stops[slot-1].position)/2)>=0,"bounded add");}
     check(model::insert(gradient,.1)<0,"ninth stop rejected");
     configure();PF_InData data{};data.pica_basicP=&basic;PF_OutData out{};
-    std::array<PF_ParamDef,160> values{};std::array<PF_ParamDef*,160> params{};
+    namespace records=starfield::adapter::native_nodes;
+    constexpr auto parameter_count=records::last_parameter_index(records::Kind::particle)+1;
+    std::array<PF_ParamDef,parameter_count> values{};std::array<PF_ParamDef*,parameter_count> params{};
+    data.num_params=parameter_count;
     for(unsigned i=0;i<params.size();++i)params[i]=&values[i];
+    for(int i=0;i<8;++i)values[records::uuid_first_index(records::Kind::particle)+i].param_type=PF_Param_FLOAT_SLIDER;
     values[layout::gradient].param_type=PF_Param_FLOAT_SLIDER;values[layout::gradient].u.fs_d.value=2;
     for(int i=0;i<8;++i){values[layout::gradient_first+2*i].param_type=PF_Param_FLOAT_SLIDER;
         values[layout::gradient_first+2*i+1].param_type=PF_Param_COLOR;values[layout::gradient_first+2*i+1].u.cd.value={255,255,255,255};}
@@ -163,7 +190,7 @@ int main() {
     check(click(200,70,2)==0 && values[layout::gradient_first+5].u.cd.value.blue==204,"native picker follows the reordered stop color");
     check(click(200,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"Alt-click deletes a moved last stop");
     check(click(52,70,1,PF_Mod_OPT_ALT_KEY)==0 && values[layout::gradient].u.fs_d.value==2,"two-stop gradient cannot lose another marker");
-    check(click(145,105)==0,"presets menu opens");check(click(145,130)==0 && values[layout::gradient].u.fs_d.value==5,"preset authors all saved stops");
+    check(click(145,105)==0 && values[layout::gradient].u.fs_d.value==5,"selected preset authors all saved stops");
     check(click(15,105)==0,"copy changes no source values");
     const auto before=values;reject=true;check(click(248,45)==PF_Err_BAD_CALLBACK_PARAM,"publication failure returned");reject=false;
     bool restored=true;for(int i=0;i<17;++i)restored &= std::memcmp(&values[layout::gradient+i],&before[layout::gradient+i],sizeof(PF_ParamDef))==0;
@@ -230,17 +257,17 @@ int main() {
     starfield::adapter::clear_particle_gradient_ui();check(gets==releases,"SDK suites balanced across all events");
     using starfield::adapter::particle_rotation_curve_event;
     event.effect_win.index=layout::rotation_curve;
-    for(int i=0;i<17;++i)values[layout::rotation_curve+i].param_type=PF_Param_FLOAT_SLIDER;
+    for(int i=0;i<layout::curve_span;++i)values[layout::rotation_curve+i].param_type=PF_Param_FLOAT_SLIDER;
     event.e_type=PF_Event_DRAW;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"default zero rotation curve draws without any bitmap");
     const auto curve_click=[&](int x,int y){event.e_type=PF_Event_DO_CLICK;event.u.do_click={};event.u.do_click.screen_point.h=x;event.u.do_click.screen_point.v=y;return particle_rotation_curve_event(&data,&out,params.data(),&event);};
     auto edits=publications;check(curve_click(118,25)==0 && publications==edits+1 && values[layout::rotation_curve].u.fs_d.value==3,"native rotation adds a point through one bank transaction");
     check(values[layout::rotation_curve+1].u.fs_d.value==0 && values[layout::rotation_curve+5].u.fs_d.value==1,"rotation curve retains normalized life endpoints");
     auto rotation_bank=values;reject=true;check(curve_click(65,20)!=0,"failed rotation publication is reported");reject=false;
-    bool curve_restored=true;for(int i=0;i<17;++i)curve_restored &= values[layout::rotation_curve+i].u.fs_d.value==rotation_bank[layout::rotation_curve+i].u.fs_d.value;
+    bool curve_restored=true;for(int i=0;i<layout::curve_span;++i)curve_restored &= values[layout::rotation_curve+i].u.fs_d.value==rotation_bank[layout::rotation_curve+i].u.fs_d.value;
     check(curve_restored,"failed curve addition restores count and every old knot");
     check(curve_click(243,35)==0,"rotation curve Flip publishes atomically");
     check(curve_click(20,100)==0 && curve_click(80,100)==0,"rotation curve Copy and Paste remain usable");
-    check(curve_click(145,100)==0 && curve_click(80,125)==0 && values[layout::rotation_curve+4].u.fs_d.value==360,"rotation +360 preset is an authored degree curve");
+    check(curve_click(145,100)==0 && values[layout::rotation_curve+4].u.fs_d.value==360,"selected rotation +360 preset is an authored degree curve");
     event.e_type=PF_Event_CLOSE_CONTEXT;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"rotation close releases UI state");
     starfield::adapter::clear_particle_gradient_ui();check(gets==releases,"SDK suites balanced across curve events");
     std::printf("Gradient editor: %d checks, %d failures\n",checks,failures);return failures?1:0;

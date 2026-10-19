@@ -1,7 +1,9 @@
 #pragma once
 #include "Parameters.hpp"
+#include "MotionLookAtCapture.hpp"
 #include "LightCapture.hpp"
 #include "WorldBridge.hpp"
+#include "starfield/core/Geometry.hpp"
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/PluginApi.h"
 #include "starfield/core/Render.hpp"
@@ -30,7 +32,13 @@ inline constexpr bool motion_popup(std::size_t i){return i==0 || i==3 || i==7;}
     }
     return PF_Err_NONE;
 }
-struct MotionSample {core::RationalTime time;core::OpaqueBytes graph;SfCoreRenderRequest camera{};LightStaging lights;};
+struct MotionSample {
+    core::RationalTime time;
+    core::OpaqueBytes graph;
+    core::OpaqueBytes motion_resource_key;
+    SfCoreRenderRequest camera{};
+    LightStaging lights;
+};
 struct MotionExposure {
     std::array<double,8> values{};
     bool enabled{};
@@ -38,7 +46,7 @@ struct MotionExposure {
     double gain{1};
 };
 [[nodiscard]] PF_Err prepare_motion_exposure(PF_InData*,PF_OutData*,const core::Graph&,
-    A_long width,A_long height,const core::Cancellation&,MotionExposure&) noexcept;
+    core::LayerUnits,const core::Cancellation&,MotionExposure&) noexcept;
 [[nodiscard]] PF_Err render_motion_cpu(PF_InData*,PF_OutData*,const SfCoreApi&,SfCoreRenderRequest,
     const MotionExposure&,const WorldLayout&,PF_EffectWorld*,HostBitDepth,const core::Cancellation&) noexcept;
 struct MotionGpuStorage {

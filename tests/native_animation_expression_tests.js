@@ -1,4 +1,5 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
 const root=path.resolve(__dirname,"..");
 const expressions=JSON.parse(fs.readFileSync(path.join(root,"artifacts/native-animation-expressions.json"),"utf8"));
@@ -51,10 +52,11 @@ const escaped=JSON.parse(fs.readFileSync(path.join(root,'artifacts/native-escape
 assert.equal(vm.runInNewContext(escaped.expression,{thisLayer:host([node(102,1,{1:1},escaped.name)])}),1);
 assert.ok(!escaped.expression.includes(escaped.name),'UTF-16 name is entirely escaped');
 // Exercise the actual gateway setter without exposing test entry points in production.
-const gateway = fs.readFileSync(path.join(root,"cep_panel/jsx/starfield_gateway.jsx"),"utf8")
-    .replace("    function setNodeControl(effect, control, value) {","    $.global.testSetNodeControl = setNodeControl;\n    function setNodeControl(effect, control, value) {");
+const gateway = fs.readFileSync(panelPath("jsx/starfield_gateway.jsx"),"utf8")
+    .replace(/    function setNodeControl\(effect, control, value(?:, forceWrite)?\) \{/,match=>"    $.global.testSetNodeControl = setNodeControl;\n"+match);
 const global = {};
 vm.runInNewContext(gateway, {$:{global}, app:{}});
+assert.equal(typeof global.testSetNodeControl,"function","setter test seam must match the actual function");
 const keyframes = [[0,10],[2,20]]; let staticWrites=0;
 const property = {name:"Size",value:15,numKeys:2,canSetExpression:true,expressionEnabled:false,
     setValue(){staticWrites++;},setValueAtTime(time,value){keyframes.push([time,value]);}};

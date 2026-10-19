@@ -34,8 +34,8 @@ struct MotionLightPathTrack {
     double maximum_probe_error{};
 };
 struct MotionLightPathTrackSet {
-    // One track per matched source, in the caller's composition order. The total
-    // sample count is bounded across the whole set, not reset for each light.
+    // One track per matched source, in caller order. An empty set represents a
+    // prefix that matched no point lights. The aggregate sample count is bounded.
     std::vector<MotionLightPathTrack> tracks;
     std::size_t sample_count{};
 };
@@ -57,8 +57,10 @@ struct MotionLightPathTrackSet {
     std::uint32_t source_layer_id,core::LayerUnits,double max_chord_error,
     const core::Cancellation&,MotionLightPathTrack& output) noexcept;
 // Captures all explicitly selected matching lights independently. IDs are kept
-// in caller order, must be unique, and share one aggregate sample bound. Failure
-// or cancellation leaves output unchanged.
+// in caller order and must be unique; sources with fewer than two distinct
+// position-keyframe times are skipped because they do not define a path. The
+// remaining tracks share one aggregate sample bound. Failure or cancellation
+// leaves output unchanged.
 [[nodiscard]] PF_Err capture_motion_light_path_tracks(PF_InData*,AEGP_PluginID,
     std::span<const std::uint32_t> source_layer_ids,core::LayerUnits,double max_chord_error,
     const core::Cancellation&,MotionLightPathTrackSet& output) noexcept;

@@ -8,6 +8,7 @@
 #include "EffectGraphBackup.hpp"
 #include "PluginVersion.h"
 #include "GraphRenderJournal.hpp"
+#include "UiExclusionClient.hpp"
 #include "Param_Utils.h"
 #include "WorldBridge.hpp"
 
@@ -942,13 +943,19 @@ static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_dat
             core::Graph sampled = decoded.take_value();
             A_long failed_binding = -1;
             const char* failed_stage = "unknown";
+            NativeBindingFailure failure;
             err = sample_native_node_animation(in_data, sampled, reference_width, reference_height,
-                                               &failed_binding, &failed_stage);
+                                               &failed_binding, &failed_stage,nullptr,&failure);
             if (err) {
+                char node_id[33]{};constexpr char hex[]="0123456789abcdef";
+                for(std::size_t i=0;i<failure.node.value.bytes.size();++i) {
+                    node_id[2*i]=hex[failure.node.value.bytes[i]>>4];
+                    node_id[2*i+1]=hex[failure.node.value.bytes[i]&15];
+                }
                 if (out_data) std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, delivered params %ld).",
+                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, node %s, parameter %ld, component %ld).",
                     failed_stage, STARFIELD_VERSION_BUILD, guard.value.u.fs_d.value, static_cast<long>(failed_binding), static_cast<long>(err),
-                    static_cast<long>(in_data->num_params));
+                    node_id,static_cast<long>(failure.parameter),static_cast<long>(failure.component));
                 return err;
             }
             graph = std::make_shared<const core::Graph>(std::move(sampled));
@@ -1138,6 +1145,7 @@ void sync_curve_endpoint(PF_ParamDef* params[], A_long count_id, A_long first_po
 
 PF_Err user_changed_param(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
                           PF_UserChangedParamExtra* extra) noexcept {
+    if(ui_transaction_active())return PF_Err_NONE;
     if (!in_data || !params || !extra) return PF_Err_BAD_CALLBACK_PARAM;
     try {
         if (params[kGraphSyncGuardId] && params[kGraphSyncGuardId]->param_type == PF_Param_FLOAT_SLIDER &&

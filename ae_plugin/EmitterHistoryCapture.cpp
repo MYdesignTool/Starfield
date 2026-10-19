@@ -47,6 +47,7 @@ class TemporalCapture final : public core::TemporalGraphSampler {
     NativeHistoryTrace& trace;
     std::map<std::pair<core::NodeId,double>,core::GraphNode> nodes;
     std::map<std::pair<core::NodeId,double>,double> rates;
+    std::span<const MotionLookAtTargetResource> sample_motion_targets;
     bool context(double seconds,PF_InData& sampled) {
         if(!std::isfinite(seconds) || seconds<0 || seconds>std::numeric_limits<A_long>::max()-1.0) {
             error=PF_Err_BAD_CALLBACK_PARAM;return false;
@@ -67,6 +68,19 @@ public:
         :data(d),cancellation(c),
          plan(g,w,h,d->pixel_aspect_ratio.den?double(d->pixel_aspect_ratio.num)/d->pixel_aspect_ratio.den:1),trace(t) {}
     ~TemporalCapture() {trace.checkouts+=plan.checkout_count();}
+    void use_sample_resources(std::span<const MotionLookAtTargetResource> resources) noexcept {
+        sample_motion_targets=resources;nodes.clear();
+    }
+    void attach_sample_motion_target(core::NodeId id,core::GraphNode& value) const {
+        const auto resource=std::lower_bound(sample_motion_targets.begin(),sample_motion_targets.end(),id,
+            [](const auto& entry,core::NodeId key){return entry.node<key;});
+        if(resource==sample_motion_targets.end() || resource->node!=id || !resource->bytes)return;
+        const auto existing=std::find_if(value.parameters.begin(),value.parameters.end(),[](const auto& p){
+            return p.key==core::graph_keys::kMotionLookAtTargets;
+        });
+        if(existing==value.parameters.end())value.parameters.push_back({core::graph_keys::kMotionLookAtTargets,*resource->bytes});
+        else existing->value=*resource->bytes;
+    }
     void prepare(bool allow_static_bypass) {
         plan.prepare_constants(data,allow_static_bypass);trace.certified=plan.proofs().size();
         trace.inputs=plan.input_count();trace.constants=plan.constant_count();
@@ -93,7 +107,7 @@ public:
         using R=core::Result<core::GraphNode>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"temporal node sampling cancelled");
         if(const auto* constant=plan.constant_node(id)) {
-            ++trace.constant_node_hits;return R::success(*constant);
+            ++trace.constant_node_hits;auto value=*constant;attach_sample_motion_target(id,value);return R::success(std::move(value));
         }
         const auto key=std::make_pair(id,seconds);
         if(auto found=nodes.find(key);found!=nodes.end()) return R::success(found->second);
@@ -102,6 +116,7 @@ public:
         ++trace.node_samples;
         error=plan.sample(&sampled,id,value,&stream);
         if(error) return R::failure(core::ErrorCode::invalid_request,"historical node parameter checkout/conversion failed");
+        attach_sample_motion_target(id,value);
         if(nodes.size()>=4096) nodes.clear();
         nodes.emplace(key,value);return R::success(std::move(value));
     }
@@ -150,10 +165,12 @@ NativeHistoryTrace last_native_history_trace() noexcept {
     std::lock_guard lock(history_trace_mutex);return history_trace;
 }
 PF_Err capture_motion_particles(PF_InData* data,PF_OutData* output,const core::Graph& source,
-    A_long width,A_long height,std::span<const core::RationalTime> times,
+    A_long width,A_long height,std::span<const MotionLookAtTargetResources> sample_resources,
+    std::span<const core::RationalTime> times,
     const core::Cancellation& cancellation,std::vector<CapturedParticleFrame>& frames) noexcept try {
     TraceScope trace(data);
-    if(!data || !data->time_scale || !data->inter.checkout_param || !data->inter.checkin_param || times.size()>64)return PF_Err_BAD_CALLBACK_PARAM;
+    if(!data || !data->time_scale || !data->inter.checkout_param || !data->inter.checkin_param ||
+       times.size()>64 || (!sample_resources.empty() && sample_resources.size()!=times.size()))return PF_Err_BAD_CALLBACK_PARAM;
     TemporalCapture capture(data,source,cancellation,width,height,trace.trace);
     auto error=read_native_origin_bindings(source,capture.bindings);if(error)return error;
     error=read_native_lifetime_bindings(source,capture.lifetimes);if(error)return error;
@@ -161,13 +178,27 @@ PF_Err capture_motion_particles(PF_InData* data,PF_OutData* output,const core::G
     capture.prepare(simple);
     const bool ordinary=capture.bindings.empty() || (simple && capture.fully_constant());
     std::size_t particle_bytes=0;
-    for(const auto time:times) {
+    for(std::size_t frame_index=0;frame_index<times.size();++frame_index) {
+        const auto time=times[frame_index];
         if(cancellation.is_cancelled())return PF_Interrupt_CANCEL;
         if(time.scale<=0 || time.scale>std::numeric_limits<A_u_long>::max() ||
             time.value<std::numeric_limits<A_long>::min() || time.value>std::numeric_limits<A_long>::max())return PF_Err_BAD_CALLBACK_PARAM;
         PF_InData sampled=*data;sampled.current_time=static_cast<A_long>(time.value);sampled.time_scale=static_cast<A_u_long>(time.scale);
         sampled.time_step=static_cast<A_long>(std::clamp(std::round(double(data->time_step)/data->time_scale*time.scale),1.0,double(std::numeric_limits<A_long>::max())));
         auto graph=source;
+        const auto resources=sample_resources.empty()?std::span<const MotionLookAtTargetResource>{}:
+            std::span<const MotionLookAtTargetResource>{sample_resources[frame_index]};
+        capture.use_sample_resources(resources);
+        for(const auto& resource:resources) {
+            if(!resource.bytes)return PF_Err_BAD_CALLBACK_PARAM;
+            const auto node=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==resource.node;});
+            if(node==graph.nodes.end() || node->type_key!=core::graph_keys::kMotionNode)return PF_Err_BAD_CALLBACK_PARAM;
+            const auto parameter=std::find_if(node->parameters.begin(),node->parameters.end(),[](const auto& p){
+                return p.key==core::graph_keys::kMotionLookAtTargets;
+            });
+            if(parameter==node->parameters.end())node->parameters.push_back({core::graph_keys::kMotionLookAtTargets,*resource.bytes});
+            else parameter->value=*resource.bytes;
+        }
         double clock=double(time.value)/time.scale;
         PF_ParamDef enabled{},seconds{};
         error=PF_CHECKOUT_PARAM(&sampled,kTimeRemapEnabledId,sampled.current_time,sampled.time_step,sampled.time_scale,&enabled);

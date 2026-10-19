@@ -4,6 +4,9 @@
 #include "ModelImportUI.hpp"
 #include "NodeEffects.hpp"
 #include "SPBasic.h"
+#include "UiExclusionClient.hpp"
+#include <commdlg.h>
+#include <fstream>
 
 namespace {
 constexpr auto guard=adapter::native_nodes::sync_guard_index(adapter::native_nodes::Kind::model);
@@ -63,6 +66,8 @@ void setup(PF_InData& data){clear();context=&data;suites=refs=writes=undo_groups
         host_values[index].one_d=params[index].param_type==PF_Param_CHECKBOX?params[index].u.bd.value:
             params[index].param_type==PF_Param_ANGLE?double(params[index].u.ad.value)/65536:params[index].u.fs_d.value;}
     host_values[adapter::native_nodes::uuid_first_index(adapter::native_nodes::Kind::model)].one_d=1;
+    for(int i=0;i<8;++i){const auto index=adapter::native_nodes::uuid_first_index(adapter::native_nodes::Kind::model)+i;
+        params[index].param_type=PF_Param_FLOAT_SLIDER;params[index].u.fs_d.value=host_values[index].one_d;}
     host_values[layout::mesh].arbH=reinterpret_cast<AEGP_ArbBlockVal>(copy(params[layout::mesh].u.arb_d.value));
     host_values[layout::source].one_d=1;data.pica_basicP=&basic;data.effect_ref=reinterpret_cast<PF_ProgPtr>(1);data.time_scale=24;data.current_time=12;
 }
@@ -76,6 +81,10 @@ void checkpoints(PF_InData& data){
     project_id=-1;CHECK(adapter::capture_model_import_checkpoint(&data,checkpoint)!=0&&writes==0&&undo_groups==0);
     project_id=101;
     CHECK(adapter::capture_model_import_checkpoint(&data,checkpoint)==0);
+    const auto borrowed=pf.AEGP_GetNewEffectForEffect;
+    pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH*)->A_Err{return 512;};
+    CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)==0 && refs==0 && suites==0);
+    pf.AEGP_GetNewEffectForEffect=borrowed;
     CHECK(checkpoint.project==101&&checkpoint.comp==202&&checkpoint.layer==303&&checkpoint.mesh==mesh_bytes());
     CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)==0&&refs==0&&suites==0&&locks==0&&handles.size()==2);
     layer_time={24,48};CHECK(adapter::validate_model_import_checkpoint(&data,checkpoint)==0);layer_time={12,24};
@@ -152,9 +161,43 @@ void transactions(PF_InData& data){
 }
 AEGP_PluginID node_graph_sync_plugin_id() noexcept{return 1;}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef* values[],const PF_UserChangedParamExtra* changed,bool) noexcept {
+    CHECK(refs==0); // all source streams/AEGP values released before graph publication
     ++syncs;CHECK(changed&&changed->param_index==layout::source&&values[layout::source]->u.pd.value==2&&values[guard]->u.fs_d.value==0);
     CHECK(host_values[layout::source].one_d==2&&host_values[layout::revision].one_d==values[layout::revision]->u.sd.value);
     if(fail_rollback)fail_index=layout::mesh;return fail_sync?512:0;
+}
+PF_Err sync_model_import_graph_parameter(PF_InData* data,PF_OutData* out,PF_ParamDef* values[],
+    const PF_UserChangedParamExtra* changed,const adapter::EffectUiExclusion&) noexcept {
+    return sync_node_graph_parameter(data,out,values,changed,false);
+}
+namespace {
+unsigned button_dialogs{},button_held{};
+BOOL WINAPI transaction_chooser(OPENFILENAMEW* dialog){CHECK(refs==0 && suites==0 && button_held==0);++button_dialogs;
+    std::wcscpy(dialog->lpstrFile,L"artifacts/model-import-transaction-tests/button.obj");return TRUE;}
+DWORD WINAPI transaction_chooser_error(){return 0;}
+}
+#define GetOpenFileNameW transaction_chooser
+#define CommDlgExtendedError transaction_chooser_error
+#include "../ae_plugin/ModelImportUI.cpp"
+#undef GetOpenFileNameW
+#undef CommDlgExtendedError
+void button_transactions(PF_InData& data){
+    const auto module=LoadLibraryW(L"artifacts/model-ui-exclusion-tests/paired/StarfieldHost.aex");CHECK(module);
+    const auto initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(module,"SFLD_TestInitialize"));CHECK(initialize);initialize();
+    std::ofstream("artifacts/model-import-transaction-tests/button.obj",std::ios::binary)<<triangle;
+    utility.AEGP_GetMainHWND=[](void* out)->A_Err{*static_cast<HWND*>(out)=reinterpret_cast<HWND>(1);return 0;};
+    data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err{
+        ++button_held;*out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=host_values[i].one_d;return 0;};
+    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{--button_held;return 0;};
+    for(auto count:{0,101})for(bool reject:{false,true}){
+        setup(data);data.num_params=count;PF_OutData out{};const auto old=mesh_bytes();fail_sync=reject;
+        const auto error=adapter::import_model_obj(&data,&out,reinterpret_cast<PF_ParamDef**>(1));
+        CHECK((error!=0)==reject && data.num_params==count && syncs==1 && button_held==0 && refs==0 && suites==0 &&
+            host_values[guard].one_d==0 && undo_groups==undo_ends && !adapter::ui_transaction_active());
+        CHECK(host_values[layout::source].one_d==(reject?1:2) && host_values[layout::revision].one_d==(reject?0:1));
+        CHECK(reject?mesh_bytes()==old:mesh_bytes()!=old);
+    }
+    CHECK(button_dialogs==4);clear();CHECK(FreeLibrary(module)!=0);
 }
 int main(){std::setvbuf(stdout,nullptr,_IONBF,0);if(model_controls_fixture_main())return 1;
     PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;
@@ -164,6 +207,8 @@ int main(){std::setvbuf(stdout,nullptr,_IONBF,0);if(model_controls_fixture_main(
     effects.AEGP_GetInstalledKeyFromLayerEffect=[](AEGP_EffectRefH,AEGP_InstalledEffectKey* out)->A_Err{*out=5;return 0;};
     effects.AEGP_GetEffectMatchName=[](AEGP_InstalledEffectKey,A_char* out)->A_Err{std::strcpy(out,wrong_match?"third.party":"org.starfieldfx.node.model");return 0;};
     effects.AEGP_GetEffectFlags=[](AEGP_EffectRefH,AEGP_EffectFlags* out)->A_Err{*out=effect_flags;return 0;};
+    effects.AEGP_GetLayerNumEffects=[](AEGP_LayerH,A_long* out)->A_Err{*out=1;return 0;};
+    effects.AEGP_GetLayerEffectByIndex=[](AEGP_PluginID,AEGP_LayerH,A_long,AEGP_EffectRefH* out)->A_Err{*out=reinterpret_cast<AEGP_EffectRefH>(1);return 0;};
     streams.AEGP_GetEffectNumParamStreams=[](AEGP_EffectRefH,A_long* out)->A_Err{*out=101;return 0;};
     projects.AEGP_GetProjectByIndex=[](A_long,AEGP_ProjectH* out)->A_Err{*out=reinterpret_cast<AEGP_ProjectH>(1);return 0;};
     projects.AEGP_GetProjectRootFolder=[](AEGP_ProjectH,AEGP_ItemH* out)->A_Err{*out=reinterpret_cast<AEGP_ItemH>(1);return 0;};
@@ -175,5 +220,5 @@ int main(){std::setvbuf(stdout,nullptr,_IONBF,0);if(model_controls_fixture_main(
     streams.AEGP_GetNewEffectStreamByIndex=stream;streams.AEGP_DisposeStream=dispose_stream;streams.AEGP_GetStreamType=type;
     streams.AEGP_GetNewStreamValue=get;streams.AEGP_DisposeStreamValue=dispose_value;streams.AEGP_SetStreamValue=set;
     utility.AEGP_StartUndoGroup=start;utility.AEGP_EndUndoGroup=end;
-    try{transactions(data);checkpoints(data);std::printf("Model import transaction/checkpoints: %u checks, %u failures (May2023 SDK/fake host)\n",checks,failures);return failures?1:0;}
+    try{transactions(data);checkpoints(data);button_transactions(data);std::printf("Model import transaction/checkpoints: %u checks, %u failures (May2023 SDK/fake host)\n",checks,failures);return failures?1:0;}
     catch(const std::exception& error){std::printf("FAILED: %s\n",error.what());clear();return 1;}}

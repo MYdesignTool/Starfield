@@ -24,13 +24,10 @@ for(const mode of ["add","replace"]) {
     ok(applied.nodes.some(n=>n.type===edits.types.particle&&n.parameters.some(p=>p.key==="15"&&p.value===4)));
     eq(applied.nodes.filter(n=>n.type===edits.types.output).length,1);
 }
-// Execute the real inspector select builder without starting the whole panel.
-const panel=fs.readFileSync(path.join(root,"js/panel.js"),"utf8"),start=panel.indexOf("    function popupInput(parameter) {");
-ok(start>=0);const end=panel.indexOf("\n    function ",start+1);ok(end>start);
-const document={createElement(tag){return {tag,children:[],dataset:{},appendChild(x){this.children.push(x);},addEventListener(){}};}};
-const build=vm.runInNewContext("("+panel.slice(start,end).trim()+")",{document,onEdit(){}});
-const select=build(shapeField());eq(select.children.map(o=>o.textContent),names);
-eq(select.children.map(o=>!!o.disabled),[false,false,false,false,true,false]);eq(select.value,"6");
+// Display metadata remains available for graph/preset compatibility; parameter
+// controls now belong to AE Effect Controls, so CEP has no popup builder.
+const panel=fs.readFileSync(path.join(root,"js/panel.js"),"utf8");
+ok(!panel.includes("function popupInput("));
 const source=fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8").replace("    function readNativeNode(effect, layer) {",
     "    $.global.shapeApi={read:readNativeNode,write:setNodeParameters,validate:validateNodeManifest,toNative:particleShapeToNative,fromNative:particleShapeFromNative};\n    function readNativeNode(effect, layer) {");
 const global={},context=vm.createContext({$:{global},app:{}});vm.runInContext(source,context);
@@ -53,7 +50,10 @@ for(const invalid of [-1,5,6,1.5,"4",null,NaN,Infinity])reject(()=>api.toNative(
 for(const invalid of [0,5,7,1.5,NaN,Infinity])reject(()=>api.fromNative(invalid),/Unsupported Particle Shape/);
 const before=writes;
 for(const [type,value] of [["3",4],[3,5],[3,"4"],[4,4]]) {
-    shape.type=type;shape.value=value;reject(()=>api.validate(realm([record])),/Invalid Particle Shape/);
+    shape.type=type;shape.value=value;
+    // Wire validation precedes semantic shape validation; both must reject
+    // before any host write, with the specific boundary's diagnostic.
+    reject(()=>api.validate(realm([record])),type===3 && typeof value==="number"?/Invalid Particle Shape/:/control record: invalid parameter 15 type, identity or value/);
 }
 eq(writes,before);eq(nativeShape.value,6);eq(props["Panel Sync Guard"].value,0);
-console.log(`model_particle_shape_tests: ${checks} checks passed; actual candidate view/select/gateway, fake host controls`);
+console.log(`model_particle_shape_tests: ${checks} checks passed; actual candidate view/preset/gateway, fake host controls`);

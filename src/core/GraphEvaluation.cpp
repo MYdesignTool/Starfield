@@ -8,14 +8,18 @@
 #include "starfield/core/MotionCircle.hpp"
 #include "starfield/core/MotionPathTravel.hpp"
 #include "starfield/core/MotionPathPoints.hpp"
+#include "starfield/core/MotionLightPathResource.hpp"
+#include "starfield/core/MotionLookAtTargets.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
 #include "starfield/core/ParticleMotionFrame.hpp"
+#include "starfield/core/TurbulenceNoise.hpp"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <new>
 #include <optional>
@@ -79,6 +83,9 @@ std::uint64_t scoped_birth_identity(std::uint64_t identity,NodeId scope) noexcep
 }
 std::uint64_t branch_birth_identity(std::uint64_t identity,NodeId particle) noexcept {
     return scoped_birth_identity(mix64(identity^0x424952544842524eull),particle);
+}
+std::uint64_t stream_route_identity(std::uint64_t identity,NodeId terminal) noexcept {
+    return scoped_birth_identity(mix64(identity^0x5354524d524f5554ull),terminal);
 }
 bool allow_particle_birth(const ParticleValues& appearance,std::uint32_t effective_seed,
     std::uint64_t identity,NodeId emitter) noexcept {
@@ -425,14 +432,15 @@ void apply_particle_style(ParticleInstance& particle, const ParticleValues& appe
 #include "ModelEvaluation.hpp"
 #include "MotionEvaluation.hpp"
 #include "OrderedForce.hpp"
+#include "TurbulenceEvaluation.hpp"
 
 bool is_particle_graph_edge(const GraphNode& source, const GraphNode& destination) noexcept {
     const auto& from = source.type_key;
     const auto& to = destination.type_key;
     if (from == kEmitterNode) return to == kParticleNode;
-    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode;
-    if (from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode)
-        return to == kForceNode || to == kTransformNode || to == kMotionNode || to == kOutputNode;
+    if (to == kEmitterNode) return from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode || from == kTurbulenceNode;
+    if (from == kParticleNode || from == kForceNode || from == kTransformNode || from == kMotionNode || from == kTurbulenceNode)
+        return to == kForceNode || to == kTransformNode || to == kMotionNode || to == kTurbulenceNode || to == kOutputNode;
     return false;
 }
 
@@ -484,9 +492,13 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         std::vector<std::optional<CompiledParticleTransform>> transforms(count);
         ModelValues models;MaterialValues materials;
         std::map<NodeId,CompiledMotionCircle> circles;
+        std::map<NodeId,TurbulenceValues> turbulences;
         std::map<NodeId,MotionLookAtSettings> look_ats;
         std::map<NodeId,MotionPathClockValue> path_clocks;
         std::map<NodeId,CompiledMotionPathTravel> paths;
+        std::map<NodeId,MotionLightPathSettings> light_path_settings;
+        std::map<NodeId,MotionLightPathResource> light_path_resources;
+        std::map<NodeId,CompiledMotionLightPath> light_paths;
         // Check semantic bounds on every node, including disconnected/parked nodes.
         for (std::size_t i = 0; i < count; ++i) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "node validation cancelled");
@@ -535,15 +547,30 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             } else if(node.type_key==kTransformNode) {
                 auto value=read_transform(node);if(!value.has_value())return R::failure(value.error());
                 transforms[i]=value.take_value();
+            } else if(node.type_key==kTurbulenceNode) {
+                auto value=read_turbulence(node);if(!value.has_value())return R::failure(value.error());
+                turbulences.emplace(node.id,value.take_value());
             } else if(node.type_key==kMotionNode) {
                 auto mode=read_motion_mode(node);if(!mode.has_value())return R::failure(mode.error());
                 if(mode.value()==1){auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());circles.emplace(node.id,value.take_value());}
-                else if(mode.value()==2){auto value=read_motion_look_at(node);if(!value.has_value())return R::failure(value.error());look_ats.emplace(node.id,value.take_value());}
+                else if(mode.value()==2){auto value=read_motion_look_at(node,cancellation);if(!value.has_value())return R::failure(value.error());look_ats.emplace(node.id,value.take_value());}
                 else {
-                    auto value=read_motion_path_clock(node);if(!value.has_value())return R::failure(value.error());
-                    budget.work+=value.value().clock.segment_count();
-                    auto points=read_motion_path_points(node,cancellation,budget.work);if(!points.has_value())return R::failure(points.error());
-                    path_clocks.emplace(node.id,value.take_value());
+                    if(find_value(node,kMotionPathLightResource)) {
+                        auto settings=read_motion_light_path_settings(node);if(!settings.has_value())return R::failure(settings.error());
+                        auto resource=read_motion_light_path_resource(node,cancellation,budget.work,budget.path_bytes);
+                        if(!resource.has_value())return R::failure(resource.error());
+                        auto clock=compile_motion_curve_clock(settings.value().clock.over_life);
+                        if(!clock.has_value())return R::failure(clock.error());
+                        budget.work+=clock.value().segment_count();
+                        if(budget.work>20'000'000)return R::failure(ErrorCode::work_limit_exceeded,"Light Path curve work limit");
+                        light_path_settings.emplace(node.id,settings.take_value());
+                        light_path_resources.emplace(node.id,resource.take_value());
+                    } else {
+                        auto value=read_motion_path_clock(node);if(!value.has_value())return R::failure(value.error());
+                        budget.work+=value.value().clock.segment_count();
+                        auto points=read_motion_path_points(node,cancellation,budget.work);if(!points.has_value())return R::failure(points.error());
+                        path_clocks.emplace(node.id,value.take_value());
+                    }
                 }
             } else if(node.type_key==kMaterialNode) {
                 auto value=read_material(node);if(!value.has_value())return R::failure(value.error());materials.emplace(node.id,value.take_value());
@@ -633,30 +660,94 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         result.evaluated_nodes.reserve(active_count);
         for (const std::size_t index : topological_order) result.evaluated_nodes.push_back(nodes[index]->id);
         using MotionPlan=std::shared_ptr<const std::vector<NodeId>>;
-        std::vector<MotionPlan> motion_plans(count);
-        const auto motion_plan=[&](std::size_t particle)->Result<MotionPlan> {
-            if(circles.empty()&&look_ats.empty()&&path_clocks.empty())return Result<MotionPlan>::success({});
-            if(motion_plans[particle])return Result<MotionPlan>::success(motion_plans[particle]);
-            auto chain=plan_motion_chain(nodes,incoming,outgoing,active,topological_order,particle,output,cancellation,budget.work);
-            if(!chain.has_value())return Result<MotionPlan>::failure(chain.error());
-            motion_plans[particle]=std::make_shared<const std::vector<NodeId>>(chain.take_value());
-            return Result<MotionPlan>::success(motion_plans[particle]);
+        struct StreamPathPlan {
+            std::size_t particle{},terminal{};
+            std::vector<std::size_t> nodes;
+            std::vector<std::size_t> prefix_forces;
+            MotionPlan motion;
+            std::shared_ptr<const TransformBranchPlan> transform;
         };
+        std::vector<StreamPathPlan> stream_paths;
+        std::vector<std::vector<std::size_t>> paths_by_particle(count);
         const bool has_transforms=std::any_of(transforms.begin(),transforms.end(),[](const auto& value){return value.has_value();});
-        std::vector<std::shared_ptr<const TransformBranchPlan>> transform_plans(count);
-        const auto transform_plan=[&](std::size_t particle)->Result<std::shared_ptr<const TransformBranchPlan>> {
-            using P=Result<std::shared_ptr<const TransformBranchPlan>>;
-            if(!has_transforms)return P::success({});
-            if(transform_plans[particle])return P::success(transform_plans[particle]);
-            auto stages=motion_plan(particle);if(!stages.has_value())return P::failure(stages.error());
-            const auto deferred=stages.value()?std::span<const NodeId>{*stages.value()}:std::span<const NodeId>{};
-            auto planned=plan_transform_branch(nodes,incoming,outgoing,active,topological_order,particle,output,transforms,cancellation,budget.transform,deferred);
-            if(!planned.has_value())return P::failure(planned.error());
-            auto value=planned.take_value();auto basis=retain_transform_basis(result,value);
-            if(!basis.has_value())return P::failure(basis.error());value.sprite_basis_index=basis.value();
-            transform_plans[particle]=std::make_shared<const TransformBranchPlan>(std::move(value));
-            return P::success(transform_plans[particle]);
-        };
+        std::uint64_t turbulence_noise_work{};
+        // A stream that fans out to Output is an independent render branch.
+        // Plan each path separately so modifiers on sibling paths never leak
+        // into each other's Force, Transform, or Motion calculations.
+        for(const auto terminal:incoming[output]) {
+            if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"stream path planning cancelled");
+            std::vector<std::size_t> reverse_path;
+            auto current=terminal;std::size_t particle=count;
+            for(std::size_t steps=0;steps<=count;++steps) {
+                if(current>=count)break;
+                if(particles[current]){particle=current;break;}
+                reverse_path.push_back(current);
+                if(incoming[current].size()!=1)break;
+                current=incoming[current].front();
+            }
+            if(particle==count)continue;
+            std::reverse(reverse_path.begin(),reverse_path.end());
+            if(reverse_path.size()>kMaxGraphNodes || budget.work>20'000'000-reverse_path.size())
+                return R::failure(ErrorCode::work_limit_exceeded,"stream path planning work limit");
+            budget.work+=reverse_path.size();
+            StreamPathPlan route;route.particle=particle;route.terminal=terminal;route.nodes=std::move(reverse_path);
+            std::vector<NodeId> motion_nodes;
+            std::size_t first_ordered=route.nodes.size();
+            for(std::size_t position=0;position<route.nodes.size();++position) {
+                const auto index=route.nodes[position];const auto& type=nodes[index]->type_key;
+                if(type==kMotionNode || type==kTurbulenceNode) {first_ordered=std::min(first_ordered,position);motion_nodes.push_back(nodes[index]->id);}
+                else if(type==kForceNode) {
+                    if(first_ordered==route.nodes.size())route.prefix_forces.push_back(index);
+                    else motion_nodes.push_back(nodes[index]->id);
+                } else if(type==kTransformNode&&first_ordered!=route.nodes.size())motion_nodes.push_back(nodes[index]->id);
+            }
+            // Include every ordered processor downstream of the first Motion or
+            // Turbulence. Earlier Force/Transform stay in the simulation prefix.
+            if(first_ordered!=route.nodes.size()) {
+                motion_nodes.clear();
+                for(std::size_t position=first_ordered;position<route.nodes.size();++position) {
+                    const auto index=route.nodes[position];const auto& type=nodes[index]->type_key;
+                    if(type==kMotionNode||type==kTurbulenceNode||type==kForceNode||type==kTransformNode)motion_nodes.push_back(nodes[index]->id);
+                }
+                route.motion=std::make_shared<const std::vector<NodeId>>(std::move(motion_nodes));
+            }
+            if(has_transforms) {
+                TransformBranchPlan plan;plan.terminal=true;
+                for(std::size_t position=0;position<first_ordered;++position) {
+                    const auto index=route.nodes[position];
+                    if(forces[index])plan.force_nodes.push_back(nodes[index]->id);
+                }
+                const auto compose_range=[&](std::size_t begin,std::size_t end)->Result<std::optional<CompiledParticleTransform>> {
+                    using T=Result<std::optional<CompiledParticleTransform>>;
+                    std::optional<CompiledParticleTransform> combined;
+                    for(std::size_t position=begin;position<end;++position) {
+                        if(cancellation.is_cancelled())return T::failure(ErrorCode::cancelled,"stream Transform planning cancelled");
+                        const auto index=route.nodes[position];if(!transforms[index])continue;
+                        if(!combined)combined=*transforms[index];
+                        else {
+                            if(++budget.transform.matrices>65536)return T::failure(ErrorCode::work_limit_exceeded,"Transform derived matrix limit exceeded");
+                            auto composed=compose_particle_transforms(*combined,*transforms[index]);
+                            if(!composed.has_value())return T::failure(composed.error());combined=composed.take_value();
+                        }
+                    }
+                    return T::success(std::move(combined));
+                };
+                auto combined=compose_range(0,first_ordered);if(!combined.has_value())return R::failure(combined.error());
+                plan.combined=combined.take_value();
+                for(std::size_t position=0;position<first_ordered;++position) {
+                    const auto index=route.nodes[position];if(!forces[index])continue;
+                    auto suffix=compose_range(position+1,first_ordered);if(!suffix.has_value())return R::failure(suffix.error());
+                    if(suffix.value()) {
+                        if(++budget.transform.matrices>65536)return R::failure(ErrorCode::work_limit_exceeded,"Transform derived matrix limit exceeded");
+                        plan.force_spaces.emplace(nodes[index]->id,*suffix.value());
+                    }
+                }
+                auto basis=retain_transform_basis(result,plan);if(!basis.has_value())return R::failure(basis.error());
+                plan.sprite_basis_index=basis.value();route.transform=std::make_shared<const TransformBranchPlan>(std::move(plan));
+            }
+            const auto route_index=stream_paths.size();stream_paths.push_back(std::move(route));
+            paths_by_particle[particle].push_back(route_index);
+        }
         const auto apply_motion_frame=[&](ParticleInstance& instance,const MotionPlan& plan,std::uint32_t seed,
             MotionCircleOrigins origins)->Result<bool> {
             if(plan)for(std::size_t stage=0;stage<plan->size();++stage) {
@@ -683,6 +774,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     if(!travel.has_value())return Result<bool>::failure(travel.error());
                     auto moved=found->second.apply_at_distance(instance,travel.value().first,travel.value().second,result.sprite_bases);
                     if(!moved.has_value())return moved;
+                } else if(const auto light_path_found=light_paths.find(id);light_path_found!=light_paths.end()) {
+                    const auto& settings=light_path_settings.at(id);
+                    const auto random=motion_speed_random(instance,id,seed);
+                    const auto delay=settings.max_delay_seconds*(1-settings.delay_random_percent/100.*random);
+                    auto sample=light_path_found->second.sample(instance.age_seconds,instance.lifetime_seconds,
+                        delay,random,cancellation);
+                    if(!sample.has_value())return Result<bool>::failure(sample.error());
+                    auto moved=apply_motion_light_path_sample(instance,settings,sample.value(),result.sprite_bases);
+                    if(!moved.has_value())return moved;
                 } else if(const auto circle=circles.find(id);circle!=circles.end()) {
                     const auto& c=circle->second;auto clock=c.clock(instance.age_seconds,instance.lifetime_seconds);
                     if(!clock.has_value())return Result<bool>::failure(clock.error());
@@ -691,7 +791,15 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                         c.settings().radians_per_second*factor*clock.value().weight,origins);
                     if(!moved.has_value())return moved;
                 } else if(const auto look=look_ats.find(id);look!=look_ats.end()) {
+                    budget.work+=look->second.use_nearest_light?look->second.light_targets.size():0;
+                    if(budget.work>20'000'000)return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Look At target work limit");
                     auto turned=apply_motion_look_at(instance,look->second,result.sprite_bases);if(!turned.has_value())return turned;
+                } else if(const auto turbulence=turbulences.find(id);turbulence!=turbulences.end()) {
+                    const auto cost=std::uint64_t{3}*turbulence->second.levels;
+                    if(turbulence_noise_work>kMaxTurbulenceNoiseWork-cost)
+                        return Result<bool>::failure(ErrorCode::work_limit_exceeded,"Turbulence noise work limit exceeded");
+                    turbulence_noise_work+=cost;
+                    auto moved=apply_turbulence(instance,turbulence->second,id,seed);if(!moved.has_value())return moved;
                 } else {
                     const auto index=index_of(id);if(index>=count||!transforms[index])return Result<bool>::failure(ErrorCode::invalid_request,"missing ordered Transform");
                     auto moved=apply_ordered_particle_transform(instance,*transforms[index]);if(!moved.has_value())return moved;
@@ -711,6 +819,11 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         if(output_particle_count&&to_seconds(*normalized)>=0)for(std::size_t i=0;i<count;++i)if(active[i]&&path_clocks.contains(nodes[i]->id)) {
             auto value=compile_motion_graph_path(*nodes[i],path_clocks.at(nodes[i]->id).settings,cancellation,budget.work,budget.path_bytes);
             if(!value.has_value())return R::failure(value.error());paths.emplace(nodes[i]->id,value.take_value());
+        }
+        if(output_particle_count&&to_seconds(*normalized)>=0)for(std::size_t i=0;i<count;++i)if(active[i]&&light_path_resources.contains(nodes[i]->id)) {
+            auto value=compile_motion_graph_light_path(light_path_resources.at(nodes[i]->id),light_path_settings.at(nodes[i]->id),
+                cancellation,budget.work,budget.path_bytes);
+            if(!value.has_value())return R::failure(value.error());light_paths.emplace(nodes[i]->id,value.take_value());
         }
 
         // Apply stage rules before either primary or Auxiliary evaluation. An
@@ -793,23 +906,22 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 }
                 for (std::size_t branch = 0; branch < children.size(); ++branch) {
                     const auto child = children[branch];
-                    auto planned=transform_plan(child);if(!planned.has_value())return R::failure(planned.error());
-                    const auto tf_plan=planned.value();
-                    auto circle_plan=motion_plan(child);if(!circle_plan.has_value())return R::failure(circle_plan.error());
-                    if(tf_plan && !tf_plan->terminal)continue;
+                    for(const auto route_index:paths_by_particle[child]) {
+                    const auto& route=stream_paths[route_index];
+                    const auto tf_plan=route.transform;
+                    const auto circle_plan=route.motion;
                     const auto* tf=tf_plan && tf_plan->combined?&*tf_plan->combined:nullptr;
                     Settings settings = emitters[emitter]->value;
                     settings.particle_count = output_particle_count;
                     settings.particle_lifetime_seconds = particles[child]->lifetime_seconds;
                     ParticleValues appearance = *particles[child];
-                    std::vector<bool> visited(count, false); stack = {child};
                     std::vector<NodeId> force_ids;
-                    while (!stack.empty()) {
-                        const auto current = stack.back(); stack.pop_back();
-                        if (visited[current]) continue; visited[current] = true;
-                        const bool ordered_force=circle_plan.value()&&std::find(circle_plan.value()->begin(),circle_plan.value()->end(),nodes[current]->id)!=circle_plan.value()->end();
-                        if (forces[current] && !ordered_force && (!tf_plan || std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[current]->id)!=tf_plan->force_nodes.end())) { settings.gravity.x += forces[current]->gravity.x; settings.gravity.y += forces[current]->gravity.y; settings.gravity.z += forces[current]->gravity.z; settings.linear_drag += forces[current]->linear_drag; settings.forces.push_back(motion_for_emitter(forces[current]->motion, nodes[emitter]->id));force_ids.push_back(nodes[current]->id); }
-                        for (const auto destination : outgoing[current]) if (active[destination] && !emitters[destination]) stack.push_back(destination);
+                    for(const auto force_index:route.prefix_forces) {
+                        if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"auxiliary Force planning cancelled");
+                        const auto& force=*forces[force_index];settings.gravity.x+=force.gravity.x;settings.gravity.y+=force.gravity.y;
+                        settings.gravity.z+=force.gravity.z;settings.linear_drag+=force.linear_drag;
+                        settings.forces.push_back(motion_for_emitter(force.motion,nodes[emitter]->id));
+                        force_ids.push_back(nodes[force_index]->id);
                     }
                     auto validated_settings = validate_settings(settings);
                     if (!validated_settings.notices.empty()) return R::failure(ErrorCode::invalid_request, "auxiliary force values outside bounds");
@@ -892,14 +1004,16 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                             apply_particle_properties(instance,*particles[children[branch]],child_settings.value.seed,
                                 birth_position,tf);
                             if(tf_plan)apply_transform_style(instance,*tf_plan);
-                            auto particle_origin=circle_plan.value()?simulate_particle_at_age(child_settings.value,0,child_id,dimension_context,tf).position:Vec3{};
+                            auto particle_origin=circle_plan?simulate_particle_at_age(child_settings.value,0,child_id,dimension_context,tf).position:Vec3{};
                             // child_settings has a zero emitter pivot; add its parent placement.
                             particle_origin={particle_origin.x+origin.x,particle_origin.y+origin.y,particle_origin.z+origin.z};
-                            auto turned=apply_motion_frame(instance,circle_plan.value(),child_settings.value.seed,
+                            if(paths_by_particle[child].size()>1)instance.id=stream_route_identity(instance.id,nodes[route.terminal]->id);
+                            auto turned=apply_motion_frame(instance,circle_plan,child_settings.value.seed,
                                 {particle_origin,birth_position});if(!turned.has_value())return R::failure(turned.error());
-                            if(appearance.authored_birth)instance.id=branch_birth_identity(child_id,nodes[child]->id);
+                            if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[child]->id);
                             retain(std::move(instance), birth);
                         }
+                    }
                     }
                 }
             }
@@ -914,9 +1028,9 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         if (active_particles.empty()) {
             for (const std::size_t index : topological_order) {
                 const auto type = nodes[index]->type_key;
-                if (type == kForceNode || type==kTransformNode || type==kMotionNode) {
+                if (type == kForceNode || type==kTransformNode || type==kMotionNode || type==kTurbulenceNode) {
                     return R::failure(ErrorCode::invalid_request,
-                                      "active Force paths require a connected Particle node");
+                                      "active particle modifier paths require a connected Particle node");
                 }
             }
             return finish_model_output(std::move(result),graph,models,model_indices.value());
@@ -926,11 +1040,6 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             return nodes[left]->id < nodes[right]->id;
         });
         std::size_t branch_count = 0;
-        std::vector<std::size_t> topological_rank(count, count);
-        for (std::size_t rank = 0; rank < topological_order.size(); ++rank) {
-            topological_rank[topological_order[rank]] = rank;
-        }
-
         std::vector<std::uint32_t> emitter_branch_counts(count, 0);
         for (const std::size_t particle_index : active_particles) {
             for (const std::size_t emitter_index : incoming[particle_index]) {
@@ -939,9 +1048,12 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                                       "Particle inputs must connect directly to emitters");
                 }
                 ++emitter_branch_counts[emitter_index];
-                ++branch_count;
+                if(branch_count>65536||paths_by_particle[particle_index].size()>65536-branch_count)
+                    return R::failure(ErrorCode::work_limit_exceeded,"particle stream branch count exceeds its limit");
+                branch_count+=paths_by_particle[particle_index].size();
             }
         }
+        if(branch_count>65536)return R::failure(ErrorCode::work_limit_exceeded,"particle stream branch count exceeds its limit");
 
         // An active Force node may be included in Output's ancestry
         // without being reachable from any Particle stream (for example, a
@@ -956,10 +1068,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                     has_particle_source[index] = has_particle_source[index] || has_particle_source[source];
                 }
             }
-            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key==kTransformNode || nodes[index]->type_key==kMotionNode) &&
+            if ((nodes[index]->type_key == kForceNode || nodes[index]->type_key==kTransformNode || nodes[index]->type_key==kMotionNode || nodes[index]->type_key==kTurbulenceNode) &&
                 !has_particle_source[index]) {
                 return R::failure(ErrorCode::invalid_request,
-                                  "every active Force path must descend from a Particle node");
+                                  "every active particle modifier path must descend from a Particle node");
             }
         }
 
@@ -968,96 +1080,46 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
             ParticleSlotSequence slots;
             std::size_t emitter{0};
             std::size_t particle{0};
-            std::shared_ptr<const TransformBranchPlan> transform;
-            MotionPlan motion;
+            std::size_t route{0};
         };
         const double time_seconds = to_seconds(*normalized);
         std::vector<BranchPlan> branches;
         branches.reserve(branch_count);
         std::vector<std::uint32_t> emitter_branch_indices(count, 0);
-        std::vector<std::uint32_t> visited(count, 0);
-        std::uint64_t traversal_work = 0;
         for (std::size_t particle_branch = 0; particle_branch < active_particles.size(); ++particle_branch) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "particle branch planning cancelled");
             const std::size_t particle_index = active_particles[particle_branch];
             if (incoming[particle_index].empty()) continue;
-            const std::uint32_t visit_id = static_cast<std::uint32_t>(particle_branch + 1);
-            std::vector<std::size_t> stack{particle_index};
-            std::vector<std::size_t> branch_forces;
-            visited[particle_index] = visit_id;
-            while (!stack.empty()) {
-                if (cancellation.is_cancelled()) {
-                    return R::failure(ErrorCode::cancelled, "particle branch traversal cancelled");
-                }
-                if (traversal_work >= kMaxBranchTraversalWork) {
-                    return R::failure(ErrorCode::invalid_request, "graph exceeds the particle-branch evaluation budget");
-                }
-                const std::size_t current = stack.back();
-                stack.pop_back();
-                ++traversal_work;
-                const auto& node = *nodes[current];
-                if (node.type_key == kForceNode) branch_forces.push_back(current);
-
-                for (const std::size_t destination : outgoing[current]) {
-                    if (traversal_work >= kMaxBranchTraversalWork) {
-                        return R::failure(ErrorCode::invalid_request,
-                                          "graph exceeds the particle-branch evaluation budget");
-                    }
-                    ++traversal_work;
-                    if (active[destination] && !emitters[destination] && visited[destination] != visit_id) {
-                        visited[destination] = visit_id;
-                        stack.push_back(destination);
-                    }
-                }
-            }
-            const auto by_dependency = [&topological_rank](std::size_t left, std::size_t right) {
-                return topological_rank[left] < topological_rank[right];
-            };
-            std::sort(branch_forces.begin(), branch_forces.end(), by_dependency);
-            auto planned=transform_plan(particle_index);if(!planned.has_value())return R::failure(planned.error());
-            const auto tf_plan=planned.value();
-            auto circle_plan=motion_plan(particle_index);if(!circle_plan.has_value())return R::failure(circle_plan.error());
-            if(circle_plan.value())branch_forces.erase(std::remove_if(branch_forces.begin(),branch_forces.end(),[&](auto force){
-                return std::find(circle_plan.value()->begin(),circle_plan.value()->end(),nodes[force]->id)!=circle_plan.value()->end();
-            }),branch_forces.end());
-            if(tf_plan)branch_forces.erase(std::remove_if(branch_forces.begin(),branch_forces.end(),[&](auto force) {
-                return std::find(tf_plan->force_nodes.begin(),tf_plan->force_nodes.end(),nodes[force]->id)==tf_plan->force_nodes.end();
-            }),branch_forces.end());
-            std::vector<NodeId> force_ids;for(auto force:branch_forces)force_ids.push_back(nodes[force]->id);
-            // Plan the shared Particle's downstream topology once, then create
-            // independent birth sequences for each direct emitter input.
+            // Each path receives the same deterministic emitter partition.
+            // Fan-out duplicates the stream; it does not divide births again.
             for (const std::size_t emitter : incoming[particle_index]) {
-                Settings branch_settings = emitters[emitter]->value;
-                branch_settings.particle_count = output_particle_count;
-                branch_settings.particle_lifetime_seconds = particles[particle_index]->lifetime_seconds;
-                for (const std::size_t force_index : branch_forces) {
-                    if (cancellation.is_cancelled()) {
-                        return R::failure(ErrorCode::cancelled, "force-chain evaluation cancelled");
-                    }
-                    const auto& force = *forces[force_index];
-                    branch_settings.gravity.x += force.gravity.x;
-                    branch_settings.gravity.y += force.gravity.y;
-                    branch_settings.gravity.z += force.gravity.z;
-                    branch_settings.linear_drag += force.linear_drag;
-                    branch_settings.forces.push_back(motion_for_emitter(force.motion, nodes[emitter]->id));
-                }
-                auto bounded = validate_settings(branch_settings);
-                if (!bounded.notices.empty()) {
-                    return R::failure(ErrorCode::invalid_request,
-                                      "combined force values exceed supported bounds");
-                }
-                if(tf_plan)map_transform_forces(bounded.value,*tf_plan,force_ids,emitters[emitter]->value.gravity);
-
                 const auto& appearance=*particles[particle_index];
                 const auto partition=emitter_branch_indices[emitter]++;
-                const auto slots = live_particle_branch_slots(bounded, time_seconds,
-                    appearance.authored_birth?1:emitter_branch_counts[emitter],appearance.authored_birth?0:partition,
-                    appearance.birth.chance_percent==100);
-                if (!slots.has_value()) return R::failure(slots.error());
-                bounded.value.seed=shifted_particle_seed(bounded.value.seed,appearance.birth.seed_shift);
-                auto sequence=slots.value();if(appearance.birth.chance_percent==0)sequence.count=0;
-                branches.push_back({std::move(bounded), sequence, emitter,
-                                    particle_index,tf_plan,circle_plan.value()});
+                for(const auto route_index:paths_by_particle[particle_index]) {
+                    const auto& route=stream_paths[route_index];
+                    Settings branch_settings = emitters[emitter]->value;
+                    branch_settings.particle_count = output_particle_count;
+                    branch_settings.particle_lifetime_seconds = particles[particle_index]->lifetime_seconds;
+                    std::vector<NodeId> force_ids;force_ids.reserve(route.prefix_forces.size());
+                    for(const std::size_t force_index:route.prefix_forces) {
+                        if(cancellation.is_cancelled())return R::failure(ErrorCode::cancelled,"force-chain evaluation cancelled");
+                        const auto& force=*forces[force_index];
+                        branch_settings.gravity.x+=force.gravity.x;branch_settings.gravity.y+=force.gravity.y;
+                        branch_settings.gravity.z+=force.gravity.z;branch_settings.linear_drag+=force.linear_drag;
+                        branch_settings.forces.push_back(motion_for_emitter(force.motion,nodes[emitter]->id));
+                        force_ids.push_back(nodes[force_index]->id);
+                    }
+                    auto bounded=validate_settings(branch_settings);
+                    if(!bounded.notices.empty())return R::failure(ErrorCode::invalid_request,"combined force values exceed supported bounds");
+                    if(route.transform)map_transform_forces(bounded.value,*route.transform,force_ids,emitters[emitter]->value.gravity);
+                    const auto slots=live_particle_branch_slots(bounded,time_seconds,
+                        appearance.authored_birth?1:emitter_branch_counts[emitter],appearance.authored_birth?0:partition,
+                        appearance.birth.chance_percent==100);
+                    if(!slots.has_value())return R::failure(slots.error());
+                    bounded.value.seed=shifted_particle_seed(bounded.value.seed,appearance.birth.seed_shift);
+                    auto sequence=slots.value();if(appearance.birth.chance_percent==0)sequence.count=0;
+                    branches.push_back({std::move(bounded),sequence,emitter,particle_index,route_index});
+                }
             }
         }
 
@@ -1140,9 +1202,11 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
         for (std::size_t branch = 0; branch < branch_count; ++branch) {
             if (cancellation.is_cancelled()) return R::failure(ErrorCode::cancelled, "graph evaluation cancelled");
             const auto& plan = branches[branch];
+            const auto& route=stream_paths[plan.route];
+            const auto tf_plan=route.transform;
             const auto branch_targets = std::span<const ParticleSlotTarget>(targets).subspan(offsets[branch],
                                                                                             target_counts[branch]);
-            const auto* tf=plan.transform && plan.transform->combined?&*plan.transform->combined:nullptr;
+            const auto* tf=tf_plan && tf_plan->combined?&*tf_plan->combined:nullptr;
             const auto simulated = simulate_selected_particles_into(plan.settings, time_seconds, branch_targets,
                                                                      result.particles, cancellation, dimension_context,tf);
             if (!simulated.has_value()) return R::failure(simulated.error());
@@ -1154,7 +1218,7 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 auto& instance = result.particles[branch_targets[i].destination];
                 instance.emitter_id = nodes[plan.emitter]->id;
                 Vec3 birth_position=tf?tf->position(plan.settings.value.emitter_origin):plan.settings.value.emitter_origin;
-                MotionCircleOrigins motion_origins{plan.motion?
+                MotionCircleOrigins motion_origins{route.motion?
                     simulate_particle_at_age(plan.settings.value,0,instance.id,dimension_context,tf).position:birth_position,birth_position};
                 if(particles[plan.particle]->orient_to==2)
                     birth_position=simulate_particle_at_age(plan.settings.value,0,instance.id,dimension_context,tf).position;
@@ -1172,8 +1236,10 @@ static Result<EvaluatedGraph> evaluate_graph_impl(const Graph& graph, RationalTi
                 // Particle owns all per-life style curves.
                 apply_particle_style(instance, appearance, plan.settings.value.seed);
                 apply_particle_properties(instance,*particles[plan.particle],plan.settings.value.seed,birth_position,tf);
-                if(plan.transform)apply_transform_style(instance,*plan.transform);
-                auto turned=apply_motion_frame(instance,plan.motion,plan.settings.value.seed,motion_origins);if(!turned.has_value())return R::failure(turned.error());
+                if(tf_plan)apply_transform_style(instance,*tf_plan);
+                if(paths_by_particle[plan.particle].size()>1)
+                    instance.id=stream_route_identity(instance.id,nodes[route.terminal]->id);
+                auto turned=apply_motion_frame(instance,route.motion,plan.settings.value.seed,motion_origins);if(!turned.has_value())return R::failure(turned.error());
                 if(appearance.authored_birth)instance.id=branch_birth_identity(instance.id,nodes[plan.particle]->id);
             }
         }

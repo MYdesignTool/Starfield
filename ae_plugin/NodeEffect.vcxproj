@@ -57,8 +57,13 @@
     <NodeKindDefine>STARFIELD_NODE_KIND_MOTION</NodeKindDefine>
     <NodeOutFlags>STARFIELD_TRANSFORM_OUT_FLAGS</NodeOutFlags>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(NodeKind)'=='Turbulence'">
+    <TargetName>StarfieldTurbulence</TargetName><NodePiPL>NodeTurbulencePiPL.r</NodePiPL>
+    <NodeOutFlags>STARFIELD_TRANSFORM_OUT_FLAGS</NodeOutFlags>
+    <NodeKindDefine>STARFIELD_NODE_KIND_TURBULENCE</NodeKindDefine>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(NodePiPL)'==''">
-    <NodeKindError>NodeKind must be Emitter, Particle, Force, Transform, Model, Material, or Motion.</NodeKindError>
+    <NodeKindError>NodeKind must be Emitter, Particle, Force, Transform, Model, Material, Motion, or Turbulence.</NodeKindError>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -78,6 +83,7 @@
     <ClCompile Include="ParticleShapeUI.cpp" />
     <ClCompile Include="ParticleShapePicker.cpp" />
     <ClCompile Include="ParticleGradientUI.cpp" />
+    <ClCompile Include="MotionPrefixUI.cpp" />
     <ClCompile Include="EditorPresetPicker.cpp" />
     <ClCompile Include="GpuRender.cpp" />
     <ClCompile Include="NodeGraphSync.cpp" />

@@ -108,6 +108,32 @@ void graph(){auto g=ordered();auto r=evaluate(g);auto prefix=base();ParticleTran
     Sampler accepted(zero_force);same(evaluate(basic),temporal(accepted));
 }
 GraphNode force(unsigned id,Vec3 gravity,double drag=0,Vec3 wind={},double spin=0){return {nid(id),kForceNode,3,{{kGravity,gravity},{kLinearDrag,drag},{kWind,wind},{kSpin,spin},{kSpinFrequency,1.},{kSpinResist,0.},{kSpinDelay,0.}}};}
+void independent_output_routes(){
+    const Vec3 gravity{0,.3,0};auto single=base();attach(single,force(4,gravity));attach(single,circle(3));
+    auto plain=base(),split=base();attach(split,circle(3));
+    split.nodes.push_back(force(4,gravity));
+    for(auto& edge:split.edges)if(edge.source_node==nid(2)&&edge.destination_node==nid(3)) {
+        edge.destination_node=nid(4);edge.destination_port=kForceParticlesIn;
+    }
+    split.edges.push_back({eid(50),nid(4),kForceParticlesOut,nid(3),kMotionParticlesIn});
+    split.edges.push_back({eid(51),nid(2),kParticleParticlesOut,nid(255),kOutputParticles});
+    const auto expected_plain=evaluate(plain),expected_motion=evaluate(single),combined=evaluate(split);
+    check(combined.particles.size()==expected_plain.particles.size()+expected_motion.particles.size(),"Output merges independent particle routes");
+    for(const auto& source:expected_plain.particles){std::vector<const ParticleInstance*> matches;
+        for(const auto& p:combined.particles)if(p.age_seconds==source.age_seconds)matches.push_back(&p);
+        check(matches.size()==2,"one plain and one modified particle per source birth");
+        bool saw_plain{},saw_modified{};
+        for(const auto* p:matches){if(p->position.x==source.position.x&&p->position.y==source.position.y&&p->position.z==source.position.z&&
+                p->velocity.x==source.velocity.x&&p->velocity.y==source.velocity.y&&p->velocity.z==source.velocity.z)saw_plain=true;
+            for(const auto& motion:expected_motion.particles)if(motion.age_seconds==p->age_seconds&&motion.position.x==p->position.x&&
+                motion.position.y==p->position.y&&motion.position.z==p->position.z&&motion.velocity.x==p->velocity.x&&
+                motion.velocity.y==p->velocity.y&&motion.velocity.z==p->velocity.z)saw_modified=true;}
+        check(saw_plain&&saw_modified,"Force and Motion stay isolated to their connected branch");
+    }
+    Sampler history(split);same(combined,temporal(history));
+    auto reordered=split;std::reverse(reordered.nodes.begin(),reordered.nodes.end());std::reverse(reordered.edges.begin(),reordered.edges.end());
+    same(combined,evaluate(reordered));Sampler reordered_history(reordered);same(combined,temporal(reordered_history));
+}
 void ordered_forces(){
     auto control=base();set(node(control,1),kBirthRate,1.);set(node(control,1),kEmittingMode,std::uint32_t{1});
     auto moved=control;attach(moved,circle(3));const Vec3 gravity{.3,-.2,.1},wind{.1,.05,-.02};
@@ -206,4 +232,4 @@ void failures(){auto g=ordered();attach(g,force(10,{.02,-.01,.005},.2,{.03,0,0},
     check(original==take(serialize_graph(g,particle_node_registry())),"failure leaves source graph unchanged");const auto reference=take(encode_evaluated_particles(evaluate(g),{1,1}));std::atomic<bool> okay{true};std::thread jobs[4];for(auto& job:jobs)job=std::thread([&]{for(unsigned n=0;n<10;++n){auto r=evaluate_particle_graph(g,{1,1},never);if(!r.has_value()){okay=false;return;}auto bytes=encode_evaluated_particles(r.value(),{1,1});if(!bytes.has_value()||bytes.value()!=reference)okay=false;}});for(auto& job:jobs)job.join();check(okay,"concurrent independent graph requests");
 }
 }
-int main()try{primitive();graph();ordered_forces();snapshots();rendering();auxiliary();failures();std::printf("motion_frame_tests: %u checks passed; ordered numeric Motion/Transform/Force and snapshot10; AE qualification remains open\n",checks);return 0;}catch(const std::exception& e){std::fprintf(stderr,"Motion frame after %u checks: %s\n",checks,e.what());return 1;}
+int main()try{primitive();graph();independent_output_routes();ordered_forces();snapshots();rendering();auxiliary();failures();std::printf("motion_frame_tests: %u checks passed; ordered numeric Motion/Transform/Force and snapshot10; AE qualification remains open\n",checks);return 0;}catch(const std::exception& e){std::fprintf(stderr,"Motion frame after %u checks: %s\n",checks,e.what());return 1;}

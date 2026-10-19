@@ -1,9 +1,10 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 
 var assert = require("assert");
-var edits = require("../cep_panel/js/graph_edits.js");
-var view = require("../cep_panel/js/graph_view.js");
-var codec = require("../cep_panel/js/graph_codec.js");
+var edits = require(panelPath("js/graph_edits.js"));
+var view = require(panelPath("js/graph_view.js"));
+var codec = require(panelPath("js/graph_codec.js"));
 
 function uuid(n) { return ("00000000000000000000000000000000" + n.toString(16)).slice(-32); }
 function graph() {
@@ -70,9 +71,11 @@ assert.deepStrictEqual(particle.params.filter(function (parameter) {
     ["Size Random", 0, 100], ["Opacity Random", 0, 100]
 ], "Particle nodes project optional variation controls with zero defaults");
 assert.strictEqual(particle.curves.size.custom, true);
-assert.deepStrictEqual(particle.curves.size.points, [
+var expectedCurve = [
     { age: 0, value: 100 }, { age: 0.4, value: 60 }, { age: 1, value: 20 }
-]);
+];
+expectedCurve.interpolation = 0;
+assert.deepStrictEqual(particle.curves.size.points, expectedCurve);
 assert.strictEqual(output.maxParticles, 6400);
 assert.strictEqual(output.params[0].graphNodeId, source.nodes[2].id,
                    "Output Max Particles control belongs to the logical Output node");

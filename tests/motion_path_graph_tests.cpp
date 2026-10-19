@@ -1,12 +1,14 @@
 #include "starfield/core/GraphEvaluation.hpp"
 #include "starfield/core/MotionPathPoints.hpp"
 #include "starfield/core/MotionPathTravel.hpp"
+#include "starfield/core/MotionLightPathResource.hpp"
 #include "starfield/core/ParticleMotionPose.hpp"
 #include "starfield/core/AgeCurve.hpp"
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SpriteScene.hpp"
 #include "starfield/core/MotionBlur.hpp"
 #include "starfield/core/SequenceCodec.hpp"
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -35,12 +37,26 @@ NodeId nid(unsigned n){NodeId id;id.value.bytes[14]=std::uint8_t(n>>8);id.value.
 EdgeId eid(unsigned n){EdgeId id;id.value.bytes[14]=std::uint8_t(n>>8);id.value.bytes[15]=std::uint8_t(n);return id;}
 GraphNode& node(Graph& g,unsigned id){for(auto& n:g.nodes)if(n.id==nid(id))return n;throw std::runtime_error("node missing");}
 void set(GraphNode& n,ParameterKey key,ParameterValue v){for(auto& p:n.parameters)if(p.key==key){p.value=std::move(v);return;}n.parameters.push_back({key,std::move(v)});}
+bool has(const GraphNode& n,ParameterKey key){for(const auto& p:n.parameters)if(p.key==key)return true;return false;}
 OpaqueBytes points(std::initializer_list<Vec3> values){return take(encode_motion_path_points({values.begin(),values.size()},never));}
 Graph base(){Settings s;s.birth_rate=2;s.particle_count=100;s.particle_lifetime_seconds=3;s.emission_speed=0;
     s.velocity={.1,-.2,.05};s.velocity_spread=0;s.emitter_origin={.25,.1,-.1};s.particle_size=6;s.opacity=.8;
     return take(make_emitter_particle_output_graph(s,nid(1),nid(2),nid(255),eid(1),eid(2)));}
 GraphNode path(unsigned id=3,double speed=.4){return {nid(id),kMotionNode,1,{{kMotionMode,std::uint32_t{0}},
     {kMotionPathPoints,points({{5,7,9},{5,17,9}})},{kMotionPathSpeed,speed}}};}
+MotionLightPathResource light_resource(bool second=false) {
+    MotionLightPathResource r;
+    r.tracks.push_back({11,{{{0,1},{0,0,0}},{{1,1},{10,0,0}}},0});r.sample_count=2;
+    if(second){r.tracks.push_back({12,{{{0,1},{0,0,0}},{{2,1},{0,20,0}}},0});r.sample_count+=2;}
+    return r;
+}
+GraphNode light_path(unsigned id=3,MotionLightPathResource resource=light_resource(),double speed=100,
+    double delay=.5,MotionPathEndBehavior end=MotionPathEndBehavior::stop,bool orient=false) {
+    auto packet=take(encode_motion_light_path_resource(resource,never));
+    return {nid(id),kMotionNode,1,{{kMotionMode,std::uint32_t{0}},{kMotionPathLightResource,std::move(packet)},
+        {kMotionPathSpeedPercent,speed},{kMotionPathDelay,delay},{kMotionPathEndBehavior,std::uint32_t(end)},
+        {kMotionPathOrient,std::uint32_t(orient?1:0)},{kMotionForward,Vec3{1,0,0}}}};
+}
 void attach(Graph& g,GraphNode n){const auto id=n.id;for(auto& e:g.edges)if(e.destination_node==nid(255)){e.destination_node=id;e.destination_port=kMotionParticlesIn;}
     g.nodes.push_back(std::move(n));g.edges.push_back({eid(unsigned(g.edges.size()+10)),id,kMotionParticlesOut,nid(255),kOutputParticles});}
 EvaluatedGraph evaluate(const Graph& g,RationalTime t={1,1}){return take(evaluate_particle_graph(g,t,never));}
@@ -100,6 +116,71 @@ void graph(){auto plain=base(),g=plain;attach(g,path());auto old=evaluate(plain)
     Sampler reversed(g);auto later=temporal(reversed,{3,2});same(later,evaluate(g,{3,2}));same(r,temporal(reversed,{1,1}));
     check(r.particles.front().position.y-old.particles.front().position.y>.12&&r.particles.front().position.y-old.particles.front().position.y<.4,"stable random attenuation");
     const auto record=take(encode_evaluated_particles(r,{1,1}));same(r,take(decode_evaluated_particles(record,{1,1})));
+}
+void fan_out_paths(){
+    auto g=base();attach(g,path(3,.4));g.nodes.push_back(path(4,.8));
+    g.edges.push_back({eid(30),nid(2),kParticleParticlesOut,nid(4),kMotionParticlesIn});
+    g.edges.push_back({eid(31),nid(4),kMotionParticlesOut,nid(255),kOutputParticles});
+    check(validate_graph(g,particle_node_registry()).ok(),"independent Output paths validate");
+    const auto source=evaluate(base()),value=evaluate(g);
+    check(value.particles.size()==source.particles.size()*2,"fan-out duplicates the particle stream per Output path");
+    for(const auto& particle:source.particles){
+        std::vector<const ParticleInstance*> matches;
+        for(const auto& output:value.particles)if(output.age_seconds==particle.age_seconds)matches.push_back(&output);
+        check(matches.size()==2,"each source particle appears once on each path");
+        check(matches[0]->id!=matches[1]->id,"fan-out identities are path scoped");
+        const double first=matches[0]->position.y-particle.position.y;
+        const double second=matches[1]->position.y-particle.position.y;
+        check((std::abs(first-.4*particle.age_seconds)<1e-9&&std::abs(second-.8*particle.age_seconds)<1e-9)||
+              (std::abs(first-.8*particle.age_seconds)<1e-9&&std::abs(second-.4*particle.age_seconds)<1e-9),
+              "each output path applies only its own Motion");
+    }
+    Sampler history(g);same(value,temporal(history));
+    auto shuffled=g;std::reverse(shuffled.nodes.begin(),shuffled.nodes.end());std::reverse(shuffled.edges.begin(),shuffled.edges.end());
+    const auto shuffled_value=evaluate(shuffled);same(value,shuffled_value);Sampler shuffled_history(shuffled);same(value,temporal(shuffled_history));
+}
+void light_resource_graph(){
+    auto g=base();const auto plain=evaluate(g);attach(g,light_path(3,light_resource(true)));
+    auto r=evaluate(g);check(r.particles.size()==plain.particles.size(),"resource population retained");
+    for(std::size_t i=0;i<r.particles.size();++i){const auto age=plain.particles[i].age_seconds;const auto elapsed=std::clamp(age-.5,0.,1e6);
+        const auto x=std::min(elapsed,1.)*10,y=std::min(elapsed,2.)*10;
+        near(r.particles[i].position,Vec3{plain.particles[i].position.x+x,plain.particles[i].position.y+y,plain.particles[i].position.z},"independent source displacement");
+        const auto vx=age>=.5&&elapsed<1?10.:0.,vy=age>=.5&&elapsed<2?10.:0.;
+        near(r.particles[i].velocity,Vec3{plain.particles[i].velocity.x+vx,plain.particles[i].velocity.y+vy,plain.particles[i].velocity.z},"independent source velocity");}
+    auto restored=take(deserialize_graph(take(serialize_graph(g,particle_node_registry())),particle_node_registry()));
+    check(has(node(g,3),kMotionPathLightResource),"resource key present before history");
+    same(r,evaluate(restored));check(has(node(restored,3),kMotionPathLightResource),"resource key survives graph codec");
+    Sampler sampler(g);same(r,temporal(sampler));
+    Sampler varying_speed(g);varying_speed.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode)
+        set(n,kMotionPathSpeedPercent,100+200*(t-.5));};
+    auto animated=temporal(varying_speed,{1,1});
+    for(std::size_t i=0;i<animated.particles.size();++i){const auto& particle=animated.particles[i];const auto birth=1-particle.age_seconds;
+        const auto start=birth+.5,dt=std::max(0.,1-start),mid=(start+1)/2;
+        const auto elapsed=dt>0?(100+200*(mid-.5))/100*dt:0;
+        near(particle.position.x,evaluate(base(),{1,1}).particles[i].position.x+std::min(elapsed,1.)*10,"historical animated Speed integral",1e-8);
+        const auto velocity=particle.age_seconds>=.5&&elapsed<1?20.:0.;
+        near(particle.velocity.x,evaluate(base(),{1,1}).particles[i].velocity.x+velocity,"historical animated Speed endpoint rate",1e-8);}
+    Sampler moving_resource(g);moving_resource.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode) {
+        auto resource=light_resource();resource.tracks[0].samples[1].position.x=10*(1+t);
+        set(n,kMotionPathLightResource,take(encode_motion_light_path_resource(resource,never)));}};
+    auto moving=temporal(moving_resource,{1,1});
+    near(moving.particles.front().position.x,evaluate(base(),{1,1}).particles.front().position.x+10,"historical moving source snapshot position");
+    near(moving.particles.front().velocity.x,evaluate(base(),{1,1}).particles.front().velocity.x+25,"historical moving source snapshot velocity",1e-7);
+    auto orient=g;set(node(orient,3),kMotionPathOrient,std::uint32_t{1});auto turned=evaluate(orient);
+    const auto& p=turned.particles.front();auto forward=take(particle_motion_forward(p,{1,0,0},turned.sprite_bases));
+    near(forward,Vec3{1/std::sqrt(2.),1/std::sqrt(2.),0},"multi-source orientation follows summed velocity",1e-8);
+    auto stopped=base();attach(stopped,light_path(3,light_resource(),100,0,MotionPathEndBehavior::stop));
+    auto stop_result=evaluate(stopped,{2,1});const auto stop_base=evaluate(base(),{2,1});
+    near(stop_result.particles.front().position,Vec3{stop_base.particles.front().position.x+10,stop_base.particles.front().position.y,stop_base.particles.front().position.z},"stop holds last key");
+    near(stop_result.particles.front().velocity,stop_base.particles.front().velocity,"stop velocity zero after key");
+    auto continued=base();attach(continued,light_path(3,light_resource(),100,0,MotionPathEndBehavior::continue_direction));
+    auto continue_result=evaluate(continued,{2,1});const auto continue_base=evaluate(base(),{2,1});
+    near(continue_result.particles.front().position.x,continue_base.particles.front().position.x+20,"continue follows terminal velocity");
+    near(continue_result.particles.front().velocity.x,continue_base.particles.front().velocity.x+10,"continue keeps terminal velocity");
+    auto bad=g;set(node(bad,3),kMotionPathLightResource,OpaqueBytes{std::byte{1}});
+    check(!evaluate_particle_graph(bad,{1,1},never).has_value(),"malformed resource rejected");
+    auto parked=base();parked.nodes.push_back(light_path(3));set(node(parked,3),kMotionPathLightResource,OpaqueBytes{std::byte{1}});
+    check(!evaluate_particle_graph(parked,{1,1},never).has_value(),"parked malformed resource rejected");
 }
 void history(){auto g=base();attach(g,path());Sampler s(g);s.change=[](GraphNode& n,double t){if(n.type_key==kMotionNode)set(n,kMotionPathSpeed,.2+.3*t);};
     auto r=temporal(s),plain=evaluate(base());for(unsigned i=0;i<r.particles.size();++i){const double age=plain.particles[i].age_seconds,birth=1-age;
@@ -243,5 +324,5 @@ void failures(){auto g=base();attach(g,path());const auto original=take(serializ
     for(auto& t:threads)t.join();check(good,"concurrent requests deterministic");
 }
 }
-int main()try{packet();graph();history();animated_geometry();orientation();auxiliary();rendering();failures();std::printf("motion_path_graph_tests: %u checks passed; explicit numeric path/history, no AE/reference qualification\n",checks);return 0;}
+int main()try{packet();graph();fan_out_paths();light_resource_graph();history();animated_geometry();orientation();auxiliary();rendering();failures();std::printf("motion_path_graph_tests: %u checks passed; numeric Light Path resource, legacy path/history, no AE/reference qualification\n",checks);return 0;}
 catch(const std::exception& e){std::fprintf(stderr,"motion_path_graph_tests after %u checks: %s\n",checks,e.what());return 1;}

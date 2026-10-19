@@ -10,7 +10,7 @@ param(
     [switch]$RenderJournal,
     [string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'),
     [string]$NvrtcPath = 'artifacts\gpu-build\nvrtc-12.4.127\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll',
-    [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
+    [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +37,47 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
 }
 Import-Module Microsoft.PowerShell.Utility
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$previousBuildEnvironment = @{}
+Get-ChildItem Env: | ForEach-Object { $previousBuildEnvironment[$_.Name] = $_.Value }
+$taskBuildToolsRoot = [IO.Path]::GetFullPath($MSBuildPath)
+while ($taskBuildToolsRoot -and -not (Test-Path -LiteralPath (Join-Path $taskBuildToolsRoot 'VC\Auxiliary\Build\vcvars64.bat'))) {
+    $taskBuildToolsRoot = Split-Path -Parent $taskBuildToolsRoot
+}
+$taskVcVars = if ($taskBuildToolsRoot) { Join-Path $taskBuildToolsRoot 'VC\Auxiliary\Build\vcvars64.bat' } else { '' }
+if (Test-Path -LiteralPath $taskVcVars) {
+    # Prefer the selected toolset's compiler/linker and helper paths. This does
+    # not repair an on-disk version skew between its VC and Common7\IDE binaries.
+    $taskVcEnvironment = & $env:ComSpec /d /c "call `"$taskVcVars`" >nul && set"
+    if ($LASTEXITCODE -ne 0) { throw "Could not initialize the selected MSVC environment: $taskVcVars" }
+    foreach ($taskEntry in $taskVcEnvironment) {
+        $taskEquals = $taskEntry.IndexOf('=')
+        if ($taskEquals -gt 0) {
+            $taskName = $taskEntry.Substring(0,$taskEquals)
+            Set-Item -Path "Env:$taskName" -Value $taskEntry.Substring($taskEquals+1)
+        }
+    }
+}
+if ($env:VCToolsInstallDir) {
+    # Keep the selected toolset's linker, PDB manager, and PDB server together.
+    # Some VS images put an older Common7\IDE MSPDB140.dll earlier on PATH,
+    # which makes link.exe fail with LNK1101 despite a complete matching copy
+    # beside the selected toolset binaries.
+    $taskMsvcBin = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64'
+    $taskLink = Join-Path $taskMsvcBin 'link.exe'
+    $taskMspdb = Join-Path $taskMsvcBin 'mspdb140.dll'
+    $taskMspdbCore = Join-Path $taskMsvcBin 'mspdbcore.dll'
+    $taskMspdbServer = Join-Path $taskMsvcBin 'mspdbsrv.exe'
+    if ((Test-Path -LiteralPath $taskLink) -and (Test-Path -LiteralPath $taskMspdb) -and
+        (Test-Path -LiteralPath $taskMspdbCore) -and (Test-Path -LiteralPath $taskMspdbServer)) {
+        $taskLinkVersion = (Get-Item -LiteralPath $taskLink).VersionInfo.FileVersion
+        foreach ($taskPdbComponent in @($taskMspdb,$taskMspdbCore,$taskMspdbServer)) {
+            if ((Get-Item -LiteralPath $taskPdbComponent).VersionInfo.FileVersion -ne $taskLinkVersion) {
+                throw "Selected MSVC PDB components do not match link.exe: $taskPdbComponent"
+            }
+        }
+        $env:PATH = $taskMsvcBin + ';' + $env:PATH
+    }
+}
 $taskSourceVersion=[regex]::Match([IO.File]::ReadAllText((Join-Path $repositoryRoot 'ae_plugin/PluginVersion.h')),'#define STARFIELD_VERSION_BUILD\s+(\d+)')
 if(-not $taskSourceVersion.Success){throw 'Native build version is unavailable.'}
 $taskSourceNativeBuild=[int]$taskSourceVersion.Groups[1].Value
@@ -82,8 +123,9 @@ $adapterInputs = @(
     'include\starfield\core\ParticleBirth.hpp',
     'ae_plugin\CoreLoader.cpp', 'ae_plugin\CoreLoader.hpp',
     'ae_plugin\Camera.cpp', 'ae_plugin\LightCapture.hpp', 'ae_plugin\LightCapture.cpp', 'ae_plugin\Camera.hpp',
-    'ae_plugin\MotionPointCapture.cpp', 'ae_plugin\MotionPointCapture.hpp',
+    'ae_plugin\MotionPointCapture.cpp', 'ae_plugin\MotionPointCapture.hpp', 'ae_plugin\MotionAuthorTransaction.hpp',
     'ae_plugin\MotionLightSources.cpp', 'ae_plugin\MotionLightSources.hpp',
+    'ae_plugin\MotionLookAtCapture.cpp', 'ae_plugin\MotionLookAtCapture.hpp',
     'ae_plugin\MotionLightTiming.cpp', 'ae_plugin\MotionLightTiming.hpp',
     'ae_plugin\MotionBlur.cpp', 'ae_plugin\MotionBlur.hpp', 'include\starfield\core\MotionBlur.hpp',
     'ae_plugin\Diagnostics.cpp', 'ae_plugin\Diagnostics.hpp',
@@ -123,13 +165,14 @@ $adapterInputs = @(
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',
     'ae_plugin\NodeModelPiPL.r', 'ae_plugin\NodeMaterialPiPL.r', 'ae_plugin\MaterialLayout.hpp', 'ae_plugin\NodeMotionPiPL.r',
+    'ae_plugin\TurbulenceLayout.hpp', 'ae_plugin\NodeTurbulencePiPL.r',
     'include\starfield\core\AgeCurve.hpp',
     'include\starfield\core\Error.hpp', 'include\starfield\core\Geometry.hpp',
     'include\starfield\core\Graph.hpp', 'include\starfield\core\GraphEvaluation.hpp',
     'include\starfield\core\EmitterHistory.hpp',
     'include\starfield\core\EmissionTimeline.hpp',
     'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp', 'src\core\TransformEvaluation.hpp',
-    'include\starfield\core\ParticleSimulation.hpp',
+    'include\starfield\core\ParticleSimulation.hpp', 'src\core\TurbulenceEvaluation.hpp',
     'include\starfield\core\ParticleTransform.hpp',
     'include\starfield\core\ParticleCloud.hpp',
     'include\starfield\core\Random.hpp',
@@ -139,16 +182,19 @@ $adapterInputs = @(
     'schema\node-parameters.json',
     'src\core\Geometry.cpp', 'src\core\Graph.cpp',
     'src\core\GraphConstruction.cpp', 'src\core\Render.cpp',
-    'src\core\GraphEvaluation.cpp', 'src\core\EmitterHistory.cpp',
+    'src\core\GraphEvaluation.cpp', 'src\core\TurbulenceNoise.cpp', 'src\core\EmitterHistory.cpp',
     'src\core\ModelEvaluation.hpp',
     'include\starfield\core\MotionCircle.hpp', 'include\starfield\core\MotionGeometry.hpp',
     'include\starfield\core\ParticleMotionPose.hpp',
     'include\starfield\core\ParticleMotionFrame.hpp',
     'include\starfield\core\MotionCurveClock.hpp', 'include\starfield\core\MotionPathTravel.hpp',
     'include\starfield\core\MotionLightPathClock.hpp',
+    'include\starfield\core\MotionLightPathResource.hpp',
+    'include\starfield\core\MotionLookAtTargets.hpp',
     'include\starfield\core\MotionPathPoints.hpp',
     'src\core\MotionPathTravel.cpp',
     'src\core\MotionLightPathClock.cpp',
+    'src\core\MotionLightPathResource.cpp',
     'src\core\MotionEvaluation.hpp', 'src\core\OrderedForce.hpp',
     'ae_plugin\ModelGeometryParameter.cpp', 'ae_plugin\ModelGeometryParameter.hpp',
     'ae_plugin\ModelMirrorParameter.cpp', 'ae_plugin\ModelMirrorParameter.hpp',
@@ -197,14 +243,23 @@ if ($CoreOnly) {
     }
 }
 
+$drive = $repositoryRoot
+$mappedBuildDrive = $false
 $driveLetter = @('Z', 'Y', 'X', 'W', 'V') |
     Where-Object { -not (Test-Path -LiteralPath "$_`:\") } |
     Select-Object -First 1
-if (-not $driveLetter) { throw 'No free drive letter is available for the temporary build path.' }
-
-$drive = "${driveLetter}:"
-& $env:ComSpec /d /c "subst $drive `"$repositoryRoot`""
-if ($LASTEXITCODE -ne 0) { throw "Could not map repository to $drive" }
+if ($driveLetter) {
+    $candidateDrive = "${driveLetter}:"
+    & "$env:SystemRoot\System32\subst.exe" $candidateDrive $repositoryRoot
+    if ($LASTEXITCODE -eq 0) {
+        $drive = $candidateDrive
+        $mappedBuildDrive = $true
+    } else {
+        Write-Warning 'Temporary build drive mapping is unavailable; using the repository path directly.'
+    }
+} else {
+    Write-Warning 'No temporary build drive is available; using the repository path directly.'
+}
 try {
     $aliasSdkPath = Join-Path $drive $SdkPath
     $projectPath = Join-Path $drive 'ae_plugin\Starfield.vcxproj'
@@ -215,12 +270,12 @@ try {
         $artifactRoot = Join-Path $drive "artifacts\plugin\$ArtifactLabel"
         $outputDir = Join-Path $artifactRoot "$Platform\$Configuration"
         $intermediateDir = Join-Path $artifactRoot "obj\$Platform\$Configuration"
-        $arguments += "/p:OutDir=$outputDir\"
-        $arguments += "/p:IntDir=$intermediateDir\"
+        $arguments += "/p:OutDir=$outputDir/"
+        $arguments += "/p:IntDir=$intermediateDir/"
         $coreOutputDir = Join-Path $drive "artifacts\core-dll\$ArtifactLabel\$Platform\$Configuration"
         $coreIntermediateDir = Join-Path $drive "artifacts\core-dll\$ArtifactLabel\obj\$Platform\$Configuration"
-        $coreArguments += "/p:OutDir=$coreOutputDir\"
-        $coreArguments += "/p:IntDir=$coreIntermediateDir\"
+        $coreArguments += "/p:OutDir=$coreOutputDir/"
+        $coreArguments += "/p:IntDir=$coreIntermediateDir/"
     }
     $coreArguments += '/v:minimal'
     & $MSBuildPath @coreArguments
@@ -238,13 +293,14 @@ try {
     if($IncludeModelCandidate -or $taskSourceNativeBuild -ge 61){$taskNodeKinds+='Model'}
     if($taskSourceNativeBuild -ge 70){$taskNodeKinds+='Material'}
     if($taskSourceNativeBuild -ge 72){$taskNodeKinds+='Motion'}
+    if($taskSourceNativeBuild -ge 81){$taskNodeKinds+='Turbulence'}
     foreach ($nodeKind in $taskNodeKinds) {
         $nodeOutputDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\$Platform\$Configuration"
         $nodeIntermediateDir = Join-Path $drive "artifacts\plugin\$ArtifactLabel\obj\$Platform\$Configuration\node-$nodeKind"
         $nodeArguments = @(
             (Join-Path $drive 'ae_plugin\NodeEffect.vcxproj'), '/t:Build', '/m',
             "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:NodeKind=$nodeKind",
-            "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath", "/p:OutDir=$nodeOutputDir\", "/p:IntDir=$nodeIntermediateDir\",
+            "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath", "/p:OutDir=$nodeOutputDir/", "/p:IntDir=$nodeIntermediateDir/",
             '/v:minimal'
         )
         & $MSBuildPath @nodeArguments
@@ -252,7 +308,7 @@ try {
     }
     $hostArguments = @((Join-Path $drive 'ae_plugin\StarfieldHost.vcxproj'), '/t:Build', '/m',
         "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath",
-        "/p:OutDir=$outputDir\", "/p:IntDir=$intermediateDir\host\", '/v:minimal')
+        "/p:OutDir=$outputDir/", "/p:IntDir=$intermediateDir/host/", '/v:minimal')
     & $MSBuildPath @hostArguments
     if ($LASTEXITCODE -ne 0) { throw "General AEGP MSBuild failed with exit code $LASTEXITCODE" }
     [IO.File]::WriteAllText($fingerprintPath, $adapterFingerprint, [Text.Encoding]::ASCII)
@@ -340,5 +396,9 @@ try {
     }
 }
 finally {
-    & $env:ComSpec /d /c "subst $drive /d" | Out-Null
+    if ($mappedBuildDrive) { & "$env:SystemRoot\System32\subst.exe" $drive /d | Out-Null }
+    foreach ($taskEntry in Get-ChildItem Env:) {
+        if (-not $previousBuildEnvironment.ContainsKey($taskEntry.Name)) { Remove-Item -LiteralPath "Env:$($taskEntry.Name)" }
+    }
+    foreach ($taskName in $previousBuildEnvironment.Keys) { Set-Item -Path "Env:$taskName" -Value $previousBuildEnvironment[$taskName] }
 }

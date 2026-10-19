@@ -19,6 +19,7 @@
  *   PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG = 1 << 3 (0x00000008)
  *   PF_OutFlag2_SUPPORTS_GPU_RENDER_F32 = 1 << 25 (0x02000000)
  *   PF_OutFlag2_I_MIX_GUID_DEPENDENCIES = 1 << 21 (0x00200000)
+ *   PF_OutFlag2_I_USE_3D_LIGHTS = 1 << 2 (0x00000004)
  *
  * The group-collapsed flag is required for the topic layout: without it AE collapses
  * every parameter group, and with it each topic honours PF_ParamFlag_START_COLLAPSED,
@@ -29,6 +30,6 @@
 /* Birth-position sampling checks out historical parameters. SmartFX tracks
  * those dependencies automatically; optional prefixes require matching all-time states. */
 #define STARFIELD_OUT_FLAGS 0x06088466L  /* shutter dependencies and implemented UPDATE_PARAMS_UI */
-#define STARFIELD_OUT_FLAGS2 0x0222148AL /* includes native GPU F32 capability; accepted per-device/per-frame */
+#define STARFIELD_OUT_FLAGS2 0x0222148EL /* light/camera dependencies, GUID mixing, and native GPU F32 capability */
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

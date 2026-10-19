@@ -1,4 +1,5 @@
 #include "MotionBlur.hpp"
+#include "UiExclusionClient.hpp"
 #include "Camera.hpp"
 #include "GraphCarrier.hpp"
 #include "EmitterHistory.hpp"
@@ -14,7 +15,10 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <map>
+#include <memory>
 #include <new>
+#include <string>
 
 namespace starfield::adapter {
 namespace {
@@ -97,6 +101,7 @@ PF_Err append_motion_parameters(PF_InData* in,PF_OutData*) noexcept {
     group={};group.param_type=PF_Param_GROUP_END;group.uu.id=1649;return PF_ADD_PARAM(in,-1,&group);
 }
 PF_Err update_motion_ui(PF_InData* data,PF_ParamDef* params[]) noexcept {
+    if(ui_transaction_active())return PF_Err_NONE;
     if(!data || !data->pica_basicP || !params || !params[kMotionParameterIds[0]] || !params[kMotionParameterIds[3]])return PF_Err_BAD_CALLBACK_PARAM;
     const PF_ParamUtilsSuite3* suite{};
     auto error=data->pica_basicP->AcquireSuite(kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3,reinterpret_cast<const void**>(&suite));
@@ -112,10 +117,13 @@ PF_Err update_motion_ui(PF_InData* data,PF_ParamDef* params[]) noexcept {
     data->pica_basicP->ReleaseSuite(kPFParamUtilsSuite,kPFParamUtilsSuiteVersion3);return static_cast<PF_Err>(error);
 }
 PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph& graph,
-    A_long width,A_long height,const core::Cancellation& cancel,MotionExposure& exposure) noexcept try {
+    core::LayerUnits units,const core::Cancellation& cancel,MotionExposure& exposure) noexcept try {
     if(!data || !data->time_scale)return PF_Err_BAD_CALLBACK_PARAM;
-    width=std::max<A_long>(1,width>0?width:data->width);
-    height=std::max<A_long>(1,height>0?height:data->height);
+    if(!std::isfinite(units.layer_width)||!std::isfinite(units.layer_height)||
+       !std::isfinite(units.pixel_aspect_ratio)||units.layer_width<=0||units.layer_height<=0||units.pixel_aspect_ratio<=0)
+        return PF_Err_BAD_CALLBACK_PARAM;
+    const A_long width=static_cast<A_long>(std::clamp(std::round(units.layer_width),1.0,double(std::numeric_limits<A_long>::max())));
+    const A_long height=static_cast<A_long>(std::clamp(std::round(units.layer_height),1.0,double(std::numeric_limits<A_long>::max())));
     exposure={};exposure.values=kMotionDefaults;std::uint32_t limit=1000000;
     for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kOutputNode)
         for(const auto& p:node.parameters) {
@@ -132,6 +140,14 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
     if(!std::isfinite(start) || !std::isfinite(duration))return PF_Err_BAD_CALLBACK_PARAM;
     exposure.gain=1+v[6]/100;
     bool linear=v[3]==0;
+    bool has_look_at=false;
+    for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kMotionNode) {
+        for(const auto& p:node.parameters)if(p.key==core::graph_keys::kMotionMode)
+            if(const auto* mode=std::get_if<std::uint32_t>(&p.value);mode && *mode==2)has_look_at=true;
+    }
+    // Look At chooses the nearest moving light independently at each exposure
+    // sample. Interpolating endpoint particle poses can choose the wrong light.
+    if(has_look_at)linear=false;
     // An endpoint approximation can miss a particle whose entire life is inside
     // the exposure. Use exact samples for known short-life graphs.
     for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kParticleNode) {
@@ -150,8 +166,21 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
         capture_times.resize(2);
         if(!host_time(start,capture_times[0]) || !host_time(start+duration,capture_times[1]))return PF_Err_BAD_CALLBACK_PARAM;
     }
+    std::vector<MotionLookAtTargetResources> sample_resources;
+    std::vector<core::OpaqueBytes> sample_resource_keys;
+    if(has_look_at) {
+        sample_resources.reserve(capture_times.size());sample_resource_keys.reserve(capture_times.size());
+        for(const auto time:capture_times) {
+            if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
+            MotionLookAtTargetResources resources;core::OpaqueBytes resource_key;
+            const auto error=capture_motion_look_at_sample_resources(data,graph_carrier_plugin_id(),units,
+                cancel,graph,time,resources,resource_key);
+            if(error)return error;
+            sample_resources.push_back(std::move(resources));sample_resource_keys.push_back(std::move(resource_key));
+        }
+    }
     std::vector<CapturedParticleFrame> frames;
-    auto error=capture_motion_particles(data,out,graph,width,height,capture_times,cancel,frames);if(error)return error;
+    auto error=capture_motion_particles(data,out,graph,width,height,sample_resources,capture_times,cancel,frames);if(error)return error;
     SfCoreRenderRequest nominal_camera{};error=capture_camera(data,nominal_camera);if(error)return error;
     std::size_t byte_count=0;
     for(unsigned i=0;i<count;++i) {
@@ -167,10 +196,22 @@ PF_Err prepare_motion_exposure(PF_InData* data,PF_OutData* out,const core::Graph
             if(record.error().code==core::ErrorCode::cancelled)return PF_Interrupt_CANCEL;
             return failure(out,record.error().detail,record.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM);
         }
-        auto frozen=graph;frozen.optional_records.push_back(record.take_value());
+        auto frozen=graph;
+        if(has_look_at)for(const auto& resource:sample_resources[i]) {
+            if(!resource.bytes)return PF_Err_BAD_CALLBACK_PARAM;
+            const auto node=std::find_if(frozen.nodes.begin(),frozen.nodes.end(),[&](const auto& n){return n.id==resource.node;});
+            if(node==frozen.nodes.end() || node->type_key!=core::graph_keys::kMotionNode)return PF_Err_BAD_CALLBACK_PARAM;
+            const auto parameter=std::find_if(node->parameters.begin(),node->parameters.end(),[](const auto& p){
+                return p.key==core::graph_keys::kMotionLookAtTargets;
+            });
+            if(parameter==node->parameters.end())node->parameters.push_back({core::graph_keys::kMotionLookAtTargets,*resource.bytes});
+            else parameter->value=*resource.bytes;
+        }
+        frozen.optional_records.push_back(record.take_value());
         auto bytes=core::serialize_graph(frozen,core::particle_node_registry());if(!bytes.has_value())return failure(out,bytes.error().detail);
         byte_count+=bytes.value().size();if(byte_count>kMotionByteBudget)return failure(out,"exposure exceeds memory budget",PF_Err_OUT_OF_MEMORY);
         MotionSample sample;sample.time=times[i];sample.graph=bytes.take_value();
+        if(has_look_at)sample.motion_resource_key=std::move(sample_resource_keys[i]);
         PF_InData sampled=*data;sampled.current_time=static_cast<A_long>(times[i].value);sampled.time_scale=static_cast<A_u_long>(times[i].scale);
         error=capture_camera(&sampled,sample.camera,v[7]==1?data:nullptr);if(error)return error;
         const bool materials=std::any_of(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==core::graph_keys::kMaterialNode;});

@@ -52,7 +52,8 @@
     function valueMatches(node,expected,actual){
         if(!actual || expected.type!==actual.type)return false;
         var key=String(expected.key),curve=node.type==="org.starfieldfx.nodes.particle" && (key==="7" || key==="8" || key==="27" || key==="13") ||
-            node.type==="org.starfieldfx.nodes.force" && key==="9";
+            node.type==="org.starfieldfx.nodes.force" && key==="9" || node.type==="org.starfieldfx.nodes.motion" && key==="6" ||
+            node.type==="org.starfieldfx.nodes.turbulence" && key==="7";
         if(expected.type===7 && curve){var a=expected.value,b=actual.value;
             if(!array(a) || !array(b) || a.length!==b.length || a.length<4)return false;
             for(var h=0;h<4;h++)if(a[h]!==b[h])return false;

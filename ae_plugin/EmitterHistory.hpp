@@ -3,6 +3,7 @@
 #include "starfield/core/Graph.hpp"
 #include "starfield/core/Render.hpp"
 #include "starfield/core/GraphEvaluation.hpp"
+#include <memory>
 #include <span>
 namespace starfield::adapter {
 enum class NativeHistoryPath { unavailable, static_graph, temporal, failed };
@@ -23,8 +24,14 @@ struct CapturedParticleFrame {
     double simulation_seconds{};
     core::EvaluatedGraph particles;
 };
+struct MotionLookAtTargetResource {
+    core::NodeId node{};
+    std::shared_ptr<const core::OpaqueBytes> bytes;
+};
+using MotionLookAtTargetResources=std::vector<MotionLookAtTargetResource>;
 // One animation plan and one history cache for an entire shutter exposure.
 [[nodiscard]] PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,
-    A_long,A_long,std::span<const core::RationalTime>,const core::Cancellation&,
+    A_long,A_long,std::span<const MotionLookAtTargetResources> sample_resources,
+    std::span<const core::RationalTime>,const core::Cancellation&,
     std::vector<CapturedParticleFrame>&) noexcept;
 }

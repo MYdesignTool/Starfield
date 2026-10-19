@@ -4,6 +4,7 @@
 #include "starfield/core/AgeCurve.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 namespace starfield::core {
@@ -99,8 +100,20 @@ inline Result<bool> apply_motion_look_at(ParticleInstance& p,const MotionLookAtS
     if(!motion_pose_detail::finite(p.position)||!std::isfinite(p.age_seconds)||!std::isfinite(p.lifetime_seconds)||p.lifetime_seconds<=0)
         return R::failure(ErrorCode::invalid_request,"invalid Look At particle state");
     auto forward=particle_motion_forward(p,settings.forward,bases);if(!forward.has_value())return R::failure(forward.error());
-    Vec3 direction{settings.goal.x-p.position.x,settings.goal.y-p.position.y,settings.goal.z-p.position.z};
-    auto value=forward.value();if(p.limit_to_2d){value.z=0;direction.z=0;}
+    auto value=forward.value();
+    Vec3 goal=settings.goal;
+    if(settings.use_nearest_light) {
+        if(settings.light_targets.empty())return R::success(true);
+        double closest=std::numeric_limits<double>::infinity();
+        for(const auto candidate:settings.light_targets) {
+            const auto dx=candidate.x-p.position.x,dy=candidate.y-p.position.y;
+            const auto dz=p.limit_to_2d?0.:candidate.z-p.position.z;
+            const auto distance=dx*dx+dy*dy+dz*dz;
+            if(distance<closest){closest=distance;goal=candidate;}
+        }
+    }
+    Vec3 direction{goal.x-p.position.x,goal.y-p.position.y,goal.z-p.position.z};
+    if(p.limit_to_2d){value.z=0;direction.z=0;}
     const auto weight=std::clamp(evaluate_age_curve(settings.over_life,p.age_seconds/p.lifetime_seconds,100,100)/100,0.,1.);
     auto q=turn_motion_pose(p.motion_pose,value,direction,weight);if(!q.has_value())return R::failure(q.error());
     p.motion_pose=q.take_value();return R::success(true);

@@ -14,6 +14,7 @@
         force: "org.starfieldfx.nodes.force",
         transform: "org.starfieldfx.nodes.transform",
         motion:"org.starfieldfx.nodes.motion",
+        turbulence:"org.starfieldfx.nodes.turbulence",
         material:"org.starfieldfx.nodes.material",
         model: "org.starfieldfx.nodes.model",
         output: "org.starfieldfx.nodes.output"
@@ -120,14 +121,43 @@
             "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
         },
         motion:{
-            "1":{label:"Motion Type",kind:"popup",choices:["Circle"],values:[1]},
+            "1":{label:"Motion Type",kind:"popup",choices:["Circle","Light Path","Look At"],values:[1,0,2]},
             "2":{label:"Origin",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
-            "3":{hidden:true},"6":{hidden:true},
+            "3":{hidden:true},"6":{hidden:true},"8":{hidden:true},"21":{hidden:true},
             "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000,unit:"%"},
             "5":{label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
             "13":{label:"Origin Type",kind:"popup",choices:["Point","Particle Origin","Emitter Origin"],values:[0,1,2]},
             "14":{label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
-            "15":{label:"Offset",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"}
+            "15":{label:"Offset",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
+            "11":{label:"Max Delay (Seconds)",kind:"slider",decimals:2,step:.01,min:0,max:1000000,unit:"s"},
+            "12":{label:"Orient To Path",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "17":{label:"Speed",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"%"},
+            "18":{label:"After Path",kind:"popup",choices:["Stop","Continue"],values:[0,1]},
+            "19":{label:"Starting With",kind:"text",placeholder:"All…",maxBytes:128},
+            "20":{label:"Delay Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
+        },
+        turbulence:{
+            "1":{label:"Turbulence Origin",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "2":{label:"Noise Amplitude",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
+            "3":{label:"Noise frequency",kind:"slider",decimals:2,step:.01,min:.01,max:100000},
+            "4":{label:"Noise Levels",kind:"slider",decimals:0,step:1,min:1,max:8},
+            "5":{label:"Fractal Speed",kind:"slider",decimals:2,step:.01,min:-100000,max:100000},
+            "6":{label:"Fractal Offset",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "7":{hidden:true},
+            "8":{label:"Turbulence Type",kind:"popup",choices:["Normal","Axis","One Side"],values:[0,3,4]},
+            "9":{label:"Choose axis",kind:"popup",choices:["Axis X","Axis Y","Axis Z","Normal"],values:[0,1,2,3]},
+            "10":{label:"Turbulence affect",kind:"popup",choices:["Infinite","Sphere"],values:[0,1]},
+            "11":{label:"Sphere size",kind:"slider",decimals:1,step:1,min:.01,max:100000000,unit:"px"},
+            "12":{label:"Sphere feather",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "13":{label:"Turbulence Randomize",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "14":{label:"Affected Properties",kind:"popup",choices:["All","Noise"],values:[0,1]},
+            "15":{label:"Position offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "16":{label:"Scale offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "17":{label:"Color offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "18":{label:"Opacity offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "19":{label:"Rotation offset",kind:"slider",decimals:1,step:1,min:-360,max:360,unit:"°"},
+            "20":{label:"Noise Scale",kind:"slider",decimals:1,step:1,min:.01,max:100000,unit:"%"},
+            "21":{label:"Fractal Evolution",kind:"slider",decimals:1,step:1,min:-100000,max:100000,unit:"°"}
         },
         material:{
             "1":{label:"Color Source",kind:"popup",choices:["Particle Color","Material Color"],values:[0,1]},
@@ -159,7 +189,7 @@
             "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
         }
     };
-    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",motion:"Motion", model:"Model",material:"Material",
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",motion:"Motion",turbulence:"Turbulence", model: "Model",material:"Material",
                    output: "Output" };
 
     function fail(code, message) {
@@ -285,6 +315,7 @@
     }
 
     function graphValueToDisplay(value, spec) {
+        if (spec.kind === "text") return String(value);
         if (spec.kind === "popup") return spec.values ? spec.values.indexOf(Number(value))+1 : Number(value) + (spec.displayOffset || 0);
         if (spec.kind === "color") return value.map(function (channel) { return channel * spec.scale; });
         return Object.prototype.toString.call(value) === "[object Array]" ? value.slice() : Number(value) * (spec.scale || 1);
@@ -306,6 +337,8 @@
             choices: spec && spec.choices ? spec.choices.slice() : undefined,
             enumValues: spec && spec.values ? spec.values.slice() : undefined,
             disabledChoices: spec && spec.disabledChoices ? spec.disabledChoices.slice() : undefined,
+            placeholder: spec && spec.placeholder ? spec.placeholder : undefined,
+            maxBytes: spec && spec.maxBytes ? spec.maxBytes : undefined,
             unit: spec && spec.unit ? spec.unit : undefined,
             legacyKey: spec ? spec.legacyKey : undefined,
             legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
@@ -448,6 +481,12 @@
                         Number((findParameter(source,"15") || {}).value)!==3)continue;
                 }
                 if (kind === "emitter" && graphParameter.key === "1") continue;
+                if(kind==="motion") {
+                    var motionModeParameter=findParameter(source,"1"),sourceMotionMode=motionModeParameter?Number(motionModeParameter.value):1;
+                    if(sourceMotionMode===0 && ["2","3","4","13","14","15"].indexOf(graphParameter.key)>=0)continue;
+                    if(sourceMotionMode===1 && ["11","12","17","18","19","20"].indexOf(graphParameter.key)>=0)continue;
+                    if(sourceMotionMode===2 && ["2","3","4","5","11","12","13","14","15","17","18","20"].indexOf(graphParameter.key)>=0)continue;
+                }
                 if (spec && spec.hidden) continue;
                 if(kind==="particle" && graphParameter.key==="1" && node.colorMode!==0) continue;
                 if (kind === "emitter") {
@@ -620,13 +659,33 @@
                 node.curves={size:decodeCurve(forceCurve && forceCurve.value,0,100,100,100)};
             }
             if(kind==="motion") {
-                var motionOrder=["1","13","2","14","15","4","5"];
+                var selectedMotionMode=findParameter(source,"1"),mode=selectedMotionMode?Number(selectedMotionMode.value):1;
+                var motionOrder=mode===0?["1","19","17","5","11","20","12","18"]:
+                    mode===2?["1","19"]:["1","13","2","14","15","4","5"];
+                var visibleMotionKeys=mode===0?{"1":1,"19":1,"17":1,"5":1,"11":1,"20":1,"12":1,"18":1,"6":1}:
+                    mode===2?{"1":1,"19":1,"6":1}:{"1":1,"13":1,"2":1,"14":1,"15":1,"4":1,"5":1,"6":1};
+                for(var motionIndex=node.params.length-1;motionIndex>=0;motionIndex--)
+                    if(!visibleMotionKeys[node.params[motionIndex].graphKey])node.params.splice(motionIndex,1);
                 node.params.sort(function(a,b){return motionOrder.indexOf(a.graphKey)-motionOrder.indexOf(b.graphKey);});
                 var motionCurve=findParameter(source,"6");
                 if(motionCurve && motionCurve.type!==7)fail("invalid_curve","Motion curve must use opaque bytes");
                 node.curveParameterKeys={size:"6"};node.curves={size:decodeCurve(motionCurve && motionCurve.value,0,100,100,100)};
             }
-            if (node.curveParameterKeys && kind !== "force" && kind!=="motion") {
+            if(kind==="turbulence") {
+                var turbulenceMode=findParameter(source,"8"),turbulenceAffect=findParameter(source,"10");
+                var turbulenceModeValue=turbulenceMode?Number(turbulenceMode.value):0;
+                for(var turbulenceIndex=node.params.length-1;turbulenceIndex>=0;turbulenceIndex--) {
+                    var turbulenceKey=node.params[turbulenceIndex].graphKey;
+                    if(turbulenceKey==="9" && turbulenceModeValue!==3 && turbulenceModeValue!==4)node.params.splice(turbulenceIndex,1);
+                    else if((turbulenceKey==="11" || turbulenceKey==="12") && (!turbulenceAffect || Number(turbulenceAffect.value)!==1))node.params.splice(turbulenceIndex,1);
+                }
+                node.params.sort(function(a,b){return Number(a.graphKey)-Number(b.graphKey);});
+                var turbulenceCurve=findParameter(source,"7");
+                if(turbulenceCurve && turbulenceCurve.type!==7)fail("invalid_curve","Turbulence curve must use opaque bytes");
+                node.curveParameterKeys={size:"7"};
+                node.curves={size:decodeCurve(turbulenceCurve && turbulenceCurve.value,0,100,100,100)};
+            }
+            if (node.curveParameterKeys && kind !== "force" && kind!=="motion" && kind!=="turbulence") {
                 var sizeEnd = findParameter(source, "4");
                 var opacityEnd = findParameter(source, "6");
                 var sizeCurve = findParameter(source, "7");
@@ -730,6 +789,7 @@
                          throw new Error("This Shape requires the OBJ face-emission workflow.");
                      return parameter.enumValues ? parameter.enumValues[index] : Number(displayValue) - parameter.displayOffset;
                  }
+                 if (parameter.kind === "text") return String(displayValue);
                  if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
                  return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
              } };

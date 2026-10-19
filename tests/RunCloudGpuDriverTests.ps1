@@ -50,12 +50,12 @@ auto r=request(shape,camera);r.frame.alpha_mode=alpha;
         [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash}
     }
     $fingerprints | ConvertTo-Json | Set-Content -LiteralPath "$directory\fixture-hashes.json" -Encoding UTF8
-    $sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
+    $sources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource','MotionGeometry','MotionPathTravel','EmitterHistory','Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene') | ForEach-Object {'src\core\'+$_+'.cpp'}
     $scopeStubs=@'
 #include "EmitterHistory.hpp"
 #include "EditorPresetPicker.hpp"
 namespace starfield::adapter {
-PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,A_long,A_long,
+PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,A_long,A_long,std::span<const MotionLookAtTargetResources>,
     std::span<const core::RationalTime>,const core::Cancellation&,std::vector<CapturedParticleFrame>&) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 bool choose_curve_preset(PF_InData*,core::AgeCurve&) noexcept {return false;}
 bool choose_gradient_preset(PF_InData*,core::ColorGradient&) noexcept {return false;}

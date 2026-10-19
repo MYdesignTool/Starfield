@@ -680,8 +680,40 @@ NodeRegistry make_particle_node_registry() {
         ParameterDescriptor{kMotionPathOrient,ParameterKind::uint32,false},
         ParameterDescriptor{kMotionOriginType,ParameterKind::uint32,false},
         ParameterDescriptor{kMotionAxisAngles,ParameterKind::vector3_float64,false},
-        ParameterDescriptor{kMotionOffset,ParameterKind::vector3_float64,false}};
+        ParameterDescriptor{kMotionOffset,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kMotionPathLightResource,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kMotionPathSpeedPercent,ParameterKind::float64,false},
+        ParameterDescriptor{kMotionPathEndBehavior,ParameterKind::uint32,false},
+        ParameterDescriptor{kMotionPathStartingWith,ParameterKind::utf8,false},
+        ParameterDescriptor{kMotionPathDelayRandom,ParameterKind::float64,false},
+        ParameterDescriptor{kMotionLookAtTargets,ParameterKind::opaque_bytes,false}};
     registry.types.push_back(std::move(motion));
+    NodeTypeDescriptor turbulence;
+    turbulence.type_key=kTurbulenceNode;turbulence.schema_version=1;
+    turbulence.ports={PortDescriptor{kTurbulenceParticlesIn,PortDirection::input,kParticleStream,true,0},
+        PortDescriptor{kTurbulenceParticlesOut,PortDirection::output,kParticleStream,false,0}};
+    turbulence.parameters={ParameterDescriptor{kTurbulenceOrigin,ParameterKind::vector3_float64,true},
+        ParameterDescriptor{kTurbulenceAmplitude,ParameterKind::float64,true},
+        ParameterDescriptor{kTurbulenceFrequency,ParameterKind::float64,true},
+        ParameterDescriptor{kTurbulenceLevels,ParameterKind::uint32,true},
+        ParameterDescriptor{kTurbulenceEvolutionSpeed,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceOffset,ParameterKind::vector3_float64,false},
+        ParameterDescriptor{kTurbulenceOverLife,ParameterKind::opaque_bytes,false},
+        ParameterDescriptor{kTurbulenceMode,ParameterKind::uint32,false},
+        ParameterDescriptor{kTurbulenceAxis,ParameterKind::uint32,false},
+        ParameterDescriptor{kTurbulenceAffect,ParameterKind::uint32,false},
+        ParameterDescriptor{kTurbulenceSphereSize,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceSphereFeather,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceRandomize,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceProperties,ParameterKind::uint32,false},
+        ParameterDescriptor{kTurbulencePositionOffset,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceScaleOffset,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceColorOffset,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceOpacityOffset,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceRotationOffset,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceNoiseScale,ParameterKind::float64,false},
+        ParameterDescriptor{kTurbulenceEvolution,ParameterKind::float64,false}};
+    registry.types.push_back(std::move(turbulence));
     NodeTypeDescriptor model;
     model.type_key=kModelNode;model.schema_version=1;
     model.ports={PortDescriptor{kModelGeometryOut,PortDirection::output,kModelStream,false,0},

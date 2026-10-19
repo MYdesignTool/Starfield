@@ -4,12 +4,17 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: compile/run Model OBJ import transactions with local May2023 SDK fake callbacks; add -Run to act.';exit 0}
 $taskDir=if($Sanitize){'artifacts\model-import-transaction-asan-tests'}else{'artifacts\model-import-transaction-tests'}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
-$taskSources=@('Time','Render','Settings','SequenceCodec','Graph','GraphConstruction','GraphEvaluation','MotionGeometry','MotionPathTravel','EmitterHistory',
+$taskSources=@('Time','Render','Settings','SequenceCodec','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource','MotionGeometry','MotionPathTravel','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','ModelGeometry','ModelResources','Geometry') |
     ForEach-Object {'src\core\'+$_+'.cpp'}
 Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null
+    New-Item -ItemType Directory -Path 'artifacts/model-import-transaction-tests' -Force | Out-Null
+    if(-not(Test-Path -LiteralPath 'artifacts/model-ui-exclusion-tests/paired/StarfieldHost.aex')){
+        & tests/RunModelUiExclusionTests.ps1 -Run
+        if(-not $?){throw 'UI exclusion fixture failed.'}
+    }
     $taskArgs=@('/nologo','/std:c++20','/W4','/permissive-','/EHsc','/O2','/MT','/DMSWindows','/DWIN32','/D_WINDOWS','/D_CRT_SECURE_NO_WARNINGS',
         '/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',

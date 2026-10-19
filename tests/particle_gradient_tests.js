@@ -1,7 +1,9 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm");
-const view=require("../cep_panel/js/graph_view.js"),edits=require("../cep_panel/js/graph_edits.js");
+const view=require(panelPath("js/graph_view.js")),edits=require(panelPath("js/graph_edits.js"));
 const stops=[{position:0,color:[1,0,0]},{position:.3,color:[0,1,0]},{position:1,color:[0,0,1]}];
+stops.interpolation=0;
 const bytes=view.encodeGradient(stops);
 assert.deepEqual(view.decodeGradient(bytes),stops);
 assert.throws(()=>view.encodeGradient([{position:0,color:[1,1,1]},{position:0,color:[1,1,1]}]),/Unordered/);
@@ -9,9 +11,10 @@ assert.throws(()=>view.decodeGradient(bytes.slice(0,-1)),/Malformed/);
 const hdr=view.encodeGradient([{position:0,color:[3,0,0]},{position:1,color:[0,2,0]}]);
 assert.equal(view.decodeGradient(hdr)[0].color[0],3,"gradient codec preserves float colors");
 const inset=[{position:.2,color:[1,0,0]},{position:.8,color:[0,0,1]}];
+inset.interpolation=0;
 const insetBytes=view.encodeGradient(inset);assert.deepEqual(view.decodeGradient(insetBytes),inset);
 const global={};
-const source=fs.readFileSync(require.resolve("../cep_panel/jsx/starfield_gateway.jsx"),"utf8")
+const source=fs.readFileSync(panelPath("jsx/starfield_gateway.jsx"),"utf8")
     .replace("    function writeNodeColorGradient(effect, bytes) {",
         "    $.global.testGradientWrite=writeNodeColorGradient;\n    function writeNodeColorGradient(effect, bytes) {");
 vm.runInNewContext(source,{$:{global},app:{}});
@@ -21,6 +24,7 @@ for(let i=0;i<8;i++) for(const suffix of ["Position","Color"])
         get expressionEnabled(){throw new Error("constant bank must not query expressions");},
         setValue(value){this.value=value;values.set(this.name,value);}});
 properties.push({name:"Color Gradient",value:2,numKeys:0,canSetExpression:false,setValue(value){values.set(this.name,value);}});
+properties.push({name:"Color Gradient Interpolation",value:0,numKeys:0,canSetExpression:false,setValue(value){values.set(this.name,value);}});
 const effect={matchName:"org.starfieldfx.node.particle",numProperties:properties.length,
     property(index){return typeof index==="number"?properties[index-1]:properties.find(p=>p.name===index);}};
 global.testGradientWrite(effect,Array.from(bytes));
@@ -34,7 +38,7 @@ global.testGradientWrite(effect,Array.from(insetBytes));
 assert.equal(values.get("Color Gradient 0 Position"),20);assert.equal(values.get("Color Gradient 1 Position"),80);
 const nodeId="00000000000000000000000000000001",copyId="00000000000000000000000000000002";
 let graph=edits.apply({nodes:[],edges:[],optionalRecords:[]},{type:"addNode",nodeType:"particle"},()=>nodeId);
-assert.equal(graph.nodes[0].schemaVersion,6);
+assert.equal(graph.nodes[0].schemaVersion,7);
 assert.equal(graph.nodes[0].parameters.find(p=>p.key==="12").value,0);
 assert.equal(view.decodeGradient(graph.nodes[0].parameters.find(p=>p.key==="13").value).length,2);
 graph=edits.apply(graph,{type:"setParameters",changes:[{nodeId,parameterKey:"13",valueType:7,value:bytes}]});

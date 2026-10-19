@@ -18,7 +18,7 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-81";
+    var GATEWAY_BUILD = "native-presets-99";
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -28,6 +28,7 @@
     var graphNonceCounter = 0;
     // Property references live only inside one synchronous gateway request.
     var nativePropertyIndexes = [];
+    var motionReadSamples = {};
     var nativeLayerInventory = null;
     var GRAPH_CARRIERS = {
         revision: { index: 39, name: "Graph Revision" },
@@ -44,6 +45,7 @@
         "org.starfieldfx.nodes.force": { kind: "force", label: "Force", matchName: "org.starfieldfx.node.force" },
         "org.starfieldfx.nodes.transform": { kind: "transform", label: "Transform", matchName: "org.starfieldfx.node.transform" },
         "org.starfieldfx.nodes.motion": {kind:"motion",label:"Motion",matchName:"org.starfieldfx.node.motion"},
+        "org.starfieldfx.nodes.turbulence": {kind:"turbulence",label:"Turbulence",matchName:"org.starfieldfx.node.turbulence"},
         "org.starfieldfx.nodes.model": {kind:"model",label:"Model",matchName:"org.starfieldfx.node.model"},
         "org.starfieldfx.nodes.material":{kind:"material",label:"Material",matchName:"org.starfieldfx.node.material"}
     };
@@ -146,6 +148,7 @@
 
     function reply(payload) {
         nativePropertyIndexes = [];
+        motionReadSamples = {};
         nativeLayerInventory = null;
         payload.protocol = PROTOCOL;
         payload.version = VERSION;
@@ -161,6 +164,7 @@
 
     function parseRequest(text) {
         nativePropertyIndexes = [];
+        motionReadSamples = {};
         nativeLayerInventory = null;
         if (typeof text !== "string" || text.length === 0 || text.length > MAX_REQUEST_BYTES) return null;
         var request = null;
@@ -443,7 +447,10 @@
             ageFirst: 910, valueFirst: 920, extraAgeBase: 3700, extraValueBase: 3800 },
         "Motion Over Life": {effect:"org.starfieldfx.node.motion",count:{name:"Motion Over Life",diskId:1713},
             mode:{name:"Motion Over Life Curve Interpolation",diskId:1714},prefix:"Motion Over Life Curve ",age:" Age",
-            ageFirst:3900,valueFirst:4100,extraAgeBase:3900,extraValueBase:4100}
+            ageFirst:3900,valueFirst:4100,extraAgeBase:3900,extraValueBase:4100},
+        "Turbulence Over Life (Percent)": {effect:"org.starfieldfx.node.turbulence",count:{name:"Turbulence Over Life (Percent)",diskId:1813},
+            mode:{name:"Turbulence Over Life (Percent) Curve Interpolation",diskId:1814},prefix:"Turbulence Over Life (Percent) Curve ",age:" Age",
+            ageFirst:4300,valueFirst:4400,extraAgeBase:4300,extraValueBase:4400}
     };
 
     function nativeCurveBank(effect, label) {
@@ -469,55 +476,59 @@
         return typeof control === "string" ? control : control.name + " [disk " + control.diskId + "]";
     }
 
+    // Cache only layout locators. AE objects are not stable instance identities,
+    // and no effect/Property reference survives an enumeration or another write.
     function nativePropertyIndex(effect) {
-        for (var n = 0; n < nativePropertyIndexes.length; n++) {
-            if (nativePropertyIndexes[n].effect === effect) return nativePropertyIndexes[n];
-        }
-        var index = {effect:effect,names:{},matches:{},complete:false};
-        if (nativePropertyIndexes.length >= 64) nativePropertyIndexes.shift();
-        nativePropertyIndexes.push(index);
-        return index;
+        var kind=String(effect.matchName);
+        for(var n=0;n<nativePropertyIndexes.length;n++)if(nativePropertyIndexes[n].kind===kind)return nativePropertyIndexes[n];
+        var index={kind:kind,names:{},matches:{},complete:false};
+        if(nativePropertyIndexes.length>=64)nativePropertyIndexes.shift();
+        nativePropertyIndexes.push(index);return index;
     }
-
-    function completeNativePropertyIndex(index) {
-        var visited = 0;
-        function childCount(group) {
-            try { return Number(group.numProperties) || 0; } catch (ignored) { return 0; }
-        }
-        function visit(group, depth) {
-            var count = childCount(group);
-            if (depth > 16 || count > 8192 || visited + count > 8192) throw new Error("Native control layout exceeds its lookup bound.");
-            for (var i = 1; i <= count; i++) {
-                var child = group.property(i);
-                if (!child) continue;
-                visited++;
-                var name = "$" + child.name, match = "$" + child.matchName;
-                if (!Object.prototype.hasOwnProperty.call(index.names,name)) index.names[name] = child;
-                if (!Object.prototype.hasOwnProperty.call(index.matches,match)) index.matches[match] = child;
-                if (childCount(child) > 0) visit(child,depth+1);
+    function completeNativePropertyIndex(index,effect) {
+        var visited=0;
+        function childCount(group){try{return Number(group.numProperties)||0;}catch(error){return 0;}}
+        function visit(group,path,depth){
+            var count=childCount(group);
+            if(depth>16 || count>8192 || visited+count>8192)throw new Error("Native control layout exceeds its lookup bound.");
+            for(var i=1;i<=count;i++){
+                var child=group.property(i);if(!child)continue;visited++;
+                var name=String(child.name),match=String(child.matchName),next=path.concat([i]);
+                var locator={path:next,name:name,matchName:match};
+                if(!Object.prototype.hasOwnProperty.call(index.names,"$"+name))index.names["$"+name]=locator;
+                if(!Object.prototype.hasOwnProperty.call(index.matches,"$"+match))index.matches["$"+match]=locator;
+                if(childCount(child)>0)visit(child,next,depth+1);
             }
         }
-        visit(index.effect,0);
-        index.complete = true;
+        visit(effect,[],0);index.complete=true;
     }
-
-    function indexedNativeProperty(effect, names, byMatchName) {
-        var index = nativePropertyIndex(effect), identity = byMatchName ? "matchName" : "name";
-        var bucket = byMatchName ? index.matches : index.names;
-        for (var i = 0; i < names.length; i++) if (bucket["$"+names[i]]) return bucket["$"+names[i]];
-        if (!index.complete) {
-            // Preserve AE's direct lookup and try both exact disk-ID spellings
-            // before traversing anything. Flat native controls usually hit here.
-            for (var d = 0; d < names.length; d++) {
-                var direct = null;
-                try { direct = effect.property(names[d]); } catch (ignored) { /* bounded fallback below */ }
-                if (direct && direct[identity] === names[d]) {
-                    bucket["$"+names[d]] = direct; return direct;
-                }
-            }
-            completeNativePropertyIndex(index);
+    function resolveNativeLocator(effect,locator,identity,wanted){
+        if(!locator)return null;
+        try{
+            var result=effect;
+            if(locator.selector)result=effect.property(locator.selector);
+            else for(var p=0;p<locator.path.length && result;p++)result=result.property(locator.path[p]);
+            return result && result[identity]===wanted?result:null;
+        }catch(error){return null;}
+    }
+    function indexedNativeProperty(effect,names,byMatchName){
+        var index=nativePropertyIndex(effect),identity=byMatchName?"matchName":"name",bucket=byMatchName?index.matches:index.names;
+        var mismatch=false;
+        for(var i=0;i<names.length;i++){
+            var locator=bucket["$"+names[i]],cached=resolveNativeLocator(effect,locator,identity,names[i]);if(cached)return cached;
+            if(locator)mismatch=true;
         }
-        for (var n = 0; n < names.length; n++) if (bucket["$"+names[n]]) return bucket["$"+names[n]];
+        for(var d=0;d<names.length;d++){
+            var direct=null;try{direct=effect.property(names[d]);}catch(error){}
+            if(direct && direct[identity]===names[d]){bucket["$"+names[d]]={selector:names[d]};return direct;}
+        }
+        // A path mismatch can follow an instance-specific group layout change.
+        // Rebuild only metadata for the current effect, then validate every use.
+        if(!index.complete || mismatch){index.names={};index.matches={};completeNativePropertyIndex(index,effect);}
+        bucket=byMatchName?index.matches:index.names;
+        for(var n=0;n<names.length;n++){
+            var found=resolveNativeLocator(effect,bucket["$"+names[n]],identity,names[n]);if(found)return found;
+        }
         return null;
     }
 
@@ -548,25 +559,14 @@
         }
     }
 
-    function nodeEffectsById(layer, id) {
-        var parade = layer.property("ADBE Effect Parade");
-        var matches = [];
-        if (!parade) return matches;
-        for (var i = 1; i <= parade.numProperties; i++) {
-            var effect = parade.property(i);
-            if (!effect || !nativeNodeTypeByMatch(effect.matchName) || transactionBackup(effect)) continue;
-            if (nodeIdentity(effect) === id) matches.push(effect);
-        }
-        return matches;
-    }
-
-    function nodeEffectById(layer, id) {
-        var matches = nodeEffectsById(layer, id);
-        if (matches.length > 1) {
-            throw new Error("Multiple AE node effects share node identity " + id +
-                            ". Duplicate the node in the Starfield graph so it receives a new identity.");
-        }
-        return matches.length ? matches[0] : null;
+    function nodeEffectById(layer,id) {
+        var indices=nodeEffectIndices(layer),matches=indices["$"+id] || [];
+        if(matches.length>1)throw new Error("Multiple AE node effects share node identity "+id+".");
+        if(!matches.length)return null;
+        var effect=layer.property("ADBE Effect Parade").property(matches[0]);
+        if(!effect || !nativeNodeTypeByMatch(effect.matchName) || nodeIdentity(effect)!==id || transactionBackup(effect))
+            throw new Error("The node identity changed while resolving "+id+".");
+        return effect;
     }
 
     function nativeNodeTypeByMatch(matchName) {
@@ -588,13 +588,13 @@
         return left === right;
     }
 
-    function setNodeControl(effect, control, value) {
+    function setNodeControl(effect, control, value, forceWrite) {
         var property = findNodeControl(effect, control), name = nodeControlName(control);
         if (!property || typeof property.setValue !== "function") {
             throw new Error("Node effect parameter is missing: " + name + " (" + effect.matchName + ", " + effect.name + ", " + GATEWAY_BUILD + ")");
         }
         try {
-            if (!sameValue(property.value, value)) {
+            if (forceWrite || !sameValue(property.value, value)) {
                 if (property.canSetExpression === true && property.expressionEnabled) {
                     throw new Error("This parameter is driven by an expression; edit its expression in AE.");
                 }
@@ -709,8 +709,16 @@
     }
 
     function nodeControlValue(effect, control) {
+        var sampleMotion=control && control.diskId===1701 && effect.matchName==="org.starfieldfx.node.motion";
         var property = findNodeControl(effect, control);
         if (!property) throw new Error("Node effect parameter is missing: " + nodeControlName(control) + " (" + effect.matchName + ", " + effect.name + ", " + GATEWAY_BUILD + ")");
+        // Consume the freshly resolved Property before any other host access.
+        // This selector cannot animate. Sampling failure must not silently
+        // select a different reader with potentially different host state.
+        if(sampleMotion) {
+            try { return property.valueAtTime(0,true); }
+            catch(sampleError) { throw new Error("Cannot sample Motion Type [disk 1701]: "+String(sampleError)); }
+        }
         return property.value;
     }
 
@@ -736,6 +744,53 @@
     function materialControl(index){return {name:["Color Source","Color","Roughness","Metallic","Opacity","AE Lights"][index-1],diskId:1600+index};}
     function motionControl(index){return {name:["Motion Type","Origin Type","Origin XY","Origin Z","Angle X","Angle Y","Angle Z",
         "Offset X","Offset Y","Offset Z","Speed","Speed Random"][index-1],diskId:1700+index};}
+    // ExtendScript does not associate chained conditionals like modern JS.
+    // Keep these public enum conversions as explicit branches.
+    function motionModeFromNative(value) {
+        if(value===1)return 1;
+        if(value===2)return 0;
+        if(value===3)return 2;
+        throw new Error("Invalid native Motion Type.");
+    }
+    function motionModeToNative(value) {
+        if(value===1)return 1;
+        if(value===0)return 2;
+        if(value===2)return 3;
+        return 0;
+    }
+    function motionPathControl(key){var controls={"11":"Max Delay (Seconds)","12":"Orient To Path","18":"After Path","20":"Delay Random"};
+        return controls[String(key)];}
+    function motionPrefixControl(chunk){return "Starting With Byte "+("0"+chunk).slice(-2);}
+    function motionPrefixBytes(value){
+        if(typeof value!=="string" || value.indexOf("\u0000")>=0)throw new Error("Starting With must be valid text without NUL characters.");
+        var encoded=encodeURIComponent(value),bytes=[];
+        for(var index=0;index<encoded.length;){
+            if(encoded.charAt(index)==="%") {var byteValue=parseInt(encoded.substr(index+1,2),16);if(!isFinite(byteValue))throw new Error("Invalid Starting With text.");bytes.push(byteValue);index+=3;}
+            else {bytes.push(encoded.charCodeAt(index));index++;}
+        }
+        if(bytes.length>128)throw new Error("Starting With is limited to 128 UTF-8 bytes.");
+        return bytes;
+    }
+    function readMotionPrefix(effect){
+        var length=Number(nodeControlValue(effect,"Starting With Length")),bytes=[];
+        if(!isFinite(length)||Math.floor(length)!==length||length<0||length>128)throw new Error("Invalid Starting With length.");
+        for(var chunk=0;chunk<43;chunk++){
+            var packed=Number(nodeControlValue(effect,motionPrefixControl(chunk)));
+            if(!isFinite(packed)||Math.floor(packed)!==packed||packed<0||packed>16777215)throw new Error("Invalid Starting With storage.");
+            for(var part=0;part<3&&bytes.length<length;part++)bytes.push((packed>>>(part*8))&255);
+        }
+        if(bytes.length!==length)throw new Error("Incomplete Starting With storage.");
+        var encoded="";for(var index=0;index<bytes.length;index++)encoded+="%"+(bytes[index]<16?"0":"")+bytes[index].toString(16);
+        try{return decodeURIComponent(encoded);}catch(error){throw new Error("Starting With storage is not valid UTF-8.");}
+    }
+    function writeMotionPrefix(effect,value){
+        var bytes=motionPrefixBytes(value);
+        setNodeControl(effect,"Starting With Length",bytes.length);
+        for(var chunk=0;chunk<43;chunk++){
+            var packed=0;for(var part=0;part<3;part++)if(chunk*3+part<bytes.length)packed|=bytes[chunk*3+part]<<(part*8);
+            setNodeControl(effect,motionPrefixControl(chunk),packed);
+        }
+    }
     function modelControl(index) {
         var names=["Source","Import OBJ","Model Mesh","Mesh Revision","Offset X","Offset Y","Offset Z",
             "Angle X","Angle Y","Angle Z","Scale X","Scale Y","Scale Z","Flip X","Flip Y","Flip Z","Center","Normalize"];
@@ -764,7 +819,7 @@
             if(!Object.prototype.hasOwnProperty.call(types,key) || fields[key] || p.type!==types[key])throw new Error("Invalid Model field: "+key);
             fields[key]=p;
             if(p.type===5) {
-                var limit=key==="4"?1e9:key==="5"?32768:100000;
+                var limit=key==="4"?1e9:(key==="5"?32768:100000);
                 if(!(nativeRecords.array(v)) || v.length!==3)throw new Error("Invalid Model vector: "+key);
                 for(var axis=0;axis<3;axis++)if(typeof v[axis]!=="number" || !isFinite(v[axis]) || Math.abs(v[axis])>limit ||
                     (key==="5" && v[axis]>=32768))throw new Error("Invalid Model vector: "+key);
@@ -872,7 +927,7 @@
                     throw new Error("Invalid Transform layer resource.");
             } else if(key==="1" || key==="2" || key==="3" || key==="4") {
                 if(p.type!==5 || !(nativeRecords.array(v)) || v.length!==3)throw new Error("Invalid Transform vector "+key+".");
-                var limit=key==="4"?10000:key==="3"?32768:1000000;
+                var limit=key==="4"?10000:(key==="3"?32768:1000000);
                 for(var a=0;a<3;a++)if(typeof v[a]!=="number" || !isFinite(v[a]) || Math.abs(v[a])>limit)
                     throw new Error("Transform vector is out of range: "+key+".");
             } else if(key==="5" || key==="6") {
@@ -930,7 +985,8 @@ function createNativeRecordContract() {
             "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
         force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
         transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
-        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"13":3,"14":5,"15":5},optional:{"6":7}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"11":4,"12":3,"13":3,"14":5,"15":5,"17":4,"18":3,"19":6,"20":4},optional:{"6":7,"8":5}},
+        turbulence:{version:1,required:{"1":5,"2":4,"3":4,"4":3},optional:{"5":4,"6":5,"7":7,"8":3,"9":3,"10":3,"11":4,"12":4,"13":4,"14":3,"15":4,"16":4,"17":4,"18":4,"19":4,"20":4,"21":4}},
         material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
         model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
     };
@@ -947,6 +1003,8 @@ function createNativeRecordContract() {
         if(field.type===4)return typeof value==="number" && isFinite(value);
         if(field.type===5){if(!array(value) || value.length!==3)return false;
             for(var axis=0;axis<3;axis++)if(typeof value[axis]!=="number" || !isFinite(value[axis]))return false;return true;}
+        if(field.type===6){if(typeof value!=="string" || value.indexOf("\u0000")>=0)return false;
+            try{return encodeURIComponent(value).replace(/%[0-9a-f]{2}/gi,"x").length<=128;}catch(ignored){return false;}}
         if(field.type===7){var tag=Object.prototype.toString.call(value);
             if(!array(value) && tag!=="[object Uint8Array]")return false;
             if(!integer(value.length,0,24576))return false;
@@ -963,12 +1021,17 @@ function createNativeRecordContract() {
             if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
             if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
             if(node.type===prefix+"motion") {
-                if(key==="1" && field.value!==1)invalid(node,"only Circle is authored in this stage");
+                if(key==="1" && !integer(field.value,0,2))invalid(node,"unsupported Motion mode");
                 if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
                 if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
                 if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
                 if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
                 if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+                if(key==="11" && (field.value<0 || field.value>1000000))invalid(node,"invalid Light Path Max Delay");
+                if(key==="12" && !integer(field.value,0,1))invalid(node,"invalid Light Path Orient To Path");
+                if(key==="17" && (field.value<0 || field.value>100000))invalid(node,"invalid Light Path Speed");
+                if(key==="18" && !integer(field.value,0,1))invalid(node,"invalid Light Path end behavior");
+                if(key==="20" && (field.value<0 || field.value>100))invalid(node,"invalid Light Path Delay Random");
             }
             if(node.type===prefix+"material") {
                 if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
@@ -976,6 +1039,19 @@ function createNativeRecordContract() {
                     if(field.value[channel]<0 || field.value[channel]>1)invalid(node,"material color must be in 0..1");
                 if((key==="3" || key==="4" || key==="5") && (field.value<0 || field.value>1))
                     invalid(node,"material parameter "+key+" must be in 0..1");
+            }
+            if(node.type===prefix+"turbulence") {
+                if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
+                if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
+                if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
+                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
+                if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
+                if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");
+                if((key==="12" || key==="13") && (field.value<0 || field.value>100))invalid(node,"Turbulence amount outside 0..100");
+                if(key>="15" && key<="19" && (field.value < -100 || field.value > 100))invalid(node,"Turbulence property offset outside -100..100");
+                if(key==="20" && (field.value<=0 || field.value>100000))invalid(node,"invalid Noise Scale");
+                if(key==="21" && Math.abs(field.value)>100000)invalid(node,"invalid Fractal Evolution");
             }
             found[key]=true;
         }
@@ -1033,16 +1109,25 @@ function createNativeRecordContract() {
         } else if(type==="org.starfieldfx.nodes.motion") {
             var motionGeometry=transformGeometry(layer),motionOrigin=nodeControlValue(effect,motionControl(3));
             var motionMode=Number(nodeControlValue(effect,motionControl(1))),motionOriginType=Number(nodeControlValue(effect,motionControl(2)));
-            if(motionMode!==1 || Math.floor(motionOriginType)!==motionOriginType || motionOriginType<1 || motionOriginType>3)throw new Error("Invalid Motion mode/origin type.");
-            node.parameters.push({key:"1",type:3,value:1},{key:"13",type:3,value:motionOriginType-1},
+            if((motionMode!==1&&motionMode!==2&&motionMode!==3) || Math.floor(motionOriginType)!==motionOriginType || motionOriginType<1 || motionOriginType>3)throw new Error("Invalid Motion mode/origin type.");
+            var motionCoreMode=motionModeFromNative(motionMode);
+            motionReadSamples["$"+node.id]={reader:"valueAtTime(0,true)",raw:motionMode,core:motionCoreMode};
+            node.parameters.push({key:"1",type:3,value:motionCoreMode},{key:"13",type:3,value:motionOriginType-1},
                 {key:"2",type:5,value:[(Number(motionOrigin[0])-motionGeometry.width/2)*motionGeometry.aspect/motionGeometry.height,
                     .5-Number(motionOrigin[1])/motionGeometry.height,Number(nodeControlValue(effect,motionControl(4)))/motionGeometry.height]},
                 {key:"3",type:5,value:[0,0,1]},
                 {key:"14",type:5,value:[-Number(nodeControlValue(effect,motionControl(5))),Number(nodeControlValue(effect,motionControl(6))),-Number(nodeControlValue(effect,motionControl(7)))]},
                 {key:"15",type:5,value:[Number(nodeControlValue(effect,motionControl(8)))*motionGeometry.aspect/motionGeometry.height,
                     -Number(nodeControlValue(effect,motionControl(9)))/motionGeometry.height,Number(nodeControlValue(effect,motionControl(10)))/motionGeometry.height]},
+                {key:"8",type:5,value:[1,0,0]},
                 {key:"4",type:4,value:Number(nodeControlValue(effect,motionControl(11)))*(2*Math.PI/100)},
-                {key:"5",type:4,value:Number(nodeControlValue(effect,motionControl(12)))});
+                {key:"5",type:4,value:Number(nodeControlValue(effect,motionControl(12)))},
+                {key:"11",type:4,value:Number(nodeControlValue(effect,motionPathControl(11)))},
+                {key:"12",type:3,value:Number(nodeControlValue(effect,motionPathControl(12)))},
+                {key:"17",type:4,value:Math.max(0,Number(nodeControlValue(effect,motionControl(11))))},
+                {key:"18",type:3,value:Number(nodeControlValue(effect,motionPathControl(18)))-1},
+                {key:"19",type:6,value:readMotionPrefix(effect)},
+                {key:"20",type:4,value:Number(nodeControlValue(effect,motionPathControl(20)))});
             var motionBank=nativeCurveBank(effect,"Motion Over Life"),motionCount=Number(nodeControlValue(effect,motionBank.controls.count));
             if(!isFinite(motionCount)||Math.floor(motionCount)!==motionCount||motionCount<0||motionCount>64||motionCount===1)throw new Error("Invalid Motion curve count.");
             if(motionCount) {
@@ -1050,6 +1135,52 @@ function createNativeRecordContract() {
                 for(var mp=0;mp<motionCount;mp++) {appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,false))));
                     appendFloat64(motionBytes,Number(nodeControlValue(effect,nativeCurvePointControl(motionBank,mp,true))));}
                 node.parameters.push({key:"6",type:7,value:motionBytes});
+            }
+        } else if(type==="org.starfieldfx.nodes.turbulence") {
+            var turbulenceGeometry=transformGeometry(layer),turbulenceOrigin=nodeControlValue(effect,"Turbulence Origin XY");
+            var turbulenceMode=Number(nodeControlValue(effect,"Turbulence Type"));
+            var turbulenceModeMap={1:0,2:3,3:4};
+            if(!Object.prototype.hasOwnProperty.call(turbulenceModeMap,String(turbulenceMode)))throw new Error("Invalid Turbulence Type.");
+            var turbulenceAxis=Number(nodeControlValue(effect,"Choose axis"));
+            var turbulenceAffect=Number(nodeControlValue(effect,"Turbulence affect"));
+            var turbulenceProperties=Number(nodeControlValue(effect,"Affected Properties"));
+            if(turbulenceAxis<1||turbulenceAxis>4||Math.floor(turbulenceAxis)!==turbulenceAxis||
+                turbulenceAffect<1||turbulenceAffect>2||Math.floor(turbulenceAffect)!==turbulenceAffect||
+                turbulenceProperties<1||turbulenceProperties>2||Math.floor(turbulenceProperties)!==turbulenceProperties)
+                throw new Error("Invalid Turbulence selector.");
+            node.parameters.push({key:"1",type:5,value:[
+                (Number(turbulenceOrigin[0])-turbulenceGeometry.width/2)*turbulenceGeometry.aspect/turbulenceGeometry.height,
+                .5-Number(turbulenceOrigin[1])/turbulenceGeometry.height,
+                Number(nodeControlValue(effect,"Turbulence Origin Z"))/turbulenceGeometry.height]},
+                {key:"2",type:4,value:Number(nodeControlValue(effect,"Noise Amplitude"))/turbulenceGeometry.height},
+                {key:"3",type:4,value:Number(nodeControlValue(effect,"Noise frequency"))},
+                {key:"4",type:3,value:Number(nodeControlValue(effect,"Noise Levels"))},
+                {key:"5",type:4,value:Number(nodeControlValue(effect,"Fractal Speed"))},
+                {key:"6",type:5,value:[Number(nodeControlValue(effect,"Fractal Offset X"))*turbulenceGeometry.aspect/turbulenceGeometry.height,
+                    -Number(nodeControlValue(effect,"Fractal Offset Y"))/turbulenceGeometry.height,
+                    Number(nodeControlValue(effect,"Fractal Offset Z"))/turbulenceGeometry.height]},
+                {key:"8",type:3,value:turbulenceModeMap[String(turbulenceMode)]},
+                {key:"9",type:3,value:turbulenceAxis-1},{key:"10",type:3,value:turbulenceAffect-1});
+            var turbulenceScalars=[[11,"Sphere size"],[12,"Sphere feather"],[13,"Turbulence Randomize"],
+                [15,"Position offset"],[16,"Scale offset"],[17,"Color offset"],[18,"Opacity offset"],
+                [19,"Rotation offset"],[20,"Noise Scale"],[21,"Fractal Evolution"]];
+            for(var tsi=0;tsi<turbulenceScalars.length;tsi++) {
+                var turbulenceKey=turbulenceScalars[tsi][0],turbulenceName=turbulenceScalars[tsi][1];
+                var turbulenceValue=Number(nodeControlValue(effect,turbulenceName));
+                if(turbulenceKey===11)turbulenceValue/=turbulenceGeometry.height;
+                node.parameters.push({key:String(turbulenceKey),type:4,value:turbulenceValue});
+            }
+            node.parameters.push({key:"14",type:3,value:turbulenceProperties-1});
+            var turbulenceBank=nativeCurveBank(effect,"Turbulence Over Life (Percent)"),turbulenceCount=Number(nodeControlValue(effect,turbulenceBank.controls.count));
+            if(!isFinite(turbulenceCount)||Math.floor(turbulenceCount)!==turbulenceCount||turbulenceCount<0||turbulenceCount>64||turbulenceCount===1)
+                throw new Error("Invalid Turbulence curve count.");
+            if(turbulenceCount) {
+                var turbulenceBytes=[1,turbulenceCount,Number(nodeControlValue(effect,turbulenceBank.controls.mode)),0];
+                for(var tp=0;tp<turbulenceCount;tp++) {
+                    appendFloat64(turbulenceBytes,Number(nodeControlValue(effect,nativeCurvePointControl(turbulenceBank,tp,false))));
+                    appendFloat64(turbulenceBytes,Number(nodeControlValue(effect,nativeCurvePointControl(turbulenceBank,tp,true))));
+                }
+                node.parameters.push({key:"7",type:7,value:turbulenceBytes});
             }
         } else if(type==="org.starfieldfx.nodes.material") {
             var materialSource=Number(nodeControlValue(effect,materialControl(1)));
@@ -1063,7 +1194,7 @@ function createNativeRecordContract() {
             if(source!==1 && source!==2)throw new Error("Invalid Model Source.");
             var imported=source===2 && asset.revision>0,resource=[],bounds=[];
             for(var byteIndex=0;byteIndex<16;byteIndex++)resource.push(imported?parseInt(node.id.substr(byteIndex*2,2),16):0);
-            for(var axis=0;axis<6;axis++)appendFloat64(bounds,imported?asset.bounds[axis]:axis<3?-.5:.5);
+            for(var axis=0;axis<6;axis++)appendFloat64(bounds,imported?asset.bounds[axis]:(axis<3?-.5:.5));
             node.parameters.push({key:"1",type:7,value:resource},{key:"2",type:3,value:imported?asset.revision:0});
             for(var group=0;group<3;group++) {
                 var components=[];
@@ -1081,8 +1212,8 @@ function createNativeRecordContract() {
                 var components=[];
                 for(var axis=0;axis<3;axis++) {
                     var component=Number(nodeControlValue(effect,transformControl(4+3*group+axis)));
-                    components.push(group===0 ? component*(axis===0?tg.aspect:axis===1?-1:1)/tg.height :
-                        group===1 ? component*(axis===1?1:-1) : component);
+                    components.push(group===0 ? component*(axis===0?tg.aspect:(axis===1?-1:1))/tg.height :
+                        (group===1 ? component*(axis===1?1:-1) : component));
                 }
                 node.parameters.push({key:String(2+group),type:5,value:components});
             }
@@ -1191,6 +1322,7 @@ function createNativeRecordContract() {
     }
 
     function readNativeNodes(layer) {
+        motionReadSamples = {};
         var nodes = [], parade = layer.property("ADBE Effect Parade");
         for (var i = 1; parade && i <= parade.numProperties; i++) {
             var effect = parade.property(i);
@@ -1210,10 +1342,10 @@ function createNativeRecordContract() {
             copy.push({id:node.id,type:node.type,schemaVersion:node.schemaVersion,parameters:parameters,
                 position:{x:node.position.x,y:node.position.y},outgoing:outgoing});
         }
-        copy.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+        copy.sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
         for (var i = 0; i < copy.length; i++) {
             copy[i].parameters.sort(function (a, b) { return Number(a.key) - Number(b.key); });
-            copy[i].outgoing.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+            copy[i].outgoing.sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
         }
         return JSON.stringify(copy);
     }
@@ -1276,7 +1408,12 @@ function createNativeRecordContract() {
         if (nativeNodeTypeByMatch(effect.matchName) !== node.type) {
             throw new Error("Node parameter type mismatch: " + node.type + " / " + effect.matchName);
         }
-        if(node.type==="org.starfieldfx.nodes.material")nativeRecords.schema(node);
+        if(node.type==="org.starfieldfx.nodes.material" || node.type==="org.starfieldfx.nodes.motion" || node.type==="org.starfieldfx.nodes.turbulence")nativeRecords.schema(node);
+        var motionModeField=node.type==="org.starfieldfx.nodes.motion"?nodeParameter(node,"1"):null;
+        var authoredMotionMode=motionModeField?Number(motionModeField.value):null;
+        var authoredMotionPopup=motionModeToNative(authoredMotionMode);
+        var authoredComplete=false;
+        if(node.type==="org.starfieldfx.nodes.motion" && !authoredMotionPopup)throw new Error("Invalid authored Motion Type.");
         if(node.type==="org.starfieldfx.nodes.model") {
             var requestedModel=validateModelRecord(node),storedAsset=modelAssetDescriptor(effect);
             if(requestedModel.imported) {
@@ -1288,6 +1425,9 @@ function createNativeRecordContract() {
         }
         setNodeControl(effect, "Panel Sync Guard", 1);
         try {
+            // Native publication is the sole Motion selector writer. Script
+            // setters can queue a competing supervised delivery before the
+            // definitive AEGP write. The verified guard below carries intent.
             if(node.type === "org.starfieldfx.nodes.particle") {
                 var hasTransfer=false;
                 for(var tp=0;tp<node.parameters.length;tp++)if(String(node.parameters[tp].key)==="30")hasTransfer=true;
@@ -1348,18 +1488,55 @@ function createNativeRecordContract() {
                     else throw new Error("Emitter graph parameter is not mapped to an AE control: " + key);
                 } else if(type==="org.starfieldfx.nodes.motion") {
                     var motionGeometry=transformGeometry(layer);
-                    if(key==="1")setNodeControl(effect,motionControl(1),1);
+                    var graphMotionMode=authoredMotionMode;
+                    if(key==="1")continue; // Native publication consumes the explicit guard intent.
                     else if(key==="13")setNodeControl(effect,motionControl(2),value+1);
                     else if(key==="2") {
                         setNodeControl(effect,motionControl(3),[motionGeometry.width/2+value[0]*motionGeometry.height/motionGeometry.aspect,motionGeometry.height/2-value[1]*motionGeometry.height]);
                         setNodeControl(effect,motionControl(4),value[2]*motionGeometry.height);
-                    } else if(key==="3")continue; // Derived default axis; angles14 own its author controls.
+                    } else if(key==="3" || key==="8")continue; // Derived axis/forward; angles14 own Circle orientation.
                     else if(key==="14" || key==="15")for(var ma=0;ma<3;ma++)setNodeControl(effect,motionControl((key==="14"?5:8)+ma),
-                        value[ma]*(key==="14"?(ma===1?1:-1):motionGeometry.height*(ma===0?1/motionGeometry.aspect:ma===1?-1:1)));
-                    else if(key==="4")setNodeControl(effect,motionControl(11),value*(100/(2*Math.PI)));
+                        value[ma]*(key==="14"?(ma===1?1:-1):motionGeometry.height*(ma===0?1/motionGeometry.aspect:(ma===1?-1:1))));
+                    else if(key==="4") {if(graphMotionMode===1)setNodeControl(effect,motionControl(11),value*(100/(2*Math.PI)));}
                     else if(key==="5")setNodeControl(effect,motionControl(12),value);
                     else if(key==="6")writeNodeCurve(effect,"Motion Over Life",value);
+                    else if(key==="11")setNodeControl(effect,motionPathControl(11),value);
+                    else if(key==="12")setNodeControl(effect,motionPathControl(12),value);
+                    else if(key==="17") {if(graphMotionMode===0)setNodeControl(effect,motionControl(11),value);}
+                    else if(key==="18")setNodeControl(effect,motionPathControl(18),value+1);
+                    else if(key==="19")writeMotionPrefix(effect,value);
+                    else if(key==="20")setNodeControl(effect,motionPathControl(20),value);
                     else throw new Error("Motion graph parameter is not mapped: "+key);
+                } else if(type==="org.starfieldfx.nodes.turbulence") {
+                    var turbulenceGeometry=transformGeometry(layer);
+                    if(key==="1") {
+                        setNodeControl(effect,"Turbulence Origin XY",[turbulenceGeometry.width/2+value[0]*turbulenceGeometry.height/turbulenceGeometry.aspect,
+                            turbulenceGeometry.height/2-value[1]*turbulenceGeometry.height]);
+                        setNodeControl(effect,"Turbulence Origin Z",value[2]*turbulenceGeometry.height);
+                    } else if(key==="2")setNodeControl(effect,"Noise Amplitude",Number(value)*turbulenceGeometry.height);
+                    else if(key==="3")setNodeControl(effect,"Noise frequency",value);
+                    else if(key==="4")setNodeControl(effect,"Noise Levels",value);
+                    else if(key==="5")setNodeControl(effect,"Fractal Speed",value);
+                    else if(key==="6") {
+                        setNodeControl(effect,"Fractal Offset X",value[0]*turbulenceGeometry.height/turbulenceGeometry.aspect);
+                        setNodeControl(effect,"Fractal Offset Y",-value[1]*turbulenceGeometry.height);
+                        setNodeControl(effect,"Fractal Offset Z",value[2]*turbulenceGeometry.height);
+                    } else if(key==="7")writeNodeCurve(effect,"Turbulence Over Life (Percent)",value);
+                    else if(key==="8")setNodeControl(effect,"Turbulence Type",value===0?1:(value===3?2:3));
+                    else if(key==="9")setNodeControl(effect,"Choose axis",Number(value)+1);
+                    else if(key==="10")setNodeControl(effect,"Turbulence affect",Number(value)+1);
+                    else if(key==="11")setNodeControl(effect,"Sphere size",Number(value)*turbulenceGeometry.height);
+                    else if(key==="12")setNodeControl(effect,"Sphere feather",value);
+                    else if(key==="13")setNodeControl(effect,"Turbulence Randomize",value);
+                    else if(key==="14")setNodeControl(effect,"Affected Properties",Number(value)+1);
+                    else if(key==="15")setNodeControl(effect,"Position offset",value);
+                    else if(key==="16")setNodeControl(effect,"Scale offset",value);
+                    else if(key==="17")setNodeControl(effect,"Color offset",value);
+                    else if(key==="18")setNodeControl(effect,"Opacity offset",value);
+                    else if(key==="19")setNodeControl(effect,"Rotation offset",value);
+                    else if(key==="20")setNodeControl(effect,"Noise Scale",value);
+                    else if(key==="21")setNodeControl(effect,"Fractal Evolution",value);
+                    else throw new Error("Turbulence graph parameter is not mapped: "+key);
                 } else if(type==="org.starfieldfx.nodes.material") {
                     // Portable enums are zero based; AE popup values are one based.
                     // Validate before any write and use exact native switch constants.
@@ -1384,8 +1561,8 @@ function createNativeRecordContract() {
                         setNodeControl(effect,transformControl(3),value[2]*geometry.height);
                     } else if(key==="2" || key==="3" || key==="4") {
                         for(var axis=0;axis<3;axis++)setNodeControl(effect,transformControl(4+3*(Number(key)-2)+axis),
-                            key==="2" ? value[axis]*geometry.height*(axis===0?1/geometry.aspect:axis===1?-1:1) :
-                            key==="3" ? value[axis]*(axis===1?1:-1) : value[axis]);
+                            key==="2" ? value[axis]*geometry.height*(axis===0?1/geometry.aspect:(axis===1?-1:1)) :
+                            (key==="3" ? value[axis]*(axis===1?1:-1) : value[axis]));
                     } else if(key==="5" || key==="6")setNodeControl(effect,transformControl(Number(key)+8),value);
                     else if(key==="8")setNodeControl(effect,transformControl(1),layerResourceIndex(layer,value));
                     else throw new Error("Transform graph parameter is not mapped: "+key);
@@ -1474,13 +1651,73 @@ function createNativeRecordContract() {
             }
             if (type === "org.starfieldfx.nodes.force" && !nodeParameter(node,"9")) writeNodeCurve(effect,"Wind and Spin",null);
             if(type==="org.starfieldfx.nodes.motion" && !nodeParameter(node,"6"))writeNodeCurve(effect,"Motion Over Life",null);
+            if(type==="org.starfieldfx.nodes.turbulence" && !nodeParameter(node,"7"))writeNodeCurve(effect,"Turbulence Over Life (Percent)",null);
             if (type === "org.starfieldfx.nodes.particle") {
                 if (!nodeParameter(node, "7")) writeNodeCurve(effect, "Size", null);
                 if (!nodeParameter(node, "8")) writeNodeCurve(effect, "Opacity", null);
                 if (!nodeParameter(node, "27")) writeNodeCurve(effect, "Rotation", null);
             }
+            authoredComplete=true;
         } finally {
-            setNodeControl(effect, "Panel Sync Guard", 0);
+            // Private transient intent: native publication owns the definitive
+            // popup write/readback and releases this guard only after acceptance.
+            setNodeControl(effect, "Panel Sync Guard",
+                authoredComplete && node.type==="org.starfieldfx.nodes.motion"?4+authoredMotionMode:0);
+        }
+        if(node.type==="org.starfieldfx.nodes.motion") {
+            nativePropertyIndexes=[];
+            var savedMotion=nodeEffectById(layer,node.id);
+            if(!savedMotion || Number(nodeControlValue(savedMotion,"Panel Sync Guard"))!==4+authoredMotionMode)
+                throw new Error("Motion author intent was not saved (node "+node.id+", Core "+authoredMotionMode+").");
+        }
+    }
+
+    // Failure-only evidence: every sample owns a fresh, uniquely identified
+    // effect/child lookup. Never repair a mismatch with a later getter.
+    function motionReadbackEvidence(layer, id) {
+        var evidence={gateway:GATEWAY_BUILD,node:id,snapshot:motionReadSamples["$"+id] || null};
+        function probe(name,read) {
+            try { evidence[name]=read(); }
+            catch(error) { evidence[name]="unavailable: "+String(error).substr(0,160); }
+        }
+        function source() {
+            var effect=nodeEffectById(layer,id);
+            if(!effect || effect.matchName!=="org.starfieldfx.node.motion")throw new Error("Unique Motion source unavailable.");
+            return effect;
+        }
+        function sample(byDisk,time) {
+            var effect=source(),property=byDisk?findNodeDiskControl(effect,1701):findEffectProperty(effect,"Motion Type");
+            if(!property)throw new Error("Motion Type control unavailable.");
+            var value=Number(time===null?property.value:property.valueAtTime(time,true));
+            if(!isFinite(value))throw new Error("Nonfinite Motion Type sample.");
+            return value;
+        }
+        probe("host",function(){return String(app.version);});
+        probe("guard",function(){return Number(nodeControlValue(source(),"Panel Sync Guard"));});
+        probe("named",function(){return sample(false,null);});
+        probe("disk",function(){return sample(true,null);});
+        probe("namedZero",function(){return sample(false,0);});
+        probe("diskZero",function(){return sample(true,0);});
+        probe("time",function(){var time=Number(layer.containingComp.time);if(!isFinite(time))throw new Error("Invalid comp time.");return time;});
+        if(typeof evidence.time==="number") {
+            probe("namedCurrent",function(){return sample(false,evidence.time);});
+            probe("diskCurrent",function(){return sample(true,evidence.time);});
+        }
+        return evidence;
+    }
+
+    function verifyAuthoredMotionModes(authored, saved, layer) {
+        var byId={};for(var i=0;i<saved.length;i++)byId["$"+saved[i].id]=saved[i];
+        for(var n=0;n<authored.length;n++) {
+            var node=authored[n];if(node.type!=="org.starfieldfx.nodes.motion")continue;
+            var actual=byId["$"+node.id],wanted=nodeParameter(node,"1"),observed=actual && nodeParameter(actual,"1");
+            if(!actual || actual.type!==node.type || !wanted || !observed || wanted.value!==observed.value) {
+                var message="Published Motion Type differs from authored (node "+node.id+", expected "+
+                    (wanted?wanted.value:"missing")+", actual "+(observed?observed.value:"missing")+").";
+                try { message+=" Motion readback: "+JSON.stringify(motionReadbackEvidence(layer,node.id)); }
+                catch(diagnosticError) { message+=" Motion readback unavailable ("+GATEWAY_BUILD+")."; }
+                throw new Error(message);
+            }
         }
     }
 
@@ -1666,7 +1903,8 @@ function createNativeRecordContract() {
             for(var j=0;j<matches.length;j++){
                 var effect=layer.property("ADBE Effect Parade").property(matches[j]);
                 var guard=Number(nodeControlValue(effect,"Panel Sync Guard"));
-                if(guard!==0 && guard!==3)throw new Error("The node to retire is busy: "+ids[i]);
+                var pendingMotion=effect.matchName==="org.starfieldfx.node.motion" && guard>=4 && guard<=6 && Math.floor(guard)===guard;
+                if(guard!==0 && guard!==3 && !pendingMotion)throw new Error("The node to retire is busy: "+ids[i]);
                 setNodeControl(effect,"Panel Sync Guard",3);
                 if(Number(nodeControlValue(effect,"Panel Sync Guard"))!==3)throw new Error("The node retirement was not saved: "+ids[i]);
             }
@@ -1779,6 +2017,86 @@ function createNativeRecordContract() {
         pinned.pinTarget = true;
         pinned.target = {token:token};
         return pinned;
+    }
+
+    function graphGuardState(request) {
+        if(!request || request.pinTarget!==true || !request.target)throw new Error("A pinned renderer is required for guard ownership.");
+        // Resolve only the guard, not the whole carrier or node snapshot.
+        var target=findTargetByToken(request.target.token);
+        if(target.error)throw new Error(target.error.message);
+        var property=resolveCarrier(target.effect,"guard");
+        if(!property)throw new Error("The renderer guard is unavailable.");
+        // This hidden stream cannot animate. Match EffectGraphBackup::scalar:
+        // sample the saved value at zero, before expressions, without fallback.
+        var value=Number(property.valueAtTime(0,true));
+        if(!isFinite(value) || Math.floor(value)!==value)throw new Error("The renderer guard is invalid.");
+        return {property:property,value:value};
+    }
+    function graphBusyMessage(value,request) {
+        var message="Another graph transaction owns this renderer (guard="+value+", gateway="+GATEWAY_BUILD+").";
+        // Failure-only readback. Never replace the decision with a later sample
+        // or let diagnostic failure authorize writes or obscure the busy error.
+        try {
+            var data={gateway:GATEWAY_BUILD,reader:"valueAtTime(0,true)",saved:value,target:request.target.token};
+            function probe(key,read){try{data[key]=read();}catch(error){data[key]="unavailable: "+String(error);}}
+            function source(key){var target=findTargetByToken(request.target.token);
+                if(target.error)throw new Error(target.error.message);
+                var property=target.effect.property(key);if(!property)throw new Error("Missing guard stream.");return property;}
+            probe("host",function(){return String(app.version);});
+            probe("indexed",function(){return Number(source(40).value);});
+            probe("named",function(){return Number(source("Panel Graph Sync Guard").value);});
+            probe("indexedZero",function(){return Number(source(40).valueAtTime(0,true));});
+            probe("namedZero",function(){return Number(source("Panel Graph Sync Guard").valueAtTime(0,true));});
+            probe("name",function(){return String(source(40).name);});
+            probe("matchName",function(){return String(source(40).matchName);});
+            probe("propertyIndex",function(){return Number(source(40).propertyIndex);});
+            message+=" Guard readback: "+JSON.stringify(data);
+        } catch(error) {message+=" Guard readback unavailable: "+String(error);}
+        return message;
+    }
+    function acquireGraphGuard(owner) {
+        var state=graphGuardState(owner.request);
+        if(state.value!==0)throw new Error(graphBusyMessage(state.value,owner.request));
+        // A failed/discarded acquisition cannot authorize rollback writes.
+        // A setter may throw after saving1, so check that partial success too.
+        try { state.property.setValue(1); }
+        catch(writeError) {
+            try { owner.owned=graphGuardState(owner.request).value===1; }
+            catch(unreadableGuard) { owner.owned=false; }
+            throw writeError;
+        }
+        owner.owned=graphGuardState(owner.request).value===1;
+        if(!owner.owned)throw new Error("Renderer guard acquisition was not saved.");
+    }
+    function releaseGraphGuard(owner) {
+        var state=graphGuardState(owner.request);
+        if(state.value!==0 && state.value!==1)throw new Error("Renderer guard changed during release: "+state.value);
+        if(state.value===1)state.property.setValue(0);
+        var saved=graphGuardState(owner.request).value;
+        if(saved!==0)throw new Error("Renderer guard release was not saved (guard="+saved+").");
+        owner.owned=false;owner.released=true;
+    }
+    function graphCleanupFailure(result,error) {
+        var message="Renderer transaction cleanup failed: "+String(error)+" ("+GATEWAY_BUILD+").";
+        if(result && !result.ok && result.error){result.error.message+=" "+message;return result;}
+        return {ok:false,error:{code:"graph_guard_release_failed",message:message}};
+    }
+    function finishGraphGuard(owner,keepGuard,groupOpen,result) {
+        if(owner.owned && !keepGuard) {
+            try { releaseGraphGuard(owner); }
+            catch(releaseError) { result=graphCleanupFailure(result,releaseError); }
+        }
+        if(groupOpen) {
+            try { app.endUndoGroup(); }
+            catch(undoError) { result=graphCleanupFailure(result,undoError); }
+        }
+        if(owner.released) {
+            try {
+                var saved=graphGuardState(owner.request).value;
+                if(saved!==0)throw new Error("Renderer guard changed after undo closure (guard="+saved+").");
+            } catch(verifyError) { result=graphCleanupFailure(result,verifyError); }
+        }
+        return result;
     }
 
     function nativeSnapshot(resolved) {
@@ -1994,13 +2312,15 @@ function createNativeRecordContract() {
         var resolved = graphCarrierTarget(request);
         if (resolved.error) return fail(resolved.error.code, resolved.error.message);
         request = pinGraphTransaction(request,resolved.token);
-        var groupOpen = false, guarded = false, added = [], previous = [], layer = resolved.target.layer;
+        var groupOpen = false, added = [], previous = [], layer = resolved.target.layer;
+        var owner={request:request,owned:false,released:false},keepRollbackGuard=false,result=null;
         var wasReady = Number(resolved.properties.nodeEffectsReady.value);
         try {
             graphCommitCommand(); // Reject mismatched installation before adding effects.
-            if (Number(resolved.properties.guard.value) !== 0) throw new Error("Another graph transaction owns this renderer.");
+            var guardValue=graphGuardState(request).value;
+            if (guardValue !== 0) throw new Error(graphBusyMessage(guardValue,request));
             app.beginUndoGroup("Starfield: synchronize node effects"); groupOpen = true;
-            resolved.properties.guard.setValue(1); guarded = true;
+            acquireGraphGuard(owner);
             if (wasReady !== 1) {
                 var existing = reconcileNativeRecords(layer), occupied = nodeIds(existing);
                 previous = JSON.parse(JSON.stringify(existing));
@@ -2053,11 +2373,12 @@ function createNativeRecordContract() {
             if(resolved.error)throw new Error(resolved.error.message);
             var snapshot = nativeSnapshot(resolved);
             if (!snapshot.initialized) throw new Error("The renderer did not acknowledge the independent node records.");
-            return reply({ ok: true, operation: "syncGraphSnapshot", requestId: request.requestId || "",
-                target:{token:resolved.token}, nonce:receipt.nonce, snapshot:snapshot });
+            result={ ok: true, operation: "syncGraphSnapshot", requestId: request.requestId || "",
+                target:{token:resolved.token}, nonce:receipt.nonce, snapshot:snapshot };
         } catch (error) {
             var rollbackMessage = "";
             try {
+                if (owner.owned) {
                 if (added.length) {
                     removeNativeNodeEffects(layer, added);
                 }
@@ -2069,16 +2390,14 @@ function createNativeRecordContract() {
                 }
                 var restored = graphCarrierTarget(request);
                 if (restored.error) throw new Error(restored.error.message);
-                if (guarded) restored.properties.nodeEffectsReady.setValue(wasReady);
-            } catch (rollbackError) { rollbackMessage = " Bootstrap rollback failed: " + rollbackError.toString(); }
-            return fail("node_effect_sync_failed", error.toString() + rollbackMessage);
+                restored.properties.nodeEffectsReady.setValue(wasReady);
+                }
+            } catch (rollbackError) { keepRollbackGuard=true;rollbackMessage = " Bootstrap rollback failed; renderer remains guarded: " + rollbackError.toString(); }
+            result={ok:false,error:{code:"node_effect_sync_failed",message:error.toString()+rollbackMessage}};
         } finally {
-            if (guarded) {
-                var clean = graphCarrierTarget(request);
-                if (!clean.error) clean.properties.guard.setValue(0);
-            }
-            if (groupOpen) app.endUndoGroup();
+            result=finishGraphGuard(owner,keepRollbackGuard,groupOpen,result);
         }
+        return reply(result);
     }
 
     function ensureNodeEffects(request) {
@@ -2128,15 +2447,18 @@ function createNativeRecordContract() {
             return fail("node_removal_requires_transaction","Node removal requires the paired full graph transaction.");
         var groupOpen = false;
         var result = null;
+        var keepRollbackGuard = false;
+        var owner={request:request,owned:false,released:false};
         var layer = resolved.target.layer;
         try { graphCommitCommand(); }
         catch (missingCommand) { return fail("graph_commit_unavailable", missingCommand.toString()); }
-        if (Number(resolved.properties.guard.value) !== 0)
-            return fail("graph_transaction_busy", "Another graph transaction owns this renderer.");
+        var guardValue=graphGuardState(request).value;
+        if (guardValue !== 0)
+            return fail("graph_transaction_busy", graphBusyMessage(guardValue,request));
         try {
             app.beginUndoGroup("Starfield: edit graph and nodes");
             groupOpen = true;
-            resolved.properties.guard.setValue(1);
+            acquireGraphGuard(owner);
             ensureNativeNodeEffects(layer, desiredNodes, true, previousNodes);
             removeNativeNodeEffects(layer, removedNodeIds(previousNodes, desiredNodes));
 
@@ -2154,31 +2476,37 @@ function createNativeRecordContract() {
             if (!updated || !updated.initialized || updated.revision <= snapshot.revision) {
                 throw new Error("The host acknowledgement did not match the saved graph snapshot.");
             }
+            // Reject inside the guarded transaction so catch can restore the
+            // prior graph and remove a partially authored new node.
+            verifyAuthoredMotionModes(desiredNodes,updated.nativeNodes,fresh.target.layer);
             result = { ok: true, operation: "submitGraph", requestId: request.requestId || "",
                        target: { token: fresh.token }, nonce: receipt.nonce, snapshot: updated };
         } catch (error) {
             var rollbackMessage = "";
             try {
+                if(owner.owned) {
                 // Inspect what actually survived a partial commit. Rewriting every
                 // parameter would also touch unrelated controls and animation.
                 ensureNativeNodeEffects(layer, previousNodes, true, readNativeNodes(layer));
-                removeNativeNodeEffects(layer, addedNodeIds(previousNodes, desiredNodes));
+                var rollbackAdded=addedNodeIds(previousNodes,readNativeNodes(layer));
+                // Keep published sources physically alive until the old graph
+                // and bindings are restored. Guard3 excludes additions from
+                // compilation without invalidating their old dependencies.
+                if(rollbackAdded.length)retireNativeNodeEffects(layer,rollbackAdded);
                 var restored = graphCarrierTarget(request);
                 if (restored.error) throw new Error(restored.error.message);
                 writeRendererRecord(restored, snapshot.renderer);
                 var rollback = triggerGraphCarrier(restored, "Starfield: restore node graph", request.requestId, null, false);
                 if (!rollback.ok) throw new Error(rollback.error.message);
-            } catch (rollbackError) { rollbackMessage = " Node-effect rollback failed: " + rollbackError.toString(); }
+                removeNativeNodeEffects(layer,rollbackAdded);
+                }
+            } catch (rollbackError) {
+                keepRollbackGuard=true;
+                rollbackMessage = " Node-effect rollback failed; renderer remains guarded: " + rollbackError.toString();
+            }
             result = { ok: false, error: { code: "graph_commit_failed", message: error.toString() + rollbackMessage } };
         } finally {
-            var clean = graphCarrierTarget(request);
-            if (!clean.error) clean.properties.guard.setValue(0);
-            if (groupOpen) {
-                try { app.endUndoGroup(); }
-                catch (endError) {
-                    if (result && result.ok) result = { ok: false, error: { code: "graph_commit_failed", message: endError.toString() } };
-                }
-            }
+            result=finishGraphGuard(owner,keepRollbackGuard,groupOpen,result);
         }
         return reply(result);
     }
@@ -2688,6 +3016,10 @@ function createNativeRecordContract() {
                 for(var i=selected.length-1;i>=0;i--)selected[i].selected=false;
             }
             layer.selected = true;
+            // Clearing AE selections may refresh its wrappers. Resolve the
+            // requested UUID again after that UI mutation, before selecting it.
+            effect=request.nodeId==="000000000000000000000000000000ff"?graphCarrierTarget(request).target.effect:nodeEffectById(layer,request.nodeId);
+            if(!effect)throw new Error("The selected node effect disappeared during selection.");
             effect.selected = true;
             var reveal=app.findMenuCommandId("Starfield Reveal Selected Effect");
             if(!reveal)throw new Error("Native effect reveal requires the current Starfield Host build.");

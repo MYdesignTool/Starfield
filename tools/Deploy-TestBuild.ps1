@@ -7,7 +7,8 @@ param(
     [switch]$KeepNative,
     [switch]$IncludeModel,
     [switch]$IncludeMaterial,
-    [switch]$IncludeMotion
+    [switch]$IncludeMotion,
+    [switch]$IncludeTurbulence
 )
 $ErrorActionPreference = 'Stop'
 if ($Install -and $Rollback) { throw 'Choose one action.' }
@@ -15,6 +16,7 @@ if ($KeepNative -and $Rollback) { throw 'KeepNative belongs to a panel-only inst
 if ($IncludeModel -and $KeepNative) { throw 'Model requires a full native/Core/panel paired installation.' }
 if ($IncludeMaterial -and (-not $IncludeModel -or $KeepNative)) { throw 'Material requires a full -IncludeModel native/Core/panel pair.' }
 if($IncludeMotion -and (-not $IncludeMaterial -or $KeepNative)){throw 'Motion requires a complete -IncludeModel -IncludeMaterial native/Core/panel pair.'}
+if($IncludeTurbulence -and (-not $IncludeMotion -or $KeepNative)){throw 'Turbulence requires a complete -IncludeModel -IncludeMaterial -IncludeMotion native/Core/panel pair.'}
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $destination = (Resolve-Path -LiteralPath $PluginDir).Path
 $bundle = Join-Path $repo 'dist'
@@ -30,15 +32,18 @@ $names = @('StarfieldParticle.aex', 'StarfieldEmitter.aex', 'StarfieldParticleNo
 # Rollback derives the optional module from this exact saved deployment, so the
 # paired Restore tool needs no extra switch and never reinterprets old records.
 if ($Rollback -and (Test-Path -LiteralPath $recordPath)) {
-    $taskRollbackRecord=Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+    $taskRollbackRecord=Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if($taskRollbackRecord.modelCandidate){$IncludeModel=$true}
     if($taskRollbackRecord.materialCandidate){$IncludeMaterial=$true}
     if($taskRollbackRecord.motionCandidate){$IncludeMotion=$true}
+    if($taskRollbackRecord.turbulenceCandidate){$IncludeTurbulence=$true}
 }
 if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldModel.aex'))){$IncludeModel=$true}
 if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMaterial.aex'))){$IncludeMaterial=$true}
 if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMotion.aex'))){$IncludeMotion=$true}
+if($KeepNative -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTurbulence.aex'))){$IncludeTurbulence=$true}
 if(-not $Rollback -and -not $KeepNative -and -not $IncludeMotion -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMotion.aex'))){throw 'Installed Motion requires a complete -IncludeMotion pair; refusing a partial replacement.'}
+if(-not $Rollback -and -not $KeepNative -and -not $IncludeTurbulence -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTurbulence.aex'))){throw 'Installed Turbulence requires a complete -IncludeTurbulence pair; refusing a partial replacement.'}
 if(-not $Rollback -and -not $KeepNative -and -not $IncludeMaterial -and (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldMaterial.aex'))){
     throw 'Installed Material requires a full -IncludeModel -IncludeMaterial pair; refusing a partial replacement.'
 }
@@ -48,6 +53,7 @@ if(-not $Rollback -and -not $KeepNative -and -not $IncludeModel -and (Test-Path 
 if($IncludeModel){$names += 'StarfieldModel.aex'}
 if($IncludeMaterial){$names += 'StarfieldMaterial.aex'}
 if($IncludeMotion){$names += 'StarfieldMotion.aex'}
+if($IncludeTurbulence){$names += 'StarfieldTurbulence.aex'}
 # Preserve CEP-only rollback support for the installed pre-Transform bundle.
 if ($KeepNative -and -not (Test-Path -LiteralPath (Join-Path $bundle 'StarfieldTransform.aex'))) {
     $names = @($names | Where-Object { $_ -ne 'StarfieldTransform.aex' })
@@ -108,7 +114,7 @@ function Restore-Deployment($record) {
     if ($record.selectorExisted) { Copy-Item -LiteralPath (Join-Path $backup 'bundle\current.txt') -Destination $selector }
 }
 if ($Rollback) {
-    $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+    $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (Test-Path -LiteralPath (Join-Path $backup 'rolled-back.txt')) { throw 'Already rolled back.' }
     foreach ($entry in $record.files) {
         if ($allowedNames -notcontains $entry.name) { throw 'Unknown bundle file in rollback record.' }
@@ -123,6 +129,12 @@ if ($Rollback) {
     [IO.File]::WriteAllText((Join-Path $backup 'rolled-back.txt'), 'restored')
     Write-Host 'Previous layout and files restored; candidate retained in backup.'
     exit 0
+}
+# Current source deployments must not ship divergent embedded node validators.
+# Binary-only fixture/legacy checkouts have no contract source. Rollback above
+# restores its exact historical bytes without applying today's contract.
+if(Test-Path -LiteralPath (Join-Path $repo 'tools/candidates/native_record_contract.js')) {
+    & (Join-Path $PSScriptRoot 'Assert-PanelContract.ps1')
 }
 foreach ($source in $sources.Values) { if (-not (Test-Path -LiteralPath $source)) { throw "Missing candidate: $source" } }
 if (Test-Path -LiteralPath $backup) { throw "Backup exists: $backup" }
@@ -151,7 +163,7 @@ if ($KeepNative) {
 }
 New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
-    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel;materialCandidate=[bool]$IncludeMaterial;motionCandidate=[bool]$IncludeMotion}
+    selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel;materialCandidate=[bool]$IncludeMaterial;motionCandidate=[bool]$IncludeMotion;turbulenceCandidate=[bool]$IncludeTurbulence}
 if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
 foreach ($name in $allowedNames) {
     $target = Join-Path $bundle $name

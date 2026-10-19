@@ -1,7 +1,8 @@
 "use strict";
+const panelPath=require("./panel_test_paths.cjs");
 
 const assert = require("node:assert/strict");
-const codec = require("../cep_panel/js/graph_codec.js");
+const codec = require(panelPath("js/graph_codec.js"));
 
 function id(tail) { return "0000000000000000000000000000000" + tail; }
 

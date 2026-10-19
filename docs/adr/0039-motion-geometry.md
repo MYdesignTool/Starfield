@@ -1,11 +1,70 @@
 # ADR 0039 — Motion geometry and first three modes
 
-Status: numeric geometry and all three numeric graph modes implemented;
-Circle author contract accepted for the staged native72/CEP76 release, M3-18.
-native73/CEP77 adds ordered downstream Force and percentage units; frozen SDK/
-panel/paired deployment/rollback gates passed2026-10-12. Actual AE acceptance open.
-Circle AE2023 qualification, the other two authors and remaining interactions
-stay open. Historical Model releases carried numeric Motion without an author.
+## M3-20 native Starting With restoration — 2026-10-18 candidate
+
+The owner confirms OBJ import is restored at native91 and reports no Light Path
+Starting With. CEP91 removed its only authoring UI. Retain disk1715's FLOAT_SLIDER
+length and43 packed chunks, names/count/schema/ABI; expose the length parameter
+as a custom control instead of a numeric widget. Preserve the `Starting With
+Length` parameter name; the control draws only the prompt/value area and opens a
+native prefix dialog. Do not add a custom topic title, which duplicates AE's
+label. No saved-value migration is needed: old names and numeric bank remain
+identical and CEP99 still reads them.
+Empty prefix matches all eligible lights, otherwise exact name-prefix matching;
+Light Path continues to require point lights with a path. Look At shares the
+prefix. Do not silently convert the prefix into a single layer ID.
+
+The dialog retains only owned text/identity/target snapshots. Recheck after
+closing, reject stale/guarded/ambiguous sources, and publish all44 bank fields
+through the Motion author transaction before graph acceptance. Partial writes
+or publication failure restore exact old fields/guard; one undo group. Existing
+normal Motion mode writes keep their behavior. Actual AE acceptance remains open.
+
+The owner reports that Light Path produces no visible result and opening the
+Starting With editor is followed by `missing Light Path source resource` with
+stream -1. Source tracing locates the failure in temporal history: native
+animation sampling rebuilds Motion parameters from numeric aliases and drops
+the frame-scoped SFPL1 resource captured during Smart Pre-Render. Stream -1 is
+the history capture's unset-stream sentinel; this message is Core's missing
+resource error, not a failed AE stream checkout. Sampled Motion nodes must
+retain that frame resource. The same rule applies to the pre-render Look At
+target snapshot; shutter-specific target snapshots still override it. This
+preserves one captured source trajectory across particle birth-time samples
+without recapturing or changing the Light Path source policy.
+
+Status: numeric geometry and all three numeric graph modes implemented. The
+incremental test pair native80 / Core ABI9 / CEP83 was deployed on 2026-10-13;
+the install receipt and post-install hash verification are recorded in
+`artifacts/m3-18-native80-deploy-after.json`. Circle, Light Path and Look At are
+exposed in the native popup/CEP graph, with native values mapped to stable Core
+values1/0/2. Manual AE2023 qualification remains open, as do exact arbitrary
+Light Path source interpolation and external-light cache invalidation. The
+separate high-node-count deletion warning is deferred to M3-17. Historical
+Model releases carried numeric Motion without an author.
+
+The deployed native80 AE2023 May2023 x64 pair links the Core and all nine AEX
+modules. Light Path captures bounded adaptive AE-evaluated samples per matched
+point light and plays each source track independently; it remains a numeric
+piecewise-linear approximation, not exact arbitrary AE interpolation. External
+light cache invalidation and full host qualification remain open. The owner has
+deferred the separate high-node-count node-deletion warning to M3-17; no deletion
+repair is part of this Motion increment.
+
+### Look At shutter targets — source follow-up, 2026-10-13
+
+When comp motion blur is active, capture each Look At target packet at the exact
+PF time of its shutter sample. Use that graph to evaluate the particle sample and
+include the packet bytes in the SmartFX cache identity. Force direct shutter
+samples for Look At instead of interpolating endpoint particle poses, because
+the nearest matching light can change during exposure. The adapter is extracted
+as a testable AE seam. Its fake-SDK regression captures nonempty animated light
+targets at separate shutter times and checks target-packet/cache-key changes,
+deterministic repeated capture, PF input preservation, and suite cleanup; the
+standard and ASAN light-source suites each pass8,600 checks. The earlier
+no-publish May2023 x64 candidate built Core, main and all nine node AEX modules
+before the native80/CEP83 staged deployment. This is offline adapter evidence,
+not AE2023 qualification. External-layer cache notification remains an AE
+qualification gate.
 
 ## Owner-approved incremental publication — 2026-10-10
 
@@ -22,6 +81,46 @@ Next work can select one publicly operable Motion stage when the goal resumes.
 
 The later owner resume supersedes that pause. Circle's author stage deployed
 2026-10-12; complete Motion/Turbulence work remains active.
+
+## Light Path native binding migration — implementation notes
+
+The Light Path author controls append after the existing Motion curve bank and
+keep their assigned disk IDs stable. Hidden Starting With UTF-8 storage uses a
+length plus 43 constant 24-bit numeric chunks for at most 128 bytes; it is
+reconstructed into the graph's UTF-8 parameter and is not a render-time host
+stream. Max Delay, Delay Random and Orient To Path are animated controls. After
+Path is a constant Stop/Continue popup.
+
+Private binding record10 extends the Motion field span from142 through190 so
+the appended controls can be recorded and their animated values receive numeric
+aliases. Binding readers1..9 retain their original layouts. A legacy Motion
+binding9 graph is read with Max Delay0.5 seconds, Delay Random0, Orient To Path
+false and Stop defaults; its next edit writes the new aliases. During render
+sampling, Starting With is carried from the already validated graph parameter,
+so animation sampling does not acquire or access an AEGP stream for the hidden
+constant text controls. CoreABI9, snapshot formats and released AE disk IDs do
+not change.
+
+This section records the earlier pre-deployment implementation stage. The
+native Motion Type selector, CEP Starting With field, gateway UTF-8 prefix
+round-trip, render-time SFPL1 capture and binding10 are included in the deployed
+native80/CEP83 test pair. The edited main AEX and Motion NodeEffect C++ targets
+compile with the May2023 SDK. Earlier 32-bit MSBuild and PiPLtool invocations
+failed; the subsequent constrained cached-conversion path completed the
+native80 build. The generated PiPL batch uses ASCII relative paths so
+preprocessing works from the non-ASCII checkout. Focused
+binding/resource/graph/history/Model regression/panel suites pass. The paired
+test candidate is deployed; exact receipt and rollback details are in
+`docs/current-state.md`.
+
+Light Path currently stores bounded adaptive AE-evaluated path samples and Core
+plays them piecewise-linearly. The observed probe deviation is not a proof of
+exact preservation of source interpolation between all captured instants. This
+remains a completion gate, along with external light invalidation and host
+qualification. Starting With prefix persistence and Look At nearest-light
+capture are included in native80/CEP83. The owner has deferred the separate
+deletion warning, which appears correlated with high node counts, to M3-17; it
+is not part of this Motion increment.
 
 ## Scope and evidence
 
@@ -91,8 +190,29 @@ compatible particle-processing modules must compose in arbitrary order;
 native73 implements the downstream Force behavior and removes native72's temporary
 Force-after-Motion restriction. Remaining placements and branch merges still need
 their actual ordered behavior, rather than merely bypassing validation.
-Distinct-chain merges must likewise preserve branch-local computations. Graph
-cycles and incompatible port value kinds remain structural errors.
+Output fan-out and branch-local computations are specified by the source-candidate
+contract below. Graph cycles and incompatible port value kinds remain structural
+errors.
+
+### Output fan-out and branch-local evaluation — source candidate, 2026-10-13
+
+For each Particle stream, Core now plans each path ending at an Output input
+independently. The path's connected Force, Transform and Motion stages execute in
+edge order; sibling paths do not share modifier state. Output combines the
+resulting streams, so a fan-out contributes one copy per connected Output path.
+Those copies receive deterministic route-scoped particle identities, while the
+emitter's birth slots are partitioned once per Particle node (fan-out does not
+split or re-roll the source population). This makes results independent of node
+array order and edge insertion order.
+
+The branch contract is exercised in ordinary and temporal evaluation, including
+Motion plus a direct Particle-to-Output route, different Light Path branches,
+Force isolation and reversed node/edge arrays. This supports Output fan-out and
+its stream union. It does not introduce reconvergent particle joins at an
+intermediate single-input processor; graph ports remain the authority for which
+connections are structurally valid. This is an implementation contract for the
+owner's edge-ordered modular graph, not a claim about undocumented reference
+merge behavior. Actual AE2023 render and author behavior remain host gates.
 
 Motion Speed values are percentages. Circle100%=one turn/second, so its existing
 100-to2*pi conversion remains numerically correct; expose the percentage unit.
@@ -578,6 +698,67 @@ Path author. External light selection/order, dependency invalidation/GUID,
 selector/thread qualification, units and reference delay/end policies must be
 completed before the three-mode native/CEP pairing is released.
 
+### SFPL1 Motion graph/history integration — unpublished, 2026-10-13
+
+The resource-backed Light Path branch is now connected to ordinary and temporal
+Core graph evaluation. Motion key16 carries the checked SFPL1 byte resource;
+key17 carries Speed percent, and key18 carries the two-value Stop/Continue enum.
+Existing Motion keys5 and6 supply stable Speed Random and Motion Over Life. Each
+source retains its own rational first/last CompTime clock and sampled trajectory.
+At evaluation, each source independently maps particle age through its clock;
+its displacement from its own first position and its velocity are accumulated in
+composition order. Continue uses the last captured direction and reported clock
+overshoot; Stop holds the last captured position. The request-wide work and memory
+caps, cancellation, and temporal resource sampling remain in force.
+
+This remains unpublished and is not operable in the installed AE pairing. The
+unpublished native Motion effect and CEP inspector now expose Light Path and
+Starting With, and binding10 persists the prefix through graph key19. Smart
+Pre-Render resolves it to point-light IDs, captures per-light tracks, injects
+SFPL1 into the render graph and mixes its bytes into the PF render GUID. Duplicate
+prefixes in one pre-render reuse the captured snapshot. GUID mixing makes the
+captured resource part of render identity but does not prove AE recaptures it after
+an external light edit. The captured piecewise-linear track remains a bounded
+approximation of AE's evaluated interpolation. Do not advertise Light Path or
+deploy this stage by itself.
+
+The focused Core graph/resource fixture passes 10,471 checks in both standard
+and ASAN builds. The x86-host MSBuild attempt failed at Core link with
+LNK1101/MSPDB140 version mismatch; using the installed 64-bit MSBuild compiles
+and links Core. The full unpublished build then stops at PiPL generation because
+the local Adobe SDK `PiPLtool.exe` fails Windows process startup with an invalid
+system DLL relocation. `BuildPiPL.ps1` now passes ASCII relative paths through its
+generated batch, and the resource preprocessor successfully creates the `.rr`
+intermediate from this non-ASCII checkout. No AE acceptance or deployment was run.
+
+No complete native candidate was produced. Build evidence is
+`artifacts/m3-18-motion-binding10-x64msbuild-build.log`; Core output is under
+`artifacts/core-dll/m3-18-motion-binding10-x64msbuild/`.
+
+### Look At light-target author increment — source only, 2026-10-13
+
+The third native Motion Type choice is Look At. Its author surface reuses the
+existing Starting With prefix and Motion Over Life curve. At pre-render time the
+adapter resolves all prefix-matched composition lights in composition order,
+captures their current layer origins relative to the Starfield owner, and places
+the owned values in an `SFLA` render-only packet. The packet carries stable
+composition-local layer IDs and finite bounded positions, is capped at256
+targets, and is mixed into the PF render GUID. It is attached only to the
+in-memory frame graph, not saved to the project's authored graph.
+
+Core chooses the target with the smallest current particle-to-light distance for
+each particle; equal distances keep the first source in composition order. A
+2D-limited particle compares only XY. An empty matched set preserves its current
+orientation. Numeric static-goal Look At graphs remain readable. This captures
+the light positions at the render frame; it does not capture a shutter-time
+light trajectory. The source candidate passed1,492 target/graph checks in
+standard and ASAN builds,39 panel checks,18 JSX ES3 syntax checks and a full
+May2023 x64 build. A subsequent source edit adds
+`PF_OutFlag2_I_USE_3D_LIGHTS` to match the main effect's actual light-suite use;
+rebuild before publication. The installed native77/CEP81 pair does not contain
+this author. AE2023 qualification, external-light cache refresh review and staged
+deployment remain open.
+
 The numeric graph/history stage is implemented2026-10-10. MSVC /MT standard and
 ASAN each pass8288 checks: SFMP1 max-size roundtrip/every truncation/header/number
 validation before allocation, actual graph/codec/snapshot9, metadata versus
@@ -691,6 +872,30 @@ flags must be implemented and paired in PiPL/runtime before advertising them.
 Graph revision alone cannot certify that animated external points are constant.
 This is an integration requirement, not a reproduced cache defect in the unused
 capture seam. Binding/metadata/ABI changes need their append-only migration plan.
+
+### Light Path source type filter
+
+The Light Path author resolves `Starting With` against the owned composition light
+inventory using exact UTF-16 prefix matching and preserves composition order. Its
+eligible set contains `AEGP_LightType_POINT` only. The shared inventory keeps AE
+light type as an owned numeric value; the selector retains no SDK handles. The
+The owner requested each matching point-light trajectory to be evaluated
+independently and combined. The selector does not remove matches based on
+`video_active`; that caller policy remains separate. Empty matches return an empty
+selection. At Smart Pre-Render, an empty Point Light selection or a selection whose
+sampled positions never change reports an explicit source-path error instead of
+silently encoding an empty resource. Selected sources with fewer than two distinct
+Position keyframe times are still skipped; their all-static result is surfaced by
+the same diagnostic. The owner then reported native95's empty-match message while
+confirming same-comp `Point Light 1` and prefix `P`. Native96 extends the empty
+match report with composition object-type counts, the render-time prefix, name and
+point match counts, and the first captured light name. The owner's native96 dialog
+reports `prefix='p'` and `first='Point Light 1'`, confirming AE layer
+classification and type are correct while the saved lowercase prefix fails the
+existing case-sensitive match. Correct the prefix to uppercase `P` or the full
+exact layer name. Actual particle following after the correction still requires
+AE host verification. The selector remains connected to render-time resource
+capture and Light Path authoring; this source is not yet fully qualified for AE.
 
 Confirm reference resource/units/Origin Type/Starting With policies before
 publishing controls. Then define explicit append-only Motion identity, author

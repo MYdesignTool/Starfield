@@ -25,6 +25,9 @@
 #elif defined(STARFIELD_NODE_KIND_MOTION)
 #define STARFIELD_NODE_NAME "Starfield Motion"
 #define STARFIELD_NODE_MATCH "org.starfieldfx.node.motion"
+#elif defined(STARFIELD_NODE_KIND_TURBULENCE)
+#define STARFIELD_NODE_NAME "Starfield Turbulence"
+#define STARFIELD_NODE_MATCH "org.starfieldfx.node.turbulence"
 #else
 #error Define exactly one STARFIELD_NODE_KIND_* for each node module.
 #endif

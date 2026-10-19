@@ -3,6 +3,7 @@
 #include "GraphCarrier.hpp"
 #include "NativeNodeGraph.hpp"
 #include "Parameters.hpp"
+#include "MotionBlur.hpp"
 #include "WorldBridge.hpp"
 #include "AE_EffectCB.h"
 #include "starfield/core/SequenceCodec.hpp"
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -26,10 +28,14 @@ bool fake_native_compile = false;
 struct NativeBindingTransaction::Impl {};
 NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH)
     : impl_(std::make_unique<Impl>()) {}
+NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH,AEGP_LayerH)
+    : impl_(std::make_unique<Impl>()) {}
 NativeBindingTransaction::~NativeBindingTransaction() = default;
-PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*) noexcept { return PF_Err_NONE; }
+PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*,const char**,A_long*,const core::Graph*,bool,bool) noexcept { return PF_Err_NONE; }
+PF_Err NativeBindingTransaction::retire_after_publication(A_long*,const char**) noexcept { return PF_Err_NONE; }
+PF_Err NativeBindingTransaction::rollback_model_resources() noexcept { return PF_Err_NONE; }
 void NativeBindingTransaction::accept() noexcept {}
-PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long, A_long*, const char**, const core::NodeId*) noexcept { return PF_Err_NONE; }
+PF_Err sample_native_node_animation(PF_InData*, core::Graph&, A_long, A_long, A_long*, const char**, const core::NodeId*, NativeBindingFailure*) noexcept { return PF_Err_NONE; }
 // Sibling-effect enumeration is qualified in the native host check. This fake
 // host deliberately has no AEGP effect parade; it must not silently compile one.
 PF_Err compile_native_node_graph(PF_InData*, PF_ParamDef*[], core::Graph& graph, bool& found,
@@ -107,7 +113,7 @@ PF_Err checkin(PF_ProgPtr, PF_ParamDef* value) {
 PF_Err add_param(PF_ProgPtr, PF_ParamIndex, PF_ParamDef* value) { registered.push_back(*value); return PF_Err_NONE; }
 
 PF_ArbParamsExtra call_for(PF_FunctionSelector function) {
-    PF_ArbParamsExtra call{}; call.id = kGraphParameterId; call.which_function = function; return call;
+    PF_ArbParamsExtra call{}; call.id = kGraphParameterDiskId; call.which_function = function; return call;
 }
 PF_Err invoke(PF_InData& host, PF_ArbParamsExtra& call) { return graph_arbitrary_callback(&host, &call); }
 PF_ArbitraryH new_value(PF_InData& host) {
@@ -176,7 +182,11 @@ void test_callbacks(PF_InData& host) {
     auto graph = graph_from_controls(settings);
     CHECK(graph.has_value());
     PF_ArbitraryH different = nullptr;
-    CHECK(create_graph_parameter(&host, graph.value(), &different) == PF_Err_NONE);
+    std::uint32_t checksum{};
+    CHECK(create_graph_parameter(&host, graph.value(), &different,&checksum) == PF_Err_NONE);
+    std::uint32_t stored_checksum{};
+    for(unsigned i=0;i<4;++i)stored_checksum|=std::to_integer<std::uint32_t>(handles.at(different)->bytes[24+i])<<(8u*i);
+    CHECK(checksum==stored_checksum);
     call.u.compare_func_params.b_arbH = different;
     CHECK(invoke(host, call) == PF_Err_NONE); CHECK(comparison == PF_ArbCompare_NOT_EQUAL);
     for (const double time : {0.0, 0.5, 1.0}) {
@@ -196,7 +206,9 @@ void test_callbacks(PF_InData& host) {
     CHECK(invoke(host, call) != PF_Err_NONE); CHECK(restored == nullptr && handles.size() == live);
     // Failure to lock a newly allocated handle must dispose it.
     fail_lock = true;
-    CHECK(create_graph_parameter(&host, graph.value(), &restored) == PF_Err_OUT_OF_MEMORY);
+    checksum=0xdeadbeefu;
+    CHECK(create_graph_parameter(&host, graph.value(), &restored,&checksum) == PF_Err_OUT_OF_MEMORY);
+    CHECK(checksum==0xdeadbeefu);
     CHECK(restored == nullptr && handles.size() == live);
     call.id = 99; CHECK(invoke(host, call) == PF_Err_BAD_CALLBACK_PARAM);
     CHECK(!read_graph_parameter(&host, nullptr).has_value());
@@ -233,7 +245,7 @@ void test_parameters(PF_InData& host) {
     CHECK((graph_guard.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
     CHECK((graph_guard.ui_flags & PF_PUI_INVISIBLE) != 0);
     CHECK(std::strcmp(graph_guard.name, "Panel Graph Sync Guard") == 0);
-    CHECK(kTotalEffectParameterCount == 91);
+    CHECK(kTotalEffectParameterCount == 1011);
     const auto& revision = registered[kGraphRevisionId - 1];
     CHECK(std::strcmp(revision.name, "Graph Revision") == 0);
     CHECK((revision.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
@@ -257,13 +269,23 @@ void test_parameters(PF_InData& host) {
             --group_depth;
         }
     }
-    CHECK(group_depth == 0 && group_count == 1);
+    CHECK(group_depth == 0 && group_count == 5);
     const auto& launcher=registered[0];
     CHECK(launcher.name[0]=='\0' && launcher.uu.id==1631 && launcher.param_type==PF_Param_NO_DATA);
-    CHECK(launcher.ui_flags==(PF_PUI_TOPIC|PF_PUI_CONTROL|PF_PUI_DONT_ERASE_TOPIC) && launcher.ui_width==304 && launcher.ui_height==104);
+    CHECK(launcher.ui_flags==(PF_PUI_TOPIC|PF_PUI_CONTROL|PF_PUI_DONT_ERASE_TOPIC) && launcher.ui_width==304 && launcher.ui_height==130);
     CHECK((launcher.flags&PF_ParamFlag_CANNOT_TIME_VARY)!=0);
-    for (const std::size_t index : {10u, 11u, 19u, 20u, 25u, 80u, 84u, 85u, 88u}) {
-        const auto& slot = registered[index - 1];
+    // Bootstrap labels preserve their disk identity after native layout
+    // compaction; the number in the label is not the current stream index.
+    for (const char* name : {"Bootstrap Slot 10", "Bootstrap Slot 11", "Bootstrap Slot 19",
+        "Bootstrap Slot 20", "Bootstrap Slot 25", "Bootstrap Slot 80", "Bootstrap Slot 84",
+        "Bootstrap Slot 85", "Graph Checksum High"}) {
+        const auto found = std::find_if(registered.begin(), registered.end(),
+            [name](const PF_ParamDef& value) { return std::strcmp(value.name, name) == 0; });
+        CHECK(found != registered.end());
+        if (found == registered.end()) continue;
+        CHECK(std::count_if(registered.begin(), registered.end(),
+            [name](const PF_ParamDef& value) { return std::strcmp(value.name, name) == 0; }) == 1);
+        const auto& slot = *found;
         CHECK(slot.param_type == PF_Param_FLOAT_SLIDER);
         CHECK((slot.ui_flags & PF_PUI_INVISIBLE) != 0);
         CHECK((slot.flags & PF_ParamFlag_CANNOT_TIME_VARY) != 0);
@@ -279,7 +301,11 @@ void test_parameters(PF_InData& host) {
     checked_indices.clear();
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(snapshot && checked_out.empty() && active_source == kNodeControlSource);
-    CHECK(checked_indices == std::vector<A_long>({kControlSourceId, kGraphParameterId}));
+    auto expected_checkouts=std::vector<A_long>({kControlSourceId, kGraphSyncGuardId,kGraphParameterId,
+        kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,
+        kTimeSamplingHzId, kAccelerationId});
+    expected_checkouts.insert(expected_checkouts.end(),kMotionParameterIds.begin(),kMotionParameterIds.end());
+    CHECK(checked_indices == expected_checkouts);
     const auto frozen = core::serialize_graph(*snapshot, core::particle_node_registry());
     CHECK(frozen.has_value());
     const auto previous = parameters[kGraphParameterId].u.arb_d.value;
@@ -401,7 +427,8 @@ void test_parameters(PF_InData& host) {
     CHECK(!snapshot && checked_out.empty()); fail_checkout = -1;
     dispose(parameters[kGraphParameterId].u.arb_d.value);
     dispose(previous); // replaced by capture; in AE the host owns and frees it
-    dispose(registered[kGraphParameterId - 1].u.arb_d.dephault);
+    for(const auto& definition:registered)if(definition.param_type==PF_Param_ARBITRARY_DATA)
+        dispose(definition.u.arb_d.dephault);
 }
 
 void test_point_control_preview_scale(PF_InData& host) {
@@ -741,7 +768,7 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(registered[kMaxParticlesId-1].u.fs_d.value==1000000 && registered[kMaxParticlesId-1].u.fs_d.dephault==1000000);
     CHECK(registered[89].param_type==PF_Param_GROUP_START && registered[89].ui_flags==PF_PUI_NONE);
     CHECK(registered[93].param_type==PF_Param_GROUP_START && registered[93].ui_flags==PF_PUI_NONE);
-    CHECK(std::strcmp(registered[kTimeRemapEnabledId-1].name,"Time Remapping On / Off")==0 && registered[kTimeRemapEnabledId-1].param_type==PF_Param_CHECKBOX);
+    CHECK(std::strcmp(registered[kTimeRemapEnabledId-1].name,"On / Off")==0 && registered[kTimeRemapEnabledId-1].param_type==PF_Param_CHECKBOX);
     CHECK(std::strcmp(registered[kPreviewChanceId-1].name,"Particle chance")==0 && registered[kPreviewChanceId-1].u.fs_d.dephault==100);
     CHECK((registered[kTimeRemapSecondsId-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0);
     CHECK(registered[kAccelerationId-1].param_type==PF_Param_POPUP);
@@ -789,10 +816,48 @@ void test_renderer_controls(PF_InData& host) {
     CHECK(checkout_render_graph(&host,&output,graph)!=0 && !graph && checked_out.empty());
     fail_checkout=-1;
     dispose(parameters[kGraphParameterId].u.arb_d.value);
-    dispose(registered[kGraphParameterId-1].u.arb_d.dephault);
+    for(const auto& definition:registered)if(definition.param_type==PF_Param_ARBITRARY_DATA)
+        dispose(definition.u.arb_d.dephault);
+}
+
+void benchmark_publication_encoding(PF_InData& host) {
+    // Both branches use the same graph, allocator and build. This measures the
+    // removed duplicate encoding only; it is not an AE frame-rate benchmark.
+    for(const unsigned target:{4u,64u,256u}){
+        auto graph=graph_from_controls(core::Settings{}).take_value();
+        const auto emitter=graph.nodes.front();
+        while(graph.nodes.size()<target){
+            auto node=emitter;const auto index=static_cast<unsigned>(graph.nodes.size());
+            node.id.value.bytes[0]=0xee;node.id.value.bytes[14]=static_cast<std::uint8_t>(index>>8);
+            node.id.value.bytes[15]=static_cast<std::uint8_t>(index);graph.nodes.push_back(std::move(node));
+        }
+        std::array<double,5> twice{},once{};
+        for(unsigned sample=0;sample<5;++sample)for(unsigned order=0;order<2;++order){
+            const bool duplicate=((sample+order)%2)==0;
+            const auto start=std::chrono::steady_clock::now();
+            for(unsigned repeat=0;repeat<31;++repeat){
+                std::uint32_t prior{};
+                if(duplicate){
+                    const auto bytes=core::serialize_graph(graph,core::particle_node_registry());
+                    CHECK(bytes.has_value());
+                    for(unsigned i=0;i<4;++i)prior|=std::to_integer<std::uint32_t>(bytes.value()[24+i])<<(8u*i);
+                }
+                PF_ArbitraryH value{};std::uint32_t checksum{};
+                CHECK(create_graph_parameter(&host,graph,&value,&checksum)==0);
+                if(duplicate)CHECK(prior==checksum);
+                dispose(value);
+            }
+            const double micros=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count()/31;
+            (duplicate?twice:once)[sample]=micros;
+        }
+        std::sort(twice.begin(),twice.end());std::sort(once.begin(),once.end());
+        std::printf("Graph encoding %zu nodes: duplicate %.2f us, single %.2f us, reduction %.1f%% (median)\n",
+            graph.nodes.size(),twice[2],once[2],100*(1-once[2]/twice[2]));
+    }
 }
 
 int main() {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     PF_UtilCallbacks utils{};
     utils.host_new_handle = allocate; utils.host_lock_handle = lock;
     utils.host_unlock_handle = unlock; utils.host_dispose_handle = dispose; utils.host_get_handle_size = size_of;
@@ -812,6 +877,7 @@ int main() {
     test_world_copy_cancellation();
     test_world_output_is_transparent_outside_particles();
     test_numeric_graph_receipt(host);
+    benchmark_publication_encoding(host);
 #endif
     CHECK(handles.empty() && checked_out.empty());
     std::printf("%d adapter checks, %d failures\n", checks, failures);

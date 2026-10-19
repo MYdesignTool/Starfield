@@ -304,18 +304,23 @@ PF_Err particle_gradient_event(PF_InData* data,PF_OutData* out,PF_ParamDef* para
 PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept {
     return particle_rotation_curve_event(data,out,params,event,false);
 }
-PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event,bool motion) noexcept try {
+PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event,bool motion) noexcept {
+    return particle_rotation_curve_event(data,out,params,event,motion,false);
+}
+PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event,bool motion,bool turbulence) noexcept try {
     if(!data || !out || !event)return PF_Err_NONE;
     if(event->e_type==PF_Event_CLOSE_CONTEXT){
         erase_curve_context(event->contextH);
         return PF_Err_NONE;
     }
-    if(!event->contextH || !(motion?native_nodes::motion_layout::curve_base(event->effect_win.index):layout::curve_base(event->effect_win.index)) || event->effect_win.area!=PF_EA_CONTROL ||
+    if(motion && data->num_params!=native_nodes::parameter_count(native_nodes::Kind::motion))return PF_Err_NONE;
+    if(!event->contextH || !(motion?native_nodes::motion_layout::curve_base(event->effect_win.index):
+        turbulence?native_nodes::turbulence_layout::curve_base(event->effect_win.index):layout::curve_base(event->effect_win.index)) || event->effect_win.area!=PF_EA_CONTROL ||
        !params || !params[event->effect_win.index])return PF_Err_NONE;
     const auto base=event->effect_win.index;
     const bool rotation=!motion&&base==layout::rotation_curve;
     const double minimum=rotation?-32768.0:0.0,maximum=rotation?32768.0:100.0;
-    const auto mode_index=layout::curve_interpolation(base);
+    const auto mode_index=turbulence?native_nodes::turbulence_layout::curve_last:layout::curve_interpolation(base);
     if(!params[mode_index])return PF_Err_NONE;
     core::AgeCurve value{};
     const auto mode=params[mode_index]->u.fs_d.value;
@@ -324,8 +329,8 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
     const double count=params[base]->u.fs_d.value;
     if(count==0) {
         const auto endpoint=base==layout::size_curve?layout::size_over_life:layout::opacity_over_life;
-        if(!rotation && !motion && !params[endpoint])return PF_Err_NONE;
-        value.count=2;value.points[0]={0,rotation?0.0:100.0};value.points[1]={1,rotation?0.0:motion?100.0:params[endpoint]->u.fs_d.value};
+        if(!rotation && !motion && !turbulence && !params[endpoint])return PF_Err_NONE;
+        value.count=2;value.points[0]={0,rotation?0.0:100.0};value.points[1]={1,rotation?0.0:(!motion&&!turbulence)?params[endpoint]->u.fs_d.value:100.0};
     }
     else {
         if(!std::isfinite(count) || count<2 || count>core::kMaxAgeCurvePoints || std::floor(count)!=count)return PF_Err_NONE;
@@ -338,7 +343,8 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
     }
     if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
     std::array<std::uint16_t,8> identity{};
-    const auto identity_first=native_nodes::uuid_first_index(motion?native_nodes::Kind::motion:native_nodes::Kind::particle);
+    const auto identity_first=native_nodes::uuid_first_index(motion?native_nodes::Kind::motion:
+        turbulence?native_nodes::Kind::turbulence:native_nodes::Kind::particle);
     for(A_long i=0;i<8;++i) {
         const auto* field=params[identity_first+i];
         if(!field || field->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;

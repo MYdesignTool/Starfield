@@ -60,6 +60,104 @@ Result<const OpaqueBytes*> read_motion_path_points(const GraphNode& node,const C
     if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path request work limit");
     return checked.has_value()?R::success(bytes):R::failure(checked.error());
 }
+Result<MotionLightPathSettings> read_motion_light_path_settings(const GraphNode& node) {
+    using R=Result<MotionLightPathSettings>;MotionLightPathSettings s;
+    if(const auto* raw=find_value(node,kMotionPathSpeedPercent)) {
+        const auto* speed=std::get_if<double>(raw);
+        if(!speed)return R::failure(ErrorCode::invalid_request,"invalid Light Path Speed percent");
+        s.clock.speed_percent=*speed;
+    }
+    for(auto [key,destination]:{std::pair{kMotionPathDelay,&s.max_delay_seconds},
+        std::pair{kMotionSpeedRandom,&s.clock.speed_random_percent}})
+        if(const auto* value=find_value(node,key)){const auto* number=std::get_if<double>(value);
+            if(!number)return R::failure(ErrorCode::invalid_request,"invalid Light Path clock value");*destination=*number;}
+    if(const auto* value=find_value(node,kMotionPathDelayRandom)) {
+        const auto* random=std::get_if<double>(value);
+        if(!random)return R::failure(ErrorCode::invalid_request,"invalid Light Path Delay Random");
+        s.delay_random_percent=*random;
+    }
+    if(const auto* value=find_value(node,kMotionPathEndBehavior)) {
+        const auto* mode=std::get_if<std::uint32_t>(value);
+        if(!mode||*mode>1)return R::failure(ErrorCode::invalid_request,"invalid Light Path end behavior");
+        s.clock.end_behavior=static_cast<MotionPathEndBehavior>(*mode);
+    }
+    if(const auto* value=find_value(node,kMotionPathOrient)) {
+        const auto* flag=std::get_if<std::uint32_t>(value);
+        if(!flag||*flag>1)return R::failure(ErrorCode::invalid_request,"invalid Light Path orient flag");
+        s.orient_to_path=*flag==1;
+    }
+    if(const auto* value=find_value(node,kMotionForward)) {
+        const auto* forward=std::get_if<Vec3>(value);
+        if(!forward)return R::failure(ErrorCode::invalid_request,"invalid Light Path forward");s.forward=*forward;
+    }
+    if(const auto* value=find_value(node,kMotionOverLife)) {
+        const auto* bytes=std::get_if<OpaqueBytes>(value);
+        if(!bytes||!decode_age_curve(*bytes,s.clock.over_life,0,1000))
+            return R::failure(ErrorCode::invalid_request,"invalid Light Path Over Life");
+    }
+    auto checked=compile_motion_curve_clock(s.clock.over_life);
+    if(!checked.has_value())return R::failure(checked.error());
+    if(!std::isfinite(s.max_delay_seconds)||s.max_delay_seconds<0||s.max_delay_seconds>1e6||
+       !std::isfinite(s.delay_random_percent)||s.delay_random_percent<0||s.delay_random_percent>100||
+       !std::isfinite(s.clock.speed_percent)||s.clock.speed_percent<0||s.clock.speed_percent>1e6||
+       !std::isfinite(s.clock.speed_random_percent)||s.clock.speed_random_percent<0||s.clock.speed_random_percent>100||
+       !motion_circle_detail::bounded(s.forward)||(s.orient_to_path&&s.forward.x==0&&s.forward.y==0&&s.forward.z==0))
+        return R::failure(ErrorCode::invalid_request,"Light Path setting outside supported bounds");
+    return R::success(std::move(s));
+}
+class MotionLightResourceWorkCancellation final:public Cancellation {
+    const Cancellation& source_;std::uint64_t& work_;mutable bool exceeded_{};
+public:
+    MotionLightResourceWorkCancellation(const Cancellation& source,std::uint64_t& work):source_(source),work_(work){}
+    bool is_cancelled()const noexcept override {
+        if(source_.is_cancelled())return true;
+        if(++work_>20'000'000){exceeded_=true;return true;}return false;
+    }
+    bool exceeded()const noexcept{return exceeded_;}
+};
+Result<MotionLightPathResource> read_motion_light_path_resource(const GraphNode& node,
+    const Cancellation& cancel,std::uint64_t& work,std::size_t& bytes_used) {
+    using R=Result<MotionLightPathResource>;
+    const auto* raw=find_value(node,kMotionPathLightResource);const auto* bytes=raw?std::get_if<OpaqueBytes>(raw):nullptr;
+    if(!bytes)return R::failure(ErrorCode::invalid_request,"missing Light Path source resource");
+    if(bytes_used>kMotionPathRequestBytes||bytes->size()>kMotionPathRequestBytes-bytes_used)
+        return R::failure(ErrorCode::work_limit_exceeded,"Light Path request resource limit");
+    MotionLightResourceWorkCancellation charged(cancel,work);
+    auto result=decode_motion_light_path_resource(*bytes,charged);
+    if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path resource work limit");
+    if(!result.has_value())return R::failure(result.error());
+    bytes_used+=bytes->size();return result;
+}
+Result<CompiledMotionLightPath> compile_motion_graph_light_path(const MotionLightPathResource& resource,
+    const MotionLightPathSettings& settings,const Cancellation& cancel,std::uint64_t& work,std::size_t& bytes_used) {
+    using R=Result<CompiledMotionLightPath>;
+    MotionLightResourceWorkCancellation charged(cancel,work);
+    auto compiled=compile_motion_light_path(resource,settings,charged);
+    if(charged.exceeded())return R::failure(ErrorCode::work_limit_exceeded,"Light Path compile work limit");
+    if(!compiled.has_value())return compiled;
+    const auto bytes=compiled.value().storage_bytes();
+    if(bytes_used>kMotionPathRequestBytes||bytes>kMotionPathRequestBytes-bytes_used)
+        return R::failure(ErrorCode::work_limit_exceeded,"Light Path request storage limit");
+    bytes_used+=bytes;return compiled;
+}
+Result<bool> apply_motion_light_path_sample(ParticleInstance& particle,const MotionLightPathSettings& settings,
+    const MotionLightPathEvaluation& value,std::span<const ParticleSpriteBasis> bases) noexcept {
+    using R=Result<bool>;auto next=particle;
+    next.position={next.position.x+value.displacement.x,next.position.y+value.displacement.y,next.position.z+value.displacement.z};
+    next.velocity={next.velocity.x+value.velocity.x,next.velocity.y+value.velocity.y,next.velocity.z+value.velocity.z};
+    if(!motion_circle_detail::bounded(next.position)||!motion_circle_detail::bounded(next.velocity))
+        return R::failure(ErrorCode::invalid_request,"Light Path particle state exceeds bounds");
+    const auto direction=value.combined_direction;
+    if(settings.orient_to_path&&(direction.x!=0||direction.y!=0||direction.z!=0)) {
+        auto forward=particle_motion_forward(next,settings.forward,bases);
+        if(!forward.has_value())return R::failure(forward.error());
+        auto target=direction,current=forward.value();
+        if(next.limit_to_2d){target.z=0;current.z=0;}
+        auto pose=turn_motion_pose(next.motion_pose,current,target,1);
+        if(!pose.has_value())return R::failure(pose.error());next.motion_pose=pose.take_value();
+    }
+    particle=std::move(next);return R::success(true);
+}
 Result<CompiledMotionPathTravel> compile_motion_graph_path(const GraphNode& node,const MotionPathTravelSettings& settings,
     const Cancellation& cancel,std::uint64_t& work,std::size_t& bytes_used) {
     using R=Result<CompiledMotionPathTravel>;
@@ -74,11 +172,29 @@ Result<CompiledMotionPathTravel> compile_motion_graph_path(const GraphNode& node
     if(storage>kMotionPathRequestBytes-bytes_used)return R::failure(ErrorCode::work_limit_exceeded,"Light Path request storage limit");
     bytes_used+=storage;return compiled;
 }
-Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node) {
+Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node,const Cancellation& cancellation) {
     using R=Result<MotionLookAtSettings>;MotionLookAtSettings s;
-    for(auto [key,destination]:{std::pair{kMotionGoal,&s.goal},std::pair{kMotionForward,&s.forward}}) {
-        const auto* raw=find_value(node,key);const auto* value=raw?std::get_if<Vec3>(raw):nullptr;
-        if(!value||!motion_circle_detail::bounded(*value))return R::failure(ErrorCode::invalid_request,"missing/invalid Look At goal/forward");*destination=*value;
+    const auto* target_raw=find_value(node,kMotionLookAtTargets);
+    if(target_raw) {
+        const auto* bytes=std::get_if<OpaqueBytes>(target_raw);
+        if(!bytes)return R::failure(ErrorCode::invalid_request,"invalid Look At light targets");
+        auto targets=decode_motion_look_at_targets(*bytes,cancellation);
+        if(!targets.has_value())return R::failure(targets.error());
+        s.light_targets.reserve(targets.value().size());
+        for(const auto& target:targets.value())s.light_targets.push_back(target.position);
+        s.use_nearest_light=true;
+    }
+    if(const auto* raw=find_value(node,kMotionGoal)) {
+        const auto* value=std::get_if<Vec3>(raw);
+        if(!value||!motion_circle_detail::bounded(*value))return R::failure(ErrorCode::invalid_request,"invalid Look At goal");
+        s.goal=*value;
+    } else if(!s.use_nearest_light) {
+        return R::failure(ErrorCode::invalid_request,"missing Look At goal/targets");
+    }
+    if(const auto* raw=find_value(node,kMotionForward)) {
+        const auto* value=std::get_if<Vec3>(raw);
+        if(!value||!motion_circle_detail::bounded(*value))return R::failure(ErrorCode::invalid_request,"invalid Look At forward");
+        s.forward=*value;
     }
     if(s.forward.x==0&&s.forward.y==0&&s.forward.z==0)return R::failure(ErrorCode::invalid_request,"Look At forward must be nonzero");
     if(const auto* raw=find_value(node,kMotionOverLife)) {
@@ -161,7 +277,7 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Motion context planning cancelled");
         if(!terminal[at]||context_at[at]==count)continue;auto context=context_at[at];
         const auto& type=nodes[at]->type_key;
-        if(type==kMotionNode||(context&&(type==kTransformNode||type==kForceNode))){
+        if(type==kMotionNode||type==kTurbulenceNode||(context&&(type==kTransformNode||type==kForceNode))){
             contexts.push_back({context,nodes[at]->id});context=contexts.size()-1;}
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {
