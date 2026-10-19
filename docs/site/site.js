@@ -47,7 +47,7 @@
     return seed / 4294967296;
   };
   // Fixed artwork, independent of viewport size; no simulated performance claims.
-  const points = Array.from({ length: 2400 }, () => {
+  const points = Array.from({ length: 3600 }, () => {
     const angle = random() * Math.PI * 2;
     const lane = random();
     const radius = 0.40 + Math.pow(lane, 0.7) * 0.58;
@@ -55,8 +55,8 @@
       angle,
       radius,
       elevation: (random() - 0.5) * (0.11 + lane * 0.27),
-      brightness: 0.2 + random() * 0.8,
-      size: random() > 0.975 ? 1.65 : 0.35 + random() * 0.65,
+      brightness: 0.4 + random() * 0.6,
+      size: random() > 0.975 ? 1.9 : 0.55 + random() * 0.85,
       speed: 0.025 + (1 - lane) * 0.055,
       warm: random() > 0.23
     };
@@ -91,7 +91,7 @@
       return { point, x: cx + (x * cos - y * sin) * scale, y: cy + (x * sin + y * cos) * scale, depth };
     }).sort((a, b) => a.depth - b.depth);
     for (const { point, x, y, depth } of projected) {
-      const alpha = point.brightness * (0.44 + (depth + 1) * 0.23);
+      const alpha = Math.min(1, point.brightness * (0.65 + (depth + 1) * 0.2));
       const size = point.size * (0.75 + (depth + 1) * 0.25);
       context.fillStyle = point.warm ? `rgba(247,${Math.round(114 + point.brightness * 66)},${Math.round(48 + point.brightness * 65)},${alpha})` : `rgba(218,215,181,${alpha * 0.85})`;
       context.fillRect(x, y, size, size);

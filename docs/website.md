@@ -35,9 +35,11 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 
 初次只读远端检查显示仓库公开、默认分支 main、Pages 尚未启用。本机 Git 连接受失效代理阻挡；浏览器未登录 GitHub，无法代为更改 Pages Source。首次上线需 owner 登录后选择 GitHub Actions。实现、静态验证与实际发布结果分别记录，不能把预期地址当上线证据。
 
-本地静态验证与脚本语法通过。`artifacts/website/` 保存静态检查及临时 VM 交互 smoke 记录；覆盖动画暂停/恢复、系统减少动态效果、隐藏页面/移出视口停止、像素比上限、菜单/Escape/锚点关闭和无 Canvas 回退。这些不是实际浏览器视觉验收。首个远端 Actions run `39284762080` 检查时处于 queued，不记为 CI 通过。
+本地静态验证与脚本语法通过。`artifacts/website/` 保存静态检查及临时 VM 交互 smoke 记录；覆盖动画暂停/恢复、系统减少动态效果、隐藏页面/移出视口停止、像素比上限、菜单/Escape/锚点关闭和无 Canvas 回退。这些是离线验证。远端 [Actions run 39284989514](https://github.com/MYdesignTool/Starfield/actions/runs/39284989514) 已完成且 conclusion=success；PR 的 deploy 按设计跳过，不代表 Pages 上线。后续提交的 CI 仍需分别查看。
 
-本地浏览器预览服务的准备脚本位于 `artifacts/website/preview.cjs`，默认仅报告。只有 owner 明确批准运行 `node artifacts/website/preview.cjs --serve` 后才可启动，监听 `127.0.0.1:4173`，内容仅 `docs/site/`，地址为 `http://127.0.0.1:4173/Starfield/`；一次 Ctrl+C 停止。当前尚未启动该服务，桌面/手机视觉验收待完成。
+Owner 于 2026-10-20 明确批准运行 `node artifacts/website/preview.cjs --serve` 并在检查后停止。临时服务仅监听 `127.0.0.1:4173`，内容仅 `docs/site/`，使用 `/Starfield/` 子路径。沙箱内服务最初不能被浏览器访问；经同命令沙箱外执行后，HTTP 200 与应用内浏览器访问成功。没有修改代理、注册表、系统防火墙或 AE。完成后已 Ctrl+C 停止；只读核验该端口监听数为 0。
+
+实际应用内 Chromium 检查了 1440×1000 桌面、390×844 手机和 320×740 窄屏。标题/按钮/节点图/功能区无横向溢出；手机菜单展开、Escape 关闭并返回焦点、FAQ 展开、动画暂停/恢复通过，控制台 warn/error 为空。按预览调整了粒子可见度。桌面首页、功能区和手机工作流截图保存于 `artifacts/website/{desktop-home,desktop-features,mobile-workflow}.png`。系统减少动态效果和隐藏/离屏状态仍仅有 VM 检查，不补记为浏览器实测。截图接口曾有短暂同步超时，恢复后重新核对并保存最终截图。
 
 ## 回退
 
