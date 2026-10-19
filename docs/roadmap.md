@@ -5,6 +5,7 @@
 | 范围 | 当前处理原则 |
 | --- | --- |
 | P-04 容器迁移 | 已完成 web_panel 目录迁移、重建部署、旧 CEP 注册退役及本地 main 整合；owner 接受与专项证据边界见当前状态 |
+| P-05 菜单整理 | 两个 Window 面板入口、会话命令 ID 和 Diagnostics 修复菜单已部署；等待 owner AE 复测后整合，当前证据见 current-state.md |
 | 已实现节点 | 保留现有行为，不因迁移扩大功能或恢复浮动属性编辑器；参数通过 AE Effect Controls 编辑 |
 | Motion Light Path | 大小写敏感 Starting With 规则保留；修正前缀后的实际粒子轨迹没有独立专项记录，不从容器验收推断数值 parity |
 | 硬件、性能和生命周期扩展 | GPU 实际设备/CPU 像素对照、在途 Core 切换、IME/workspace、故障/headless 等按明确场景补证据；没有新增用户需求时不自行扩展功能 |

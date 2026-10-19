@@ -57,12 +57,12 @@ const textureLayers=[44,66].map((id,i)=>({id,name:i?"Back texture":"Front textur
         name==="ADBE Effect Parade"?{numProperties:0,property:()=>null}:null;}}));
 const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",time:0,numLayers:3,layer:index=>[layer,...textureLayers][index-1]});
 layer.containingComp=comp;textureLayers.forEach(l=>l.containingComp=comp);
-const exported={};
+const exported={__SFLD_nativeCommandsV1:{version:1,commands:{get "Starfield Commit Node Graph"(){return nativeCommandAvailable?99:0;}}}};
 vm.runInNewContext("JSON.stringify = wireStringify;\n"+source,{CompItem,wireStringify:value=>JSON.stringify(value,
     (_,item)=>roundWireNumbers&&typeof item==="number"?Number(item.toPrecision(12)):item),
     $:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5},numItems:1,item:()=>comp},
     beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;},
-    findMenuCommandId(name){assert.equal(name,"Starfield Commit Node Graph");return nativeCommandAvailable?99:0;},
+    findMenuCommandId(){throw Error("Window menu lookup must not be used for bound native commands");},
     executeCommand(id){assert.equal(id,99);if(!ignoreNativeCommand)compile(renderer.properties["Commit Graph Edit"].value);}}});
 const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toString(16).padStart(4,"0")).join("");
 function graphFromEffects() {

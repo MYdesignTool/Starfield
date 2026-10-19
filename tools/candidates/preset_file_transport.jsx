@@ -13,7 +13,7 @@
     function fileError(error){return api.fail("preset_file_error",error.toString());}
     function active(id){var s=host[KEY];return s && s.id===id && new Date().getTime()<=s.expires?s:null;}
     function queued(s){s.stage="queued";s.expires=new Date().getTime()+300000;
-        var command=app.findMenuCommandId("Starfield Choose Preset File");
+        var command=(typeof host.SFLD_nativeCommandId==="function"?host.SFLD_nativeCommandId("Starfield Choose Preset File"):app.findMenuCommandId("Starfield Choose Preset File"));
         if(!command)throw new Error("The paired Starfield Host file chooser is unavailable.");
         app.executeCommand(command);return api.reply({ok:true,transferId:s.id,state:"queued"});}
     function retain(s,response){s.result=response;s.stage="ready";s.expires=new Date().getTime()+300000;return "1";}

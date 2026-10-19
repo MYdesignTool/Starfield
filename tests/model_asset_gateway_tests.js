@@ -29,8 +29,8 @@ const parade={list:[renderer,model],get numProperties(){return this.list.length;
 const layer={id:303,width:1920,height:1080,source:{pixelAspect:1},property(name){return name==="ADBE Effect Parade"?parade:null;}};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,numLayers:1,layer(i){return i===1?layer:null;}});
 const app={project:{rootFolder:{id:0},numItems:1,item(i){return i===1?comp:null;}},
-    findMenuCommandId(name){eq(name,"Starfield Prepare Model Asset Export");return 9;},executeCommand(id){eq(id,9);commands++;}};
-const host={},context=vm.createContext({$:{global:host},app,CompItem,Date:function(){this.getTime=()=>now;}});
+    findMenuCommandId(){throw Error("Internal menus are hidden");},executeCommand(id){eq(id,9);commands++;}};
+const host={__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Prepare Model Asset Export":9}}},context=vm.createContext({$:{global:host},app,CompItem,Date:function(){this.getTime=()=>now;}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 const load=()=>vm.runInContext(source,context);load();
 function request(operation,extra){return JSON.stringify(Object.assign({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,

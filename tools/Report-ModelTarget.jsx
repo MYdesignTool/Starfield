@@ -1,5 +1,6 @@
 // Read-only identity report. Run manually in AE after selecting the Starfield
-// layer. No project changes, files, preferences, registry or commands are written.
+// layer, after opening the current WebView2 panel. No project changes, files,
+// preferences, registry or commands are written.
 (function () {
     var project = app.project;
     var comp = project ? project.activeItem : null;
@@ -13,7 +14,9 @@
     var status = session ? String(session.state) : "none";
     var remaining = session && typeof session.expires === "number" ?
         Math.ceil((session.expires - (new Date()).getTime()) / 1000) : "none";
-    var command = app.findMenuCommandId("Starfield Apply Model Graph Transaction");
+    var command = typeof host.SFLD_nativeCommandId === "function" ?
+        host.SFLD_nativeCommandId("Starfield Apply Model Graph Transaction") :
+        app.findMenuCommandId("Starfield Apply Model Graph Transaction");
     alert("Starfield Model target (read-only)\n" +
         "token=p" + Number(project.rootFolder.id) + "-c" + Number(comp.id) + "-l" + Number(layers[0].id) +
         "\nAE=" + app.version + "\nlayer=" + layers[0].name +

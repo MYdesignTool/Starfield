@@ -3,6 +3,7 @@
 #endif
 #include "WebPanelHost.hpp"
 #include "WebPanelProtocol.hpp"
+#include "NativeCommandBindings.hpp"
 #include "ScriptDiagnostic.hpp"
 #include "UiExclusionHost.hpp"
 #include "AE_GeneralPlugPanels.h"
@@ -300,8 +301,25 @@ void open_presets() {
     (void)make_view(owner,true);
 }
 A_Err snap_sizes(AEGP_PanelRefcon,A_LPoint*,A_long* count) noexcept {if(count)*count=0;return A_Err_NONE;}
-A_Err flyout_items(AEGP_PanelRefcon,AEGP_FlyoutMenuItem*,A_long* count) noexcept {if(count)*count=0;return A_Err_NONE;}
-A_Err flyout_command(AEGP_PanelRefcon,AEGP_FlyoutMenuCmdID) noexcept {return A_Err_NONE;}
+A_Err flyout_items(AEGP_PanelRefcon,AEGP_FlyoutMenuItem* items,A_long* count) noexcept {
+    if(!count)return A_Err_GENERIC;
+    if(items) {
+        if(*count<2)return A_Err_GENERIC;
+        items[0]={1,AEGP_FlyoutMenuMarkType_NORMAL,TRUE,AEGP_FlyoutMenuCmdID_NONE,
+            reinterpret_cast<const A_u_char*>("Diagnostics")};
+        items[1]={2,AEGP_FlyoutMenuMarkType_NORMAL,static_cast<A_Boolean>(native_command_bindings[5].command>0),1,
+            reinterpret_cast<const A_u_char*>("Repair Selected Graph")};
+    }
+    *count=2;return A_Err_NONE;
+}
+A_Err flyout_command(AEGP_PanelRefcon refcon,AEGP_FlyoutMenuCmdID command) noexcept {
+    if(command!=1)return A_Err_NONE;
+    if(stopped || std::this_thread::get_id()!=ui_thread || !ui_exclusion_available() || !host_accepts_panel_work())return A_Err_GENERIC;
+    const auto found=std::find_if(views.begin(),views.end(),[&](const auto& view){return view.get()==reinterpret_cast<View*>(refcon) && view->alive && !view->presets;});
+    if(found==views.end() || native_command_bindings[5].command<=0)return A_Err_GENERIC;
+    Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
+    return commands.value?commands.value->AEGP_DoCommand(native_command_bindings[5].command):A_Err_GENERIC;
+}
 A_Err create_panel(AEGP_GlobalRefcon,AEGP_CreatePanelRefcon,AEGP_PlatformViewRef container,
     AEGP_PanelH panel,AEGP_PanelFunctions1* functions,AEGP_PanelRefcon* refcon) noexcept try {
     if(stopped || std::this_thread::get_id()!=ui_thread || !container || !functions || !refcon)return A_Err_GENERIC;
@@ -334,7 +352,7 @@ std::wstring execute(std::wstring_view body) {
     AEGP_MemHandle result{},diagnostic{};
     struct Handles {const AEGP_MemorySuite1* memory;AEGP_MemHandle& result;AEGP_MemHandle& diagnostic;
         ~Handles(){if(result)memory->AEGP_FreeMemHandle(result);if(diagnostic)memory->AEGP_FreeMemHandle(diagnostic);}} handles{memory.value,result,diagnostic};
-    const auto script=utf8(body);
+    const auto script=native_command_script()+utf8(body);
     A_Err script_error{};
     {
         // Capture only this call's host errors. In particular a modal-state
@@ -369,10 +387,10 @@ void initialize_web_panel_host(SPBasicSuite* suites,AEGP_PluginID id) noexcept t
     if(panels.value->AEGP_RegisterCreatePanelHook(id,reinterpret_cast<const A_u_char*>(panel_match),create_panel,nullptr,TRUE))return;
     if(!commands.value->AEGP_GetUniqueCommand(&graph_command) &&
         !registrations.value->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_command,command_hook,nullptr))
-        commands.value->AEGP_InsertMenuCommand(graph_command,panel_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM);
+        commands.value->AEGP_InsertMenuCommand(graph_command,panel_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_SORTED);
     if(!commands.value->AEGP_GetUniqueCommand(&presets_command) &&
         !registrations.value->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,presets_command,command_hook,nullptr))
-        commands.value->AEGP_InsertMenuCommand(presets_command,presets_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM);
+        commands.value->AEGP_InsertMenuCommand(presets_command,presets_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_SORTED);
     (void)registrations.value->AEGP_RegisterUpdateMenuHook(id,menu_hook,nullptr);
 }catch(...){}
 bool step_web_panel_host() noexcept try {

@@ -18,7 +18,19 @@
 (function () {
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-100";
+    var GATEWAY_BUILD = "native-presets-101";
+    function nativeCommandId(name) {
+        var owner = (typeof $ !== "undefined" && $.global) ? $.global : this;
+        var bindings = owner.__SFLD_nativeCommandsV1, id;
+        if (bindings) {
+            if (bindings.version !== 1 || !bindings.commands ||
+                !Object.prototype.hasOwnProperty.call(bindings.commands, name)) return 0;
+            id = bindings.commands[name];
+            return typeof id === "number" && isFinite(id) && id > 0 && id <= 2147483647 && Math.floor(id) === id ? id : 0;
+        }
+        // Explicit legacy rollback and standalone scripts on older native hosts.
+        return typeof app.findMenuCommandId === "function" ? app.findMenuCommandId(name) : 0;
+    }
     var MATCH_NAME = "org.starfieldfx.particle";
     var MAX_CHANGES = 40;
     var MAX_REQUEST_BYTES = 262144;
@@ -2135,8 +2147,8 @@ function createNativeRecordContract() {
     }
 
     function graphCommitCommand() {
-        var command = typeof app.findMenuCommandId === "function" ? app.findMenuCommandId("Starfield Commit Node Graph") : 0;
-        if (!command || typeof app.executeCommand !== "function") throw new Error("Starfield native graph command is unavailable. Install the matching native69 / CEP72 pair before editing.");
+        var command = nativeCommandId("Starfield Commit Node Graph");
+        if (!command || typeof app.executeCommand !== "function") throw new Error("Starfield native graph command is unavailable. Install the matching native Host and WebView2 panel before editing.");
         return command;
     }
 
@@ -3021,7 +3033,7 @@ function createNativeRecordContract() {
             effect=request.nodeId==="000000000000000000000000000000ff"?graphCarrierTarget(request).target.effect:nodeEffectById(layer,request.nodeId);
             if(!effect)throw new Error("The selected node effect disappeared during selection.");
             effect.selected = true;
-            var reveal=app.findMenuCommandId("Starfield Reveal Selected Effect");
+            var reveal=nativeCommandId("Starfield Reveal Selected Effect");
             if(!reveal)throw new Error("Native effect reveal requires the current Starfield Host build.");
             app.executeCommand(reveal);
             return reply({ok:true, operation:"selectNodeEffect", nodeId:request.nodeId, requestId:request.requestId || ""});
@@ -3108,6 +3120,7 @@ function createNativeRecordContract() {
     // Publish the entry points on the ExtendScript global object; everything above is
     // private to this IIFE (see the note next to the entry points).
     var host = (typeof $ !== "undefined" && $.global) ? $.global : this;
+    host.SFLD_nativeCommandId = nativeCommandId;
     // Retire cached synchronous file entry points. File windows are owned by the
     // queued native chooser; a script modal here would bypass idle exclusion.
     host.SFLD_readPresetFile=function(requestJson) {
@@ -3190,7 +3203,7 @@ function createNativeRecordContract() {
                 state:"queued",pages:[],bytes:0,expires:(new Date()).getTime()+60000};
             // Source is read directly: Cube may retain an imported mesh.
             modelAuthor(session);
-            var command=app.findMenuCommandId("Starfield Prepare Model Asset Export");
+            var command=nativeCommandId("Starfield Prepare Model Asset Export");
             if(!command)return fail("model_asset_unavailable","Model asset transfer requires the paired Starfield Host build.");
             host[modelBridgeKey]=session;
             app.executeCommand(command);

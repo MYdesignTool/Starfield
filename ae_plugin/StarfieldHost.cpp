@@ -10,6 +10,7 @@
 #include "GraphCommitRequest.hpp"
 #include "GraphRepairRequest.hpp"
 #include "WebPanelHost.hpp"
+#include "NativeCommandBindings.hpp"
 #include "Parameters.hpp"
 #include <algorithm>
 #include <chrono>
@@ -52,7 +53,7 @@ bool starfield_effect(const char* match) noexcept {
 }
 A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
-    if(command!=reveal_command)return A_Err_NONE;
+    if(!reveal_command || command!=reveal_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     if(stopped || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
     Suite<AEGP_ItemSuite9> items(kAEGPItemSuite,kAEGPItemSuiteVersion9);
@@ -121,7 +122,7 @@ A_Err reveal_menu(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexc
 A_Err repair_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
     using namespace starfield::adapter;
-    if(command!=graph_repair_command)return A_Err_NONE;
+    if(!graph_repair_command || command!=graph_repair_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     if(stopped || graph_commit_running || std::this_thread::get_id()!=main_thread)return A_Err_GENERIC;
     HostUiExclusion exclusion;if(!exclusion)return A_Err_GENERIC;
@@ -152,7 +153,7 @@ A_Err repair_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
 A_Err commit_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept try {
     using namespace starfield::adapter;
-    if(command!=graph_commit_command)return A_Err_NONE;
+    if(!graph_commit_command || command!=graph_commit_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     if(stopped || graph_commit_running || SFLD_SourceUiExclusionActiveV1() || std::this_thread::get_id()!=main_thread)return A_Err_GENERIC;
     graph_commit_running=true;
@@ -232,7 +233,7 @@ A_Err commit_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
 } catch(...) {graph_commit_running=false;return A_Err_GENERIC;}
 A_Err model_asset_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
-    if(command!=model_asset_command)return A_Err_NONE;
+    if(!model_asset_command || command!=model_asset_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     starfield::adapter::queue_model_asset_export();return A_Err_NONE;
 }
@@ -295,7 +296,7 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
 } catch(...) {running=false;return A_Err_NONE;}
 A_Err model_transaction_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
-    if(command!=model_transaction_command)return A_Err_NONE;
+    if(!model_transaction_command || command!=model_transaction_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     starfield::adapter::queue_model_graph_transaction();return A_Err_NONE;
 }
@@ -307,7 +308,7 @@ A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {
 }
 A_Err preset_file_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     AEGP_HookPriority,A_Boolean,A_Boolean* handled) noexcept {
-    if(command!=preset_file_command)return A_Err_NONE;
+    if(!preset_file_command || command!=preset_file_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     starfield::adapter::queue_preset_file_dialog();return A_Err_NONE;
 }
@@ -331,31 +332,22 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
     // Session-resident AEGP owns UI commands. Navigation writes no trigger
     // parameters and does not dirty the graph or invalidate rendered frames.
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&reveal_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,reveal_command,reveal_selected,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(reveal_command,reveal_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM)) {
-        (void)commands->AEGP_EnableCommand(reveal_command);
-    }
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&model_asset_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_asset_command,model_asset_queue,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(model_asset_command,starfield::adapter::model_asset_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
-        (void)commands->AEGP_EnableCommand(model_asset_command);
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&model_transaction_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,model_transaction_command,model_transaction_queue,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(model_transaction_command,starfield::adapter::model_transaction_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
-        (void)commands->AEGP_EnableCommand(model_transaction_command);
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&preset_file_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,preset_file_command,preset_file_queue,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(preset_file_command,starfield::adapter::preset_file_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
-        (void)commands->AEGP_EnableCommand(preset_file_command);
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&graph_commit_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_commit_command,commit_node_graph,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(graph_commit_command,starfield::adapter::graph_commit_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
-        (void)commands->AEGP_EnableCommand(graph_commit_command);
-    if(!error && commands && !commands->AEGP_GetUniqueCommand(&graph_repair_command) &&
-       !registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_repair_command,repair_node_graph,nullptr) &&
-       !commands->AEGP_InsertMenuCommand(graph_repair_command,starfield::adapter::graph_repair_command_name,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_AT_BOTTOM))
-        (void)commands->AEGP_EnableCommand(graph_repair_command);
+    // Keep named command definitions and hooks, but no Window menu entries.
+    // Panel scripts receive the allocated IDs directly, so menu-name lookup is
+    // no longer part of the current frontend's authoring contract.
+    const auto hidden=[&](AEGP_Command& destination,const char* name,AEGP_CommandHook hook) {
+        destination=error?0:starfield::adapter::register_hidden_native_command(commands.value,registrations.value,id,name,hook);
+    };
+    using namespace starfield::adapter;
+    hidden(reveal_command,reveal_name,reveal_selected);
+    hidden(model_asset_command,model_asset_command_name,model_asset_queue);
+    hidden(model_transaction_command,model_transaction_command_name,model_transaction_queue);
+    hidden(preset_file_command,preset_file_command_name,preset_file_queue);
+    hidden(graph_commit_command,graph_commit_command_name,commit_node_graph);
+    hidden(graph_repair_command,graph_repair_command_name,repair_node_graph);
+    native_command_bindings={{{reveal_name,reveal_command},{model_asset_command_name,model_asset_command},
+        {model_transaction_command_name,model_transaction_command},{preset_file_command_name,preset_file_command},
+        {graph_commit_command_name,graph_commit_command},{graph_repair_command_name,graph_repair_command}}};
     if(!error && commands && (reveal_command || model_asset_command || model_transaction_command || preset_file_command || graph_commit_command || graph_repair_command))
         (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;

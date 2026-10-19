@@ -12,6 +12,25 @@ backup retention. Actual Windows registration removal and the installed pairing
 are recorded only in current-state.md. Owner release acceptance is separate from
 an instrumented full qualification matrix; unreported scenarios stay unreported.
 
+## Window menu cleanup — P-05, 2026-10-19
+
+Owner authorized keeping only the graph and preset panel entries in Window.
+Native100 keeps the six internal command names, allocated IDs and original
+handlers, registering their definitions with SDK AEGP_Menu_NONE. Panel101
+resolves them from a versioned session map prepended by the native host to each
+safe idle script call. IDs are never persisted or guessed. Invalid/missing IDs
+in a present map fail closed; only an absent map permits older-host named-menu
+fallback for explicit rollback. No app method is monkey-patched. Registration
+failure publishes ID zero and handlers reject zero callbacks. The graph panel
+flyout exposes Diagnostics > Repair Selected Graph, with valid/live panel,
+main-thread, host readiness and transaction exclusion checks. Repair remains
+an explicit user action through the existing native repair handler.
+
+Offline fake-suite/JS evidence is separate from real AE Menu_NONE dispatch,
+flyout visibility, preset/file/Model and save/quit acceptance. Current evidence
+and installed pairing belong in current-state.md. Historical recovery scripts
+retain their dated frozen baselines; they are not current deployment commands.
+
 The General AEGP owns the dockable graph panel and a separate modeless preset
 window. Reuse all current HTML, graph/preset JavaScript, optional Model modules,
 and the existing generation-checked JSX/native transaction gateway. The small

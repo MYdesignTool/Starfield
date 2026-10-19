@@ -21,8 +21,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunAllTests.ps1 -Group
 - WebPanelHost 生产队列的 fake-AE 检查覆盖来源、期限、关闭/重放/FIFO、模态禁用/取消、quiet-error 恢复及从真实测试 EXE 位置发现 web_panel，不启动 AE 或 WebView2。
 - 面板 suite 覆盖既有节点、预设/图事务及容器适配；Particle curve 浮点归一化仍严格校验头部、布局、真实数值差异和完整回滚。
 - PowerShell 夹具覆盖部署配对、历史/当前清单前缀、目录恢复、后续修改拒绝，以及最近五版保留和不跟随归档 Junction。
-- 实际 AE2023 的 owner 接受与专项未报告项见 [行为证据](compatibility-matrix.md)。native99 路径迁移的离线检查不冒充实际 AE 启动记录。
+- P-05 覆盖实际隐藏命令注册、会话 ID 校验/刷新、无可见菜单查找的节点/Model/预设文件事务和 Diagnostics 修复菜单；诊断报告保持只读。实际 AE2023 的 owner 接受与专项未报告项见 [行为证据](compatibility-matrix.md)，不从离线通过推断菜单或隐藏命令在实际宿主已验证。
 
-本轮日志保留在 artifacts/webview2/：native99-web-panel-*.log、backup-retention-tests.log；所有 suite 详细输出在 artifacts/panel-tests 和 artifacts/all-tests。SDK 完整构建使用 BuildWindows.ps1 的两个 NoPublish 开关，输出在 artifacts/plugin、core-dll。当前最终计数从实际结果文件读取并写入当前状态，不在多个文档复制。
+P-05 日志保留在 artifacts/webview2/native100-menu-*.log，所有前端 suite 详细输出在 artifacts/panel-tests。此前 native99-web-panel-*.log、backup-retention-tests.log 和 artifacts/all-tests 属于 P-04 历史验证。SDK 完整构建使用 BuildWindows.ps1 的两个 NoPublish 开关，输出在 artifacts/plugin、core-dll。当前最终计数从实际结果文件读取并写入当前状态，不在多个文档复制。
 
 编辑器 get_global_id 属于 OpenCL 内建符号的解析环境。所有配置默认强制加载 .vscode/OpenClIntelliSense.h；它不参与运行构建。C17/C++20 独立内核及 CPU shader fixture 的语法检查见 kernel-editor-default-tests.log。用户配置说明见 [editor-setup.md](editor-setup.md)。

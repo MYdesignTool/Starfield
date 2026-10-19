@@ -176,7 +176,7 @@
         var s={version:1,id:request.transactionId,request:plain(request),assets:validateAssets(nodes,request.assets || []),state:"uploading",
             expires:now()+5*60*1000,lastProgress:now(),time:resolved.target.layer.time,cancelled:false,uploadAsset:0,uploadPage:0};
         target(s,0,true);
-        var command=app.findMenuCommandId("Starfield Apply Model Graph Transaction");
+        var command=(typeof host.SFLD_nativeCommandId==="function"?host.SFLD_nativeCommandId("Starfield Apply Model Graph Transaction"):app.findMenuCommandId("Starfield Apply Model Graph Transaction"));
         if(!command)return api.fail("model_transaction_unavailable","Model graph edits require the paired Starfield Host build.");
         host[KEY]=s;return api.reply({ok:true,transactionId:s.id,state:s.state});
     }catch(error){return api.fail("invalid_model_transaction",error.toString());}};
@@ -196,7 +196,7 @@
         var pair=matching(text,"queueModelGraphTransaction"),s=pair.s;
         if(s.state!=="uploading")throw new Error("Model graph request is already queued or finished.");target(s,0,true);
         for(var i=0;i<s.assets.length;i++)if(s.assets[i].pages.length!==Math.ceil(s.assets[i].bytes*2/PAGE))throw new Error("Incomplete Model upload.");
-        var command=app.findMenuCommandId("Starfield Apply Model Graph Transaction");if(!command)throw new Error("Paired Model Host command is unavailable.");
+        var command=(typeof host.SFLD_nativeCommandId==="function"?host.SFLD_nativeCommandId("Starfield Apply Model Graph Transaction"):app.findMenuCommandId("Starfield Apply Model Graph Transaction"));if(!command)throw new Error("Paired Model Host command is unavailable.");
         s.state="queued";s.lastProgress=now();app.executeCommand(command);return api.reply({ok:true,transactionId:s.id,state:s.state});
     }catch(error){if(typeof s!=="undefined" && s && (s.state==="uploading" || s.state==="queued"))failure(s,error.toString());return api.fail("model_transaction_queue_failed",error.toString());}};
     host.SFLD_modelTransactionHostRequest=function(){var s=host[KEY];if(!s || !session(s.id) || s.state!=="queued")return "0";

@@ -27,6 +27,8 @@ Settings.hpp 拥有 Core 值类型，Render.hpp 是宿主无关渲染边界。AE
 
 WebView2 回调只保存有界自有数据；只允许本地映射的两个页面发送请求。UI idle 检查线程、重入、插件互斥、有效且启用的 AE 主 HWND 和脚本可用性。模态期间保持 FIFO 与原截止时间，过期或旧页面请求不执行；单次 ExecuteScript 的 quiet-error 状态成对恢复，不持久修改全局偏好。关闭、导航和重放保护见 ADR0046。
 
+Window 菜单只提供两个面板入口。内部命令用 AEGP_Menu_NONE 定义并保留处理器，每次面板脚本执行前注入本会话的六项命令 ID；共享 gateway 按版本和整数范围验证后调用，不依赖可见菜单名称。绑定存在但缺失/无效时拒绝，只有旧宿主完全没有绑定时才使用历史名称查找。图修复由节点面板原生 Diagnostics 菜单显式触发，继续走既有互斥和修复处理器。
+
 图与节点身份、磁盘参数 ID、schema、动画、读回/回滚及 Core ABI 不因容器迁移而变化。按绝对时间与稳定身份求值，图/历史/几何及 Core lease 在 render 完成前保持有效。Core 输入为数值和拥有明确生命周期的资源；文件和宿主操作在适配层。
 
 SmartFX 尊重 rowbytes、PAR、downsample、ROI 与 AE 8/16/32-bpc 语义。GPU 按设备/帧协商；MFR 和 Compute Cache 仍关闭，不从编译推断真实设备或新版宿主资格。格式、Motion/Transform/Model 的具体契约以 Settings/Render/PluginApi/schema 和对应 ADR 为准，不复制历史 ABI/snapshot 数字。

@@ -12,6 +12,8 @@
 
 当前入口是 AE Window 菜单的 Starfield Particle Controls (WebView2) 和 Starfield Presets (WebView2)。前端和原生配对由仓库部署工具维护，不运行旧 CEP 安装器。`CSXS/manifest.xml` 仅保留协议版本校验和显式历史兼容用途，不表示 CEP 仍注册，也不扩大宿主支持范围。
 
+native100/panel101 将六个内部命令从 Window 菜单隐藏，由原生宿主在安全 idle 调用前提供会话命令 ID。不要删除命令实现或恢复旧菜单来解决命令缺失。手动图修复位于节点面板右上角菜单 **Diagnostics → Repair Selected Graph**，仅在需要故障恢复且已选中原 Starfield 图层时使用。独立诊断脚本先打开当前面板以建立会话绑定；历史专用恢复脚本保留原有冻结版本限制。
+
 旧注册的精确清理状态和恢复命令见 [当前状态](../docs/current-state.md)。`Install.ps1` 现在只报告退役说明。任何宿主注册恢复都要独立授权；脚本不写注册表。
 
 ```powershell

@@ -25,8 +25,8 @@ function manifest(g){const positions=layout.resolve(g);return g.nodes.filter(n=>
 function render(g){const n=g.nodes.find(n=>n.type===edits.types.output),r={id:n.id,position:layout.resolve(g)[n.id]};
     ["maxParticles","timeRemapEnabled","timeRemapSeconds","previewEnabled","previewChance","acceleration","timeSamplingHz","motionBlur","shutterAngle","shutterPhase","motionBlurType","motionBlurLevels","linearAccuracy","opacityBoost","motionBlurDisregard"].forEach((name,i)=>{
         const p=n.parameters.find(p=>String(p.key)===String(i+1));r[name]=p?p.value:[1000000,0,0,0,100,0,30,1,360,0,0,8,70,0,0][i];});return r;}
-const sandbox={$:{global:{}},Date:class extends Date{constructor(...args){super(args.length?args[0]:now);}},
-    app:{findMenuCommandId:()=>55,executeCommand:()=>{if(throwQueue)throw new Error("queue command failed");hostRuns++;if(!skipNative)tasks.push(nativeRun);}}};
+const sandbox={$:{global:{__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Apply Model Graph Transaction":55}}}},Date:class extends Date{constructor(...args){super(args.length?args[0]:now);}},
+    app:{findMenuCommandId(){throw Error("Internal menus are hidden");},executeCommand:()=>{if(throwQueue)throw new Error("queue command failed");hostRuns++;if(!skipNative)tasks.push(nativeRun);}}};
 const context=vm.createContext(sandbox),host=sandbox.$.global,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
 vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"),context);
 const api=host.__SFLD_modelTransactionAPI;

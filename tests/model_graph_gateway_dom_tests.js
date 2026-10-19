@@ -99,8 +99,8 @@ const front={id:44,name:"Front",index:2,width:320,height:180,source:{pixelAspect
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,name:"Comp",time:0,numLayers:3,layer:i=>[layer,front,back][i-1]});
 Object.defineProperty(comp,"selectedLayers",{get:()=>[layer]});
 for(const l of [layer,front,back])l.containingComp=comp;layer.index=1;
-const host={},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
-    beginUndoGroup(){undo++;},endUndoGroup(){undo++;if(restoreGuardOnUndo){restoreGuardOnUndo=false;renderer.properties["Panel Graph Sync Guard"].value=1;}},findMenuCommandId:name=>name==="Starfield Commit Node Graph"?99:55,
+const host={__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Commit Node Graph":99,"Starfield Apply Model Graph Transaction":55,"Starfield Reveal Selected Effect":55}}},context=vm.createContext({CompItem,$:{global:host},app:{project:{activeItem:comp,rootFolder:{id:0},numItems:1,item:()=>comp},
+    beginUndoGroup(){undo++;},endUndoGroup(){undo++;if(restoreGuardOnUndo){restoreGuardOnUndo=false;renderer.properties["Panel Graph Sync Guard"].value=1;}},findMenuCommandId(){throw Error("Internal menus are hidden");},
     executeCommand(id){commands++;if(id!==99)return;
         if(!rejectCommit)for(const effect of items)if(effect.matchName==="org.starfieldfx.node.motion") {
             const guard=effect.properties["Panel Sync Guard"],mode=effect.properties["Motion Type"];

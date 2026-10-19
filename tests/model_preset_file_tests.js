@@ -56,8 +56,8 @@ File.prototype.rename=function(name){operations.push(["rename",this.fsName,name]
 File.prototype.remove=function(){operations.push(["remove",this.fsName]);if(fault.removeBackupThrows && this.fsName.endsWith(".bak"))throw new Error("cleanup failed");
     if(fault.removeBackup && this.fsName.endsWith(".bak") || fault.removeTemporary && this.fsName.endsWith(".tmp"))return false;delete disk[this.fsName];return true;};
 let queuedCommands=0;
-const app={findMenuCommandId:name=>name==="Starfield Choose Preset File"?77:0,executeCommand:id=>{eq(id,77);queuedCommands++;}};
-const host={},context=vm.createContext({$:{global:host},File,app,confirm:()=>{throw new Error("Script confirm must not run.");},Date:function(){this.getTime=()=>now;}});
+const app={findMenuCommandId(){throw Error("Internal menus are hidden");},executeCommand:id=>{eq(id,77);queuedCommands++;}};
+const host={__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Choose Preset File":77}}},context=vm.createContext({$:{global:host},File,app,confirm:()=>{throw new Error("Script confirm must not run.");},Date:function(){this.getTime=()=>now;}});
 function reload(){vm.runInContext(load("jsx/starfield_gateway.jsx"),context);vm.runInContext(load("jsx/preset_file_transport.jsx"),context);}
 reload();
 function rawCall(op,extra,target=host){return JSON.parse(target["SFLD_"+op](JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation:op,transferId,...extra})));}
@@ -153,7 +153,7 @@ class Element{constructor(){this.children=[];this.listeners={};this.value="";thi
     getContext(){return new Proxy({},{get:()=>()=>{}});}}
 function ui(capturedGraph,meshFailure=false){
     reset();tasks=[];const elements={},calls=[],timers=new Map();let timer=0,loads=0;
-    const browserHost={File,Date,app,$:{global:null}};browserHost.$.global=browserHost;
+    const browserHost={File,Date,app,$:{global:null},__SFLD_nativeCommandsV1:host.__SFLD_nativeCommandsV1};browserHost.$.global=browserHost;
     const hostContext=vm.createContext(browserHost);
     browserHost.$.evalFile=function(file){loads++;vm.runInContext(load(file.fsName.split("web_panel/")[1]),hostContext);};
     vm.runInContext(load("jsx/starfield_gateway.jsx"),hostContext);

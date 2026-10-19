@@ -14,10 +14,13 @@ AEGP_ErrReportState* quiet_state{};
 std::string last_script;
 std::vector<std::string> executed;
 AEGP_UtilitySuite6 utility{};AEGP_MemorySuite1 memory{};
+AEGP_CommandSuite1 commands{};
+unsigned native_calls{};
 void check(bool ok,const char* label){++checks;if(!ok){++failures;std::cerr<<label<<'\n';}}
 SPErr acquire(const char* name,int32,const void** output){++acquisitions;*output=nullptr;
     if(!std::strcmp(name,kAEGPUtilitySuite))*output=&utility;
     if(!std::strcmp(name,kAEGPMemorySuite))*output=&memory;
+    if(!std::strcmp(name,kAEGPCommandSuite))*output=&commands;
     return *output?kSPNoError:kSPBadParameterError;
 }
 SPErr release(const char*,int32){++releases;return kSPNoError;}
@@ -69,6 +72,23 @@ int main() {
     SPBasicSuite sdk{};sdk.AcquireSuite=acquire;sdk.ReleaseSuite=release;
     initialize_ui_exclusion();initialize_web_panel_host(&sdk,8);
     check(!environment && !com_owned && !creating_environment && views.empty(),"headless registration never initializes COM or a browser");
+    commands.AEGP_GetUniqueCommand=[](AEGP_Command* output)->A_Err{*output=7001;return 0;};
+    commands.AEGP_InsertMenuCommand=[](AEGP_Command id,const A_char* name,AEGP_MenuID menu,A_long position)->A_Err{
+        check(id==7001 && !std::strcmp(name,"Starfield test internal command") && menu==AEGP_Menu_NONE && position==AEGP_MENU_INSERT_SORTED,
+            "production internal registration keeps its name and never inserts into Window");return 0;};
+    commands.AEGP_EnableCommand=[](AEGP_Command id)->A_Err{check(id==7001,"hidden command enabled");return 0;};
+    AEGP_RegisterSuite5 registrations{};
+    registrations.AEGP_RegisterCommandHook=[](AEGP_PluginID id,AEGP_HookPriority priority,AEGP_Command command,AEGP_CommandHook,AEGP_CommandRefcon)->A_Err{
+        check(id==8 && priority==AEGP_HP_BeforeAE && command==7001,"hidden command hook remains session resident");return 0;};
+    check(register_hidden_native_command(&commands,&registrations,8,"Starfield test internal command",nullptr)==7001,"registered internal ID published");
+    commands.AEGP_InsertMenuCommand=[](AEGP_Command,const A_char*,AEGP_MenuID,A_long)->A_Err{return 1;};
+    check(!register_hidden_native_command(&commands,&registrations,8,"failed",nullptr),"failed hidden registration never publishes an executable ID");
+    native_command_bindings={{{"Starfield Reveal Selected Effect",7001},{"Starfield Prepare Model Asset Export",7002},
+        {"Starfield Apply Model Graph Transaction",7003},{"Starfield Choose Preset File",7004},
+        {"Starfield Commit Node Graph",7005},{"Starfield Repair Selected Graph",7006}}};
+    const auto prelude=native_command_script();
+    check(prelude.find("\"Starfield Commit Node Graph\":7005")!=std::string::npos,"session map contains allocated IDs, no hardcoded frontend IDs");
+    commands.AEGP_DoCommand=[](AEGP_Command id)->A_Err{check(id==7006,"diagnostic dispatch uses the repair binding only");++native_calls;return 0;};
     main_window=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);
     check(main_window && !IsWindowVisible(main_window),"invisible message-only host stand-in created");
     auto view=std::make_shared<View>();views.push_back(view);view->epoch=1;
@@ -87,20 +107,31 @@ int main() {
     check(!step_web_panel_host() && executions==0 && requests.size()==1,"failed main-window lookup fails closed");window_lookup_failure=false;
     const auto valid_main=main_window;main_window=nullptr;
     check(!step_web_panel_host() && executions==0 && requests.size()==1,"missing main window defers shutdown work");main_window=valid_main;
-    check(!step_web_panel_host() && executions==1 && last_script=="\xE4\xB8\xAD\xE6\x96\x87 script" && freed==2,"UI idle executes exactly once and frees both AE handles");
+    check(!step_web_panel_host() && executions==1 && last_script==prelude+"\xE4\xB8\xAD\xE6\x96\x87 script" && freed==2,"UI idle binds current IDs then executes exactly once and frees both AE handles");
     check(acquisitions==releases,"AE suites released after callback");
     event->json=message(L"wv-2",L"expired");view->receive(event.Get());requests.front().expires={};step_web_panel_host();check(executions==1,"expired edit cannot write later");
     event->json=message(L"wv-3",L"old document");view->receive(event.Get());++view->epoch;step_web_panel_host();check(executions==1,"navigation invalidates queued edits");
     for(unsigned i=4;i<68;++i){event->json=message(L"wv-"+std::to_wstring(i),L"ordered "+std::to_wstring(i));view->receive(event.Get());}
     check(requests.size()==64,"bounded queue accepts its exact capacity");event->json=message(L"wv-68",L"overflow");view->receive(event.Get());check(requests.size()==64,"count overflow rejects without mutation");
-    while(!requests.empty())step_web_panel_host();check(executions==65 && executed[1]=="ordered 4" && executed.back()=="ordered 67" && queued_bytes==0,"FIFO execution and accounting");
+    while(!requests.empty())step_web_panel_host();check(executions==65 && executed[1]==prelude+"ordered 4" && executed.back()==prelude+"ordered 67" && queued_bytes==0,"FIFO execution and accounting");
     script_failure=true;event->json=message(L"wv-69",L"failing");view->receive(event.Get());step_web_panel_host();check(executions==66 && freed==132,"failed script still frees all memory");script_failure=false;
     check(wide("\xE4\xB8\xAD\xE6\x96\x87")==L"中文" && utf8(L"中文")=="\xE4\xB8\xAD\xE6\x96\x87","UTF-8 result roundtrip");
     for(unsigned i=70;i<74;++i){event->json=message(L"wv-"+std::to_wstring(i),std::wstring(1040000,L'x'));view->receive(event.Get());}
     check(requests.size()==4 && queued_bytes==8320000,"byte capacity is independent of count capacity");
     event->json=message(L"wv-74",std::wstring(1040000,L'x'));view->receive(event.Get());check(requests.size()==4 && queued_bytes==8320000,"byte overflow rejects atomically");
     for(auto& queued:requests)queued.expires={};while(!requests.empty())step_web_panel_host();check(queued_bytes==0 && executions==66,"expired large messages free their byte reservations");
-    A_long snaps=5,items=20;check(!snap_sizes(nullptr,nullptr,&snaps) && snaps==0 && !flyout_items(nullptr,nullptr,&items) && items==0,"SDK panel callback table has valid empty callbacks");
+    A_long snaps=5,items=0;check(!snap_sizes(nullptr,nullptr,&snaps) && snaps==0 && !flyout_items(nullptr,nullptr,&items) && items==2,"diagnostic flyout advertises its exact size");
+    AEGP_FlyoutMenuItem menu[2]{};
+    check(!flyout_items(nullptr,menu,&items) && menu[0].indent==1 && menu[1].indent==2 && menu[1].cmdID==1 && menu[1].enabledB,
+        "repair belongs to the native panel Diagnostics submenu");
+    items=1;check(flyout_items(nullptr,menu,&items)!=0,"short flyout allocation rejects without overflow");
+    const auto panel_ref=reinterpret_cast<AEGP_PanelRefcon>(view.get());
+    check(!flyout_command(panel_ref,1) && native_calls==1,"manual diagnostic repair reaches native callback");
+    EnableWindow(main_window,FALSE);check(flyout_command(panel_ref,1)!=0 && native_calls==1,"modal host cannot run diagnostic repair");EnableWindow(main_window,TRUE);
+    {HostUiExclusion excluded;check(flyout_command(panel_ref,1)!=0 && native_calls==1,"in-flight transaction blocks diagnostic repair");}
+    check(flyout_command(nullptr,1)!=0 && native_calls==1,"stale panel ref cannot run repair");
+    native_command_bindings[5].command=0;items=2;
+    check(!flyout_items(nullptr,menu,&items) && !menu[1].enabledB && flyout_command(panel_ref,1)!=0,"unavailable repair is disabled and cannot execute command zero");
     check(quiet_starts==66 && quiet_ends==66 && !quiet_active,"success and script-error paths restore quiet-error state");
     quiet_start_failure=true;
     check(execute(L"must not run").find(L"host_busy")!=std::wstring::npos && executions==66 && quiet_starts==quiet_ends,
