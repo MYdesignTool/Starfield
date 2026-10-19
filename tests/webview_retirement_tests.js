@@ -35,5 +35,8 @@ result=acceptedRun(altered);assert.notEqual(result.status,0,"different accepted 
 result=acceptedRun(accepted);assert.equal(result.status,0,result.stderr);assert(!fs.existsSync(extension));assert(fs.existsSync(retained));
 result=run("Restore");assert.equal(result.status,0,result.stderr);assert(!fs.existsSync(retained));assert.equal(fs.realpathSync(extension),fs.realpathSync(panelRoot));
 fs.unlinkSync(extension);fs.symlinkSync(path.join(repo,"cep_panel"),retained,"junction");
-result=run("Restore");assert.equal(result.status,0,result.stderr);assert.equal(fs.realpathSync(extension),fs.realpathSync(panelRoot)),"legacy source path is rebound to web_panel on explicit restore";
+result=run("Restore");assert.equal(result.status,0,result.stderr);assert.equal(fs.realpathSync(extension),fs.realpathSync(panelRoot),"legacy source path is rebound to web_panel on explicit restore");
+fs.unlinkSync(extension);fs.symlinkSync(path.join(repo,"cep_panel"),extension,"junction");
+result=acceptedRun(accepted);assert.equal(result.status,0,result.stderr);assert(fs.lstatSync(retained).isSymbolicLink(),"retire the already-dangling historical registration without traversing its target");
+result=run("Restore");assert.equal(result.status,0,result.stderr);assert.equal(fs.realpathSync(extension),fs.realpathSync(panelRoot));
 console.log("CEP retirement: report, owner/hash guards, exact Junction restore and legacy-path rebind passed in checkout-only fixture.");
