@@ -31,7 +31,13 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 
 ## 发布状态
 
-初次只读远端检查显示仓库公开、默认分支 main、Pages 尚未启用。本机 Git 连接受失效代理阻挡；浏览器未登录 GitHub。实现、静态验证与实际发布结果分别记录，不能把预期地址当上线证据。
+首版已通过已连接的 GitHub 接口提交至独立分支 `codex/web-01-github-pages`，见 [草稿 PR #1](https://github.com/MYdesignTool/Starfield/pull/1)。未合入 main、未上线。没有推送本地 P-05/P-06/P-07/GOV 在途插件修改；远端 README/任务卡修改从远端 main 分别追加官网入口与本卡，保留各自已有内容。本地 checkout 分支及预先存在的修改保持。
+
+初次只读远端检查显示仓库公开、默认分支 main、Pages 尚未启用。本机 Git 连接受失效代理阻挡；浏览器未登录 GitHub，无法代为更改 Pages Source。首次上线需 owner 登录后选择 GitHub Actions。实现、静态验证与实际发布结果分别记录，不能把预期地址当上线证据。
+
+本地静态验证与脚本语法通过。`artifacts/website/` 保存静态检查及临时 VM 交互 smoke 记录；覆盖动画暂停/恢复、系统减少动态效果、隐藏页面/移出视口停止、像素比上限、菜单/Escape/锚点关闭和无 Canvas 回退。这些不是实际浏览器视觉验收。首个远端 Actions run `39284762080` 检查时处于 queued，不记为 CI 通过。
+
+本地浏览器预览服务的准备脚本位于 `artifacts/website/preview.cjs`，默认仅报告。只有 owner 明确批准运行 `node artifacts/website/preview.cjs --serve` 后才可启动，监听 `127.0.0.1:4173`，内容仅 `docs/site/`，地址为 `http://127.0.0.1:4173/Starfield/`；一次 Ctrl+C 停止。当前尚未启动该服务，桌面/手机视觉验收待完成。
 
 ## 回退
 

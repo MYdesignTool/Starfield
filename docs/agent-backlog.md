@@ -4,6 +4,8 @@
 
 Owner 于 2026-10-20 要求开始实现官网，并使用 GitHub Pages。拥有 docs/site/、.github/workflows/pages.yml、tests/website-check.cjs、docs/website.md、ADR0047，以及 README/文档索引/本卡中的官网入口。采用独立静态页面，仅发布 docs/site/；不将 SDK、插件二进制、宿主前端、内部文档或 artifacts 打包入站点。不修改插件、参数/schema、渲染或现有部署。产品内容以当前架构与验证边界为准；网页粒子与节点图均为明确标注的独立演示，不冒充 AE 渲染或截图。不承诺公开安装包、其他宿主或未经验证的性能。验证静态资源、链接、脚本与 Pages 发布配置；远端发布和浏览器实测仅在实际成功后记录。
 
+首版、响应式样式与动效已实现，本地静态检查、脚本语法及 VM 交互 smoke 通过；草稿 PR #1 位于 codex/web-01-github-pages。Pages 尚未启用、未上线；远端 CI 与真实浏览器检查须按实际结果补记。发布步骤与证据边界见 docs/website.md。本卡不关闭任何 AE 宿主门。
+
 ## P-04 — AEGP Panel + WebView2 已完成
 
 旧 CEP 注册已在 owner 要求重发 UAC 后移出扫描目录；web_panel 迁移及已验证检查点已合入本地 main。源码/安装配对、精确注册路径、证据和恢复命令见 [current-state.md](current-state.md)。本卡不再存在待执行的管理员清理或 main 合并步骤。
