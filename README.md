@@ -4,7 +4,7 @@
 
 ## 当前入口
 
-源码前端目录为 `web_panel/`，不要重建 `cep_panel/` 或自动安装 CEP。当前源码/安装配对、验证边界、注册清理状态及回滚命令统一见 [当前状态](docs/current-state.md)。历史候选和旧 passing counts 不代表当前版本。
+源码前端目录为 web_panel。当前源码/安装配对、验证边界、注册清理状态及回滚命令统一见 [当前状态](docs/current-state.md)。历史候选和旧 passing counts 不代表当前版本。
 
 - [文档索引](docs/README.md)、[架构](docs/architecture.md)、[任务卡](docs/agent-backlog.md)、[路线图](docs/roadmap.md)
 - [前端](web_panel/README.md)、[AE 适配层](ae_plugin/README.md)、[编辑器配置](docs/editor-setup.md)
