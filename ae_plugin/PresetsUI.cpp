@@ -52,8 +52,8 @@ void launch(PF_InData* data,MainLauncherAction action) noexcept {
     if(action==MainLauncherAction::none)return;
     EffectUiExclusion exclusion;if(!exclusion)return;
     const auto script=action==MainLauncherAction::panel ?
-        "(function(){var id=app.findMenuCommandId('Starfield Particle Controls');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions.');}())" :
-        "(function(){var id=app.findMenuCommandId('Starfield Presets');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from Window > Extensions, then click Presets.');}())";
+        "(function(){var id=app.findMenuCommandId('Starfield Particle Controls (WebView2)') || app.findMenuCommandId('Starfield Particle Controls');if(id)app.executeCommand(id);else alert('Open Starfield Particle Controls from the Window menu.');}())" :
+        "(function(){var id=app.findMenuCommandId('Starfield Presets (WebView2)') || app.findMenuCommandId('Starfield Presets');if(id)app.executeCommand(id);else alert('Open Starfield Presets from the Window menu.');}())";
     (void)utility->AEGP_ExecuteScript(graph_carrier_plugin_id(),script,FALSE,nullptr,nullptr);
 }
 void draw_actions(PF_InData* data,DRAWBOT_SupplierRef source,DRAWBOT_SurfaceRef target,

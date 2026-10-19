@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("assert"),fs=require("fs"),path=require("path"),vm=require("vm");
-const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","cep_panel");
+const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","web_panel");
 class Element {
     constructor(name) { this.name=name;this.children=[];this.listeners={};this.attributes={};this.style={};this.classes=new Set();
         this.classList={add:x=>this.classes.add(x),remove:x=>this.classes.delete(x),toggle:(x,on)=>on?this.classes.add(x):this.classes.delete(x)}; }

@@ -4,7 +4,7 @@
 // This exercises the gateway/coordinator, not the native compiler or AE host.
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
-const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../cep_panel");
+const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../web_panel");
 const codec = require(path.join(panelRoot,"js/graph_codec.js")), layout = require(path.join(panelRoot,"js/graph_layout.js"));
 const edits = require(path.join(panelRoot,"js/graph_edits.js")), transactions = require(path.join(panelRoot,"js/graph_transactions.js"));
 const view = require(path.join(panelRoot,"js/graph_view.js"));

@@ -1,6 +1,5 @@
 # 功能核对入口
 
-原2026-09-30审计将相机、Motion Blur、预设和节点画布描述为未实现，已不适用于当前工作树。
-已实现/开发中/已部署的区别见 [current-state.md](current-state.md)，剩余产品工作见 [roadmap.md](roadmap.md)，实际 host 证据见 [compatibility-matrix.md](compatibility-matrix.md)。
-当前范围包含独立原生节点、动画/历史、曲线/渐变、程序形状、相机/深度、CPU/GPU 和 Motion Blur；Transform 的原生/Core 候选与 CEP/AE 完成度仍须区分。
-这不代表达到 Stardust 数值/功能 parity。Texture、Transfer、网格/体积/材质等参考行为族仍按独立案例安排。
+当前实现覆盖原生节点、动画/历史、曲线/渐变、相机/深度、CPU/GPU、Motion Blur、Transform、Model/Material、Motion 和 Turbulence 的既有范围。界面由 AEGP Panel + WebView2 承载；参数编辑在 AE Effect Controls，旧 CEP/浮动编辑器不恢复。
+
+源码、实际部署、owner 接受与专项未测项是不同事实，分别见 [当前状态](current-state.md)、[路线图](roadmap.md) 和 [宿主证据](compatibility-matrix.md)。这不宣称完整参考产品 parity，也不把菜单库存当作已实现的新行为。

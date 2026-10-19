@@ -1,7 +1,7 @@
 "use strict";
 // Ordinary authoring and UI tests; actual AE Null/render qualification is separate.
 const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm"),assert=require("node:assert/strict");
-const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","cep_panel");
+const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","web_panel");
 const edits=require(path.join(panelRoot,"js/graph_edits.js")),view=require(path.join(panelRoot,"js/graph_view.js"));
 const codec=require(path.join(panelRoot,"js/graph_codec.js")),layout=require(path.join(panelRoot,"js/graph_layout.js"));
 const snapshots=require(path.join(panelRoot,"js/native_graph_snapshot.js")),transactions=require(path.join(panelRoot,"js/graph_transactions.js"));

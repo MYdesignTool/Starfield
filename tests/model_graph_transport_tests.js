@@ -105,6 +105,43 @@ try{global.setTimeout=fn=>tasks.push(fn);
 }finally{global.setTimeout=originalTimer;}
 reset();client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(hostRuns,1);eq(bytesRead,meshHex.length/2);
 token="p101-c202-l303";
+// Owner's AE2023/WebView2 failure: Opacity positions .1/.8 are read back as
+// binary32 values promoted into the binary64 curve payload. Exercise actual
+// publication rather than comparing hand-written scalar tolerance formulas.
+for(const phase of ["prepared","published"]){
+    reset();const rounded=ns=>{for(const n of ns.filter(n=>n.type===edits.types.particle)){
+        const p=n.parameters.find(p=>p.key==="8"),bytes=Buffer.from(p.value);
+        eq(bytes.length,68);eq(Array.from(bytes.subarray(0,4)),[1,4,0,0]);
+        for(let offset=4;offset<bytes.length;offset+=8)bytes.writeDoubleLE(Math.fround(bytes.readDoubleLE(offset)),offset);
+        eq(bytes.readDoubleLE(20),0.10000000149011612);eq(bytes.readDoubleLE(36),0.800000011920929);
+        p.value=Array.from(bytes);
+    }};
+    if(phase==="prepared")preparedMutation=rounded;else savedMutation=rounded;
+    client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(restores,0);
+}
+// Corruptions are real mismatches, even when most other bytes/knots match.
+// Failure still restores the full pre-transaction graph and revision.
+for(const [label,mutate] of [
+    ["decoded curve byte 20",bytes=>bytes.writeDoubleLE(.1001,20)],
+    ["decoded curve byte 28",bytes=>bytes.writeDoubleLE(99,28)],
+    ["curve header byte 2",bytes=>{bytes[2]=1;}],
+    ["curve decode at byte 20",bytes=>bytes.writeDoubleLE(Infinity,20)]
+]){
+    reset();savedMutation=ns=>{const p=ns.find(n=>n.type===edits.types.particle).parameters.find(p=>p.key==="8"),bytes=Buffer.from(p.value);
+        mutate(bytes);p.value=Array.from(bytes);};
+    client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,false);eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);
+    ok(result.error.message.includes(label));
+}
+let allBanks=edits.apply(imported,{type:"addNode",nodeType:"motion"},()=>uuid(8200));
+allBanks=edits.apply(allBanks,{type:"addNode",nodeType:"turbulence"},()=>uuid(8201));
+reset(allBanks);savedMutation=ns=>{
+    const keys={particle:["7","8","13","27"],force:["9"],motion:["6"],turbulence:["7"]};
+    for(const n of ns){const kind=n.type.split(".").pop();for(const p of n.parameters){if(!keys[kind] || !keys[kind].includes(String(p.key)))continue;
+        const bytes=Buffer.from(p.value);for(let offset=4;offset<bytes.length;offset+=8)bytes.writeDoubleLE(Math.fround(bytes.readDoubleLE(offset)),offset);
+        p.value=Array.from(bytes);
+    }}
+};
+client().apply(plan(allBanks),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(restores,0);
 // The generic identity/assets error must identify which boundary rejected the
 // request without issuing a host call or revealing mesh payloads.
 for(const badToken of [undefined,null,"p-1-c202-l303","p00-c202-l303","p101-c0-l303","p101-c202-l0","pinned"]){

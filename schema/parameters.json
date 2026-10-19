@@ -1493,7 +1493,7 @@
     "constant": true,
     "uiWidth": 304,
     "uiHeight": 130,
-    "asset": "cep_panel/assets/starfield-presets-banner.png",
+    "asset": "web_panel/assets/starfield-presets-banner.png",
     "extensionId": "org.starfieldfx.panel.presets",
     "actions": [
       "Panel: Click To Open",

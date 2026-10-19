@@ -2,9 +2,9 @@
 // Run after launching AE with -r tools/native_node_host_bridge.jsx. Each RPC has
 // a 20-second deadline; failures stop this check instead of retrying AE operations.
 const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
-const codec=require("../cep_panel/js/graph_codec.js"),edits=require("../cep_panel/js/graph_edits.js");
-const transactions=require("../cep_panel/js/graph_transactions.js"),view=require("../cep_panel/js/graph_view.js");
-const snapshots=require("../cep_panel/js/native_graph_snapshot.js");
+const codec=require("../web_panel/js/graph_codec.js"),edits=require("../web_panel/js/graph_edits.js");
+const transactions=require("../web_panel/js/graph_transactions.js"),view=require("../web_panel/js/graph_view.js");
+const snapshots=require("../web_panel/js/native_graph_snapshot.js");
 const folder=path.join(__dirname,"../artifacts/host-check");
 let serial=0,token;const evidence=[];
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));

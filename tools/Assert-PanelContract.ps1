@@ -2,7 +2,7 @@
 param([string]$PanelRoot)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-if(-not $PanelRoot){$PanelRoot=Join-Path $taskRepo 'cep_panel'}
+if(-not $PanelRoot){$PanelRoot=Join-Path $taskRepo 'web_panel'}
 $taskPanel=(Resolve-Path -LiteralPath $PanelRoot).Path
 $taskFactory=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'candidates/native_record_contract.js')).Replace("`r`n","`n").TrimEnd()
 foreach($taskName in @('js/graph_edits.js','jsx/starfield_gateway.jsx')) {

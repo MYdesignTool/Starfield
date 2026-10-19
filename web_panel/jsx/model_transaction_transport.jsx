@@ -46,26 +46,56 @@
     function parameter(node,key){for(var i=0;i<node.parameters.length;i++)if(String(node.parameters[i].key)===String(key))return node.parameters[i];return null;}
     function close(a,b,color){
         if(array(a) && array(b)){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(!close(a[i],b[i],color))return false;return true;}
-        if(typeof a==="number" && typeof b==="number")return isFinite(a) && isFinite(b) && Math.abs(a-b)<=(color?1/255+1e-7:1e-6*Math.max(1,Math.abs(a)));
+        if(typeof a==="number" && typeof b==="number"){
+            if(!isFinite(a) || !isFinite(b))return false;
+            var tolerance=1e-6*Math.max(1,Math.abs(a));
+            if(color===true)tolerance=1/255+1e-7;
+            return Math.abs(a-b)<=tolerance;
+        }
         return a===b;
     }
-    function valueMatches(node,expected,actual){
+    function curveStride(type,key){
+        // Explicit branches: recognized byte banks never fall through to byte
+        // comparison. Do not rely on mixed AND/OR dispatch in ExtendScript.
+        if(type==="org.starfieldfx.nodes.particle"){
+            if(key==="13")return 32;
+            if(key==="7" || key==="8" || key==="27")return 16;
+            return 0;
+        }
+        if(type==="org.starfieldfx.nodes.force"){if(key==="9")return 16;return 0;}
+        if(type==="org.starfieldfx.nodes.motion"){if(key==="6")return 16;return 0;}
+        if(type==="org.starfieldfx.nodes.turbulence"){if(key==="7")return 16;return 0;}
+        return 0;
+    }
+    function bankMatches(expected,actual,stride,detail){
+        var a=expected.value,b=actual.value;
+        if(!array(a) || !array(b) || a.length!==b.length || a.length<4){detail.reason="curve arrays or lengths differ";return false;}
+        if(a[0]!==1 || a[3]!==0 || !integer(a[1],2,stride===32?8:64) || a.length!==4+a[1]*stride){
+            detail.reason="malformed curve header/layout";return false;}
+        for(var h=0;h<4;h++)if(a[h]!==b[h]){detail.reason="curve header byte "+h+" differs";return false;}
+        for(var offset=4;offset<a.length;offset+=8){
+            var wanted,observed,color=false;
+            if(stride===32 && (offset-4)%32!==0)color=true;
+            try{wanted=api.float64(a,offset);observed=api.float64(b,offset);}
+            catch(error){detail.reason="curve decode at byte "+offset+": "+String(error);return false;}
+            if(!close(wanted,observed,color)){
+                detail.reason="decoded curve byte "+offset+": expected "+String(wanted)+", actual "+String(observed)+
+                    ", delta "+String(Math.abs(wanted-observed));return false;
+            }
+        }
+        return true;
+    }
+    function valueMatches(node,expected,actual,detail){
         if(!actual || expected.type!==actual.type)return false;
-        var key=String(expected.key),curve=node.type==="org.starfieldfx.nodes.particle" && (key==="7" || key==="8" || key==="27" || key==="13") ||
-            node.type==="org.starfieldfx.nodes.force" && key==="9" || node.type==="org.starfieldfx.nodes.motion" && key==="6" ||
-            node.type==="org.starfieldfx.nodes.turbulence" && key==="7";
-        if(expected.type===7 && curve){var a=expected.value,b=actual.value;
-            if(!array(a) || !array(b) || a.length!==b.length || a.length<4)return false;
-            for(var h=0;h<4;h++)if(a[h]!==b[h])return false;
-            for(var offset=4;offset<a.length;offset+=8)if(!close(api.float64(a,offset),api.float64(b,offset),key==="13" && (offset-4)%32!==0))return false;
-            return true;}
+        var key=String(expected.key),stride=curveStride(node.type,key);
+        if(expected.type===7 && stride!==0)return bankMatches(expected,actual,stride,detail);
         return close(expected.value,actual.value,node.type==="org.starfieldfx.nodes.particle" && (key==="1" || key==="2"));
     }
     function records(expected,actual,ignoreModelAsset){
-        function differs(node,field,wanted,observed){
+        function differs(node,field,wanted,observed,detail){
             function describe(value){var text=JSON.stringify(value);return typeof text==="string"?text.substr(0,192):String(value);}
             throw new Error("Saved node "+node.id+" ("+node.type+") / "+field+" differs (expected "+describe(wanted)+", actual "+describe(observed)+
-                "; gateway="+api.gatewayBuild+", contract="+api.recordContractId+").");
+                "; "+(detail || "record mismatch")+"; gateway="+api.gatewayBuild+", contract="+api.recordContractId+").");
         }
         if(expected.length!==actual.length)throw new Error("Saved node count differs (expected "+expected.length+", actual "+actual.length+").");var map={};
         for(var i=0;i<actual.length;i++){if(map[actual[i].id])throw new Error("Duplicate saved node identity.");map[actual[i].id]=actual[i];}
@@ -101,7 +131,8 @@
             for(var p=0;p<node.parameters.length;p++){var field=node.parameters[p];
                 if(ignoreModelAsset && node.type===MODEL && /^(1|2|12|13)$/.test(String(field.key)))continue;
                 if(node.type==="org.starfieldfx.nodes.transform" && String(field.key)==="7")continue;
-                if(!valueMatches(node,field,parameter(saved,field.key)))differs(node,"parameter "+field.key,field,parameter(saved,field.key));}
+                var detail={};
+                if(!valueMatches(node,field,parameter(saved,field.key),detail))differs(node,"parameter "+field.key,field,parameter(saved,field.key),detail.reason);}
         }
     }
     function renderer(expected,actual){for(var key in expected)if(Object.prototype.hasOwnProperty.call(expected,key) && !close(expected[key],actual[key])){

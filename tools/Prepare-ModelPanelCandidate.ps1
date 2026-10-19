@@ -16,7 +16,7 @@ if(-not $Prepare){Write-Host "Report: prepare isolated Model author source at $t
 if(Test-Path -LiteralPath $taskDestination){throw 'Candidate directory already exists; choose a new name. No files were replaced.'}
 $taskBaseline=Get-Content -LiteralPath $taskRecipe -Raw | ConvertFrom-Json
 if($taskBaseline.schema -ne 1 -or $taskBaseline.files.Count -ne $taskAllowed.Count){throw 'Invalid candidate recipe.'}
-[xml]$taskInstalledManifest=[IO.File]::ReadAllText((Join-Path $taskRepo 'cep_panel/CSXS/manifest.xml'))
+[xml]$taskInstalledManifest=[IO.File]::ReadAllText((Join-Path $taskRepo 'web_panel/CSXS/manifest.xml'))
 if($taskInstalledManifest.ExtensionManifest.ExtensionBundleVersion -ne ('0.1.0.'+$taskBaseline.basePanel) -or
     $PanelGeneration -le $taskBaseline.basePanel){throw 'Recipe basePanel differs from the source manifest or candidate does not advance it.'}
 function Get-SourceHash([string]$taskPath){
@@ -27,24 +27,24 @@ function Get-SourceHash([string]$taskPath){
 }
 foreach($taskFile in $taskBaseline.files){
     if($taskFile.path -notin $taskAllowed){throw 'Candidate recipe contains an unexpected source path.'}
-    $taskSource=Join-Path $taskRepo ('cep_panel/'+$taskFile.path)
+    $taskSource=Join-Path $taskRepo ('web_panel/'+$taskFile.path)
     if((Get-SourceHash $taskSource) -ne $taskFile.normalizedSha256){throw "CEP baseline differs at $($taskFile.path); rebuild the candidate delta before preparation."}
 }
 # The patch can modify only these existing panel files, beneath the isolated copy.
 foreach($taskLine in [IO.File]::ReadAllLines($taskPatch)){
     if($taskLine.StartsWith('--- ') -or $taskLine.StartsWith('+++ ')){
-        if($taskLine -notmatch '^(--- a|\+\+\+ b)/cep_panel/(.+)$' -or $Matches[2] -notin $taskAllowed){throw 'Patch contains an unexpected target path.'}
+        if($taskLine -notmatch '^(--- a|\+\+\+ b)/web_panel/(.+)$' -or $Matches[2] -notin $taskAllowed){throw 'Patch contains an unexpected target path.'}
     }
 }
 New-Item -ItemType Directory -Path $taskDestination -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $taskRepo 'cep_panel') -Destination (Join-Path $taskDestination 'cep_panel') -Recurse
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_assets.js')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Destination (Join-Path $taskDestination 'cep_panel/js/model_graph_transactions.js')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Destination (Join-Path $taskDestination 'cep_panel/js/preset_files.js')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Destination (Join-Path $taskDestination 'cep_panel/jsx/preset_file_transport.jsx')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_transport.jsx') -Destination (Join-Path $taskDestination 'cep_panel/jsx/model_transaction_transport.jsx')
+Copy-Item -LiteralPath (Join-Path $taskRepo 'web_panel') -Destination (Join-Path $taskDestination 'web_panel') -Recurse
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Destination (Join-Path $taskDestination 'web_panel/js/model_assets.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Destination (Join-Path $taskDestination 'web_panel/js/model_graph_transactions.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Destination (Join-Path $taskDestination 'web_panel/js/preset_files.js')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_file_transport.jsx') -Destination (Join-Path $taskDestination 'web_panel/jsx/preset_file_transport.jsx')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_transaction_transport.jsx') -Destination (Join-Path $taskDestination 'web_panel/jsx/model_transaction_transport.jsx')
 foreach($taskFile in $taskBaseline.files){
-    if((Get-SourceHash (Join-Path $taskDestination ('cep_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
+    if((Get-SourceHash (Join-Path $taskDestination ('web_panel/'+$taskFile.path))) -ne $taskFile.normalizedSha256){throw 'Copied baseline changed during preparation.'}
 }
 # A git archive beneath artifacts/ still discovers the enclosing checkout.
 # Running apply from that archive treats its patch paths as outside the cwd and
@@ -75,7 +75,7 @@ try {
 $taskContract=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'candidates/native_record_contract.js')).Replace("`r`n","`n").TrimEnd()
 $taskContractBlock="    // BEGIN STARFIELD NATIVE RECORD CONTRACT`n"+$taskContract+"`n    var nativeRecords=createNativeRecordContract();`n    // END STARFIELD NATIVE RECORD CONTRACT"
 foreach($taskContractTarget in @(@('js/graph_edits.js','    function nativeRecordSchema(record) {'),@('jsx/starfield_gateway.jsx','    function readNativeNode(effect, layer) {'))){
-    $taskContractPath=Join-Path $taskDestination ('cep_panel/'+$taskContractTarget[0])
+    $taskContractPath=Join-Path $taskDestination ('web_panel/'+$taskContractTarget[0])
     $taskContractText=[IO.File]::ReadAllText($taskContractPath).Replace("`r`n","`n")
     if($taskContractText.Contains('// BEGIN STARFIELD NATIVE RECORD CONTRACT')){
         $taskContractText=[regex]::Replace($taskContractText,'(?s)    // BEGIN STARFIELD NATIVE RECORD CONTRACT.*?    // END STARFIELD NATIVE RECORD CONTRACT',[Text.RegularExpressions.MatchEvaluator]{param($taskMatch) $taskContractBlock})
@@ -85,21 +85,21 @@ foreach($taskContractTarget in @(@('js/graph_edits.js','    function nativeRecor
     }
     [IO.File]::WriteAllText($taskContractPath,$taskContractText,[Text.UTF8Encoding]::new($false))
 }
-$taskManifest=Join-Path $taskDestination 'cep_panel/CSXS/manifest.xml'
+$taskManifest=Join-Path $taskDestination 'web_panel/CSXS/manifest.xml'
 $taskManifestText=[regex]::Replace([IO.File]::ReadAllText($taskManifest),'0\.1\.0\.\d+',('0.1.0.'+$PanelGeneration))
 $taskManifestText=[regex]::Replace($taskManifestText,'Version="0\.1\.\d+"',('Version="0.1.'+$PanelGeneration+'"'))
 [IO.File]::WriteAllText($taskManifest,$taskManifestText,[Text.UTF8Encoding]::new($false))
 foreach($taskPage in @('index.html','presets.html')){
-    $taskPagePath=Join-Path $taskDestination ('cep_panel/'+$taskPage)
+    $taskPagePath=Join-Path $taskDestination ('web_panel/'+$taskPage)
     $taskPageText=[regex]::Replace([IO.File]::ReadAllText($taskPagePath),'\?v=\d+',('?v='+$PanelGeneration))
     [IO.File]::WriteAllText($taskPagePath,$taskPageText,[Text.UTF8Encoding]::new($false))
 }
 foreach($taskGatewayPath in @('jsx/starfield_gateway.jsx','js/panel.js','js/preset_manager.js')){
-    $taskGatewayFile=Join-Path $taskDestination ('cep_panel/'+$taskGatewayPath)
+    $taskGatewayFile=Join-Path $taskDestination ('web_panel/'+$taskGatewayPath)
     $taskGatewayText=[regex]::Replace([IO.File]::ReadAllText($taskGatewayFile),'native-presets-\d+',('native-presets-'+$PanelGeneration))
     [IO.File]::WriteAllText($taskGatewayFile,$taskGatewayText,[Text.UTF8Encoding]::new($false))
 }
-[ordered]@{basePanel=$taskBaseline.basePanel;panelGeneration=$PanelGeneration;candidatePath=(Join-Path $taskDestination 'cep_panel');published=$false;
+[ordered]@{basePanel=$taskBaseline.basePanel;panelGeneration=$PanelGeneration;candidatePath=(Join-Path $taskDestination 'web_panel');published=$false;
     modelAssetsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_assets.js') -Algorithm SHA256).Hash;
     modelGraphTransactionsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/model_graph_transactions.js') -Algorithm SHA256).Hash;
     presetFilesSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/preset_files.js') -Algorithm SHA256).Hash;
@@ -108,5 +108,5 @@ foreach($taskGatewayPath in @('jsx/starfield_gateway.jsx','js/panel.js','js/pres
     nativeRecordContractSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'candidates/native_record_contract.js') -Algorithm SHA256).Hash;
     patchSha256=(Get-FileHash -LiteralPath $taskPatch -Algorithm SHA256).Hash} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskDestination 'candidate.json') -Encoding UTF8
-& (Join-Path $PSScriptRoot 'Assert-PanelContract.ps1') -PanelRoot (Join-Path $taskDestination 'cep_panel')
+& (Join-Path $PSScriptRoot 'Assert-PanelContract.ps1') -PanelRoot (Join-Path $taskDestination 'web_panel')
 Write-Host "Prepared isolated Model author candidate: $taskDestination"

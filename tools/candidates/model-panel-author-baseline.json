@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "Owner-requested rollback complete2026-10-13: installed native77/Core ABI9/CEP81 from frozen352562d and restored active implementation to release1a6cf73. Rejected native78/79 directions withdrawn. Original installed10/18/27/selector hashes verified; accepted immediate draft paint, receipt handling and Circle preserved. Original deletion errors remain unresolved. No build/test/automatic host execution during rollback. See docs/current-state.md.",
+  "status": "Historical frozen CEP81 recipe, not current installation status. Current source is web_panel; this legacy helper must fail closed against an unmatched baseline. See docs/current-state.md.",
   "basePanel": 81,
   "files": [
     {

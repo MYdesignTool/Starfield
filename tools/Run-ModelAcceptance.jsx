@@ -122,7 +122,7 @@
             var journal=new File(fixture.nativeJournal);run.nativeJournalOffset=journal.exists?journal.length:0;
             run.nativeJournal={frames:0,canceled:0,errors:[]};}
         if(fixture.deadlineMilliseconds!==undefined && (typeof fixture.deadlineMilliseconds!=="number" || !isFinite(fixture.deadlineMilliseconds) || fixture.deadlineMilliseconds<120000 || fixture.deadlineMilliseconds>600000 || Math.floor(fixture.deadlineMilliseconds)!==fixture.deadlineMilliseconds))throw new Error("Invalid bounded acceptance deadline.");
-        $.evalFile(new File(config.repo+"/cep_panel/jsx/starfield_gateway.jsx"));$.evalFile(new File(config.repo+"/cep_panel/jsx/model_transaction_transport.jsx"));
+        $.evalFile(new File(config.repo+"/web_panel/jsx/starfield_gateway.jsx"));$.evalFile(new File(config.repo+"/web_panel/jsx/model_transaction_transport.jsx"));
         if(host.SFLD_modelTransactionReady()!==config.gatewayBuild)throw new Error("Installed gateway/transport generation differs.");
         if(previous && previous instanceof CompItem)for(var s=1;s<=previous.numLayers;s++)selection.push({layer:previous.layer(s),selected:previous.layer(s).selected});
         for(var oldItem=1;oldItem<=app.project.numItems;oldItem++)originalItems["$"+app.project.item(oldItem).id]=true;

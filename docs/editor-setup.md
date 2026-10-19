@@ -1,15 +1,7 @@
 # 编辑器配置
 
-打开 tools/Starfield.code-workspace 或直接打开 newStardust；仅打开父 forensic 工作区不会应用本工程的 C++ 配置。
-项目配置使用 C++20、MSVC x64、当前 Core 和本地 May2023 SDK。原生 variant 定义必须与正在查看的 Emitter/Particle/Force/Transform 代码一致；Appearance 已退役。PluginApi.h 是当前 ABI 的唯一声明，不从旧检查点复制 ABI2。
+打开 tools/Starfield.code-workspace 或仓库根目录；父 forensic 工作区不会应用本工程配置。MSVC 路径和头文件由 .vscode/c_cpp_properties.json 管理，C++20、May2023 AE SDK 和固定 WebView2 SDK 与构建保持一致。工具链更新后修改 starfieldCompiler。
 
-IntelliSense/browse 缓存位于忽略的 artifacts/editor，不扫描父目录旧源码或 deployed binaries。tools/Clean-Workspace.ps1 可报告并清掉此工作区的再生成缓存，不改用户 profile 缓存/全局编辑器设置。
-诊断持续时由 owner 执行 C/C++: Reset IntelliSense Database，再 Developer: Reload Window。用 Go to Definition 确认 SfCoreRenderRequest 指向本 checkout 的 PluginApi.h。
+所有配置默认加载 OpenClIntelliSense.h，只供 IDE 声明 get_global_id/内核限定符，不参与 CUDA/OpenCL 运行编译。默认配置也能解析 SpriteKernel.h，无需为它切换。查看 WebPanelHost 时选择 WebView2 Host；节点 variant 选择对应类型，详见 [.vscode 说明](../.vscode/README.md)。
 
-实际编译/include provenance 的入口：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tests/RunCoreTests.ps1 -NativeSync -TraceIncludes
-```
-
-测试响应文件使用仓库 cwd 下的相对路径，避免非 ASCII 路径进入 CL 参数；不再通过 subst 映射盘符。原生 PiPL 构建仍由 BuildWindows.ps1 管理。编辑器提示和编译日志分别判断，历史 editor 修复不是当前 ABI 验收。
+缓存位于 artifacts/editor。若配置更新后旧红线仍在，可执行 Developer: Reload Window 或 C/C++: Reset IntelliSense Database。不要修改全局 IDE 配置或用户缓存。编辑器提示与实际编译结果分别判断，不能以红线或编译通过推断 AE 行为。

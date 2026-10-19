@@ -11,7 +11,7 @@ function Assert-ModelTest([bool]$taskPass,[string]$taskMessage){$script:taskChec
 function Write-ModelTest([string]$taskPath,[string]$taskText){New-Item -ItemType Directory -Path (Split-Path -Parent $taskPath) -Force | Out-Null;[IO.File]::WriteAllText($taskPath,$taskText,[Text.UTF8Encoding]::new($false))}
 function Hash-ModelTest([string]$taskPath){return (Get-FileHash -LiteralPath $taskPath).Hash}
 foreach($taskTool in @('Deploy-TestBuild.ps1','Deploy-ModelTestBuild.ps1','Restore-TestBuild.ps1')){New-Item -ItemType Directory -Path (Join-Path $taskRoot 'tools') -Force | Out-Null;Copy-Item -LiteralPath (Join-Path $taskRepo ('tools/'+$taskTool)) -Destination (Join-Path $taskRoot ('tools/'+$taskTool))}
-$taskPrepared=Join-Path $taskRoot 'artifacts/prepared/model-test';$taskBundle=Join-Path $taskRoot 'dist';$taskPanelRoot=Join-Path $taskRoot 'cep_panel'
+$taskPrepared=Join-Path $taskRoot 'artifacts/prepared/model-test';$taskBundle=Join-Path $taskRoot 'dist';$taskPanelRoot=Join-Path $taskRoot 'web_panel'
 $taskPlugin=Join-Path $taskRoot 'artifacts/deploy-test/host';$taskCep=Join-Path $taskRoot 'artifacts/deploy-test/panel-link'
 $taskIsolatedPrefix=[IO.Path]::GetFullPath((Join-Path $taskRepo 'artifacts/deploy-test'))+'\'
 foreach($taskPath in @($taskRoot,$taskPlugin,$taskCep,$taskBundle,$taskPanelRoot,$taskPrepared)) {
@@ -35,8 +35,8 @@ $taskPaths=@('index.html','css/panel.css','js/graph_edits.js','js/native_graph_s
 $taskRecipeFiles=@();$taskNewPanel=@();$taskOldPanel=@()
 foreach($taskPath in ($taskPaths+@('CSXS/manifest.xml','js/model_assets.js','js/model_graph_transactions.js','js/preset_files.js','jsx/preset_file_transport.jsx','jsx/model_transaction_transport.jsx'))){
     $taskNewText=if($taskPath -eq 'CSXS/manifest.xml'){'ExtensionBundleVersion="0.1.0.'+$taskNewGeneration+'"'}elseif($taskPath -eq 'jsx/starfield_gateway.jsx'){'native-presets-'+$taskNewGeneration}else{'new-panel'+$taskNewGeneration+'-'+$taskPath}
-    $taskNew=Join-Path $taskPrepared ('cep_panel/'+$taskPath);Write-ModelTest $taskNew $taskNewText;$taskNewPanel+=[pscustomobject]@{path='cep_panel/'+$taskPath;hash=(Hash-ModelTest $taskNew)}
-    if($UpgradeInstalledModel -or $taskPath -in $taskPaths -or $taskPath -eq 'CSXS/manifest.xml'){$taskOld=Join-Path $taskPanelRoot $taskPath;Write-ModelTest $taskOld ('old-panel'+$taskOldGeneration+'-'+$taskPath);$taskOldPanel+=[pscustomobject]@{path='cep_panel/'+$taskPath;installedHash=(Hash-ModelTest $taskOld)}
+    $taskNew=Join-Path $taskPrepared ('web_panel/'+$taskPath);Write-ModelTest $taskNew $taskNewText;$taskNewPanel+=[pscustomobject]@{path='web_panel/'+$taskPath;hash=(Hash-ModelTest $taskNew)}
+    if($UpgradeInstalledModel -or $taskPath -in $taskPaths -or $taskPath -eq 'CSXS/manifest.xml'){$taskOld=Join-Path $taskPanelRoot $taskPath;Write-ModelTest $taskOld ('old-panel'+$taskOldGeneration+'-'+$taskPath);$taskOldPanel+=[pscustomobject]@{path='web_panel/'+$taskPath;installedHash=(Hash-ModelTest $taskOld)}
         if($taskPath -in $taskPaths){$taskRecipeFiles+=[pscustomobject]@{path=$taskPath;normalizedSha256=(Hash-ModelTest $taskOld)}}}}
 Write-ModelTest (Join-Path $taskRoot 'tools/candidates/model-panel-author-baseline.json') (ConvertTo-Json @{schema=1;files=$taskRecipeFiles} -Depth 4)
 Write-ModelTest (Join-Path $taskRoot 'artifacts/m3-16-native60-deploy-after.json') (ConvertTo-Json @{nativeBuild=$taskOldBuild;panelGeneration=$taskOldGeneration;coreAbi=$(if($taskOldBuild -ge 70){9}elseif($UpgradeInstalledModel){8}else{7});sourceCommit=('a'*40);native=$taskOldNative;panel=@{files=$taskOldPanel};selector=$taskOldSelector} -Depth 5)
@@ -64,7 +64,7 @@ Assert-ModelTest ((Invoke-ModelTest 'partial-replacement' 'Deploy-TestBuild.ps1'
 # A source not yet copied during a failed publication may legitimately be absent.
 $taskBackup=Join-Path $taskRoot 'artifacts/disabled/model-pair';$taskManifestPath=Join-Path $taskBackup 'panel-snapshot.json'
 $taskManifest=Get-Content -LiteralPath $taskManifestPath -Raw | ConvertFrom-Json
-$taskMissing='cep_panel/jsx/model_transaction_transport.jsx';Move-Item -LiteralPath (Join-Path $taskRoot $taskMissing) -Destination (Join-Path $taskRoot 'held-new-helper.jsx')
+$taskMissing='web_panel/jsx/model_transaction_transport.jsx';Move-Item -LiteralPath (Join-Path $taskRoot $taskMissing) -Destination (Join-Path $taskRoot 'held-new-helper.jsx')
 if($UpgradeInstalledModel){
     Copy-Item -LiteralPath (Join-Path $taskBackup ('panel/'+$taskMissing.Substring(10))) -Destination (Join-Path $taskRoot $taskMissing)
     ($taskManifest.files | Where-Object path -eq $taskMissing).installedHash=Hash-ModelTest (Join-Path $taskRoot $taskMissing)

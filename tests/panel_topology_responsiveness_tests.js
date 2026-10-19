@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("node:assert/strict"),fs=require("fs"),path=require("path"),vm=require("vm");
-const root=path.resolve(__dirname,".."),panel=process.env.STARFIELD_PANEL_ROOT || path.join(root,"cep_panel");
+const root=path.resolve(__dirname,".."),panel=process.env.STARFIELD_PANEL_ROOT || path.join(root,"web_panel");
 const codec=require(path.join(panel,"js/graph_codec.js")),edits=require(path.join(panel,"js/graph_edits.js")),view=require(path.join(panel,"js/graph_view.js"));
 const transactions=require(path.join(panel,"js/graph_transactions.js")),fixture=require("./native_snapshot_fixture.js");
 const parser=require("internal/deps/acorn/acorn/dist/acorn"),source=fs.readFileSync(path.join(panel,"js/panel.js"),"utf8");

@@ -20,9 +20,9 @@ foreach($taskTool in @('Deploy-PanelTestBuild.ps1','Deploy-TestBuild.ps1','Resto
 New-Item -ItemType Directory -Path (Join-Path $taskRoot 'tests') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $taskRepo 'tests/extendscript_syntax_tests.js') -Destination (Join-Path $taskRoot 'tests/extendscript_syntax_tests.js')
 Copy-Item -LiteralPath (Join-Path $taskRepo 'tests/extendscript_conditionals.cjs') -Destination (Join-Path $taskRoot 'tests/extendscript_conditionals.cjs')
-$taskLive=Join-Path $taskRoot 'cep_panel';$taskBundle=Join-Path $taskRoot 'dist'
+$taskLive=Join-Path $taskRoot 'web_panel';$taskBundle=Join-Path $taskRoot 'dist'
 $taskPlugin=Join-Path $taskRoot 'artifacts/deploy-test/host';$taskCep=Join-Path $taskRoot 'artifacts/deploy-test/cep'
-$taskCandidate=Join-Path $taskRoot 'artifacts/prepared/panel-test/cep_panel'
+$taskCandidate=Join-Path $taskRoot 'artifacts/prepared/panel-test/web_panel'
 New-Item -ItemType Directory -Path $taskLive,$taskBundle,$taskPlugin -Force | Out-Null
 New-Item -ItemType Junction -Path (Join-Path $taskPlugin 'Starfield') -Target $taskBundle | Out-Null
 New-Item -ItemType Junction -Path $taskCep -Target $taskLive | Out-Null
@@ -45,8 +45,8 @@ foreach($taskPath in $taskPaths){
         elseif($taskPath -in @('jsx/starfield_gateway.jsx','js/panel.js','js/preset_manager.js')){'var GATEWAY_BUILD = "native-presets-'+$taskNextPanel+'";'}
         elseif($taskPath -in @('index.html','presets.html')){'script.js?v='+$taskNextPanel}else{'// candidate'+$taskNextPanel+' '+$taskPath}
     Write-PanelTest (Join-Path $taskCandidate $taskPath) $taskText
-    $taskOldPanel += @{path='cep_panel/'+$taskPath;installedHash=(Hash-PanelTest (Join-Path $taskLive $taskPath))}
-    $taskNewPanel += @{path='cep_panel/'+$taskPath;hash=(Hash-PanelTest (Join-Path $taskCandidate $taskPath))}
+    $taskOldPanel += @{path='web_panel/'+$taskPath;installedHash=(Hash-PanelTest (Join-Path $taskLive $taskPath))}
+    $taskNewPanel += @{path='web_panel/'+$taskPath;hash=(Hash-PanelTest (Join-Path $taskCandidate $taskPath))}
 }
 Write-PanelTest (Join-Path $taskRoot 'artifacts/prepared/panel-test/candidate.json') (ConvertTo-Json @{basePanel=$taskBasePanel;panelGeneration=$taskNextPanel})
 Write-PanelTest (Join-Path $taskRoot 'artifacts/m3-17-native61-deploy-after.json') (ConvertTo-Json @{nativeBuild=$InstalledNativeBuild;coreAbi=$taskAbi;panelGeneration=$taskBasePanel;sourceCommit=('a'*40);native=$taskNative;panel=@{files=$taskOldPanel};selector=$taskSelector} -Depth 6)

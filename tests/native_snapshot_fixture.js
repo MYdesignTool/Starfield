@@ -2,9 +2,9 @@
 
 // Current ordinary-control receipts for client tests. This is a protocol fixture,
 // not an AE compiler: the gateway host model exercises actual property writes.
-const codec = require("../cep_panel/js/graph_codec.js");
-const layout = require("../cep_panel/js/graph_layout.js");
-const edits = require("../cep_panel/js/graph_edits.js");
+const codec = require("../web_panel/js/graph_codec.js");
+const layout = require("../web_panel/js/graph_layout.js");
+const edits = require("../web_panel/js/graph_edits.js");
 const fields = ["maxParticles", "timeRemapEnabled", "timeRemapSeconds", "previewEnabled",
     "previewChance", "acceleration", "timeSamplingHz", "motionBlur", "shutterAngle",
     "shutterPhase", "motionBlurType", "motionBlurLevels", "linearAccuracy", "opacityBoost",

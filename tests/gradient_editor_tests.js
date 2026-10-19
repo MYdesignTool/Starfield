@@ -16,6 +16,6 @@ for(const name of ["curve_editor","gradient_editor","editor_presets"]){
     assert.ok(!fs.existsSync(panelPath("js/"+name+".js")),"unused editor script is physically retired: "+name);
 }
 const generator=fs.readFileSync(require("node:path").join(__dirname,"../tools/Generate-EditorPresets.ps1"),"utf8");
-assert.ok(!generator.includes("cep_panel\\js\\editor_presets.js"),"native generation cannot resurrect the CEP script");
+assert.ok(!generator.includes("web_panel\\js\\editor_presets.js"),"native generation cannot resurrect the CEP script");
 assert.ok(generator.includes("EditorPresetCatalog.hpp"),"native AE editor presets still have their build input");
 console.log("CEP editor retirement checks passed: no DOM/styles/handlers/value-edit requests/helper files or regenerating output; native presets preserved.");

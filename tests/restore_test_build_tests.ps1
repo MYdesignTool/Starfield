@@ -21,12 +21,12 @@ foreach($taskName in $taskNames) {
 }
 & (Join-Path $taskRoot 'tools\Deploy-TestBuild.ps1') -PluginDir $taskPluginDir -BackupName paired -Install
 $taskBackup=Join-Path $taskRoot 'artifacts\disabled\paired'
-$taskTarget=Join-Path $taskRoot 'cep_panel\js\fixture.js'
+$taskTarget=Join-Path $taskRoot 'web_panel\js\fixture.js'
 $taskSaved=Join-Path $taskBackup 'panel\js\fixture.js'
 New-Item -ItemType Directory -Path (Split-Path -Parent $taskTarget),(Split-Path -Parent $taskSaved) -Force | Out-Null
 [IO.File]::WriteAllText($taskTarget,'new panel')
 [IO.File]::WriteAllText($taskSaved,'old panel')
-$taskRecord=@{files=@(@{path='cep_panel/js/fixture.js';installedHash=(Get-FileHash $taskTarget).Hash;oldHash=(Get-FileHash $taskSaved).Hash})}
+$taskRecord=@{restoreSourceDirectory='cep_panel';files=@(@{path='web_panel/js/fixture.js';installedHash=(Get-FileHash $taskTarget).Hash;oldHash=(Get-FileHash $taskSaved).Hash})}
 $taskRecord | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $taskBackup 'panel-snapshot.json') -Encoding UTF8
 & (Join-Path $taskRoot 'tools\Restore-TestBuild.ps1') -PluginDir $taskPluginDir -BackupName paired
 if([IO.File]::ReadAllText($taskTarget) -ne 'new panel') {throw 'Report mode changed a source.'}
@@ -36,6 +36,8 @@ try {& (Join-Path $taskRoot 'tools\Restore-TestBuild.ps1') -PluginDir $taskPlugi
 if(-not $taskRejected -or [IO.File]::ReadAllText($taskTarget) -ne 'later owner edit') {throw 'Modified source was overwritten.'}
 [IO.File]::WriteAllText($taskTarget,'new panel')
 & (Join-Path $taskRoot 'tools\Restore-TestBuild.ps1') -PluginDir $taskPluginDir -BackupName paired -Restore
+$taskTarget=Join-Path $taskRoot 'cep_panel/js/fixture.js'
+if(Test-Path -LiteralPath (Join-Path $taskRoot 'web_panel')){throw 'Legacy native restore did not restore its source directory name.'}
 if([IO.File]::ReadAllText($taskTarget) -ne 'old panel' -or
    [IO.File]::ReadAllText((Join-Path $taskBackup 'candidate-panel\js\fixture.js')) -ne 'new panel') {throw 'Paired source retention/restoration failed.'}
 foreach($taskName in $taskNames) {

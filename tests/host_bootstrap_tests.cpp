@@ -2,7 +2,7 @@
 #include "../ae_plugin/StarfieldHost.cpp"
 #include <iostream>
 namespace {
-unsigned checks{},failures{},gets{},disposes{},acquisitions{},releases{},calls{};
+unsigned checks{},failures{},gets{},disposes{},acquisitions{},releases{},calls{},missing_suites{};
 bool active=true,fail_message{},fail_registration{};
 A_long effects_count=3;
 AEGP_IdleHook idle_callback{};AEGP_DeathHook death_callback{};
@@ -16,6 +16,7 @@ SPErr acquire(const char* name,int32,const void** value) {
     if(!std::strcmp(name,kAEGPCompSuite))*value=&comps;
     if(!std::strcmp(name,kAEGPLayerSuite))*value=&layers;
     if(!std::strcmp(name,kAEGPEffectSuite))*value=&effects;
+    if(!*value)++missing_suites;
     return *value?kSPNoError:kSPBadParameterError;
 }
 SPErr release(const char*,int32){++releases;return kSPNoError;}
@@ -43,7 +44,7 @@ int main() {
     SPBasicSuite sdk{};sdk.AcquireSuite=acquire;sdk.ReleaseSuite=release;AEGP_GlobalRefcon refcon{};
     check(StarfieldHostEntry(&sdk,0,0,8,&refcon)==0 && idle_callback && death_callback,"General AEGP hooks owned for the session");
     A_long sleep=60;idle_callback(nullptr,nullptr,&sleep);
-    check(sleep==30 && calls==1 && gets==disposes && acquisitions==releases,"only renderer is messaged and references are callback-local");
+    check(sleep==30 && calls==1 && gets==disposes && acquisitions==releases+missing_suites,"only renderer is messaged and references are callback-local");
     const auto throttle=acquisitions;idle_callback(nullptr,nullptr,&sleep);check(acquisitions==throttle,"idle throttle");
     next_scan={};std::thread worker([&]{idle_callback(nullptr,nullptr,&sleep);});worker.join();check(acquisitions==throttle,"worker rejected before AEGP access");
     active=false;next_scan={};idle_callback(nullptr,nullptr,&sleep);check(calls==1,"no active comp is harmless");
@@ -53,6 +54,6 @@ int main() {
     effects_count=1;next_scan={};idle_callback(nullptr,nullptr,&sleep);check(layer_index==0 && effect_index==0,"stack shrink recovers without stale handles");
     death_callback(nullptr,nullptr);next_scan={};const auto dead=acquisitions;idle_callback(nullptr,nullptr,&sleep);check(acquisitions==dead,"death prevents host access");
     stopped=false;fail_registration=true;check(StarfieldHostEntry(&sdk,0,0,8,&refcon)==0 && stopped,"partial registration remains resident and inert");
-    check(acquisitions==releases,"suite references balanced");
+    check(acquisitions==releases+missing_suites,"every acquired suite is released; unsupported optional suites are never released");
     std::cout<<checks<<" General AEGP bootstrap checks, "<<failures<<" failures\n";return failures?1:0;
 }

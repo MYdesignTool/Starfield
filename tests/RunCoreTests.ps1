@@ -81,7 +81,7 @@ try {
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp','ae_plugin\ParticleGradientUI.cpp') }
     if ($Gpu) { $sources += @('ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\MotionBlur.cpp', 'tests\adapter_capture_stubs.cpp', 'tests\editor_preset_picker_stub.cpp') }
     if ($GradientEditor) { $sources = @('tests\gradient_editor_tests.cpp','ae_plugin\ParticleGradientUI.cpp') }
-    if ($HostBootstrap) { $sources = @('tests\host_bootstrap_tests.cpp') }
+    if ($HostBootstrap) { $sources = @('tests\host_bootstrap_tests.cpp','tests\host_bootstrap_stubs.cpp','ae_plugin\UiExclusionHost.cpp') }
     if ($ParticleTransform) { $sources = @('tests\particle_transform_tests.cpp','src\core\ParticleTransform.cpp') }
     if ($TransformTransport) { $sources[0] = 'tests\transform_transport_tests.cpp' }
     if ($TransformGraph) { $sources[0] = 'tests\transform_graph_tests.cpp' }

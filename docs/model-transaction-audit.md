@@ -1,5 +1,7 @@
 # Model 提交链路整体排查 — 2026-10-11
 
+> 历史排查记录：下文安装版本、CEP 路径、暂停/下一步与回滚命令只属于 2026-10-11。当前链路契约见 ADR0038/0040，实际安装与授权见 current-state.md；旧备份可能已按最近五版策略清理。
+
 ## native69 / CEP72 deployed — 2026-10-11 19:27+08
 
 Installed native69/packed32837/CoreABI8/CEP72 from frozen source

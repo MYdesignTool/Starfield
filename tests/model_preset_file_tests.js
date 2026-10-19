@@ -155,7 +155,7 @@ function ui(capturedGraph,meshFailure=false){
     reset();tasks=[];const elements={},calls=[],timers=new Map();let timer=0,loads=0;
     const browserHost={File,Date,app,$:{global:null}};browserHost.$.global=browserHost;
     const hostContext=vm.createContext(browserHost);
-    browserHost.$.evalFile=function(file){loads++;vm.runInContext(load(file.fsName.split("cep_panel/")[1]),hostContext);};
+    browserHost.$.evalFile=function(file){loads++;vm.runInContext(load(file.fsName.split("web_panel/")[1]),hostContext);};
     vm.runInContext(load("jsx/starfield_gateway.jsx"),hostContext);
     function reply(payload){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,...payload});}
     const captured=fixture.receipt({ok:true,target:{token:"target"},snapshot:{initialized:true,revision:11,checksum:"00000000",recordStamp:"stamp",
@@ -171,7 +171,7 @@ function ui(capturedGraph,meshFailure=false){
     browserHost.SFLD_releaseModelAsset=()=>{calls.push("releaseModelAsset");return reply({ok:true});};
     const window={prompt:()=>"UI mesh",StarfieldPresets:presets,StarfieldGraphCodec:codec,StarfieldGraphTransactions:transactions,StarfieldNativeGraphSnapshot:snapshots,
         StarfieldModelAssets:assets,StarfieldPresetFiles:{create:options=>files.create({...options,schedule:fn=>tasks.push(fn)})},close(){},
-        __adobe_cep__:{getSystemPath:()=>"C:/test/cep_panel",evalScript(script,callback){if(script.includes("return SFLD_readPresetFileModal("))nativeModal(browserHost);callback(vm.runInContext(script,hostContext));}}};
+        __adobe_cep__:{getSystemPath:()=>"C:/test/web_panel",evalScript(script,callback){if(script.includes("return SFLD_readPresetFileModal("))nativeModal(browserHost);callback(vm.runInContext(script,hostContext));}}};
     const uiContext=vm.createContext({window,document:{getElementById:id=>elements[id] || (elements[id]=new Element()),createElement:()=>new Element()},
         prompt:()=>"UI mesh",setTimeout(fn,delay){timers.set(++timer,{fn,delay});return timer;},clearTimeout:id=>timers.delete(id),console,Date,JSON,Math});
     vm.runInContext(load("js/preset_manager.js"),uiContext);
@@ -188,7 +188,7 @@ function ui(capturedGraph,meshFailure=false){
 ui(imported);ui(graph(false));ui(presets.build("sparks",1080));ui(imported,true);
 // Run the unchanged legacy preset checks against the isolated dependencies.
 const legacyRequire=require("node:module").createRequire(path.join(__dirname,"preset_tests.js"));
-function candidateRequire(name){return name.startsWith("../cep_panel/")?require(path.join(root,name.slice("../cep_panel/".length))):legacyRequire(name);}
-candidateRequire.resolve=name=>name.startsWith("../cep_panel/")?path.join(root,name.slice("../cep_panel/".length)):legacyRequire.resolve(name);
+function candidateRequire(name){return name.startsWith("../web_panel/")?require(path.join(root,name.slice("../web_panel/".length))):legacyRequire(name);}
+candidateRequire.resolve=name=>name.startsWith("../web_panel/")?path.join(root,name.slice("../web_panel/".length)):legacyRequire.resolve(name);
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,"preset_tests.js"),"utf8"),{require:candidateRequire,console},{filename:"preset_tests.js (isolated dependencies)"});
 console.log(`model_preset_file_tests: ${checks} checks passed; real isolated codec/client/gateway; no AE or disk IO`);

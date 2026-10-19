@@ -9,6 +9,7 @@
 #include "UiExclusionHost.hpp"
 #include "GraphCommitRequest.hpp"
 #include "GraphRepairRequest.hpp"
+#include "WebPanelHost.hpp"
 #include "Parameters.hpp"
 #include <algorithm>
 #include <chrono>
@@ -241,6 +242,7 @@ A_Err idle(AEGP_GlobalRefcon,AEGP_IdleRefcon,A_long* sleep) noexcept try {
     if(stopped || running || std::this_thread::get_id()!=main_thread ||
        !starfield::adapter::ui_exclusion_available())return A_Err_NONE;
     running=true;struct RunningScope{~RunningScope(){running=false;}} scope;
+    if(starfield::adapter::step_web_panel_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_preset_file_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_model_asset_host() && sleep)*sleep=std::min(*sleep,A_long{1});
     if(starfield::adapter::step_model_transaction_host() && sleep)*sleep=std::min(*sleep,A_long{1});
@@ -298,7 +300,8 @@ A_Err model_transaction_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command 
     starfield::adapter::queue_model_graph_transaction();return A_Err_NONE;
 }
 A_Err death(AEGP_GlobalRefcon,AEGP_DeathRefcon) noexcept {
-    stopped=true;starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();
+    stopped=true;starfield::adapter::stop_web_panel_host();
+    starfield::adapter::stop_model_asset_host();starfield::adapter::stop_model_transaction_host();
     starfield::adapter::stop_preset_file_host();
     starfield::adapter::stop_ui_exclusion();return A_Err_NONE;
 }
@@ -324,6 +327,7 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
     // Once a hook is registered the module must stay resident, even if a later
     // registration fails. This optional helper never rejects AE startup.
     if(error)stopped=true;
+    if(!error)starfield::adapter::initialize_web_panel_host(suites,id);
     // Session-resident AEGP owns UI commands. Navigation writes no trigger
     // parameters and does not dirty the graph or invalidate rendered frames.
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);

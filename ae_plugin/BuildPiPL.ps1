@@ -44,8 +44,8 @@ function Get-PiPLStringData([string]$Value,[bool]$Pascal) {
 function Set-PiPLRrcStringProperty([string]$Text,[string]$PropertyCode,[string]$Value,[bool]$Pascal) {
     $code = [regex]::Escape($PropertyCode)
     $pattern = '(?m)^(?<lead>[ \t]*"' + $code + '"[ \t]*,[ \t]*/\*[ \t]*''name''[ \t]*PINameProperty[ \t]*\*/[ \t]*\r?\n[ \t]*RSCS32\(0\),[ \t]*\r?\n[ \t]*)RSCS32\([ \t]*\d+[ \t]*\),[ \t]*\r?\n(?<indent>[ \t]*)"[^"\r\n]*",[ \t]*\r?$'
-    $matches = [regex]::Matches($Text, $pattern)
-    if ($matches.Count -ne 1) { throw "PiPL cache identity property $PropertyCode was not unique." }
+    $propertyMatches = [regex]::Matches($Text, $pattern)
+    if ($propertyMatches.Count -ne 1) { throw "PiPL cache identity property $PropertyCode was not unique." }
     $data = Get-PiPLStringData $Value $Pascal
     return [regex]::Replace($Text, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{
         param($m)

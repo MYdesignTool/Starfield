@@ -40,7 +40,7 @@ const window={StarfieldPresets:presets,StarfieldGraphCodec:codec,StarfieldGraphT
     }}});
 }},
     StarfieldModelAssets:require(panelPath("js/model_assets.js")),StarfieldPresetFiles:require(panelPath("js/preset_files.js")),
-    StarfieldNativeGraphSnapshot:snapshots,close(){},__adobe_cep__:{getSystemPath:()=>"C:/test/cep_panel",
+    StarfieldNativeGraphSnapshot:snapshots,close(){},__adobe_cep__:{getSystemPath:()=>"C:/test/web_panel",
         evalScript(script,callback){callback(vm.runInNewContext(script,host));}}};
 const context={window,document,console,Date,JSON,Math,
     setTimeout(callback,delay){timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id)};

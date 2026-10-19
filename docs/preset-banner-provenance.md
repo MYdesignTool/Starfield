@@ -1,6 +1,6 @@
 # Starfield preset banner
 
-Asset: `cep_panel/assets/starfield-presets-banner.png`, 1086x362 PNG, 819524 bytes.
+Asset: `web_panel/assets/starfield-presets-banner.png`, 1086x362 PNG, 819524 bytes.
 SHA-256: `313999EC1D0C67CD28B73FB0C13530BDBA4F5A3A2B22F6298FF6CAB2725ECD3A`.
 Created2026-10-04 with the imagegen skill and built-in image_gen tool. Original
 generation is retained outside the checkout by the tool. Original2172x724 PNG

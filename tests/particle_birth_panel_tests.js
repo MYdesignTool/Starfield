@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
-const root=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../cep_panel");
+const root=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../web_panel");
 const edits=require(path.join(root,"js/graph_edits.js")),view=require(path.join(root,"js/graph_view.js"));
 const presets=require(path.join(root,"js/presets.js")),codec=require(path.join(root,"js/graph_codec.js"));
 let checks=0;const eq=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=x=>{checks++;assert.ok(x);},reject=(f,re)=>{checks++;assert.throws(f,re);};

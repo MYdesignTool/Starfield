@@ -1,0 +1,56 @@
+"use strict";
+const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
+const code=fs.readFileSync(path.join(__dirname,"../web_panel/js/webview_host.js"),"utf8");
+function fixture(options={}) {
+    const events={},messages=[],webEvents={};
+    const root={chrome:{webview:{postMessage(value){messages.push(value);if(options.fail)throw Error("closed");},addEventListener(name,fn){webEvents[name]=fn;}}},
+        __starfieldWebViewConfig:{root:"D:/中文 project/web_panel"},addEventListener(name,fn){events[name]=fn;}};
+    if(options.cep)root.__adobe_cep__=options.cep;
+    if(options.noConfig)delete root.__starfieldWebViewConfig;
+    if(options.noWeb)delete root.chrome;
+    vm.runInNewContext(code,{window:root});
+    return {root,events,messages,reply(id,result,channel="org.starfieldfx.webview2/1"){webEvents.message({data:{channel,id,result}});}};
+}
+const original={evalScript(){}};
+assert.equal(fixture({cep:original}).root.__adobe_cep__,original,"existing CEP transport unchanged");
+assert.equal(fixture({noConfig:true}).root.__adobe_cep__,undefined);
+assert.equal(fixture({noWeb:true}).root.__adobe_cep__,undefined);
+const f=fixture(),bridge=f.root.__adobe_cep__;
+assert.equal(bridge.getSystemPath("extension"),"D:/中文 project/web_panel");
+assert.equal(bridge.getSystemPath("userData"),"");
+const received=[];
+bridge.evalScript('JSON.stringify({name:"灯光\\\"",unicode:"中文"})',value=>received.push(value));
+bridge.evalScript("second",value=>received.push(value));
+assert.equal(f.messages[0].script,'JSON.stringify({name:"灯光\\\"",unicode:"中文"})');
+f.reply("wv-1","wrong","untrusted");f.reply("missing","wrong");assert.equal(received.length,0);
+f.reply("wv-2",'{"ok":true,"second":true}');f.reply("wv-1",'{"ok":true,"name":"中文"}');
+f.reply("wv-1","duplicate");assert.deepEqual(received,['{"ok":true,"second":true}','{"ok":true,"name":"中文"}']);
+bridge.requestOpenExtension("third.party");assert.equal(f.messages.length,2);
+bridge.requestOpenExtension("org.starfieldfx.panel.presets");assert.equal(f.messages[2].kind,"openPresets");
+f.reply("wv-3",'{}');bridge.closeExtension();assert.equal(f.messages[3].kind,"close");f.reply("wv-4",'{}');
+let prevented=0;
+f.events.keydown({key:"z",ctrlKey:true,target:{tagName:"INPUT"},preventDefault(){prevented++;}});
+assert.equal(prevented,0);
+f.events.keydown({key:"z",ctrlKey:true,target:{tagName:"DIV"},preventDefault(){prevented++;}});
+assert.equal(f.messages[4].kind,"undo");f.reply("wv-5",'{}');
+f.events.keydown({key:"z",ctrlKey:true,shiftKey:true,target:{tagName:"DIV"},preventDefault(){prevented++;}});
+assert.equal(f.messages[5].kind,"redo");f.reply("wv-6",'{}');
+f.events.keydown({key:"y",ctrlKey:true,repeat:true,target:{tagName:"DIV"},preventDefault(){}});
+assert.equal(f.messages.length,6,"held shortcut never repeats a project write");
+const busy=fixture();let rejected;
+for(let i=0;i<64;i++)busy.root.__adobe_cep__.evalScript("x",()=>{});
+busy.root.__adobe_cep__.evalScript("overflow",value=>{rejected=JSON.parse(value);});
+assert.equal(busy.messages.length,64);assert.equal(rejected.error.code,"webview_unavailable");
+busy.reply("wv-1","done");busy.root.__adobe_cep__.evalScript("space freed",()=>{});assert.equal(busy.messages.length,65);
+const maximum=fixture();maximum.root.__adobe_cep__.evalScript("x".repeat(1048576),()=>{});assert.equal(maximum.messages.length,1,"nested old request wrapper retains headroom");
+const oversized=fixture();oversized.root.__adobe_cep__.evalScript("x".repeat(1048577),value=>{rejected=JSON.parse(value);});assert.equal(oversized.messages.length,0);
+const failed=fixture({fail:true});failed.root.__adobe_cep__.evalScript("x",value=>{rejected=JSON.parse(value);});assert.equal(rejected.error.code,"webview_transport_failed");
+const versioned=fixture();let nativeError;
+versioned.root.__adobe_cep__.evalScript("/* native-presets-99 */ SFLD_getPanelState()",value=>{nativeError=JSON.parse(value);});
+versioned.reply("wv-1",'{"ok":false,"error":{"code":"host_timeout","message":"Expired without executing"}}');
+assert.equal(nativeError.protocol,"org.starfieldfx.panel");assert.equal(nativeError.version,1);assert.equal(nativeError.gatewayBuild,"native-presets-99");assert.equal(nativeError.error.code,"host_timeout","native failures preserve their typed error instead of masquerading as version mismatches");
+let closed;
+bridge.evalScript("awaiting",value=>{closed=JSON.parse(value);});f.events.pagehide();assert.equal(closed.error.code,"panel_closed");
+bridge.evalScript("after close",value=>{rejected=JSON.parse(value);});assert.equal(rejected.error.code,"webview_unavailable");
+for(const html of ["index.html","presets.html"]){const text=fs.readFileSync(path.join(__dirname,"../web_panel",html),"utf8");assert(text.indexOf("js/webview_host.js")<text.indexOf("js/graph_codec.js"));}
+console.log("WebView2 adapter: existing CEP, Unicode, ordering, duplicate replies, queue bounds, errors, teardown and shortcuts passed.");

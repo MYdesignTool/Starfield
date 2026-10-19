@@ -4,7 +4,7 @@
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
 const parser=require("internal/deps/acorn/acorn/dist/acorn"),options={ecmaVersion:3,allowReserved:"never"};
 const conditionals=require("./extendscript_conditionals.cjs"),vm=require("node:vm");
-const root=path.resolve(process.argv[2] || process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../cep_panel"));
+const root=path.resolve(process.argv[2] || process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"../web_panel"));
 let checks=0;
 for(const source of ["var byte=0;","for(var byte=0;byte<16;byte++){}","var native;","var enum;",
     "var public;","var x={default:1};","let x=0;","const x=0;","var f=()=>1;","var s=`text`;"]){
@@ -27,6 +27,7 @@ for(const [mode,expected] of [[1,0],[2,0],[3,2]]){
 assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation("true?'A':false?'B':true?'C':'D';")),"C");checks++;
 assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation("true?'A':(false?'B':'C');")),"A");checks++;
 const files=fs.readdirSync(jsxRoot).filter(name=>name.endsWith(".jsx")).sort();
+parser.parse(fs.readFileSync(path.join(__dirname,"../tools/WebPanelQualification.jsx"),"utf8"),options);checks++;
 assert.ok(files.length>0);checks++;
 for(const name of files){
     try{const source=fs.readFileSync(path.join(jsxRoot,name),"utf8");parser.parse(source,options);checks++;

@@ -5,18 +5,18 @@ param(
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BaselineName='m3-17-native61-deploy-after',
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName='m3-17-native61-panel63-es3-20261010',
     [string]$PluginDir='D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins',
-    [string]$CepJunction='C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel',
+    [string]$CepJunction='',
     [switch]$Install
 )
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskPrepared=Join-Path $taskRepo ('artifacts/prepared/'+$PreparedName)
-$taskCandidate=Join-Path $taskPrepared 'cep_panel'
+$taskCandidate=Join-Path $taskPrepared 'web_panel'
 $taskInfo=Get-Content -LiteralPath (Join-Path $taskPrepared 'candidate.json') -Raw | ConvertFrom-Json
 $taskBaseline=Get-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BaselineName+'.json')) -Raw | ConvertFrom-Json
 $taskNativeSource=if($taskBaseline.nativeSourceCommit){$taskBaseline.nativeSourceCommit}else{$taskBaseline.sourceCommit}
 $taskBundle=Join-Path $taskRepo 'dist'
-$taskLive=Join-Path $taskRepo 'cep_panel'
+$taskLive=Join-Path $taskRepo 'web_panel'
 $taskBackup=Join-Path $taskRepo ('artifacts/disabled/'+$BackupName)
 $taskSnapshot=Join-Path $taskBackup 'panel-snapshot.json'
 $taskSimulation=[IO.Path]::GetFullPath($PluginDir).StartsWith((Join-Path $taskRepo 'artifacts/deploy-test/'),[StringComparison]::OrdinalIgnoreCase)
@@ -28,7 +28,7 @@ function Assert-PanelJunction([string]$taskPath,[string]$taskTarget){
 function Hash-PanelFile([string]$taskPath){return (Get-FileHash -LiteralPath $taskPath -Algorithm SHA256).Hash}
 function Check-PanelHost(){if(-not $taskSimulation -and (Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue)){throw 'Close AE before publishing the CEP patch.'}}
 Assert-PanelJunction (Join-Path $PluginDir 'Starfield') $taskBundle
-Assert-PanelJunction $CepJunction $taskLive
+if($CepJunction){Assert-PanelJunction $CepJunction $taskLive} # Optional legacy fixture, never register CEP.
 $taskMaterialPair=$taskBaseline.nativeBuild -eq 70 -and $taskBaseline.coreAbi -eq 9
 $taskExpectedNativeCount=if($taskMaterialPair){9}else{8}
 if((-not $taskMaterialPair -and ($taskBaseline.nativeBuild -notin @(61,65) -or $taskBaseline.coreAbi -ne 8)) -or @($taskBaseline.native).Count -ne $taskExpectedNativeCount -or
@@ -52,8 +52,8 @@ $taskFiles=@($taskBaseline.panel.files)
 if($taskFiles.Count -ne $taskPaths.Count -or @($taskFiles.path | Sort-Object -Unique).Count -ne $taskPaths.Count){throw 'Incomplete/duplicate panel baseline.'}
 $taskEntries=@()
 foreach($taskFile in $taskFiles){
-    if($taskFile.path -notin @($taskPaths | ForEach-Object {'cep_panel/'+$_})){throw 'Unexpected panel path.'}
-    $taskRelative=$taskFile.path.Substring('cep_panel/'.Length)
+    if($taskFile.path -notin @($taskPaths | ForEach-Object {'web_panel/'+$_})){throw 'Unexpected panel path.'}
+    $taskRelative=$taskFile.path.Substring('web_panel/'.Length)
     if((Hash-PanelFile (Join-Path $taskLive $taskRelative)) -ne $taskFile.installedHash){throw "Installed panel changed: $taskRelative"}
     $taskEntries += [pscustomobject]@{path=$taskFile.path;existed=$true;oldHash=$taskFile.installedHash;
         installedHash=(Hash-PanelFile (Join-Path $taskCandidate $taskRelative))}
@@ -85,7 +85,7 @@ $taskBefore | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $tas
 # full Model-aware native backup for the established paired Restore tool.
 & (Join-Path $PSScriptRoot 'Deploy-TestBuild.ps1') -PluginDir $PluginDir -BackupName $BackupName -KeepNative -Install
 foreach($taskEntry in $taskEntries){
-    $taskRelative=$taskEntry.path.Substring('cep_panel/'.Length)
+    $taskRelative=$taskEntry.path.Substring('web_panel/'.Length)
     $taskSaved=Join-Path $taskBackup ('panel/'+$taskRelative)
     New-Item -ItemType Directory -Path (Split-Path -Parent $taskSaved) -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $taskLive $taskRelative) -Destination $taskSaved
@@ -97,7 +97,7 @@ Save-PanelSnapshot
 try{
     Check-PanelHost
     foreach($taskEntry in $taskEntries){
-        $taskRelative=$taskEntry.path.Substring('cep_panel/'.Length)
+        $taskRelative=$taskEntry.path.Substring('web_panel/'.Length)
         $taskSource=Join-Path $taskCandidate $taskRelative
         if((Hash-PanelFile $taskSource) -ne $taskEntry.installedHash -or
             (Hash-PanelFile (Join-Path $taskLive $taskRelative)) -ne $taskEntry.oldHash){throw 'Panel changed after preflight.'}

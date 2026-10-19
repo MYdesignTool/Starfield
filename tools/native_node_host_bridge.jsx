@@ -87,7 +87,7 @@
         write("stage.txt", "before_add_renderer");
         state.layer.property("ADBE Effect Parade").addProperty("org.starfieldfx.particle");
         write("stage.txt", "renderer_added");
-        $.evalFile(new File(root+"/cep_panel/jsx/starfield_gateway.jsx"));
+        $.evalFile(new File(root+"/web_panel/jsx/starfield_gateway.jsx"));
         write("stage.txt", "gateway_loaded");
         $.global.SFLD_HostCheck=state;
         write("ready.json",'{"ok":true,"version":'+quote(app.version)+'}');

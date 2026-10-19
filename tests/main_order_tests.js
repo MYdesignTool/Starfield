@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
-const repo=path.join(__dirname,".."),panel=process.env.STARFIELD_PANEL_ROOT || path.join(repo,"cep_panel");
+const repo=path.join(__dirname,".."),panel=process.env.STARFIELD_PANEL_ROOT || path.join(repo,"web_panel");
 let checks=0;function eq(a,b){checks++;assert.deepEqual(a,b);}function ok(value){checks++;assert.ok(value);}
 const schema=JSON.parse(fs.readFileSync(path.join(repo,"schema/parameters.json"),"utf8"));
 eq(schema.manifestVersion,30); // ADR0038 appended Model mirrors; existing IDs below stay fixed.

@@ -1,26 +1,16 @@
-# AE2023 行为验收
+# AE2023 行为证据
 
-编译和 fake-host/Core 测试不等于 AE 实际行为通过。当前安装版本见 [current-state.md](current-state.md)；旧观察保留在 [有日期的原始记录](history/2026-10-07/compatibility-matrix.md)。
+范围为 After Effects 2023.5.0 Build 52；不从编译推断更新宿主支持。当前配对和 Windows 注册状态见 [current-state.md](current-state.md)。
 
-## 已记录观察的边界
-
-AE2023.5.0 Build52 的早期候选已有 owner 观察：透明粒子、8/16/32-bpc、Full/Half/Third/Quarter 坐标、时间一致性、基本形状/重力/大小、保存/重开、复制/粘贴与撤销/重做、自动 CEP 发现。
-H-01 的 Full/Quarter 手动热重载、缺失/坏选择文件 fallback，以及与旧单体三个 Full/8-bpc render-queue 帧的 decoded RGBA 对比有记录。
-这些证据属于记录中对应的候选和场景，不自动覆盖后来所有曲线、GPU、Motion Blur、Transform 或所有工程。native45 曲线操作已有 owner 定性接受；性能没有可推广的基准数字。
-
-## 剩余 gates
-
-| 行为 | 需要的证据 |
+| 范围 | 证据边界 |
 | --- | --- |
-| 当前原生/CEP 图编辑 | 添加/删除/连线/多选、原生 ECW 改值、读回一致、冲突回滚与单次 undo |
-| 项目持久化 | graph bytes/曲线/渐变/旋转、原生动画、资源、重开、复制及迁移策略 |
-| panel54 palette | 实际外观/坐标、取消、拖动与目标切换 |
-| CEP 性能 | idle/seek、多 Emitter、Add/Replace 的光标与延迟 |
-| Motion Blur | 所有模式、camera disregard、各色深、短 lifetime、反向时间与成本 |
-| Transform | 已部署的 ABI6/panel54 候选；Null 动画/父级/剪切/反射/奇异尺度、ordered Force/Auxiliary 与 shutter |
-| GPU | 实际 AE 支持的设备/backend、失败 fallback、CPU 像素对照与资源/取消 |
-| Core reload | 真正渲染进行中的切换、重复切换、取消、反向请求、扩大像素场景 |
-| SDK 线程边界 | Camera/Layer suite 各 selector 与线程允许范围；禁用 MFR 不代替审计 |
+| 新画布 | owner 确认无可见故障 |
+| 预设 | owner 接受 panel100 的复测；原先 Particle8 发布读回错误不再作为当前失败记录 |
+| 保存/退出模态 | native98 增加宿主 HWND/脚本可用性门槛及单次 quiet-error 配对，owner 随后确认验证无误并授权退役 |
+| web_panel 目录迁移 | owner 明确授权；原生内容发现、资源路径、前端和回滚由离线/构建验证；若没有新的实际启动记录，不捏造 native99 宿主运行证据 |
+| 逐节点排列、IME/workspace、资源极限和故障/headless | 没有逐项实测记录；保留为后续针对性回归场景，owner 版本接受不等于整张专项矩阵测试通过 |
+| GPU/性能/Core 在途切换 | 需硬件/时序/像素等实际证据；离线测试计数不代替测量 |
 
-每条记录至少包含 host family/build、bundle 哈希、步骤、实际输出和失败证据。selection crash 的早期记录保留用于追溯；未经复现不能把静态猜测写成当前根因。Options 的 geometry/history 是进程全局最近读数，可能来自另一实例；文本中的硬编码 Build31 不是可靠的当前二进制身份。
-宿主操作与部署按 ADR0011。整理期间没有新 AE 验收，以上开放 gates 均保留。
+Motion 的大小写敏感前缀行为保持；修正前缀后实际轨迹的专项记录仍待补充。渲染模式、参数和保存格式不因容器/目录变化而迁移。MFR 和 Compute Cache 继续关闭。
+
+原先重复的“CEP 保持启用”“panel54 palette 待验收”和历史安装版本已从活跃入口移到 [归档](history/2026-10-19/pre-web-panel/docs/compatibility-matrix.md)。历史观察仅覆盖各自日期、版本与场景。新记录应包含准确 host/build、bundle 身份、步骤、实际输出与失败证据。

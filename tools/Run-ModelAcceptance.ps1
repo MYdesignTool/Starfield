@@ -9,7 +9,7 @@ if($UseRunningInstance){if($taskExisting.Count -ne 1){throw 'UseRunningInstance 
 elseif($taskExisting.Count){throw 'AE must be closed before launching automated acceptance.'}
 if(-not (Test-Path -LiteralPath $AfterEffectsPath) -or -not (Test-Path -LiteralPath $taskWrapper)){throw 'Missing AE executable or prepared acceptance wrapper.'}
 . (Join-Path $PSScriptRoot 'ModelAcceptanceContract.ps1')
-$taskExpected=Get-StarfieldAcceptanceBuild (Split-Path -Parent $taskWrapper) (Join-Path $taskRepo 'cep_panel/jsx/starfield_gateway.jsx')
+$taskExpected=Get-StarfieldAcceptanceBuild (Split-Path -Parent $taskWrapper) (Join-Path $taskRepo 'web_panel/jsx/starfield_gateway.jsx')
 if(Test-Path -LiteralPath (Join-Path $taskRepo ('artifacts/'+$PreparedName+'/result.json'))){throw 'A result already exists; prepare a fresh wrapper directory to retain evidence.'}
 $taskDirectory=Split-Path -Parent $taskWrapper
 $taskProcess=Start-Process -FilePath $AfterEffectsPath -ArgumentList @('-r',('"'+$taskWrapper+'"')) -WorkingDirectory $taskDirectory -WindowStyle Hidden -PassThru

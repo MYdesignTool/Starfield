@@ -4,7 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const panelRoot = process.env.STARFIELD_PANEL_ROOT || path.join(__dirname, "..", "cep_panel");
+const panelRoot = process.env.STARFIELD_PANEL_ROOT || path.join(__dirname, "..", "web_panel");
 
 class FakeElement {
     constructor(id) {
@@ -48,7 +48,7 @@ const window = {
     ResizeObserver: class { constructor(callback) { resizeObservers.push(callback); } observe() {} },
     requestAnimationFrame(callback) { animationFrames.push(callback); },
     __adobe_cep__: {
-        getSystemPath() { return "C:/Starfield/cep_panel"; },
+        getSystemPath() { return "C:/Starfield/web_panel"; },
         evalScript(script, callback) {
             const deliver = callback;
             callback = text => {

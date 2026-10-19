@@ -3,14 +3,14 @@ param([Parameter(Mandatory=$true)][ValidatePattern('^[a-z0-9][a-z0-9-]{0,63}$')]
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BaselineName='m3-16-native60-deploy-after',
     [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$BackupName='m3-17-native61-panel62-model-20261010',
     [string]$PluginDir='D:\Software\Adobe\Adobe After Effects 2023\Support Files\Plug-ins',
-    [string]$CepJunction='C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel',
+    [string]$CepJunction='',
     [switch]$Install)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskPluginDir=$PluginDir
 $taskPrepared=Join-Path $taskRepo ('artifacts/prepared/'+$PreparedName)
 $taskBackup=Join-Path $taskRepo ('artifacts/disabled/'+$BackupName)
-$taskPanelRoot=Join-Path $taskRepo 'cep_panel'
+$taskPanelRoot=Join-Path $taskRepo 'web_panel'
 $taskBundle=Join-Path $taskRepo 'dist'
 $taskBaseline=Get-Content -LiteralPath (Join-Path $taskRepo ('artifacts/'+$BaselineName+'.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
 $taskFrozen=Get-Content -LiteralPath (Join-Path $taskPrepared 'native-bundle/candidate.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -54,7 +54,7 @@ if([IO.File]::ReadAllText((Join-Path $taskPrepared 'source/ae_plugin/PluginVersi
 function Assert-ModelJunction([string]$taskPath,[string]$taskTarget){$taskItem=Get-Item -LiteralPath $taskPath -Force;
     if($taskItem.LinkType -ne 'Junction' -or [IO.Path]::GetFullPath([string]$taskItem.Target).TrimEnd('\') -ne [IO.Path]::GetFullPath($taskTarget).TrimEnd('\')){throw 'Existing Junction differs.'};return $taskItem}
 $taskLink=Assert-ModelJunction (Join-Path $taskPluginDir 'Starfield') $taskBundle
-$taskCepLink=Assert-ModelJunction $CepJunction $taskPanelRoot
+$taskCepLink=if($CepJunction){Assert-ModelJunction $CepJunction $taskPanelRoot}else{$null}
 if(@(Get-ChildItem -LiteralPath $taskPluginDir -Force | Where-Object Name -like 'Starfield*').Count -ne 1){throw 'Unexpected host Starfield entries.'}
 foreach($taskEntry in $taskBaseline.native){if((Get-FileHash -LiteralPath (Join-Path $taskBundle $taskEntry.name)).Hash -ne $taskEntry.hash){throw 'Installed native baseline differs.'}}
 if($taskBaselineBuild -eq 60 -and (Test-Path -LiteralPath (Join-Path $taskBundle 'StarfieldModel.aex'))){throw 'Unexpected installed Model before full promotion.'}
@@ -72,13 +72,13 @@ $taskPaths=@($taskRecipe.files.path)+@('CSXS/manifest.xml','js/model_assets.js',
 if($taskPaths.Count -ne 18 -or $taskFrozen.panelFiles.Count -ne 18){throw 'Expected eighteen paired panel sources.'}
 $taskPanel=[ordered]@{baselineCommit=$taskBaseline.sourceCommit;candidateCommit=$taskFrozen.sourceCommit;files=@()}
 foreach($taskRelative in $taskPaths){
-    $taskOld=Join-Path $taskPanelRoot $taskRelative;$taskNew=Join-Path $taskPrepared ('cep_panel/'+$taskRelative)
-    $taskFrozenEntry=@($taskFrozen.panelFiles | Where-Object path -eq ('cep_panel/'+$taskRelative))
+    $taskOld=Join-Path $taskPanelRoot $taskRelative;$taskNew=Join-Path $taskPrepared ('web_panel/'+$taskRelative)
+    $taskFrozenEntry=@($taskFrozen.panelFiles | Where-Object path -eq ('web_panel/'+$taskRelative))
     if($taskFrozenEntry.Count -ne 1 -or (Get-FileHash -LiteralPath $taskNew).Hash -ne $taskFrozenEntry[0].hash){throw 'Frozen panel differs.'}
     $taskExisted=Test-Path -LiteralPath $taskOld
-    $taskPanel.files+=[pscustomobject]@{path='cep_panel/'+$taskRelative;existed=$taskExisted;oldHash=$(if($taskExisted){(Get-FileHash -LiteralPath $taskOld).Hash}else{$null});installedHash=$taskFrozenEntry[0].hash}
+    $taskPanel.files+=[pscustomobject]@{path='web_panel/'+$taskRelative;existed=$taskExisted;oldHash=$(if($taskExisted){(Get-FileHash -LiteralPath $taskOld).Hash}else{$null});installedHash=$taskFrozenEntry[0].hash}
 }
-if([IO.File]::ReadAllText((Join-Path $taskPrepared 'cep_panel/CSXS/manifest.xml')) -notmatch ('ExtensionBundleVersion="0\.1\.0\.'+$taskFrozen.panelGeneration+'"') -or [IO.File]::ReadAllText((Join-Path $taskPrepared 'cep_panel/jsx/starfield_gateway.jsx')) -notmatch ('native-presets-'+$taskFrozen.panelGeneration+'\b')){throw 'Candidate CEP generation differs.'}
+if([IO.File]::ReadAllText((Join-Path $taskPrepared 'web_panel/CSXS/manifest.xml')) -notmatch ('ExtensionBundleVersion="0\.1\.0\.'+$taskFrozen.panelGeneration+'"') -or [IO.File]::ReadAllText((Join-Path $taskPrepared 'web_panel/jsx/starfield_gateway.jsx')) -notmatch ('native-presets-'+$taskFrozen.panelGeneration+'\b')){throw 'Candidate CEP generation differs.'}
 $taskProcesses=@(Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue | Select-Object ProcessName,Id)
 Write-Host ('AE process count: '+$taskProcesses.Count)
 Write-Host ('Complete native'+$taskFrozen.nativeBuild+'/Core ABI'+$taskExpectedAbi+'/CEP'+$taskFrozen.panelGeneration+' test pair; actual AE2023 qualification remains open.')

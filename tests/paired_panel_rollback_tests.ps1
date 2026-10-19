@@ -4,7 +4,7 @@ $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskFixture=Join-Path $taskRepo ('artifacts\deploy-test\paired-panel-'+[DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')+'\repo')
 $taskPlugins=Join-Path $taskFixture 'artifacts\deploy-test\ae\Plug-ins'
 $taskTools=Join-Path $taskFixture 'tools'
-$taskPanel=Join-Path $taskFixture 'cep_panel'
+$taskPanel=Join-Path $taskFixture 'web_panel'
 $taskBundle=Join-Path $taskFixture 'dist'
 $taskBackup=Join-Path $taskFixture 'artifacts\disabled\check'
 New-Item -ItemType Directory -Path $taskPlugins,$taskTools,$taskPanel,$taskBundle -Force | Out-Null
@@ -32,8 +32,8 @@ New-Item -ItemType Directory -Path (Join-Path $taskBackup 'panel') -Force | Out-
 $taskRecord=@{files=@(
     # Legacy record without existed still restores the saved source.
     @{path='cep_panel/index.html';oldHash=(Get-FileHash -LiteralPath (Join-Path $taskBackup 'panel\index.html')).Hash;installedHash=(Get-FileHash -LiteralPath (Join-Path $taskPanel 'index.html')).Hash},
-    @{path='cep_panel/gradient_editor.js';existed=$false;oldHash=$null;installedHash=(Get-FileHash -LiteralPath (Join-Path $taskPanel 'gradient_editor.js')).Hash},
-    @{path='cep_panel/retired_editor.js';existed=$true;removed=$true;oldHash=(Get-FileHash -LiteralPath (Join-Path $taskBackup 'panel\retired_editor.js')).Hash;installedHash=$null}
+    @{path='web_panel/gradient_editor.js';existed=$false;oldHash=$null;installedHash=(Get-FileHash -LiteralPath (Join-Path $taskPanel 'gradient_editor.js')).Hash},
+    @{path='web_panel/retired_editor.js';existed=$true;removed=$true;oldHash=(Get-FileHash -LiteralPath (Join-Path $taskBackup 'panel\retired_editor.js')).Hash;installedHash=$null}
 )}
 $taskManifest=Join-Path $taskBackup 'panel-snapshot.json'
 $taskRecord | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $taskManifest -Encoding UTF8
@@ -47,13 +47,13 @@ $ErrorActionPreference='Continue'
 $ErrorActionPreference='Stop'
 if($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath (Join-Path $taskBackup 'candidate-panel'))){throw 'Changed candidate was overwritten.'}
 [IO.File]::WriteAllText((Join-Path $taskPanel 'gradient_editor.js'),'new gradient')
-$taskRecord.files[1].path='cep_panel/../dist/StarfieldParticle.aex'
+$taskRecord.files[1].path='web_panel/../dist/StarfieldParticle.aex'
 $taskRecord | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $taskManifest -Encoding UTF8
 $ErrorActionPreference='Continue'
 & powershell -NoProfile -ExecutionPolicy Bypass -File $taskRestore -PluginDir $taskPlugins -BackupName check -Restore *> (Join-Path $taskFixture 'rejected-path.log')
 $ErrorActionPreference='Stop'
 if($LASTEXITCODE -eq 0){throw 'Path traversal was accepted.'}
-$taskRecord.files[1].path='cep_panel/gradient_editor.js'
+$taskRecord.files[1].path='web_panel/gradient_editor.js'
 $taskRecord.files[2].removed=$false
 $taskRecord | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $taskManifest -Encoding UTF8
 $ErrorActionPreference='Continue'

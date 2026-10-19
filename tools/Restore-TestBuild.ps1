@@ -10,14 +10,18 @@ $taskBackup = Join-Path $taskRepo "artifacts\disabled\$BackupName"
 $taskManifest = Join-Path $taskBackup 'panel-snapshot.json'
 if (-not (Test-Path -LiteralPath $taskManifest)) { throw 'Paired panel snapshot is missing; use the original deployment rollback for binary-only backups.' }
 $taskRecord = Get-Content -LiteralPath $taskManifest -Raw -Encoding UTF8 | ConvertFrom-Json
-$taskPanelRoot = [IO.Path]::GetFullPath((Join-Path $taskRepo 'cep_panel')) + '\'
+$taskPanelDirectory=if(Test-Path -LiteralPath (Join-Path $taskRepo 'web_panel')){'web_panel'}else{'cep_panel'}
+$taskPanelRoot = [IO.Path]::GetFullPath((Join-Path $taskRepo $taskPanelDirectory)) + '\'
+$taskRestoreDirectory=if($taskRecord.restoreSourceDirectory){[string]$taskRecord.restoreSourceDirectory}else{$taskPanelDirectory}
+if($taskRestoreDirectory -cnotin @('web_panel','cep_panel')){throw 'Invalid restore source directory.'}
+if($taskRestoreDirectory -cne $taskPanelDirectory -and (Test-Path -LiteralPath (Join-Path $taskRepo $taskRestoreDirectory))){throw 'Restore source rename target already exists.'}
 $taskSavedRoot = [IO.Path]::GetFullPath((Join-Path $taskBackup 'panel')) + '\'
 $taskCandidateRoot = [IO.Path]::GetFullPath((Join-Path $taskBackup 'candidate-panel')) + '\'
 $taskEntries = @()
 foreach ($taskEntry in $taskRecord.files) {
-    if ([string]$taskEntry.path -notmatch '^cep_panel/[A-Za-z0-9_./-]+$' -or
+    if ([string]$taskEntry.path -notmatch '^(web_panel|cep_panel)/[A-Za-z0-9_./-]+$' -or
         ([string]$taskEntry.path).Split('/') -contains '..') { throw 'Invalid paired panel path.' }
-    $taskRelative = ([string]$taskEntry.path).Substring('cep_panel/'.Length)
+    $taskRelative = ([string]$taskEntry.path).Substring(([string]$taskEntry.path).IndexOf('/')+1)
     $taskTarget = [IO.Path]::GetFullPath((Join-Path $taskPanelRoot $taskRelative))
     $taskSaved = [IO.Path]::GetFullPath((Join-Path $taskSavedRoot $taskRelative))
     $taskRetained = [IO.Path]::GetFullPath((Join-Path $taskCandidateRoot $taskRelative))
@@ -43,8 +47,9 @@ foreach ($taskEntry in $taskRecord.files) {
     $taskEntries += [pscustomobject]@{target=$taskTarget;saved=$taskSaved;retained=$taskRetained;oldHash=$taskEntry.oldHash;existed=$taskExisted;present=$taskPresent}
 }
 if (-not $taskEntries.Count) { throw 'Paired panel snapshot is empty.' }
-Write-Host "Restore previous bundle through Deploy-TestBuild.ps1 and $($taskEntries.Count) verified CEP source files."
+Write-Host "Restore previous bundle through Deploy-TestBuild.ps1 and $($taskEntries.Count) verified panel source files."
 Write-Host "Keep candidate panel sources under $taskCandidateRoot"
+Write-Host "Source folder after restore: $taskRestoreDirectory (legacy manifest prefixes remain compatible)."
 if (-not $Restore) { Write-Host 'Read-only report. Add -Restore for the explicit action.'; exit 0 }
 if (Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue) { throw 'Close AE before restoring a paired build.' }
 # Retain every candidate source before the first source is overwritten.
@@ -67,4 +72,8 @@ foreach ($taskEntry in $taskEntries) {
         if (Test-Path -LiteralPath $taskEntry.target) { throw 'New panel source remains after rollback.' }
     }
 }
-Write-Host 'Previous paired bundle and panel restored; candidate sources retained. The CEP source rollback is visible in Git.'
+if($taskRestoreDirectory -cne $taskPanelDirectory){
+    # Both exact direct children were validated above; never move outside repo.
+    Rename-Item -LiteralPath $taskPanelRoot.TrimEnd('\') -NewName $taskRestoreDirectory
+}
+Write-Host 'Previous paired bundle and panel restored; candidate sources retained. The source rollback is visible in Git.'

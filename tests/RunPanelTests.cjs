@@ -13,7 +13,7 @@ for (const suite of fs.readdirSync(__dirname).filter(name => name.endsWith("_tes
     // Syntax/UI suites use the bundled Acorn instead of a vendored dependency.
     const result = spawnSync(process.execPath, ["--expose-internals",path.join(__dirname, suite)], {
         cwd: repository, encoding: "utf8", windowsHide: true,
-        env: {...process.env,STARFIELD_PANEL_ROOT:process.env.STARFIELD_PANEL_ROOT || path.join(repository,"cep_panel")}
+        env: {...process.env,STARFIELD_PANEL_ROOT:process.env.STARFIELD_PANEL_ROOT || path.join(repository,"web_panel")}
     });
     fs.writeFileSync(path.join(output, suite + ".log"),
         (result.stdout || "") + (result.stderr || "") + (result.error ? String(result.error) : ""));

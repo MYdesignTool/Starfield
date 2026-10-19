@@ -1,7 +1,7 @@
 "use strict";
 // Actual panel + palette + graph edit/transaction modules, no AE process.
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
-const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","cep_panel");
+const panelRoot=process.env.STARFIELD_PANEL_ROOT || path.join(__dirname,"..","web_panel");
 const codec=require(path.join(panelRoot,"js","graph_codec.js")),layout=require(path.join(panelRoot,"js","graph_layout.js"));
 const edits=require(path.join(panelRoot,"js","graph_edits.js"));
 const fixture=require("./native_snapshot_fixture.js");
@@ -66,7 +66,7 @@ host.SFLD_submitGraph=text=>{
     if(denyNext){denyNext=false;return response({ok:false,error:{code:"stale_graph",message:"Graph changed before commit"}});}
     graph=codec.fromHex(request.graphHex);revision++;return response(receipt());
 };
-win.__adobe_cep__={getSystemPath:()=>"C:/test/cep_panel",evalScript(script,callback){
+win.__adobe_cep__={getSystemPath:()=>"C:/test/web_panel",evalScript(script,callback){
     const value=vm.runInNewContext(script,host);
     if(holdSelection && script.includes("return SFLD_selectNodeEffect")){releaseSelection=()=>callback(value);}
     else if(holdSubmit && script.includes("return SFLD_submitGraph")){releaseSubmit=()=>callback(value);}

@@ -1,0 +1,25 @@
+{
+  "docs": [
+    "README.md",
+    "AGENTS.md",
+    "docs/current-state.md",
+    "docs/agent-backlog.md",
+    "docs/architecture.md",
+    "docs/roadmap.md",
+    "docs/testing.md",
+    "docs/build-matrix.md",
+    "docs/compatibility-matrix.md",
+    "docs/current-feature-audit.md",
+    "docs/editor-setup.md",
+    "cep_panel/README.md",
+    "ae_plugin/README.md"
+  ],
+  "source": "pre-web_panel rename",
+  "date": "2026-10-19",
+  "purpose": "History only. Current status headings are obsolete.",
+  "instructionSnapshot": {
+    "original": "AGENTS.md",
+    "reason": "Historical data must not become nested AGENTS instructions.",
+    "archivedAs": "project-instructions-snapshot.md"
+  }
+}

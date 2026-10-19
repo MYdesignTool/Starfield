@@ -36,6 +36,9 @@ function Assert-RuntimeNativePair([string]$RepositoryRoot,[string]$Label,[string
     }
 }
 Import-Module Microsoft.PowerShell.Utility
+if(-not $CoreOnly -and -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '../artifacts/webview2/dependencies/sdk-1.0.4258.31/build/native/include/WebView2.h'))){
+    throw 'Missing pinned WebView2 SDK. Run tools/Prepare-WebView2Sdk.ps1 -Download; no Runtime installation is needed.'
+}
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $previousBuildEnvironment = @{}
 Get-ChildItem Env: | ForEach-Object { $previousBuildEnvironment[$_.Name] = $_.Value }

@@ -1,7 +1,11 @@
-# Delivery examples (Spark, Snow, Floating Light)
+# Historical example recipes (Spark, Snow, Floating Light)
+
+This is an early Alpha recipe reference, not today's UI/defaults or acceptance
+record. Historical buttons and open questions below are preserved as context;
+current behavior comes from schema/source and current-state.md.
 
 Three acceptance examples for the current Alpha. Values below are the same ones the
-panel's **Example** presets apply (`cep_panel/js/panel.js`), and they can also be typed
+historical panel's **Example** presets applied (current source: `web_panel/js/panel.js`), and they can also be typed
 into the Effect Controls Window by hand — no panel required, so the examples stay
 verifiable if the CEP panel is unavailable.
 

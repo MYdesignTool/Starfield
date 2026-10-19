@@ -1,104 +1,41 @@
-M3-20 host identity/import (2026-10-15): native89/CEP93/CoreABI9 installed.
-Full May2023 SDK, label2023, x64 Release build used -IncludeModelCandidate
--NoDistPublish -NoRuntimePublish, then standing-authorized full paired
-Deploy-TestBuild installation after AE0. Evidence artifacts/m3-20-host-identity-20261015/ contains
-baseline/candidate panel, frozen source/input hashes, matching AEX/PDB candidates,
-standard/ASAN/native/DOM logs, raw AE probes and before/after receipts. All11/25
-installed and backup hashes, runtime selector and isolated Core ABI9 query verify.
-Use current-state.md's paired one-step undo to88/92; no AE restart/acceptance was
-performed. Scratch diagnostics remain under artifacts and cannot enter releases.
+# 构建、部署与回滚
 
-# 构建与产物管理
+当前安装、候选、哈希和证据只记录在 [current-state.md](current-state.md)。历史逐版本构建流水见 [归档](history/2026-10-19/pre-web-panel/docs/build-matrix.md)。
 
-M3-20 add-path (2026-10-15): native88/Core ABI9 retained; deployed CEP92 removes
-dual Motion selector authoring and ordinary Cube's unnecessary full backup,
-reuses matching gateway code and loads optional Model transport on demand.
-No native build needed. Candidate/baseline/tests/receipts are confined to
-artifacts/m3-20-add-path-20261014/. Publish only after fresh zero-AE checks with
-Deploy-TestBuild -KeepNative and paired24-file CEP91 backups. Added loader has
-existed=false in paired undo; exact installed state is in current-state.md.
+## 构建候选
 
-
-P-02M (2026-10-14): CEP91 removes the floating node parameter editor. No native
-build is needed; retain installed native88/Core ABI9 byte for byte. Candidate,
-baseline, logs and receipts: artifacts/p-02m-ae-controls-only-20261014/.
-Publish the tested panel through the existing checkout CEP Junction after a
-fresh zero-AE check, using Deploy-TestBuild.ps1 -KeepNative for the paired native
-baseline. Preserve all panel files and a panel-snapshot.json under the same
-backup for Restore-TestBuild one-step undo. Exact installation is in current-state.md.
-Published pairing is native88/Core ABI9/CEP91. Deleted existing panel sources have
-explicit removed=true/null installedHash records and verified oldHash backups;
-Restore rejects reappearance or unrecorded absence, then restores those files.
-Deployment receipt reads specify UTF8 for Windows PowerShell compatibility.
-
-
-当前源码/安装版本和哈希见 [current-state.md](current-state.md)，带日期的构建/部署过程见 [历史记录](history/2026-10-07/build-matrix.md)。
-
-## 工具链与候选
-
-Windows x64 Release 使用 MSVC v145、本地 AdobeSDK/May2023_AfterEffectsSDK、artifact label2023；AE 范围为2023。
-原生 AEX/Core 使用 /MT，避免 AE2023 自带旧 MSVC runtime 干扰。SDK 头、样例、PiPL 工具与生成输出不进入 Git。
+Windows x64 Release，MSVC v145、本地 AdobeSDK/May2023_AfterEffectsSDK，artifact label2023，原生/Core 使用 /MT。SDK 和生成文件不入 Git。WebView2 使用固定 SDK 和静态 loader，不在本任务中安装 Evergreen Runtime。
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Prepare-WebView2Sdk.ps1 -Download
 powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -NoDistPublish -NoRuntimePublish
-# 显式默认 SDK/产物标签：
-powershell -NoProfile -ExecutionPolicy Bypass -File ae_plugin/BuildWindows.ps1 -SdkPath 'AdobeSDK\May2023_AfterEffectsSDK' -ArtifactLabel 2023 -NoDistPublish -NoRuntimePublish
 ```
 
-默认 BuildWindows 会尝试发布，候选检查必须显式使用以上两个 NoPublish 开关。PiPL flags/version 与运行时代码保持一致；BuildPiPL 校验并生成资源。若本机 Adobe PiPLtool 无法启动，节点资源只有在除资源编号、名称、match name、打包版本和 flags2 外的预处理内容与缓存逐字一致时才允许转换，并再次校验输出身份、flags 和版本。主要代码变化按需完整重建，不能依赖旧资源或时间戳推断二进制兼容。
-GPU 本地构建依赖放在 artifacts/gpu-build，Prepare-GpuBuildInputs.ps1 和 Build-GpuKernels.py 维护它；清理保留这些依赖和生成输入。
+原生内容发现和资源输入使用 web_panel/。PiPL 与运行时版本/能力必须一致；BuildPiPL 仅接受经严格输入与身份/flags/version 核验的缓存转换。CoreOnly 受共享输入指纹及安装配对约束，不可用来发布尚未安装的新 adapter。
 
-## 发布、安装和回滚
+## 发布及恢复
 
-2026-10-14 resumed M3-20 candidate: native88/packed32856, unchanged Core ABI9,
-existing CEP90 private author protocol. Full May2023 /MT NoDistPublish and
-NoRuntimePublish build passes; frozen evidence and deployment receipts belong
-under `artifacts/m3-20-motion-lifetime-20261014/`. The native87 crash evidence,
-matching PDBs, frozen source and rollback backups stay preserved. Installation
-and one-step undo are recorded in current-state.md, not inferred from compilation.
+完整当前节点包由 10 个 AEX 和 Core 组成。AE0 下，按 ADR0011 的 standing authorization 使用 Deploy-TestBuild.ps1、既有单个 Plug-ins/Starfield -> dist Junction；完整包包含 Model/Material/Motion/Turbulence 的全部开关。只改前端时可用 -KeepNative，仍须保留配对快照。面板源码由 web_panel/ 直接加载，不依赖 CEP 注册。
 
-2026-10-14 crash rollback: native87/CEP90 is rejected and exact86/89 restored.
-11/27 hashes match its original receipt; Core runtime selector and panel contract
-verify. Native87 sources/build outputs remain preserved as withdrawn candidates
-and must not be republished while awaiting owner instructions. Crash analysis,
-matching PDBs and rollback receipts: `artifacts/m3-20-native87-crash-20261014/`.
+Deploy-TestBuild 默认报告，-Install 明确行动；Restore-TestBuild 默认核验，-Restore 才恢复。后者接受历史 cep_panel/ 与当前 web_panel/ 清单前缀；迁移备份通过 restoreSourceDirectory 恢复旧原生程序所需的目录名。源文件有后续修改、未知路径或哈希不符时拒绝覆盖。旧的 Model/Panel 专用 helper 保留其受限历史 baseline 契约，不能用旧 baseline 宣称当前版本可发布。
 
-Historical2026-10-14 native87/CEP90 full pair was frozen and deployed under
-`artifacts/m3-20-motion-native-author-20261014/` after applicable offline gates.
-Build uses NoDistPublish/NoRuntimePublish; source fingerprint includes the new
-MotionAuthorTransaction.hpp. PE byte parsing confirms all10 AEX packed32855/
-identities, without loading them. Candidate/deployment scripts verify frozen
-11 native/Core and27 panel hashes, current source fingerprint, installed86/89
-baseline and a fresh AE-close check. Exact paired backup restores86/89. Actual
-deployment status remains in current-state.md and its deploy-after receipt.
+旧 CEP 注册由 Set-LegacyCepPanel.ps1 单独管理，默认报告；不自动重装 CEP。其 Windows 精确路径和管理员要求见当前状态。任何脚本不写注册表，其他宿主变动仍需逐项授权。
 
-完整候选的基础模块是 Particle、Emitter、ParticleNode、Force、Transform、Host 六个 AEX 和 Core；Model、Material、Motion、Turbulence 随对应开关成套加入。native86/CEP89 当前恢复配对含11个 native/Core 文件及 Turbulence，配对备份保留全部27个面板文件；native87 作者修正已因崩溃撤回，见 ADR0045。dist 是经单个 AE Plug-ins/Starfield Junction 使用的安装 bundle，不能作为一般垃圾目录删除。
-CoreOnly 不改 AEX，但共享源/ABI 指纹变化会拒绝该路径；runtime 发布还检查安装的 AEX 与对应候选配对。当前 native86 使用 Core ABI9；更改 ABI 时必须成对重建和发布。
+## 产物及保留
 
-Deploy-TestBuild.ps1 默认报告，显式 -Install 才行动；Turbulence 需使用 `-IncludeTurbulence` 并同时包含 Model、Material、Motion。Restore-TestBuild.ps1 默认检查含 panel-snapshot 的配对备份，显式 -Restore 才恢复；binary-only 备份通过 Deploy-TestBuild.ps1 -Rollback 恢复。BackupName 必须是本次唯一名字，备份保留在 artifacts/disabled。
-Assert-PanelContract.ps1 只读核对单一 ES3 工厂与面板/网关两份内嵌代码逐字一致，以及 manifest、gateway 和 HTML 缓存版本一致；当前源码 Install 与 Model 候选准备必须通过该检查。历史回滚恢复原配对，不要求历史源码符合当前工厂。
-按 ADR0011 的 standing authorization，紧邻部署的只读进程检查确认 AfterFX/AfterFX_64 未运行后可使用既有 Junction 部署 Starfield；其他宿主改动仍需逐项授权。部署保留/核对前后哈希与一条回滚命令；任何脚本不写注册表。
-
-## 目录与清理
-
-| 路径 | 内容 | 整理策略 |
-| --- | --- | --- |
-| artifacts/plugin/2023/x64/Release | 当前原生候选、符号、配对指纹 | 保留当前 AEX/PDB/指纹；去除退役 Appearance 输出 |
-| artifacts/core-dll/2023/x64/Release | Core 候选、符号 | 保留当前 DLL/PDB |
-| artifacts/plugin/2023/obj、core-dll/2023/obj、editor | 编译/IntelliSense 缓存 | 可再生成 |
-| artifacts/*-tests、all-tests、panel-tests | 编译测试、日志、隔离夹具 | 编译中间产物可清，日志记录保留 |
-| artifacts/disabled、prepared | 部署备份及待发布/回滚来源 | 保留 |
-| artifacts/runtime | 旧 runtime；备份 Junction 仍可能引用 | 保留，不能按“旧目录”直接删除 |
-| artifacts/worktrees | 已登记的 Git worktree | 保留，用 Git/worktree 流程处理 |
-| artifacts/crash、reference、reports、diagnostics | 故障与行为证据 | 保留 |
-| artifacts/history/20261007 | 旧的一次性脚本、日志、收据 | 归档并保留原路径清单 |
-| artifacts/report-verification-20261007 | 报告核验与探针 | 保留源/结果，清掉可再编译的二进制 |
-| artifacts/workspace-cleanup-20261007 | 本次清单、验证与文档恢复包 | 保留 |
+| 路径 | 策略 |
+| --- | --- |
+| artifacts/plugin、core-dll、gpu-build、webview2/dependencies | 保留当前候选、符号、指纹及本地依赖 |
+| artifacts/*-tests、panel-tests、all-tests | 测试夹具和日志；保留验证证据 |
+| artifacts/disabled | owner 授权仅保留最近 5 个本 checkout 的实际 deployment.json 备份；清理前复制清单、记录删除目录/字节，不跟随 Junction |
+| artifacts/rollback-retention | 旧回滚包清理前后的清单与 deployment 元数据；删除的旧二进制不可恢复 |
+| artifacts/prepared、runtime、crash、reports、diagnostics、worktrees | 本轮备份清理不触碰；不要从“旧目录”推断可删 |
+| dist、AdobeSDK | 安装或构建输入，禁止当作缓存删除 |
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Clean-Workspace.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Clean-Workspace.ps1 -Clean
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Prune-DeploymentBackups.ps1
+# 只有明确授权且核对报告后才执行：
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Prune-DeploymentBackups.ps1 -Keep 5 -Prune
 ```
 
-清理默认报告；-Clean 只接受明确目录和扩展名，验证绝对路径在 artifacts 内，拒绝 reparse point/链接和正在运行的编译器。保留 dist、SDK、备份、GPU 依赖与 worktree；删除库存写在 workspace-cleanup 目录。
-禁止使用 git clean -fd 清理共享工作树：共享工作树中的 Transform 集成源码和测试属于另一项正在开发的任务。测试入口见 [testing.md](testing.md)。
+不要使用 git clean/reset 清理共享工作树。源测试不按年龄删除；注册工作树走对应 Git 流程。后续清理不能从本次授权推断可以删除 SDK、prepared 候选、事故证据或在用 Core。
