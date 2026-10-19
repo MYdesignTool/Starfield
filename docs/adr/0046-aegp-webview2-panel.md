@@ -3,6 +3,7 @@
 - Status: accepted by owner after native98/panel100 retest; web_panel source migration explicitly authorized, 2026-10-19.
 - Owner request: 2026-10-19. Baseline commit c43e293 (native96 / CEP99).
 - Task: P-04. Windows x64 / May2023 SDK / AE2023 only.
+- Completion: old CEP registration moved outside the scan root after successful UAC; the web_panel migration is integrated into local main. Exact installation and acceptance evidence remain in current-state.md.
 
 Current source lives under web_panel/; do not recreate the retired cep_panel/
 directory or auto-register CEP. The owner accepted the canvas, preset repair and

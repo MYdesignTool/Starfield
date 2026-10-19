@@ -31,7 +31,7 @@
 ## Current checkpoint
 
 - Read docs/current-state.md for the current source candidate, deployed pairing, test evidence and open host gates. Do not copy historical hashes or passing counts into current instructions.
-- The current UI is AEGP Panel + WebView2, with shared source under `web_panel/`; parameter editing uses AE Effect Controls. Legacy CEP and floating inspectors are retired. Do not recreate `cep_panel/` or infer current deployment from historical version numbers; read docs/current-state.md, including any pending Windows registration cleanup.
+- The current UI is AEGP Panel + WebView2, with shared source under `web_panel/`; parameter editing uses AE Effect Controls. Legacy CEP and floating inspectors are retired. Do not recreate `cep_panel/` or infer current deployment from historical version numbers; read docs/current-state.md for verified retirement, installed pairing and rollback state.
 - Preserve all in-progress Transform and particle feature changes; do not use git clean/reset or delete untracked files as a cleanup shortcut.
 - MNT-01 owns workspace/document/test cleanup only. Main implementation, IDs/ABI/schemas, SDK, dist, prepared candidates, rollback backups and registered worktrees remain outside that task's mutation scope.
 - Current test commands and logs live in docs/testing.md. Historical host evidence remains dated under docs/history; compilation does not qualify a host.

@@ -17,11 +17,13 @@ Core 源码未变，但完整重建的二进制哈希不同，不能宣称与旧
 
 ## 旧 CEP Windows 注册与 main
 
-**尚有失效的旧 Junction，管理员清理未完成。** 普通移动被 Windows ACL 拒绝，UAC 提权返回“操作被用户取消”。源 cep_panel/ 已改名，旧注册的目标及 manifest 不存在，因此它不能加载旧面板；这不等于 Windows 注册已删除。
+**旧 CEP 注册已移出扩展扫描目录。** 仅保留本项目自己的恢复入口；没有修改其他扩展、注册表或共享缓存。
+
+2026-10-19 经 owner 要求重新发起 UAC 后成功。实测注册状态：扫描目录内 true → false，保留目录 false → true。证据为 artifacts/webview2/elevated-cep-retirement-result.json、elevated-cep-retirement.log 及本轮 cep-registration-*.json。
 
 旧注册：`C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\cep_panel`。保留位置：`C:\Program Files (x86)\Common Files\Adobe\CEP\starfield-legacy-cep-disabled`。退役工具只接受本 checkout 的当前或历史源码 Junction，支持已失效的历史目标；不访问别的扩展。
 
-需要时，在 **管理员 PowerShell** 的本仓库根目录执行：
+**已执行成功的退役命令（记录用途，不要重复执行）：**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Set-LegacyCepPanel.ps1 -Action Disable -QualificationReport artifacts/webview2/owner-retirement-acceptance.json
@@ -33,7 +35,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Set-LegacyCepPanel.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Set-LegacyCepPanel.ps1 -Action Restore
 ```
 
-恢复会将历史 Junction 的指向重新绑定到 web_panel。验收记录保留真实 owner 原句及 accepted native98 / authorized native99 rename 的边界，不捏造全矩阵通过。当前变更在工作分支；遵循 owner 的先退役再合并顺序，旧 Windows 注册清理完成后再合入本地 main。未推送远端。
+恢复会将历史 Junction 的指向重新绑定到 web_panel。验收记录保留真实 owner 原句及 accepted native98 / authorized native99 rename 的边界，不捏造全矩阵通过。已快进合入本地 main；尚未推送远端。
 
 ## 测试及回滚
 
