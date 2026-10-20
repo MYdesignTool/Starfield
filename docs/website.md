@@ -8,6 +8,8 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 - `docs/site/styles.css`：响应式布局与减少动态效果样式。
 - `docs/site/site.js`：移动菜单、独立 Canvas 粒子插画和暂停/页面可见性管理。
 - `docs/site/assets/mark.svg`：本站原创星形标识。
+- `docs/site/assets/orbit.svg`：原创粒子轨道封面，脚本或 Canvas 不可用时仍有完整视觉。
+- `docs/site/404.html`：独立错误页面，不依赖相对资源，深层失效链接仍可返回官网。
 - `.github/workflows/pages.yml`：验证与部署，只上传 `docs/site/`。
 
 网页概念动画与插画不调用 Core，也不代表 AE 截图、输出或性能。保持开发中、Windows x64 / AE2023 的范围说明。没有正式安装包时不添加虚假下载入口；官网发布不更改插件的验证与安装状态。
@@ -31,15 +33,17 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 
 ## 发布状态
 
-首版已通过已连接的 GitHub 接口提交至独立分支 `codex/web-01-github-pages`，见 [草稿 PR #1](https://github.com/MYdesignTool/Starfield/pull/1)。未合入 main、未上线。没有推送本地 P-05/P-06/P-07/GOV 在途插件修改；远端 README/任务卡修改从远端 main 分别追加官网入口与本卡，保留各自已有内容。本地 checkout 分支及预先存在的修改保持。
+首版已通过已连接的 GitHub 接口提交至独立分支 `codex/web-01-github-pages`，见 [PR #1](https://github.com/MYdesignTool/Starfield/pull/1)。未合入 main、未上线。没有推送本地 P-05/P-06/P-07/GOV 在途插件修改；远端 README/任务卡修改从远端 main 分别追加官网入口与本卡，保留各自已有内容。本地 checkout 分支及预先存在的修改保持。
 
-初次只读远端检查显示仓库公开、默认分支 main、Pages 尚未启用。本机 Git 连接受失效代理阻挡；浏览器未登录 GitHub，无法代为更改 Pages Source。首次上线需 owner 登录后选择 GitHub Actions。实现、静态验证与实际发布结果分别记录，不能把预期地址当上线证据。
+Owner 于 2026-10-20 要求先完成代码与 PR、暂不上线，随后告知已将 Pages Source 设为 GitHub Actions，并要求先自行检查视觉。此设置完成不视为发布授权；本轮不合并 main 或触发生产部署。初次只读检查时仓库公开、默认分支 main、Pages 尚未启用，保留为历史观察。Git 的失效代理可通过单条命令的临时选项绕过，未修改系统/Git 配置；未发现可用的非交互仓库凭据。不能把预期地址当上线证据。
 
 本地静态验证与脚本语法通过。`artifacts/website/` 保存静态检查及临时 VM 交互 smoke 记录；覆盖动画暂停/恢复、系统减少动态效果、隐藏页面/移出视口停止、像素比上限、菜单/Escape/锚点关闭和无 Canvas 回退。这些是离线验证。远端 [Actions run 39284989514](https://github.com/MYdesignTool/Starfield/actions/runs/39284989514) 已完成且 conclusion=success；PR 的 deploy 按设计跳过，不代表 Pages 上线。后续提交的 CI 仍需分别查看。
 
 Owner 于 2026-10-20 明确批准运行 `node artifacts/website/preview.cjs --serve` 并在检查后停止。临时服务仅监听 `127.0.0.1:4173`，内容仅 `docs/site/`，使用 `/Starfield/` 子路径。沙箱内服务最初不能被浏览器访问；经同命令沙箱外执行后，HTTP 200 与应用内浏览器访问成功。没有修改代理、注册表、系统防火墙或 AE。完成后已 Ctrl+C 停止；只读核验该端口监听数为 0。
 
 实际应用内 Chromium 检查了 1440×1000 桌面、390×844 手机和 320×740 窄屏。标题/按钮/节点图/功能区无横向溢出；手机菜单展开、Escape 关闭并返回焦点、FAQ 展开、动画暂停/恢复通过，控制台 warn/error 为空。按预览调整了粒子可见度。桌面首页、功能区和手机工作流截图保存于 `artifacts/website/{desktop-home,desktop-features,mobile-workflow}.png`。系统减少动态效果和隐藏/离屏状态仍仅有 VM 检查，不补记为浏览器实测。截图接口曾有短暂同步超时，恢复后重新核对并保存最终截图。
+
+最后一轮补齐原创 SVG 轨道封面与独立 404 页面，并把样式格式化为可读源码；格式化前后规范化 CSS token 一致。再次检查桌面全页、390px 手机首页/功能区、导航定位、SVG 与 404 显示。新增截图为 `home-final.png`、`desktop-full-final.png`、`mobile-full-final.png` 和 `404-preview.png`。一次全页截图期间记录了无来源的 `animation in undefined` 异常；全新标签页的加载、暂停/恢复与全页截图重放未复现，记录保留在 `artifacts/website/visual-review.json`，不把它描述成已修复的产品缺陷。临时预览再次停止，端口监听数核验为 0。
 
 ## 回退
 
