@@ -9,22 +9,23 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 - `docs/site/index.html`：产品介绍、工作流、功能、入门与 FAQ。
 - `docs/site/styles.css`：响应式布局、图片融合、CSS 星光与减少动态效果样式。
 - `docs/site/site.js`：移动菜单、闪烁暂停/恢复、离屏和页面可见性管理。无 Canvas 绘制、旋转星轨或逐帧脚本循环。
+- `docs/site/demo/`：复用插件画布 UI 的隔离演示，支持添加、拖动、连接/断开与删除、撤销、重置。内存适配器替代宿主提交，不生成粒子；复用与维护见 [节点画布说明](website-canvas.md)。不影响主图星光。
 - `docs/site/assets/hero-particles.jpg`：1254×1254 概念主图，391,687 bytes。脚本不可用时仍显示图片与静止星光。
 - `docs/site/assets/mark.svg`：本站四角星标识。
 - `docs/site/404.html`：独立错误页面，不依赖相对资源，深层失效链接仍可返回官网。
 - `.github/workflows/pages.yml`：验证与部署，只上传 `docs/site/`。
 
-概念图片、星光与功能插画不调用 Core，也不代表 AE 截图、输出或性能；图注和 FAQ 已标注。保持开发中、Windows x64 / AE2023 的范围说明。没有正式安装包时不添加虚假下载入口；官网发布不更改插件的验证与安装状态。
+概念图片、星光、功能插画及 UI 画布不调用 Core，也不代表 AE 输出或性能；图注和 FAQ 已标注。节点画布复用自有前端代码，宿主桥、事务和文件操作均不加载。保持开发中、Windows x64 / AE2023 的范围说明。没有正式安装包时不添加虚假下载入口；官网发布不更改插件的验证与安装状态。
 
 ## 验证与预览
 
 仓库根目录运行 `node tests/website-check.cjs`，检查资源和锚点、ARIA 引用、脚本语法、项目子路径、发布目录以及无 SDK/二进制/符号链接混入。不安装依赖或启动本地服务器。
 
-当前图片版验证通过：8 个公开文件、12 个本地资源引用，总计 432,380 bytes，单文件保持小于 500,000 bytes。脚本语法通过。忽略目录内 `artifacts/website/image-hero-smoke.cjs` 验证手动暂停/恢复、初始与动态减少动画、隐藏页面、离屏重入、缺失 IntersectionObserver 和菜单/Escape/锚点关闭；这些为 VM 检查，不冒充浏览器实测。旧 `interaction-smoke.cjs` 针对已移除的 Canvas，不再适用于当前主图。
+当前含交互画布的版本验证通过：17 个公开文件、22 个本地资源引用，总计 660,805 bytes，单文件保持小于 500,000 bytes。脚本语法与 `tests/website-graph-check.cjs` 通过。忽略目录内 `artifacts/website/image-hero-smoke.cjs` 验证星光手动暂停/恢复、初始与动态减少动画、隐藏页面、离屏重入、缺失 IntersectionObserver 和菜单/Escape/锚点关闭；这些为 VM 检查，不冒充浏览器实测。旧 `interaction-smoke.cjs` 针对已移除的主图 Canvas，不再适用于当前主图。画布的真实模块与浏览器交互证据见 [画布说明](website-canvas.md)。
 
 实际应用内 Chromium 核验默认桌面、390×844 手机图片裁切、320×740 窄屏无横向溢出、图片加载、12 个星光的运行状态、暂停/恢复、手机菜单与 Escape；控制台 warn/error 为空。截图保存于 `artifacts/website/image-hero-desktop.png`、`image-hero-mobile.png`。系统减少动态效果、页面隐藏和离屏恢复仍以 VM 证据为准。
 
-Owner 已明确批准 `node artifacts/website/preview.cjs --serve`，仅监听 `127.0.0.1:4173`、仅提供 `docs/site/`、使用 `/Starfield/` 子路径。图片版检查后已 Ctrl+C 停止，只读核验端口监听数为 0。没有修改代理、注册表、防火墙或 AE。撤回这次临时预览只需 Ctrl+C；当前已完成。
+Owner 已明确批准 `node artifacts/website/preview.cjs --serve`，仅监听 `127.0.0.1:4173`、仅提供 `docs/site/`、使用 `/Starfield/` 子路径。图片版初次检查后已停止；owner 随后要求打开预览供体验，目前保留运行。停止只需 Ctrl+C（当前 exec session 58360）；没有修改代理、注册表、防火墙或 AE。
 
 后续发布前仍应检查桌面和窄屏布局、手机菜单与 Escape、FAQ、星光暂停/播放、系统减少动态效果及外链。静态检查不能替代实际浏览器检查。
 

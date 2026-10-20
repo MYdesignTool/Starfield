@@ -13,8 +13,14 @@ the surrounding engineering documents. Relative asset links support the `/Starfi
 project path, local files and a future domain without bundler configuration.
 
 The site describes the independent Starfield identity and current Windows / AE2023
-development scope. Generated raster particle artwork and the conceptual node diagram are
-labelled as illustrations, not host screenshots or rendered output. Publication
+development scope. Generated raster particle artwork is labelled as an illustration.
+The interactive node playground reuses project-owned panel UI modules and 46 selected
+canvas functions inside a sandboxed iframe. An in-memory adapter replaces host
+selection, reads, transactions and layout commits; no host bridge, polling, parameter
+transport, preset/file operations or renderer is loaded. The frame has only
+`allow-scripts`, a CSP with `connect-src 'none'`, and no persistence. Its UI-only scope
+is visible in the frame and caption. Shared source/export details belong in
+`docs/website-canvas.md`. Publication
 does not qualify a host, device or performance claim. There is no fabricated
 installer, testimonial, price, performance figure or unsupported compatibility claim.
 

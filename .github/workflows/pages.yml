@@ -6,11 +6,13 @@ on:
     paths:
       - docs/site/**
       - tests/website-check.cjs
+      - tests/website-graph-check.cjs
       - .github/workflows/pages.yml
   pull_request:
     paths:
       - docs/site/**
       - tests/website-check.cjs
+      - tests/website-graph-check.cjs
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -30,7 +32,9 @@ jobs:
         with:
           node-version: '22'
       - name: Validate website and publication boundary
-        run: node tests/website-check.cjs
+        run: |
+          node tests/website-check.cjs
+          node tests/website-graph-check.cjs
       - name: Upload website only
         uses: actions/upload-pages-artifact@v4
         with:

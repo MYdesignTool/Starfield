@@ -61,16 +61,9 @@
     <section id="workflow" class="section workflow" aria-labelledby="workflow-title">
       <div class="section-heading"><p class="eyebrow section-index">01 — CONNECT YOUR IDEAS</p><div><h2 id="workflow-title">想法有了。<br>把它们<span class="muted">连接起来。</span></h2><p class="section-intro">发射、塑形、施加力，再输出。<br>让每一步创作，都有清晰的来路。</p></div></div>
       <div class="workflow-layout">
-        <figure class="graph-demo">
-          <div class="graph-toolbar"><span><span class="status-dot"></span> PARTICLE GRAPH</span><span>CONCEPT / 01</span></div>
-          <div class="graph-content" role="img" aria-label="节点工作流示意：Emitter 连接 Particle，再连接 Force，最后连接 Output。">
-            <svg class="graph-wires" viewBox="0 0 700 350" preserveAspectRatio="none" aria-hidden="true"><path d="M190 115 C255 115 190 205 265 205"/><path d="M395 205 C455 205 395 115 460 115"/><path d="M590 115 C650 115 535 280 605 280"/></svg>
-            <div class="graph-node node-emitter"><div><span class="node-icon">↗</span> Emitter <span class="node-number">01</span></div><p>粒子的起点</p><i class="port port-out"></i></div>
-            <div class="graph-node node-particle"><i class="port port-in"></i><div><span class="node-icon">✦</span> Particle <span class="node-number">02</span></div><p>赋予形态与色彩</p><i class="port port-out"></i></div>
-            <div class="graph-node node-force"><i class="port port-in"></i><div><span class="node-icon">≈</span> Force <span class="node-number">03</span></div><p>让运动发生</p><i class="port port-out"></i></div>
-            <div class="graph-node node-output"><i class="port port-in"></i><div><span class="node-icon">▣</span> Output</div></div>
-            <span class="graph-axis" aria-hidden="true">└ X / Y</span>
-          </div><figcaption>工作流概念示意 · 非 After Effects 界面截图</figcaption>
+        <figure class="graph-demo graph-live">
+          <iframe src="demo/index.html" title="Starfield 节点画布 UI 体验" loading="lazy" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+          <figcaption>试着添加、拖动和连接节点。复用插件画布 UI，仅在网页中体验，不生成粒子。</figcaption>
         </figure>
         <ol class="workflow-steps"><li><span>01</span><div><h3>构建你的粒子系统</h3><p>在节点画布中连接 Emitter、Particle、Force 与 Output，直观整理创作逻辑。</p></div></li><li><span>02</span><div><h3>回到熟悉的控制方式</h3><p>在 AE Effect Controls 中调整参数、关键帧、曲线与渐变，让粒子融入现有动画流程。</p></div></li><li><span>03</span><div><h3>把灵感留给下一次</h3><p>通过独立预设面板保存、应用与导入导出预设，继续发展你的粒子系统。</p></div></li></ol>
       </div>
@@ -97,7 +90,7 @@
       <details><summary>Starfield 是什么？<span aria-hidden="true">＋</span></summary><p>Starfield 是独立实现的 After Effects 粒子插件。通过节点画布组织系统，在 AE 原生 Effect Controls 中编辑参数，并通过独立预设面板管理预设。</p></details>
       <details><summary>现在可以下载正式版吗？<span aria-hidden="true">＋</span></summary><p>项目目前仍处于开发阶段，本站尚未提供正式安装包。你可以在 GitHub 查看源码与构建说明；对外版本以仓库实际发布信息为准。</p></details>
       <details><summary>支持哪些系统与 AE 版本？<span aria-hidden="true">＋</span></summary><p>当前开发与验证范围是 Windows x64 和 After Effects 2023。macOS、其他 AE 版本及具体硬件的兼容性尚未在此承诺。部分功能仍有宿主实测待办，构建成功不代表全部场景已经验证。</p></details>
-      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页主视觉是参考插件预设主图生成的概念图片，叠加轻微星光明灭；节点图与功能插画也是网页示意，不代表插件的实际渲染画面、界面截图或性能。</p></details>
+      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页主视觉是参考插件预设主图生成的概念图片，叠加轻微星光明灭；节点区复用插件画布 UI，但操作仅保存在当前网页内存中，不提交到 AE，也不生成粒子。功能插画为网页示意，不代表实际渲染或性能。</p></details>
       <details><summary>如何参与或反馈问题？<span aria-hidden="true">＋</span></summary><p>可以通过 <a href="https://github.com/MYdesignTool/Starfield/issues">GitHub Issues</a> 提交问题或建议。反馈时请提供 AE 版本、复现步骤和必要截图，并先移除工程中的私人信息。源码使用 <a href="https://github.com/MYdesignTool/Starfield/blob/main/LICENSE">MIT 许可证</a>；Adobe SDK 不随源码分发。</p></details>
     </div></section>
   </main>

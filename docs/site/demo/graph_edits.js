@@ -1,0 +1,745 @@
+// Pure schema-1 graph edit planner. It preserves canonical graph data and optional
+// records; the native registry remains authoritative for semantic validation.
+(function (root, factory) {
+    var layout = typeof module === "object" && module.exports
+        ? require("./graph_layout.js") : root.StarfieldGraphLayout;
+    var api = factory(layout);
+    if (typeof module === "object" && module.exports) module.exports = api;
+    else root.StarfieldGraphEdits = api;
+}(typeof window !== "undefined" ? window : this, function (layout) {
+    "use strict";
+
+    var TYPES = {
+        emitter: "org.starfieldfx.nodes.emitter",
+        particle: "org.starfieldfx.nodes.particle",
+        force: "org.starfieldfx.nodes.force",
+        transform: "org.starfieldfx.nodes.transform",
+        motion:"org.starfieldfx.nodes.motion",
+        turbulence:"org.starfieldfx.nodes.turbulence",
+        material:"org.starfieldfx.nodes.material",
+        model: "org.starfieldfx.nodes.model",
+        output: "org.starfieldfx.nodes.output"
+    };
+    var SCHEMA_VERSIONS = { emitter: 7, particle: 7, force: 3, transform: 1, motion:1, turbulence:1, model: 1, material:1, output: 4 };
+    var PORTS = {
+        "org.starfieldfx.nodes.emitter": { input: "2", output: "1" },
+        "org.starfieldfx.nodes.particle": { input: "1", modelInput: "3", output: "2" },
+        "org.starfieldfx.nodes.force": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
+        "org.starfieldfx.nodes.motion": {input:"1",output:"2"},
+        "org.starfieldfx.nodes.turbulence": {input:"1",output:"2"},
+        "org.starfieldfx.nodes.model": { output: "1" },
+        "org.starfieldfx.nodes.material": { input:"2",output:"1" },
+        "org.starfieldfx.nodes.output": { input: "1" }
+    };
+    var DEFAULTS = {
+        emitter: [
+            { key: "2", type: 4, value: 100 },
+            { key: "3", type: 3, value: 1000 },
+            { key: "5", type: 3, value: 0 }, { key: "6", type: 5, value: [0, 0, 0] },
+            { key: "7", type: 5, value: [0, 0, 0] }, { key: "8", type: 4, value: 10 },
+            { key: "9", type: 4, value: 1 }, { key: "10", type: 4, value: 0.05 },
+            { key: "11", type: 4, value: 0 }, { key: "14", type: 4, value: 0 },
+            { key: "12", type: 4, value: 100 },
+            { key: "15", type: 4, value: 0 }, { key: "16", type: 4, value: 0 },
+            { key: "17", type: 3, value: 1 }, { key: "18", type: 4, value: 60 },
+            { key: "19", type: 4, value: 100 }, { key: "20", type: 4, value: 100 },
+            { key: "21", type: 4, value: 100 }, { key: "22", type: 4, value: 0 },
+            {key:"23",type:3,value:0},{key:"31",type:3,value:0}, {key:"24",type:4,value:100},
+            {key:"25",type:4,value:0}, {key:"26",type:4,value:100},
+            {key:"27",type:4,value:0}, {key:"28",type:4,value:0},
+            {key:"29",type:4,value:0}, {key:"30",type:4,value:0}, {key:"32",type:5,value:[0,0,0]}
+        ],
+        particle: [
+            { key: "12", type: 3, value: 0 },
+            { key: "13", type: 7, value: defaultGradient() },
+            { key: "1", type: 5, value: [1, 1, 1] },
+            { key: "3", type: 4, value: 10 }, { key: "4", type: 4, value: 100 },
+            { key: "5", type: 4, value: 1 }, { key: "6", type: 4, value: 100 },
+            { key: "11", type: 4, value: 2 },
+            { key: "9", type: 4, value: 0 }, { key: "10", type: 4, value: 0 },
+            { key: "14", type: 4, value: 0 }, { key: "15", type: 3, value: 0 },
+            { key: "16", type: 4, value: 10 }, { key: "17", type: 3, value: 0 },
+            { key: "18", type: 5, value: [0,0,0] }, { key: "19", type: 4, value: 0 },
+            { key: "20", type: 5, value: [0,0,0] }, { key: "21", type: 4, value: 0 },
+            { key: "27", type: 7, value: defaultRotationCurve() },
+            { key: "22", type: 3, value: 0 }, { key: "23", type: 4, value: 0 },
+            { key: "24", type: 3, value: 2 }, {key:"25",type:3,value:0},
+            {key:"26",type:4,value:0}, {key:"28",type:4,value:50}, {key:"29",type:4,value:50}, {key:"30",type:3,value:0},
+            {key:"31",type:3,value:0},{key:"32",type:3,value:0},{key:"33",type:3,value:0},
+            {key:"34",type:3,value:0},{key:"35",type:3,value:1},{key:"36",type:3,value:0},
+            {key:"37",type:3,value:10},{key:"38",type:4,value:150},{key:"39",type:4,value:66},
+            {key:"40",type:2,value:0},{key:"41",type:4,value:100}
+        ],
+        force: [
+            { key: "1", type: 5, value: [0, 0, 0] }, { key: "2", type: 4, value: 0 },
+            { key: "3", type: 4, value: 0 }, { key: "4", type: 5, value: [0,0,0] },
+            { key: "5", type: 4, value: 0 }, { key: "6", type: 4, value: 0 },
+            { key: "7", type: 4, value: 0 }, { key: "8", type: 4, value: 0 }
+        ],
+        transform: [
+            {key:"1",type:5,value:[0,0,0]}, {key:"2",type:5,value:[0,0,0]},
+            {key:"3",type:5,value:[0,0,0]}, {key:"4",type:5,value:[100,100,100]},
+            {key:"5",type:4,value:100}, {key:"6",type:4,value:100}, {key:"8",type:3,value:0}
+        ],
+        material:[{key:"1",type:3,value:0},{key:"2",type:5,value:[1,1,1]},{key:"3",type:4,value:.5},{key:"4",type:4,value:0},{key:"5",type:4,value:1},{key:"6",type:3,value:1}],
+        motion:[{key:"1",type:3,value:1},{key:"2",type:5,value:[0,0,0]},{key:"3",type:5,value:[0,0,1]},
+            {key:"4",type:4,value:2*Math.PI},{key:"5",type:4,value:0},{key:"8",type:5,value:[1,0,0]},{key:"11",type:4,value:.5},
+            {key:"12",type:3,value:0},{key:"13",type:3,value:0},{key:"14",type:5,value:[0,0,0]},
+            {key:"15",type:5,value:[0,0,0]},{key:"17",type:4,value:100},{key:"18",type:3,value:0},
+            {key:"19",type:6,value:""},{key:"20",type:4,value:0}],
+        turbulence:[{key:"1",type:5,value:[0,0,0]},{key:"2",type:4,value:50},{key:"3",type:4,value:15},
+            {key:"4",type:3,value:3},{key:"5",type:4,value:0},{key:"6",type:5,value:[0,0,0]},
+            {key:"7",type:7,value:defaultTurbulenceCurve()},{key:"8",type:3,value:0},{key:"9",type:3,value:0},
+            {key:"10",type:3,value:0},{key:"11",type:4,value:100},{key:"12",type:4,value:100},
+            {key:"13",type:4,value:0},{key:"14",type:3,value:0},{key:"15",type:4,value:0},
+            {key:"16",type:4,value:0},{key:"17",type:4,value:0},{key:"18",type:4,value:0},
+            {key:"19",type:4,value:0},{key:"20",type:4,value:100},{key:"21",type:4,value:0}],
+        model: [
+            {key:"1",type:7,value:new Uint8Array(16)}, {key:"2",type:3,value:0},
+            {key:"4",type:5,value:[0,0,0]}, {key:"5",type:5,value:[0,0,0]},
+            {key:"6",type:5,value:[100,100,100]},
+            {key:"7",type:3,value:0}, {key:"8",type:3,value:0}, {key:"9",type:3,value:0},
+            {key:"10",type:3,value:0}, {key:"11",type:3,value:0},
+            {key:"12",type:7,value:defaultModelBounds()}, {key:"13",type:3,value:0}
+        ],
+        output: [{ key: "1", type: 3, value: 1000000 }, {key:"2",type:3,value:0},
+            {key:"3",type:4,value:0}, {key:"4",type:3,value:0}, {key:"5",type:4,value:100},{key:"6",type:3,value:0},{key:"7",type:3,value:30},{key:"8",type:3,value:1},{key:"9",type:4,value:360},{key:"10",type:4,value:0},{key:"11",type:3,value:0},{key:"12",type:4,value:8},{key:"13",type:4,value:70},{key:"14",type:4,value:0},{key:"15",type:3,value:0}]
+    };
+
+    function defaultGradient() {
+        var bytes=new Uint8Array(68),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;
+        for(var i=0;i<2;i++) {
+            view.setFloat64(4+32*i,i,true);
+            for(var channel=0;channel<3;channel++) view.setFloat64(12+32*i+8*channel,1,true);
+        }
+        return bytes;
+    }
+
+    function defaultModelBounds() {
+        var bytes=new Uint8Array(48),view=new DataView(bytes.buffer);
+        for(var axis=0;axis<6;axis++)view.setFloat64(axis*8,axis<3?-.5:.5,true);
+        return bytes;
+    }
+
+    function defaultRotationCurve() {
+        var bytes=new Uint8Array(36),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;view.setFloat64(20,1,true);
+        return bytes;
+    }
+
+    function defaultTurbulenceCurve() {
+        var bytes=new Uint8Array(36),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=2;view.setFloat64(12,100,true);view.setFloat64(20,1,true);view.setFloat64(28,100,true);
+        return bytes;
+    }
+
+    function fail(code, message) {
+        var result = new Error(message);
+        result.code = code;
+        throw result;
+    }
+
+    // Ordinary AE controls are read by name in the current gateway. Their
+    // portable graph schema is determined by that complete field layout, not
+    // by a potentially stale projection label. This never upgrades graph hex
+    // or adds defaults to an older project's missing controls.
+    // BEGIN STARFIELD NATIVE RECORD CONTRACT
+// One ES3 factory embedded verbatim in both CEP planning and the AE gateway.
+// Portable control layouts only: native disk IDs/ABI/defaults stay elsewhere.
+function createNativeRecordContract() {
+    var prefix="org.starfieldfx.nodes.",specs={
+        emitter:{version:7,required:{"2":4,"3":3,"5":3,"6":5,"7":5,"8":4,"9":4,"10":4,"11":4,"12":4,
+            "14":4,"15":4,"16":4,"17":3,"18":4,"19":4,"20":4,"21":4,"22":4,"23":3,
+            "24":4,"25":4,"26":4,"27":4,"28":4,"29":4,"30":4,"31":3,"32":5},optional:{}},
+        particle:{version:7,required:{"1":5,"3":4,"4":4,"5":4,"6":4,"9":4,"10":4,"11":4,"12":3,"13":7,
+            "14":4,"15":3,"16":4,"17":3,"18":5,"19":4,"20":5,"21":4,"22":3,"23":4,
+            "24":3,"25":3,"26":4,"28":4,"29":4},optional:{"7":7,"8":7,"27":7,"30":3,"31":3,
+            "32":3,"33":3,"34":3,"35":3,"36":3,"37":3,"38":4,"39":4,"40":2,"41":4}},
+        force:{version:3,required:{"1":5,"2":4,"3":4,"4":5,"5":4,"6":4,"7":4,"8":4},optional:{"9":7}},
+        transform:{version:1,required:{"1":5,"2":5,"3":5,"4":5,"5":4,"6":4},optional:{"7":7,"8":3}},
+        motion:{version:1,required:{"1":3,"2":5,"3":5,"4":4,"5":4,"11":4,"12":3,"13":3,"14":5,"15":5,"17":4,"18":3,"19":6,"20":4},optional:{"6":7,"8":5}},
+        turbulence:{version:1,required:{"1":5,"2":4,"3":4,"4":3},optional:{"5":4,"6":5,"7":7,"8":3,"9":3,"10":3,"11":4,"12":4,"13":4,"14":3,"15":4,"16":4,"17":4,"18":4,"19":4,"20":4,"21":4}},
+        material:{version:1,required:{"1":3,"2":5,"3":4,"4":4,"5":4,"6":3},optional:{}},
+        model:{version:1,required:{"1":7,"2":3,"4":5,"5":5,"6":5,"7":3,"8":3,"9":3,"10":3,"11":3,"12":7,"13":3},optional:{}}
+    };
+    function own(object,key){return Object.prototype.hasOwnProperty.call(object,key);}
+    function array(value){return Object.prototype.toString.call(value)==="[object Array]";}
+    function integer(value,min,max){return typeof value==="number" && isFinite(value) && Math.floor(value)===value && value>=min && value<=max;}
+    function spec(type){if(typeof type!=="string" || type.substr(0,prefix.length)!==prefix)return null;
+        var kind=type.substr(prefix.length);if(!own(specs,kind))return null;return specs[kind];}
+    function invalid(node,detail){var error=new Error("Native node "+(node && node.id || "missing")+" ("+
+        (node && node.type || "missing")+") control record: "+detail+".");error.code="invalid_native_node_record";throw error;}
+    function wire(field){var value=field.value;
+        if(field.type===2)return integer(value,-2147483648,2147483647);
+        if(field.type===3)return integer(value,0,4294967295);
+        if(field.type===4)return typeof value==="number" && isFinite(value);
+        if(field.type===5){if(!array(value) || value.length!==3)return false;
+            for(var axis=0;axis<3;axis++)if(typeof value[axis]!=="number" || !isFinite(value[axis]))return false;return true;}
+        if(field.type===6){if(typeof value!=="string" || value.indexOf("\u0000")>=0)return false;
+            try{return encodeURIComponent(value).replace(/%[0-9a-f]{2}/gi,"x").length<=128;}catch(ignored){return false;}}
+        if(field.type===7){var tag=Object.prototype.toString.call(value);
+            if(!array(value) && tag!=="[object Uint8Array]")return false;
+            if(!integer(value.length,0,24576))return false;
+            for(var byteIndex=0;byteIndex<value.length;byteIndex++)if(!integer(value[byteIndex],0,255))return false;return true;}
+        return false;
+    }
+    function schema(node){var layout=node && spec(node.type),found={};
+        if(!layout)invalid(node,"unsupported node type");
+        if(!integer(node.schemaVersion,1,layout.version))invalid(node,"unsupported schemaVersion "+node.schemaVersion);
+        if(!array(node.parameters) || node.parameters.length>64)invalid(node,"missing or oversized parameters");
+        for(var p=0;p<node.parameters.length;p++){
+            var field=node.parameters[p];if(!field || !/^[1-9][0-9]*$/.test(String(field.key)))invalid(node,"invalid parameter identity");
+            var key=String(field.key),type=0;
+            if(own(layout.required,key))type=layout.required[key];else if(own(layout.optional,key))type=layout.optional[key];
+            if(!type || found[key] || field.type!==type || !wire(field))invalid(node,"invalid parameter "+key+" type, identity or value");
+            if(node.type===prefix+"motion") {
+                if(key==="1" && !integer(field.value,0,2))invalid(node,"unsupported Motion mode");
+                if(key==="13" && !integer(field.value,0,2))invalid(node,"invalid Circle Origin Type");
+                if(key==="5" && (field.value<0 || field.value>100))invalid(node,"invalid Circle Speed Random");
+                if(key==="4" && Math.abs(field.value)>100000*(2*Math.PI/100))invalid(node,"Circle Speed outside native range");
+                if(key==="3" && (field.value[0]!==0 || field.value[1]!==0 || field.value[2]!==1))invalid(node,"Circle axis must be authored through Angle XYZ");
+                if(key==="14")for(var axis=0;axis<3;axis++)if(Math.abs(field.value[axis])>=32768)invalid(node,"Circle angle outside native range");
+                if(key==="11" && (field.value<0 || field.value>1000000))invalid(node,"invalid Light Path Max Delay");
+                if(key==="12" && !integer(field.value,0,1))invalid(node,"invalid Light Path Orient To Path");
+                if(key==="17" && (field.value<0 || field.value>100000))invalid(node,"invalid Light Path Speed");
+                if(key==="18" && !integer(field.value,0,1))invalid(node,"invalid Light Path end behavior");
+                if(key==="20" && (field.value<0 || field.value>100))invalid(node,"invalid Light Path Delay Random");
+            }
+            if(node.type===prefix+"material") {
+                if((key==="1" || key==="6") && !integer(field.value,0,1))invalid(node,"material switch "+key+" must be 0 or 1");
+                if(key==="2")for(var channel=0;channel<3;channel++)
+                    if(field.value[channel]<0 || field.value[channel]>1)invalid(node,"material color must be in 0..1");
+                if((key==="3" || key==="4" || key==="5") && (field.value<0 || field.value>1))
+                    invalid(node,"material parameter "+key+" must be in 0..1");
+            }
+            if(node.type===prefix+"turbulence") {
+                if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
+                if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
+                if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
+                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
+                if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
+                if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");
+                if((key==="12" || key==="13") && (field.value<0 || field.value>100))invalid(node,"Turbulence amount outside 0..100");
+                if(key>="15" && key<="19" && (field.value < -100 || field.value > 100))invalid(node,"Turbulence property offset outside -100..100");
+                if(key==="20" && (field.value<=0 || field.value>100000))invalid(node,"invalid Noise Scale");
+                if(key==="21" && Math.abs(field.value)>100000)invalid(node,"invalid Fractal Evolution");
+            }
+            found[key]=true;
+        }
+        for(var key in layout.required)if(own(layout.required,key) && !found[key])invalid(node,"missing parameter "+key);
+        return layout.version;
+    }
+    return {id:"native-control-contract-1",array:array,schema:schema,version:function(type){var layout=spec(type);
+        if(!layout)invalid({type:type},"unsupported node type");return layout.version;}};
+}
+    var nativeRecords=createNativeRecordContract();
+    // END STARFIELD NATIVE RECORD CONTRACT
+    function nativeRecordSchema(record) {
+        return nativeRecords.schema(record);
+    }
+
+    function copyValue(value) {
+        if (Object.prototype.toString.call(value) === "[object Array]") {
+            return value.map(copyValue);
+        }
+        if (value instanceof Uint8Array) return new Uint8Array(value);
+        return value;
+    }
+
+    function copyGraph(graph) {
+        if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
+            Object.prototype.toString.call(graph.edges) !== "[object Array]") {
+            fail("invalid_graph", "graph must contain node and edge arrays");
+        }
+        return {
+            version: graph.version,
+            nodes: graph.nodes.map(function (node) {
+                return { id: node.id, type: node.type, schemaVersion: node.schemaVersion,
+                         parameters: node.parameters.map(function (parameter) {
+                             return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                         }) };
+            }),
+            edges: graph.edges.map(function (edge) {
+                return { id: edge.id, sourceNode: edge.sourceNode, sourcePort: edge.sourcePort,
+                         destinationNode: edge.destinationNode, destinationPort: edge.destinationPort };
+            }),
+            optionalRecords: (graph.optionalRecords || []).slice()
+        };
+    }
+
+    function makeId(factory, graph) {
+        var occupied = {};
+        for (var n = 0; n < graph.nodes.length; n++) occupied["$" + graph.nodes[n].id] = true;
+        for (var e = 0; e < graph.edges.length; e++) occupied["$" + graph.edges[e].id] = true;
+        for (var attempt = 0; attempt < 32; attempt++) {
+            var value = factory();
+            if (typeof value !== "string" || !/^[0-9a-fA-F]{32}$/.test(value) || /^0{32}$/.test(value)) {
+                fail("invalid_id_factory", "ID factory must return a non-zero 128-bit UUID in hexadecimal");
+            }
+            value = value.toLowerCase();
+            if (!occupied["$" + value]) return value;
+        }
+        fail("id_collision", "unable to allocate a unique graph UUID");
+    }
+
+    function randomId() {
+        var bytes = new Uint8Array(16);
+        var cryptoObject = typeof window !== "undefined" ? window.crypto : null;
+        if (cryptoObject && typeof cryptoObject.getRandomValues === "function") cryptoObject.getRandomValues(bytes);
+        else {
+            for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        var result = "";
+        for (var b = 0; b < bytes.length; b++) result += (bytes[b] < 16 ? "0" : "") + bytes[b].toString(16);
+        return result;
+    }
+
+    function nodeById(graph, id) {
+        for (var i = 0; i < graph.nodes.length; i++) if (graph.nodes[i].id === id) return graph.nodes[i];
+        return null;
+    }
+
+    function makeNode(kind, id) {
+        var auxiliary = kind === "auxiliary";
+        if (auxiliary) kind = "emitter";
+        if (!Object.prototype.hasOwnProperty.call(TYPES, kind)) fail("unknown_node_type", "unsupported built-in node type");
+        var result = { id: id, type: TYPES[kind], schemaVersion: SCHEMA_VERSIONS[kind],
+                 parameters: DEFAULTS[kind].map(function (parameter) {
+                     return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                 }) };
+        if (auxiliary) result.parameters.filter(function (p) { return p.key === "31"; })[0].value = 1;
+        return result;
+    }
+
+    function makeEdge(graph, factory, sourceNode, destinationNode, sourcePort, destinationPort) {
+        return { id: makeId(factory, graph), sourceNode: sourceNode, sourcePort: sourcePort,
+                 destinationNode: destinationNode, destinationPort: destinationPort };
+    }
+
+    function validateConnection(graph, sourceId, destinationId, sourcePort, destinationPort) {
+        var source = nodeById(graph, sourceId);
+        var destination = nodeById(graph, destinationId);
+        if (!source || !destination) fail("missing_node", "connection endpoint does not exist");
+        if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
+        var sourceSchema = PORTS[source.type];
+        var destinationSchema = PORTS[destination.type];
+        var geometrySource=source.type===TYPES.model || source.type===TYPES.material;
+        var modelConnection=destinationSchema && geometrySource && destination.type===TYPES.particle &&
+            String(destinationPort)===destinationSchema.modelInput;
+        if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
+            (!modelConnection && destinationSchema.input !== String(destinationPort))) {
+            fail("invalid_port", "connection must use a compatible built-in output and input port");
+        }
+        if(geometrySource && !modelConnection && destination.type!==TYPES.output && destination.type!==TYPES.material)
+            fail("invalid_model_destination","Connect geometry to Material, Particle or Output.");
+        if(destination.type===TYPES.material && !geometrySource)
+            fail("invalid_material_connection","A Material input accepts model geometry.");
+        if(destination.type===TYPES.material && graph.edges.some(function(e){return e.destinationNode===destination.id && e.sourceNode!==source.id;}))
+            fail("material_already_connected","A Material accepts one geometry input.");
+        if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
+            fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
+        }
+        if (destination.type === TYPES.particle && source.type !== TYPES.emitter && !modelConnection) {
+            fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
+        }
+        if (destination.type === TYPES.emitter) {
+            var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
+            if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
+        }
+        // Reject a cycle before producing a request. The native validator still checks
+        // the complete graph, including node-specific stage rules and resource limits.
+        var adjacency = {};
+        for (var i = 0; i < graph.edges.length; i++) {
+            var edge = graph.edges[i];
+            (adjacency["$" + edge.sourceNode] || (adjacency["$" + edge.sourceNode] = [])).push(edge.destinationNode);
+        }
+        var pending = [destinationId];
+        var visited = {};
+        while (pending.length) {
+            var current = pending.pop();
+            if (current === sourceId) fail("cycle", "connection would create a cycle");
+            if (visited["$" + current]) continue;
+            visited["$" + current] = true;
+            var next = adjacency["$" + current] || [];
+            for (var j = 0; j < next.length; j++) pending.push(next[j]);
+        }
+    }
+
+    function addNode(graph, edit, idFactory, positions) {
+        var id = makeId(idFactory, graph);
+        var node = makeNode(edit.nodeType, id);
+        if (node.type === TYPES.emitter) {
+            var height = Number(edit.layerHeightPixels) || 1;
+            if (!(height > 0) || !isFinite(height)) fail("invalid_geometry", "Emitter layer height must be positive.");
+            node.parameters.filter(function (p) { return p.key === "12"; })[0].value = 100 / height;
+        }
+        if (node.type === TYPES.turbulence) {
+            // These graph fields are stored in layer-height-relative world
+            // units. Convert the pixel-valued AE defaults before they reach
+            // the gateway, which multiplies them by the same height on write.
+            var turbulenceHeight = Number(edit.layerHeightPixels) || 1;
+            if (!(turbulenceHeight > 0) || !isFinite(turbulenceHeight))
+                fail("invalid_geometry", "Turbulence layer height must be positive.");
+            for (var ti = 0; ti < node.parameters.length; ti++) {
+                var parameter = node.parameters[ti];
+                if (parameter.key === "2" || parameter.key === "11") parameter.value /= turbulenceHeight;
+            }
+        }
+        graph.nodes.push(node);
+        var fallback = layout.derive(graph)[id];
+        positions[id] = edit.position || fallback;
+        return id;
+    }
+
+    function connect(graph, edit, idFactory) {
+        var source = nodeById(graph, edit.from);
+        var destination = nodeById(graph, edit.to);
+        if (!source || !destination) fail("missing_node", "connection endpoint does not exist");
+        var sourceSchema = PORTS[source.type];
+        var destinationSchema = PORTS[destination.type];
+        if (!sourceSchema || !destinationSchema) fail("unknown_node_type", "connection uses a node type not known to this editor");
+        var sourcePort = edit.outputPort === undefined ? sourceSchema.output : String(edit.outputPort);
+        var destinationPort = edit.inputPort === undefined ?
+            ((source.type===TYPES.model || source.type===TYPES.material) && destination.type===TYPES.particle ? destinationSchema.modelInput : destinationSchema.input) : String(edit.inputPort);
+        validateConnection(graph, edit.from, edit.to, sourcePort, destinationPort);
+        for (var i = 0; i < graph.edges.length; i++) {
+            var existing = graph.edges[i];
+            if (existing.sourceNode === edit.from && existing.sourcePort === sourcePort &&
+                existing.destinationNode === edit.to && existing.destinationPort === destinationPort) {
+                return true;
+            }
+        }
+        graph.edges.push(makeEdge(graph, idFactory, edit.from, edit.to, sourcePort, destinationPort));
+        return false;
+    }
+
+    function disconnect(graph, edit) {
+        var found = -1;
+        for (var i = 0; i < graph.edges.length; i++) {
+            var edge = graph.edges[i];
+            var match = edit.edgeId ? edge.id === edit.edgeId : edge.sourceNode === edit.from && edge.destinationNode === edit.to;
+            if (!match) continue;
+            if (found >= 0) fail("ambiguous_edge", "more than one edge matches; specify the stable edge ID");
+            found = i;
+        }
+        if (found < 0) fail("missing_edge", "edge does not exist");
+        graph.edges.splice(found, 1);
+    }
+
+    function insertNode(graph, edit, idFactory, positions) {
+        var edgeIndex = -1;
+        for (var i = 0; i < graph.edges.length; i++) {
+            var candidate = graph.edges[i];
+            if (edit.edgeId ? candidate.id === edit.edgeId : candidate.sourceNode === edit.from && candidate.destinationNode === edit.to) {
+                if (edgeIndex >= 0) fail("ambiguous_edge", "specify the stable edge ID to insert into a parallel connection");
+                edgeIndex = i;
+            }
+        }
+        if (edgeIndex < 0) fail("missing_edge", "edge to splice does not exist");
+        var previous = graph.edges[edgeIndex];
+        if (!nodeById(graph, previous.sourceNode) || !nodeById(graph, previous.destinationNode)) {
+            fail("missing_node", "edge to splice refers to a node absent from the graph");
+        }
+        var position = edit.position || {
+            x: (positions[previous.sourceNode].x + positions[previous.destinationNode].x) / 2,
+            y: (positions[previous.sourceNode].y + positions[previous.destinationNode].y) / 2
+        };
+        var nodeId = edit.nodeId || null;
+        if (nodeId && (!nodeById(graph, nodeId) || nodeId === previous.sourceNode || nodeId === previous.destinationNode)) {
+            fail("missing_node", "the node to insert must exist and differ from both edge endpoints");
+        }
+        graph.edges.splice(edgeIndex, 1);
+        if (!nodeId) nodeId = addNode(graph, { nodeType: edit.nodeType, position: position,
+            layerHeightPixels: edit.layerHeightPixels }, idFactory, positions);
+        else positions[nodeId] = position;
+        if (edit.layout !== undefined) moveNodes(graph, { positions: edit.layout }, positions);
+        connect(graph, { from: previous.sourceNode, to: nodeId,
+                         outputPort: previous.sourcePort }, idFactory);
+        connect(graph, { from: nodeId, to: previous.destinationNode,
+                         inputPort: previous.destinationPort }, idFactory);
+        return nodeId;
+    }
+
+    function createInsertEdit(nodeId, edge, position, layoutPositions) {
+        if (typeof nodeId !== "string" || !nodeId || !edge || Object.prototype.toString.call(edge) !== "[object Array]" ||
+            edge.length !== 2 || !position || !isFinite(Number(position.x)) || !isFinite(Number(position.y))) {
+            fail("invalid_edit", "insert edit requires a node, an edge, and a finite drop position");
+        }
+        var edit = { type: "insertNode", nodeId: nodeId, edgeId: edge.id || undefined,
+                     from: edge[0], to: edge[1],
+                     position: { x: Number(position.x), y: Number(position.y) } };
+        if (layoutPositions !== undefined) {
+            if (!layoutPositions || Object.prototype.toString.call(layoutPositions) !== "[object Object]") {
+                fail("invalid_edit", "insert edit layout must be a node ID position map");
+            }
+            if (Object.keys(layoutPositions).length) edit.layout = layoutPositions;
+        }
+        return edit;
+    }
+
+    function deleteNodes(graph, edit, positions) {
+        if (Object.prototype.toString.call(edit.nodeIds) !== "[object Array]" || !edit.nodeIds.length) {
+            fail("invalid_edit", "deleteNodes requires at least one node ID");
+        }
+        var ids = {};
+        for (var i = 0; i < edit.nodeIds.length; i++) {
+            if (!nodeById(graph, edit.nodeIds[i])) fail("missing_node", "cannot delete a node absent from the graph");
+            ids["$" + edit.nodeIds[i]] = true;
+        }
+        for (var n = 0; n < graph.nodes.length; n++) {
+            if (ids["$" + graph.nodes[n].id] && graph.nodes[n].type === TYPES.output) {
+                fail("required_output", "the required Output node cannot be deleted");
+            }
+        }
+        graph.nodes = graph.nodes.filter(function (node) { return !ids["$" + node.id]; });
+        graph.edges = graph.edges.filter(function (edge) {
+            return !ids["$" + edge.sourceNode] && !ids["$" + edge.destinationNode];
+        });
+        for (var id in ids) {
+            if (Object.prototype.hasOwnProperty.call(ids, id)) delete positions[id.slice(1)];
+        }
+    }
+
+    function duplicateNodes(graph, edit, idFactory, positions) {
+        if (Object.prototype.toString.call(edit.nodeIds) !== "[object Array]" || !edit.nodeIds.length) {
+            fail("invalid_edit", "duplicateNodes requires at least one node ID");
+        }
+        var selected = {};
+        var ids = {};
+        for (var i = 0; i < edit.nodeIds.length; i++) {
+            if (!nodeById(graph, edit.nodeIds[i])) fail("missing_node", "cannot duplicate a node absent from the graph");
+            selected["$" + edit.nodeIds[i]] = true;
+        }
+        var originals = graph.nodes.filter(function (node) { return selected["$" + node.id]; });
+        for (var n = 0; n < originals.length; n++) {
+            if (originals[n].type === TYPES.output) fail("duplicate_output", "Output is unique and cannot be duplicated");
+            var copy = { id: makeId(idFactory, graph), type: originals[n].type,
+                         schemaVersion: originals[n].schemaVersion,
+                         parameters: originals[n].parameters.map(function (parameter) {
+                             return { key: parameter.key, type: parameter.type, value: copyValue(parameter.value) };
+                         }) };
+            graph.nodes.push(copy);
+            if(copy.type===TYPES.model){
+                var resource=copy.parameters.filter(function(p){return String(p.key)==="1";})[0];
+                if(resource.value.some(function(byte){return byte!==0;}))resource.value=copy.id.match(/../g).map(function(byte){return parseInt(byte,16);});
+                (edit.modelResourceCopies || (edit.modelResourceCopies=[])).push({sourceId:originals[n].id,nodeId:copy.id});
+            }
+            ids["$" + originals[n].id] = copy.id;
+            var originalPosition = positions[originals[n].id];
+            var offset = edit.offset || { x: 28, y: 28 };
+            positions[copy.id] = { x: originalPosition.x + offset.x, y: originalPosition.y + offset.y };
+        }
+        var originalEdges = graph.edges.slice();
+        for (var e = 0; e < originalEdges.length; e++) {
+            var edge = originalEdges[e];
+            var sourceSelected = selected["$" + edge.sourceNode] === true;
+            var destinationSelected = selected["$" + edge.destinationNode] === true;
+            if (!sourceSelected && !destinationSelected) continue;
+            var source = nodeById(graph, edge.sourceNode);
+            var destination = nodeById(graph, edge.destinationNode);
+
+            if (!source || !destination) continue;
+            var copiedSource = sourceSelected ? ids["$" + edge.sourceNode] : edge.sourceNode;
+            var copiedDestination = destinationSelected ? ids["$" + edge.destinationNode] : edge.destinationNode;
+            graph.edges.push(makeEdge(graph, idFactory, copiedSource, copiedDestination,
+                                      edge.sourcePort, edge.destinationPort));
+        }
+        return ids;
+    }
+
+    function moveNodes(graph, edit, positions) {
+        if (!edit.positions || Object.prototype.toString.call(edit.positions) !== "[object Object]") {
+            fail("invalid_edit", "moveNodes requires a node ID to position map");
+        }
+        if (!Object.keys(edit.positions).length) fail("invalid_edit", "moveNodes requires at least one position");
+        for (var id in edit.positions) {
+            if (!Object.prototype.hasOwnProperty.call(edit.positions, id)) continue;
+            if (!nodeById(graph, id)) fail("missing_node", "cannot move a node that is absent from the graph");
+            positions[id] = edit.positions[id];
+        }
+    }
+
+    function setParameters(graph, edit) {
+        if (Object.prototype.toString.call(edit.changes) !== "[object Array]" ||
+            !edit.changes.length || edit.changes.length > 512) {
+            fail("invalid_edit", "setParameters requires between 1 and 512 parameter changes");
+        }
+        for (var i = 0; i < edit.changes.length; i++) {
+            var change = edit.changes[i];
+            if (!change || typeof change.nodeId !== "string" || typeof change.parameterKey !== "string" ||
+                !/^\d+$/.test(change.parameterKey)) {
+                fail("invalid_edit", "parameter changes need a node ID and decimal graph parameter key");
+            }
+            var node = nodeById(graph, change.nodeId);
+            if (!node) fail("missing_node", "cannot edit a node absent from the graph");
+            if (node.type === TYPES.transform && change.parameterKey === "7")
+                fail("invalid_parameter", "Inherited motion is sampled by After Effects.");
+            if(node.type===TYPES.model) {
+                if(["1","2","3","12"].indexOf(change.parameterKey)>=0)
+                    fail("invalid_parameter","Model geometry is owned by the native import transaction.");
+                if(change.parameterKey==="13") {
+                    if(change.valueType!==3 || (change.value!==0 && change.value!==1))
+                        fail("invalid_parameter","Choose Cube or OBJ.");
+                    var asset=(edit.modelAssets || {})[node.id],revision=0,resource=new Uint8Array(16),bounds=defaultModelBounds();
+                    if(change.value===1 && asset && asset.revision>0) {
+                        if(!Number.isInteger(asset.revision) || asset.revision>2147483647 || !Array.isArray(asset.bounds) || asset.bounds.length!==6)
+                            fail("invalid_parameter","The Model asset descriptor is invalid.");
+                        revision=asset.revision;
+                        for(var byte=0;byte<16;byte++)resource[byte]=parseInt(node.id.substr(byte*2,2),16);
+                        var boundView=new DataView(bounds.buffer);
+                        asset.bounds.forEach(function(v,axis){
+                            if(!Number.isFinite(v) || Math.abs(v)>1e9 || (axis>2 && v<asset.bounds[axis-3]))
+                                fail("invalid_parameter","The Model bounds are invalid.");
+                            boundView.setFloat64(axis*8,v,true);
+                        });
+                    }
+                    node.parameters.forEach(function(parameter){
+                        if(parameter.key==="1")parameter.value=resource;
+                        if(parameter.key==="2")parameter.value=revision;
+                        if(parameter.key==="12")parameter.value=bounds;
+                    });
+                }
+            }
+            var found = -1;
+            for (var p = 0; p < node.parameters.length; p++) {
+                if (node.parameters[p].key === change.parameterKey) { found = p; break; }
+            }
+            if (change.remove === true) {
+                if (found < 0) continue;
+                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
+                    (node.type===TYPES.particle && ["7","8"].indexOf(change.parameterKey)>=0))) {
+                    fail("invalid_parameter", "only optional over-life curve parameters can be removed");
+                }
+                node.parameters.splice(found, 1);
+                continue;
+            }
+            var value = copyValue(change.value);
+            if(node.type===TYPES.particle && (change.parameterKey==="40" || change.parameterKey==="41")) {
+                var seed=change.parameterKey==="40";
+                if(change.valueType!==(seed?2:4) || typeof value!=="number" || !Number.isFinite(value) ||
+                    value<(seed?-2147483648:0) || value>(seed?2147483647:100) || (seed && !Number.isInteger(value)))
+                    fail("invalid_parameter","Invalid Birth parameter.");
+                [0,100].forEach(function(defaultValue,index) {
+                    var birthKey=String(40+index);
+                    if(birthKey!==change.parameterKey && !node.parameters.some(function(p){return p.key===birthKey;}))
+                        node.parameters.push({key:birthKey,type:index===0?2:4,value:defaultValue});
+                });
+                if(found<0) {node.parameters.push({key:change.parameterKey,type:change.valueType,value:value});continue;}
+            }
+            if(node.type===TYPES.particle && Number(change.parameterKey)>=30 && Number(change.parameterKey)<=36 && found<0) {
+                var max=Number(change.parameterKey)<=32 && Number(change.parameterKey)>=31?2147483647:
+                    change.parameterKey==="30"?3:change.parameterKey==="33"?7:change.parameterKey==="34"?2:1;
+                if(change.valueType!==3 || !Number.isInteger(value) || value<0 || value>max)
+                    fail("invalid_parameter","Invalid Particle texture/transfer value.");
+                node.parameters.push({key:change.parameterKey,type:3,value:value});continue;
+            }
+            if(node.type===TYPES.particle && Number(change.parameterKey)>=37 && Number(change.parameterKey)<=39) {
+                var cloudKey=Number(change.parameterKey);
+                if(change.valueType!==(cloudKey===37?3:4) || typeof value!=="number" || !Number.isFinite(value) ||
+                    value<(cloudKey===39?0:1) || value>1000 || (cloudKey===37 && !Number.isInteger(value)))
+                    fail("invalid_parameter","Invalid Cloud parameter.");
+                if(found<0) {node.parameters.push({key:change.parameterKey,type:change.valueType,value:value});continue;}
+            }
+            if(node.type===TYPES.particle && change.parameterKey==="15" && change.valueType===3 && value===2) {
+                [10,150,66].forEach(function(defaultValue,index) {
+                    var cloudKey=String(37+index);
+                    if(!node.parameters.some(function(p){return p.key===cloudKey;}))
+                        node.parameters.push({key:cloudKey,type:index===0?3:4,value:defaultValue});
+                });
+            }
+            if (node.type === TYPES.transform && change.parameterKey === "8") {
+                if (change.valueType !== 3 || !Number.isInteger(value) || value < 0 || value > 2147483647)
+                    fail("invalid_parameter", "Choose an available layer or None.");
+                if (found < 0) { node.parameters.push({key:"8",type:3,value:value}); continue; }
+            }
+            if (found < 0) {
+                if (!((node.type===TYPES.motion && change.parameterKey==="6") ||
+                    (node.type===TYPES.particle && ["7","8","13"].indexOf(change.parameterKey)>=0)) ||
+                    change.valueType !== 7 || !(value instanceof Uint8Array)) {
+                    fail("missing_parameter", "the requested graph parameter is not present");
+                }
+                node.parameters.push({ key: change.parameterKey, type: 7, value: value });
+                continue;
+            }
+            if (change.valueType !== node.parameters[found].type) {
+                fail("parameter_type_mismatch", "graph parameter edits must preserve the value type");
+            }
+            node.parameters[found].value = value;
+            if(node.type===TYPES.motion && ["1","4","17"].indexOf(change.parameterKey)>=0) {
+                var angular=node.parameters.filter(function(p){return p.key==="4";})[0];
+                var percent=node.parameters.filter(function(p){return p.key==="17";})[0];
+                var motionMode=node.parameters.filter(function(p){return p.key==="1";})[0];
+                if(angular && percent) {
+                    if(change.parameterKey==="17" || (change.parameterKey==="1" && motionMode.value===0))
+                        angular.value=percent.value*(2*Math.PI/100);
+                    else percent.value=Math.max(0,angular.value*(100/(2*Math.PI)));
+                }
+            }
+        }
+        // Changing the source back to Default removes its parent stream in the
+        // same authored transaction, including the saved source-side records.
+        graph.edges = graph.edges.filter(function (edge) {
+            var target = nodeById(graph, edge.destinationNode);
+            if (!target || target.type !== TYPES.emitter) return true;
+            var mode = target.parameters.filter(function (p) { return p.key === "31"; })[0];
+            return mode && Number(mode.value) === 1;
+        });
+    }
+
+    function apply(inputGraph, edit, idFactory) {
+        if (!edit || typeof edit.type !== "string") fail("invalid_edit", "edit type is required");
+        var graph = copyGraph(inputGraph);
+        // Upgrade only as part of an explicit, undoable edit. Preserve the old
+        // edge identity and fan-out destinations; read-only refresh is untouched.
+        var legacy=graph.edges.filter(function(edge){
+            var source=nodeById(graph,edge.sourceNode),target=nodeById(graph,edge.destinationNode);
+            return source && target && source.type===TYPES.material && target.type===TYPES.model;
+        });
+        legacy.forEach(function(edge){
+            var material=edge.sourceNode,model=edge.destinationNode;
+            // A shared legacy Material cannot become a single-input geometry
+            // node without duplicating authored controls. Keep that attachment
+            // readable/editable until its connections are deliberately replaced.
+            if(legacy.filter(function(old){return old.sourceNode===material;}).length!==1 ||
+                graph.edges.some(function(input){return input.destinationNode===material;}))return;
+            graph.edges.forEach(function(out){if(out.sourceNode===model)out.sourceNode=material;});
+            edge.sourceNode=model;edge.sourcePort="1";edge.destinationNode=material;edge.destinationPort="2";
+        });
+        graph.nodes.forEach(function(node){
+            if(node.type===TYPES.particle && !node.parameters.some(function(p){return p.key==="30";}))
+                node.parameters.push({key:"30",type:3,value:0});
+        });
+        var positions = layout.resolve(graph);
+        idFactory = idFactory || randomId;
+        if (edit.type === "addNode") addNode(graph, edit, idFactory, positions);
+        else if (edit.type === "connect") {
+            if (connect(graph, edit, idFactory)) return graph;
+        }
+        else if (edit.type === "disconnect") disconnect(graph, edit);
+        else if (edit.type === "insertNode") insertNode(graph, edit, idFactory, positions);
+        else if (edit.type === "deleteNodes") deleteNodes(graph, edit, positions);
+        else if (edit.type === "duplicateNodes") duplicateNodes(graph, edit, idFactory, positions);
+        else if (edit.type === "moveNodes") moveNodes(graph, edit, positions);
+        else if (edit.type === "setParameters") setParameters(graph, edit);
+        else fail("unsupported_edit", "edit operation is not supported");
+        return layout.set(graph, positions);
+    }
+
+    function canConnect(graph, sourceId, destinationId, sourcePort, destinationPort) {
+        if (!graph) return false;
+        try {
+            validateConnection(graph, sourceId, destinationId, sourcePort, destinationPort);
+            return true;
+        } catch (invalidConnection) { return false; }
+    }
+
+    return { types: TYPES, ports: PORTS, schemaVersion: function(kind) { return SCHEMA_VERSIONS[kind]; },
+             nativeRecordSchema: nativeRecordSchema,
+             apply: apply, createInsertEdit: createInsertEdit,
+             randomId: randomId, canConnect: canConnect };
+}));

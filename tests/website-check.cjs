@@ -26,6 +26,14 @@ assert(files.includes(path.join(site, '.nojekyll')), 'Disable Jekyll processing'
 let links = 0;
 function verifyReference(from, reference) {
   if (!reference || reference === '#' || reference.startsWith('data:')) return;
+  if (from.endsWith('.css') && reference.startsWith('#')) {
+    const owners = files.filter(file => file.endsWith('.html') &&
+      [...fs.readFileSync(file, 'utf8').matchAll(/<link\b[^>]*href="([^"]+)"/g)]
+        .some(match => path.resolve(path.dirname(file), match[1].split('?')[0]) === from));
+    assert(owners.length, `CSS fragment has no document owner: ${reference}`);
+    for (const owner of owners) verifyReference(owner, reference);
+    return;
+  }
   if (/^https?:/.test(reference)) {
     assert(reference.startsWith('https://'), `Use HTTPS: ${reference}`);
     return;

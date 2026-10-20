@@ -1,0 +1,796 @@
+// Convert canonical graph records into the panel's parameter-inspector view model.
+(function (root, factory) {
+    var layout = typeof module === "object" && module.exports
+        ? require("./graph_layout.js") : root.StarfieldGraphLayout;
+    var api = factory(layout);
+    if (typeof module === "object" && module.exports) module.exports = api;
+    else root.StarfieldGraphView = api;
+}(typeof window !== "undefined" ? window : this, function (layout) {
+    "use strict";
+
+    var TYPE = {
+        emitter: "org.starfieldfx.nodes.emitter",
+        particle: "org.starfieldfx.nodes.particle",
+        force: "org.starfieldfx.nodes.force",
+        transform: "org.starfieldfx.nodes.transform",
+        motion:"org.starfieldfx.nodes.motion",
+        turbulence:"org.starfieldfx.nodes.turbulence",
+        material:"org.starfieldfx.nodes.material",
+        model: "org.starfieldfx.nodes.model",
+        output: "org.starfieldfx.nodes.output"
+    };
+    var SPECS = {
+        emitter: {
+            "2": { label: "Particles Per Second", kind: "slider", decimals: 0, step: 1, min: 0, max: 1000000, legacyKey: "birth_rate" },
+            "3": { label: "Random Seed", kind: "slider", decimals: 0, step: 1, min: 0, max: 2147483647, legacyKey: "seed" },
+            "5": { label: "Type", kind: "popup", decimals: 0, step: 1, min: 1, max: 4, displayOffset: 1,
+                  choices: ["Point", "Box", "Sphere", "Disc"], legacyKey: "emitter_shape" },
+            "6": { label: "Origin", kind: "point3d", decimals: 3, min: -100, max: 100, legacyKey: "emitter_origin" },
+            "7": { label: "Velocity", hidden: true, kind: "point3d", decimals: 2, min: -1000, max: 1000,
+                  legacyKeys: ["velocity_x", "velocity_y", "velocity_z"] },
+            "8": { label: "Particle Size", hidden: true, kind: "slider", decimals: 2, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
+            "9": { label: "Opacity", hidden: true, kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%", legacyKey: "opacity" },
+            "10": { label: "Disc Size", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 10, legacyKey: "emitter_size" },
+            "11": { label: "Velocity Random", hidden: true, kind: "slider", decimals: 2, min: 0, max: 100, legacyKey: "velocity_spread" },
+            "12": { label: "Speed", kind: "slider", decimals: 1, step: 1, min: 0, max: 10000, unit: "px/s" },
+            "13": { label: "Speed Amplitude", hidden: true, kind: "slider", decimals: 3, min: 0, max: 100000 },
+            "22": { label: "Speed Random", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%" },
+            "14": { label: "Angle X", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
+            "15": { label: "Angle Y", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
+            "16": { label: "Angle Z", kind: "slider", decimals: 1, step: 0.1, min: -32768, max: 32767.99998, unit: "°" },
+            "17": { label: "Direction", kind: "popup", decimals: 0, step: 1, min: 1, max: 2, displayOffset: 1,
+                   choices: ["Directional", "Uniform"] },
+            "18": { label: "Direction Span", kind: "slider", decimals: 1, step: 1, min: 0, max: 180 },
+            "19": { label: "Size X", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_x" },
+            "20": { label: "Size Y", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_y" },
+            "21": { label: "Size Z", kind: "slider", decimals: 0, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "emitter_size_z" },
+            "23": { label:"Emitting",kind:"popup",decimals:0,step:1,min:1,max:4,displayOffset:1,choices:["Default","Once","Sequenced","Randomized"] },
+            "24": {label:"Emit Chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "25": {label:"Emit Life Start",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "26": {label:"Emit Life End",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "27": {label:"Inherit Velocity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "28": {label:"Inherit Size",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "29": {label:"Inherit Opacity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "30": {label:"Inherit Color",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "31": {hidden:true},
+            "32": {label:"Orient",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"}
+        },
+        particle: {
+            "1": { label: "Color", kind: "color", decimals: 0, step: 1, min: 0, max: 255, scale: 255, legacyKey: "color_start" },
+            "2": { hidden: true },
+            "12": {label:"Particle Color",kind:"popup",decimals:0,step:1,min:1,max:4,displayOffset:1,
+                choices:["Solid color","Color over life","Random from gradient","Loop from grad"]},
+            "13": {hidden:true},
+            "3": { label: "Size (Pixels)", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit: "px", legacyKey: "particle_size" },
+            "4": { label: "Size Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "particle_size_end" },
+            "5": { label: "Opacity", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, scale: 100, unit: "%", legacyKey: "opacity" },
+            "6": { label: "Opacity Over Life", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit: "%", legacyKey: "opacity_end" },
+            "9": { label: "Size Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "particle_size_random" },
+            "10": { label: "Opacity Random", kind: "slider", decimals: 0, step: 1, min: 0, max: 100, legacyKey: "opacity_random" },
+            "11": { label: "Life (Seconds)", kind: "slider", decimals: 1, min: 0, max: 10000, step: 0.1, legacyKey: "particle_lifetime" },
+            "14": {label:"Life Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "15": {label:"Shape",kind:"popup",min:1,max:6,values:[0,1,2,3,null,4],disabledChoices:[4],
+                choices:["Circle","Rectangle","Cloud","Texture","Face","Model"]},
+            "16": {label:"Size Y (Pixels)",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
+            "17": {label:"Orient To",kind:"popup",min:1,max:3,displayOffset:1,choices:["Nothing","Motion(particle)","Emitter"]},
+            "18": {label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "19": {label:"Angle Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "20": {label:"Speed",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°/s"},
+            "21": {label:"Rotation Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "22": {label:"Limit To 2D",kind:"popup",min:1,max:2,displayOffset:1,choices:["Off","On"]},
+            "23": {label:"Particle Feather",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "24": {label:"Up Axis",kind:"popup",min:1,max:3,displayOffset:1,choices:["X","Y","Z"]},
+            "25": {label:"Random Limit",kind:"popup",min:1,max:5,displayOffset:1,choices:["None","All Axis","X","Y","Z"]},
+            "26": {label:"Limit Angle",kind:"slider",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "27": {hidden:true},
+            "28": {label:"Anchor X (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
+            "29": {label:"Anchor Y (Percent)",kind:"slider",decimals:1,step:.1,min:0,max:100,unit:"%"},
+            "30": {label:"Transfer Mode",kind:"popup",min:1,max:4,displayOffset:1,choices:["Normal","Add","Screen","Stencil"]},
+            "31": {label:"Texture Layer",kind:"popup",values:[0],choices:["None"]},
+            "32": {label:"Dark Side",kind:"popup",values:[0],choices:["None"]},
+            "33": {label:"Texture Time Sample",kind:"popup",min:1,max:8,displayOffset:1,
+                choices:["Current Time","Play Once","Loop","Stretch","Random Still Frame","Random Once","Random Loop","Freeze Frame"]},
+            "34": {label:"Texture Color Use",kind:"popup",min:1,max:3,displayOffset:1,choices:["Default","Alpha","Lightness"]},
+            "35": {label:"Use Texture Ratio",kind:"popup",values:[0,1],choices:["Off","On"]},
+            "36": {label:"Ignore Perspective",kind:"popup",values:[0,1],choices:["Off","On"]},
+            "37": {label:"Circles",kind:"slider",decimals:0,step:1,min:1,max:1000},
+            "38": {label:"Aspect",kind:"slider",decimals:2,step:1,min:1,max:1000},
+            "39": {label:"Density",kind:"slider",decimals:2,step:1,min:0,max:1000},
+            "40": {label:"Shift Seed",kind:"slider",decimals:0,step:1,min:-2147483648,max:2147483647},
+            "41": {label:"Birth Chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
+        },
+        force: {
+            "1": { label: "Gravity", kind: "slider", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "2": { label: "Air Density", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 100 },
+            "3": { label: "Gravity random", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit:"%" },
+            "4": { label: "Wind", kind: "point3d", decimals: 1, step: 1, min: -100000, max: 100000 },
+            "5": { label: "Spin", kind: "slider", decimals: 1, step: 1, min: 0, max: 100000, unit:"px" },
+            "6": { label: "Spin Frequency", kind: "slider", decimals: 2, step: 0.01, min: 0, max: 1000 },
+            "7": { label: "Spin resist", kind: "slider", decimals: 1, step: 1, min: 0, max: 100, unit:"%" },
+            "8": { label: "Spin Delay (Seconds)", kind: "slider", decimals: 1, step: 0.1, min: 0, max: 10000 },
+            "9": { hidden:true }
+        },
+        transform: {
+            "1": {label:"Anchor",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "2": {label:"Position",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "3": {label:"Rotation",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "4": {label:"Scale",kind:"point3d",decimals:1,step:1,min:-10000,max:10000,unit:"%"},
+            "5": {label:"Particles Scale",kind:"slider",decimals:1,step:1,min:0,max:10000,unit:"%"},
+            "6": {label:"Particles Opacity",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "7": {hidden:true},
+            "8": {label:"Inherit Motion (Null Layer)",kind:"popup",values:[0],choices:["None"]}
+        },
+        motion:{
+            "1":{label:"Motion Type",kind:"popup",choices:["Circle","Light Path","Look At"],values:[1,0,2]},
+            "2":{label:"Origin",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
+            "3":{hidden:true},"6":{hidden:true},"8":{hidden:true},"21":{hidden:true},
+            "4":{label:"Speed",kind:"slider",decimals:1,step:1,min:-100000,max:100000,unit:"%"},
+            "5":{label:"Speed Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "13":{label:"Origin Type",kind:"popup",choices:["Point","Particle Origin","Emitter Origin"],values:[0,1,2]},
+            "14":{label:"Angle",kind:"point3d",decimals:1,step:.1,min:-32768,max:32767.99998,unit:"°"},
+            "15":{label:"Offset",kind:"point3d",decimals:1,step:1,min:-100000,max:100000,unit:"px"},
+            "11":{label:"Max Delay (Seconds)",kind:"slider",decimals:2,step:.01,min:0,max:1000000,unit:"s"},
+            "12":{label:"Orient To Path",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "17":{label:"Speed",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"%"},
+            "18":{label:"After Path",kind:"popup",choices:["Stop","Continue"],values:[0,1]},
+            "19":{label:"Starting With",kind:"text",placeholder:"All…",maxBytes:128},
+            "20":{label:"Delay Random",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"}
+        },
+        turbulence:{
+            "1":{label:"Turbulence Origin",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "2":{label:"Noise Amplitude",kind:"slider",decimals:1,step:1,min:0,max:100000,unit:"px"},
+            "3":{label:"Noise frequency",kind:"slider",decimals:2,step:.01,min:.01,max:100000},
+            "4":{label:"Noise Levels",kind:"slider",decimals:0,step:1,min:1,max:8},
+            "5":{label:"Fractal Speed",kind:"slider",decimals:2,step:.01,min:-100000,max:100000},
+            "6":{label:"Fractal Offset",kind:"point3d",decimals:1,step:1,min:-1000000,max:1000000,unit:"px"},
+            "7":{hidden:true},
+            "8":{label:"Turbulence Type",kind:"popup",choices:["Normal","Axis","One Side"],values:[0,3,4]},
+            "9":{label:"Choose axis",kind:"popup",choices:["Axis X","Axis Y","Axis Z","Normal"],values:[0,1,2,3]},
+            "10":{label:"Turbulence affect",kind:"popup",choices:["Infinite","Sphere"],values:[0,1]},
+            "11":{label:"Sphere size",kind:"slider",decimals:1,step:1,min:.01,max:100000000,unit:"px"},
+            "12":{label:"Sphere feather",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "13":{label:"Turbulence Randomize",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "14":{label:"Affected Properties",kind:"popup",choices:["All","Noise"],values:[0,1]},
+            "15":{label:"Position offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "16":{label:"Scale offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "17":{label:"Color offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "18":{label:"Opacity offset",kind:"slider",decimals:1,step:1,min:-100,max:100,unit:"%"},
+            "19":{label:"Rotation offset",kind:"slider",decimals:1,step:1,min:-360,max:360,unit:"°"},
+            "20":{label:"Noise Scale",kind:"slider",decimals:1,step:1,min:.01,max:100000,unit:"%"},
+            "21":{label:"Fractal Evolution",kind:"slider",decimals:1,step:1,min:-100000,max:100000,unit:"°"}
+        },
+        material:{
+            "1":{label:"Color Source",kind:"popup",choices:["Particle Color","Material Color"],values:[0,1]},
+            "2":{label:"Color",kind:"color"},
+            "3":{label:"Roughness",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "4":{label:"Metallic",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "5":{label:"Opacity",kind:"slider",decimals:2,step:.01,min:0,max:1},
+            "6":{label:"AE Lights",kind:"popup",choices:["Off","On"],values:[0,1]}
+        },
+        model: {
+            "1": {hidden:true}, "2": {hidden:true}, "3": {hidden:true}, "12": {hidden:true},
+            "13": {label:"Source",kind:"popup",choices:["Cube","OBJ"],values:[0,1]},
+            "4": {label:"Offset",kind:"point3d",decimals:2,step:.1,min:-1e9,max:1e9},
+            "5": {label:"Angle",kind:"point3d",decimals:2,step:1,min:-32768,max:32767.99998,unit:"°"},
+            "6": {label:"Scale",kind:"point3d",decimals:2,step:1,min:-100000,max:100000,unit:"%"},
+            "7": {label:"Flip X",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "8": {label:"Flip Y",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "9": {label:"Flip Z",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "10": {label:"Center",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "11": {label:"Normalize",kind:"popup",choices:["Off","On"],values:[0,1]}
+        },
+        output: {
+            "1": { label: "Max Particles", kind: "slider", decimals: 0, step: 1, min: 0, max: 2000000, legacyKey: "particle_count" },
+            "2": {label:"Time Remapping On / Off",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "3": {label:"Time (Seconds)",kind:"slider",decimals:2,step:0.1,min:-1000000,max:1000000},
+            "4": {label:"Preview",kind:"popup",choices:["Off","On"],values:[0,1]},
+            "5": {label:"Particle chance",kind:"slider",decimals:1,step:1,min:0,max:100,unit:"%"},
+            "6": {label:"Acceleration",kind:"popup",choices:["GPU","CPU"],values:[0,1]},
+            "7": {label:"Time Sampling",kind:"popup",choices:["30 Hz","60 Hz","120 Hz"],values:[30,60,120]}
+        }
+    };
+    var LABELS = { emitter: "Emitter", particle: "Particle", force: "Force", transform:"Transform",motion:"Motion",turbulence:"Turbulence", model: "Model",material:"Material",
+                   output: "Output" };
+
+    function fail(code, message) {
+        var error = new Error(message);
+        error.code = code;
+        throw error;
+    }
+
+    function kindFor(type) {
+        for (var kind in TYPE) if (Object.prototype.hasOwnProperty.call(TYPE, kind) && TYPE[kind] === type) return kind;
+        return null;
+    }
+
+    function findParameter(node, key) {
+        for (var i = 0; i < node.parameters.length; i++) {
+            if (node.parameters[i].key === key) return node.parameters[i];
+        }
+        return null;
+    }
+
+    function activeEmitterParameters(graph) {
+        if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
+            Object.prototype.toString.call(graph.edges) !== "[object Array]") return null;
+        var byId = {};
+        var incoming = {};
+        var outputIds = [];
+        for (var i = 0; i < graph.nodes.length; i++) {
+            var node = graph.nodes[i];
+            if (!node || typeof node.id !== "string" || !node.id) return null;
+            byId["$" + node.id] = node;
+            if (kindFor(node.type) === "output") outputIds.push(node.id);
+        }
+        if (outputIds.length !== 1) return null;
+        for (var e = 0; e < graph.edges.length; e++) {
+            var edge = graph.edges[e];
+            if (!edge || !byId["$" + edge.sourceNode] || !byId["$" + edge.destinationNode]) return null;
+            var destinationKey = "$" + edge.destinationNode;
+            if (!incoming[destinationKey]) incoming[destinationKey] = [];
+            incoming[destinationKey].push(edge.sourceNode);
+        }
+        var active = {};
+        var pending = [outputIds[0]];
+        active["$" + outputIds[0]] = true;
+        while (pending.length) {
+            var current = pending.pop();
+            var sources = incoming["$" + current] || [];
+            for (var s = 0; s < sources.length; s++) {
+                var key = "$" + sources[s];
+                if (!active[key]) { active[key] = true; pending.push(sources[s]); }
+            }
+        }
+        var emitters = [];
+        var particles = [];
+        for (var n = 0; n < graph.nodes.length; n++) {
+            if (kindFor(graph.nodes[n].type) === "emitter" && active["$" + graph.nodes[n].id]) {
+                var emitting = findParameter(graph.nodes[n], "31");
+                if (emitting && Number(emitting.value) === 1) return null; // sampled parent populations require native evaluation
+                emitters.push(graph.nodes[n]);
+            } else if (kindFor(graph.nodes[n].type) === "particle" && active["$" + graph.nodes[n].id]) {
+                particles.push(graph.nodes[n]);
+            }
+        }
+        var output = byId["$" + outputIds[0]];
+        var capParameter = findParameter(output, "1");
+        if (!capParameter) return null;
+        var cap = Number(capParameter.value);
+        if (!isFinite(cap) || Math.floor(cap) !== cap || cap < 0 || cap > 2000000) return null;
+        particles.sort(function (left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; });
+        var streams = [];
+        for (var emitterIndex = 0; emitterIndex < emitters.length; emitterIndex++) {
+            var emitter = emitters[emitterIndex], rateParameter = findParameter(emitter, "2");
+            if (!rateParameter) return null;
+            var rate = Number(rateParameter.value);
+            if (!isFinite(rate) || rate < 0 || rate > 1000000) return null;
+            var branchLifetimes = [], lifetime = 0;
+            for (var particleIndex = 0; particleIndex < particles.length; particleIndex++) {
+                var particle = particles[particleIndex];
+                if ((incoming["$" + particle.id] || []).indexOf(emitter.id) < 0) continue;
+                var lifeParameter = findParameter(particle, "11");
+                if (!lifeParameter) return null;
+                var life = Number(lifeParameter.value);
+                if (!isFinite(life) || life < 0 || life > 10000) return null;
+                branchLifetimes.push(life);
+                lifetime = Math.max(lifetime, life);
+            }
+            if (branchLifetimes.length) streams.push({ emitterId: emitter.id, birthRate: rate,
+                lifetimeSeconds: lifetime, branchLifetimes: branchLifetimes });
+        }
+        return { maxParticles: cap, emitters: streams };
+    }
+
+    function countLiveParticles(timeSeconds, birthRate, lifetimeSeconds, populationCap, branchLifetimes) {
+        var time = Number(timeSeconds), rate = Number(birthRate), lifetime = Number(lifetimeSeconds);
+        var cap = Math.floor(Number(populationCap));
+        if (!isFinite(time) || !isFinite(rate) || !isFinite(lifetime) || !isFinite(cap) ||
+            time < 0 || rate <= 0 || lifetime <= 0 || cap <= 0) return 0;
+        var lastSlot = Math.floor(time * rate);
+        if (!isFinite(lastSlot) || lastSlot > 9007199254740992) return 0;
+        if (!branchLifetimes || !branchLifetimes.length) branchLifetimes = [lifetime];
+        var count = 0;
+        for (var branch = 0; branch < branchLifetimes.length; branch++) {
+            var branchLife = Number(branchLifetimes[branch]);
+            if (!isFinite(branchLife) || branchLife <= 0) continue;
+            var firstSlot = Math.max(0, Math.floor((time - branchLife) * rate) + 1);
+            var offset = (branch - (firstSlot % branchLifetimes.length) + branchLifetimes.length) % branchLifetimes.length;
+            var firstAssigned = firstSlot + offset;
+            if (firstAssigned <= lastSlot) count += Math.floor((lastSlot - firstAssigned) / branchLifetimes.length) + 1;
+            if (count >= cap) return cap;
+        }
+        return count;
+    }
+
+    function countGraphLiveParticles(timeSeconds, emission) {
+        if (!emission) return 0;
+        var count = 0;
+        for (var i = 0; i < emission.emitters.length; i++) {
+            var stream = emission.emitters[i];
+            count += countLiveParticles(timeSeconds, stream.birthRate, stream.lifetimeSeconds,
+                                        emission.maxParticles, stream.branchLifetimes);
+            if (count >= emission.maxParticles) return emission.maxParticles;
+        }
+        return count;
+    }
+
+    function graphValueToDisplay(value, spec) {
+        if (spec.kind === "text") return String(value);
+        if (spec.kind === "popup") return spec.values ? spec.values.indexOf(Number(value))+1 : Number(value) + (spec.displayOffset || 0);
+        if (spec.kind === "color") return value.map(function (channel) { return channel * spec.scale; });
+        return Object.prototype.toString.call(value) === "[object Array]" ? value.slice() : Number(value) * (spec.scale || 1);
+    }
+
+    function viewParameter(node, kind, graphParameter, spec) {
+        var parameter = {
+            key: node.id + ":" + graphParameter.key,
+            graphKey: graphParameter.key,
+            graphType: graphParameter.type,
+            graphNodeId: node.id,
+            label: spec ? spec.label : "Parameter " + graphParameter.key,
+            kind: spec ? spec.kind : (graphParameter.type === 5 ? "point3d" : "slider"),
+            value: spec ? graphValueToDisplay(graphParameter.value, spec) : graphParameter.value,
+            displayDecimals: spec ? spec.decimals : 3,
+            scrubStep: spec && spec.step ? spec.step : undefined,
+            min: spec && typeof spec.min === "number" ? spec.min : undefined,
+            max: spec && typeof spec.max === "number" ? spec.max : undefined,
+            choices: spec && spec.choices ? spec.choices.slice() : undefined,
+            enumValues: spec && spec.values ? spec.values.slice() : undefined,
+            disabledChoices: spec && spec.disabledChoices ? spec.disabledChoices.slice() : undefined,
+            placeholder: spec && spec.placeholder ? spec.placeholder : undefined,
+            maxBytes: spec && spec.maxBytes ? spec.maxBytes : undefined,
+            unit: spec && spec.unit ? spec.unit : undefined,
+            legacyKey: spec ? spec.legacyKey : undefined,
+            legacyKeys: spec && spec.legacyKeys ? spec.legacyKeys.slice() : undefined,
+            displayScale: spec && spec.scale ? spec.scale : 1,
+            displayOffset: spec && spec.displayOffset ? spec.displayOffset : 0,
+            readonly: !spec
+        };
+        return parameter;
+    }
+
+    function decodeCurve(value, minimum, maximum, fallbackStart, fallbackEnd) {
+        var points = [{ age: 0, value: fallbackStart }, { age: 1, value: fallbackEnd }];
+        if (value === null || value === undefined) return { custom: false, points: points };
+        if (!(value instanceof Uint8Array) || value.length < 36) {
+            fail("invalid_curve", "an active over-life curve has an invalid payload length or value type");
+        }
+        var view = new DataView(value.buffer, value.byteOffset, value.byteLength);
+        var count = value[1];
+        if (value[0] !== 1 || count < 2 || count > 64 || value[2] > 3 || value[3] !== 0 ||
+            value.length !== 4 + count * 16) fail("invalid_curve", "the graph contains a malformed over-life curve");
+        points = [];
+        for (var i = 0; i < count; i++) {
+            var age = view.getFloat64(4 + i * 16, true);
+            var ordinate = view.getFloat64(12 + i * 16, true);
+            if (!isFinite(age) || !isFinite(ordinate) || age < 0 || age > 1 ||
+                ordinate < minimum || ordinate > maximum || (i && age <= points[i - 1].age)) {
+                fail("invalid_curve", "the graph contains an unordered or out-of-range over-life curve");
+            }
+            points.push({ age: age, value: ordinate });
+        }
+        if (points[0].age !== 0 || points[points.length - 1].age !== 1) {
+            fail("invalid_curve", "over-life curves must have endpoints at 0 and 100 percent life");
+        }
+        points.interpolation=value[2];return { custom: true, points: points, interpolation:value[2] };
+    }
+
+    function encodeCurve(points) {
+        var mode=points && points.interpolation===undefined?0:points && points.interpolation;
+        if(typeof mode!=="number" || Math.floor(mode)!==mode || mode<0 || mode>3)fail("invalid_curve","Unknown curve mode.");
+        if (!points || points.length < 2 || points.length > 64 || points[0].age !== 0 ||
+            points[points.length - 1].age !== 1) fail("invalid_curve", "a curve needs fixed 0 and 100 percent endpoints");
+        var bytes = new Uint8Array(4 + points.length * 16);
+        bytes[0] = 1;
+        bytes[1] = points.length;bytes[2]=points.interpolation||0;
+        if(bytes[2]>3)fail("invalid_curve","Unknown curve mode.");
+        var view = new DataView(bytes.buffer);
+        for (var i = 0; i < points.length; i++) {
+            if (!isFinite(points[i].age) || !isFinite(points[i].value) ||
+                points[i].age < 0 || points[i].age > 1 || (i && points[i].age <= points[i - 1].age)) {
+                fail("invalid_curve", "curve points must be finite and ordered by life percentage");
+            }
+            view.setFloat64(4 + i * 16, points[i].age, true);
+            view.setFloat64(12 + i * 16, points[i].value, true);
+        }
+        return bytes;
+    }
+
+    function decodeGradient(value) {
+        if(value===undefined || value===null) return [{position:0,color:[1,1,1]},{position:1,color:[1,1,1]}];
+        if(!(value instanceof Uint8Array) || value.length<68 || value[0]!==1 || value[2]>1 || value[3]!==0 ||
+            value[1]<2 || value[1]>8 || value.length!==4+32*value[1]) fail("invalid_gradient","Malformed Color Gradient.");
+        var view=new DataView(value.buffer,value.byteOffset,value.byteLength),stops=[];
+        for(var i=0;i<value[1];i++) {
+            var position=view.getFloat64(4+32*i,true),color=[];
+            if(!isFinite(position) || position<0 || position>1 || (i && position<=stops[i-1].position)) fail("invalid_gradient","Unordered Color Gradient.");
+            for(var c=0;c<3;c++) {
+                var channel=view.getFloat64(12+32*i+8*c,true);
+                if(!isFinite(channel)||channel<0||channel>64) fail("invalid_gradient","Invalid Color Gradient channel.");
+                color.push(channel);
+            }
+            stops.push({position:position,color:color});
+        }
+        stops.interpolation=value[2];return stops;
+    }
+    function encodeGradient(stops) {
+        if(stops && stops.interpolation!==undefined && stops.interpolation!==0 && stops.interpolation!==1)fail("invalid_gradient","Unknown gradient mode.");
+        if(!stops || stops.length<2 || stops.length>8) fail("invalid_gradient","A gradient requires 2–8 stops.");
+        var bytes=new Uint8Array(4+32*stops.length),view=new DataView(bytes.buffer);
+        bytes[0]=1;bytes[1]=stops.length;bytes[2]=stops.interpolation||0;
+        for(var i=0;i<stops.length;i++) {
+            view.setFloat64(4+32*i,stops[i].position,true);
+            for(var c=0;c<3;c++) view.setFloat64(12+32*i+8*c,stops[i].color[c],true);
+        }
+        decodeGradient(bytes);return bytes;
+    }
+
+    function project(graph, layoutOverride, geometry, layerResources) {
+        if (!graph || Object.prototype.toString.call(graph.nodes) !== "[object Array]" ||
+            Object.prototype.toString.call(graph.edges) !== "[object Array]") {
+            fail("invalid_graph", "the decoded graph has no node and edge arrays");
+        }
+        var nodes = [];
+        var positions = layoutOverride || layout.resolve(graph);
+        var byId = {};
+        for (var i = 0; i < graph.nodes.length; i++) {
+            var source = graph.nodes[i];
+            var kind = kindFor(source.type);
+            if (!kind) fail("unknown_node_type", "the panel cannot display node type " + source.type);
+            var emitting = findParameter(source,"31");
+            var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
+            var shape = findParameter(source,"5");
+            var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
+                         inputPort: kind === "material" ? "2" : kind === "model" ?
+                            (graph.edges.some(function(edge){return edge.destinationNode===source.id && edge.destinationPort==="2";})?"2":null) :
+                            kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+                         modelInputPort: kind === "particle" ? "3" : null,
+                         outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" || kind === "material" ? "1" : "2"),
+                         params: [], graphParameters: source.parameters, curves: null,
+                         curveParameterKeys: kind === "particle"
+                            ? { size: "7", opacity: "8", rotation:"27", sizeStart: "3", sizeEnd: "4", opacityStart: "5", opacityEnd: "6" }
+                            : null };
+            byId[node.id] = node;
+            if(kind==="particle") {
+                var colorMode=findParameter(source,"12"),gradient=findParameter(source,"13");
+                node.colorMode=colorMode?Number(colorMode.value):0;
+                node.gradient=decodeGradient(gradient?gradient.value:null);
+            }
+            var specs = SPECS[kind];
+            var displayParameters=source.parameters.slice();
+            if(kind==="transform" && !findParameter(source,"8"))displayParameters.push({key:"8",type:3,value:0});
+            if(kind==="particle" && !findParameter(source,"30"))displayParameters.push({key:"30",type:3,value:0});
+            if(kind==="particle")[0,0,0,0,1,0].forEach(function(value,i){
+                if(!findParameter(source,String(31+i)))displayParameters.push({key:String(31+i),type:3,value:value});
+            });
+            if(kind==="particle")[10,150,66].forEach(function(value,i){
+                if(!findParameter(source,String(37+i)))displayParameters.push({key:String(37+i),type:i===0?3:4,value:value});
+            });
+            if(kind==="particle")[0,100].forEach(function(value,i){
+                if(!findParameter(source,String(40+i)))displayParameters.push({key:String(40+i),type:i===0?2:4,value:value});
+            });
+            for (var p = 0; p < displayParameters.length; p++) {
+                var graphParameter = displayParameters[p];
+                var spec = specs[graphParameter.key];
+                if (kind === "particle") {
+                    if (graphParameter.key === "7" || graphParameter.key === "8") continue;
+                    if(Number(graphParameter.key)>=37 && Number(graphParameter.key)<=39 &&
+                        Number((findParameter(source,"15") || {}).value)!==2)continue;
+                    if(graphParameter.key==="16" && [2,4].indexOf(Number((findParameter(source,"15") || {}).value))>=0)continue;
+                    if(Number(graphParameter.key)>=31 && Number(graphParameter.key)<=36 &&
+                        Number((findParameter(source,"15") || {}).value)!==3)continue;
+                }
+                if (kind === "emitter" && graphParameter.key === "1") continue;
+                if(kind==="motion") {
+                    var motionModeParameter=findParameter(source,"1"),sourceMotionMode=motionModeParameter?Number(motionModeParameter.value):1;
+                    if(sourceMotionMode===0 && ["2","3","4","13","14","15"].indexOf(graphParameter.key)>=0)continue;
+                    if(sourceMotionMode===1 && ["11","12","17","18","19","20"].indexOf(graphParameter.key)>=0)continue;
+                    if(sourceMotionMode===2 && ["2","3","4","5","11","12","13","14","15","17","18","20"].indexOf(graphParameter.key)>=0)continue;
+                }
+                if (spec && spec.hidden) continue;
+                if(kind==="particle" && graphParameter.key==="1" && node.colorMode!==0) continue;
+                if (kind === "emitter") {
+                    if (Number(graphParameter.key) >= 24 && Number(graphParameter.key) <= 30 && !isAuxiliary) continue;
+                    if (["19","20","21"].indexOf(graphParameter.key) >= 0 && (!shape || [1,2].indexOf(Number(shape.value)) < 0)) continue;
+                    if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
+                }
+                var parameter = viewParameter(node, kind, graphParameter, spec);
+                if(kind==="particle" && (graphParameter.key==="31" || graphParameter.key==="32")) {
+                    parameter.choices=["None"];parameter.enumValues=[0];
+                    (layerResources || []).forEach(function(resource){
+                        if(resource.texture && Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
+                            parameter.enumValues.indexOf(resource.id)<0) {
+                            parameter.choices.push(String(resource.name));parameter.enumValues.push(resource.id);
+                        }
+                    });
+                    var textureSelected=parameter.enumValues.indexOf(graphParameter.value);
+                    if(textureSelected<0) {parameter.choices.push("Unavailable layer ("+graphParameter.value+")");
+                        parameter.enumValues.push(graphParameter.value);textureSelected=parameter.enumValues.length-1;}
+                    parameter.value=textureSelected+1;node.params.push(parameter);continue;
+                }
+                if(kind==="model" && ["4","5","6"].indexOf(graphParameter.key)>=0) {
+                    [0,1,2].forEach(function(axis){
+                        var component=viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider";component.key+=":"+axis;
+                        component.label=spec.label+" "+["X","Y","Z"][axis];
+                        component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=1;component.value=graphParameter.value[axis];node.params.push(component);
+                    });continue;
+                }
+                if(kind==="motion" && graphParameter.key==="4") {
+                    parameter.displayScale=100/(2*Math.PI);parameter.value=graphParameter.value*parameter.displayScale;
+                    node.params.push(parameter);continue;
+                }
+                if (kind === "transform" || kind === "motion") {
+                    var th=geometry && Number(geometry.height)>0 ? Number(geometry.height) : 1;
+                    var tw=geometry && Number(geometry.width)>0 ? Number(geometry.width) : 1;
+                    var ta=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
+                    if (kind==="transform" && graphParameter.key === "8") {
+                        parameter.choices=["None"];parameter.enumValues=[0];
+                        (layerResources || []).forEach(function(resource){
+                            if(Number.isInteger(resource.id) && resource.id>0 && resource.id<=2147483647 &&
+                                parameter.enumValues.indexOf(resource.id)<0) {
+                                parameter.choices.push(String(resource.name));parameter.enumValues.push(resource.id);
+                            }
+                        });
+                        var selected=parameter.enumValues.indexOf(graphParameter.value);
+                        if(selected<0) { parameter.choices.push("Unavailable layer ("+graphParameter.value+")");
+                            parameter.enumValues.push(graphParameter.value);selected=parameter.enumValues.length-1; }
+                        parameter.value=selected+1;node.params.push(parameter);continue;
+                    }
+                    if ((kind==="transform" && graphParameter.key === "1") || (kind==="motion" && graphParameter.key==="2")) {
+                        parameter.kind="point2d";parameter.label=kind==="motion"?"Origin XY":"Anchor XY";parameter.key+=":xy";
+                        parameter.min=-32768;parameter.max=32767.99998474121;
+                        parameter.channelMin=[parameter.min,parameter.min];parameter.channelMax=[parameter.max,parameter.max];
+                        parameter.originComponent="xy";parameter.canonicalOrigin=graphParameter.value.slice();
+                        parameter.geometry={width:tw,height:th,pixelAspect:ta};
+                        parameter.value=[tw/2+graphParameter.value[0]*th/ta,th/2-graphParameter.value[1]*th];
+                        node.params.push(parameter);
+                        var tz=viewParameter(node,kind,graphParameter,spec);
+                        tz.kind="slider";tz.label=kind==="motion"?"Origin Z":"Anchor Z";tz.key+=":z";
+                        tz.originComponent="z";tz.canonicalOrigin=graphParameter.value.slice();tz.geometry=parameter.geometry;
+                        tz.value=graphParameter.value[2]*th;node.params.push(tz);continue;
+                    }
+                    if ((kind==="transform" && ["2","3","4"].indexOf(graphParameter.key)>=0) ||
+                        (kind==="motion" && ["14","15"].indexOf(graphParameter.key)>=0)) {
+                        [0,1,2].forEach(function(axis){
+                            var component=viewParameter(node,kind,graphParameter,spec);
+                            component.kind="slider";component.key+=":"+axis;
+                            component.label=spec.label+" "+["X","Y","Z"][axis];
+                            component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                            component.displayScale=["2","15"].indexOf(graphParameter.key)>=0 ? th*(axis===0?1/ta:axis===1?-1:1) :
+                                ["3","14"].indexOf(graphParameter.key)>=0 ? (axis===1?1:-1) : 1;
+                            component.value=graphParameter.value[axis]*component.displayScale;node.params.push(component);
+                        });continue;
+                    }
+                }
+                if(kind==="particle" && ["18","20"].indexOf(graphParameter.key)>=0) {
+                    [0,1,2].forEach(function(axis) {
+                        var component=viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider";component.key+=":"+axis;
+                        component.label=spec.label+" "+["X","Y","Z"][axis];
+                        component.forceComponent=axis;component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=1;component.value=graphParameter.value[axis];
+                        node.params.push(component);
+                    });
+                    continue;
+                }
+                if (kind === "force" && (graphParameter.key === "1" || graphParameter.key === "4")) {
+                    var forceHeight = geometry && Number(geometry.height) > 0 ? Number(geometry.height) : 1;
+                    var forceAspect=geometry && Number(geometry.pixelAspect)>0 ? Number(geometry.pixelAspect) : 1;
+                    var axes = graphParameter.key === "1" ? [1] : [0,1,2];
+                    axes.forEach(function(axis) {
+                        var component = viewParameter(node,kind,graphParameter,spec);
+                        component.kind="slider"; component.key+=":"+axis;
+                        component.label=graphParameter.key === "1" ? "Gravity" : "Wind "+["X","Y","Z"][axis];
+                        component.forceComponent=axis; component.canonicalForce=graphParameter.value.slice();
+                        component.displayScale=forceHeight*(axis===0 ? 1/forceAspect : axis===1 ? -1 : 1);
+                        component.value=graphParameter.value[axis]*component.displayScale;
+                        node.params.push(component);
+                    });
+                    continue;
+                }
+                if (kind === "force" && graphParameter.key === "5" && geometry && Number(geometry.height)>0) {
+                    parameter.value *= Number(geometry.height); parameter.displayScale=Number(geometry.height);
+                }
+                if (kind === "emitter" && geometry && Number(geometry.height) > 0 && Number(geometry.width) > 0) {
+                    var height = Number(geometry.height), width = Number(geometry.width);
+                    var aspect = Number(geometry.pixelAspect);
+                    if (!isFinite(aspect) || aspect <= 0) aspect = 1;
+                    if (graphParameter.key === "6") {
+                        var origin = graphParameter.value;
+                        parameter.kind = "point2d"; parameter.label = "Origin XY";
+                        parameter.key += ":xy"; parameter.originComponent = "xy";
+                        parameter.canonicalOrigin = origin.slice(); parameter.geometry = geometry;
+                        parameter.displayDecimals = 0; parameter.scrubStep = 1;
+                        parameter.channelMin = [width / 2 - 100 * height / aspect, height / 2 - 100 * height];
+                        parameter.channelMax = [width / 2 + 100 * height / aspect, height / 2 + 100 * height];
+                        parameter.min = Math.min(parameter.channelMin[0], parameter.channelMin[1]);
+                        parameter.max = Math.max(parameter.channelMax[0], parameter.channelMax[1]);
+                        parameter.value = [width / 2 + origin[0] * height / aspect, height / 2 - origin[1] * height];
+                        node.params.push(parameter);
+                        var zParameter = viewParameter(node, kind, graphParameter, spec);
+                        zParameter.kind = "slider"; zParameter.label = "Origin Z";
+                        zParameter.key += ":z"; zParameter.originComponent = "z";
+                        zParameter.canonicalOrigin = origin.slice(); zParameter.geometry = geometry;
+                        zParameter.displayDecimals = 0; zParameter.scrubStep = 1;
+                        zParameter.min = -100 * height; zParameter.max = 100 * height;
+                        zParameter.value = origin[2] * height; zParameter.unit = "px";
+                        node.params.push(zParameter);
+                        continue;
+                    }
+                    if (graphParameter.key === "12") {
+                        parameter.value = Number(graphParameter.value) * height;
+                        parameter.displayScale = height;
+                    }
+                }
+                node.params.push(parameter);
+            }
+            if (kind === "particle") {
+                ["9", "10"].forEach(function (key) {
+                    if (!findParameter(source, key)) {
+                        node.params.push(viewParameter(node, kind,
+                            { key: key, type: 4, value: 0 }, specs[key]));
+                    }
+                });
+            }
+            if (kind === "transform") {
+                var transformOrder=["8","1","2","3","4","5","6"];
+                node.params.sort(function(a,b){return transformOrder.indexOf(a.graphKey)-transformOrder.indexOf(b.graphKey);});
+            }
+            if (kind === "emitter") {
+                var emitterOrder = ["5","23","2","6","12","22","14","15","16","17","32","18","19","20","21","10","24","25","26","27","28","29","30","3"];
+                node.params.sort(function (a,b) { return emitterOrder.indexOf(a.graphKey)-emitterOrder.indexOf(b.graphKey); });
+            }
+            if (kind === "particle") {
+                var particleOrder = {"15":0,"11":1,"14":2,"3":3,"16":4,"9":5,"5":6,"10":7,
+                    "12":8,"1":9,"2":10,"23":11,"30":12,"24":13,"4":14,"6":15,"17":16,"18":17,"19":18,
+                    "25":19,"26":20,"20":21,"21":22,"28":23,"29":24,"22":25,"31":26,"32":27,"33":28,"34":29,"35":30,"36":31,"37":32,"38":33,"39":34,"40":35,"41":36};
+                node.params.sort(function (left, right) {
+                    return (particleOrder[left.graphKey] || 0) - (particleOrder[right.graphKey] || 0);
+                });
+            }
+            if (kind === "force") {
+                var forceOrder=["1","3","4","5","6","7","8","2"];
+                node.params.sort(function(a,b) { return forceOrder.indexOf(a.graphKey)-forceOrder.indexOf(b.graphKey); });
+                var forceCurve=findParameter(source,"9");
+                if (forceCurve && forceCurve.type!==7) fail("invalid_curve","Force curve must use opaque bytes");
+                node.curveParameterKeys={size:"9"};
+                node.curves={size:decodeCurve(forceCurve && forceCurve.value,0,100,100,100)};
+            }
+            if(kind==="motion") {
+                var selectedMotionMode=findParameter(source,"1"),mode=selectedMotionMode?Number(selectedMotionMode.value):1;
+                var motionOrder=mode===0?["1","19","17","5","11","20","12","18"]:
+                    mode===2?["1","19"]:["1","13","2","14","15","4","5"];
+                var visibleMotionKeys=mode===0?{"1":1,"19":1,"17":1,"5":1,"11":1,"20":1,"12":1,"18":1,"6":1}:
+                    mode===2?{"1":1,"19":1,"6":1}:{"1":1,"13":1,"2":1,"14":1,"15":1,"4":1,"5":1,"6":1};
+                for(var motionIndex=node.params.length-1;motionIndex>=0;motionIndex--)
+                    if(!visibleMotionKeys[node.params[motionIndex].graphKey])node.params.splice(motionIndex,1);
+                node.params.sort(function(a,b){return motionOrder.indexOf(a.graphKey)-motionOrder.indexOf(b.graphKey);});
+                var motionCurve=findParameter(source,"6");
+                if(motionCurve && motionCurve.type!==7)fail("invalid_curve","Motion curve must use opaque bytes");
+                node.curveParameterKeys={size:"6"};node.curves={size:decodeCurve(motionCurve && motionCurve.value,0,100,100,100)};
+            }
+            if(kind==="turbulence") {
+                var turbulenceMode=findParameter(source,"8"),turbulenceAffect=findParameter(source,"10");
+                var turbulenceModeValue=turbulenceMode?Number(turbulenceMode.value):0;
+                for(var turbulenceIndex=node.params.length-1;turbulenceIndex>=0;turbulenceIndex--) {
+                    var turbulenceKey=node.params[turbulenceIndex].graphKey;
+                    if(turbulenceKey==="9" && turbulenceModeValue!==3 && turbulenceModeValue!==4)node.params.splice(turbulenceIndex,1);
+                    else if((turbulenceKey==="11" || turbulenceKey==="12") && (!turbulenceAffect || Number(turbulenceAffect.value)!==1))node.params.splice(turbulenceIndex,1);
+                }
+                node.params.sort(function(a,b){return Number(a.graphKey)-Number(b.graphKey);});
+                var turbulenceCurve=findParameter(source,"7");
+                if(turbulenceCurve && turbulenceCurve.type!==7)fail("invalid_curve","Turbulence curve must use opaque bytes");
+                node.curveParameterKeys={size:"7"};
+                node.curves={size:decodeCurve(turbulenceCurve && turbulenceCurve.value,0,100,100,100)};
+            }
+            if (node.curveParameterKeys && kind !== "force" && kind!=="motion" && kind!=="turbulence") {
+                var sizeEnd = findParameter(source, "4");
+                var opacityEnd = findParameter(source, "6");
+                var sizeCurve = findParameter(source, "7");
+                var opacityCurve = findParameter(source, "8");
+                if ((sizeCurve && sizeCurve.type !== 7) || (opacityCurve && opacityCurve.type !== 7)) {
+                    fail("invalid_curve", "over-life curve graph parameters must use the opaque value type");
+                }
+                node.curves = {
+                    size: decodeCurve(sizeCurve && sizeCurve.value, 0, 100,
+                                      100, sizeEnd ? sizeEnd.value : 100),
+                    opacity: decodeCurve(opacityCurve && opacityCurve.value, 0, 100,
+                                         100, opacityEnd ? opacityEnd.value : 100),
+                    rotation: decodeCurve(findParameter(source,"27") && findParameter(source,"27").value,-32768,32768,0,0)
+                };
+            }
+            node.position = positions[node.id] || { x: 235, y: 22 + i * 100 };
+            nodes.push(node);
+        }
+        var outputs = nodes.filter(function (node) { return node.kind === "output"; });
+        if (outputs.length) {
+            var maxParticles = findParameter(graph.nodes.filter(function (node) {
+                return node.id === outputs[0].id;
+            })[0], "1");
+            if (maxParticles) outputs[0].maxParticles = maxParticles.value;
+        }
+        var edges = graph.edges.map(function (edge) {
+            var pair = [edge.sourceNode, edge.destinationNode];
+            pair.id = edge.id;
+            pair.outputPort = edge.sourcePort;
+            pair.inputPort = edge.destinationPort;
+            return pair;
+        });
+        return { graph: graph, nodes: nodes, edges: edges, positions: positions };
+    }
+
+    function samePositions(left, right) {
+        if (!left || !right || Object.prototype.toString.call(left) !== "[object Object]" ||
+            Object.prototype.toString.call(right) !== "[object Object]") return false;
+        var leftIds = Object.keys(left);
+        var rightIds = Object.keys(right);
+        if (leftIds.length !== rightIds.length) return false;
+        for (var i = 0; i < leftIds.length; i++) {
+            var id = leftIds[i];
+            var a = left[id];
+            var b = right[id];
+            if (!Object.prototype.hasOwnProperty.call(right, id) || !a || !b ||
+                a.x !== b.x || a.y !== b.y) return false;
+        }
+        return true;
+    }
+
+    function graphSnapshotChanged(previous, next) {
+        return !!next && (!previous || previous.revision !== next.revision ||
+                          previous.graphHex !== next.graphHex);
+    }
+
+    function mapLegacyEdit(graph, edit) {
+        var projected = project(graph);
+        var firstByKind = {};
+        for (var i = 0; i < projected.nodes.length; i++) {
+            if (!firstByKind[projected.nodes[i].kind]) firstByKind[projected.nodes[i].kind] = projected.nodes[i].id;
+        }
+        var copy = {};
+        for (var key in edit) if (Object.prototype.hasOwnProperty.call(edit, key)) copy[key] = edit[key];
+        function mapId(id) {
+            return firstByKind[id] || id;
+        }
+        if (copy.from) copy.from = mapId(copy.from);
+        if (copy.to) copy.to = mapId(copy.to);
+        if (copy.nodeId) copy.nodeId = mapId(copy.nodeId);
+        if (copy.nodeIds) copy.nodeIds = copy.nodeIds.map(mapId);
+        return copy;
+    }
+
+    return { types: TYPE, project: project, samePositions: samePositions,
+             graphSnapshotChanged: graphSnapshotChanged,
+             activeEmitterParameters: activeEmitterParameters,
+             countLiveParticles: countLiveParticles, countGraphLiveParticles: countGraphLiveParticles,
+             encodeCurve: encodeCurve, decodeCurve: decodeCurve,
+             encodeGradient:encodeGradient,decodeGradient:decodeGradient,
+             mapLegacyEdit: mapLegacyEdit, parameterToGraphValue: function (parameter, displayValue) {
+                 if (typeof parameter.forceComponent === "number") {
+                     var force=parameter.canonicalForce.slice();
+                     force[parameter.forceComponent]=Number(displayValue)/parameter.displayScale;
+                     return force;
+                 }
+                 if (parameter.originComponent) {
+                     var origin = parameter.canonicalOrigin.slice(), geometry = parameter.geometry;
+                     var height = Number(geometry.height), aspect = Number(geometry.pixelAspect);
+                     if (!isFinite(aspect) || aspect <= 0) aspect = 1;
+                     if (parameter.originComponent === "xy") {
+                         origin[0] = (Number(displayValue[0]) - Number(geometry.width) / 2) * aspect / height;
+                         origin[1] = 0.5 - Number(displayValue[1]) / height;
+                     } else origin[2] = Number(displayValue) / height;
+                     return origin;
+                 }
+                 if (parameter.kind === "popup") {
+                     var index=Number(displayValue)-1;
+                     if(parameter.disabledChoices && (Math.floor(index)!==index || index<0 ||
+                        index>=parameter.choices.length || parameter.disabledChoices.indexOf(index)>=0))
+                         throw new Error("This Shape requires the OBJ face-emission workflow.");
+                     return parameter.enumValues ? parameter.enumValues[index] : Number(displayValue) - parameter.displayOffset;
+                 }
+                 if (parameter.kind === "text") return String(displayValue);
+                 if (parameter.kind === "color") return displayValue.map(function (channel) { return channel / parameter.displayScale; });
+                 return Object.prototype.toString.call(displayValue) === "[object Array]" ? displayValue.slice() : Number(displayValue) / parameter.displayScale;
+             } };
+}));

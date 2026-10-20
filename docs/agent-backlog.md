@@ -2,7 +2,7 @@
 
 ## WEB-01 — Starfield 官网与 GitHub Pages
 
-Owner 于 2026-10-20 要求开始实现官网，并使用 GitHub Pages。拥有 docs/site/、.github/workflows/pages.yml、tests/website-check.cjs、docs/website.md、docs/website-artwork.md、ADR0047，以及 README/文档索引/本卡中的官网入口。采用独立静态页面，仅发布 docs/site/；不将 SDK、插件二进制、宿主前端、内部文档或 artifacts 打包入站点。不修改插件、参数/schema、渲染或现有部署。产品内容以当前架构与验证边界为准；网页粒子与节点图均为明确标注的独立演示，不冒充 AE 渲染或截图。不承诺公开安装包、其他宿主或未经验证的性能。验证静态资源、链接、脚本与 Pages 发布配置；远端发布和浏览器实测仅在实际成功后记录。
+Owner 于 2026-10-20 要求开始实现官网，并使用 GitHub Pages。拥有 docs/site/、.github/workflows/pages.yml、tests/website-check.cjs、tests/website-graph-check.cjs、tools/Build-WebsiteDemo.cjs、tools/website-demo/、docs/website.md、docs/website-artwork.md、docs/website-canvas.md、ADR0047，以及 README/文档索引/本卡中的官网入口。采用独立静态页面，仅发布 docs/site/；不将 SDK、插件二进制、宿主前端、内部文档或 artifacts 打包入站点。不修改插件、参数/schema、渲染或现有部署。产品内容以当前架构与验证边界为准；网页粒子与节点图均为明确标注的独立演示，不冒充 AE 渲染或截图。不承诺公开安装包、其他宿主或未经验证的性能。验证静态资源、链接、脚本与 Pages 发布配置；远端发布和浏览器实测仅在实际成功后记录。
 
 首版、响应式样式与动效已实现，本地静态检查、脚本语法及 VM 交互 smoke 通过；PR #1 位于 codex/web-01-github-pages。Owner 批准临时预览后，实际浏览器完成桌面/390/320 窄屏、菜单/Escape/FAQ/动画检查，临时服务已停止并核验监听数 0。远端 CI run39284989514 已成功，PR deploy 按设计跳过；后续提交单独检查。未上线，Pages 后续设置见下文。发布步骤与精确验证边界见 docs/website.md。本卡不关闭任何 AE 宿主门。
 
@@ -13,6 +13,8 @@ Owner 再要求四角星标识并参考插件预设主图风格。官网改为�
 Owner 认为颜色过素，进一步提高电蓝/青色饱和度与金色粒子比例，增加蓝青按钮/标题渐变和金/青/蓝紫功能插画。共享色彩规则已在桌面和手机确认生效；同步 SVG、favicon、404，更新同一 PR，仍不发布。
 
 Owner 后续否决程序化旋转星轨，要求改用图片并叠加闪烁粒子。当前主图为内置 imagegen 参照预设主图生成的本地 JPEG，配 12 个错开周期的 CSS 星光；移除 Canvas 星轨与旧 orbit.svg。桌面/390 手机/320 窄屏、暂停恢复与菜单检查通过；减少动态效果、隐藏页面与离屏恢复经 VM 验证。图源与提示词见 docs/website-artwork.md。临时预览已停止并核验监听数 0；只更新原 PR，仍不上线。
+
+Owner 再要求官网可操作节点 UI，并明确复用现有画布代码。复用五个纯前端模块、样式和 46 个 UI 函数，在 sandbox iframe 中以独立内存适配器替代宿主读写/提交。支持添加、拖动、框选、复制、连接/断开、缩放、删除、撤销和重置；不加载桥接、事务、轮询、参数/预设/文件或渲染模块。生成器默认报告，--write 仅更新官网副本；原 web_panel 不修改。共享编辑模块及隔离检查、桌面/390px 浏览器操作通过，精确证据见 docs/website-canvas.md。预览按 owner 要求保持运行供体验；仍只更新 PR，暂不上线。
 
 ## P-04 — AEGP Panel + WebView2 已完成
 
