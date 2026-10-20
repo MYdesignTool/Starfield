@@ -7,12 +7,14 @@ on:
       - docs/site/**
       - tests/website-check.cjs
       - tests/website-graph-check.cjs
+      - tests/website-glass-check.cjs
       - .github/workflows/pages.yml
   pull_request:
     paths:
       - docs/site/**
       - tests/website-check.cjs
       - tests/website-graph-check.cjs
+      - tests/website-glass-check.cjs
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -35,6 +37,7 @@ jobs:
         run: |
           node tests/website-check.cjs
           node tests/website-graph-check.cjs
+          node tests/website-glass-check.cjs
       - name: Upload website only
         uses: actions/upload-pages-artifact@v4
         with:

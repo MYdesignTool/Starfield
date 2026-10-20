@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0f14">
+  <meta name="theme-color" content="#0b101c">
   <meta name="description" content="Starfield 是面向 After Effects 2023 的独立节点式粒子插件。用节点组织粒子，用 AE 原生控件塑造运动。开放源码，持续开发中。">
   <meta property="og:title" content="Starfield — 让想象，成为粒子。">
   <meta property="og:description" content="面向 After Effects 2023 的独立节点式粒子插件。开放源码，持续开发中。">
@@ -12,7 +12,9 @@
   <title>Starfield — 让想象，成为粒子。</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="brand.css">
   <script src="site.js" defer></script>
+  <script src="glass.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到正文</a>
@@ -37,6 +39,7 @@
       </div>
       <figure class="particle-stage" aria-labelledby="particle-caption">
         <img class="hero-artwork" src="assets/hero-particles.jpg" width="1254" height="1254" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
+        <div class="hero-radiance" aria-hidden="true"></div>
         <div class="hero-sparkles" aria-hidden="true">
           <i style="--x:35%;--y:24%;--delay:-1s;--duration:4.8s"></i>
           <i style="--x:53%;--y:17%;--delay:-3.5s;--duration:5.6s"></i>
@@ -51,7 +54,7 @@
           <i style="--x:42%;--y:85%;--delay:-.9s;--duration:5.7s"></i>
           <i style="--x:68%;--y:83%;--delay:-3.8s;--duration:4.7s"></i>
         </div>
-        <div class="stage-bottom"><figcaption id="particle-caption"><span class="tiny-label">01 / STARLIGHT</span><span>概念图片与星光明灭 · 非插件渲染</span></figcaption><button id="motion-toggle" class="motion-toggle" type="button" aria-label="暂停星光闪烁" aria-pressed="false" hidden><span aria-hidden="true">Ⅱ</span></button></div>
+        <div class="stage-bottom"><figcaption id="particle-caption"><span class="tiny-label">01 / STARLIGHT</span><span>概念主视觉 · 非插件渲染</span></figcaption><button id="motion-toggle" class="motion-toggle" type="button" aria-label="暂停主视觉动效" aria-pressed="false" hidden><span aria-hidden="true">Ⅱ</span></button></div>
       </figure>
       <div class="hero-bottom"><span>自由组合。原生掌控。</span><span class="scroll-cue">SCROLL TO EXPLORE <span aria-hidden="true">↓</span></span></div>
     </section>
@@ -90,7 +93,7 @@
       <details><summary>Starfield 是什么？<span aria-hidden="true">＋</span></summary><p>Starfield 是独立实现的 After Effects 粒子插件。通过节点画布组织系统，在 AE 原生 Effect Controls 中编辑参数，并通过独立预设面板管理预设。</p></details>
       <details><summary>现在可以下载正式版吗？<span aria-hidden="true">＋</span></summary><p>项目目前仍处于开发阶段，本站尚未提供正式安装包。你可以在 GitHub 查看源码与构建说明；对外版本以仓库实际发布信息为准。</p></details>
       <details><summary>支持哪些系统与 AE 版本？<span aria-hidden="true">＋</span></summary><p>当前开发与验证范围是 Windows x64 和 After Effects 2023。macOS、其他 AE 版本及具体硬件的兼容性尚未在此承诺。部分功能仍有宿主实测待办，构建成功不代表全部场景已经验证。</p></details>
-      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页主视觉是参考插件预设主图生成的概念图片，叠加轻微星光明灭；节点区复用插件画布 UI，但操作仅保存在当前网页内存中，不提交到 AE，也不生成粒子。功能插画为网页示意，不代表实际渲染或性能。</p></details>
+      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页主视觉是参考插件预设主图生成的概念图片，加入缓慢漂移、轻微呼吸缩放与星光明灭；节点区复用插件画布 UI，但操作仅保存在当前网页内存中，不提交到 AE，也不生成粒子。功能插画为网页示意，不代表实际渲染或性能。</p></details>
       <details><summary>如何参与或反馈问题？<span aria-hidden="true">＋</span></summary><p>可以通过 <a href="https://github.com/MYdesignTool/Starfield/issues">GitHub Issues</a> 提交问题或建议。反馈时请提供 AE 版本、复现步骤和必要截图，并先移除工程中的私人信息。源码使用 <a href="https://github.com/MYdesignTool/Starfield/blob/main/LICENSE">MIT 许可证</a>；Adobe SDK 不随源码分发。</p></details>
     </div></section>
   </main>

@@ -1,4 +1,4 @@
-/* Website navigation and subtle image-overlay twinkles. No AE bridge is used. */
+/* Website navigation and controlled hero motion. No AE bridge. */
 (() => {
   'use strict';
   const menu = document.querySelector('.menu-toggle');
@@ -38,7 +38,7 @@
     stage.classList.toggle('is-still', paused || !onScreen || document.hidden);
     toggle.hidden = reducedMotion.matches;
     toggle.setAttribute('aria-pressed', String(paused));
-    toggle.setAttribute('aria-label', paused ? '播放星光闪烁' : '暂停星光闪烁');
+    toggle.setAttribute('aria-label', paused ? '播放主视觉动效' : '暂停主视觉动效');
     toggle.firstElementChild.textContent = paused ? '▷' : 'Ⅱ';
   }
   toggle.addEventListener('click', () => { paused = !paused; sync(); });

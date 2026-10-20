@@ -1,14 +1,16 @@
 # 官网维护与 GitHub Pages
 
-WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时依赖、字体服务、分析脚本或构建工具。部署决策见 [ADR0047](adr/0047-public-website.md)。
+WEB-01 / 2026-10-21。源码位于 `docs/site/`；中文静态站，无运行时依赖、字体服务、分析脚本或构建工具。部署决策见 [ADR0047](adr/0047-public-website.md)。
 
 ## 当前视觉与内容
 
-四角星标识、疏朗大写 STARFIELD 字标、冷黑背景、银白文字与蓝青交互色。首页使用参考插件预设主图风格生成的蓝白星尘与香槟金光丝图片，叠加 12 个错开周期的微小星光；图片本身保持静止。素材、完整提示词、尺寸与哈希见 [官网主图生成记录](website-artwork.md)。原预设主图及插件前端未修改。
+四角星与 STARFIELD 字标保留，视觉与 owner 自有 Ae-ToolKit 官网统一：深蓝/蓝紫光晕、悬浮玻璃导航、半透明圆角卡片、描边高光和蓝色胶囊按钮。首页保留原蓝白星尘/香槟金图片，加入缓慢漂移、轻微缩放与光感呼吸，统一控制原 12 个星光。参考仓库与动效精确范围见 [视觉实现记录](website-style.md)；素材、完整提示词、尺寸与哈希见 [主图生成记录](website-artwork.md)。原预设主图及插件前端未修改。
 
 - `docs/site/index.html`：产品介绍、工作流、功能、入门与 FAQ。
 - `docs/site/styles.css`：响应式布局、图片融合、CSS 星光与减少动态效果样式。
-- `docs/site/site.js`：移动菜单、闪烁暂停/恢复、离屏和页面可见性管理。无 Canvas 绘制、旋转星轨或逐帧脚本循环。
+- `docs/site/brand.css`：产品家族视觉、玻璃表面、图片缓动与响应式适配。
+- `docs/site/glass.js`：按原站历史修复移植的连续玻璃反光与可见区域边缘折射，空闲时停止帧调度。
+- `docs/site/site.js`：移动菜单、主视觉暂停/恢复、离屏和页面可见性管理。主图不使用 Canvas 绘制或逐帧脚本循环。
 - `docs/site/demo/`：复用插件画布 UI 的隔离演示，支持添加、拖动、连接/断开与删除、撤销、重置。内存适配器替代宿主提交，不生成粒子；复用与维护见 [节点画布说明](website-canvas.md)。不影响主图星光。
 - `docs/site/assets/hero-particles.jpg`：1254×1254 概念主图，391,687 bytes。脚本不可用时仍显示图片与静止星光。
 - `docs/site/assets/mark.svg`：本站四角星标识。
@@ -21,7 +23,7 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 
 仓库根目录运行 `node tests/website-check.cjs`，检查资源和锚点、ARIA 引用、脚本语法、项目子路径、发布目录以及无 SDK/二进制/符号链接混入。不安装依赖或启动本地服务器。
 
-当前含交互画布的版本验证通过：17 个公开文件、22 个本地资源引用，总计 660,805 bytes，单文件保持小于 500,000 bytes。脚本语法与 `tests/website-graph-check.cjs` 通过。忽略目录内 `artifacts/website/image-hero-smoke.cjs` 验证星光手动暂停/恢复、初始与动态减少动画、隐藏页面、离屏重入、缺失 IntersectionObserver 和菜单/Escape/锚点关闭；这些为 VM 检查，不冒充浏览器实测。旧 `interaction-smoke.cjs` 针对已移除的主图 Canvas，不再适用于当前主图。画布的真实模块与浏览器交互证据见 [画布说明](website-canvas.md)。
+当前玻璃/微动效版本验证通过：19 个公开文件、24 个本地资源引用，总计 683,599 bytes，单文件保持小于 500,000 bytes。脚本语法与共享画布检查通过。主视觉控制、菜单、减少动态效果、隐藏页面等 VM 检查与本轮实际浏览器证据见 [视觉实现记录](website-style.md)。旧 `interaction-smoke.cjs` 针对已移除的主图 Canvas，不适用于当前主图。画布证据见 [画布说明](website-canvas.md)。
 
 实际应用内 Chromium 核验默认桌面、390×844 手机图片裁切、320×740 窄屏无横向溢出、图片加载、12 个星光的运行状态、暂停/恢复、手机菜单与 Escape；控制台 warn/error 为空。截图保存于 `artifacts/website/image-hero-desktop.png`、`image-hero-mobile.png`。系统减少动态效果、页面隐藏和离屏恢复仍以 VM 证据为准。
 

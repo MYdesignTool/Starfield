@@ -25,9 +25,13 @@ does not qualify a host, device or performance claim. There is no fabricated
 installer, testimonial, price, performance figure or unsupported compatibility claim.
 
 No runtime dependency, third-party font, analytics or remote media is required.
+The owner's Ae-ToolKit site provides the product-family glass reference. Starfield
+uses a dedicated `brand.css` layer for shared color, type, translucent surfaces and
+responsive framing; implementation/provenance belong in `docs/website-style.md`.
 The hero uses a local JPEG with a small CSS twinkle overlay, rather than a procedural
 orbit simulation. Asset provenance and the generation prompt are recorded in
-`docs/website-artwork.md`. Twinkles respect reduced motion, offscreen state, page
+`docs/website-artwork.md`. Subtle CSS image drift, breathing light and twinkles share
+one pause control and respect reduced motion, offscreen state, page
 visibility and a pause control; core content and navigation remain usable without
 JavaScript, with a static image and static glints.
 

@@ -5,7 +5,7 @@ WEB-01 / 2026-10-20。使用内置 `imagegen` 工具生成，不使用 CLI 或�
 - 风格参考：`web_panel/assets/starfield-presets-banner.png`，仅作为生成参考，原文件未修改。其来源见 [预设主图记录](preset-banner-provenance.md)。SHA256：`313999EC1D0C67CD28B73FB0C13530BDBA4F5A3A2B22F6298FF6CAB2725ECD3A`。
 - 原始 PNG：`artifacts/website/imagegen-hero-original.png`，1254×1254，2,677,805 bytes。SHA256：`2B5B486AA3A0860CA32C66D4E607B3E389D2B05438924D51E77557196FEB3165`。原始生成件留在工具输出目录，仓库 artifacts 副本不提交。
 - 发布素材：`docs/site/assets/hero-particles.jpg`，1254×1254，391,687 bytes。只做 JPEG quality 88 编码，未裁切或改变构图。SHA256：`AB8A7E650AE177D40EFBAD20E2C9DCF35FD10AE519BC56E244B939235AF9480B`。
-- 网页通过 CSS 适配裁切与边缘融合，叠加 12 个错开周期的微小闪烁点；图片本身不旋转。此图为概念营销插画，不是插件渲染或 AE 截图。页面图注与 FAQ 均已标注。
+- 网页通过 CSS 适配裁切与边缘融合，叠加 12 个错开周期的微小闪烁点；图片通过 CSS 缓慢漂移和轻微缩放，叠加光感呼吸，不旋转；来源字节不变，范围见 website-style.md。此图为概念营销插画，不是插件渲染或 AE 截图。页面图注与 FAQ 均已标注。
 
 ## 完整提示词
 
