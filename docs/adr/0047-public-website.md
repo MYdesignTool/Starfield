@@ -13,14 +13,17 @@ the surrounding engineering documents. Relative asset links support the `/Starfi
 project path, local files and a future domain without bundler configuration.
 
 The site describes the independent Starfield identity and current Windows / AE2023
-development scope. Browser particle artwork and the conceptual node diagram are
+development scope. Generated raster particle artwork and the conceptual node diagram are
 labelled as illustrations, not host screenshots or rendered output. Publication
 does not qualify a host, device or performance claim. There is no fabricated
 installer, testimonial, price, performance figure or unsupported compatibility claim.
 
 No runtime dependency, third-party font, analytics or remote media is required.
-Animation respects reduced motion, offscreen state, page visibility and a pause
-control; core content and navigation remain usable without JavaScript.
+The hero uses a local JPEG with a small CSS twinkle overlay, rather than a procedural
+orbit simulation. Asset provenance and the generation prompt are recorded in
+`docs/website-artwork.md`. Twinkles respect reduced motion, offscreen state, page
+visibility and a pause control; core content and navigation remain usable without
+JavaScript, with a static image and static glints.
 
 The site and workflow can be reverted independently of plugin development. Remote
 publication evidence and remaining setup belong in `docs/website.md`, not in the

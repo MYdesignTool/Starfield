@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const site = path.join(root, 'docs', 'site');
-const allowed = new Set(['.html', '.css', '.js', '.svg', '.txt']);
+const allowed = new Set(['.html', '.css', '.js', '.svg', '.jpg', '.txt']);
 const files = [];
 function visit(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

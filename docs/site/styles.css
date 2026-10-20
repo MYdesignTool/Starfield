@@ -282,25 +282,52 @@ nav .nav-source {
   isolation: isolate;
 }
 
-.particle-stage canvas,.particle-fallback {
+.hero-artwork {
   width: 100%;
   height: 100%;
   display: block;
   position: absolute;
   inset: 0;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: 62% center;
 }
 
-.particle-stage canvas {
-  opacity: 0;
+.hero-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
-.particle-stage.is-ready canvas {
-  opacity: 1;
+.hero-sparkles i {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #e4f6ff;
+  box-shadow: 0 0 7px 2px #b5e6ff85;
+  opacity: .16;
+  animation: starlight var(--duration) ease-in-out var(--delay) infinite;
+  animation-play-state: paused;
 }
 
-.particle-stage.is-ready .particle-fallback {
-  display: none;
+.hero-sparkles i:nth-child(3n) {
+  width: 2px;
+  height: 2px;
+  background: #ffe2ac;
+  box-shadow: 0 0 8px 2px #ffd49775;
+}
+
+.twinkle-enabled:not(.is-still) .hero-sparkles i {
+  animation-play-state: running;
+}
+
+@keyframes starlight {
+  0%, 100% { opacity: .12; transform: scale(.7); }
+  48% { opacity: .9; transform: scale(1.2); }
+  65% { opacity: .25; transform: scale(.85); }
 }
 
 .particle-stage:after {
@@ -308,34 +335,7 @@ nav .nav-source {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(90deg,var(--bg),transparent 22%);
-}
-
-.stage-cross {
-  position: absolute;
-  color: #587188;
-  font-family: monospace;
-  font-size: 20px;
-  z-index: 1;
-}
-
-.cross-top {
-  right: 11%;
-  top: 10%;
-}
-
-.cross-bottom {
-  left: 22%;
-  bottom: 16%;
-}
-
-.stage-coordinate {
-  position: absolute;
-  right: 10%;
-  top: 16%;
-  font: 9px/1.7 monospace;
-  color: #8da5ba;
-  letter-spacing: 1px;
+  background: linear-gradient(90deg,var(--bg),transparent 25%),linear-gradient(0deg,var(--bg),transparent 15%,transparent 86%,var(--bg));
 }
 
 .stage-bottom {
@@ -397,7 +397,7 @@ nav .nav-source {
   font-size: 9px;
 }
 
-.hero-orbit {
+.hero-backdrop {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -1219,19 +1219,11 @@ details[open] summary>span {
     left: 18%;
     right: 15%;
   }
-  .stage-coordinate {
-    right: 17%;
-    top: 14%;
-  }
-  .cross-top {
+.cross-top {
     top: 8%;
     right: 19%;
   }
-  .cross-bottom {
-    left: 16%;
-    bottom: 18%;
-  }
-  .hero-bottom {
+.hero-bottom {
     bottom: 24px;
     font-size: 9px;
   }

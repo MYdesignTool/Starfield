@@ -27,7 +27,7 @@
 
   <main id="main">
     <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-orbit" aria-hidden="true"></div>
+      <div class="hero-backdrop" aria-hidden="true"></div>
       <div class="hero-copy">
         <p class="eyebrow"><span class="status-dot"></span> A PARTICLE SYSTEM FOR AFTER EFFECTS</p>
         <h1 id="hero-title">让想象，<br>成为<span class="accent">粒子。</span></h1>
@@ -36,11 +36,22 @@
         <p class="hero-meta">Windows · After Effects 2023 <span>/</span> 开发中 · 源码开放</p>
       </div>
       <figure class="particle-stage" aria-labelledby="particle-caption">
-        <img class="particle-fallback" src="assets/orbit.svg" width="900" height="850" alt="" aria-hidden="true" fetchpriority="high">
-        <canvas id="particle-canvas" aria-hidden="true"></canvas>
-        <div class="stage-cross cross-top" aria-hidden="true">＋</div><div class="stage-cross cross-bottom" aria-hidden="true">＋</div>
-        <div class="stage-coordinate" aria-hidden="true">X 042.8<br>Y 018.6<br>Z 092.1</div>
-        <div class="stage-bottom"><figcaption id="particle-caption"><span class="tiny-label">01 / ORBIT</span><span>网页粒子概念演示 · 非插件渲染</span></figcaption><button id="motion-toggle" class="motion-toggle" type="button" aria-label="暂停粒子动画" aria-pressed="false" hidden><span aria-hidden="true">Ⅱ</span></button></div>
+        <img class="hero-artwork" src="assets/hero-particles.jpg" width="1254" height="1254" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
+        <div class="hero-sparkles" aria-hidden="true">
+          <i style="--x:35%;--y:24%;--delay:-1s;--duration:4.8s"></i>
+          <i style="--x:53%;--y:17%;--delay:-3.5s;--duration:5.6s"></i>
+          <i style="--x:71%;--y:23%;--delay:-.6s;--duration:4.4s"></i>
+          <i style="--x:82%;--y:36%;--delay:-2.7s;--duration:6.2s"></i>
+          <i style="--x:64%;--y:44%;--delay:-4.1s;--duration:5.2s"></i>
+          <i style="--x:44%;--y:39%;--delay:-1.8s;--duration:5.8s"></i>
+          <i style="--x:74%;--y:58%;--delay:-.2s;--duration:4.9s"></i>
+          <i style="--x:88%;--y:68%;--delay:-3s;--duration:6.5s"></i>
+          <i style="--x:55%;--y:72%;--delay:-4.8s;--duration:5.3s"></i>
+          <i style="--x:32%;--y:67%;--delay:-2s;--duration:6s"></i>
+          <i style="--x:42%;--y:85%;--delay:-.9s;--duration:5.7s"></i>
+          <i style="--x:68%;--y:83%;--delay:-3.8s;--duration:4.7s"></i>
+        </div>
+        <div class="stage-bottom"><figcaption id="particle-caption"><span class="tiny-label">01 / STARLIGHT</span><span>概念图片与星光明灭 · 非插件渲染</span></figcaption><button id="motion-toggle" class="motion-toggle" type="button" aria-label="暂停星光闪烁" aria-pressed="false" hidden><span aria-hidden="true">Ⅱ</span></button></div>
       </figure>
       <div class="hero-bottom"><span>自由组合。原生掌控。</span><span class="scroll-cue">SCROLL TO EXPLORE <span aria-hidden="true">↓</span></span></div>
     </section>
@@ -86,7 +97,7 @@
       <details><summary>Starfield 是什么？<span aria-hidden="true">＋</span></summary><p>Starfield 是独立实现的 After Effects 粒子插件。通过节点画布组织系统，在 AE 原生 Effect Controls 中编辑参数，并通过独立预设面板管理预设。</p></details>
       <details><summary>现在可以下载正式版吗？<span aria-hidden="true">＋</span></summary><p>项目目前仍处于开发阶段，本站尚未提供正式安装包。你可以在 GitHub 查看源码与构建说明；对外版本以仓库实际发布信息为准。</p></details>
       <details><summary>支持哪些系统与 AE 版本？<span aria-hidden="true">＋</span></summary><p>当前开发与验证范围是 Windows x64 和 After Effects 2023。macOS、其他 AE 版本及具体硬件的兼容性尚未在此承诺。部分功能仍有宿主实测待办，构建成功不代表全部场景已经验证。</p></details>
-      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页粒子是为官网独立编写的 Canvas 概念动画，节点图与功能插画也都是网页示意，不代表插件的实际渲染画面、界面截图或性能。</p></details>
+      <details><summary>首页的粒子是插件渲染的吗？<span aria-hidden="true">＋</span></summary><p>首页主视觉是参考插件预设主图生成的概念图片，叠加轻微星光明灭；节点图与功能插画也是网页示意，不代表插件的实际渲染画面、界面截图或性能。</p></details>
       <details><summary>如何参与或反馈问题？<span aria-hidden="true">＋</span></summary><p>可以通过 <a href="https://github.com/MYdesignTool/Starfield/issues">GitHub Issues</a> 提交问题或建议。反馈时请提供 AE 版本、复现步骤和必要截图，并先移除工程中的私人信息。源码使用 <a href="https://github.com/MYdesignTool/Starfield/blob/main/LICENSE">MIT 许可证</a>；Adobe SDK 不随源码分发。</p></details>
     </div></section>
   </main>
