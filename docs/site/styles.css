@@ -6,7 +6,8 @@
   --line: #28343f;
   --text: #edf3f8;
   --muted: #9baebf;
-  --accent: #93ccee;
+  --accent: #5cd5ff;
+  --gold: #ffca78;
   --max: 1320px;
   --pad: clamp(24px,5.5vw,88px);
 }
@@ -63,6 +64,13 @@ button {
 
 .accent {
   color: var(--accent);
+}
+
+.hero h1 .accent {
+  background: linear-gradient(105deg,#3ca5ff,#73e9ff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .muted {
@@ -230,12 +238,13 @@ nav .nav-source {
 }
 
 .button-primary {
-  background: var(--accent);
+  background: linear-gradient(115deg,#69e7ff,#3d9eff);
   color: #0a1926;
+  box-shadow: 0 8px 32px #178fe82b;
 }
 
 .button-primary:hover {
-  background: #c2e8ff;
+  background: linear-gradient(115deg,#a3f0ff,#79c8ff);
 }
 
 .button span {
@@ -802,6 +811,56 @@ h2 {
   stroke-width: 1;
 }
 
+.section-index {
+  color: var(--gold);
+}
+
+.feature:first-child .tiny-label {
+  color: var(--gold);
+}
+
+.emission-art {
+  background: radial-gradient(ellipse at 50% 100%,#d58d312c,transparent 70%),#0d161f;
+}
+
+.emission-art span {
+  border-color: #ffca78;
+}
+
+.emission-art i {
+  background: linear-gradient(transparent,#ffd396);
+}
+
+.emission-art i:after {
+  background: #ffdb9e;
+  box-shadow: 4px 30px #eeb260,-4px 70px #bc8037;
+}
+
+.motion-art path {
+  stroke: #53d7ff;
+}
+
+.motion-art circle {
+  fill: #adf4ff;
+}
+
+.model-art path {
+  stroke: #8fa9ff;
+}
+
+.node-emitter {
+  border-color: #d9a55d;
+}
+
+.node-particle {
+  border-color: #64d6ff;
+}
+
+.node-force {
+  border-color: #9ba9ff;
+}
+
+
 .art-note {
   font-size: 9px;
   color: #879caf;
@@ -811,7 +870,7 @@ h2 {
 
 .start {
   border-block: 1px solid var(--line);
-  background: #111b25;
+  background: radial-gradient(ellipse at 85% 15%,#174e7c52,transparent 65%),#101923;
   position: relative;
 }
 
@@ -1268,7 +1327,7 @@ details[open] summary>span {
   .feature-tags {
     margin-top: 16px;
   }
-  .art-note {
+.art-note {
     line-height: 1.7;
   }
   .start-top {

@@ -58,7 +58,7 @@
       brightness: 0.4 + random() * 0.6,
       size: random() > 0.975 ? 1.9 : 0.55 + random() * 0.85,
       speed: 0.025 + (1 - lane) * 0.055,
-      champagne: random() < 0.18
+      champagne: random() < 0.34
     };
   });
   const stars = Array.from({ length: 70 }, () => ({ x: random(), y: random(), alpha: random() * 0.28 + 0.05 }));
@@ -77,10 +77,10 @@
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
     const halo = context.createRadialGradient(cx, cy, scale * 0.1, cx, cy, scale);
-    halo.addColorStop(0, 'rgba(202,227,248,0.2)');
-    halo.addColorStop(0.15, 'rgba(121,177,223,0.1)');
-    halo.addColorStop(0.55, 'rgba(57,112,166,0.045)');
-    halo.addColorStop(1, 'rgba(57,112,166,0)');
+    halo.addColorStop(0, 'rgba(255,211,141,0.3)');
+    halo.addColorStop(0.15, 'rgba(69,159,244,0.18)');
+    halo.addColorStop(0.55, 'rgba(22,115,222,0.085)');
+    halo.addColorStop(1, 'rgba(22,115,222,0)');
     context.fillStyle = halo;
     context.fillRect(0, 0, width, height);
     // Fine luminous filaments echo the existing preset banner's visual language.
@@ -97,8 +97,8 @@
           if (step === 0) context.moveTo(px, py);
           else context.lineTo(px, py);
         }
-        context.lineWidth = strand === 1 ? 0.65 : 0.35;
-        context.strokeStyle = arm === 1 ? 'rgba(225,205,169,0.32)' : 'rgba(165,207,241,0.28)';
+        context.lineWidth = strand === 1 ? 0.85 : 0.45;
+        context.strokeStyle = arm === 1 ? 'rgba(255,196,109,0.7)' : 'rgba(69,179,255,0.58)';
         context.stroke();
       }
     }
@@ -113,12 +113,12 @@
     for (const { point, x, y, depth } of projected) {
       const alpha = Math.min(1, point.brightness * (0.65 + (depth + 1) * 0.2));
       const size = point.size * (0.75 + (depth + 1) * 0.25);
-      context.fillStyle = point.champagne ? `rgba(233,211,174,${alpha * 0.8})` : `rgba(${Math.round(148 + point.brightness * 70)},${Math.round(192 + point.brightness * 50)},252,${alpha})`;
+      context.fillStyle = point.champagne ? `rgba(255,${Math.round(175 + point.brightness * 55)},${Math.round(72 + point.brightness * 60)},${alpha})` : `rgba(${Math.round(40 + point.brightness * 60)},${Math.round(150 + point.brightness * 80)},255,${alpha})`;
       context.fillRect(x, y, size, size);
       if (point.size > 1.5) {
         const glow = context.createRadialGradient(x, y, 0, x, y, size * 4);
-        glow.addColorStop(0, `rgba(218,238,255,${alpha * 0.35})`);
-        glow.addColorStop(1, 'rgba(154,204,241,0)');
+        glow.addColorStop(0, point.champagne ? `rgba(255,199,121,${alpha * 0.55})` : `rgba(81,194,255,${alpha * 0.55})`);
+        glow.addColorStop(1, 'rgba(81,194,255,0)');
         context.fillStyle = glow;
         context.fillRect(x - size * 4, y - size * 4, size * 8, size * 8);
       }

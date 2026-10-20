@@ -4,6 +4,8 @@ WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时
 
 ## 视觉语言
 
+Owner 认为首轮银蓝配色过素后，增强为电蓝/青色与明亮金色的对比。主按钮和标题强调采用蓝青渐变，旋涡增加金色粒子比例和光轨亮度；功能插画分别使用金色、青色和蓝紫色，保留冷黑背景与四角星。Canvas、静态 SVG、favicon 与 404 同步更新。桌面和390px手机检查通过，桌面/手机的共享插画色彩规则均已确认生效；截图为 `artifacts/website/vivid-{home,features,mobile}.png`。临时预览已停止，端口监听数为 0。
+
 Owner 要求标识改成四角星，并参考插件预设主图 `web_panel/assets/starfield-presets-banner.png` 的风格。官网采用银蓝四角星、疏朗大写字标、冷黑背景、银白文字与星蓝交互色；粒子旋涡使用蓝白星尘、细光丝与少量香槟金。沿用主图的色彩与质感作为参考，官网 Canvas/SVG 均独立绘制，原预设主图和插件前端未修改。主图来源见 [素材记录](preset-banner-provenance.md)。
 
 品牌更新同时应用到 favicon、页头/页尾、404、功能插画、粒子动画与静态 SVG 封面。浏览器复核桌面、390/320 手机、菜单与 Escape，四角星字标不换行且无横向溢出。修正此前格式化误写的两个伪选择器；CSSOM 中焦点规则已解析，实际键盘操作可见 2px 焦点框。截图位于 `artifacts/website/banner-style-{home,full,mobile,404}.png`；预览已停止，端口监听数为 0。
