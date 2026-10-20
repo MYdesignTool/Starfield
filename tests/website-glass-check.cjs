@@ -37,4 +37,26 @@ f.events.pointerenter({clientX:250,clientY:150,pointerType:'mouse'});f.step();f.
 assert.equal(f.frames.size,0);assert(!f.properties.has('--mx'),'reduced motion clears live reflection');
 f.reduce(false);f.events.pointerenter({clientX:250,clientY:150,pointerType:'mouse'});f.step();f.hide();assert.equal(f.frames.size,0);
 const quiet=fixture(true);quiet.events.pointermove({clientX:200,clientY:100,pointerType:'mouse'});assert.equal(quiet.frames.size,0);
-console.log('Glass regression checks passed: smooth enter/reversal/leave/re-entry, one paint per frame, idle stop, no touch capture, reduced motion, hidden page and CSS optics fallback.');
+
+// Exercise the supported-optics path too: a real iframe must never receive an
+// ancestor displacement filter, while ordinary cards still register for optics.
+const observed=[],intersected=[];
+function opticalCard(embedded){return {querySelector:selector=>selector==='iframe'&&embedded?{}:null,style:{setProperty(name){this[name]=true;}}};}
+const embedded=opticalCard(true),ordinary=opticalCard(false);
+const svgElement=()=>({style:{},setAttribute(){},append(){},appendChild(){}});
+class ResizeObserver {observe(el){observed.push(el);}}
+class IntersectionObserver {observe(el){intersected.push(el);}}
+const CSS={supports:()=>true};
+vm.runInNewContext(code,{
+  window:{CSS,ResizeObserver,IntersectionObserver,matchMedia:()=>({matches:false})},CSS,ResizeObserver,IntersectionObserver,
+  document:{querySelectorAll:()=>[embedded,ordinary],createElementNS:svgElement,body:{appendChild(){}}},
+});
+assert.deepEqual(observed,[ordinary]);assert.deepEqual(intersected,[ordinary]);
+assert(!embedded.style['--refraction'],'embedded UI is excluded from SVG refraction');
+assert(ordinary.style['--refraction'],'ordinary glass cards retain SVG refraction');
+const css=fs.readFileSync(path.join(__dirname,'../docs/site/brand.css'),'utf8');
+const frameRule=css.match(/\.graph-live\s*\{([^}]+)\}/)[1];
+assert.match(frameRule,/(?:^|;)\s*backdrop-filter:\s*none\s*;/,'iframe ancestor has no backdrop filter');
+assert.match(frameRule,/-webkit-backdrop-filter:\s*none\s*;/);
+assert.match(css,/\.graph-live::before\s*\{[^}]*backdrop-filter:\s*blur\(24px\)/,'background blur is isolated behind the iframe');
+console.log('Glass regression checks passed: continuous reflection, frame coalescing/idle stop, touch/reduced-motion/hidden fallback, iframe optics exclusion and isolated background blur.');

@@ -89,6 +89,9 @@
   const observer = new ResizeObserver(entries => entries.forEach(entry => update(entry.target)));
   const intersection = new IntersectionObserver(entries => entries.forEach(entry => { const r=records.get(entry.target);r.visible=entry.isIntersecting; if(r.visible)update(entry.target); }), { rootMargin:'100px' });
   document.querySelectorAll(surfaces).forEach((el,index) => {
+    // Embedded UI has its own compositing surface. Keep optics behind it in CSS,
+    // never on its ancestor: Chromium can blur iframe contents on repaint.
+    if (el.querySelector('iframe')) return;
     const id='glass-optics-'+index, filter=svg('filter',{id,x:0,y:0,width:'100%',height:'100%','color-interpolation-filters':'sRGB'});
     const map=svg('feImage',{x:0,y:0,width:'100%',height:'100%',preserveAspectRatio:'none',result:'bevel'});
     filter.append(map,svg('feDisplacementMap',{in:'SourceGraphic',in2:'bevel',scale:32,xChannelSelector:'R',yChannelSelector:'G'}));filters.appendChild(filter);

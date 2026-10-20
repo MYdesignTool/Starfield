@@ -10,6 +10,14 @@ WEB-01 / 2026-10-21。Owner 要求与自己的 [Ae-ToolKit 官网](https://mydes
 
 导航固定悬浮在页面上方。功能卡片、工作流步骤、画布外框、入门区、FAQ 和 404 同步玻璃表面。演示 iframe 的外观由 `tools/website-demo/demo.css` 维护并显式导出；没有修改原插件 UI 或另一项目的仓库。保留 Starfield 四角星、粒子主图和开发中/AE2023 范围，不新增参考站的版本、下载或兼容性声明。
 
+### 嵌入画布的清晰度修复
+
+Owner 随后报告工作流画布整体被模糊。检查发现 `.graph-live` 直接携带 `blur(10px) saturate(155%) url("#glass-optics-…")`，iframe 本身没有滤镜。此前仅确认滤镜加载、画布可交互，未充分覆盖 iframe 合成后的视觉清晰度。
+
+当前将 `.graph-live` 的 backdrop-filter 清空，24px 背景模糊仅放在其 `::before` 装饰层，位于 iframe 后方；保留半透明底色、圆角、阴影与一像素高光。`glass.js` 跳过包含 iframe 的表面，不为其祖先注册 SVG 折射。其他玻璃卡片继续使用光学效果。此边界避免嵌入内容进入祖先滤镜的合成路径，没有修改画布源码、缩放或交互。
+
+新增支持 SVG 光学效果时的回归：普通卡片仍被观察和注册，包含 iframe 的卡片不被注册；CSS 检查保证背景模糊位于装饰层。实际应用内 Chromium 在 1112×680 检查清晰度、滚动重绘、添加节点、断开与 Enter 端口重连；390×844 检查清晰度与无横向溢出，warn/error 为空。截图为 `artifacts/website/glass-canvas-sharp.png` 和 `glass-canvas-sharp-mobile.png`。本轮自动化拖动被浏览器工具的小数 iframe 坐标限制拦截，因此不新增拖动实测结论；共享编辑模块与原有拖动证据仍见画布说明。
+
 ## 历史修复对照
 
 Owner 指出需要参考原站的修改记录后，检查了提交历史、最终 main.js / visuals.js 和 docs/site-motion.md。初版仅提取颜色与基础模糊，遗漏了下列已修正细节；本轮在提交 PR 前替换为成熟逻辑：
