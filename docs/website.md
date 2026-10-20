@@ -2,6 +2,12 @@
 
 WEB-01 / 2026-10-20。源码位于 `docs/site/`；中文静态站，无运行时依赖、字体服务、分析脚本或构建工具。部署决策见 [ADR0047](adr/0047-public-website.md)。
 
+## 视觉语言
+
+Owner 要求标识改成四角星，并参考插件预设主图 `web_panel/assets/starfield-presets-banner.png` 的风格。官网采用银蓝四角星、疏朗大写字标、冷黑背景、银白文字与星蓝交互色；粒子旋涡使用蓝白星尘、细光丝与少量香槟金。沿用主图的色彩与质感作为参考，官网 Canvas/SVG 均独立绘制，原预设主图和插件前端未修改。主图来源见 [素材记录](preset-banner-provenance.md)。
+
+品牌更新同时应用到 favicon、页头/页尾、404、功能插画、粒子动画与静态 SVG 封面。浏览器复核桌面、390/320 手机、菜单与 Escape，四角星字标不换行且无横向溢出。修正此前格式化误写的两个伪选择器；CSSOM 中焦点规则已解析，实际键盘操作可见 2px 焦点框。截图位于 `artifacts/website/banner-style-{home,full,mobile,404}.png`；预览已停止，端口监听数为 0。
+
 ## 内容与修改
 
 - `docs/site/index.html`：产品介绍、工作流、功能、入门与 FAQ。

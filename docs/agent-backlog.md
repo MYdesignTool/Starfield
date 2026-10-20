@@ -8,6 +8,8 @@ Owner 于 2026-10-20 要求开始实现官网，并使用 GitHub Pages。拥有 
 
 Owner 后续明确先完成代码/PR、暂不上线，并告知 Pages Source 已设为 GitHub Actions，要求先完成视觉检查。本轮补齐 SVG 轨道封面、404 和可读样式，视觉/资源复核后更新 PR；不合并 main 或发布。精确 CI 与浏览器证据统一见 docs/website.md。
 
+Owner 再要求四角星标识并参考插件预设主图风格。官网改为银蓝四角星与大写字标、冷黑/银白/星蓝界面，粒子采用蓝白与少量香槟金光轨；保留原预设主图和插件前端。同步静态 SVG、favicon、404、功能图与动效，修正焦点伪选择器；桌面和390/320手机复核通过。本次仍只更新 PR，不上线。
+
 ## P-04 — AEGP Panel + WebView2 已完成
 
 旧 CEP 注册已在 owner 要求重发 UAC 后移出扫描目录；web_panel 迁移及已验证检查点已合入本地 main。源码/安装配对、精确注册路径、证据和恢复命令见 [current-state.md](current-state.md)。本卡不再存在待执行的管理员清理或 main 合并步骤。

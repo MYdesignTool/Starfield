@@ -48,17 +48,17 @@
   };
   // Fixed artwork, independent of viewport size; no simulated performance claims.
   const points = Array.from({ length: 3600 }, () => {
-    const angle = random() * Math.PI * 2;
     const lane = random();
-    const radius = 0.40 + Math.pow(lane, 0.7) * 0.58;
+    const angle = Math.floor(random() * 3) * Math.PI * 2 / 3 + (random() - 0.5) * (0.36 + lane * 0.42);
+    const radius = 0.04 + Math.pow(lane, 0.72) * 0.94;
     return {
       angle,
       radius,
-      elevation: (random() - 0.5) * (0.11 + lane * 0.27),
+      elevation: (random() - 0.5) * (0.035 + lane * 0.19),
       brightness: 0.4 + random() * 0.6,
       size: random() > 0.975 ? 1.9 : 0.55 + random() * 0.85,
       speed: 0.025 + (1 - lane) * 0.055,
-      warm: random() > 0.23
+      champagne: random() < 0.18
     };
   });
   const stars = Array.from({ length: 70 }, () => ({ x: random(), y: random(), alpha: random() * 0.28 + 0.05 }));
@@ -67,7 +67,7 @@
     if (!width || !height) return;
     context.clearRect(0, 0, width, height);
     for (const star of stars) {
-      context.fillStyle = `rgba(219,207,177,${star.alpha})`;
+      context.fillStyle = `rgba(213,231,249,${star.alpha})`;
       context.fillRect(star.x * width, star.y * height, 1, 1);
     }
     const scale = Math.min(width * 0.51, height * 0.47);
@@ -77,14 +77,34 @@
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
     const halo = context.createRadialGradient(cx, cy, scale * 0.1, cx, cy, scale);
-    halo.addColorStop(0, 'rgba(172,68,23,0)');
-    halo.addColorStop(0.5, 'rgba(182,75,29,0.06)');
-    halo.addColorStop(1, 'rgba(182,75,29,0)');
+    halo.addColorStop(0, 'rgba(202,227,248,0.2)');
+    halo.addColorStop(0.15, 'rgba(121,177,223,0.1)');
+    halo.addColorStop(0.55, 'rgba(57,112,166,0.045)');
+    halo.addColorStop(1, 'rgba(57,112,166,0)');
     context.fillStyle = halo;
     context.fillRect(0, 0, width, height);
+    // Fine luminous filaments echo the existing preset banner's visual language.
+    for (let arm = 0; arm < 3; arm++) {
+      for (let strand = 0; strand < 3; strand++) {
+        context.beginPath();
+        for (let step = 0; step <= 90; step++) {
+          const radius = 0.04 + step / 90 * 0.94;
+          const angle = arm * Math.PI * 2 / 3 + radius * 5.5 + (strand - 1) * 0.045 + time * 0.025;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.55;
+          const px = cx + (x * cos - y * sin) * scale;
+          const py = cy + (x * sin + y * cos) * scale;
+          if (step === 0) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        }
+        context.lineWidth = strand === 1 ? 0.65 : 0.35;
+        context.strokeStyle = arm === 1 ? 'rgba(225,205,169,0.32)' : 'rgba(165,207,241,0.28)';
+        context.stroke();
+      }
+    }
     const projected = points.map(point => {
       const angle = point.angle + time * point.speed;
-      const spiral = angle + point.radius * 3.2;
+      const spiral = angle + point.radius * 5.5;
       const x = Math.cos(spiral) * point.radius;
       const depth = Math.sin(spiral) * point.radius;
       const y = depth * 0.55 + point.elevation * (0.6 + Math.sin(angle) * 0.15);
@@ -93,11 +113,14 @@
     for (const { point, x, y, depth } of projected) {
       const alpha = Math.min(1, point.brightness * (0.65 + (depth + 1) * 0.2));
       const size = point.size * (0.75 + (depth + 1) * 0.25);
-      context.fillStyle = point.warm ? `rgba(247,${Math.round(114 + point.brightness * 66)},${Math.round(48 + point.brightness * 65)},${alpha})` : `rgba(218,215,181,${alpha * 0.85})`;
+      context.fillStyle = point.champagne ? `rgba(233,211,174,${alpha * 0.8})` : `rgba(${Math.round(148 + point.brightness * 70)},${Math.round(192 + point.brightness * 50)},252,${alpha})`;
       context.fillRect(x, y, size, size);
       if (point.size > 1.5) {
-        context.fillStyle = `rgba(255,191,126,${alpha * 0.12})`;
-        context.fillRect(x - 2, y - 2, size + 4, size + 4);
+        const glow = context.createRadialGradient(x, y, 0, x, y, size * 4);
+        glow.addColorStop(0, `rgba(218,238,255,${alpha * 0.35})`);
+        glow.addColorStop(1, 'rgba(154,204,241,0)');
+        context.fillStyle = glow;
+        context.fillRect(x - size * 4, y - size * 4, size * 8, size * 8);
       }
     }
     stage.classList.add('is-ready');
