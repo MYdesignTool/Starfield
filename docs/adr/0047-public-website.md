@@ -24,7 +24,13 @@ is visible in the frame and caption. Shared source/export details belong in
 does not qualify a host, device or performance claim. There is no fabricated
 installer, testimonial, price, performance figure or unsupported compatibility claim.
 
-No runtime dependency, third-party font, analytics or remote media is required.
+No third-party font, analytics or remote media is required. The landing page has
+no runtime dependencies. For the user guide added on 2026-10-23, the owner explicitly
+requested an open-source documentation framework. A pinned, locally vendored
+Docsify 4.13.1 runtime and official search plugin live under `docs/site/guide/`,
+with the MIT license. Public Markdown and hash routes require no build service,
+CDN or server rewrite. User-facing chapters remain scaffolds, with detailed
+steps and parameter descriptions deferred. Maintenance: `docs/website-guide.md`.
 The owner's Ae-ToolKit site provides the product-family glass reference. Starfield
 uses a dedicated `brand.css` layer for shared color, type, translucent surfaces and
 responsive framing; implementation/provenance belong in `docs/website-style.md`.
