@@ -33,6 +33,11 @@ body { color:var(--text); font-size:15px; line-height:1.8; }
 .markdown-section a { color:var(--accent); font-weight:400; text-underline-offset:4px; }
 .markdown-section .anchor span { color:inherit; }
 .markdown-section .anchor { color:var(--text); }
+.markdown-section table { display:table; width:100%; border-collapse:collapse; font-size:13px; }
+.markdown-section table th,.markdown-section table td { padding:12px 14px; border-color:var(--line); text-align:left; }
+.markdown-section table th { color:var(--text); background:rgba(156,188,255,.08); }
+.markdown-section table tr,.markdown-section table tr:nth-child(2n) { background:transparent; border-color:var(--line); }
+.markdown-section table tr:nth-child(2n) { background:rgba(156,188,255,.025); }
 .markdown-section blockquote { margin:28px 0; padding:16px 20px; color:#b9c8e2; border-left:2px solid #889cf5; background:rgba(138,157,245,.07); border-radius:0 12px 12px 0; }
 .markdown-section blockquote p { margin:0; }
 .doc-eyebrow { display:flex; align-items:center; flex-wrap:wrap; gap:14px; color:var(--accent); font-size:10px; letter-spacing:1.5px; }

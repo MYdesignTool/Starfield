@@ -2,6 +2,8 @@
 
 ## WEB-01 — Starfield 官网与 GitHub Pages
 
+Owner 于2026-10-23要求开始完善稳定基础。33页补充用户概念/工作流、节点职责、两种时间、外观/预设与排查，安装及Auxiliary操作2页保留草稿；按钮位置/快捷键/逐项参数不固定。逐页状态和搜索缓存同步更新，143条正文链接检查通过；内容依据和边界见docs/website-guide.md。不修改插件或扩大宿主资格，只更新原PR，暂不上线。
+
 2026-10-23 owner 新增官方用户文档框架需求并要求开源框架。扩展本卡拥有 docs/website-guide.md、tests/website-docs-check.cjs；使用本地固定版本 Docsify 4.13.1，7 分区/35 用户页面/10 类节点及搜索、导航、前后篇、回退页，细节留待填充。复用官网玻璃视觉与 Pages 发布边界，不涉及插件或其他任务文件。验证与上游许可见 docs/website-guide.md；同一 PR，不上线。
 
 Owner 于 2026-10-20 要求开始实现官网，并使用 GitHub Pages。拥有 docs/site/、.github/workflows/pages.yml、tests/website-check.cjs、tests/website-graph-check.cjs、tests/website-glass-check.cjs、tools/Build-WebsiteDemo.cjs、tools/website-demo/、docs/website.md、docs/website-artwork.md、docs/website-canvas.md、docs/website-style.md、ADR0047，以及 README/文档索引/本卡中的官网入口。采用独立静态页面，仅发布 docs/site/；不将 SDK、插件二进制、宿主前端、内部文档或 artifacts 打包入站点。不修改插件、参数/schema、渲染或现有部署。产品内容以当前架构与验证边界为准；网页粒子与节点图均为明确标注的独立演示，不冒充 AE 渲染或截图。不承诺公开安装包、其他宿主或未经验证的性能。验证静态资源、链接、脚本与 Pages 发布配置；远端发布和浏览器实测仅在实际成功后记录。

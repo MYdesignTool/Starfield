@@ -29,8 +29,11 @@ no runtime dependencies. For the user guide added on 2026-10-23, the owner expli
 requested an open-source documentation framework. A pinned, locally vendored
 Docsify 4.13.1 runtime and official search plugin live under `docs/site/guide/`,
 with the MIT license. Public Markdown and hash routes require no build service,
-CDN or server rewrite. User-facing chapters remain scaffolds, with detailed
-steps and parameter descriptions deferred. Maintenance: `docs/website-guide.md`.
+CDN or server rewrite. Following the owner's 2026-10-23 request, stable concepts
+and workflows are authored in 33 pages; installation and evolving Auxiliary
+operations remain drafts. Detailed UI steps and parameter descriptions are still
+deferred. Each route carries an explicit editorial status. Maintenance:
+`docs/website-guide.md`.
 The owner's Ae-ToolKit site provides the product-family glass reference. Starfield
 uses a dedicated `brand.css` layer for shared color, type, translucent surfaces and
 responsive framing; implementation/provenance belong in `docs/website-style.md`.
