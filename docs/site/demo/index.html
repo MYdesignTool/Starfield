@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Starfield 节点画布体验</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <link rel="stylesheet" href="panel.css" />
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <noscript>画布交互需要 JavaScript。连接流程：Emitter → Particle → Force → Output；仅 UI 体验，不生成粒子。</noscript>
+  <header class="bar demo-title"><h1>STARFIELD <span>NODE PLAYGROUND</span></h1><span>UI ONLY</span></header>
+
+  <div id="banner" class="banner hidden" role="status"></div>
+
+  <section class="toolbar" aria-label="画布工具"><label for="demoNodeType" class="sr-only">节点类型</label><select id="demoNodeType"><option value="emitter">Emitter</option><option value="auxiliary">Auxiliary</option><option value="particle">Particle</option><option value="force">Force</option><option value="transform">Transform</option><option value="motion">Motion</option><option value="turbulence">Turbulence</option><option value="model">Model</option><option value="material">Material</option></select><button id="demoAdd" type="button">＋ 添加</button><button id="demoUndo" type="button" disabled>撤销</button><button id="demoDelete" type="button">删除</button><button id="demoReset" type="button">重置</button></section>
+
+  <main id="workspace" class="workspace">
+    <section class="graph-pane" aria-label="可操作的节点画布">
+      <div class="section-heading">
+        <span>Graph</span>
+        <span class="graph-tools"><span class="section-note">拖节点 · 空白框选 · 中键平移</span><span id="zoomReadout">100%</span></span>
+      </div>
+      <div class="graph-body">
+      <aside id="nodePalette" class="node-palette" aria-label="Add nodes">
+        <div id="nodePaletteItems" class="node-palette-items">
+          <button type="button" data-node-type="emitter" aria-label="Drag Emitter onto graph" title="Emitter · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="6" cy="6" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="18" cy="18" r="2"/></g></svg>
+          </button>
+          <button type="button" data-node-type="auxiliary" aria-label="Drag Auxiliary onto graph" title="Auxiliary · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.5 2"/><g fill="currentColor"><circle cx="12" cy="12" r="2.5"/><circle cx="4" cy="5" r="1.5"/><circle cx="20" cy="19" r="1.5"/></g></svg>
+          </button>
+          <button type="button" data-node-type="particle" aria-label="Drag Particle onto graph" title="Particle · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>
+          </button>
+          <button type="button" data-node-type="force" aria-label="Drag Force onto graph" title="Force · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13m-3-3 3 3-3 3M3 12h18m-3-3 3 3-3 3M3 17h10m-3-3 3 3-3 3"/></g></svg>
+          </button>
+          <button type="button" data-node-type="transform" aria-label="Drag Transform onto graph" title="Transform · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2"/><path d="m12 3-3 3m3-3 3 3m6 6-3-3m3 3-3 3m-6 6-3-3m3 3 3-3m-9-6 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+          <button type="button" data-node-type="motion" aria-label="Drag Motion onto graph" title="Motion · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m16 3 4 2-1 4M12 8v4l3 2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          </button>
+          <button type="button" data-node-type="turbulence" aria-label="Drag Turbulence onto graph" title="Turbulence · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7c4-5 6 5 10 0s5-2 8-3M3 12c4-5 6 5 10 0s5-2 8-3M3 17c4-5 6 5 10 0s5-2 8-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <button type="button" data-node-type="model" aria-label="Drag Model onto graph" title="Model · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Zm-9 5 9 5 9-5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" data-node-type="material" aria-label="Drag Material onto graph" title="Material · drag onto graph">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" opacity=".5"/></svg>
+          </button>
+        </div>
+        <button id="nodePaletteToggle" class="node-palette-toggle" type="button" aria-controls="nodePaletteItems" aria-expanded="true" aria-label="Collapse node palette" title="Collapse nodes">‹</button>
+      </aside>
+      <div id="graphScroll" class="graph-scroll" tabindex="-1">
+        <div id="graphViewport" class="graph-viewport">
+          <div class="graph-canvas">
+          <svg id="graphEdges" class="graph-edges" viewBox="0 0 580 320" role="group" aria-label="Graph connections">
+            <defs>
+              <marker id="edgeArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0 L6 3 L0 6 Z" />
+              </marker>
+            </defs>
+            <g id="edgePaths"></g>
+          </svg>
+          <div id="chain" class="graph-nodes" aria-label="Emitter to Particle to Force to Output flow">
+            <p class="hint">正在准备画布…</p>
+          </div>
+          <div id="selectionBox" class="selection-box" hidden></div>
+          </div>
+          <canvas id="graphMinimap" class="graph-minimap" width="192" height="120"
+                  role="application" aria-label="Node minimap; click or drag to navigate"
+                  title="Node map · click or drag to navigate"></canvas>
+        </div>
+      </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bar footer"><span id="demoStatus" role="status" aria-live="polite">拖动节点或从左侧拖入新节点 · 点连线断开</span><span>仅 UI 体验，不生成粒子；刷新后恢复。</span></footer>
+
+  <div id="graphContextMenu" class="graph-context-menu" role="menu" aria-label="Node graph actions" hidden>
+    <div class="context-menu-heading">Add Node</div>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="emitter">Emitter</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="auxiliary">Auxiliary</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="particle">Particle</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="force">Force</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="transform">Transform</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="motion">Motion</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="turbulence">Turbulence</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="model">Model</button>
+    <button type="button" role="menuitem" data-action="addNode" data-node-type="material">Material</button>
+    <div class="context-menu-separator"></div>
+    <button type="button" role="menuitem" data-action="duplicateNodes">Duplicate Selected <span>Ctrl+D</span></button>
+    <button type="button" role="menuitem" data-action="deleteNodes">Delete Selected <span>Del / Backspace</span></button>
+    <button id="disconnectContextAction" type="button" role="menuitem" data-action="disconnect" hidden>Disconnect This Wire</button>
+  </div>
+
+  <script src="graph_codec.js" defer></script>
+  <script src="graph_layout.js" defer></script>
+  <script src="graph_edits.js" defer></script>
+  <script src="graph_view.js" defer></script>
+  <script src="node_palette.js" defer></script>
+  <script src="panel-demo.js" defer></script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
+| [website.md](website.md) | 官网源码、GitHub Pages 发布与回退 |
 | [current-state.md](current-state.md) | 唯一的当前源码、部署与验证状态入口 |
 | [architecture.md](architecture.md) | 模块职责、数据流、线程与所有权边界 |
 | [roadmap.md](roadmap.md) | 未完成的产品与验收工作 |
