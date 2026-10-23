@@ -31,3 +31,5 @@ website-docs-check 检查 35 个导航和搜索路由、33 基础/2 草稿状态
 Chromium 检查桌面/390px 首页、Emitter 搜索和结果跳转、深链接刷新、章节标题、手机目录与 Escape、无横向溢出；warn/error 为空。截图为 artifacts/website/docs-{home,mobile}.png。沿用 owner 的 127.0.0.1:4173 预览授权，session 25762 按此前要求保留；Ctrl+C 停止。仍只更新原 PR，不合并或发布。
 
 基础正文版本另核对桌面“认识 Starfield”的表格、搜索“生命进度”并跳转动画小节、390px 正文与术语表无溢出、安装页显示草稿标签；warn/error 为空。增加暗色表格样式与 Docsify topMargin:130，给固定导航留出定位空间。截图为 artifacts/website/docs-foundations{,-mobile}.png。该浏览器检查不等于 AE 操作或节点渲染验收。
+
+导航对齐修复：Docsify 自动给自有导航加 app-nav/no-badge，其 absolute 与 25px 顶部外边距使链接中心下移 12.5px。guide.css 将其恢复为 header 的普通 flex 子项，清除框架外边距、链接字号/间距和手机展开时的横移。965px 实测 header/标识/导航/链接中心均约 y=49；390px 均为 y=41，展开目录仍无位移或横向溢出。截图为 artifacts/website/docs-nav-centered.png，资源检查通过。

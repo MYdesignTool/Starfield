@@ -5,8 +5,9 @@ body { color:var(--text); font-size:15px; line-height:1.8; }
 .docs-header { display:flex; align-items:center; gap:18px; margin:0 auto; }
 .docs-header .brand { display:flex; align-items:center; text-decoration:none; color:var(--text); }
 .docs-label { padding-left:18px; border-left:1px solid var(--line); font-size:12px; color:var(--muted); }
-.docs-header nav { display:flex; align-items:center; margin-left:auto; }
-.docs-header nav a { text-decoration:none; white-space:nowrap; }
+/* Docsify decorates this nav with app-nav/no-badge; keep it in our header flow. */
+.docs-header nav,.docs-header nav.app-nav { display:flex; align-items:center; position:static; margin:0 0 0 auto; transform:none; line-height:1.5; }
+.docs-header nav a { display:flex; align-items:center; margin:0; padding:7px 13px; font-size:inherit; line-height:1.5; text-decoration:none; white-space:nowrap; }
 .docs-header nav a[aria-current] { color:var(--text); background:rgba(184,207,255,.08); }
 .docs-skip { position:fixed; left:24px; top:-60px; z-index:200; padding:8px 16px; color:white; background:#456fe6; border-radius:12px; }
 .docs-skip:focus { top:90px; }
