@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <bit>
 #include <cstdint>
+#include "SourceEditTelemetry.hpp"
 
 namespace starfield::adapter {
 // Read-only, session-local query; no acquisition, SDK call or message pumping.
@@ -13,6 +14,24 @@ inline bool ui_transaction_active() noexcept {
     const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return false;
     const auto query=std::bit_cast<Query>(GetProcAddress(module,"SFLD_UiExclusionActiveV1"));
     return query && query();
+}
+inline std::uint64_t graph_mutation_epoch() noexcept {
+    using Query=std::uint64_t(*)() noexcept;
+    const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return 0;
+    const auto query=std::bit_cast<Query>(GetProcAddress(module,"SFLD_GraphMutationEpochV1"));
+    return query?query():0;
+}
+inline bool source_ui_transaction_active() noexcept {
+    using Query=bool(*)() noexcept;
+    const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return false;
+    const auto query=std::bit_cast<Query>(GetProcAddress(module,"SFLD_SourceUiExclusionActiveV1"));
+    return query && query();
+}
+inline void record_source_edit(const SourceEditTelemetry& value) noexcept {
+    using Record=void(*)(const SourceEditTelemetry*) noexcept;
+    const auto module=GetModuleHandleW(L"StarfieldHost.aex");if(!module)return;
+    const auto record=std::bit_cast<Record>(GetProcAddress(module,"SFLD_RecordSourceEditV1"));
+    if(record)record(&value);
 }
 // Resolve the already loaded resident Host. Never load a library, register a
 // hook, pump messages or probe scripting availability to acquire this scope.

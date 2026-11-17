@@ -51,8 +51,8 @@ struct CoreError {
 template <typename T>
 class Result {
 public:
-    static Result success(T value) { return Result(Storage{std::in_place_type<T>, std::move(value)}); }
-    static Result failure(CoreError error) { return Result(Storage{std::in_place_type<CoreError>, error}); }
+    static Result success(T value) { return Result(std::in_place_type<T>, std::move(value)); }
+    static Result failure(CoreError error) { return Result(std::in_place_type<CoreError>, error); }
     static Result failure(ErrorCode code, const char* detail) { return failure(make_error(code, detail)); }
 
     [[nodiscard]] bool has_value() const noexcept { return std::holds_alternative<T>(storage_); }
@@ -62,7 +62,9 @@ public:
 
 private:
     using Storage = std::variant<T, CoreError>;
-    explicit Result(Storage storage) : storage_(std::move(storage)) {}
+    template <typename Value,typename... Args>
+    explicit Result(std::in_place_type_t<Value> tag,Args&&... args)
+        : storage_(tag,std::forward<Args>(args)...) {}
 
     Storage storage_;
 };

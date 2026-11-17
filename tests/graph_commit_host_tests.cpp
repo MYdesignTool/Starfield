@@ -1,4 +1,5 @@
 // Actual resident command hook; fake public SDK services, no AE process.
+#define STARFIELD_TEST_NO_JOURNAL
 #include "../ae_plugin/StarfieldHost.cpp"
 #include <iostream>
 #include <array>

@@ -8,12 +8,12 @@ struct TransformBranchPlan {
     std::vector<NodeId> force_nodes;
     std::uint32_t sprite_basis_index{};
 };
-Result<CompiledParticleTransform> read_transform(const GraphNode& node) {
+Result<CompiledParticleTransform> read_transform_for_plan(const GraphNode& node,bool topology_only) {
     using R=Result<CompiledParticleTransform>;
     ParticleTransformSettings settings;
     if(const auto* raw=find_value(node,kTransformInheritLayer)) {
         const auto* resource=std::get_if<std::uint32_t>(raw);
-        if(!resource || *resource>0x7fffffffu || (*resource && !find_value(node,kTransformInheritedMatrix)))
+        if(!resource || *resource>0x7fffffffu || (!topology_only && *resource && !find_value(node,kTransformInheritedMatrix)))
             return R::failure(ErrorCode::invalid_request,"unresolved Transform layer resource");
     }
     for(const auto item:{std::pair{kTransformAnchor,&settings.anchor},std::pair{kTransformPosition,&settings.position},
@@ -40,11 +40,12 @@ Result<CompiledParticleTransform> read_transform(const GraphNode& node) {
     }
     return compile_particle_transform(settings);
 }
+Result<CompiledParticleTransform> read_transform(const GraphNode& node) {return read_transform_for_plan(node,false);}
 Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphNode*>& nodes,
     const std::vector<std::vector<std::size_t>>& incoming,const std::vector<std::vector<std::size_t>>& outgoing,
     const std::vector<bool>& active,const std::vector<std::size_t>& order,std::size_t root,std::size_t output,
     const std::vector<std::optional<CompiledParticleTransform>>& transforms,
-    const Cancellation& cancel,TransformPlanningBudget& budget,std::span<const NodeId> deferred={}) {
+    const Cancellation& cancel,TransformPlanningBudget& budget,std::span<const NodeId> deferred={},bool* connection_error=nullptr) {
     using R=Result<TransformBranchPlan>;
     const auto count=nodes.size();std::vector<bool> reachable(count,false),terminal_path(count,false),ordered(count,false);
     // Both private callers provide UUID-sorted nodes. Deferred stages are
@@ -90,8 +91,10 @@ Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphN
         if(current==output)context_at[output]=context;
         for(auto next:outgoing[current])if(terminal_path[next]) {
             if(++budget.work>kMaxBranchTraversalWork)return R::failure(ErrorCode::work_limit_exceeded,"Transform context planning exceeds work limit");
-            if(context_at[next]!=count && context_at[next]!=context)
+            if(context_at[next]!=count && context_at[next]!=context) {
+                if(connection_error)*connection_error=true;
                 return R::failure(ErrorCode::invalid_request,"cannot merge different Transform chains of one Particle stream");
+            }
             context_at[next]=context;
         }
     }
@@ -111,7 +114,7 @@ Result<TransformBranchPlan> plan_transform_branch(const std::vector<const GraphN
     for(const auto& [id,at]:force_contexts) {
         if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Transform Force planning cancelled");
         const auto found=suffixes.find(at);
-        if(found==suffixes.end())return R::failure(ErrorCode::invalid_request,"Force has an ambiguous Transform frame");
+        if(found==suffixes.end()){if(connection_error)*connection_error=true;return R::failure(ErrorCode::invalid_request,"Force has an ambiguous Transform frame");}
         if(found->second) {
             if(++budget.matrices>65536)return R::failure(ErrorCode::work_limit_exceeded,"Transform derived matrix limit exceeded");
             result.force_spaces.emplace(id,*found->second);

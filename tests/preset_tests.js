@@ -21,7 +21,7 @@ const envelope=presets.encode(add,"Original Setup","My Presets"),imported=preset
 assert.throws(()=>presets.decode('{"format":"other"}'),/supported/);assert.throws(()=>presets.encode(base,""),/name/);
 const unsafe=JSON.parse(envelope);unsafe.graphHex="00";assert.throws(()=>presets.decode(JSON.stringify(unsafe)));
 const bad=codec.fromHex(before);bad.nodes[0].schemaVersion=6;assert.throws(()=>presets.validate(bad),/schema/);
-const cycle=codec.fromHex(before);cycle.edges.push({id:factory(),sourceNode:cycle.nodes[2].id,sourcePort:"2",destinationNode:cycle.nodes[1].id,destinationPort:"1"});assert.throws(()=>presets.validate(cycle));
+const cycle=codec.fromHex(before);cycle.edges.push({id:factory(),sourceNode:cycle.nodes[2].id,sourcePort:"2",destinationNode:cycle.nodes[1].id,destinationPort:"1"});assert.equal(presets.validate(cycle),true,"invalid author wires remain editable; native Core projects the executable subset");
 const dirty=codec.fromHex(before);dirty.optionalRecords.push("0280010008000000");assert.equal(presets.authoring(dirty).optionalRecords.filter(r=>r.startsWith("0280")).length,0,"export excludes derived animation bindings");
 assert.equal(presets.validate(presets.apply(base,{type:"applyPreset",presetGraph:imported.graph,mode:"add",applyRenderSettings:false},factory)),true);
 // Exercise the exact existing transaction and its float/color readback validation.

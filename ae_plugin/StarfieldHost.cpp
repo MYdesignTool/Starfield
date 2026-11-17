@@ -8,12 +8,15 @@
 #include "PresetFileHost.hpp"
 #include "UiExclusionHost.hpp"
 #include "GraphCommitRequest.hpp"
+#include "GraphRenderJournal.hpp"
 #include "GraphRepairRequest.hpp"
 #include "WebPanelHost.hpp"
 #include "NativeCommandBindings.hpp"
 #include "Parameters.hpp"
+#include "NodeRecord.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <thread>
@@ -26,6 +29,8 @@ AEGP_PluginID plugin_id{};
 std::thread::id main_thread;
 std::chrono::steady_clock::time_point next_scan{};
 A_long item_id{},layer_index{},effect_index{};
+std::array<std::uint16_t,8> located_uuid{};
+A_long located_layer_id{};
 bool running{},stopped{};
 AEGP_Command reveal_command{};
 AEGP_Command model_asset_command{};
@@ -56,6 +61,7 @@ A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
     if(!reveal_command || command!=reveal_command)return A_Err_NONE;
     if(handled)*handled=TRUE;
     if(stopped || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
+    located_uuid={};located_layer_id=0;
     Suite<AEGP_ItemSuite9> items(kAEGPItemSuite,kAEGPItemSuiteVersion9);
     Suite<AEGP_CompSuite11> comps(kAEGPCompSuite,kAEGPCompSuiteVersion11);
     Suite<AEGP_CollectionSuite2> collections(kAEGPCollectionSuite,kAEGPCollectionSuiteVersion2);
@@ -85,9 +91,35 @@ A_Err reveal_selected(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,
                 ~EffectScope(){suite->AEGP_DisposeEffect(value);}} effect_scope{effects.value,effect};
             if(effects->AEGP_GetInstalledKeyFromLayerEffect(effect,&key) || effects->AEGP_GetEffectMatchName(key,match) ||
                 !starfield_effect(match))continue;
+            located_uuid={};located_layer_id=0;
+            using namespace starfield::adapter::native_nodes;
+            Kind kind=Kind::emitter;bool node=true;
+            if(!std::strcmp(match,"org.starfieldfx.node.particle"))kind=Kind::particle;
+            else if(!std::strcmp(match,"org.starfieldfx.node.force"))kind=Kind::force;
+            else if(!std::strcmp(match,"org.starfieldfx.node.transform"))kind=Kind::transform;
+            else if(!std::strcmp(match,"org.starfieldfx.node.model"))kind=Kind::model;
+            else if(!std::strcmp(match,"org.starfieldfx.node.material"))kind=Kind::material;
+            else if(!std::strcmp(match,"org.starfieldfx.node.motion"))kind=Kind::motion;
+            else if(!std::strcmp(match,"org.starfieldfx.node.turbulence"))kind=Kind::turbulence;
+            else node=!std::strcmp(match,"org.starfieldfx.node.emitter");
+            if(node) {
+                std::array<std::uint16_t,8> identity{};bool valid=true;const A_Time zero{0,1};
+                for(A_long chunk=0;chunk<8;++chunk) {
+                    AEGP_StreamRefH stream{};AEGP_StreamValue2 value{};
+                    if(streams->AEGP_GetNewEffectStreamByIndex(plugin_id,effect,uuid_first_index(kind)+chunk,&stream) || !stream){valid=false;break;}
+                    const auto error=streams->AEGP_GetNewStreamValue(plugin_id,stream,AEGP_LTimeMode_LayerTime,&zero,TRUE,&value);
+                    if(!error){const auto v=value.val.one_d;valid=valid && std::isfinite(v) && v>=0 && v<=65535 && std::floor(v)==v;
+                        if(valid)identity[chunk]=static_cast<std::uint16_t>(v);streams->AEGP_DisposeStreamValue(&value);}
+                    else valid=false;
+                    streams->AEGP_DisposeStream(stream);if(!valid)break;
+                }
+                Suite<AEGP_LayerSuite9> layer_suite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
+                A_long id{};
+                if(valid && layer_suite && !layer_suite->AEGP_GetLayerID(selected.layerH,&id)){located_uuid=identity;located_layer_id=id;}
+            }
             AEGP_StreamRefH control{};
             if(streams->AEGP_GetNewEffectStreamByIndex(plugin_id,effect,
-                !std::strcmp(match,"org.starfieldfx.particle")?26:1,&control) || !control)continue;
+                !std::strcmp(match,"org.starfieldfx.particle")?26:!std::strcmp(match,"org.starfieldfx.node.emitter")?2:1,&control) || !control)continue;
             const auto result=starfield::adapter::reveal_stream(dynamic.value,control);
             streams->AEGP_DisposeStream(control);return result;
         }
@@ -219,9 +251,15 @@ A_Err commit_node_graph(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
         AEGP_ItemH next{};if(items->AEGP_GetNextProjItem(project,item,&next))return A_Err_GENERIC;item=next;
     }
     if(!request.renderer)return A_Err_NONE;
+    journal_graph_command(request.nonce,0,"Host dispatch of synchronous graph command.");
     auto error=effects->AEGP_EffectCallGeneric(plugin_id,request.renderer,&request_time,PF_Cmd_COMPLETELY_GENERAL,&request);
+    const auto generic_error=error;
     if(!error && (!request.acknowledged || request.status))error=request.status?request.status:A_Err_GENERIC;
     if(error) {
+        char detail[160]{};
+        std::snprintf(detail,sizeof(detail),"Host graph command rejected: sdk=%ld, acknowledged=%lu, status=%ld.",
+            long(generic_error),static_cast<unsigned long>(request.acknowledged),long(request.status));
+        journal_graph_command(request.nonce,long(error),detail);
         AEGP_StreamRefH ref{};
         if(!streams->AEGP_GetNewEffectStreamByIndex(plugin_id,request.renderer,kGraphEditReceiptId,&ref) && ref) {
             AEGP_StreamValue2 value{};value.streamH=ref;value.val.one_d=-request.nonce;
@@ -312,6 +350,29 @@ A_Err preset_file_queue(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command comman
     if(handled)*handled=TRUE;
     starfield::adapter::queue_preset_file_dialog();return A_Err_NONE;
 }
+A_Err host_command_dispatch(AEGP_GlobalRefcon global,AEGP_CommandRefcon refcon,AEGP_Command command,
+    AEGP_HookPriority priority,A_Boolean already,A_Boolean* handled) noexcept {
+    if(stopped || already || !handled || std::this_thread::get_id()!=main_thread)return A_Err_NONE;
+    // One resident AEGP CommandHook owns the entire session's dispatch. Defining
+    // another command must never replace the ALL hook that observes AE Clear.
+    AEGP_CommandHook hook{};
+    if(reveal_command && command==reveal_command)hook=reveal_selected;
+    else if(model_asset_command && command==model_asset_command)hook=model_asset_queue;
+    else if(model_transaction_command && command==model_transaction_command)hook=model_transaction_queue;
+    else if(preset_file_command && command==preset_file_command)hook=preset_file_queue;
+    else if(graph_commit_command && command==graph_commit_command)hook=commit_node_graph;
+    else if(graph_repair_command && command==graph_repair_command)hook=repair_node_graph;
+    if(hook)return hook(global,refcon,command,priority,already,handled);
+    return starfield::adapter::dispatch_web_panel_command(global,refcon,command,priority,already,handled);
+}
+}
+extern "C" __declspec(dllexport) bool SFLD_IsLocatedNodeV1(PF_ProgPtr ref,const std::uint16_t* uuid) noexcept {
+    if(stopped || std::this_thread::get_id()!=main_thread || !uuid || !located_layer_id ||
+       !std::equal(located_uuid.begin(),located_uuid.end(),uuid))return false;
+    Suite<AEGP_PFInterfaceSuite1> pf(kAEGPPFInterfaceSuite,kAEGPPFInterfaceSuiteVersion1);
+    Suite<AEGP_LayerSuite9> layers(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
+    AEGP_LayerH layer{};A_long id{};
+    return pf && layers && !pf->AEGP_GetEffectLayer(ref,&layer) && layer && !layers->AEGP_GetLayerID(layer,&id) && id==located_layer_id;
 }
 extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A_long,A_long,
     AEGP_PluginID id,AEGP_GlobalRefcon* refcon) noexcept {
@@ -335,19 +396,23 @@ extern "C" __declspec(dllexport) A_Err StarfieldHostEntry(SPBasicSuite* suites,A
     // Keep named command definitions and hooks, but no Window menu entries.
     // Panel scripts receive the allocated IDs directly, so menu-name lookup is
     // no longer part of the current frontend's authoring contract.
-    const auto hidden=[&](AEGP_Command& destination,const char* name,AEGP_CommandHook hook) {
-        destination=error?0:starfield::adapter::register_hidden_native_command(commands.value,registrations.value,id,name,hook);
+    const auto hidden=[&](AEGP_Command& destination,const char* name) {
+        destination=error?0:starfield::adapter::register_hidden_native_command(commands.value,registrations.value,id,name,nullptr,false);
     };
     using namespace starfield::adapter;
-    hidden(reveal_command,reveal_name,reveal_selected);
-    hidden(model_asset_command,model_asset_command_name,model_asset_queue);
-    hidden(model_transaction_command,model_transaction_command_name,model_transaction_queue);
-    hidden(preset_file_command,preset_file_command_name,preset_file_queue);
-    hidden(graph_commit_command,graph_commit_command_name,commit_node_graph);
-    hidden(graph_repair_command,graph_repair_command_name,repair_node_graph);
+    hidden(reveal_command,reveal_name);
+    hidden(model_asset_command,model_asset_command_name);
+    hidden(model_transaction_command,model_transaction_command_name);
+    hidden(preset_file_command,preset_file_command_name);
+    hidden(graph_commit_command,graph_commit_command_name);
+    hidden(graph_repair_command,graph_repair_command_name);
+    const auto command_error=error?error:!commands?A_Err_GENERIC:
+        registrations->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,AEGP_Command_ALL,host_command_dispatch,nullptr);
+    set_web_panel_command_registration(command_error);
     native_command_bindings={{{reveal_name,reveal_command},{model_asset_command_name,model_asset_command},
         {model_transaction_command_name,model_transaction_command},{preset_file_command_name,preset_file_command},
         {graph_commit_command_name,graph_commit_command},{graph_repair_command_name,graph_repair_command}}};
+    if(command_error)for(auto& binding:native_command_bindings)binding.command=0;
     if(!error && commands && (reveal_command || model_asset_command || model_transaction_command || preset_file_command || graph_commit_command || graph_repair_command))
         (void)registrations->AEGP_RegisterUpdateMenuHook(id,reveal_menu,nullptr);
     return A_Err_NONE;

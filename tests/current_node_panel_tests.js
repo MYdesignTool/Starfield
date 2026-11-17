@@ -28,8 +28,9 @@ assert.equal(auxiliary.parameters.find(p=>p.key==="31").value,1);
 for(const [from,to] of [[emitter.id,particle.id],[particle.id,auxiliary.id],[auxiliary.id,child.id],[child.id,output.id]])
     graph=edits.apply(graph,{type:"connect",from,to},()=>uuid(next++));
 assert.equal(graph.edges.find(e=>e.destinationNode===auxiliary.id).destinationPort,"2");
-assert.throws(()=>edits.apply(graph,{type:"connect",from:particle.id,to:emitter.id},()=>uuid(next++)),/Auxiliary/);
-assert.throws(()=>edits.apply(graph,{type:"connect",from:child.id,to:auxiliary.id},()=>uuid(next++)),/cycle/);
+assert.doesNotThrow(()=>edits.apply(graph,{type:"connect",from:particle.id,to:emitter.id},()=>uuid(next++)),"semantic mistakes remain editable author wires");
+assert.doesNotThrow(()=>edits.apply(graph,{type:"connect",from:child.id,to:auxiliary.id},()=>uuid(next++)),"direct Auxiliary appearance reuse is finite");
+assert.doesNotThrow(()=>edits.apply(graph,{type:"connect",from:auxiliary.id,to:particle.id},()=>uuid(next++)),"shared parent Particle accepts Auxiliary output");
 const projected=view.project(graph,null,{width:3840,height:2160,pixelAspect:1});
 const withForce=edits.apply(graph,{type:"addNode",nodeType:"force"},()=>uuid(next++));
 const forceView=view.project(withForce,null,{width:3840,height:2160,pixelAspect:1}).nodes.find(n=>n.kind==="force");
@@ -64,8 +65,8 @@ assert.deepEqual(acceleration.choices,["GPU","CPU"]);assert.deepEqual(accelerati
 assert.deepEqual([sampling.id,sampling.diskId,sampling.default],[611,1601,1]);
 assert.deepEqual(sampling.values,[30,60,120]);
 const auxView=projected.nodes.find(n=>n.id===auxiliary.id), emitterView=projected.nodes.find(n=>n.id===emitter.id);
-assert.equal(auxView.label,"Auxiliary");assert.equal(auxView.inputPort,"2");assert.equal(emitterView.inputPort,null);
-assert.deepEqual(auxView.params.slice(0,7).map(p=>p.label),["Type","Emitting","Particles Per Second","Origin XY","Origin Z","Speed","Speed Random"]);
+assert.equal(auxView.label,"Auxiliary");assert.equal(auxView.inputPort,"2");assert.equal(emitterView.inputPort,"2");
+assert.deepEqual(auxView.params.slice(0,6).map(p=>p.label),["Emitting","Particles Per Second","Origin XY","Origin Z","Speed","Speed Random"]);
 assert.equal(emitterView.params.some(p=>p.label.startsWith("Inherit")),false);
 assert.equal(auxView.params.find(p=>p.label==="Emit Chance").scrubStep,1);
 assert.equal(projected.nodes.find(n=>n.id===particle.id).params.find(p=>p.graphKey==="11").scrubStep,.1);
@@ -102,7 +103,7 @@ function effect(matchName,id) {
 }
 const main=effect("org.starfieldfx.particle"), first=effect("org.starfieldfx.node.emitter",emitter.id), second=effect("org.starfieldfx.node.emitter",auxiliary.id);
 for(const [index,name] of [[39,"Graph Revision"],[40,"Panel Graph Sync Guard"],[41,"Commit Graph Edit"],[42,"Graph Edit Receipt"],[87,"Node Effects Ready"],[88,"Graph Checksum High"],[89,"Graph Checksum Low"]]) {
-    main.props[name]=main.props[index]={name,propertyIndex:index,value:0,setValue(){writes++;}};
+    main.props[name]=main.props[index]={name,propertyIndex:index,value:0,valueAtTime(){return this.value;},setValue(){writes++;}};
 }
 const items=[main,first,second], previouslySelected={selected:true};
 const layer={id:29,name:"Layer",selected:true,selectedProperties:[previouslySelected],property(){return {numProperties:items.length,property:i=>items[i-1]};}};

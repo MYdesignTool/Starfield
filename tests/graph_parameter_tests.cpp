@@ -23,6 +23,11 @@ using namespace starfield;
 using namespace starfield::adapter;
 
 namespace starfield::adapter {
+void discard_native_compile_reuse(std::uint64_t) noexcept {}
+void accept_native_compile_reuse(PF_InData*,const node_sync::NativeEdit*,PF_ArbitraryH) noexcept {}
+PF_Err capture_native_clear_handoff(PF_InData*,AEGP_EffectRefH,AEGP_LayerH,AEGP_PluginID,const core::Graph&,NativeClearSnapshot&) noexcept {
+    return PF_Err_BAD_CALLBACK_PARAM; // This isolated fixture has no native source parade.
+}
 void capture_native_temporal_metadata(PF_InData*,const core::Graph&,AEGP_PluginID) noexcept {}
 bool fake_native_compile = false;
 struct NativeBindingTransaction::Impl {};
@@ -31,7 +36,7 @@ NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AE
 NativeBindingTransaction::NativeBindingTransaction(PF_InData*, AEGP_PluginID, AEGP_EffectRefH,AEGP_LayerH)
     : impl_(std::make_unique<Impl>()) {}
 NativeBindingTransaction::~NativeBindingTransaction() = default;
-PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*,const char**,A_long*,const core::Graph*,bool,bool) noexcept { return PF_Err_NONE; }
+PF_Err NativeBindingTransaction::install(const core::Graph&, A_long*,const char**,A_long*,const core::Graph*,bool,bool,const NativeClearSnapshot*) noexcept { return PF_Err_NONE; }
 PF_Err NativeBindingTransaction::retire_after_publication(A_long*,const char**) noexcept { return PF_Err_NONE; }
 PF_Err NativeBindingTransaction::rollback_model_resources() noexcept { return PF_Err_NONE; }
 void NativeBindingTransaction::accept() noexcept {}
@@ -225,9 +230,8 @@ void test_parameters(PF_InData& host) {
     CHECK(output.num_params == static_cast<A_long>(kTotalEffectParameterCount + 1) &&
           registered.size() == kTotalEffectParameterCount);
     const auto& source = registered[kControlSourceId - 1];
-    // Manifest revision 6: a fresh effect must drive the visible controls, so both the
-    // default and the old-project value select AE Controls. Node Graph is opt-in.
-    CHECK(source.u.pd.dephault == kLegacyControlSource && source.u.pd.value == kLegacyControlSource);
+    // New effects use native-node appearance; missing old-project values stay legacy.
+    CHECK(source.u.pd.dephault == kNodeControlSource && source.u.pd.value == kLegacyControlSource);
     CHECK((source.flags & PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS) != 0);
     // The SDK's own PF_ADD_ARBITRARY2 passes no PF_ParamFlags; arbitrary data cannot be
     // animated, and the two flags this used to carry were never part of the contract.
@@ -301,7 +305,17 @@ void test_parameters(PF_InData& host) {
     checked_indices.clear();
     CHECK(checkout_render_graph(&host, &output, snapshot, &active_source) == PF_Err_NONE);
     CHECK(snapshot && checked_out.empty() && active_source == kNodeControlSource);
-    auto expected_checkouts=std::vector<A_long>({kControlSourceId, kGraphSyncGuardId,kGraphParameterId,
+    CHECK(snapshot->nodes.size()==3 && snapshot->edges.size()==2);
+    CHECK(std::none_of(snapshot->nodes.begin(),snapshot->nodes.end(),[](const auto& node){return node.type_key==core::graph_keys::kForceNode;}));
+    const auto factory=read_graph_parameter(&host,parameters[kGraphParameterId].u.arb_d.value);
+    CHECK(factory.has_value() && is_initial_graph_template(factory.value()).value());
+    auto authored=factory.value();
+    for(auto& node:authored.nodes)if(node.type_key==core::graph_keys::kEmitterNode)
+        for(auto& parameter:node.parameters)if(parameter.key==core::graph_keys::kBirthRate)parameter.value=123.0;
+    CHECK(!is_initial_graph_template(authored).value());
+    authored=factory.value();authored.optional_records.push_back(core::OpaqueBytes{std::byte{0}});
+    CHECK(!is_initial_graph_template(authored).value());
+    auto expected_checkouts=std::vector<A_long>({kControlSourceId, kGraphSyncGuardId,kNodeEffectsReadyId,kGraphRevisionId,kGraphParameterId,kMaxParticlesId,
         kTimeRemapEnabledId, kTimeRemapSecondsId, kPreviewEnabledId, kPreviewChanceId,
         kTimeSamplingHzId, kAccelerationId});
     expected_checkouts.insert(expected_checkouts.end(),kMotionParameterIds.begin(),kMotionParameterIds.end());

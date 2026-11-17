@@ -1,4 +1,4 @@
-param([switch]$Run,[switch]$Sanitize)
+param([switch]$Run,[switch]$Sanitize,[switch]$Analyze)
 $ErrorActionPreference='Stop'
 if(-not $Run){Write-Host 'Report: native repair coordinator fake-SDK fault injection. Add -Run; no AE process/project access.';exit 0}
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -8,9 +8,10 @@ try {
         & tests/RunModelUiExclusionTests.ps1 -Run
         if(-not $?){throw 'UI exclusion fixture failed.'}
     }
-    $taskDir=if($Sanitize){'artifacts\graph-repair-asan-tests'}else{'artifacts\graph-repair-tests'}
+    if($Sanitize -and $Analyze){throw 'Choose either -Sanitize or -Analyze.'}
+    $taskDir=if($Sanitize){'artifacts\graph-repair-asan-tests'}elseif($Analyze){'artifacts\graph-repair-analysis-tests'}else{'artifacts\graph-repair-tests'}
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null
-    $taskFlags=if($Sanitize){'/fsanitize=address /Zi'}else{''}
+    $taskFlags=if($Sanitize){'/fsanitize=address /Zi'}elseif($Analyze){'/analyze'}else{''}
     $taskBatch=@"
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul

@@ -5,6 +5,7 @@
 #include "EditorPresetPicker.hpp"
 #include "starfield/core/AgeCurve.hpp"
 #include "NodeEffects.hpp"
+#include "NodeGraphSync.hpp"
 #include "NodeRecord.hpp"
 #include "AE_EffectSuites.h"
 #include "AE_EffectCBSuites.h"
@@ -28,14 +29,29 @@ struct UIState {int selected{};bool bitmap_disabled{};};
 // CLOSE_CONTEXT erases them; selection has no effect on authored values.
 std::map<PF_ContextH,UIState> contexts;
 std::optional<core::ColorGradient> clipboard;
+struct CurvePublishPreview {core::AgeCurve value;std::uint64_t token{};};
 struct CurveUIState {
     int selected{};
     core::AgeCurve original{};
     double original_count{};
     std::optional<core::AgeCurve> draft;
+    std::optional<CurvePublishPreview> publishing;
 };
 using CurveContextKey=std::tuple<std::uintptr_t,std::array<std::uint16_t,8>,A_long>;
 std::map<CurveContextKey,CurveUIState> curve_contexts;
+std::uint64_t curve_publish_token{};
+struct CurvePublishScope {
+    CurveContextKey key;std::uint64_t token;
+    CurvePublishScope(const CurveContextKey& context,CurveUIState& state,const core::AgeCurve& value):key(context),token(++curve_publish_token) {
+        if(!token)token=++curve_publish_token;
+        state.publishing=CurvePublishPreview{value,token};
+    }
+    ~CurvePublishScope() {
+        const auto found=curve_contexts.find(key);
+        if(found!=curve_contexts.end() && found->second.publishing && found->second.publishing->token==token)
+            found->second.publishing.reset();
+    }
+};
 void erase_curve_context(PF_ContextH context) noexcept {
     const auto token=reinterpret_cast<std::uintptr_t>(context);
     std::erase_if(curve_contexts,[&](const auto& entry){return std::get<0>(entry.first)==token;});
@@ -73,6 +89,24 @@ bool read(PF_ParamDef* params[],core::ColorGradient& value) noexcept {
     }
     return model::valid(value);
 }
+PF_Err publish_bank(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],native_nodes::Kind kind,A_long base) noexcept {
+    node_sync::NativeEdit bank;bank.node_kind=static_cast<std::uint32_t>(kind);bank.parameter_index=base;
+    const auto first=native_nodes::uuid_first_index(kind);
+    for(unsigned i=0;i<bank.uuid.size();++i) {
+        const auto* field=params[first+static_cast<A_long>(i)];
+        if(!field || field->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_BAD_CALLBACK_PARAM;
+        const auto word=field->u.fs_d.value;
+        if(!std::isfinite(word) || word<0 || word>65535 || std::floor(word)!=word)return PF_Err_BAD_CALLBACK_PARAM;
+        bank.uuid[i]=static_cast<std::uint16_t>(word);
+    }
+    bank.value[0]=params[base]->u.fs_d.value;
+    const bool captured=node_sync::gradient_bank_parameter(bank.node_kind,base)?
+        node_sync::capture_gradient_bank(params,bank):node_sync::capture_age_bank(params,bank);
+    if(!captured)return PF_Err_BAD_CALLBACK_PARAM;
+    // Only owned values cross this boundary. The compiler reacquires and
+    // checks the saved source; PF EVENT's delivered count is not an array proof.
+    return sync_custom_node_graph_bank(data,out,bank);
+}
 PF_Err publish(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],const core::ColorGradient& value) noexcept {
     if(!model::valid(value))return PF_Err_BAD_CALLBACK_PARAM;
     std::array<PF_ParamDef,18> previous{};
@@ -92,10 +126,9 @@ PF_Err publish(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],const core:
         color->u.cd.value={255,channel(rgb.x),channel(rgb.y),channel(rgb.z)};
         position->uu.change_flags=color->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
     }
-    PF_UserChangedParamExtra changed{};changed.param_index=layout::gradient;
     // All bank components belong to one direct publication. The renderer must
     // not read a new count with old AEGP colors before this PF event returns.
-    const auto error=sync_node_graph_parameter(data,out,params,&changed,true);
+    const auto error=publish_bank(data,out,params,native_nodes::Kind::particle,layout::gradient);
     if(error) {for(A_long i=0;i<18;++i)*params[layout::gradient+i]=previous[i];return error;}
     out->out_flags|=PF_OutFlag_REFRESH_UI|PF_OutFlag_FORCE_RERENDER;return PF_Err_NONE;
 }
@@ -239,10 +272,12 @@ void draw(PF_InData* data,PF_EventExtra* event,const core::ColorGradient& value,
     char label[80]{};std::snprintf(label,sizeof(label),"Stop %d: %.1f%%",state.selected+1,value.stops[state.selected].position*100);
     canvas.text(b.x,b.y+154,label);canvas.text(b.x,b.y+169,"Double-click: color; Alt-click: delete");
 }
-void invalidate(PF_InData* data,PF_EventExtra* event) {
+void invalidate(PF_InData* data,PF_EventExtra* event,bool immediate=true) {
     Suite<PFAppSuite6> app(data->pica_basicP,kPFAppSuite,kPFAppSuiteVersion6);
     if(app && app->PF_InvalidateRect)(void)app->PF_InvalidateRect(event->contextH,nullptr);
-    event->evt_out_flags|=PF_EO_UPDATE_NOW|PF_EO_HANDLED_EVENT;
+    event->evt_out_flags|=PF_EO_HANDLED_EVENT;
+    if(immediate)event->evt_out_flags|=PF_EO_UPDATE_NOW;
+    else event->evt_out_flags&=~PF_EO_UPDATE_NOW;
 }
 bool pick(PF_InData* data,core::Vec3& rgb) {
     Suite<PFAppSuite6> app(data->pica_basicP,kPFAppSuite,kPFAppSuiteVersion6);
@@ -313,7 +348,6 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         erase_curve_context(event->contextH);
         return PF_Err_NONE;
     }
-    if(motion && data->num_params!=native_nodes::parameter_count(native_nodes::Kind::motion))return PF_Err_NONE;
     if(!event->contextH || !(motion?native_nodes::motion_layout::curve_base(event->effect_win.index):
         turbulence?native_nodes::turbulence_layout::curve_base(event->effect_win.index):layout::curve_base(event->effect_win.index)) || event->effect_win.area!=PF_EA_CONTROL ||
        !params || !params[event->effect_win.index])return PF_Err_NONE;
@@ -322,11 +356,33 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
     const double minimum=rotation?-32768.0:0.0,maximum=rotation?32768.0:100.0;
     const auto mode_index=turbulence?native_nodes::turbulence_layout::curve_last:layout::curve_interpolation(base);
     if(!params[mode_index])return PF_Err_NONE;
+    std::array<std::uint16_t,8> identity{};
+    const auto identity_first=native_nodes::uuid_first_index(motion?native_nodes::Kind::motion:
+        turbulence?native_nodes::Kind::turbulence:native_nodes::Kind::particle);
+    for(A_long i=0;i<8;++i) {
+        const auto* field=params[identity_first+i];
+        if(!field || field->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;
+        const auto word=field->u.fs_d.value;
+        if(!std::isfinite(word) || word<0 || word>65535 || std::floor(word)!=word)return PF_Err_NONE;
+        identity[i]=static_cast<std::uint16_t>(word);
+    }
+    const CurveContextKey key{reinterpret_cast<std::uintptr_t>(event->contextH),identity,base};
+    if(curve_contexts.size()>=64 && !curve_contexts.contains(key)) {
+        const auto idle=std::find_if(curve_contexts.begin(),curve_contexts.end(),[](const auto& entry){return !entry.second.publishing;});
+        if(idle==curve_contexts.end())return PF_Err_NONE;
+        curve_contexts.erase(idle);
+    }
+    auto& state=curve_contexts[key];
+    if(state.publishing && event->e_type!=PF_Event_DRAW){event->evt_out_flags|=PF_EO_HANDLED_EVENT;return PF_Err_NONE;}
     core::AgeCurve value{};
+    const double count=params[base]->u.fs_d.value;
+    // Synchronous publication can reenter DRAW with the previous or partially
+    // updated PF bank. Keep the just-released curve visible for that call only.
+    if(state.publishing)value=state.publishing->value;
+    else {
     const auto mode=params[mode_index]->u.fs_d.value;
     if(!std::isfinite(mode) || std::floor(mode)!=mode || mode<0 || mode>3)return PF_Err_NONE;
     value.interpolation=static_cast<core::CurveInterpolation>(static_cast<unsigned>(mode));
-    const double count=params[base]->u.fs_d.value;
     if(count==0) {
         const auto endpoint=base==layout::size_curve?layout::size_over_life:layout::opacity_over_life;
         if(!rotation && !motion && !turbulence && !params[endpoint])return PF_Err_NONE;
@@ -342,19 +398,7 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         }
     }
     if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
-    std::array<std::uint16_t,8> identity{};
-    const auto identity_first=native_nodes::uuid_first_index(motion?native_nodes::Kind::motion:
-        turbulence?native_nodes::Kind::turbulence:native_nodes::Kind::particle);
-    for(A_long i=0;i<8;++i) {
-        const auto* field=params[identity_first+i];
-        if(!field || field->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;
-        const auto word=field->u.fs_d.value;
-        if(!std::isfinite(word) || word<0 || word>65535 || std::floor(word)!=word)return PF_Err_NONE;
-        identity[i]=static_cast<std::uint16_t>(word);
     }
-    const CurveContextKey key{reinterpret_cast<std::uintptr_t>(event->contextH),identity,base};
-    if(curve_contexts.size()>=64 && !curve_contexts.contains(key))curve_contexts.erase(curve_contexts.begin());
-    auto& state=curve_contexts[key];
     const auto authored=value;
     // Drafts contain only owned CPU values. Undo/external edits, keyboard
     // cancellation or a new click cannot overwrite newer host parameters.
@@ -366,7 +410,7 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
             state.draft.reset();
             if(event->e_type==PF_Event_DRAG){invalidate(data,event);return PF_Err_NONE;}
         } else value=*state.draft;
-    } else if(event->e_type==PF_Event_DRAG && value.interpolation==core::CurveInterpolation::draw) {
+    } else if(event->e_type==PF_Event_DRAG) {
         // A cancelled/evicted draft has no authored host changes to finish.
         invalidate(data,event);return PF_Err_NONE;
     }
@@ -430,11 +474,12 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
                 state.selected=nearest;
                 if(click.modifiers&PF_Mod_OPT_ALT_KEY) {
                     if(nearest>0 && nearest<int(value.count)-1 && value.count>2){for(unsigned i=nearest+1;i<value.count;++i)value.points[i-1]=value.points[i];--value.count;state.selected=0;changed=true;}
-                } else {click.send_drag=TRUE;click.continue_refcon[0]=nearest+1;}
+                } else {click.send_drag=TRUE;click.continue_refcon[0]=nearest+1;begin_stroke=true;}
             } else if(value.count<core::kMaxAgeCurvePoints) {
                 const double age=std::clamp(b.position(h),0.001,0.999);unsigned index=1;
                 while(index<value.count && value.points[index].age<age)++index;
-                if(age-value.points[index-1].age>=0.001 && value.points[index].age-age>=0.001){for(unsigned i=value.count;i>index;--i)value.points[i]=value.points[i-1];value.points[index]={age,amount(v)};++value.count;state.selected=int(index);changed=true;}
+                if(age-value.points[index-1].age>=0.001 && value.points[index].age-age>=0.001){for(unsigned i=value.count;i>index;--i)value.points[i]=value.points[i-1];value.points[index]={age,amount(v)};++value.count;state.selected=int(index);changed=true;
+                    click.send_drag=TRUE;click.continue_refcon[0]=index+1;begin_stroke=true;}
             }
             }
         } else return PF_Err_NONE;
@@ -463,7 +508,7 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
     if(event->e_type==PF_Event_DRAG && state.draft)state.draft.reset();
     if(changed) {
         if(!core::valid_age_curve(value,minimum,maximum))return PF_Err_NONE;
-        if(count==value.count && same_curve(authored,value)){invalidate(data,event);return PF_Err_NONE;}
+        if(same_curve(authored,value)){invalidate(data,event);return PF_Err_NONE;}
         std::array<PF_ParamDef,layout::curve_span> previous{};for(A_long i=0;i<layout::curve_span;++i){if(!params[base+i])return PF_Err_NONE;previous[i]=*params[base+i];}
         params[base]->u.fs_d.value=value.count;
         for(unsigned i=0;i<value.count;++i){params[base+1+2*i]->u.fs_d.value=value.points[i].age;params[base+2+2*i]->u.fs_d.value=value.points[i].value;}
@@ -472,11 +517,25 @@ PF_Err particle_rotation_curve_event(PF_InData* data,PF_OutData* out,PF_ParamDef
         // actual changed leaves. A one-sample stroke is not 130 host changes.
         for(A_long i=0;i<layout::curve_span;++i)
             if(params[base+i]->u.fs_d.value!=previous[i].u.fs_d.value)
-                params[base+i]->uu.change_flags|=PF_ChangeFlag_CHANGED_VALUE;
-        PF_UserChangedParamExtra edited{};edited.param_index=base;
-        const auto error=sync_node_graph_parameter(data,out,params,&edited,true);
-        if(error){for(A_long i=0;i<layout::curve_span;++i)*params[base+i]=previous[i];return error;}
-        out->out_flags|=PF_OutFlag_REFRESH_UI|PF_OutFlag_FORCE_RERENDER;
+                params[base+i]->uu.change_flags=PF_ChangeFlag_CHANGED_VALUE;
+        PF_Err error{};
+        {
+            CurvePublishScope preview_scope(key,state,value);
+            error=publish_bank(data,out,params,motion?native_nodes::Kind::motion:
+                turbulence?native_nodes::Kind::turbulence:native_nodes::Kind::particle,base);
+            // UPDATE_NOW schedules a DRAW immediately after this event returns,
+            // when AE may still deliver the pre-edit bank. Keep the last drag
+            // preview on screen and let the dirty control repaint after adoption.
+            if(!error)invalidate(data,event,false);
+        }
+        if(error){
+            for(A_long i=0;i<layout::curve_span;++i)*params[base+i]=previous[i];
+            if(!out->return_msg[0])std::snprintf(out->return_msg,sizeof(out->return_msg),
+                "Starfield [SF-T202]: curve edit was not published; original curve restored (AE%d).",static_cast<int>(error));
+            invalidate(data,event);return error;
+        }
+        out->out_flags|=PF_OutFlag_FORCE_RERENDER;
+        return PF_Err_NONE;
     }
     invalidate(data,event);return PF_Err_NONE;
 } catch(...) {return PF_Err_NONE;}

@@ -11,6 +11,7 @@ add_library(starfield_core STATIC
     src/core/MotionGeometry.cpp
     src/core/MotionPathTravel.cpp
     src/core/MotionLightPathClock.cpp
+    src/core/MotionLightPathResource.cpp
     src/core/Graph.cpp
     src/core/GraphConstruction.cpp
     src/core/GraphEvaluation.cpp
@@ -111,6 +112,15 @@ if(BUILD_TESTING)
     target_link_libraries(starfield_transform_graph_tests PRIVATE starfield_core)
     add_test(NAME starfield_transform_graph_tests COMMAND starfield_transform_graph_tests)
     add_executable(starfield_transform_binding_tests tests/transform_binding_tests.cpp)
+    add_executable(starfield_temporal_preparation_tests tests/temporal_preparation_tests.cpp)
+    target_link_libraries(starfield_temporal_preparation_tests PRIVATE starfield_core)
+    add_test(NAME starfield_temporal_preparation_tests COMMAND starfield_temporal_preparation_tests)
+    add_executable(starfield_age_curve_bounds_tests tests/age_curve_bounds_tests.cpp)
+    target_link_libraries(starfield_age_curve_bounds_tests PRIVATE starfield_core)
+    add_test(NAME starfield_age_curve_bounds_tests COMMAND starfield_age_curve_bounds_tests)
+    add_executable(starfield_core_preparation_storage_tests tests/core_preparation_storage_tests.cpp)
+    target_link_libraries(starfield_core_preparation_storage_tests PRIVATE starfield_core)
+    add_test(NAME starfield_core_preparation_storage_tests COMMAND starfield_core_preparation_storage_tests)
     target_include_directories(starfield_transform_binding_tests PRIVATE ae_plugin)
     target_link_libraries(starfield_transform_binding_tests PRIVATE starfield_core)
     add_test(NAME starfield_transform_binding_tests COMMAND starfield_transform_binding_tests)

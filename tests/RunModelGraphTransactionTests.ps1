@@ -8,7 +8,7 @@ Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null
     $taskArgs=@('/nologo','/std:c++20','/W4','/WX','/permissive-','/EHsc','/O2','/MT','/DMSWindows','/DWIN32','/D_WINDOWS',
-        '/D_CRT_SECURE_NO_WARNINGS','/DSTARFIELD_MODEL_GRAPH_TRANSACTION_TEST','/Iinclude','/Iae_plugin',
+        '/D_CRT_SECURE_NO_WARNINGS','/DSTARFIELD_MODEL_GRAPH_TRANSACTION_TEST','/DSTARFIELD_TEST_NO_JOURNAL','/Iinclude','/Iae_plugin',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'),'tests\effect_graph_backup_tests.cpp',
         'ae_plugin\EffectGraphBackup.cpp','ae_plugin\ModelGraphTransaction.cpp','src\core\ModelResources.cpp',

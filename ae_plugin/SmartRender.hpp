@@ -11,7 +11,7 @@ namespace starfield::adapter {
 
 struct PreRenderTimings {
     bool valid{},complete{};
-    double seconds{},total_ms{},controls_ms{},history_ms{},scene_ms{};
+    double seconds{},total_ms{},controls_ms{},history_ms{},transfer_ms{},resources_ms{},scene_ms{};
 };
 [[nodiscard]] PreRenderTimings last_pre_render_timings() noexcept;
 struct SmartRenderTiming {bool valid{},complete{},paired{};double seconds{},prepared_seconds{},total_ms{};};

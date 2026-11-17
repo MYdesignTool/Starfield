@@ -26,13 +26,32 @@ for(const [mode,expected] of [[1,0],[2,0],[3,2]]){
 }
 assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation("true?'A':false?'B':true?'C':'D';")),"C");checks++;
 assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation("true?'A':(false?'B':'C');")),"A");checks++;
+// Firsthand Adobe forum report: true || false && false becomes false. This is
+// a deliberately narrow reported-dialect model, not an actual AE engine.
+for(const [source,expected] of [["true || false && false;",false],
+    ["true || (false && false);",true],["(true || false) && false;",false],
+    ["false && false || true && false;",false],["true || false && false || true;",true],
+    ["false || true && 'last';","last"],["'first' || false && 'last';","last"],
+    ["true ? true || false && false : true;",false]]){
+    assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation(source)),expected,source);checks++;
+}
+assert.equal(vm.runInNewContext(conditionals.modelLeftAssociation(
+    "var calls=[];function f(v){calls.push(v);return v;} f(true)||f(false)&&f(false); calls.join(',');")),"true,false");checks++;
+for(const source of ["a || b && c;","a || b && c || d;","a || b && (c || d);"]){
+    assert.ok(conditionals.ungroupedLogical(source).length,source);checks++;
+}
+for(const source of ["a || (b && c);","(a || b) && c;","a && b || c;","a || call(b && c);"]){
+    assert.equal(conditionals.ungroupedLogical(source).length,0,source);checks++;
+}
 const files=fs.readdirSync(jsxRoot).filter(name=>name.endsWith(".jsx")).sort();
 parser.parse(fs.readFileSync(path.join(__dirname,"../tools/WebPanelQualification.jsx"),"utf8"),options);checks++;
 assert.ok(files.length>0);checks++;
 for(const name of files){
     try{const source=fs.readFileSync(path.join(jsxRoot,name),"utf8");parser.parse(source,options);checks++;
         const unsafe=conditionals.ungrouped(source);
-        assert.equal(unsafe.length,0,name+": ungrouped nested conditional at lines "+unsafe.map(n=>n.loc.start.line).join(","));checks++;}
+        assert.equal(unsafe.length,0,name+": ungrouped nested conditional at lines "+unsafe.map(n=>n.loc.start.line).join(","));checks++;
+        const logical=conditionals.ungroupedLogical(source);
+        assert.equal(logical.length,0,name+": ungrouped mixed logical operators at lines "+logical.map(n=>n.loc.start.line).join(","));checks++;}
     catch(error){throw new Error(name+": "+error.message);}
 }
-console.log(`extendscript_syntax_tests: ${checks} checks passed; ${files.length} complete JSX files parse as ES3 with no ungrouped nested conditionals (Acorn ${parser.version}); AE execution remains a host gate`);
+console.log(`extendscript_syntax_tests: ${checks} checks passed; ${files.length} complete JSX files parse as ES3 with no ungrouped nested conditionals or mixed logical hazards (Acorn ${parser.version}); AE execution remains a host gate`);

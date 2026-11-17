@@ -1,4 +1,5 @@
 #include "TextureResources.hpp"
+#include "GraphOutputScope.hpp"
 #include "NodeRecord.hpp"
 #include "AE_GeneralPlug.h"
 #include "SPBasic.h"
@@ -12,6 +13,7 @@
 using namespace starfield;
 namespace {
 int checks{},failures{},leases{},pixels_out{},pixels_in{},checkout_fail=-1;
+int expected_slot=626;
 bool reverse_clock{},cancelled{},missing{},self_reference{},cancel_after_checkout{};
 AEGP_PFInterfaceSuite1 pf{};AEGP_LayerSuite9 layers{};AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};
 PF_EffectWorld world{};std::array<PF_PixelFloat,4> pixels{{{1,.2f,.4f,.6f},{1,.3f,.5f,.7f},{1,.4f,.6f,.8f},{1,.5f,.7f,.9f}}};
@@ -45,7 +47,7 @@ void reset(){times.clear();pixels_out=pixels_in=0;checkout_fail=-1;reverse_clock
 }
 int main() {
     namespace nodes=adapter::native_nodes;
-    check(nodes::parameter_count(nodes::Kind::particle)==528,"append count");
+    check(nodes::parameter_count(nodes::Kind::particle)==537,"current Draw/Cloud/Birth append count");
     check(nodes::uuid_first_index(nodes::Kind::particle)==510 && nodes::sync_guard_index(nodes::Kind::particle)==518,"legacy identity fixed");
     check(nodes::authored_parameter(nodes::Kind::particle,521) && !nodes::authored_parameter(nodes::Kind::particle,520),"layer authored / topic excluded");
     pf.AEGP_GetEffectLayer=[](PF_ProgPtr,AEGP_LayerH* out)->A_Err{*out=handle<AEGP_LayerH>(1);return 0;};
@@ -64,7 +66,7 @@ int main() {
     PF_PreRenderCallbacks callbacks{};
     callbacks.GuidMixInPtr=[](PF_ProgPtr,A_u_long,const void*)->PF_Err{return 0;};
     callbacks.checkout_layer=[](PF_ProgPtr,PF_ParamIndex slot,A_long id,const PF_RenderRequest* request,A_long time,A_long,A_u_long,PF_CheckoutResult* result)->PF_Err{
-        check(slot==626,"renderer owns checkout slot");check(request->rect.right==2 && request->rect.bottom==2,"full source canvas requested");
+        check(slot==expected_slot,"renderer owns original checkout slot");check(request->rect.right==2 && request->rect.bottom==2,"full source canvas requested");
         if(id==checkout_fail)return PF_Err_BAD_CALLBACK_PARAM;
         times[id]=time;result->result_rect={0,0,2,2};result->max_result_rect=result->result_rect;
         result->ref_width=result->ref_height=2;result->par={2,1};return 0;
@@ -131,6 +133,22 @@ int main() {
     check(std::abs(prepared.sources[0].start_seconds-(2+1./30))<1e-8 &&
         std::abs(prepared.sources[0].end_seconds-(4+1./30))<1e-8,"reverse grid excludes comp out-point and includes comp in-point");
     for(const auto& [id,time]:times)check(time>60 && time<=120,"reversed checkout stays within visible comp interval");
+    reset();in.current_time=30;motion={};prepared={};
+    auto complete=graph();auto dormant=complete.nodes[1];dormant.id=core::NodeId{uuid(9)};
+    for(auto& p:dormant.parameters)if(p.key==core::graph_keys::kTextureFront)p.value=std::uint32_t{5};
+    complete.nodes.push_back(dormant);const auto work=adapter::graph_output_working_copy(complete);expected_slot=627;
+    check(!adapter::prepare_texture_resources(&in,&out,&extra,work,motion,1080,1,cancel,prepared,&complete) &&
+        prepared.sources.size()==1 && prepared.sources[0].resource_id==55 && prepared.checkouts.size()==1 && prepared.checkouts[0].slot==0,
+        "Output texture keeps full-layout renderer slot1 while compact metadata/staging stays slot0; parked missing layer5 is never queried");
+    world.width=world.height=2;world.rowbytes=2*sizeof(PF_PixelFloat);world.data=reinterpret_cast<PF_Pixel*>(pixels.data());staging={};
+    check(!adapter::stage_texture_resources(&in,&out,&render_extra,prepared,adapter::HostBitDepth::bpc32,cancel,staging) &&
+        staging.frames.size()==1 && staging.frames[0].resource_id==55 && pixels_out==pixels_in,
+        "sparse renderer slots cannot index past compact staging metadata");
+    auto unrelated=graph();for(auto& p:unrelated.nodes[1].parameters)if(p.key==core::graph_keys::kTextureFront)p.value=std::uint32_t{5};prepared={};
+    check(adapter::prepare_texture_resources(&in,&out,&extra,work,motion,1080,1,cancel,prepared,&unrelated)!=0,"active texture absent from full layout is rejected");
+    complete.edges.clear();const auto empty_work=adapter::graph_output_working_copy(complete);prepared={};missing=true;
+    check(!adapter::prepare_texture_resources(&in,&out,&extra,empty_work,motion,1080,1,cancel,prepared,&complete) &&
+        prepared.sources.empty() && prepared.checkouts.empty() && leases==0,"all parked textures acquire no host resources");
     std::printf("texture_adapter_tests: %d checks, %d failures; AE2023 qualification remains open\n",checks,failures);
     return failures?1:0;
 }

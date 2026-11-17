@@ -1,5 +1,7 @@
 #include "AEConfig.h"
 #include "NodeEffects.hpp"
+#include "NativeSourceState.hpp"
+#include "NativeNodeGraph.hpp"
 #include "GpuRender.hpp"
 
 #include "AE_EffectCB.h"
@@ -11,7 +13,6 @@
 #include "ParticleGradientUI.hpp"
 #include "MotionPrefixUI.hpp"
 #include "ParticleShape.hpp"
-#include "ParticleShapeUI.hpp"
 #include "TransformNullUI.hpp"
 #include "ModelControls.hpp"
 #include "ModelGeometryParameter.hpp"
@@ -19,6 +20,7 @@
 #include "ModelAssetExport.hpp"
 #include "ModelAssetWrite.hpp"
 #include "PluginVersion.h"
+#include "MfrQualification.hpp"
 #include "UiExclusionClient.hpp"
 #include "SPBasic.h"
 
@@ -32,10 +34,15 @@ namespace {
 
 static_assert(STARFIELD_NODE_OUT_FLAGS == (PF_OutFlag_I_AM_OBSOLETE |
                                           PF_OutFlag_DEEP_COLOR_AWARE |
-                                          PF_OutFlag_PIX_INDEPENDENT));
+                                          PF_OutFlag_PIX_INDEPENDENT | PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_NODE_OUT_FLAGS2 == (PF_OutFlag2_SUPPORTS_SMART_RENDER |
-                                           PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32));
+                                           PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32
+#if defined(STARFIELD_MFR_QUALIFICATION)
+                                           | PF_OutFlag2_SUPPORTS_THREADED_RENDERING
+#endif
+                                           ));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
+static_assert(STARFIELD_EMITTER_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_SEND_UPDATE_PARAMS_UI));
 static_assert(STARFIELD_TRANSFORM_OUT_FLAGS==(STARFIELD_NODE_OUT_FLAGS|PF_OutFlag_CUSTOM_UI));
 static_assert(STARFIELD_PARTICLE_OUT_FLAGS2==(STARFIELD_NODE_OUT_FLAGS2|PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG));
 
@@ -68,9 +75,34 @@ constexpr NodeEffectKind kNodeEffectKind=NodeEffectKind::turbulence;
 
 using namespace starfield::adapter::native_nodes;
 using namespace starfield::adapter::native_nodes::disk_ids;
+// Effect registration has no Auxiliary entry; graph records reserve kind2.
+// Never cast between these independently ordered enums.
+constexpr Kind kRecordKind=[] {
+    switch(kNodeEffectKind){
+        case NodeEffectKind::emitter:return Kind::emitter;
+        case NodeEffectKind::particle:return Kind::particle;
+        case NodeEffectKind::force:return Kind::force;
+        case NodeEffectKind::transform:return Kind::transform;
+        case NodeEffectKind::model:return Kind::model;
+        case NodeEffectKind::material:return Kind::material;
+        case NodeEffectKind::motion:return Kind::motion;
+        case NodeEffectKind::turbulence:return Kind::turbulence;
+    }
+    return Kind::emitter;
+}();
+
+PF_Err register_node_ui(PF_InData* data) noexcept {
+    // Register the advertised Effect-window UI. Ordinary parameter rows remain
+    // entirely host-owned; only explicit curve/gradient/text editors use it.
+    if(!data || !data->inter.register_ui)return PF_Err_INVALID_CALLBACK;
+    PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
+    return PF_REGISTER_UI(data,&ui);
+}
 
 PF_Err add_checked_parameter(PF_InData* in_data, PF_ParamDef& def) noexcept {
     if (!valid_disk_id(def.uu.id)) return PF_Err_BAD_CALLBACK_PARAM;
+    // Do not inject custom topic/control flags here. Native inline values are
+    // part of AE's title row, including popup and layer selectors.
     return PF_ADD_PARAM(in_data, -1, &def);
 }
 
@@ -131,13 +163,12 @@ PF_Err add_slider(PF_InData* in_data, const char* name, A_long id,
 
 PF_Err add_popup(PF_InData* in_data, const char* name, A_long id,
                  A_short choice_count, A_short initial, const char* choices,
-                 PF_ParamFlags flags=kNodeEditableFlags,A_long ui_flags=PF_PUI_NONE,A_short height=0) noexcept {
+                 PF_ParamFlags flags=kNodeEditableFlags) noexcept {
     PF_ParamDef def{};
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = flags;
-    def.ui_flags=ui_flags;
-    if(ui_flags&PF_PUI_CONTROL){def.ui_width=240;def.ui_height=height;}
+    def.ui_flags=PF_PUI_NONE; // Ordinary choices always use AE's standard widget.
     std::snprintf(def.name, sizeof(def.name), "%s", name);
     def.uu.id = id;
     def.u.pd.num_choices = choice_count;
@@ -299,7 +330,7 @@ PF_Err add_particle_parameters(PF_InData* in_data) noexcept {
     PF_Err error = PF_Err_NONE;
     {
         error=add_popup(in_data,"Shape",kParticleShapeId,6,1,starfield::adapter::particle_shapes::popup_names,
-            kNodeEditableFlags,PF_PUI_CONTROL,26);if(error)return error;
+            kNodeEditableFlags);if(error)return error;
         error=add_slider(in_data,"Life (Seconds)",kLifetimeId,0,10000,2,PF_Precision_TENTHS);if(error)return error;
         error=add_slider(in_data,"Life Random",kLifeRandomId,0,100,0,PF_Precision_TENTHS);if(error)return error;
         error=particle_group(in_data,"Particle Properties",kParticlePropertiesId);if(error)return error;
@@ -450,7 +481,7 @@ PF_Err setup_emitter(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::emitter);
-    return PF_Err_NONE;
+    return register_node_ui(in_data);
 }
 
 PF_Err setup_particle(PF_InData* in_data, PF_OutData* out_data) noexcept {
@@ -582,7 +613,7 @@ PF_Err setup_material(PF_InData* data,PF_OutData* output) noexcept {
     e=add_checkbox(data,"AE Lights",m::disk_id(6),true);if(e)return e;
     e=add_node_record(data,Kind::material);if(e)return e;
     e=add_node_identity(data);if(e)return e;
-    output->num_params=parameter_count(Kind::material);return PF_Err_NONE;
+    output->num_params=parameter_count(Kind::material);return register_node_ui(data);
 }
 
 PF_Err setup_model(PF_InData* data,PF_OutData* output) noexcept {
@@ -591,7 +622,7 @@ PF_Err setup_model(PF_InData* data,PF_OutData* output) noexcept {
     error=add_node_identity(data);if(error)return error;
     error=starfield::adapter::register_model_author_bounds(data);if(error)return error;
     output->num_params=parameter_count(Kind::model);
-    return PF_Err_NONE;
+    return register_node_ui(data);
 }
 
 PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
@@ -621,14 +652,13 @@ PF_Err setup_force(PF_InData* in_data, PF_OutData* out_data) noexcept {
     if (error != PF_Err_NONE) return error;
     out_data->num_params = starfield::adapter::native_nodes::parameter_count(
         starfield::adapter::native_nodes::Kind::force);
-    return PF_Err_NONE;
+    return register_node_ui(in_data);
 }
 
 PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
     PF_ParamDef layer{};layer.param_type=PF_Param_LAYER;layer.flags=kNodeEditableFlags|kNodeConstantFlags;
-    // PF_PUI_CONTROL replaces the default layer selector: our area must include
-    // both the layer dropdown and the separate Create Null button below it.
-    layer.ui_flags=PF_PUI_CONTROL;layer.ui_width=240;layer.ui_height=56;
+    // Use the same native Layer registration as Particle Layer/Dark Side.
+    layer.ui_flags=PF_PUI_NONE;
     layer.uu.id=kTransformInheritId;layer.u.ld.dephault=PF_LayerDefault_NONE;
     std::snprintf(layer.name,sizeof(layer.name),"Inherit Motion (Null Layer)");
     auto error=add_checked_parameter(data,layer);if(error)return error;
@@ -647,6 +677,12 @@ PF_Err setup_transform(PF_InData* data,PF_OutData* output) noexcept {
     error=add_slider(data,"Particles Opacity",kTransformParticlesOpacityId,0,100,100);if(error)return error;
     error=add_node_record(data,Kind::transform);if(error)return error;
     error=add_node_identity(data);if(error)return error;
+    // Append after the existing guard/UUID streams, preserving all old indices.
+    PF_ParamDef button{};button.param_type=PF_Param_BUTTON;
+    button.flags=kNodeEditableFlags|kNodeConstantFlags;button.uu.id=kTransformCreateNullId;
+    std::snprintf(button.name,sizeof(button.name),"Create Null");
+    button.u.button_d.u.namesptr="Create Null";
+    error=add_checked_parameter(data,button);if(error)return error;
     output->num_params=parameter_count(Kind::transform);
     PF_CustomUIInfo ui{};ui.events=PF_CustomEFlag_EFFECT;
     return data->inter.register_ui?PF_REGISTER_UI(data,&ui):PF_Err_NONE;
@@ -719,7 +755,8 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             out_data->my_version = PF_VERSION(STARFIELD_VERSION_MAJOR, STARFIELD_VERSION_MINOR,
                                               STARFIELD_VERSION_BUG, STARFIELD_VERSION_STAGE,
                                               STARFIELD_VERSION_BUILD);
-            out_data->out_flags = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
+            out_data->out_flags = kNodeEffectKind==NodeEffectKind::emitter?STARFIELD_EMITTER_OUT_FLAGS:
+                kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
                 (kNodeEffectKind==NodeEffectKind::transform||kNodeEffectKind==NodeEffectKind::motion||kNodeEffectKind==NodeEffectKind::turbulence)?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS;
             out_data->out_flags2 = kNodeEffectKind==NodeEffectKind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2;
             if (register_node_graph_sync(in_data) != PF_Err_NONE) {
@@ -748,20 +785,23 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                 return setup_force(in_data, out_data);
             }
         case PF_Cmd_SEQUENCE_SETUP:
+            starfield::adapter::invalidate_native_compile_reuse();
             out_data->sequence_data = nullptr;
             return PF_Err_NONE;
         case PF_Cmd_SEQUENCE_RESETUP:
         case PF_Cmd_SEQUENCE_FLATTEN:
         case PF_Cmd_SEQUENCE_SETDOWN:
+            starfield::adapter::invalidate_native_compile_reuse();
             return PF_Err_NONE;
         case PF_Cmd_GLOBAL_SETDOWN:
+            starfield::adapter::invalidate_native_compile_reuse();
             if constexpr(kNodeEffectKind==NodeEffectKind::particle||kNodeEffectKind==NodeEffectKind::motion||kNodeEffectKind==NodeEffectKind::turbulence)starfield::adapter::clear_particle_gradient_ui();
             return PF_Err_NONE;
         case PF_Cmd_EVENT:
             if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 const auto* event=static_cast<PF_EventExtra*>(extra);
                 if(event && event->effect_win.index==starfield::adapter::native_nodes::particle_layout::shape)
-                    return starfield::adapter::particle_shape_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+                    return PF_Err_NONE; // AE owns the ordinary Shape popup.
                 if(event && (event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_front ||
                              event->effect_win.index==starfield::adapter::native_nodes::particle_layout::texture_back))
                     return PF_Err_NONE; // AE owns these ordinary PF_LAYER widgets.
@@ -769,7 +809,7 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                     return starfield::adapter::particle_rotation_curve_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
                 return starfield::adapter::particle_gradient_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
             } else if constexpr(kNodeEffectKind==NodeEffectKind::transform)
-                return starfield::adapter::transform_null_event(in_data,out_data,params,static_cast<PF_EventExtra*>(extra));
+                return PF_Err_NONE; // AE owns Layer selection and the native button.
             else if constexpr(kNodeEffectKind==NodeEffectKind::motion) {
                 const auto* event=static_cast<PF_EventExtra*>(extra);
                 if(event && event->effect_win.index==starfield::adapter::native_nodes::motion_layout::path_prefix_length)
@@ -793,6 +833,11 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
         case PF_Cmd_USER_CHANGED_PARAM:
             if (!in_data) return PF_Err_BAD_CALLBACK_PARAM;
             if(starfield::adapter::ui_transaction_active())return PF_Err_NONE;
+            if constexpr(kNodeEffectKind==NodeEffectKind::transform) {
+                const auto* changed=static_cast<const PF_UserChangedParamExtra*>(extra);
+                if(changed && changed->param_index==transform_create_null_index())
+                    return starfield::adapter::create_transform_null(in_data,out_data,params);
+            }
             if constexpr(kNodeEffectKind==NodeEffectKind::model) {
                 const auto* changed=static_cast<const PF_UserChangedParamExtra*>(extra);
                 if(changed&&changed->param_index==starfield::adapter::native_nodes::model_layout::import_obj) {
@@ -812,10 +857,15 @@ PF_Err dispatch(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
             else return PF_Err_NONE;
         case PF_Cmd_UPDATE_PARAMS_UI:
             if(starfield::adapter::ui_transaction_active())return PF_Err_NONE;
-            if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
+            if constexpr(kNodeEffectKind==NodeEffectKind::emitter) {
+                return update_native_emitter_visibility(in_data,params);
+            } else if constexpr(kNodeEffectKind==NodeEffectKind::particle) {
                 return starfield::adapter::particle_gradient_param_ui(in_data,params);
             } else return PF_Err_NONE;
         case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra && *static_cast<const std::uint32_t*>(extra)==0x53535031)
+                return starfield::adapter::read_native_source_state(in_data,static_cast<std::uint32_t>(kRecordKind),
+                    *static_cast<starfield::adapter::NativeSourceStateRequest*>(extra));
             if constexpr(kNodeEffectKind==NodeEffectKind::model) {
                 if(extra){std::uint32_t magic{};std::memcpy(&magic,extra,sizeof(magic));
                     if(magic==0x53464d57)return starfield::adapter::write_model_asset(in_data,
@@ -840,5 +890,9 @@ PF_Err guarded(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
 
 extern "C" DllExport PF_Err EffectMain(PF_Cmd command, PF_InData* in_data, PF_OutData* out_data,
                                         PF_ParamDef* params[], PF_LayerDef* output, void* extra) {
+    starfield::adapter::MfrQualificationScope qualification(in_data,command,kNodeEffectKind==NodeEffectKind::emitter?"emitter":
+        kNodeEffectKind==NodeEffectKind::particle?"particle":kNodeEffectKind==NodeEffectKind::force?"force":
+        kNodeEffectKind==NodeEffectKind::transform?"transform":kNodeEffectKind==NodeEffectKind::model?"model":
+        kNodeEffectKind==NodeEffectKind::material?"material":kNodeEffectKind==NodeEffectKind::motion?"motion":"turbulence");
     return guarded(command, in_data, out_data, params, output, extra);
 }

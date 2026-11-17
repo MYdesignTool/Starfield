@@ -76,7 +76,7 @@ const window = {
                 }
                 const response = stateCalls < 7
                     ? { protocol: "org.starfieldfx.panel", ok: false,
-                        error: { code: "no_target", message: "Target is not ready yet." } }
+                        error: { code: "host_not_ready", message: "Host bridge is not ready yet." } }
                     : { protocol: "org.starfieldfx.panel", ok: true, revision: "r2", controlSource: "AE Controls",
                         resolution: "name", layoutPersistence: true, layout: {},
                         target: { token: "target-1", comp: "Comp 1", layer: "Particles" }, nodes: [], snapshot:{initialized:false} };
@@ -167,7 +167,7 @@ function poll(delay) {
     entry[1].callback();
 }
 const beforeIdle = stateCalls;
-poll(2000); // First stamp establishes current target markers.
+poll(200); // Selection detection starts promptly, even after startup discovery.
 assert.equal(stateCalls, beforeIdle + 1);
 for (let i = 0; i < 3; i++) poll(500);
 assert.equal(stateCalls, beforeIdle + 1, "unchanged pulses never reread native nodes");
@@ -209,11 +209,12 @@ window.StarfieldGraphEdits = {};
 simulateBootstrapFailure = true;
 elements.refresh.listeners.click();
 assert.equal(bootstrapCalls, 1);
-assert.match(elements.banner.textContent, /node_effect_sync_failed.*Particle: bootstrap failed/);
+assert.match(elements.banner.textContent, /SF-T109/);
+assert.match(elements.banner.children.at(-1).children.at(-1).textContent,/node_effect_sync_failed.*Particle: bootstrap failed/);
 windowListeners.focus();
 windowListeners.focus();
 assert.equal(bootstrapCalls, 1, "background reads must not repeatedly mutate a failing bootstrap");
-assert.match(elements.banner.textContent, /Particle: bootstrap failed/);
+assert.match(elements.banner.children.at(-1).children.at(-1).textContent, /Particle: bootstrap failed/);
 elements.refresh.listeners.click();
 assert.equal(bootstrapCalls, 2, "manual Refresh explicitly retries bootstrap once");
 

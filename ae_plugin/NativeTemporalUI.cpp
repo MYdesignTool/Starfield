@@ -14,13 +14,10 @@
 
 namespace starfield::adapter {
 namespace {
-struct UIStamp {PF_ProgPtr publisher{};PF_State state{};};
-struct IdleStamp {PF_ProgPtr publisher{};PF_State state{};unsigned captures{};
-};
+struct UIStamp {PF_ProgPtr publisher{};PF_State state{};NativeProofPublication publication;};
 std::mutex ui_mutex;
 std::thread::id ui_thread;
 std::vector<UIStamp> ui_stamps;
-std::vector<IdleStamp> idle_stamps;
 NativeUITiming ui_timing;
 struct UITimer {
     bool refreshed{},sequence{};
@@ -59,8 +56,17 @@ struct ParamUtils {
 };
 }
 void initialize_native_temporal_ui() noexcept {
-    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();idle_stamps.clear();ui_timing={};
+    std::lock_guard lock(ui_mutex);ui_thread=std::this_thread::get_id();ui_stamps.clear();ui_timing={};
 }
+void record_native_temporal_ui_capture(PF_InData* data) noexcept try {
+    if(!data || !data->effect_ref || !data->pica_basicP || !on_ui_thread())return;
+    const auto publication=native_control_proof_publication(data);if(!publication.id)return;
+    ParamUtils utils(data);PF_State after{};if(!utils.state(after))return;
+    std::lock_guard lock(ui_mutex);
+    std::erase_if(ui_stamps,[&](const auto& entry){return entry.publisher==data->effect_ref;});
+    if(ui_stamps.size()>=32)ui_stamps.erase(ui_stamps.begin());
+    ui_stamps.push_back({data->effect_ref,after,publication});
+} catch(...) {}
 NativeUITiming last_native_ui_timing() noexcept {
     std::lock_guard lock(ui_mutex);return ui_timing;
 }
@@ -77,25 +83,25 @@ void refresh_native_temporal_ui(PF_InData* data,PF_ParamDef* params[],
         params[kGraphParameterId]->param_type!=PF_Param_ARBITRARY_DATA || !plugin_id)return;
     if(ui_transaction_active() || data->num_params<=kGraphSyncGuardId || !params[kGraphSyncGuardId] ||
         params[kGraphSyncGuardId]->param_type!=PF_Param_FLOAT_SLIDER || params[kGraphSyncGuardId]->u.fs_d.value!=0)return;
-    std::optional<PF_State> old;
+    std::vector<UIStamp> old;
     {std::lock_guard lock(ui_mutex);
         if(ui_thread!=std::this_thread::get_id())return; // Before any SDK operation.
-        for(const auto& entry:ui_stamps)if(entry.publisher==data->effect_ref){old=entry.state;break;}}
+        old=ui_stamps;}
     RefreshScope scope;
     UITimer timer;
     ParamUtils utils(data);PF_State before{};
-    if(!utils.state(before) || (old && utils.same(*old,before)))return;
+    if(!utils.state(before))return;
+    // Callback effect_ref is not persistent identity. Compare the complete host
+    // dependency state, and ensure the publication still exists, before skipping
+    // optional UI work. Render independently validates complete or alias proofs.
+    for(const auto& entry:old)if(native_control_proof_publication_available(entry.publication.id) && utils.same(entry.state,before))return;
     const auto graph=read_graph_parameter(data,params[kGraphParameterId]->u.arb_d.value);
     if(!graph.has_value())return;
     timer.refreshed=true;
     capture_native_temporal_metadata(data,graph.value(),plugin_id);
     std::vector<core::NodeId> ids;for(const auto& node:graph.value().nodes)ids.push_back(node.id);
     if(validated_native_control_proofs(data,ids).empty())return; // Retry optional unavailable metadata later.
-    PF_State after{};if(!utils.state(after) || !utils.same(before,after))return;
-    std::lock_guard lock(ui_mutex);
-    std::erase_if(ui_stamps,[&](const auto& entry){return entry.publisher==data->effect_ref;});
-    if(ui_stamps.size()>=32)ui_stamps.erase(ui_stamps.begin());
-    ui_stamps.push_back({data->effect_ref,after});
+    record_native_temporal_ui_capture(data);
     // No project writes, undo records, render requests or handled-event flags.
 } catch(...) {} // Optional UI optimization cannot reject an authored edit.
 
@@ -109,30 +115,25 @@ void refresh_native_temporal_idle(PF_InData* data,AEGP_PluginID id,NativeBootstr
     } idle_timing{request};
     if(refreshing || !on_ui_thread() || !data || !data->effect_ref || !data->pica_basicP || !data->utils ||
         (data->in_flags & PF_InFlag_PROJECT_IS_RENDER_ONLY) || !id)return;
-    RefreshScope scope;ParamUtils utils(data);PF_State before{};
+    RefreshScope scope;UITimer timer;ParamUtils utils(data);PF_State before{};
     if(!utils.state(before))return;
-    std::optional<IdleStamp> old;
+    std::vector<UIStamp> old;
     {std::lock_guard lock(ui_mutex);
-        for(const auto& entry:idle_stamps)if(entry.publisher==data->effect_ref){old=entry;break;}}
-    const auto existing=validated_native_control_proofs(data);
-    // Loading can settle over more than one idle tick. Capture three times, then
-    // deduplicate unchanged state, preserving sampled PPS prefixes. A dependency
-    // change or missing proof always retries without a dialog.
-    if(old && old->captures>=3 && utils.same(old->state,before) && !existing.empty()) {
-        request.proofs=static_cast<std::uint32_t>(existing.size());request.error=PF_Err_NONE;return;
+        old=ui_stamps;}
+    // First capture still warms every active alias. Its post-warm stamp is shared
+    // with DRAW/Options; unchanged dependencies do not require three full passes.
+    // A dependency change or missing proof still retries without a dialog.
+    for(const auto& entry:old)if(native_control_proof_publication_available(entry.publication.id) && utils.same(entry.state,before)) {
+        request.proofs=static_cast<std::uint32_t>(entry.publication.count);request.error=PF_Err_NONE;return;
     }
-    UITimer timer;timer.refreshed=true;request.refreshed=1;
+    timer.refreshed=true;request.refreshed=1;
     request.error=capture_current_native_temporal_metadata(data,id);
     if(request.error)return;
     const auto trace=last_native_metadata_trace();request.error=trace.error;
     const auto certified=validated_native_control_proofs(data);
     request.proofs=static_cast<std::uint32_t>(certified.size());
     if(request.error || certified.empty())return;
-    PF_State after{};if(!utils.state(after) || !utils.same(before,after))return;
-    std::lock_guard lock(ui_mutex);
-    std::erase_if(idle_stamps,[&](const auto& entry){return entry.publisher==data->effect_ref;});
-    if(idle_stamps.size()>=32)idle_stamps.erase(idle_stamps.begin());
-    idle_stamps.push_back({data->effect_ref,after,old?old->captures+1:1});
+    record_native_temporal_ui_capture(data);
 } catch(...) {request.error=PF_Err_BAD_CALLBACK_PARAM;}
 
 PF_Err flatten_native_temporal_sequence(PF_InData* data,PF_OutData* out) noexcept {

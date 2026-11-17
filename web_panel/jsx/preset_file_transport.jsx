@@ -1,6 +1,7 @@
 // Loaded only for an explicit preset file operation, after starfield_gateway.jsx.
 (function(){
     var host=$.global,api=host.__SFLD_presetFileAPI;
+    var JSON=api && api.json;
     if(!api)throw new Error("Preset file gateway is unavailable.");
     var KEY="__SFLD_presetFileSessionV1",PAGE=32768,MAX_TEXT=128*1024*1024+256*1024,MAX_BYTES=128*1024*1024+1024*1024;
     function integer(n,min,max){return typeof n==="number" && isFinite(n) && Math.floor(n)===n && n>=min && n<=max;}

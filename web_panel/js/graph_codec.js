@@ -571,6 +571,7 @@
     }
 
     function serialize(graph) {
+        if(graph && graph.canvasOnly)throw {code:"canvas_snapshot_read_only",message:"Load a complete editing snapshot before serializing this canvas."};
         graph = normalizeGraphForWrite(graph);
         validateGraphShape(graph);
         var nodes = graph.nodes.slice().sort(function (left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; });

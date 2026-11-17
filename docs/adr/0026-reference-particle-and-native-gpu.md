@@ -1,5 +1,122 @@
 # ADR 0026: reference particle controls and AE native GPU rendering
 
+## PERF-04 / native107: temporal preparation compilation — 2026-10-25
+
+All-time certified inputs now feed a request-local compiled-value cache rather
+than repeating GraphNode copies and parameter/curve validation for every live
+birth or processor integration time. ADR0043 defines the optional C++ sampler
+capability, resource ownership and proof boundary. Complex Force branches,
+Wind/Spin, Transform and Turbulence continue through the original temporal
+algorithm; PERF-02's static eligibility exclusions remain unchanged.
+
+SmartFX diagnostics now split preparation into C controls, H history, T graph
+transfer, R resources/Core acquisition/cache-key staging, and S GPU scene.
+Total includes other adapter work and host callback time within pre_render;
+it cannot measure host scheduling before the selector or prove end-to-end
+latency. Options snapshots the previous render's timings before its existing
+UI-side proof warming. Offline numerical equality and performance evidence do
+not qualify AE2023 behavior or establish parity with Stardust.
+
+## PERF-02 / native106: certified linear gravity and drag preparation — 2026-10-25
+
+Owner authorized implementing the largest measured preparation improvement after
+PERF-01. Native static eligibility now uses the same Output ancestor set as the
+animation plan. Parked processors retain their records without disabling an
+otherwise certified simple graph's fast path.
+
+For active Force graphs, this release qualifies only one linear
+Emitter -> Particle -> Force(s) -> Output chain: Default emission, no Auxiliary,
+no random Life, zero Wind and Spin, and host all-time PF_State constant proofs
+for every active bound component. Stable gravity randomness and scalar drag are
+allowed. Both normal history capture and shutter particle capture reuse the
+existing ordinary evaluator under these conditions; no new Core solver, ABI,
+parameter ID, schema, Render.hpp contract or GPU algorithm is introduced.
+
+The proof gate is still mandatory. Missing/changed states and active animated,
+Wind/Spin, Transform/Motion/Turbulence/Model/Material processors retain historical
+sampling. A first broader numeric matrix found non-equivalent independent
+parallel Force routes, so fan-out/convergence and multiple Emitter/Particle
+routes are explicitly excluded from the new Force gate. Do not extend this gate
+from equal sample values or from the apparent constancy of a selected frame.
+
+Actual adapter regressions first reproduced both old slow paths. The qualified
+matrix covers 504 numeric scenarios (30/60/120Hz, one/two serial Forces, gravity
+randomness, zero/tiny/normal/high drag, subframes and jumps); 10,944 particle
+comparisons passed with maximum absolute difference 1.384e-12. The parallel
+mismatch is retained as evidence rather than corrected under this task.
+Offline preparation timing excludes real AE checkout/expression cost and does
+not qualify host latency or Stardust parity. Evidence: artifacts/perf-02-20261024/.
+
+## P-08R: ECW construction crash — 2026-10-23
+
+Owner reports native102 crashes when selecting a layer carrying the effects.
+Dump353c795d-e977-4abf-a7a7-88a647eb8798 records a null read in
+AfterFXLib+0x193d9ab. Native102 modules are loaded, but raw pointer scanning is
+not an unwound stack and does not prove which plug-in path triggered the fault.
+
+Confirmed source defect: adding CUSTOM_UI/PUI_TOPIC to Emitter, Force, Material
+and Model did not add PF_REGISTER_UI for those node setups. The prior tests left
+register_ui null, so successful parameter registration never checked this SDK
+contract. A new actual callback assertion fails on native102 Emitter. Native103
+registers PF_CustomEFlag_EFFECT once in each previously missing setup and
+propagates registration errors. Existing Particle/Motion/Turbulence/Transform
+registration remains. No parameters, schemas, graph evaluation or ABI change.
+
+Locator drawing also checks absent context, successful-but-null Drawbot draw,
+supplier and surface references, and supplier text capability before text calls.
+Fake-suite tests cover these early exits and balanced suite release. This fixes
+concrete defects; disappearance of the reported AE crash still requires the
+owner's layer-selection reproduction. Native102 was withdrawn as a complete
+pair before building the correction; dump/PDB/binaries/frontend are retained.
+
+## P-08: Auxiliary appearance sharing and locator — 2026-10-23
+
+Owner supplied reference ECW/graph screenshots and explicitly confirmed that a
+direct Particle ↔ Auxiliary pair emits one child generation using the same
+Particle appearance, not recursive offspring. The Particle→Auxiliary edge in
+this exact reciprocal pair is a parent reference excluded from topological
+dependency. All ports, source flags and ordinary cycles are still validated.
+Static and historical parent-prefix evaluation excludes that Auxiliary from
+the parent ancestry, so children never become their own parents. This extends
+ADR0006/0020's former blanket cycle rejection without changing IDs, schemas,
+the saved edges or Core ABI9. No virtual public Particle identity is invented.
+
+New effects created as Auxiliary receive that name. Their Type, source Size,
+Disc Size and shape Angle controls are hidden, while saved values and guarded
+preset/rollback access remain intact. Shared rate, origin, speed, direction and
+Orient remain. Reference-only unimplemented controls are not advertised.
+
+Native102 adds cosmetic title drawing to editable node effects. The existing
+Reveal command records the located UUID/layer in resident Host session memory;
+draw events query it and draw a blue-cyan line in the first visible parameter
+title, preserving its label and ordinary value widget. This creates no parameter,
+undo entry or render dependency. PiPL/runtime CUSTOM_UI agree; no parameter
+indices or saved layouts change. Output's existing UI is not modified. First
+title placement, width, selection refresh and host collection variants require
+actual AE verification. Panel generation103 reloads shared authoring scripts.
+
+## P-07: Emitter / Auxiliary native presentation — 2026-10-19
+
+Owner reports identical native option lists and requests Auxiliary-only controls
+to be distinguished. The [reference user guide](https://superluminal.tv/user-guide)
+describes Auxiliary as emission from a parent particle system, with inheritable
+properties. This supports the source distinction; it does not establish exact
+reference timing or every inheritance kernel.
+
+Keep the shared Emitter AEX and all registered parameters, IDs, indices, values,
+animation, schemas and Core ABI unchanged. Ordinary Emitter hides runtime streams
+20..26: Emit Chance, Emit Life Start/End and Inherit Velocity/Size/Opacity/Color.
+Auxiliary exposes them using its existing source flag at stream34, independently
+of Emitting timing. Shared shape, origin, rate, speed and direction controls
+retain their existing behavior; no unimplemented inheritance controls are added.
+
+Native101 declares SEND_UPDATE_PARAMS_UI for Emitter in both PiPL and runtime.
+The implemented selector updates non-undoable AEGP HIDDEN flags. The supervised
+Panel Sync Guard temporarily exposes the bank for preset/transaction writes and
+rollback, restoring source visibility on release. This is presentation only;
+there is no layout or project-data migration. Offline tests and SDK compilation
+do not qualify ECW refresh, undo/reopen or preset editing in actual AE2023.
+
 Status: implementation in progress, M3-06. Owner requests reference parameter
 names/order, proper Emitting timing, Uniform default, Life Random, particle
 shapes/rotation/color controls, performance improvements and GPU by default.

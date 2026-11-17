@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -13,6 +14,19 @@ inline constexpr std::size_t max_requests = 64;
 inline constexpr std::size_t max_queued_bytes = 8 * 1024 * 1024;
 inline constexpr std::wstring_view channel = L"org.starfieldfx.webview2/1";
 struct Message { std::wstring id, kind, script; };
+struct GraphInput {std::wstring page;std::uint64_t epoch{};bool down{};};
+inline bool parse_graph_input(std::wstring_view text,GraphInput& output) {
+    const auto split=text.find(L'|'),last=text.rfind(L'|');
+    if(split==std::wstring_view::npos || split<8 || split>64 || last<=split+1 || last+2!=text.size() || text.size()>85)return false;
+    for(const auto c:text.substr(0,split))if(!((c>=L'a'&&c<=L'z') || (c>=L'0'&&c<=L'9') || c==L'-'))return false;
+    std::uint64_t epoch{};
+    for(const auto c:text.substr(split+1,last-split-1)) {
+        if(c<L'0'||c>L'9'||epoch>900719925474099ULL)return false;
+        epoch=epoch*10+unsigned(c-L'0');
+    }
+    if(!epoch || epoch>9007199254740991ULL || (text.back()!=L'0' && text.back()!=L'1'))return false;
+    output={std::wstring(text.substr(0,split)),epoch,text.back()==L'1'};return true;
+}
 inline std::wstring quote(std::wstring_view value) {
     constexpr wchar_t hex[]=L"0123456789abcdef";
     std::wstring result=L"\"";
@@ -75,7 +89,11 @@ inline bool parse(std::wstring_view json, Message& output) {
     }
     ws();if(!closed || at!=json.size() || !seen[0] || !seen[1] || !seen[2] || candidate.id.empty() || candidate.id.size()>64)return false;
     for(const auto c:candidate.id)if(!((c>=L'0'&&c<=L'9') || (c>=L'a'&&c<=L'z') || c==L'-'))return false;
-    if(candidate.kind==L"evalScript"){if(!seen[3] || candidate.script.empty() || candidate.script.size()>max_script)return false;}
+    if(candidate.kind==L"evalScript" || candidate.kind==L"evalScriptKeepGraphFocus"){if(!seen[3] || candidate.script.empty() || candidate.script.size()>max_script)return false;}
+    else if(candidate.kind==L"graphInputState"){GraphInput input;if(!seen[3] || !parse_graph_input(candidate.script,input))return false;}
+    else if(candidate.kind==L"nativeGraphDelete"){if(!seen[3] || candidate.script.empty() || candidate.script.size()>6400)return false;}
+    else if(candidate.kind==L"nativeGraphPatch"){if(!seen[3] || candidate.script.empty() || candidate.script.size()>48000)return false;}
+    else if(candidate.kind==L"nativeGraphDiagnostics"){if(!seen[3] || candidate.script.empty() || candidate.script.size()>6400)return false;}
     else if(candidate.kind!=L"openPresets" && candidate.kind!=L"close" && candidate.kind!=L"undo" && candidate.kind!=L"redo")return false;
     else if(seen[3])return false;
     output=std::move(candidate);return true;

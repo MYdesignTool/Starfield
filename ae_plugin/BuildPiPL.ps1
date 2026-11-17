@@ -6,10 +6,14 @@ param(
     [string]$VersionHeaderPath = '',
     [string]$OutFlagsName = 'STARFIELD_OUT_FLAGS',
     [string]$OutFlags2Name = 'STARFIELD_OUT_FLAGS2',
-    [switch]$GeneralPlugin
+    [switch]$GeneralPlugin,
+    [switch]$MfrQualification
 )
 
 $ErrorActionPreference = 'Continue'
+if($MfrQualification -and $GeneralPlugin){throw 'MFR belongs to effect modules, not the AEGP panel.'}
+$taskMfrDefine=if($MfrQualification){'/DSTARFIELD_MFR_QUALIFICATION'}else{''}
+if($MfrQualification){$OutFlags2Name+='_MFR_QUALIFICATION'}
 if (-not $FlagHeaderPath) { $FlagHeaderPath = Join-Path $PSScriptRoot 'PluginFlags.h' }
 if (-not $VersionHeaderPath) { $VersionHeaderPath = Join-Path $PSScriptRoot 'PluginVersion.h' }
 $null = New-Item -ItemType Directory -Force -Path $IntermediateDir
@@ -64,7 +68,7 @@ try {
     $batchPath = Join-Path $IntermediateDir 'BuildStarfieldPiPL.cmd'
     $batch = @"
 @echo off
-cl /nologo /Tc"$resourceArgument" /I "$headersArgument" /EP > "StarfieldPiPL.rr"
+cl /nologo /Tc"$resourceArgument" /I "$headersArgument" $taskMfrDefine /EP > "StarfieldPiPL.rr"
 if errorlevel 1 exit /b %errorlevel%
 "$toolArgument" "StarfieldPiPL.rr" "StarfieldPiPL.rrc"
 if errorlevel 1 exit /b %errorlevel%

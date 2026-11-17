@@ -90,7 +90,6 @@ struct Device {
     A_u_long index{};
     Runtime runtime;
     void* program{}; void* kernel{}; void* copy_kernel{};
-    std::mutex mutex;
     ~Device() {
         if(!runtime.dll) return;
         ContextScope context(runtime,info.device_framework,info.contextPV);
@@ -125,7 +124,7 @@ struct Device {
             runtime.cuMemcpyHtoDAsync(reinterpret_cast<DevicePtr>(buffer),source,bytes,info.command_queuePV) :
             runtime.clEnqueueWriteBuffer(info.command_queuePV,buffer,0,0,bytes,source,0,nullptr,nullptr);
     }
-    int dispatch(void* output,const std::array<void*,4>& buffers,std::array<unsigned,11>& values,float gain,unsigned rows) {
+    int dispatch(void* request_kernel,void* output,const std::array<void*,4>& buffers,std::array<unsigned,11>& values,float gain,unsigned rows) {
         if(info.device_framework==PF_GPU_Framework_CUDA) {
             std::array<DevicePtr,5> ptrs{reinterpret_cast<DevicePtr>(output),reinterpret_cast<DevicePtr>(buffers[0]),
                 reinterpret_cast<DevicePtr>(buffers[1]),reinterpret_cast<DevicePtr>(buffers[2]),reinterpret_cast<DevicePtr>(buffers[3])};
@@ -133,16 +132,35 @@ struct Device {
             for(unsigned i=0;i<5;++i) args[i]=&ptrs[i];
             for(unsigned i=0;i<11;++i) args[i+5]=&values[i];
             args[16]=&gain;
-            return runtime.cuLaunchKernel(kernel,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,info.command_queuePV,args.data(),nullptr);
+            return runtime.cuLaunchKernel(request_kernel,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,info.command_queuePV,args.data(),nullptr);
         }
         std::array<void*,5> ptrs{output,buffers[0],buffers[1],buffers[2],buffers[3]};
-        for(unsigned i=0;i<5;++i) {const auto err=runtime.clSetKernelArg(kernel,i,sizeof(void*),&ptrs[i]);if(err) return err;}
-        for(unsigned i=0;i<11;++i) {const auto err=runtime.clSetKernelArg(kernel,i+5,sizeof(unsigned),&values[i]);if(err) return err;}
-        if(const auto err=runtime.clSetKernelArg(kernel,16,sizeof(float),&gain);err)return err;
+        for(unsigned i=0;i<5;++i) {const auto err=runtime.clSetKernelArg(request_kernel,i,sizeof(void*),&ptrs[i]);if(err) return err;}
+        for(unsigned i=0;i<11;++i) {const auto err=runtime.clSetKernelArg(request_kernel,i+5,sizeof(unsigned),&values[i]);if(err) return err;}
+        if(const auto err=runtime.clSetKernelArg(request_kernel,16,sizeof(float),&gain);err)return err;
         const std::size_t global[2]{values[0],rows};
         // Let each driver choose legal local sizes, including narrow ROI worlds.
-        return runtime.clEnqueueNDRangeKernel(info.command_queuePV,kernel,2,nullptr,global,nullptr,0,nullptr,nullptr);
+        return runtime.clEnqueueNDRangeKernel(info.command_queuePV,request_kernel,2,nullptr,global,nullptr,0,nullptr,nullptr);
     }
+};
+// The compiled program is device-owned and immutable after setup. OpenCL kernel
+// argument state is mutable, so each overlapping/reentrant request owns a kernel.
+// CUDA launch arguments are already supplied per call. AE retains gpu_data from
+// device setup until setdown; no request may retain it past its selector return.
+struct RequestKernel {
+    Device& device;
+    void* handle{};
+    bool opencl{};
+    RequestKernel(Device& d,bool copy):device(d),opencl(d.info.device_framework==PF_GPU_Framework_OPENCL) {
+        if(opencl) {
+            int error{};
+            handle=d.runtime.clCreateKernel(d.program,copy?"starfield_copy_pixels":"starfield_sprite_render",&error);
+            if(error && handle) { (void)d.runtime.clReleaseKernel(handle); handle=nullptr; }
+        } else handle=copy?d.copy_kernel:d.kernel;
+    }
+    ~RequestKernel() { if(opencl && handle) (void)device.runtime.clReleaseKernel(handle); }
+    RequestKernel(const RequestKernel&)=delete;
+    RequestKernel& operator=(const RequestKernel&)=delete;
 };
 struct Suites {
     SPBasicSuite* basic{}; const PF_GPUDeviceSuite1* gpu{}; const PF_WorldSuite2* world{};
@@ -215,7 +233,6 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     auto* d=device(data);
     if(!in || !out || !output || !gpu_device_matches(d,framework,index) || scene.status!=SF_CORE_OK ||
         scene.struct_size!=sizeof(scene) || scene.tile_size!=16 || samples<1 || samples>64 || !(gain>=1 && gain<=11)) return PF_Err_BAD_CALLBACK_PARAM;
-    std::lock_guard lock(d->mutex);
     ContextScope context(d->runtime,framework,d->info.contextPV);
     if(!context.valid) return PF_Err_BAD_CALLBACK_PARAM;
     Suites suites; const auto suite_error=suites.acquire(in,true); if(suite_error) return suite_error;
@@ -255,6 +272,8 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     // Relative placement is supplied through normalized output origins by SmartRender.
     const auto roi_x=roi_width && roi_height?std::int64_t(scene.region.left)-world_left:0,roi_y=roi_width && roi_height?std::int64_t(scene.region.top)-world_top:0;
     if(roi_x<0 || roi_y<0 || roi_x+roi_width>output->width || roi_y+roi_height>output->height) return PF_Err_BAD_CALLBACK_PARAM;
+    RequestKernel kernel(*d,false);
+    if(!kernel.handle) return PF_Err_OUT_OF_MEMORY;
     FrameMemory memory{gpu,in->effect_ref,*d};
     std::array<std::size_t,4> bytes{std::max<std::size_t>(16,std::size_t(scene.sprite_count)*sizeof(SfGpuSprite)),
         std::max<std::size_t>(16,(std::size_t(scene.tiles_x)*scene.tiles_y+1)*samples*sizeof(std::uint32_t)),
@@ -283,7 +302,7 @@ PF_Err render_gpu_scene(PF_InData* in,PF_OutData* out,const void* data,PF_GPU_Fr
     for(unsigned y=0;y<values[1];y+=128) {
         const auto interrupted=PF_ABORT(in); if(interrupted) {out->return_msg[0]='\0';return interrupted;}
         values[4]=y;
-        if(d->dispatch(output_buffer,memory.buffers,values,gain,std::min(128u,values[1]-y))!=0 || d->sync()!=0) {
+        if(d->dispatch(kernel.handle,output_buffer,memory.buffers,values,gain,std::min(128u,values[1]-y))!=0 || d->sync()!=0) {
             std::snprintf(out->return_msg,sizeof(out->return_msg),"Starfield native GPU dispatch failed (%s, device %lu).",
                 framework==PF_GPU_Framework_CUDA?"CUDA":"OpenCL",static_cast<unsigned long>(index));
             return PF_Err_INTERNAL_STRUCT_DAMAGED;
@@ -298,7 +317,7 @@ PF_Err copy_gpu_pixels(PF_InData* in,const void* data,PF_GPU_Framework framework
     auto* d=device(data);
     if(!in || !input || !output || !gpu_device_matches(d,framework,index) || !d->copy_kernel) return PF_Err_BAD_CALLBACK_PARAM;
     if(output->width==0 || output->height==0) return PF_Err_NONE;
-    std::lock_guard lock(d->mutex);ContextScope context(d->runtime,framework,d->info.contextPV);
+    ContextScope context(d->runtime,framework,d->info.contextPV);
     if(!context.valid) return PF_Err_BAD_CALLBACK_PARAM;
     Suites suites;const auto suite_error=suites.acquire(in,true);if(suite_error)return suite_error;
     const auto& gpu=*suites.gpu;
@@ -319,18 +338,20 @@ PF_Err copy_gpu_pixels(PF_InData* in,const void* data,PF_GPU_Framework framework
         (buffers[0]==buffers[1] && (dx!=0 || dy!=0 || output->rowbytes!=input->rowbytes))) return PF_Err_BAD_CALLBACK_PARAM;
     std::array<unsigned,9> values{unsigned(output->width),unsigned(output->height),unsigned(output->rowbytes/4),
         unsigned(input->width),unsigned(input->height),unsigned(input->rowbytes/4),unsigned(std::int32_t(dx)),unsigned(std::int32_t(dy)),0};
+    RequestKernel kernel(*d,true);
+    if(!kernel.handle) return PF_Err_OUT_OF_MEMORY;
     for(unsigned y=0;y<values[1];y+=128) {
         const auto abort=PF_ABORT(in);if(abort)return abort;
         values[8]=y;const auto rows=std::min(128u,values[1]-y);int error{};
         if(framework==PF_GPU_Framework_CUDA) {
             std::array<DevicePtr,2> pointers{reinterpret_cast<DevicePtr>(buffers[0]),reinterpret_cast<DevicePtr>(buffers[1])};
             std::array<void*,11> args{&pointers[0],&pointers[1]};for(unsigned i=0;i<9;++i)args[i+2]=&values[i];
-            error=d->runtime.cuLaunchKernel(d->copy_kernel,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,d->info.command_queuePV,args.data(),nullptr);
+            error=d->runtime.cuLaunchKernel(kernel.handle,(values[0]+15)/16,(rows+7)/8,1,16,8,1,0,d->info.command_queuePV,args.data(),nullptr);
         } else {
-            for(unsigned i=0;i<2 && !error;++i)error=d->runtime.clSetKernelArg(d->copy_kernel,i,sizeof(void*),&buffers[i]);
-            for(unsigned i=0;i<9 && !error;++i)error=d->runtime.clSetKernelArg(d->copy_kernel,i+2,sizeof(unsigned),&values[i]);
+            for(unsigned i=0;i<2 && !error;++i)error=d->runtime.clSetKernelArg(kernel.handle,i,sizeof(void*),&buffers[i]);
+            for(unsigned i=0;i<9 && !error;++i)error=d->runtime.clSetKernelArg(kernel.handle,i+2,sizeof(unsigned),&values[i]);
             const std::size_t global[2]{values[0],rows};
-            if(!error)error=d->runtime.clEnqueueNDRangeKernel(d->info.command_queuePV,d->copy_kernel,2,nullptr,global,nullptr,0,nullptr,nullptr);
+            if(!error)error=d->runtime.clEnqueueNDRangeKernel(d->info.command_queuePV,kernel.handle,2,nullptr,global,nullptr,0,nullptr,nullptr);
         }
         // Borrowed worlds remain alive through completion even after enqueue errors.
         const auto completion=d->sync();if(error || completion)return PF_Err_INTERNAL_STRUCT_DAMAGED;

@@ -16,9 +16,133 @@
 // undo and persistence remain AE 2023 gates.
 
 (function () {
+    // Private ES3 JSON for clean AE engines. Never install/replace global JSON.
+    function createGatewayJSON() {
+        function quoteJSON(value) {
+            return '"' + value.replace(/[\\"\x00-\x1f\u2028\u2029\ud800-\udfff]/g, function (character) {
+                return "\\u" + ("0000" + character.charCodeAt(0).toString(16)).slice(-4);
+            }) + '"';
+        }
+        function stringify(value) {
+            var parents = [];
+            function encode(item, depth) {
+                if (depth > 64) throw new Error("JSON nesting limit exceeded.");
+                if (item === null) return "null";
+                var kind = typeof item;
+                if (kind === "string") return quoteJSON(item);
+                if (kind === "boolean") return String(item);
+                if (kind === "number") return isFinite(item) ? String(item) : "null";
+                if (kind !== "object") return undefined;
+                for (var p = 0; p < parents.length; p++) {
+                    if (parents[p] === item) throw new Error("Cyclic JSON value.");
+                }
+                parents.push(item);
+                var parts = [], encoded, key, result;
+                if (Object.prototype.toString.call(item) === "[object Array]") {
+                    for (var i = 0; i < item.length; i++) {
+                        encoded = encode(item[i], depth + 1);
+                        parts.push(typeof encoded === "undefined" ? "null" : encoded);
+                    }
+                    result = "[" + parts.join(",") + "]";
+                } else {
+                    for (key in item) if (Object.prototype.hasOwnProperty.call(item, key)) {
+                        encoded = encode(item[key], depth + 1);
+                        if (typeof encoded !== "undefined") parts.push(quoteJSON(key) + ":" + encoded);
+                    }
+                    result = "{" + parts.join(",") + "}";
+                }
+                parents.pop();
+                return result;
+            }
+            return encode(value, 0);
+        }
+        function parse(text) {
+            text = String(text);
+            var at = 0;
+            function invalid() { throw new Error("Invalid JSON at character " + at + "."); }
+            function space() { while (at < text.length && /[ \t\r\n]/.test(text.charAt(at))) at++; }
+            function string() {
+                var pieces = [], character, escape, digits, start;
+                at++;
+                start = at;
+                while (at < text.length) {
+                    character = text.charAt(at++);
+                    if (character === '"') { pieces.push(text.substring(start, at - 1)); return pieces.join(""); }
+                    if (character === "\\") {
+                        pieces.push(text.substring(start, at - 1));
+                        if (at >= text.length) invalid();
+                        escape = text.charAt(at++);
+                        if (escape === '"' || escape === "\\" || escape === "/") pieces.push(escape);
+                        else if (escape === "b") pieces.push("\b");
+                        else if (escape === "f") pieces.push("\f");
+                        else if (escape === "n") pieces.push("\n");
+                        else if (escape === "r") pieces.push("\r");
+                        else if (escape === "t") pieces.push("\t");
+                        else if (escape === "u") {
+                            digits = text.substr(at, 4);
+                            if (!/^[0-9a-fA-F]{4}$/.test(digits)) invalid();
+                            pieces.push(String.fromCharCode(parseInt(digits, 16))); at += 4;
+                        } else invalid();
+                        start = at;
+                    } else {
+                        if (character.charCodeAt(0) < 32) invalid();
+                    }
+                }
+                invalid();
+            }
+            function value(depth) {
+                if (depth > 64) invalid();
+                space();
+                var character = text.charAt(at), result, key, start;
+                if (character === '"') return string();
+                if (character === "[" || character === "{") {
+                    var array = character === "[", closing = array ? "]" : "}";
+                    result = array ? [] : {}; at++; space();
+                    if (text.charAt(at) === closing) { at++; return result; }
+                    while (at < text.length) {
+                        if (array) result.push(value(depth + 1));
+                        else {
+                            if (text.charAt(at) !== '"') invalid();
+                            key = string();
+                            if (key === "__proto__") invalid();
+                            space(); if (text.charAt(at++) !== ":") invalid();
+                            result[key] = value(depth + 1);
+                        }
+                        space(); character = text.charAt(at++);
+                        if (character === closing) return result;
+                        if (character !== ",") invalid();
+                        space();
+                    }
+                    invalid();
+                }
+                if (text.substr(at, 4) === "true") { at += 4; return true; }
+                if (text.substr(at, 5) === "false") { at += 5; return false; }
+                if (text.substr(at, 4) === "null") { at += 4; return null; }
+                function digit() { var c = text.charAt(at); return c >= "0" && c <= "9"; }
+                start = at;
+                if (text.charAt(at) === "-") at++;
+                if (text.charAt(at) === "0") at++;
+                else {
+                    if (text.charAt(at) < "1" || text.charAt(at) > "9" || !digit()) invalid();
+                    while (digit()) at++;
+                }
+                if (text.charAt(at) === ".") { at++; if (!digit()) invalid(); while (digit()) at++; }
+                if (text.charAt(at) === "e" || text.charAt(at) === "E") {
+                    at++; if (text.charAt(at) === "+" || text.charAt(at) === "-") at++;
+                    if (!digit()) invalid(); while (digit()) at++;
+                }
+                return Number(text.substring(start, at));
+            }
+            var result = value(0); space();
+            if (at !== text.length) invalid();
+            return result;
+        }
+        return {parse:parse,stringify:stringify};
+    }
+    var JSON = createGatewayJSON();
     var PROTOCOL = "org.starfieldfx.panel";
     var VERSION = 1;
-    var GATEWAY_BUILD = "native-presets-101";
+    var GATEWAY_BUILD = "native-presets-124";
     function nativeCommandId(name) {
         var owner = (typeof $ !== "undefined" && $.global) ? $.global : this;
         var bindings = owner.__SFLD_nativeCommandsV1, id;
@@ -197,8 +321,11 @@
         }
         var layer = null;
         var count = 0;
-        for (var i = 1; i <= comp.numLayers; i++) {
-            var candidate = comp.layer(i);
+        var selected=comp.selectedLayers;
+        var selectionArray=selected && typeof selected.length==="number";
+        var selectionCount=selectionArray?selected.length:comp.numLayers;
+        for (var i = 0; i < selectionCount; i++) {
+            var candidate = selectionArray?selected[i]:comp.layer(i+1);
             if (!candidate.selected) continue;
             // Any selected layer carrying the effect counts, whatever its kind. Text
             // layers were skipped here before, which made a selected text layer with the
@@ -254,10 +381,24 @@
         return findTarget();
     }
 
+    // Only panel discovery may follow selection or retain the last viewed
+    // layer. Mutations still resolve the explicit canvas target, never a guess.
+    function findPanelTarget(request) {
+        if(request && request.retainTarget===true && request.projectScope!==graphEditProjectScope())
+            return request.pinTarget===true?{error:{code:"no_target",message:"The previous canvas belongs to another project."}}:findTarget();
+        var target=findRequestTarget(request);
+        if(!target.error || !request || request.pinTarget===true || request.retainTarget!==true)return target;
+        if(target.error.code!=="no_target" && target.error.code!=="no_active_comp" && target.error.code!=="ambiguous_target")return target;
+        var retained=findTargetByToken(request.target && request.target.token);
+        return retained.error?target:retained;
+    }
+
     function transactionBackup(effect) {
         if(!effect)return false;
         var guard=effect.property(effect.matchName===MATCH_NAME?"Panel Graph Sync Guard":"Panel Sync Guard");
-        return !!guard && (Number(guard.value)===2 || Number(guard.value)===3);
+        if(!guard)return false;
+        var saved=Number(guard.valueAtTime(0,true));
+        return saved===2 || saved===3;
     }
     function effectCount(layer) {
         if (!layer) return 0;
@@ -1056,7 +1197,7 @@ function createNativeRecordContract() {
                 if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
                 if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
                 if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
-                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="8" && field.value!==0 && field.value!==3 && field.value!==4)invalid(node,"unsupported Turbulence Type");
                 if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
                 if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
                 if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");
@@ -1076,6 +1217,9 @@ function createNativeRecordContract() {
     var nativeRecords=createNativeRecordContract();
     // END STARFIELD NATIVE RECORD CONTRACT
     function readNativeNode(effect, layer) {
+        return readNativeNodeRecord(effect,layer,false);
+    }
+    function readNativeNodeRecord(effect, layer, canvasOnly) {
         var type = nativeNodeTypeByMatch(effect.matchName);
         var node = { id: nodeUuidValue(effect, "Node UUID "), type: type,
             schemaVersion: nativeRecords.version(type),
@@ -1089,7 +1233,20 @@ function createNativeRecordContract() {
             var value = nodeControlValue(effect, name);
             node.parameters.push({ key: String(key), type: 5, value: [Number(value[0]), Number(value[1]), Number(value[2])] });
         }
-        if (type === "org.starfieldfx.nodes.emitter") {
+        if(canvasOnly){
+            if(type==="org.starfieldfx.nodes.emitter"){scalar(2,"Particles Per Second");scalar(31,"Auxiliary Source",3);}
+            else if(type==="org.starfieldfx.nodes.particle"){
+                scalar(3,"Size (Pixels)");scalar(5,"Opacity");node.parameters[node.parameters.length-1].value/=100;
+                node.parameters.push({key:"15",type:3,value:particleShapeFromNative(Number(nodeControlValue(effect,"Shape")))});
+            }else if(type==="org.starfieldfx.nodes.transform"){scalar(5,transformControl(13));scalar(6,transformControl(14));}
+            else if(type==="org.starfieldfx.nodes.material"){scalar(1,materialControl(1),3);node.parameters[node.parameters.length-1].value--;}
+            else if(type==="org.starfieldfx.nodes.model"){scalar(13,modelControl(1),3);node.parameters[node.parameters.length-1].value--;}
+            else if(type==="org.starfieldfx.nodes.turbulence"){
+                var modes={1:0,2:3,3:4};node.parameters.push({key:"8",type:3,value:modes[Number(nodeControlValue(effect,"Turbulence Type"))]});
+            }else if(type==="org.starfieldfx.nodes.force"){
+                node.parameters.push({key:"1",type:5,value:[0,-Number(nodeControlValue(effect,"Gravity"))/Number(layer.height),0]});scalar(2,"Air Density");
+            }
+        } else if (type === "org.starfieldfx.nodes.emitter") {
             scalar(2, "Particles Per Second"); scalar(3, "Random Seed", 3);
             scalar(5, "Type", 3); node.parameters[node.parameters.length - 1].value--;
             var xy = nodeControlValue(effect, "Origin XY"), z = Number(nodeControlValue(effect, "Origin Z"));
@@ -1333,12 +1490,12 @@ function createNativeRecordContract() {
         return node;
     }
 
-    function readNativeNodes(layer) {
+    function readNativeNodes(layer,canvasOnly) {
         motionReadSamples = {};
         var nodes = [], parade = layer.property("ADBE Effect Parade");
         for (var i = 1; parade && i <= parade.numProperties; i++) {
             var effect = parade.property(i);
-            if (effect && nativeNodeTypeByMatch(effect.matchName) && !transactionBackup(effect)) nodes.push(readNativeNode(effect, layer));
+            if (effect && nativeNodeTypeByMatch(effect.matchName) && !transactionBackup(effect)) nodes.push(canvasOnly?readNativeNodeRecord(effect,layer,true):readNativeNode(effect,layer));
         }
         return nodes;
     }
@@ -1770,7 +1927,7 @@ function createNativeRecordContract() {
                 var connection = node.outgoing[e];
                 if (!connection || typeof connection.id !== "string" || !/^[0-9a-fA-F]{32}$/.test(connection.id) ||
                     typeof connection.target !== "string" || !/^[0-9a-fA-F]{32}$/.test(connection.target) ||
-                    connection.target.toLowerCase() === node.id || edgeIds["$" + connection.id.toLowerCase()]) {
+                    edgeIds["$" + connection.id.toLowerCase()]) {
                     throw new Error("node manifest contains an invalid or duplicate connection record.");
                 }
                 connection.id = connection.id.toLowerCase();
@@ -1804,7 +1961,8 @@ function createNativeRecordContract() {
             nativePropertyIndexes = [];
             if (!effect) throw new Error("AE did not return the effect instance.");
             stage = "name effect";
-            effect.name = spec.label + " " + node.id.substr(0, 6);
+            var sourceFlag=node.type==="org.starfieldfx.nodes.emitter"?nodeParameter(node,"31"):null;
+            effect.name = (sourceFlag && Number(sourceFlag.value)===1?"Auxiliary":spec.label) + " " + node.id.substr(0, 6);
             stage = "write node identity";
             setNodeIdentity(effect, node.id);
             stage = "write node record and parameters";
@@ -2044,6 +2202,83 @@ function createNativeRecordContract() {
         if(!isFinite(value) || Math.floor(value)!==value)throw new Error("The renderer guard is invalid.");
         return {property:property,value:value};
     }
+    // Failure evidence is bounded plain data in the existing script engine.
+    // No file I/O, AE references, recovery decisions or project writes. Reads
+    // and busy retries never replace the last mutating failure's captured trail.
+    function graphTraceScope() {
+        try {
+            var file=app.project.file;
+            if(file && typeof file.fsName==="string" && file.fsName.length>0 && file.fsName.length<=512)return file.fsName;
+        }catch(ignored){}
+        return ""; // Unproven identity: engine history only, never this lock's cause.
+    }
+    function graphEditProjectScope() {
+        try { var file=app.project.file;
+            if(file && typeof file.fsName==="string" && file.fsName.length<=4096)return file.fsName;
+        }catch(ignored){}
+        return "";
+    }
+    function graphTraceArray(value,limit) {
+        return Object.prototype.toString.call(value)==="[object Array]" && value.length<=limit;
+    }
+    function graphTrace(stage,request,detail,failed) {
+        try {
+            var key="__SFLD_graphTraceV1",state=host[key];
+            if(!state){state={version:2,events:[],failures:[]};host[key]=state;}
+            if(state.version!==2 || !graphTraceArray(state.events,32) || !graphTraceArray(state.failures,8))return;
+            var token="",operation="",scope=graphTraceScope(),i,found=-1;
+            if(request && request.target && typeof request.target.token==="string")token=request.target.token.substr(0,96);
+            if(request && typeof request.operation==="string")operation=request.operation.substr(0,64);
+            for(i=0;i<state.failures.length;i++)if(state.failures[i].target===token && state.failures[i].scope===scope)found=i;
+            var event={gateway:GATEWAY_BUILD,scope:scope,stage:String(stage).substr(0,64),target:token,operation:operation,
+                detail:String(detail || "").substr(0,512)};
+            if((stage==="guard.acquire" || stage==="model.accepted") && found>=0){state.failures.splice(found,1);found=-1;}
+            state.events.push(event);
+            if(state.events.length>32)state.events=state.events.slice(state.events.length-32);
+            if(failed && found<0){
+                var trail=[];
+                for(i=0;i<state.events.length;i++)if(state.events[i].target===token && state.events[i].scope===scope)trail.push(state.events[i]);
+                state.failures.push({scope:scope,target:token,event:event,trail:trail.slice(-12)});
+                if(state.failures.length>8)state.failures.shift();
+            }
+        }catch(ignored){} // Diagnostics must not change authoring or its failure.
+    }
+    function graphTraceEventCopy(event) {
+        function field(name,limit){var value=event[name];if(typeof value!=="string" || value.length>limit)throw new Error("Invalid trace field");return value;}
+        return {gateway:field("gateway",64),scope:field("scope",512),stage:field("stage",64),
+            target:field("target",96),operation:field("operation",64),detail:field("detail",512)};
+    }
+    function graphTraceText(request) {
+        try {
+            var token="",scope=graphTraceScope();
+            if(request && request.target)token=String(request.target.token).substr(0,96);
+            var state=host.__SFLD_graphTraceV1,trail=[],failure=null,history=null,i,j;
+            if(state) {
+                if(state.version!==2 || !graphTraceArray(state.events,32) || !graphTraceArray(state.failures,8))throw new Error("Invalid trace state");
+                for(i=0;i<state.events.length;i++) {
+                    var event=graphTraceEventCopy(state.events[i]);
+                    if(event.target===token && event.scope===scope)trail.push(event);
+                }
+                for(i=0;i<state.failures.length;i++) {
+                    var saved=state.failures[i];
+                    if(saved.target!==token || saved.scope!==scope)continue;
+                    if(!graphTraceArray(saved.trail,12))throw new Error("Invalid failure trail");
+                    var copied={scope:scope,target:token,event:graphTraceEventCopy(saved.event),trail:[]};
+                    if(copied.event.target!==token || copied.event.scope!==scope)throw new Error("Failure scope mismatch");
+                    for(j=0;j<saved.trail.length;j++) {
+                        var previous=graphTraceEventCopy(saved.trail[j]);
+                        if(previous.target!==token || previous.scope!==scope)throw new Error("Trail scope mismatch");
+                        copied.trail.push(previous);
+                    }
+                    if(scope)failure=copied;else history=copied;
+                }
+            }
+            var data={gateway:GATEWAY_BUILD,scope:scope,historyOnly:!scope,target:token,failure:failure,engineHistory:history,recent:trail.slice(-12)};
+            var text=JSON.stringify(data);
+            if(typeof text!=="string" || text.length>32768)throw new Error("Trace response limit");
+            return " Last graph trace: "+text;
+        }catch(ignored){return " Last graph trace unavailable.";}
+    }
     function graphBusyMessage(value,request) {
         var message="Another graph transaction owns this renderer (guard="+value+", gateway="+GATEWAY_BUILD+").";
         // Failure-only readback. Never replace the decision with a later sample
@@ -2064,11 +2299,12 @@ function createNativeRecordContract() {
             probe("propertyIndex",function(){return Number(source(40).propertyIndex);});
             message+=" Guard readback: "+JSON.stringify(data);
         } catch(error) {message+=" Guard readback unavailable: "+String(error);}
-        return message;
+        return message+graphTraceText(request);
     }
     function acquireGraphGuard(owner) {
         var state=graphGuardState(owner.request);
         if(state.value!==0)throw new Error(graphBusyMessage(state.value,owner.request));
+        graphTrace("guard.acquire",owner.request,"saved=0");
         // A failed/discarded acquisition cannot authorize rollback writes.
         // A setter may throw after saving1, so check that partial success too.
         try { state.property.setValue(1); }
@@ -2079,6 +2315,7 @@ function createNativeRecordContract() {
         }
         owner.owned=graphGuardState(owner.request).value===1;
         if(!owner.owned)throw new Error("Renderer guard acquisition was not saved.");
+        graphTrace("guard.owned",owner.request,"saved=1");
     }
     function releaseGraphGuard(owner) {
         var state=graphGuardState(owner.request);
@@ -2087,6 +2324,7 @@ function createNativeRecordContract() {
         var saved=graphGuardState(owner.request).value;
         if(saved!==0)throw new Error("Renderer guard release was not saved (guard="+saved+").");
         owner.owned=false;owner.released=true;
+        graphTrace("guard.released",owner.request,"saved=0");
     }
     function graphCleanupFailure(result,error) {
         var message="Renderer transaction cleanup failed: "+String(error)+" ("+GATEWAY_BUILD+").";
@@ -2094,24 +2332,26 @@ function createNativeRecordContract() {
         return {ok:false,error:{code:"graph_guard_release_failed",message:message}};
     }
     function finishGraphGuard(owner,keepGuard,groupOpen,result) {
+        if(owner.owned && keepGuard)graphTrace("guard.kept",owner.request,
+            result && result.error && result.error.message,true);
         if(owner.owned && !keepGuard) {
             try { releaseGraphGuard(owner); }
-            catch(releaseError) { result=graphCleanupFailure(result,releaseError); }
+            catch(releaseError) { graphTrace("guard.release.failed",owner.request,releaseError,true);result=graphCleanupFailure(result,releaseError); }
         }
         if(groupOpen) {
             try { app.endUndoGroup(); }
-            catch(undoError) { result=graphCleanupFailure(result,undoError); }
+            catch(undoError) { graphTrace("undo.close.failed",owner.request,undoError,true);result=graphCleanupFailure(result,undoError); }
         }
         if(owner.released) {
             try {
                 var saved=graphGuardState(owner.request).value;
                 if(saved!==0)throw new Error("Renderer guard changed after undo closure (guard="+saved+").");
-            } catch(verifyError) { result=graphCleanupFailure(result,verifyError); }
+            } catch(verifyError) { graphTrace("guard.verify.failed",owner.request,verifyError,true);result=graphCleanupFailure(result,verifyError); }
         }
         return result;
     }
 
-    function nativeSnapshot(resolved) {
+    function nativeSnapshot(resolved,canvasOnly) {
         var revision = Number(resolved.properties.revision.value);
         var high = Number(resolved.properties.checksumHigh.value), low = Number(resolved.properties.checksumLow.value);
         if (!isFinite(revision) || Math.floor(revision) !== revision || revision < 0 || revision > MAX_GRAPH_REVISION ||
@@ -2120,20 +2360,37 @@ function createNativeRecordContract() {
         }
         var checksum = (high * 65536 + low).toString(16);
         while (checksum.length < 8) checksum = "0" + checksum;
-        var nodes = readNativeNodes(resolved.target.layer), repairNeeded = false;
+        if(canvasOnly && Number(resolved.properties.nodeEffectsReady.value)===1 && revision>0){
+            if(Number(resolved.properties.guard.value)!==0)throw new Error("The graph is being edited; its canvas is not ready yet.");
+            var displayNodes=readNativeNodes(resolved.target.layer,true);
+            var displayRenderer={id:"000000000000000000000000000000ff",maxParticles:Number(findEffectProperty(resolved.target.effect,"Max Particles").value),
+                position:{x:Number(findEffectProperty(resolved.target.effect,"Layout Output X").value),y:Number(findEffectProperty(resolved.target.effect,"Layout Output Y").value)}};
+            return {canvasOnly:true,initialized:true,revision:revision,checksum:checksum,nativeNodes:displayNodes,renderer:displayRenderer,
+                projectScope:graphEditProjectScope(),geometry:{width:Number(resolved.target.layer.width),height:Number(resolved.target.layer.height),
+                    pixelAspect:resolved.target.layer.source?Number(resolved.target.layer.source.pixelAspect):1},
+                canvasStamp:authoringStamp(displayNodes,displayRenderer)};
+        }
+        var nodes = readNativeNodes(resolved.target.layer), repairNeeded = false, repairReason = "";
         var hasTransform=false;
         for(var resourceNode=0;resourceNode<nodes.length;resourceNode++)
             if(nodes[resourceNode].type==="org.starfieldfx.nodes.transform" ||
                 (nodes[resourceNode].type==="org.starfieldfx.nodes.particle" &&
                     (Number(nodeParameter(nodes[resourceNode],15).value)===3 ||
                      Number(nodeParameter(nodes[resourceNode],31).value)>0 || Number(nodeParameter(nodes[resourceNode],32).value)>0)))hasTransform=true;
-        try { validateNodeManifest(nodes); } catch (invalidRecord) { repairNeeded = true; }
+        try { validateNodeManifest(nodes); } catch (invalidRecord) {
+            repairNeeded = true;
+            try { repairReason=String(invalidRecord).substr(0,1000); }
+            catch(unreadableReason){repairReason="Native node records failed validation.";}
+        }
         var renderer = readRendererRecord(resolved);
         return { initialized: Number(resolved.properties.nodeEffectsReady.value) === 1 && revision > 0 && !repairNeeded,
-            repairNeeded: repairNeeded, revision: revision, checksum: checksum, nativeNodes: nodes,
+            repairNeeded: repairNeeded, repairReason:repairReason, revision: revision, checksum: checksum, nativeNodes: nodes,
+            projectScope: graphEditProjectScope(),
             renderer: renderer, layerResources: hasTransform ?
                 layerInventory(resolved.target.layer).entries : [], geometry: { width:Number(resolved.target.layer.width), height:Number(resolved.target.layer.height),
                 pixelAspect:resolved.target.layer.source ? Number(resolved.target.layer.source.pixelAspect) : 1 },
+            compTime:Number(resolved.target.comp.time),
+            panelStamp:panelStamp(resolved.target,resolved.token,"Node Graph",[revision,Number(resolved.properties.nodeEffectsReady.value),high,low],renderer,null),
             recordStamp:authoringStamp(nodes,renderer) };
     }
 
@@ -2153,6 +2410,7 @@ function createNativeRecordContract() {
     }
 
     function triggerGraphCarrier(resolved, undoLabel, requestId, nonce, manageUndoGroup) {
+        var traceRequest={target:{token:resolved.token},operation:"nativeGraphCommit"};
         var commit = resolved.properties.commit;
         var receipt = resolved.properties.receipt;
         if (typeof nonce !== "number") nonce = nextGraphNonce(commit, receipt);
@@ -2165,11 +2423,13 @@ function createNativeRecordContract() {
                 groupOpen = true;
             }
             commit.setValue(nonce);
+            graphTrace("native.commit.begin",traceRequest,"nonce="+nonce);
             // Explicit synchronous AEGP command. setValue is only a request
             // write; no supervised callback or queued idle script is assumed.
             app.executeCommand(command);
         } catch (error) {
             failed = error.toString();
+            graphTrace("native.commit.failed",traceRequest,failed,true);
         } finally {
             if (groupOpen) {
                 try { app.endUndoGroup(); }
@@ -2182,6 +2442,7 @@ function createNativeRecordContract() {
         var acknowledged=graphCarrierTarget({pinTarget:true,target:{token:resolved.token}});
         if(acknowledged.error)return {ok:false,error:acknowledged.error};
         var acceptedNonce = Number(acknowledged.properties.receipt.value);
+        graphTrace("native.commit.receipt",traceRequest,"requested="+nonce+", saved="+acceptedNonce,acceptedNonce!==nonce);
         if (acceptedNonce !== nonce) {
             if (acceptedNonce === -nonce) {
                 return { ok: false, error: { code: "graph_commit_rejected", message: "The effect rejected the graph transaction. The existing graph was kept." },
@@ -2327,14 +2588,21 @@ function createNativeRecordContract() {
         var groupOpen = false, added = [], previous = [], layer = resolved.target.layer;
         var owner={request:request,owned:false,released:false},keepRollbackGuard=false,result=null;
         var wasReady = Number(resolved.properties.nodeEffectsReady.value);
+        var syncStep="preflight";
         try {
             graphCommitCommand(); // Reject mismatched installation before adding effects.
             var guardValue=graphGuardState(request).value;
             if (guardValue !== 0) throw new Error(graphBusyMessage(guardValue,request));
             app.beginUndoGroup("Starfield: synchronize node effects"); groupOpen = true;
             acquireGraphGuard(owner);
+            graphTrace("sync.begin",request,"ready="+wasReady+", reason="+
+                (typeof request.syncReason==="string"?request.syncReason.substr(0,400):"unavailable"));
+            syncStep="initialize native effects";
             if (wasReady !== 1) {
                 var existing = reconcileNativeRecords(layer), occupied = nodeIds(existing);
+                var startupIdentity = !existing.length && Number(resolved.properties.revision.value) === 0 &&
+                    controlSource(resolved.target.effect) === "Node Graph";
+                var startupPrefix = "81cb8bb1f320411498f5d25b54912c";
                 previous = JSON.parse(JSON.stringify(existing));
                 occupied["$000000000000000000000000000000ff"] = true;
                 var emitter = null, particle = null;
@@ -2346,21 +2614,21 @@ function createNativeRecordContract() {
                 }
                 var initial = [];
                 if (!emitter) {
-                    emitter = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:7,
+                    emitter = {id:startupIdentity?startupPrefix+"01":newNodeUuid(occupied),type:"org.starfieldfx.nodes.emitter",schemaVersion:7,
                         parameters:[{key:"6",type:5,value:[0,0,0]}],position:{x:180,y:22},outgoing:[]};
                     initial.push(emitter);
                 }
                 if (!particle) {
-                    particle = {id:newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:7,
+                    particle = {id:startupIdentity?startupPrefix+"03":newNodeUuid(occupied),type:"org.starfieldfx.nodes.particle",schemaVersion:7,
                         parameters:[],position:{x:180,y:190},outgoing:[]};
                     initial.push(particle);
                 }
                 var wiring = [];
                 if (!emitter.outgoing.length) {
-                    emitter.outgoing = [{id:newNodeUuid(occupied),target:particle.id}]; wiring.push(emitter);
+                    emitter.outgoing = [{id:startupIdentity?startupPrefix+"06":newNodeUuid(occupied),target:particle.id}]; wiring.push(emitter);
                 }
                 if (!particle.outgoing.length) {
-                    particle.outgoing = [{id:newNodeUuid(occupied),target:"000000000000000000000000000000ff"}];
+                    particle.outgoing = [{id:startupIdentity?startupPrefix+"07":newNodeUuid(occupied),target:"000000000000000000000000000000ff"}];
                     wiring.push(particle);
                 }
                 for (var n = 0; n < initial.length; n++) {
@@ -2377,7 +2645,9 @@ function createNativeRecordContract() {
             }
             resolved = graphCarrierTarget(request);
             if (resolved.error) throw new Error(resolved.error.message);
+            syncStep="reconcile native records";
             reconcileNativeRecords(layer);
+            syncStep="publish native graph";
             resolved.properties.nodeEffectsReady.setValue(1);
             var receipt = triggerGraphCarrier(resolved, "Starfield: compile node effects", request.requestId, null, false);
             if (!receipt.ok) throw new Error(receipt.error.message);
@@ -2405,7 +2675,8 @@ function createNativeRecordContract() {
                 restored.properties.nodeEffectsReady.setValue(wasReady);
                 }
             } catch (rollbackError) { keepRollbackGuard=true;rollbackMessage = " Bootstrap rollback failed; renderer remains guarded: " + rollbackError.toString(); }
-            result={ok:false,error:{code:"node_effect_sync_failed",message:error.toString()+rollbackMessage}};
+            if(owner.owned)graphTrace("sync.failed",request,syncStep+": "+String(error)+rollbackMessage,true);
+            result={ok:false,error:{code:"node_effect_sync_failed",message:syncStep+": "+String(error)+rollbackMessage+(owner.owned?graphTraceText(request):"")}};
         } finally {
             result=finishGraphGuard(owner,keepRollbackGuard,groupOpen,result);
         }
@@ -2529,8 +2800,8 @@ function createNativeRecordContract() {
         return Number(property.value) === 2 ? "Node Graph" : "AE Controls";
     }
 
-    function getState(request) {
-        var target = findRequestTarget(request);
+    function getState(request,knownTarget) {
+        var target = knownTarget || findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
         var report = { resolution: "name" };
         var token = targetToken(target);
@@ -2690,7 +2961,19 @@ function createNativeRecordContract() {
     }
 
     function getPanelState(request) {
-        var state = JSON.parse(getState(request));
+        var target=findPanelTarget(request);
+        if(target.error)return fail(target.error.code,target.error.message);
+        if(controlSource(target.effect)==="Node Graph") {
+            var token=targetToken(target),carrier=graphCarrierTarget({target:{token:token},pinTarget:true});
+            if(carrier.error)return fail(carrier.error.code,carrier.error.message);
+            var snapshot=nativeSnapshot(carrier,request.canvasOnly===true);
+            return reply({ok:true,operation:"getPanelState",requestId:request.requestId || "",
+                target:{token:token,comp:target.comp.name,layer:target.layer.name},
+                controlSource:"Node Graph",resolution:"native",layoutPersistence:true,
+                revision:(snapshot.canvasOnly?"canvas-":"graph-")+snapshot.revision+"-"+(snapshot.canvasOnly?snapshot.canvasStamp:snapshot.recordStamp),snapshot:snapshot,
+                frameStatus:snapshot.canvasOnly?null:JSON.parse(getFrameStatus({target:{token:token},pinTarget:true},target))});
+        }
+        var state = JSON.parse(getState(request,target));
         if (!state.ok) return reply(state);
         var resolved = graphCarrierTarget({target:{token:state.target.token},pinTarget:true});
         if (resolved.error) return fail(resolved.error.code,resolved.error.message);
@@ -2699,8 +2982,26 @@ function createNativeRecordContract() {
         return reply(state);
     }
 
+    function panelStamp(target,token,source,markers,renderer,legacyRevision) {
+        var parade=target.layer.property("ADBE Effect Parade"),semantic={};
+        for(var key in renderer)if(Object.prototype.hasOwnProperty.call(renderer,key) && key!=="position" && key!=="timeRemapSeconds")semantic[key]=renderer[key];
+        // Timeline and cosmetic coordinates do not change graph structure.
+        return JSON.stringify([token,source,source==="AE Controls"?Number(target.comp.time):null,markers,
+            parade?parade.numProperties:0,Number(target.comp.numLayers),Number(target.layer.width),Number(target.layer.height),
+            target.layer.source?Number(target.layer.source.pixelAspect):1,source==="AE Controls"?renderer:semantic,legacyRevision]);
+    }
+
     function getPanelPulse(request) {
-        var target = findRequestTarget(request);
+        var target = findPanelTarget(request);
+        if(request.selectionOnly===true){
+            var absent=target.error && (target.error.code==="no_target" || target.error.code==="no_effect" ||
+                target.error.code==="no_active_comp" || target.error.code==="no_project");
+            if(target.error && !absent)return fail(target.error.code,target.error.message);
+            var selectionToken=absent?null:targetToken(target),scope=graphEditProjectScope();
+            if(!absent && selectionToken===null)return fail("host_error","The panel target identity is unavailable.");
+            return reply({ok:true,operation:"getPanelPulse",selectionOnly:true,projectScope:scope,
+                target:selectionToken?{token:selectionToken}:null,selectionStamp:JSON.stringify([scope,selectionToken])});
+        }
         if (target.error) return fail(target.error.code,target.error.message);
         var token = targetToken(target);
         if (token === null) return fail("host_error","The panel target identity is unavailable.");
@@ -2712,20 +3013,17 @@ function createNativeRecordContract() {
             markers.push(Number(property.value));
         }
         var renderer = readRendererRecord({target:target});
-        var frame = JSON.parse(getFrameStatus({target:{token:token},pinTarget:true}));
+        var frame = JSON.parse(getFrameStatus({target:{token:token},pinTarget:true},target));
         if (!frame.ok) return reply(frame);
-        var parade = target.layer.property("ADBE Effect Parade");
         var legacyRevision = source === "AE Controls" ? currentRevision(target,{}) : null;
         // No sibling control reads, curve decoding, simulation or writes here.
-        var stamp = JSON.stringify([token,source,Number(target.comp.time),markers,
-            parade ? parade.numProperties : 0,Number(target.comp.numLayers),Number(target.layer.width),Number(target.layer.height),
-            target.layer.source ? Number(target.layer.source.pixelAspect) : 1,renderer,legacyRevision]);
+        var stamp = panelStamp(target,token,source,markers,renderer,legacyRevision);
         return reply({ok:true,operation:"getPanelPulse",requestId:request.requestId || "",
-            target:{token:token},stamp:stamp,frameStatus:frame});
+            target:{token:token},projectScope:graphEditProjectScope(),stamp:stamp,compTime:Number(target.comp.time),authorTimeSeconds:renderer.timeRemapSeconds,frameStatus:frame});
     }
 
-    function getFrameStatus(request) {
-        var target = findRequestTarget(request);
+    function getFrameStatus(request,knownTarget) {
+        var target = knownTarget || findRequestTarget(request);
         if (target.error) return fail(target.error.code, target.error.message);
         var token = targetToken(target);
         if (token === null) return fail("host_error", "AE did not provide stable IDs for the project, composition, layer, and effect.");
@@ -2875,6 +3173,59 @@ function createNativeRecordContract() {
         var updated = getState({ requestId: request.requestId, pinTarget: request.pinTarget,
                                  target: request.target });
         return updated;
+    }
+
+    // Persist presentation metadata without compiling, uploading a manifest,
+    // duplicating effects, or reading any particle controls/curves.
+    function setGraphNodeLayout(request) {
+        if(typeof request.projectScope!=="string" || request.projectScope!==graphEditProjectScope())
+            return fail("stale_project","The project changed before its layout was saved.");
+        if(!nativeRecords.array(request.positions) || !request.positions.length || request.positions.length>64)
+            return fail("invalid_request","Expected 1 to 64 changed node positions.");
+        var resolved=graphCarrierTarget(request);
+        if(resolved.error)return fail(resolved.error.code,resolved.error.message);
+        if(controlSource(resolved.target.effect)!=="Node Graph" || Number(resolved.properties.nodeEffectsReady.value)!==1 ||
+            Number(resolved.properties.revision.value)<=0 || Number(resolved.properties.guard.value)!==0)
+            return fail("graph_not_ready","The renderer is not idle and initialized for layout editing.");
+        var planned=[],seen={};
+        function coordinate(value){return typeof value==="number" && isFinite(value) && Math.abs(value)<=1000000000;}
+        // Millipixel wire rounding, never a coordinate-relative pixel budget.
+        function equal(a,b){return Math.abs(a-b)<=0.001;}
+        for(var i=0;i<request.positions.length;i++) {
+            var change=request.positions[i];
+            if(!change || !/^[0-9a-f]{32}$/.test(change.id) || /^0{32}$/.test(change.id) || seen["$"+change.id] || !change.from || !change.to)
+                return fail("invalid_request","Invalid or duplicate layout node identity.");
+            seen["$"+change.id]=true;
+            var output=change.id==="000000000000000000000000000000ff";
+            var effect=output?resolved.target.effect:nodeEffectById(resolved.target.layer,change.id);
+            if(!effect)return fail("stale_layout","A moved node no longer exists.");
+            if(!output && Number(nodeControlValue(effect,"Panel Sync Guard"))!==0)return fail("graph_not_ready","A moved node is busy.");
+            for(var axisIndex=0;axisIndex<2;axisIndex++) {
+                var axis=axisIndex===0?"x":"y";
+                if(!coordinate(change.from[axis]) || !coordinate(change.to[axis]))return fail("invalid_value","Invalid layout coordinate.");
+                var property=output?findEffectProperty(effect,"Layout Output "+axis.toUpperCase()):findNodeControl(effect,"Node Layout "+axis.toUpperCase());
+                if(!property || typeof property.setValue!=="function")return fail("missing_parameter","A layout stream is unavailable.");
+                if(property.numKeys>0 || property.isTimeVarying)return fail("animated_parameter","Layout streams must remain constant.");
+                var previous=Number(property.value);
+                if(!coordinate(previous))return fail("invalid_value","The saved layout coordinate is invalid.");
+                if(equal(previous,change.to[axis]))continue;
+                if(!equal(previous,change.from[axis]))return fail("stale_layout","Node positions changed outside this edit. Refresh before moving them again.");
+                planned.push({property:property,previous:previous,value:change.to[axis]});
+            }
+        }
+        var opened=false,attempted=-1,error=null,rollbackError=null,undoError=null;
+        try {
+            if(planned.length){app.beginUndoGroup("Starfield: move nodes");opened=true;}
+            for(var p=0;p<planned.length;p++){attempted=p;planned[p].property.setValue(planned[p].value);}
+        } catch(writeError) {
+            error=String(writeError);
+            for(var r=attempted;r>=0;r--)try{planned[r].property.setValue(planned[r].previous);}catch(restoreError){rollbackError=rollbackError || String(restoreError);}
+        } finally {
+            if(opened)try{app.endUndoGroup();}catch(closeError){undoError=String(closeError);}
+        }
+        if(error || undoError)return fail("layout_save_failed",(error || "Layout was written, but Undo closure failed.")+
+            (rollbackError?" Restore failed: "+rollbackError:"")+(undoError?" Undo: "+undoError:""));
+        return reply({ok:true,operation:"setGraphNodeLayout",requestId:request.requestId || "",target:{token:resolved.token},written:planned.length});
     }
 
     function setNodeLayout(request) {
@@ -3138,6 +3489,11 @@ function createNativeRecordContract() {
     host.SFLD_getFrameStatus = SFLD_getFrameStatus;
     host.SFLD_setParameters = SFLD_setParameters;
     host.SFLD_setNodeLayout = SFLD_setNodeLayout;
+    host.SFLD_setGraphNodeLayout = function(requestJson) {
+        var request=parseRequest(requestJson);
+        if(!request || request.operation!=="setGraphNodeLayout")return fail("invalid_request","Invalid graph layout request.");
+        try{return setGraphNodeLayout(request);}catch(error){return fail("layout_save_failed",String(error));}
+    };
     host.SFLD_getGraphSnapshot = SFLD_getGraphSnapshot;
     host.SFLD_syncGraphSnapshot = SFLD_syncGraphSnapshot;
     host.SFLD_submitGraph = SFLD_submitGraph;
@@ -3287,12 +3643,13 @@ function createNativeRecordContract() {
     };
     // File transport is loaded only by explicit preset file actions. Its sessions
     // contain bounded plain data; these closures carry no host object references.
-    host.__SFLD_presetFileAPI={parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
-    host.__SFLD_modelTransactionAPI={gatewayBuild:GATEWAY_BUILD,recordContractId:nativeRecords.id,recordSchema:nativeRecords.schema,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
+    host.__SFLD_presetFileAPI={json:JSON,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES};
+    host.__SFLD_modelTransactionAPI={json:JSON,gatewayBuild:GATEWAY_BUILD,recordContractId:nativeRecords.id,recordSchema:nativeRecords.schema,parse:parseRequest,reply:reply,fail:fail,maxGraphBytes:MAX_GRAPH_BYTES,
+        trace:graphTrace,
         resolve:graphCarrierTarget,snapshot:nativeSnapshot,validateNodes:validateNodeManifest,validateRenderer:validateRendererManifest,
         validateTransform:validateTransformResources,modelRecord:validateModelRecord,ensure:ensureNativeNodeEffects,
         retire:retireNativeNodeEffects,remove:removeNativeNodeEffects,removed:removedNodeIds,writeRenderer:writeRendererRecord,nonce:nextGraphNonce,
-        trigger:triggerGraphCarrier,float64:readGraphFloat64};
+        trigger:triggerGraphCarrier,float64:readGraphFloat64,guardState:graphGuardState};
     // Readiness probe for the panel's self-loading path: cheap, side-effect free.
     host.SFLD_ready = function () { return PROTOCOL + "/" + VERSION + "/" + GATEWAY_BUILD; };
 })();

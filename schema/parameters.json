@@ -1,7 +1,7 @@
 {
-  "manifestVersion": 30,
-  "schemaVersion": 30,
-  "revisionNote": "Unpublished M3-17 appends main Model mirrors755..1010 and count1011 by new disk1900..2155/2200. Existing streams0..754/IDs/defaults stay fixed. Complete paired author release required; ADR0038.",
+  "manifestVersion": 31,
+  "schemaVersion": 31,
+  "revisionNote": "UX-16 / ADR0049 changes only fresh Control Source default to Node Graph; oldProjectValue1 and all IDs/counts stay fixed. M3-17 Model mirrors755..1010/count1011 use disk1900..2155/2200 per ADR0038. Graph sequence encoding is unchanged; deploy the complete native/panel pair.",
   "effect": {
     "displayName": "Starfield Particle",
     "matchName": "org.starfieldfx.particle",
@@ -419,14 +419,14 @@
       "key": "control_source",
       "label": "Control Source",
       "type": "popup",
-      "default": 1,
+      "default": 2,
       "oldProjectValue": 1,
       "animated": false,
       "choices": [
         "AE Controls",
         "Node Graph"
       ],
-      "note": "Defaults to AE Controls (revision 6):  a fresh effect drives the visible controls. USE_VALUE_FOR_OLD_PROJECTS keeps old projects on AE Controls; switching alone never replaces the stored graph.",
+      "note": "ADR0049: new/reset effects default to Node Graph with the initial native-node appearance. USE_VALUE_FOR_OLD_PROJECTS retains AE Controls for old projects missing this parameter; persisted source values are unchanged.",
       "hidden": true
     },
     {

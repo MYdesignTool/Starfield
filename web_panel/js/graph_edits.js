@@ -28,7 +28,7 @@
         "org.starfieldfx.nodes.transform": { input: "1", output: "2" },
         "org.starfieldfx.nodes.motion": {input:"1",output:"2"},
         "org.starfieldfx.nodes.turbulence": {input:"1",output:"2"},
-        "org.starfieldfx.nodes.model": { output: "1" },
+        "org.starfieldfx.nodes.model": { input: "2", output: "1" },
         "org.starfieldfx.nodes.material": { input:"2",output:"1" },
         "org.starfieldfx.nodes.output": { input: "1" }
     };
@@ -218,7 +218,7 @@ function createNativeRecordContract() {
                 if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
                 if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
                 if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
-                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="8" && field.value!==0 && field.value!==3 && field.value!==4)invalid(node,"unsupported Turbulence Type");
                 if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
                 if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
                 if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");
@@ -325,49 +325,14 @@ function createNativeRecordContract() {
         var source = nodeById(graph, sourceId);
         var destination = nodeById(graph, destinationId);
         if (!source || !destination) fail("missing_node", "connection endpoint does not exist");
-        if (sourceId === destinationId) fail("cycle", "a node cannot connect to itself");
-        var sourceSchema = PORTS[source.type];
-        var destinationSchema = PORTS[destination.type];
-        var geometrySource=source.type===TYPES.model || source.type===TYPES.material;
-        var modelConnection=destinationSchema && geometrySource && destination.type===TYPES.particle &&
-            String(destinationPort)===destinationSchema.modelInput;
-        if (!sourceSchema || !destinationSchema || sourceSchema.output !== String(sourcePort) ||
-            (!modelConnection && destinationSchema.input !== String(destinationPort))) {
-            fail("invalid_port", "connection must use a compatible built-in output and input port");
-        }
-        if(geometrySource && !modelConnection && destination.type!==TYPES.output && destination.type!==TYPES.material)
-            fail("invalid_model_destination","Connect geometry to Material, Particle or Output.");
-        if(destination.type===TYPES.material && !geometrySource)
-            fail("invalid_material_connection","A Material input accepts model geometry.");
-        if(destination.type===TYPES.material && graph.edges.some(function(e){return e.destinationNode===destination.id && e.sourceNode!==source.id;}))
-            fail("material_already_connected","A Material accepts one geometry input.");
-        if (source.type === TYPES.emitter && destination.type !== TYPES.particle) {
-            fail("emitter_requires_particle", "an emitter must connect directly to a Particle node");
-        }
-        if (destination.type === TYPES.particle && source.type !== TYPES.emitter && !modelConnection) {
-            fail("particle_requires_emitter", "a Particle node input accepts an Emitter directly");
-        }
-        if (destination.type === TYPES.emitter) {
-            var mode = destination.parameters.filter(function (p) { return p.key === "31"; })[0];
-            if (!mode || Number(mode.value) !== 1) fail("auxiliary_required", "Create an Auxiliary source before connecting a parent stream.");
-        }
-        // Reject a cycle before producing a request. The native validator still checks
-        // the complete graph, including node-specific stage rules and resource limits.
-        var adjacency = {};
-        for (var i = 0; i < graph.edges.length; i++) {
-            var edge = graph.edges[i];
-            (adjacency["$" + edge.sourceNode] || (adjacency["$" + edge.sourceNode] = [])).push(edge.destinationNode);
-        }
-        var pending = [destinationId];
-        var visited = {};
-        while (pending.length) {
-            var current = pending.pop();
-            if (current === sourceId) fail("cycle", "connection would create a cycle");
-            if (visited["$" + current]) continue;
-            visited["$" + current] = true;
-            var next = adjacency["$" + current] || [];
-            for (var j = 0; j < next.length; j++) pending.push(next[j]);
-        }
+        var sourceSchema = PORTS[source.type], destinationSchema = PORTS[destination.type];
+        var geometry = source.type === TYPES.model || source.type === TYPES.material;
+        var canonicalInput = geometry && destination.type === TYPES.particle ? "3" : destinationSchema && destinationSchema.input;
+        if (!sourceSchema || !destinationSchema || !sourceSchema.output ||
+            String(sourcePort) !== sourceSchema.output || String(destinationPort) !== canonicalInput)
+            fail("invalid_port", "Use this node's visible output and input ports.");
+        // Semantic mistakes are retained as author wires. Core alone decides
+        // the executable subset and supplies persisted node warnings.
     }
 
     function addNode(graph, edit, idFactory, positions) {
@@ -482,7 +447,7 @@ function createNativeRecordContract() {
         return edit;
     }
 
-    function deleteNodes(graph, edit, positions) {
+    function deleteNodes(graph, edit, positions, idFactory) {
         if (Object.prototype.toString.call(edit.nodeIds) !== "[object Array]" || !edit.nodeIds.length) {
             fail("invalid_edit", "deleteNodes requires at least one node ID");
         }
@@ -496,12 +461,23 @@ function createNativeRecordContract() {
                 fail("required_output", "the required Output node cannot be deleted");
             }
         }
-        graph.nodes = graph.nodes.filter(function (node) { return !ids["$" + node.id]; });
-        graph.edges = graph.edges.filter(function (edge) {
-            return !ids["$" + edge.sourceNode] && !ids["$" + edge.destinationNode];
+        var before=graph.edges.slice(), kept=before.filter(function(edge){return !ids["$"+edge.sourceNode] && !ids["$"+edge.destinationNode];});
+        graph.edges=kept;
+        before.forEach(function(input){
+            if(ids["$"+input.sourceNode] || !ids["$"+input.destinationNode])return;
+            var waiting=[input.destinationNode],visited={};
+            while(waiting.length){
+                var node=waiting.pop();if(visited["$"+node])continue;visited["$"+node]=true;
+                before.forEach(function(output){
+                    if(output.sourceNode!==node)return;
+                    if(ids["$"+output.destinationNode])waiting.push(output.destinationNode);
+                    else if(output.destinationNode!==input.sourceNode)connect(graph,{from:input.sourceNode,to:output.destinationNode},idFactory);
+                });
+            }
         });
-        for (var id in ids) {
-            if (Object.prototype.hasOwnProperty.call(ids, id)) delete positions[id.slice(1)];
+        if(edit.type!=="detachNodes") {
+            graph.nodes = graph.nodes.filter(function (node) { return !ids["$" + node.id]; });
+            for (var id in ids) if (Object.prototype.hasOwnProperty.call(ids, id)) delete positions[id.slice(1)];
         }
     }
 
@@ -530,7 +506,7 @@ function createNativeRecordContract() {
                 (edit.modelResourceCopies || (edit.modelResourceCopies=[])).push({sourceId:originals[n].id,nodeId:copy.id});
             }
             ids["$" + originals[n].id] = copy.id;
-            var originalPosition = positions[originals[n].id];
+            var originalPosition = edit.origins && edit.origins[originals[n].id] || positions[originals[n].id];
             var offset = edit.offset || { x: 28, y: 28 };
             positions[copy.id] = { x: originalPosition.x + offset.x, y: originalPosition.y + offset.y };
         }
@@ -692,24 +668,17 @@ function createNativeRecordContract() {
     }
 
     function apply(inputGraph, edit, idFactory) {
+        if(inputGraph && inputGraph.canvasOnly)fail("canvas_snapshot_read_only","Load complete controls before editing canvas metadata.");
         if (!edit || typeof edit.type !== "string") fail("invalid_edit", "edit type is required");
+        if(edit.type==="batch") {
+            if(!Array.isArray(edit.edits) || !edit.edits.length || edit.edits.length>32)fail("invalid_edit","An edit batch requires 1..32 operations.");
+            return edit.edits.reduce(function(graph,item){
+                if(!item || item.type==="batch")fail("invalid_edit","Nested batches are not supported.");
+                var entry=Object.assign({},item);entry.layerHeightPixels=edit.layerHeightPixels || item.layerHeightPixels;
+                return apply(graph,entry,idFactory);
+            },inputGraph);
+        }
         var graph = copyGraph(inputGraph);
-        // Upgrade only as part of an explicit, undoable edit. Preserve the old
-        // edge identity and fan-out destinations; read-only refresh is untouched.
-        var legacy=graph.edges.filter(function(edge){
-            var source=nodeById(graph,edge.sourceNode),target=nodeById(graph,edge.destinationNode);
-            return source && target && source.type===TYPES.material && target.type===TYPES.model;
-        });
-        legacy.forEach(function(edge){
-            var material=edge.sourceNode,model=edge.destinationNode;
-            // A shared legacy Material cannot become a single-input geometry
-            // node without duplicating authored controls. Keep that attachment
-            // readable/editable until its connections are deliberately replaced.
-            if(legacy.filter(function(old){return old.sourceNode===material;}).length!==1 ||
-                graph.edges.some(function(input){return input.destinationNode===material;}))return;
-            graph.edges.forEach(function(out){if(out.sourceNode===model)out.sourceNode=material;});
-            edge.sourceNode=model;edge.sourcePort="1";edge.destinationNode=material;edge.destinationPort="2";
-        });
         graph.nodes.forEach(function(node){
             if(node.type===TYPES.particle && !node.parameters.some(function(p){return p.key==="30";}))
                 node.parameters.push({key:"30",type:3,value:0});
@@ -717,16 +686,30 @@ function createNativeRecordContract() {
         var positions = layout.resolve(graph);
         idFactory = idFactory || randomId;
         if (edit.type === "addNode") addNode(graph, edit, idFactory, positions);
+        else if (edit.type === "addNodes") {
+            if (Object.prototype.toString.call(edit.nodes) !== "[object Array]" || !edit.nodes.length || edit.nodes.length > 16)
+                fail("invalid_edit", "An addition batch must contain between one and sixteen nodes.");
+            edit.nodes.forEach(function (entry) {
+                if (!entry || typeof entry.nodeId !== "string" || !/^[0-9a-f]{32}$/.test(entry.nodeId) || entry.nodeType === "output")
+                    fail("invalid_edit", "An addition requires a stable node ID and an editable node type.");
+                if (nodeById(graph, entry.nodeId)) fail("duplicate_node_id", "The added node already exists.");
+                addNode(graph, { nodeType: entry.nodeType, position: entry.position,
+                    layerHeightPixels: edit.layerHeightPixels }, function () { return entry.nodeId; }, positions);
+            });
+        }
         else if (edit.type === "connect") {
             if (connect(graph, edit, idFactory)) return graph;
         }
         else if (edit.type === "disconnect") disconnect(graph, edit);
         else if (edit.type === "insertNode") insertNode(graph, edit, idFactory, positions);
-        else if (edit.type === "deleteNodes") deleteNodes(graph, edit, positions);
+        else if (edit.type === "deleteNodes" || edit.type === "detachNodes") deleteNodes(graph, edit, positions, idFactory);
         else if (edit.type === "duplicateNodes") duplicateNodes(graph, edit, idFactory, positions);
         else if (edit.type === "moveNodes") moveNodes(graph, edit, positions);
         else if (edit.type === "setParameters") setParameters(graph, edit);
         else fail("unsupported_edit", "edit operation is not supported");
+        var counts={};
+        if(graph.nodes.length>64)fail("node_capacity","A native graph supports 63 author nodes plus Output.");
+        graph.edges.forEach(function(edge){counts[edge.sourceNode]=(counts[edge.sourceNode] || 0)+1;if(counts[edge.sourceNode]>4)fail("connection_capacity","A node supports four outgoing connections. Disconnect another wire first.");});
         return layout.set(graph, positions);
     }
 

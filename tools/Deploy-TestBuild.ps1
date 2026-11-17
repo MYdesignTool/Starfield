@@ -5,12 +5,16 @@ param(
     [switch]$Install,
     [switch]$Rollback,
     [switch]$KeepNative,
+    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$ArtifactLabel = '2023',
+    [switch]$MfrQualificationTest,
     [switch]$IncludeModel,
     [switch]$IncludeMaterial,
     [switch]$IncludeMotion,
     [switch]$IncludeTurbulence
 )
 $ErrorActionPreference = 'Stop'
+if($MfrQualificationTest -and ($KeepNative -or $Rollback -or $ArtifactLabel -notlike '*-mfr-qualification')){throw 'MfrQualificationTest requires a full isolated qualification bundle.'}
+if($ArtifactLabel -like '*-mfr-qualification' -and -not $MfrQualificationTest -and -not $Rollback){throw 'Experimental MFR bundle requires explicit -MfrQualificationTest; never a routine deployment.'}
 if ($Install -and $Rollback) { throw 'Choose one action.' }
 if ($KeepNative -and $Rollback) { throw 'KeepNative belongs to a panel-only installation, not rollback.' }
 if ($IncludeModel -and $KeepNative) { throw 'Model requires a full native/Core/panel paired installation.' }
@@ -64,13 +68,17 @@ $rootNames = @($allowedNames) + @($allowedNames | ForEach-Object { [IO.Path]::Ch
 $sources = @{}
 foreach ($name in $names) {
     $kind = if ($name -eq 'StarfieldCore.dll') { 'core-dll' } else { 'plugin' }
-    $sources[$name] = if ($KeepNative) { Join-Path $bundle $name } else { Join-Path $repo "artifacts\$kind\2023\x64\Release\$name" }
+    $sources[$name] = if ($KeepNative) { Join-Path $bundle $name } else { Join-Path $repo "artifacts\$kind\$ArtifactLabel\x64\Release\$name" }
     Write-Host "$($sources[$name]) -> $(Join-Path $bundle $name)"
 }
 Write-Host "Single AE junction: $link -> $bundle"
 Write-Host "Archive loose Starfield binaries and old runtime junction: $backup\host"
 Write-Host "Undo: powershell -ExecutionPolicy Bypass -File tools\Deploy-TestBuild.ps1 -PluginDir '$destination' -BackupName '$BackupName' -Rollback"
 if (-not $Install -and -not $Rollback) { Write-Host 'Read-only report.'; exit 0 }
+if($MfrQualificationTest){
+    $taskBuildConfig=Get-Content -LiteralPath (Join-Path $repo "artifacts/plugin/$ArtifactLabel/x64/Release/build-configuration.json") -Raw | ConvertFrom-Json
+    if(-not $taskBuildConfig.mfrQualification -or -not $taskBuildConfig.renderJournal -or $taskBuildConfig.artifactLabel -ne $ArtifactLabel){throw 'Qualification build provenance is missing or mismatched.'}
+}
 $simulation = $destination.StartsWith((Join-Path $repo 'artifacts\deploy-test\'), [StringComparison]::OrdinalIgnoreCase)
 if (-not $simulation -and (Get-Process AfterFX, AfterFX_64 -ErrorAction SilentlyContinue)) { throw 'Close AE before replacing an AEX or changing its installation.' }
 
@@ -163,6 +171,7 @@ if ($KeepNative) {
 }
 New-Item -ItemType Directory -Path (Join-Path $backup 'host'), (Join-Path $backup 'bundle'), $bundle, $runtime -Force | Out-Null
 $record = [ordered]@{pluginDir=$destination; bundle=$bundle; linkCreated=(-not (Test-Path -LiteralPath $link));
+    artifactLabel=$ArtifactLabel;mfrQualificationTest=[bool]$MfrQualificationTest;
     selectorExisted=(Test-Path -LiteralPath $selector); files=@(); runtimeName='';modelCandidate=[bool]$IncludeModel;materialCandidate=[bool]$IncludeMaterial;motionCandidate=[bool]$IncludeMotion;turbulenceCandidate=[bool]$IncludeTurbulence}
 if ($record.selectorExisted) { Copy-Item -LiteralPath $selector -Destination (Join-Path $backup 'bundle\current.txt') }
 foreach ($name in $allowedNames) {

@@ -10,10 +10,10 @@ namespace starfield::adapter {
 struct NativeCommandBinding { const char* name; AEGP_Command command; };
 inline std::array<NativeCommandBinding,6> native_command_bindings{};
 inline AEGP_Command register_hidden_native_command(const AEGP_CommandSuite1* commands,
-    const AEGP_RegisterSuite5* registrations,AEGP_PluginID plugin,const char* name,AEGP_CommandHook hook) {
+    const AEGP_RegisterSuite5* registrations,AEGP_PluginID plugin,const char* name,AEGP_CommandHook hook,bool register_hook=true) {
     AEGP_Command command{};
     if(commands && registrations && !commands->AEGP_GetUniqueCommand(&command) && command>0 &&
-       !registrations->AEGP_RegisterCommandHook(plugin,AEGP_HP_BeforeAE,command,hook,nullptr) &&
+       (!register_hook || !registrations->AEGP_RegisterCommandHook(plugin,AEGP_HP_BeforeAE,command,hook,nullptr)) &&
        !commands->AEGP_InsertMenuCommand(command,name,AEGP_Menu_NONE,AEGP_MENU_INSERT_SORTED) &&
        !commands->AEGP_EnableCommand(command))return command;
     return 0;

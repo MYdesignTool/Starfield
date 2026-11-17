@@ -19,6 +19,9 @@ inline constexpr A_long kNodeControlSource = 2;
 
 // Stable identities are scoped to a single graph, not the host effect instance.
 [[nodiscard]] core::Result<core::Graph> graph_from_controls(const core::Settings& settings);
+// Render-only projection before the first native author publication (ADR0049).
+[[nodiscard]] core::Result<core::Graph> initial_node_graph(A_long layer_height, std::uint32_t max_particles);
+[[nodiscard]] core::Result<bool> is_initial_graph_template(const core::Graph& graph);
 [[nodiscard]] core::Result<core::Graph> read_graph_parameter(PF_InData* in_data, PF_ArbitraryH handle);
 [[nodiscard]] PF_Err create_graph_parameter(PF_InData* in_data, const core::Graph& graph,
                                            PF_ArbitraryH* output,

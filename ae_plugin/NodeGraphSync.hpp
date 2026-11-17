@@ -45,6 +45,10 @@ inline const char* stage_name(Stage stage) noexcept {
 // Local UI edit context; borrowed refs live only until direct publication returns.
 // No cross-effect transport, persistent schema or render-thread state.
 struct NativeEdit {
+    mutable std::uint64_t compile_reuse_token{};
+    mutable std::uint32_t reused_nodes{},state_queries{};
+    mutable std::uint32_t reuse_misses{},source_failure{};
+    mutable std::uint64_t compile_us{},query_us{},full_read_us{};
     struct Field { A_long index{}; ValueKind kind{}; std::array<double,4> value{}; };
     std::array<Field,native_nodes::particle_layout::curve_span> additional_fields{};
     std::uint32_t additional_count{};
@@ -159,6 +163,30 @@ inline bool capture_age_bank(PF_ParamDef* params[],NativeEdit& edit) noexcept {
     if(!capture(layout::curve_interpolation(base)))return false;
     if(!valid_edit(candidate))return false;
     edit=candidate;return true;
+}
+
+inline bool valid_custom_bank(const NativeEdit& edit) noexcept {
+    namespace layout=native_nodes::particle_layout;
+    if(!valid_edit(edit) || edit.value_kind!=ValueKind::scalar)return false;
+    if(edit.node_kind==1 && edit.parameter_index==layout::gradient) {
+        if(edit.additional_count!=18 || edit.value[0]<2 || edit.value[0]>8 || std::floor(edit.value[0])!=edit.value[0])return false;
+        for(unsigned i=0;i<18;++i) {
+            const auto expected=i>0 && i<=16 && i%2==0?ValueKind::color:ValueKind::scalar;
+            if(edit.additional_fields[i].index!=layout::gradient+static_cast<A_long>(i) || edit.additional_fields[i].kind!=expected)return false;
+        }
+    } else {
+        const auto base=edit.node_kind==1?layout::curve_base(edit.parameter_index):
+            edit.node_kind==7?native_nodes::motion_layout::curve_base(edit.parameter_index):
+            edit.node_kind==8?native_nodes::turbulence_layout::curve_base(edit.parameter_index):0;
+        const auto count=edit.value[0];
+        if(!base || base!=edit.parameter_index || count<2 || count>layout::curve_points || std::floor(count)!=count ||
+           edit.additional_count!=2*static_cast<unsigned>(count)+2)return false;
+        for(unsigned i=0;i+1<edit.additional_count;++i)
+            if(edit.additional_fields[i].index!=base+static_cast<A_long>(i) || edit.additional_fields[i].kind!=ValueKind::scalar)return false;
+        const auto& mode=edit.additional_fields[edit.additional_count-1];
+        if(mode.index!=layout::curve_interpolation(base) || mode.kind!=ValueKind::scalar)return false;
+    }
+    return edit.additional_fields[0].value==edit.value;
 }
 // A supervised follow-up can arrive before AEGP exposes every newly changed
 // component. Capture the entire callback bank for both PF events and supervision.

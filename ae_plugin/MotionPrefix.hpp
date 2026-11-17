@@ -32,7 +32,7 @@ inline bool encode(std::wstring_view text,Bank& out) noexcept try {
     if(size<=0 || size>layout::path_prefix_bytes)return false;
     std::string bytes(size,'\0');
     if(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.data(),int(text.size()),bytes.data(),size,nullptr,nullptr)!=size)return false;
-    bank[0]=size;for(int i=0;i<size;++i)bank[1+i/3]+=double(static_cast<unsigned char>(bytes[i])<<(8*(i%3)));
+    bank[0]=size;for(int i=0;i<size;++i)bank[1+i/3]+=double(std::uint64_t(static_cast<unsigned char>(bytes[i]))<<(8u*(unsigned(i)%3u)));
     out=bank;return true;
 }catch(...){return false;}
 }

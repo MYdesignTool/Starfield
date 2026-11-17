@@ -21,7 +21,7 @@
     }
 
     function validateSnapshot(snapshot, codec, maxBytes) {
-        if (!snapshot || snapshot.initialized !== true || typeof snapshot.graphHex !== "string") {
+        if (!snapshot || snapshot.canvasOnly || snapshot.initialized !== true || typeof snapshot.graphHex !== "string") {
             throw { code: "graph_snapshot_uninitialized", message: "Capture current controls into Node Graph mode before editing topology." };
         }
         if (typeof snapshot.revision !== "number" || !isFinite(snapshot.revision) ||
@@ -98,6 +98,9 @@
             return reject("The saved node or connection count differs.");
         var defaults = { "9": 0, "10": 0 };
         function near(a, b, color) {
+            // Strings also expose length and indexed characters. Recursing into
+            // a nonempty prefix would compare its first character indefinitely.
+            if (typeof a === "string" || typeof b === "string") return a === b;
             if (typeof a === "number" && typeof b === "number") {
                 return isFinite(a) && isFinite(b) && Math.abs(a - b) <=
                     (color ? 1 / 255 + 1e-7 : 1e-6 * Math.max(1, Math.abs(a)));
@@ -216,7 +219,7 @@
                         if(node.type==="org.starfieldfx.nodes.model" && node.modelAsset)
                             authoredEdit.modelAssets[node.id]=node.modelAsset;
                     });
-                    var updated = edits.apply(graph, authoredEdit, idFactory);
+                    var updated = edit.type==="compiledBatch" ? edit.graph : edits.apply(graph, authoredEdit, idFactory);
                     graphHex = codec.toHex(updated);
                     if (graphHex.length / 2 > maxBytes) {
                         callback(failure("size_limit_exceeded", "The edited graph exceeds the AE project limit of " + maxBytes + " bytes."));
@@ -251,7 +254,6 @@
                                 (mismatch.message || "The native graph receipt is not current.")));
                             return;
                         }
-                        validateSnapshot(saved, codec, maxBytes);
                     } catch (error) {
                         callback(failure(error && error.code ? error.code : "invalid_graph_snapshot",
                                          error && error.message ? error.message : String(error)));
@@ -357,5 +359,103 @@
         return { apply: apply, ensureNativeEffects: ensureNativeEffects };
     }
 
-    return { create: create, defaultMaxBytes: DEFAULT_MAX_BYTES };
+    // Independent additions can be rebased onto our own confirmed receipts.
+    // Other edits remain exclusive; the host still sees one guarded writer.
+    function createAdditionQueue(options) {
+        options=options || {};
+        var codec=options.codec,edits=options.edits,current=null;
+        var maxPending=64,maxBatch=16,maxBytes=options.maxBytes || DEFAULT_MAX_BYTES;
+        var client=create({call:options.call,codec:codec,edits:edits,maxBytes:maxBytes,
+            loadModelModules:options.loadModelModules,modelTransactions:options.modelTransactions,modelAssets:options.modelAssets});
+        if(typeof options.schedule!=="function")throw new Error("addition queue needs a paint scheduler");
+        function count(session) {return session.waiting.length+(session.batch?session.batch.items.length:0);}
+        function isCurrent(session) {return !options.isCurrentTarget || options.isCurrentTarget(session.token);}
+        function draft(session) {
+            var graph=validateSnapshot(session.confirmed.snapshot,codec,maxBytes);
+            var items=(session.batch?session.batch.items:[]).concat(session.waiting);
+            // The queue may hold more than one bounded host batch.
+            for(var offset=0;offset<items.length;offset+=maxBatch)
+                graph=edits.apply(graph,{type:"addNodes",nodes:items.slice(offset,offset+maxBatch),
+                    layerHeightPixels:session.confirmed.snapshot.geometry?Number(session.confirmed.snapshot.geometry.height):1});
+            return graph;
+        }
+        function publish(session,graph) {
+            if(options.onView && isCurrent(session))options.onView(graph || draft(session),session.confirmed.snapshot,
+                {pending:count(session)>0,count:count(session),targetToken:session.token});
+        }
+        function stop(session,result) {
+            if(current!==session)return;
+            var dropped=count(session);current=null;session.waiting=[];session.batch=null;
+            if(!isCurrent(session))return;
+            try {publish(session);} catch(ignored) { /* authoritative refresh owns recovery */ }
+            if(options.onError)options.onError(result,{targetToken:session.token,dropped:dropped});
+        }
+        function schedule(session) {
+            if(current!==session || session.scheduled || session.batch || !session.waiting.length)return;
+            session.scheduled=true;
+            try {options.schedule(function () {
+                if(current!==session)return;
+                session.scheduled=false;flush(session);
+            });} catch(error) {stop(session,failure("graph_preview_failed",error.message || String(error)));}
+        }
+        function flush(session) {
+            if(current!==session || session.batch || !session.waiting.length)return;
+            if(!isCurrent(session)){current=null;return;}
+            var batch={items:session.waiting.splice(0,maxBatch)};session.batch=batch;
+            var base=session.confirmed;
+            client.apply({type:"addNodes",nodes:batch.items},function(result) {
+                if(current!==session || session.batch!==batch)return;
+                if(!isCurrent(session)){current=null;return;}
+                if(!result || !result.ok){stop(session,result || failure("bad_response","No addition acknowledgement."));return;}
+                if(!result.target || result.target.token!==session.token) {
+                    stop(session,failure("stale_target","The addition acknowledgement belongs to another effect."));return;
+                }
+                session.confirmed={ok:true,target:result.target,snapshot:result.snapshot};session.batch=null;
+                var diagnostics=result.diagnostics;
+                if(diagnostics && (diagnostics.cleanupError || diagnostics.undoError || diagnostics.notificationPending)) {
+                    stop(session,failure("graph_applied_with_warning","The batch was applied, but After Effects could not safely continue. Refresh before adding more nodes."));return;
+                }
+                try {
+                    if(!session.waiting.length) {
+                        current=null;publish(session);
+                        if(options.onSettled)options.onSettled(result);
+                    } else {publish(session);schedule(session);}
+                } catch(error) {
+                    if(current!==session)current=session;
+                    stop(session,failure("graph_preview_failed",error.message || String(error)));
+                }
+            },session.token,base.snapshot.revision,base);
+        }
+        function enqueue(edit,response) {
+            var session=current,accepted=false;
+            try {
+                if(session && !isCurrent(session)){current=null;session=null;}
+                if(!edit || edit.type!=="addNode" || edit.nodeType==="output")return failure("invalid_edit","Only independent node additions can be queued.");
+                if(!session) {
+                    response=snapshots.normalize(response);
+                    if(!response || !response.ok || !response.target || typeof response.target.token!=="string" || !response.target.token)
+                        return failure("stale_target","A confirmed target is required for node additions.");
+                    validateSnapshot(response.snapshot,codec,maxBytes);
+                    session={token:response.target.token,confirmed:response,waiting:[],batch:null,scheduled:false};
+                } else if(response && response.target && response.target.token!==session.token)
+                    return failure("stale_target","The addition queue belongs to another effect.");
+                if(count(session)>=maxPending)return failure("host_busy","Too many nodes are waiting to be added. Wait for the current additions to finish.");
+                var updated=edits.apply(draft(session),{type:"addNode",nodeType:edit.nodeType,position:edit.position,
+                    layerHeightPixels:session.confirmed.snapshot.geometry?Number(session.confirmed.snapshot.geometry.height):1},options.idFactory);
+                if(codec.toHex(updated).length>maxBytes*2)return failure("size_limit_exceeded","The edited graph exceeds the AE project size limit.");
+                var node=updated.nodes[updated.nodes.length-1],position=layout.resolve(updated)[node.id];
+                session.waiting.push({nodeId:node.id,nodeType:edit.nodeType,position:{x:position.x,y:position.y}});
+                current=session;accepted=true;publish(session,updated);schedule(session);
+                return {ok:true,nodeId:node.id};
+            } catch(error) {
+                var result=failure(error.code || "invalid_graph",error.message || String(error));
+                if(accepted)stop(session,result);
+                return result;
+            }
+        }
+        return {enqueue:enqueue,busy:function(){return !!current;},canAccept:function(){return !current || count(current)<maxPending;},
+            cancel:function(){current=null;}};
+    }
+
+    return { create: create, createAdditionQueue:createAdditionQueue, defaultMaxBytes: DEFAULT_MAX_BYTES };
 }));

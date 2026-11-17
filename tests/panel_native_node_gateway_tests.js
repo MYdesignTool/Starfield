@@ -13,7 +13,7 @@ const uuid = n => n.toString(16).padStart(32, "0"), outputId = uuid(255);
 let epoch = 0, rejectNext = false, revision = 0, commits = 0, roundWireNumbers = false, beforeSubmit = null;
 let rejectNextAdd = null;
 let nativeCommandAvailable=true,ignoreNativeCommand=false;
-let nodePropertyReads = 0;
+let nodePropertyReads = 0,propertyWrites=0,failWrite=null,readsByName={};
 let numericNodeVisits = 0, hideDirectCurveIds = false;
 const undo = { begins: 0, ends: 0 }, clone = value => Array.isArray(value) ? value.slice() : value;
 const renderer = { matchName: "org.starfieldfx.particle", name: "Starfield Particle", properties: {} };
@@ -24,11 +24,12 @@ const items=[renderer];
 function assertFresh(captured) { if(captured!==epoch) throw new Error("Invalid indexed-group reference"); }
 function wrapProperty(p,captured,isNode) {
     return {name:p.name,matchName:p.matchName,propertyIndex:p.propertyIndex,canSetExpression:false,
-        get value(){assertFresh(captured);if(isNode)nodePropertyReads++;return clone(p.value);},
+        get numKeys(){return p.numKeys || 0;},get isTimeVarying(){return !!p.isTimeVarying;},
+        get value(){assertFresh(captured);readsByName[p.name]=(readsByName[p.name] || 0)+1;if(isNode)nodePropertyReads++;return clone(p.value);},
         valueAtTime(time,preExpression){assertFresh(captured);assert.equal(time,0);assert.equal(preExpression,true);return clone(p.value);},
         get expression(){throw new Error("AEGP_CanVaryOverTime: expressions are forbidden on node records");},
         set expression(_){throw new Error("Expression requests are unsupported");},
-        setValue(v){assertFresh(captured);p.value=clone(v);} };
+        setValue(v){assertFresh(captured);propertyWrites++;p.value=clone(v);if(failWrite===p){failWrite=null;throw Error("Injected partially applied coordinate write");}} };
 }
 function wrapEffect(raw) {
     const captured=epoch;
@@ -58,12 +59,14 @@ const textureLayers=[44,66].map((id,i)=>({id,name:i?"Back texture":"Front textur
 const comp=new CompItem();Object.assign(comp,{id:17,name:"Test Comp",time:0,numLayers:3,layer:index=>[layer,...textureLayers][index-1]});
 layer.containingComp=comp;textureLayers.forEach(l=>l.containingComp=comp);
 const exported={__SFLD_nativeCommandsV1:{version:1,commands:{get "Starfield Commit Node Graph"(){return nativeCommandAvailable?99:0;}}}};
-vm.runInNewContext("JSON.stringify = wireStringify;\n"+source,{CompItem,wireStringify:value=>JSON.stringify(value,
-    (_,item)=>roundWireNumbers&&typeof item==="number"?Number(item.toPrecision(12)):item),
+vm.runInNewContext(source,{CompItem,JSON:undefined,
     $:{global:exported},app:{project:{activeItem:comp,rootFolder:{id:5},numItems:1,item:()=>comp},
     beginUndoGroup(){undo.begins++;},endUndoGroup(){undo.ends++;},
     findMenuCommandId(){throw Error("Window menu lookup must not be used for bound native commands");},
     executeCommand(id){assert.equal(id,99);if(!ignoreNativeCommand)compile(renderer.properties["Commit Graph Edit"].value);}}});
+const privateJSON=exported.__SFLD_modelTransactionAPI.json,plainStringify=privateJSON.stringify;
+privateJSON.stringify=value=>plainStringify(roundWireNumbers?JSON.parse(JSON.stringify(value,
+    (_,item)=>typeof item==="number"?Number(item.toPrecision(12)):item)):value);
 const readUuid=(c,prefix)=>Array.from({length:8},(_,i)=>c[prefix+i].value.toString(16).padStart(4,"0")).join("");
 function graphFromEffects() {
     const graph={version:1,nodes:[],edges:[],optionalRecords:[]},positions={};
@@ -153,6 +156,11 @@ assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
 ignoreNativeCommand=false;
 const boot=snapshots.normalize(invoke("syncGraphSnapshot"));
 assert.equal(boot.ok,true,JSON.stringify(boot));assert.equal(boot.snapshot.initialized,true);
+assert.equal(boot.snapshot.nativeNodes.find(n=>n.type===edits.types.emitter).id,"81cb8bb1f320411498f5d25b54912c01",
+    "new Node Graph effects preserve the first render's emitter identity");
+assert.equal(boot.snapshot.nativeNodes.find(n=>n.type===edits.types.particle).id,"81cb8bb1f320411498f5d25b54912c03");
+assert.deepEqual(boot.snapshot.nativeNodes.map(n=>n.outgoing[0].id).sort(),
+    ["81cb8bb1f320411498f5d25b54912c06","81cb8bb1f320411498f5d25b54912c07"]);
 assert.equal(boot.snapshot.checksumMatches,true,"ordinary record codec must match the compiled payload CRC");
 const initial=codec.fromHex(boot.snapshot.graphHex);
 renderer.properties["Control Source"].value=2;
@@ -165,6 +173,16 @@ const combined=invoke("getPanelState");
 assert.equal(combined.ok,true,JSON.stringify(combined));
 assert.equal(combined.snapshot.nativeNodes.length,2,"one combined request returns the current native graph");
 assert.equal(commits,commitsBeforePulse,"combined full inspection is read-only");
+assert.equal(combined.snapshot.panelStamp,pulse.stamp,"accepted full receipt seeds the same structural pulse");
+assert.equal(combined.frameStatus.ok,true,"combined read includes frame status without another IPC");
+comp.time=1;
+assert.equal(invoke("getPanelPulse").stamp,pulse.stamp,"timeline movement does not dirty graph structure");
+assert.equal(invoke("getPanelPulse").frameStatus.timeSeconds,1,"timeline still updates live frame status");
+comp.time=0;
+renderer.properties["Time (Seconds)"].value=7;
+assert.equal(invoke("getPanelPulse").authorTimeSeconds,7,"same-comp-time Time edit is visible to next manifest planning");
+assert.equal(invoke("getPanelPulse").stamp,pulse.stamp,"time-only edits do not force a full state read");
+renderer.properties["Time (Seconds)"].value=0;
 hideDirectCurveIds=true;
 numericNodeVisits=0;
 const fallback=invoke("getGraphSnapshot");
@@ -174,6 +192,43 @@ assert.equal(numericNodeVisits,new Set(Object.values(particleRaw.properties)).si
     "one bounded layout traversal plus 25 fresh validated field resolutions; no retained Property references");
 hideDirectCurveIds=false;
 const emitterId=initial.nodes.find(n=>n.type===edits.types.emitter).id,particleId=initial.nodes.find(n=>n.type===edits.types.particle).id;
+{
+    const raw=items.find(e=>e.matchName==="org.starfieldfx.node.emitter"),x=raw.properties["Node Layout X"],y=raw.properties["Node Layout Y"];
+    const from={x:x.value,y:y.value},to={x:from.x+42,y:from.y-31},oldCommits=commits,oldWrites=propertyWrites;
+    const positions=[{id:emitterId,from,to}],fields={projectScope:"",positions};
+    readsByName={};
+    const saved=invoke("setGraphNodeLayout",fields);
+    assert.equal(saved.ok,true,JSON.stringify(saved));assert.equal(saved.written,2);
+    assert.equal(propertyWrites-oldWrites,2,"one moved node writes two coordinate streams only");
+    assert.equal(commits,oldCommits,"layout save never compiles or changes the saved graph receipt");
+    assert.ok(!readsByName["Particles Per Second"] && !readsByName["Size (Pixels)"] && !readsByName["Size Curve Count"],"layout save reads no author values or curves");
+    assert.equal(invoke("getPanelPulse").stamp,pulse.stamp,"cosmetic layout preserves pulse stamp");
+    assert.equal(invoke("setGraphNodeLayout",fields).written,0,"already applied coordinates require no duplicate writes");
+    assert.equal(invoke("setGraphNodeLayout",{...fields,projectScope:"other.aep"}).error.code,"stale_project");
+    assert.equal(invoke("setGraphNodeLayout",{...fields,positions:[{id:emitterId,from,to:{x:to.x+1,y:to.y}}]}).error.code,"stale_layout","stale edit cannot overwrite newer layout");
+    assert.equal(invoke("setGraphNodeLayout",{...fields,positions:[positions[0],positions[0]]}).error.code,"invalid_request");
+    y.numKeys=1;
+    assert.equal(invoke("setGraphNodeLayout",{...fields,positions:[{id:emitterId,from:to,to:from}]}).error.code,"animated_parameter");delete y.numKeys;
+    renderer.properties["Panel Graph Sync Guard"].value=1;
+    assert.equal(invoke("setGraphNodeLayout",fields).error.code,"graph_not_ready");renderer.properties["Panel Graph Sync Guard"].value=0;
+    raw.properties["Panel Sync Guard"].value=1;
+    assert.equal(invoke("setGraphNodeLayout",fields).error.code,"graph_not_ready");raw.properties["Panel Sync Guard"].value=0;
+    failWrite=y;
+    const failed=invoke("setGraphNodeLayout",{...fields,positions:[{id:emitterId,from:to,to:from}]});
+    assert.equal(failed.error.code,"layout_save_failed");assert.equal(x.value,to.x);assert.equal(y.value,to.y,"partial failed axis is compensated too");
+    assert.equal(undo.begins,undo.ends,"failed cosmetic write balances its Undo group");
+    assert.equal(invoke("setGraphNodeLayout",{...fields,positions:[{id:emitterId,from:to,to:from}]}).ok,true);
+    for(const large of [1e8,-1e8,999999990,-999999990]) {
+        x.value=large;y.value=0;
+        const delta={id:emitterId,from:{x:large,y:0},to:{x:large+5,y:0}};
+        const result=invoke("setGraphNodeLayout",{projectScope:"",positions:[delta]});
+        assert.equal(result.ok,true);assert.equal(result.written,1);assert.equal(x.value,large+5,"large signed canvas coordinates preserve a five-pixel move");
+        const stale=invoke("setGraphNodeLayout",{projectScope:"",positions:[{id:emitterId,from:delta.from,to:{x:large+7,y:0}}]});
+        assert.equal(stale.error.code,"stale_layout","large coordinates cannot widen the conflict tolerance");
+    }
+    x.value=from.x;y.value=from.y;
+    assert.equal(commits,oldCommits,"success, conflict and failure never enter publisher or Model protocol");
+}
 const presets=require(path.join(panelRoot,"js/presets.js"));
 const transactionEdits=Object.assign({},edits,{apply:(graph,edit,nextId)=>edit.type==="applyPreset"?
     presets.apply(graph,edit,nextId):edits.apply(graph,edit,nextId)});
@@ -394,4 +449,40 @@ assert.deepEqual(birthValues(codec.fromHex(snapshot().graphHex)),[[]],"legacy pr
 assert.equal(apply({type:"addNode",nodeType:"force"}).ok,true);
 assert.deepEqual(birthValues(codec.fromHex(snapshot().graphHex)),[[]],"unrelated topology edit preserves legacy activation0");
 assert.equal(undo.begins,undo.ends);assert.ok(commits>=8);
+assert.equal(apply({type:"addNode",nodeType:"auxiliary"}).ok,true);
+assert.ok(items.some(e=>/^Auxiliary [0-9a-f]{6}$/.test(e.name)),"Auxiliary creation names its native effect by source identity");
+// PERF-03: exercise actual gateway creation with indexed-group invalidation on
+// every append, one Undo group per batch and delayed UI acknowledgements.
+{
+    const scheduled=[],replies=[],errors=[],views=[];let identity=900000;
+    const beforeCount=items.length,beforeCommits=commits,beforeUndo=undo.begins;
+    const queue=transactions.createAdditionQueue({codec,edits,idFactory:()=>uuid(identity++),
+        schedule:fn=>scheduled.push(fn),onView:g=>views.push(g),onError:r=>errors.push(r),
+        call(op,fields,callback){const result=invoke(op,fields);replies.push(()=>callback(result));}});
+    for(const kind of ["emitter","auxiliary","particle","force","particle","force","emitter","auxiliary"])
+        assert.equal(queue.enqueue({type:"addNode",nodeType:kind,position:{x:45,y:-25}},invoke("getGraphSnapshot")).ok,true);
+    assert.equal(commits,beforeCommits);scheduled.shift()();
+    assert.equal(commits,beforeCommits+1);assert.equal(undo.begins,beforeUndo+1);
+    for(const kind of ["particle","force","auxiliary"])
+        assert.equal(queue.enqueue({type:"addNode",nodeType:kind,position:{x:95,y:35}},invoke("getGraphSnapshot")).ok,true);
+    const plannedIds=views.at(-1).nodes.map(n=>n.id).sort();
+    replies.shift()();scheduled.shift()();replies.shift()();
+    assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(commits,beforeCommits+2);
+    assert.equal(undo.begins,beforeUndo+2);assert.equal(undo.begins,undo.ends);
+    assert.equal(items.length,beforeCount+11);assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);
+    assert.deepEqual(codec.fromHex(snapshot().graphHex).nodes.map(n=>n.id).sort(),plannedIds);
+    assert.equal(queue.busy(),false);
+}
+{
+    const beforeHex=snapshot().graphHex,beforeCount=items.length,scheduled=[],errors=[];let identity=910000;
+    const queue=transactions.createAdditionQueue({codec,edits,idFactory:()=>uuid(identity++),schedule:fn=>scheduled.push(fn),
+        onError:r=>errors.push(r),call(op,fields,callback){callback(invoke(op,fields));}});
+    for(const kind of ["force","emitter","particle"])
+        assert.equal(queue.enqueue({type:"addNode",nodeType:kind},invoke("getGraphSnapshot")).ok,true);
+    rejectNextAdd="org.starfieldfx.node.particle";scheduled.shift()();rejectNextAdd=null;
+    assert.equal(errors.length,1);assert.equal(queue.busy(),false);
+    assert.equal(items.length,beforeCount,"failed multi-add removes all effects created earlier in that batch");
+    assert.equal(snapshot().graphHex,beforeHex,"failed multi-add restores exact prior author graph");
+    assert.equal(renderer.properties["Panel Graph Sync Guard"].value,0);assert.equal(undo.begins,undo.ends);
+}
 console.log("Native node gateway checks passed: bootstrap, add, copy, native Ctrl+D, independent values/curves, signed layout, insert/connect/disconnect, AE reorder/deletion, Output, numeric receipts without expressions, rollback and delete all.");

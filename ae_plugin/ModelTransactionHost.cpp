@@ -203,6 +203,9 @@ void apply() {
     // Fence the entire executor, including its backup writes before prepare.
     // Polling/reloading must never discard a session while rollback is possible.
     if(invoke("SFLD_modelTransactionHostBegin")){failed(PF_Err_BAD_CALLBACK_PARAM);return;}
+    // Unlike the UI reentry scope, this epoch is visible to render workers and
+    // changes even if an entire mutation finishes during a parameter checkout.
+    HostGraphMutation mutation;if(!mutation){failed(PF_Err_BAD_CALLBACK_PARAM);return;}
     finish(apply_model_graph_transaction(plan));
 }
 }

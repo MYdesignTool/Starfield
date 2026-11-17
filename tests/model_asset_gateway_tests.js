@@ -9,6 +9,7 @@ const eq=(a,b)=>{checks++;assert.deepEqual(a,b);},ok=v=>{checks++;assert.ok(v);}
 const nodeId="fedcba98765432100123456789abcdef",assetId="0123456789abcdef0123456789abcdef",token="p0-c202-l303";
 const properties={};
 function add(name,disk,value){const p={name,matchName:"org.starfieldfx.node.model-"+disk,value,numKeys:0,
+    valueAtTime(){return this.value;},
     setValue(){writes++;throw new Error("Transport must not write the project");}};properties[name]=properties[p.matchName]=p;}
 add("Source",1501,1);add("Mesh Revision",1504,17);
 for(const [start,label,value] of [[5,"Offset",0],[8,"Angle",0],[11,"Scale",100]])for(let axis=0;axis<3;axis++)add(label+" "+"XYZ"[axis],1500+start+axis,value);
@@ -21,10 +22,10 @@ const model={name:"Model",matchName:"org.starfieldfx.node.model",property(key){
     if(key==="Model Mesh" || key==="org.starfieldfx.node.model-1503"){arbReads++;throw new Error("CUSTOM_VALUE");}return properties[key] || null;}};
 const carrierNames=["Graph Revision","Panel Graph Sync Guard","Commit Graph Edit","Graph Edit Receipt","Node Effects Ready","Graph Checksum High","Graph Checksum Low"];
 const carrierIndices=[39,40,41,42,87,88,89];
-const carriers={};carrierNames.forEach((name,i)=>{carriers[name]=carriers[carrierIndices[i]]={name,propertyIndex:carrierIndices[i],value:name==="Graph Revision"?11:name==="Node Effects Ready"?1:0};});
+const carriers={};carrierNames.forEach((name,i)=>{carriers[name]=carriers[carrierIndices[i]]={name,propertyIndex:carrierIndices[i],value:name==="Graph Revision"?11:name==="Node Effects Ready"?1:0,valueAtTime(){return this.value;}};});
 const renderer={name:"Starfield",matchName:"org.starfieldfx.particle",property(key){return carriers[key] || null;}};
-const backupModel={name:"Model backup",matchName:model.matchName,property(key){return key==="Panel Sync Guard"?{value:2}:model.property(key);}};
-const backupRenderer={name:"Renderer backup",matchName:renderer.matchName,property(key){return key==="Panel Graph Sync Guard"?{value:2}:renderer.property(key);}};
+const backupModel={name:"Model backup",matchName:model.matchName,property(key){return key==="Panel Sync Guard"?{value:2,valueAtTime(){return 2;}}:model.property(key);}};
+const backupRenderer={name:"Renderer backup",matchName:renderer.matchName,property(key){return key==="Panel Graph Sync Guard"?{value:2,valueAtTime(){return 2;}}:renderer.property(key);}};
 const parade={list:[renderer,model],get numProperties(){return this.list.length;},property(i){return this.list[i-1];}};
 const layer={id:303,width:1920,height:1080,source:{pixelAspect:1},property(name){return name==="ADBE Effect Parade"?parade:null;}};
 function CompItem(){}const comp=new CompItem();Object.assign(comp,{id:202,numLayers:1,layer(i){return i===1?layer:null;}});

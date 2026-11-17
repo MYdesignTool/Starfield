@@ -2,7 +2,9 @@
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const root=process.env.STARFIELD_PANEL_ROOT;if(!root)throw Error("Set STARFIELD_PANEL_ROOT to the isolated candidate.");
 const source=fs.readFileSync(path.join(__dirname,"../tools/candidates/native_record_contract.js"),"utf8");
-const context=vm.createContext({$:{global:{}}});vm.runInContext(source,context);const contract=vm.runInContext("createNativeRecordContract()",context);
+const context=vm.createContext({$:{global:{}}});
+vm.runInContext("delete Array.prototype.indexOf;",context);
+vm.runInContext(source,context);const contract=vm.runInContext("createNativeRecordContract()",context);
 const edits=require(path.join(root,"js/graph_edits.js")),copy=x=>JSON.parse(JSON.stringify(x,(_,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 let checks=0;function eq(a,b){checks++;assert.deepEqual(a,b);}function bad(fn){checks++;assert.throws(fn,e=>e.code==="invalid_native_node_record");}
 for(const name of ["js/graph_edits.js","jsx/starfield_gateway.jsx"]){const embedded=fs.readFileSync(path.join(root,name),"utf8");

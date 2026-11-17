@@ -97,7 +97,7 @@ void registration_module(PF_InData& data){
         adapter::model_import_requests==1); // route the real button to import, not the scalar sync stub
     data.num_params=0;output.return_msg[0]=0;
     CHECK(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&output,reinterpret_cast<PF_ParamDef**>(1),nullptr,&button)==PF_Err_BAD_CALLBACK_PARAM &&
-        adapter::model_import_requests==1 && std::strstr(output.return_msg,"incomplete button delivery"));
+        adapter::model_import_requests==2 && output.return_msg[0]==0); // existing zero-count chooser route never indexes params
     data.num_params=delivered_count;
     for(int axis=0;axis<6;++axis){const auto& field=registered.at(layout::author_bounds_first-1+axis);
         CHECK(field.uu.id==1519+axis&&field.param_type==PF_Param_FLOAT_SLIDER&&field.u.fs_d.dephault==(axis<3?-.5:.5)&&
@@ -412,6 +412,7 @@ int main(){
     if(model_controls_fixture_main())return 1;
     PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;
     PF_InData data{};data.utils=&utils;data.inter.add_param=add;
+    data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* ui)->PF_Err {CHECK(ui && ui->events==PF_CustomEFlag_EFFECT);return PF_Err_NONE;};
     try{registration_module(data);animation(data);invalid_records(data);ui_capture(data);CHECK(handles.empty()&&locks==0);
         std::printf("Model native binding/module: %u checks, %u failures (May2023 SDK/fake host)\n",checks,failures);return failures?1:0;}
     catch(const std::exception& error){std::printf("FAILED: %s\n",error.what());clear();return 1;}}

@@ -155,20 +155,34 @@ A_Err EffectGraphBackup::prepare(const std::array<std::uint8_t,16>& operation,st
             if(!e)e=effects_->AEGP_SetEffectFlags(duplicate,AEGP_EffectFlags_ACTIVE,0);
             AEGP_EffectFlags flags{};if(!e)e=effects_->AEGP_GetEffectFlags(duplicate,&flags);
             if(!e && flags!=(record.flags&~AEGP_EffectFlags_ACTIVE))e=PF_Err_INTERNAL_STRUCT_DAMAGED;
-            if(e && duplicate){const auto removed=erase(duplicate);if(removed)rollback_error_=removed;}
+            if(e && duplicate){const auto removed=erase(duplicate);if(removed && !rollback_error_)rollback_error_=removed;}
             if(!e)record.created=true;}
         if(!e) {
             // Literal expression references must never resolve a transaction's
             // duplicate by the author's name. Identity/rollback remain UUID based.
             AEGP_EffectRefH raw{};A_long backup_slot{};e=find(record,true,raw,backup_slot);Ref ref{effects_,raw};
-            std::array<A_UTF16Char,512> temporary{};std::size_t at{};
-            for(auto c:u"__Starfield transaction backup ")if(c)temporary[at++]=c;
+            std::array<A_UTF16Char,512> temporary{};
+            constexpr char16_t prefix[]=u"__Starfield transaction backup ";
+            constexpr auto prefix_units=std::size(prefix)-1;
+            constexpr auto tail=prefix_units+std::tuple_size_v<std::remove_cvref_t<decltype(operation)>>*2;
+            static_assert(tail+3<512);
+            std::copy_n(prefix,prefix_units,temporary.begin());
             constexpr char16_t hex[]=u"0123456789abcdef";
-            for(auto byte:operation){temporary[at++]=hex[byte>>4];temporary[at++]=hex[byte&15];}
-            temporary[at++]=u' ';temporary[at++]=hex[(i>>4)&15];temporary[at++]=hex[i&15];
+            for(std::size_t digit=0;digit<operation.size();++digit){
+                temporary[prefix_units+digit*2]=hex[operation[digit]>>4];
+                temporary[prefix_units+digit*2+1]=hex[operation[digit]&15];
+            }
+            temporary[tail]=u' ';temporary[tail+1]=hex[(i>>4)&15];temporary[tail+2]=hex[i&15];
             if(!e)e=set_name(backup_slot,temporary);
         }
-        if(e){const auto cleanup=delete_backups();if(cleanup)rollback_error_=cleanup;const auto reset=release_guard();if(reset)rollback_error_=reset;prepared_=false;return e;}
+        if(e){
+            const auto cleanup=delete_backups();if(cleanup && !rollback_error_)rollback_error_=cleanup;
+            // A failed local erase can leave an untracked, live duplicate even
+            // when all marked backups were removed. Only complete cleanup may
+            // release the original renderer; retain the first recovery error.
+            if(!rollback_error_){const auto reset=release_guard();if(reset)rollback_error_=reset;}
+            prepared_=false;return e;
+        }
     }return 0;
 }
 A_Err EffectGraphBackup::discard(A_Err (*finalize)(void*),void* context) noexcept {
@@ -176,9 +190,13 @@ A_Err EffectGraphBackup::discard(A_Err (*finalize)(void*),void* context) noexcep
     // No physical mutation follows the final refresh. Keep the renderer guarded
     // until bindings have been checked against the surviving effect parade.
     if(!cleanup && finalize)try{cleanup=finalize(context);}catch(...){cleanup=PF_Err_INTERNAL_STRUCT_DAMAGED;}
-    const auto reset=release_guard();return cleanup?cleanup:reset;
+    // A failed dependency refresh cannot expose the edited graph to rendering.
+    // Keep the owned guard and report the cleanup failure; never fake success
+    // by releasing a renderer whose final aliases have not been verified.
+    if(cleanup)return cleanup;
+    return release_guard();
 }
-A_Err EffectGraphBackup::restore() noexcept {
+A_Err EffectGraphBackup::restore(A_Err (*finalize)(void*),void* context) noexcept {
     if(!prepared_)return bad;prepared_=false;
     // Validate every required backup before deleting any surviving author effect.
     for(std::size_t i=0;i<count_;++i){AEGP_EffectRefH raw{};A_long slot{};auto e=find(records_[i],true,raw,slot);Ref ref{effects_,raw};if(e)return rollback_error_=e;}
@@ -203,7 +221,11 @@ A_Err EffectGraphBackup::restore() noexcept {
     for(std::size_t i=0;i<count_;++i)if(records_[i].kind>=0){auto& record=records_[i];record.backup=record.original;
         AEGP_EffectRefH raw{};A_long slot{};e=find(record,true,raw,slot);Ref ref{effects_,raw};if(!e)e=write_scalar(raw,record.guard,0);if(e)return rollback_error_=e;record.created=false;}
     for(std::size_t i=0;i<count_;++i)if(records_[i].kind<0){auto& record=records_[i];AEGP_EffectRefH raw{};A_long slot{};e=find(record,true,raw,slot);Ref ref{effects_,raw};
-        if(!e)e=write_scalar(raw,record.guard,0);if(e)return rollback_error_=e;record.created=false;}
-    return 0;
+        // Physical replacement invalidates compiled expression dependencies too.
+        // Promote the restored renderer from backup2 to owned1, not renderable0.
+        if(!e)e=write_scalar(raw,record.guard,1);if(e)return rollback_error_=e;record.created=false;}
+    if(finalize)try{e=finalize(context);}catch(...){e=PF_Err_INTERNAL_STRUCT_DAMAGED;}
+    if(e)return rollback_error_=e;
+    return rollback_error_=release_guard();
 }
 }

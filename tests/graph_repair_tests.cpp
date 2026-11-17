@@ -5,7 +5,7 @@
 #include <string>
 namespace {
 using namespace starfield::adapter;
-struct Fx {std::array<double,256> values{};AEGP_EffectFlags flags{AEGP_EffectFlags_ACTIVE};int kind{};};
+struct Fx {std::array<double,native_nodes::parameter_count(native_nodes::Kind::motion)> values{};AEGP_EffectFlags flags{AEGP_EffectFlags_ACTIVE};int kind{};};
 struct Layer {std::array<Fx,2> fx;AEGP_LayerFlags flags{AEGP_LayerFlag_VIDEO_ACTIVE|AEGP_LayerFlag_AUDIO_ACTIVE};};
 std::array<Layer,2> state;
 AEGP_EffectSuite4 effect{};AEGP_StreamSuite6 stream{};AEGP_LayerSuite9 layer{};AEGP_UtilitySuite6 utility{};
@@ -28,6 +28,7 @@ void reset(){state={};state[0].fx[1].kind=1;
     auto& v=state[0].fx[0].values;v[kGraphSyncGuardId]=1;v[kGraphEditCommitId]=790333;
     v[kGraphEditReceiptId]=-790333;v[kNodeEffectsReadyId]=1;v[kGraphRevisionId]=44;v[150]=987.25;
     state[0].fx[1].values[2]=123.75;
+    state[0].fx[1].values[native_nodes::uuid_first_index(native_nodes::Kind::motion)+7]=1;
     calls=fail_at=starts=ends=publishes=dupes=writes=outside=refs=suites=0;
     undo=publish_failure=bad_receipt=silent_disable=busy_author=unknown_author=ambiguous=false;}
 }
@@ -59,6 +60,7 @@ int main(){
     effect.AEGP_SetEffectFlags=[](AEGP_EffectRefH r,AEGP_EffectFlags mask,AEGP_EffectFlags f)->A_Err{
         mutation();if(!silent_disable)fx(r)->flags=(fx(r)->flags&~mask)|(f&mask);return fail();};
     stream.AEGP_GetNewEffectStreamByIndex=[](AEGP_PluginID,AEGP_EffectRefH r,A_long i,AEGP_StreamRefH* out)->A_Err{
+        if(i<0 || static_cast<std::size_t>(i)>=fx(r)->values.size())return PF_Err_INVALID_INDEX;
         if(auto e=fail())return e;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{fx(r),i});++refs;return 0;};
     stream.AEGP_DisposeStream=[](AEGP_StreamRefH r)->A_Err{delete reinterpret_cast<Ref*>(r);--refs;return 0;};
     stream.AEGP_GetStreamType=[](AEGP_StreamRefH,AEGP_StreamType* t)->A_Err{*t=AEGP_StreamType_OneD;return fail();};
@@ -84,6 +86,7 @@ int main(){
         check(state[0].fx[0].values[150]==987.25 && state[0].fx[1].values[2]==123.75,"authored data untouched");
         return std::pair{result,std::string(request.message)};};
     reset();auto result=run();const auto success_calls=calls;
+    if(result.first)std::cerr<<"Initial repair: "<<result.second<<'\n';
     check(result.first==0 && publishes==1 && dupes==1 && state[0].fx[0].values[kGraphSyncGuardId]==0 &&
         state[0].fx[0].values[kGraphEditReceiptId]==790334 && state[0].fx[0].flags==AEGP_EffectFlags_ACTIVE,"original repaired in place with backup");
     for(unsigned n=1;n<=success_calls;++n){reset();fail_at=n;result=run();check(result.first!=0,"single host fault cannot report successful repair");
@@ -100,6 +103,32 @@ int main(){
     for(double guard:{0.,2.}){reset();state[0].fx[0].values[kGraphSyncGuardId]=guard;check(run().first!=0 && writes==0,"only exact failed guard repairable");}
     reset();state[0].fx[0].values[kGraphEditReceiptId]=0;check(run().first!=0 && writes==0,"pending request refuses repair");
     reset();state[0].fx[0].flags=AEGP_EffectFlags_NONE;check(run().first==0 && state[0].fx[0].flags==0,"original disabled state preserved");
+    const auto orphan=[] {
+        reset();state[0].fx[0].values[kGraphSyncGuardId]=0;state[0].fx[0].values[kGraphEditReceiptId]=790333;
+        auto& author=state[0].fx[1].values;const auto kind=native_nodes::Kind::motion;
+        author[native_nodes::connection_count_index(kind)]=2;
+        for(A_long slot=0;slot<2;++slot) {
+            const auto first=native_nodes::connection_first_index(kind)+slot*16;
+            author[first+7]=slot?255:99;author[first+15]=100+slot;
+        }
+    };
+    orphan();result=run();const auto orphan_calls=calls;
+    if(result.first)std::cerr<<"Orphan repair: "<<result.second<<'\n';
+    const auto first=native_nodes::connection_first_index(native_nodes::Kind::motion);
+    check(result.first==0 && publishes==1 && dupes==1,"idle guard0 graph supports explicit backed-up repair");
+    check(state[0].fx[1].values[native_nodes::connection_count_index(native_nodes::Kind::motion)]==1 &&
+        state[0].fx[1].values[first+7]==255 && state[0].fx[1].values[first+15]==101,
+        "missing native destination is removed while surviving output edge identity is preserved");
+    check(state[1].fx[1].values[first+7]==99 && state[1].fx[1].values[first+23]==255,
+        "full-layer backup retains exact pre-repair orphan and surviving links");
+    for(A_long word=0;word<16;++word)check(state[0].fx[1].values[first+16+word]==0,"removed trailing record is cleared");
+    for(unsigned n=1;n<=orphan_calls;++n) {
+        orphan();fail_at=n;result=run();check(result.first!=0,"single host fault cannot report successful orphan repair");
+    }
+    orphan();state[0].fx[1].values[native_nodes::uuid_first_index(native_nodes::Kind::motion)+7]=255;
+    check(run().first!=0 && publishes==0,"source identity collision with Output rejects before publication");
+    orphan();state[0].fx[0].values[kGraphEditReceiptId]=0;
+    check(run().first!=0 && writes==0,"guard0 pending commit cannot enter repair");
     check(FreeLibrary(module)!=0,"release isolated exclusion fixture");
     std::cout<<checks<<" repair coordinator checks, "<<failures<<" failures\n";return failures?1:0;
 }

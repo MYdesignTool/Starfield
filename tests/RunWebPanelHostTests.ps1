@@ -1,14 +1,19 @@
-param([switch]$Run)
+param([switch]$Run,[switch]$Analyze,[switch]$Sanitize)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report only: production WebPanelHost queue with fake AE suites. Add -Run; does not start AE or WebView2.';exit 0}
-$taskDirectory='artifacts\webview2\host-tests'
+if($Analyze -and $Sanitize){throw 'Choose -Analyze or -Sanitize.'}
+$taskDirectory=if($Analyze){'artifacts\webview2\host-analysis-tests'}elseif($Sanitize){'artifacts\webview2\host-asan-tests'}else{'artifacts\webview2\host-tests'}
 New-Item -ItemType Directory -Force -Path (Join-Path $taskRepo $taskDirectory) | Out-Null
 $taskArgs=@('/nologo','/utf-8','/std:c++20','/W4','/WX','/EHsc','/O2','/MT','/DMSWindows','/DWIN32','/D_WINDOWS','/DUNICODE','/D_UNICODE','/D_CRT_SECURE_NO_WARNINGS',
     '/Iinclude','/Iae_plugin','/IAdobeSDK/May2023_AfterEffectsSDK/Examples/Headers','/IAdobeSDK/May2023_AfterEffectsSDK/Examples/Headers/SP',
     '/Iartifacts/webview2/dependencies/sdk-1.0.4258.31/build/native/include',('/Fo'+$taskDirectory+'/'),('/Fe'+$taskDirectory+'/tests.exe'),
-    'tests/web_panel_host_tests.cpp','ae_plugin/UiExclusionHost.cpp','/link','artifacts/webview2/dependencies/sdk-1.0.4258.31/build/native/x64/WebView2LoaderStatic.lib',
+    'tests/web_panel_host_tests.cpp','ae_plugin/UiExclusionHost.cpp','ae_plugin/NativeGraphEdit.cpp')
+if($Analyze){$taskArgs+='/analyze'}
+if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDirectory+'/compiler.pdb'))}
+$taskArgs+=@('/link','artifacts/webview2/dependencies/sdk-1.0.4258.31/build/native/x64/WebView2LoaderStatic.lib',
     'Advapi32.lib','Ole32.lib','OleAut32.lib','Version.lib','Shlwapi.lib','Comctl32.lib','User32.lib','Gdi32.lib')
+if($Sanitize){$taskArgs+=@('/DEBUG',('/PDB:'+ $taskDirectory+'/tests.pdb'))}
 [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDirectory/compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))
 $taskBatch=@"
 @echo off

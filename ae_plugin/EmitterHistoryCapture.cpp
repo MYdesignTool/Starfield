@@ -17,17 +17,6 @@ namespace starfield::adapter {
 namespace {
 std::mutex history_trace_mutex;
 NativeHistoryTrace history_trace;
-bool static_history_eligible(const core::Graph& graph) {
-    for(const auto& node:graph.nodes) {
-        if(node.type_key==core::graph_keys::kEmitterNode) {
-            for(const auto& p:node.parameters)
-                if((p.key==core::graph_keys::kEmittingMode || p.key==core::graph_keys::kAuxiliarySource) && std::get<std::uint32_t>(p.value)!=0)return false;
-        } else if(node.type_key==core::graph_keys::kParticleNode) {
-            for(const auto& p:node.parameters)if(p.key==core::graph_keys::kLifeRandom && std::get<double>(p.value)!=0)return false;
-        } else if(node.type_key!=core::graph_keys::kOutputNode)return false;
-    }
-    return true;
-}
 struct TraceScope {
     NativeHistoryTrace trace;
     std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
@@ -47,6 +36,8 @@ class TemporalCapture final : public core::TemporalGraphSampler {
     NativeHistoryTrace& trace;
     std::map<std::pair<core::NodeId,double>,core::GraphNode> nodes;
     std::map<std::pair<core::NodeId,double>,double> rates;
+    std::map<core::NodeId,const NativeControlProof*> rate_profiles,life_bounds,constant_lives;
+    bool proof_indexes_ready{};
     std::span<const MotionLookAtTargetResource> sample_motion_targets;
     bool context(double seconds,PF_InData& sampled) {
         if(!std::isfinite(seconds) || seconds<0 || seconds>std::numeric_limits<A_long>::max()-1.0) {
@@ -81,18 +72,40 @@ public:
         if(existing==value.parameters.end())value.parameters.push_back({core::graph_keys::kMotionLookAtTargets,*resource->bytes});
         else existing->value=*resource->bytes;
     }
-    void prepare(bool allow_static_bypass) {
-        plan.prepare_constants(data,allow_static_bypass);trace.certified=plan.proofs().size();
+    void prepare() {
+        rate_profiles.clear();life_bounds.clear();constant_lives.clear();proof_indexes_ready=false;
+        plan.prepare_constants(data,true);trace.certified=plan.proofs().size();
         trace.inputs=plan.input_count();trace.constants=plan.constant_count();
+        // plan owns the proof vector for this complete capture request. Index
+        // only pointers, retaining first-match order and avoiding profile copies.
+        try {
+            for(const auto& proof:plan.proofs()) {
+                if(proof.rate)rate_profiles.try_emplace(proof.node,&proof);
+                if(proof.life_bound)life_bounds.try_emplace(proof.node,&proof);
+                if(proof.constant && proof.life_bound)constant_lives.try_emplace(proof.node,&proof);
+            }
+            proof_indexes_ready=true;
+        } catch(const std::bad_alloc&) {rate_profiles.clear();life_bounds.clear();constant_lives.clear();}
     }
     bool fully_constant() const {return plan.fully_constant();}
+    std::optional<core::GraphNode> constant_node(core::NodeId id) override {
+        if(cancellation.is_cancelled())return {};
+        if(const auto* constant=plan.constant_node(id)) {
+            ++trace.node_queries;++trace.constant_node_hits;
+            auto value=*constant;attach_sample_motion_target(id,value);return value;
+        }
+        return {};
+    }
     core::Result<std::optional<core::EmissionRateProfile>> rate_profile(core::NodeId id) override {
-        for(const auto& p:plan.proofs()) if(p.node==id && p.rate)
+        if(const auto found=rate_profiles.find(id);found!=rate_profiles.end())
+            return core::Result<std::optional<core::EmissionRateProfile>>::success(found->second->rate);
+        if(!proof_indexes_ready)for(const auto& p:plan.proofs())if(p.node==id && p.rate)
             return core::Result<std::optional<core::EmissionRateProfile>>::success(p.rate);
         return core::Result<std::optional<core::EmissionRateProfile>>::success(std::nullopt);
     }
     std::optional<double> lifetime_upper_bound(core::NodeId id) override {
-        for(const auto& p:plan.proofs()) if(p.node==id && p.life_bound)return p.life_bound;
+        if(const auto found=life_bounds.find(id);found!=life_bounds.end())return found->second->life_bound;
+        if(!proof_indexes_ready)for(const auto& p:plan.proofs())if(p.node==id && p.life_bound)return p.life_bound;
         return {};
     }
     std::optional<double> constant_birth_chance(core::NodeId id) override {
@@ -145,8 +158,8 @@ public:
         ++trace.life_queries;
         using R=core::Result<double>;
         if(cancellation.is_cancelled()) return R::failure(core::ErrorCode::cancelled,"Life sampling cancelled");
-        for(const auto& p:plan.proofs())if(p.node==id && p.constant && p.life_bound)
-            return R::success(*p.life_bound);
+        if(const auto found=constant_lives.find(id);found!=constant_lives.end())return R::success(*found->second->life_bound);
+        if(!proof_indexes_ready)for(const auto& p:plan.proofs())if(p.node==id && p.constant && p.life_bound)return R::success(*p.life_bound);
         const auto found=std::find_if(lifetimes.begin(),lifetimes.end(),[&](const auto& b){return b.particle==id;});
         if(found==lifetimes.end()) return R::failure(core::ErrorCode::invalid_request,"Life binding missing");
         PF_InData sampled{};if(!context(seconds,sampled)) return R::failure(core::ErrorCode::invalid_time,"historical Life time exceeds AE range");
@@ -174,8 +187,8 @@ PF_Err capture_motion_particles(PF_InData* data,PF_OutData* output,const core::G
     TemporalCapture capture(data,source,cancellation,width,height,trace.trace);
     auto error=read_native_origin_bindings(source,capture.bindings);if(error)return error;
     error=read_native_lifetime_bindings(source,capture.lifetimes);if(error)return error;
-    const bool simple=static_history_eligible(source);
-    capture.prepare(simple);
+    const bool simple=native_static_history_eligible(source);
+    capture.prepare();
     const bool ordinary=capture.bindings.empty() || (simple && capture.fully_constant());
     std::size_t particle_bytes=0;
     for(std::size_t frame_index=0;frame_index<times.size();++frame_index) {
@@ -249,8 +262,8 @@ PF_Err capture_emitter_origin_history(PF_InData* data,PF_OutData* output,core::G
         error=read_native_lifetime_bindings(graph,capture.lifetimes);if(error) return error;
         // The ordinary evaluator selects only the alive slot interval and uses
         // closed-form motion. Never select it from merely equal sample values.
-        const bool simple=static_history_eligible(graph);
-        capture.prepare(simple);
+        const bool simple=native_static_history_eligible(graph);
+    capture.prepare();
         if(simple && capture.fully_constant()) {trace.trace.path=NativeHistoryPath::static_graph;return PF_Err_NONE;}
         // Core CPU/GPU path evaluates a certified static graph only once.
         const core::RationalTime time{data->current_time,data->time_scale};

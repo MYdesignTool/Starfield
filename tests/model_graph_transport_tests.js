@@ -25,20 +25,27 @@ function manifest(g){const positions=layout.resolve(g);return g.nodes.filter(n=>
 function render(g){const n=g.nodes.find(n=>n.type===edits.types.output),r={id:n.id,position:layout.resolve(g)[n.id]};
     ["maxParticles","timeRemapEnabled","timeRemapSeconds","previewEnabled","previewChance","acceleration","timeSamplingHz","motionBlur","shutterAngle","shutterPhase","motionBlurType","motionBlurLevels","linearAccuracy","opacityBoost","motionBlurDisregard"].forEach((name,i)=>{
         const p=n.parameters.find(p=>String(p.key)===String(i+1));r[name]=p?p.value:[1000000,0,0,0,100,0,30,1,360,0,0,8,70,0,0][i];});return r;}
-const sandbox={$:{global:{__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Apply Model Graph Transaction":55}}}},Date:class extends Date{constructor(...args){super(args.length?args[0]:now);}},
+const sandbox={JSON:undefined,$:{global:{__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Apply Model Graph Transaction":55}}}},Date:class extends Date{constructor(...args){super(args.length?args[0]:now);}},
     app:{findMenuCommandId(){throw Error("Internal menus are hidden");},executeCommand:()=>{if(throwQueue)throw new Error("queue command failed");hostRuns++;if(!skipNative)tasks.push(nativeRun);}}};
 const context=vm.createContext(sandbox),host=sandbox.$.global,realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
-vm.runInContext(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"),context);
+// AE's ES3 Array library does not provide indexOf. Other panels can inject it
+// into the shared engine, which must not be required for graph validation.
+vm.runInContext("delete Array.prototype.indexOf;",context);
+const dialectSource=source=>process.env.STARFIELD_EXTENDSCRIPT_CONDITIONAL_MODEL==="1"?
+    require("./extendscript_conditionals.cjs").modelLeftAssociation(source):source;
+function transportSource(){return dialectSource(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"));}
+vm.runInContext(dialectSource(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8")),context);
 const api=host.__SFLD_modelTransactionAPI;
 let nodes=[],renderer={},revision=11,guard=0,stamp="stamp",tasks=[],hostRuns=0,prepares=0,commits=0,restores=0,writes=0,bytesRead=0,
     failedPrepare=false,failedCommit=false,badSaved=false,cleanupError=0,undoError=0,loseQueueAck=false,loseResult=false,now=1000,sequence=2000,
-    throwQueue=false,skipNative=false,stopAfterClaim=false,loseRequestAck=false;
+    throwQueue=false,skipNative=false,stopAfterClaim=false,loseRequestAck=false,loseCommitAck=false;
 const nativeMeshes={};let savedMutation=null,preparedMutation=null,publishes=0;
 function snapshot(){const current=copy(nodes);for(const n of current)if(n.type===edits.types.model){const asset=nativeMeshes[n.id],raw=n.parameters.find(p=>p.key==="12").value;
     n.modelAsset=asset?{revision:asset.revision,bounds:asset.bounds}: {revision:n.parameters.find(p=>p.key==="2").value,bounds:Array.from({length:6},(_,i)=>Buffer.from(raw).readDoubleLE(i*8))};}
     return realm({initialized:true,revision,checksum:"00000000",nativeNodes:current,renderer:copy(renderer),recordStamp:stamp,geometry:{width:1920,height:1080,pixelAspect:1}});}
 api.resolve=request=>request.target && request.target.token===token?{token,target:{layer:{time:0}},properties:{guard:{get value(){return guard;}},revision:{get value(){return revision;}}}}:{error:{code:"stale_target",message:"Wrong target"}};
 api.snapshot=()=>snapshot();api.validateTransform=()=>{};
+api.guardState=request=>{if(!request.pinTarget || !request.target || request.target.token!==token)throw Error("Wrong guard owner");return {value:guard};};
 api.ensure=(layer,desired,writeExisting,previous,defer)=>{writes++;if(defer){prepares++;if(failedPrepare)throw new Error("prepare failure");
         nodes=copy(desired).map(n=>{if(n.type===edits.types.model){const old=previous.find(p=>p.id===n.id);return old?{...copy(old),position:n.position,outgoing:n.outgoing}:manifest(cube).find(p=>p.type===edits.types.model) && {...copy(manifest(cube).find(p=>p.type===edits.types.model)),id:n.id,position:n.position,outgoing:n.outgoing};}return n;});
     }else{commits++;if(failedCommit)throw new Error("commit failure");for(const n of desired){if(n.type===edits.types.model && n.parameters.find(p=>p.key==="13").value===1){
@@ -64,14 +71,17 @@ function nativeRun(){const line=host.SFLD_modelTransactionHostRequest();if(line=
         for(const [key,value] of [[1,a.source===2?Array.from(Buffer.from(a.nodeId,"hex")):Array(16).fill(0)],[2,a.source===2?a.revision:0],
             [12,a.source===2?Array.from(raw):manifest(cube).find(n=>n.type===edits.types.model).parameters.find(p=>p.key==="12").value],[13,a.source-1]])n.parameters.find(p=>p.key===String(key)).value=value;}
         if(preparedMutation)preparedMutation(nodes);
-        success=host.SFLD_modelTransactionHostCommit(id)==="1";}
+        success=host.SFLD_modelTransactionHostCommit(id)==="1";
+        // The JSX has saved its publication result, but a lost native script
+        // acknowledgement makes the actual executor roll back that publication.
+        if(success && loseCommitAck)success=false;}
     if(!success){nodes=before.nodes;renderer=before.renderer;revision=before.revision;restores++;}
     guard=0;if(!loseResult)eq(host.SFLD_modelTransactionHostResult(id,[success?1:0,success?7:5,success?0:512,0,0,cleanupError,undoError,0,-1].join("|")),"1");
 }
 function reset(g=cube){nodes=manifest(g);renderer=render(g);revision=11;guard=0;stamp="stamp";tasks=[];hostRuns=prepares=commits=restores=writes=bytesRead=0;
     savedMutation=preparedMutation=null;publishes=0;
-    failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=throwQueue=skipNative=stopAfterClaim=loseRequestAck=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
-    for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(fs.readFileSync(path.join(root,"jsx/model_transaction_transport.jsx"),"utf8"),context);}
+    failedPrepare=failedCommit=badSaved=loseQueueAck=loseResult=throwQueue=skipNative=stopAfterClaim=loseRequestAck=loseCommitAck=false;cleanupError=undoError=0;now=1000;host.__SFLD_modelGraphTransactionV1=null;
+    for(const key of Object.keys(nativeMeshes))delete nativeMeshes[key];vm.runInContext(transportSource(),context);}
 function request(operation,fields={}){return JSON.stringify({protocol:"org.starfieldfx.panel",version:1,gatewayBuild:gatewayBuild,operation,requestId:"test",pinTarget:true,target:{token},transactionId,changes:[],...fields});}
 function call(operation,fields,callback){
     if(operation==="submitGraph"){
@@ -90,6 +100,34 @@ function call(operation,fields,callback){
     if(operation==="queueModelGraphTransaction" && loseQueueAck)callback({ok:false,error:{code:"host_timeout",message:"lost"}});else callback(r);}
 function drain(){let visits=0;while(tasks.length){ok(++visits<1000);tasks.shift()();}}
 function plan(g=imported){return {target:{token},baseGraphRevision:11,baseRecordStamp:"stamp",graphHex:codec.toHex(g),nodeManifest:manifest(g),rendererManifest:render(g)};}
+// Owned phases cannot be replaced, even after expiry while native outcome is
+// pending. Use real begin parsing and session lifetime logic, without writing
+// controls or invoking native commands. Both modern and reported old dialects
+// must preserve the exact destination for a delayed native result.
+for(const phase of ["executing","applying","published"])for(const expired of [false,true]){
+    reset();
+    eq(JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{...plan(cube),assets:[]}))).ok,true);
+    const owned=host.__SFLD_modelGraphTransactionV1;owned.state=phase;
+    if(expired)now=owned.expires+1;
+    const response=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{...plan(cube),assets:[],transactionId:uuid(999)})));
+    eq(response.ok,false,phase+" must reject takeover after expiry="+expired);
+    eq(response.error.code,"model_transaction_busy");eq(host.__SFLD_modelGraphTransactionV1,owned);
+    eq([hostRuns,writes,publishes,guard],[0,0,0,0]);
+    eq(host.SFLD_modelTransactionHostResult(transactionId,"0|5|516|0|0|0|0|0|-1"),"1");
+    eq(owned.state,"complete");eq(owned.result.committed,false);
+    eq(host.__SFLD_modelGraphTransactionV1,owned);
+}
+for(const phase of ["uploading","queued","receiving","complete","failed"])for(const expired of [false,true]){
+    reset();
+    eq(JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{...plan(cube),assets:[]}))).ok,true);
+    const previous=host.__SFLD_modelGraphTransactionV1;previous.state=phase;
+    if(expired)now=previous.expires+1;
+    const expected=expired || phase==="complete" || phase==="failed";
+    const response=JSON.parse(host.SFLD_beginModelGraphTransaction(request("beginModelGraphTransaction",{...plan(cube),assets:[],transactionId:uuid(999)})));
+    eq(response.ok,expected,phase+" lifetime after expiry="+expired);
+    eq(host.__SFLD_modelGraphTransactionV1===previous,!expected);
+    eq([hostRuns,writes,publishes,guard],[0,0,0,0]);
+}
 const meshAsset={nodeId:modelId,source:2,revision:17,bounds,meshHex};
 function client(){return clientAPI.create({call,schedule:fn=>tasks.push(fn),now:()=>now,idFactory:()=>transactionId});}
 reset();let result;client().apply(plan(),[meshAsset],r=>{result=r;});drain();eq(result.ok,true,JSON.stringify(result));eq(result.committed,true);eq([hostRuns,prepares,commits,restores],[1,1,1,0]);eq(bytesRead,meshHex.length/2);
@@ -134,6 +172,14 @@ for(const [label,mutate] of [
 }
 let allBanks=edits.apply(imported,{type:"addNode",nodeType:"motion"},()=>uuid(8200));
 allBanks=edits.apply(allBanks,{type:"addNode",nodeType:"turbulence"},()=>uuid(8201));
+for(const value of [0,3,4,1,2,-1,5,.5,"0",null,NaN,Infinity]){
+    const records=realm(manifest(allBanks));
+    records.find(n=>n.type===edits.types.turbulence).parameters.find(p=>String(p.key)==="8").value=value;
+    const validate=()=>api.validateNodes(records);
+    if(value===0 || value===3 || value===4)assert.doesNotThrow(validate);
+    else assert.throws(validate);
+    checks++;
+}
 reset(allBanks);savedMutation=ns=>{
     const keys={particle:["7","8","13","27"],force:["9"],motion:["6"],turbulence:["7"]};
     for(const n of ns){const kind=n.type.split(".").pop();for(const p of n.parameters){if(!keys[kind] || !keys[kind].includes(String(p.key)))continue;
@@ -291,7 +337,32 @@ reset();client().apply(plan(),[{...meshAsset,meshHex:meshHex.slice(0,-2)+"00"}],
 reset();const cancel=client().apply(plan(),[meshAsset],r=>{result=r;});cancel.cancel();drain();eq(result.ok,false);eq(hostRuns,0);eq(writes,0);
 reset();client().apply(plan(),[meshAsset],r=>{result=r;});stamp="changed";drain();eq(result.ok,false);eq(hostRuns,0);eq(writes,0);
 reset();loseResult=true;client().apply(plan(),[meshAsset],r=>{result=r;});
-for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();eq(result.committed,true);eq(result.diagnostics.notificationPending,true);eq(hostRuns,1);
+for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();
+eq(result.ok,false);eq(result.error.code,"model_transaction_outcome_unknown");eq(result.committed,undefined);eq(hostRuns,1);
+// Publication is provisional until native commit acknowledgement + cleanup.
+// On lost acknowledgement the real executor restores the original graph, even
+// though the JSX session still says published. A timeout cannot claim success.
+reset();loseCommitAck=loseResult=true;let callbacks=0;
+client().apply(plan(),[meshAsset],r=>{result=r;callbacks++;});
+for(let step=0;step<12 && tasks.length;step++)tasks.shift()();
+const awaitingOutcome=host.__SFLD_modelGraphTransactionV1;
+eq(awaitingOutcome.state,"published");eq(restores,1);eq(nodes,manifest(cube));eq(revision,11);
+now+=5*60*1000+1;drain();
+eq(result.ok,false);eq(result.error.code,"model_transaction_outcome_unknown");eq(result.committed,undefined);eq(callbacks,1);
+eq(host.__SFLD_modelGraphTransactionV1,awaitingOutcome,"timeout preserves final receipt destination");
+let replacement;call("beginModelGraphTransaction",{...plan(),transactionId:uuid(9090),assets:[]},r=>replacement=r);
+eq(replacement.ok,false);eq(replacement.error.code,"model_transaction_busy");eq(host.__SFLD_modelGraphTransactionV1,awaitingOutcome);
+eq(host.SFLD_modelTransactionHostResult(transactionId,"0|5|512|0|0|0|0|0|-1"),"1");
+eq(awaitingOutcome.state,"complete");eq(awaitingOutcome.result.committed,false);eq(callbacks,1);eq(hostRuns,1);
+reset();loseResult=true;
+const cancelPublished=client().apply(plan(),[meshAsset],r=>{result=r;});
+for(let step=0;step<12 && tasks.length;step++)tasks.shift()();
+const cancelledPublication=host.__SFLD_modelGraphTransactionV1;
+eq(cancelledPublication.state,"published");cancelPublished.cancel();drain();
+eq(result.ok,false);eq(result.error.code,"model_transaction_cancel_pending");eq(result.committed,undefined);
+eq(host.__SFLD_modelGraphTransactionV1,cancelledPublication);
+eq(host.SFLD_modelTransactionHostResult(transactionId,"1|7|0|0|0|516|0|0|-1"),"1");
+eq(cancelledPublication.result.committed,true);eq(cancelledPublication.result.diagnostics.cleanupError,516);eq(hostRuns,1);
 reset();loseResult=true;failedPrepare=true;client().apply(plan(),[meshAsset],r=>{result=r;});
 for(let step=0;step<12 && tasks.length;step++)tasks.shift()();now+=5*60*1000+1;drain();
 eq(result.error.code,"model_transaction_outcome_unknown");ok(result.error.message.includes("state=applying"));ok(result.error.message.includes("prepare failure"));

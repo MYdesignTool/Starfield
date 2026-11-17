@@ -21,7 +21,7 @@ public:
     EffectGraphBackup& operator=(const EffectGraphBackup&)=delete;
     A_Err prepare(const std::array<std::uint8_t,16>& transaction_id,
         std::span<const std::array<std::uint8_t,16>> desired_ids={}) noexcept;
-    A_Err restore() noexcept;
+    A_Err restore(A_Err (*finalize)(void*)=nullptr,void* context=nullptr) noexcept;
     // After publication, deletion failures leave marked, disabled backups and
     // must be reported as cleanup failures, not as an unapplied graph edit.
     A_Err discard(A_Err (*finalize)(void*)=nullptr,void* context=nullptr) noexcept;

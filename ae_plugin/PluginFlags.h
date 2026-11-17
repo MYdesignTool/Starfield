@@ -31,5 +31,11 @@
  * those dependencies automatically; optional prefixes require matching all-time states. */
 #define STARFIELD_OUT_FLAGS 0x06088466L  /* shutter dependencies and implemented UPDATE_PARAMS_UI */
 #define STARFIELD_OUT_FLAGS2 0x0222148EL /* light/camera dependencies, GUID mixing, and native GPU F32 capability */
+#define STARFIELD_OUT_FLAGS2_MFR_QUALIFICATION 0x0A22148EL
+#if defined(STARFIELD_MFR_QUALIFICATION)
+/* Experimental host qualification only; the default build remains unchanged. */
+#undef STARFIELD_OUT_FLAGS2
+#define STARFIELD_OUT_FLAGS2 STARFIELD_OUT_FLAGS2_MFR_QUALIFICATION
+#endif
 
 #endif /* STARFIELD_PLUGIN_FLAGS_H */

@@ -31,6 +31,7 @@ for(const page of ["panel","preset_manager"]){
      REQUEST_TIMEOUT_MS:15000,requestId:()=>"test",serial:0,state:{targetToken:"p0-c1-l29",pinnedTargetToken:null,revision:11},
      targetToken:"p0-c1-l29",extensionRoot:()=>"candidate",cep:{getSystemPath:()=>"candidate"},
      quote:JSON.stringify,literal:JSON.stringify,snippet:String,evalScript:execute,host:execute});
+ if(page==="preset_manager")vm.runInContext(source.slice(source.indexOf("function gatewayLoadFailure"),start),scope);
  vm.runInContext(source.slice(start,end),scope);
  function call(operation){let response;scope.call(operation,{},r=>response=r);eq(response.ok,true);
      eq(response.bound,engine.__SFLD_modelTransactionAPI.serial);return response;}

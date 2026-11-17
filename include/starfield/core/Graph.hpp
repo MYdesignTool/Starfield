@@ -182,6 +182,9 @@ struct GraphValidationResult {
 // sequence format. All failures are typed; invalid user graphs are never
 // traversed by the renderer.
 [[nodiscard]] GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept;
+// Sorted edge IDs: direct Particle -> Auxiliary references paired with the
+// reverse appearance-sharing edge. These are finite parent reads, not feedback.
+[[nodiscard]] std::vector<EdgeId> auxiliary_parent_references(const Graph& graph);
 
 // Stable built-in schemas used by the emitter -> Particle -> force
 // -> Output graph. Output carries the renderer-wide particle cap. Keys in this namespace are

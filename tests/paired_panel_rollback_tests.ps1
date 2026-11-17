@@ -69,6 +69,16 @@ $ErrorActionPreference='Stop'
 if($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText((Join-Path $taskPanel 'retired_editor.js')) -ne 'later owner source'){throw 'Reappeared retired source was overwritten.'}
 Remove-Item -LiteralPath (Join-Path $taskPanel 'retired_editor.js')
 $taskRecord | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $taskManifest -Encoding UTF8
+$taskCollision=Join-Path $taskBackup 'candidate-panel\index.html'
+New-Item -ItemType Directory -Path (Split-Path $taskCollision) -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $taskPanel 'index.html') -Destination $taskCollision
+$ErrorActionPreference='Continue'
+& powershell -NoProfile -ExecutionPolicy Bypass -File $taskRestore -PluginDir $taskPlugins -BackupName check *> (Join-Path $taskFixture 'rejected-retention-report.log')
+$ErrorActionPreference='Stop'
+if($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText((Join-Path $taskPanel 'index.html')) -ne 'new panel') {
+    throw 'Report failed to reject candidate retention collision before mutation.'
+}
+Remove-Item -LiteralPath $taskCollision
 & powershell -NoProfile -ExecutionPolicy Bypass -File $taskRestore -PluginDir $taskPlugins -BackupName check -Restore
 if($LASTEXITCODE -ne 0){throw 'Paired restore failed.'}
 if([IO.File]::ReadAllText((Join-Path $taskPanel 'index.html')) -ne 'old panel'){throw 'Old source not restored.'}

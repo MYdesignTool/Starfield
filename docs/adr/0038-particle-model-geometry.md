@@ -1449,3 +1449,48 @@ late queue acknowledgement and retained terminal receipts. These fixtures do not
 qualify actual AE2023 modal timing or filesystem semantics. Full paired frozen
 SDK build and AE qualification remain required. This is unpublished candidate
 functionality and adds no persistent parameter ID/schema/Core ABI.
+
+## GOV-01A empty-frame capture correction — 2026-10-19
+
+The expanded offline gate reproduces Model host sampling before the temporal
+negative-time/zero-particle-cap return. Restore the existing particle-only
+empty-frame rule for Model and Material metadata, after authored validation.
+Direct Model/Material output introduced by ADR0041 has no particle birth clock
+or particle cap and keeps current-time sampling, including a zero particle cap.
+The bounded dependency walk only identifies that existing direct-output path;
+no integration, identity, wire format, ABI or Render.hpp contract changes.
+Keep the failure propagation, no-capture empty-frame fixtures and a direct Model
+zero-cap animation regression. Offline results do not qualify AE host timing.
+
+## P-09 restore the AE-native Shape popup — 2026-10-23
+
+Supersedes the custom Shape author selector described above. native104 uses
+PF_Param_POPUP without PF_PUI_CONTROL, with the same disk213, native values1..4
+and Model6/Core4 conversion. The unsupported Face5 slot is an AE-documented
+"(-" separator, which cannot be selected, rather than a custom disabled row.
+No implemented shape is removed or renumbered; forged/native5 remains invalid.
+AE owns drawing/menu/interaction and sends USER_CHANGED_PARAM through the
+existing guarded graph synchronization and failure restoration. No custom
+Shape menu or pending DRAG selection is linked into node modules. The graph,
+bindings and Core ABI are unchanged. Real AE native popup/undo/animation/reopen
+qualification remains separate from SDK/fake-host validation.
+
+## P-09 native title takeover correction — 2026-10-23
+
+Owner AE screenshots confirm native104 hides the Shape/Transform selectors.
+Removing PF_PUI_CONTROL alone was insufficient: add_checked_parameter still
+injected PF_PUI_TOPIC and custom dimensions for the locator. In AE a native
+popup/layer's inline value belongs to the title row. Supersede the earlier
+claim that the title locator is independent of the native selector.
+
+native105 removes implicit topic/dimension injection and its title-event route
+for all ordinary node parameters. Match the existing Particle Color/Up Axis/
+texture-layer controls: native selectors have PF_PUI_NONE and zero dimensions.
+Do not paint a native row's name/value or add another custom row to compensate.
+The cosmetic locator line is suspended; existing Host reveal/session queries
+remain. Explicit curve/gradient/text editors are unchanged. No new ID, count,
+parameter type, saved graph/schema or ABI change relative to104.
+
+The stricter actual-module audit fails six selector registrations in104 before
+the fix. Passing the corrected audit/build is not AE display qualification;
+owner screenshots establish104 failure, and105 still requires host verification.

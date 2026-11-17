@@ -18,12 +18,15 @@ int32_t SF_CORE_CALL cancel(void* opaque){auto& c=*static_cast<Cancel*>(opaque);
 }
 int main() {
     static_assert(sizeof(SfModelPosition)==32&&sizeof(SfModelAttribute)==24&&sizeof(SfModelTriangle)==36);
-    static_assert(SF_CORE_ABI7_RENDER_REQUEST_SIZE+16==sizeof(SfCoreRenderRequest));
-    static_assert(SF_CORE_ABI_VERSION==8&&SF_CORE_LEGACY_ABI_VERSION==7);
-    SfCoreApi api{},legacy{};check(StarfieldCore_GetApi(8,sizeof(api),&api)==1&&api.abi_version==8,"current ABI8 table negotiates");
+    static_assert(SF_CORE_ABI7_RENDER_REQUEST_SIZE+16==SF_CORE_ABI8_RENDER_REQUEST_SIZE);
+    static_assert(SF_CORE_ABI8_RENDER_REQUEST_SIZE<sizeof(SfCoreRenderRequest));
+    static_assert(SF_CORE_ABI_VERSION==9&&SF_CORE_LEGACY_ABI_VERSION==7);
+    SfCoreApi api{},abi8{},legacy{};
+    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1&&api.abi_version==SF_CORE_ABI_VERSION,"current ABI9 table negotiates");
+    check(StarfieldCore_GetApi(8,sizeof(abi8),&abi8)==1&&abi8.abi_version==8,"ABI8 table remains available");
     check(StarfieldCore_GetApi(7,sizeof(legacy),&legacy)==1&&legacy.abi_version==7,"ABI7 table remains available");
     check(StarfieldCore_GetApi(6,sizeof(api),&api)==0,"unsupported ABI6 remains rejected");
-    check(StarfieldCore_GetApi(8,sizeof(api)-1,&api)==0,"bad API table size rejects");
+    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api)-1,&api)==0,"bad API table size rejects");
     Settings settings;settings.particle_count=10;settings.birth_rate=10;settings.particle_lifetime_seconds=2;
     auto graph=make_emitter_particle_output_graph(settings,node(1),node(2),node(3),edge(1),edge(2));check(graph.has_value(),"normal graph fixture constructs");
     auto wire=serialize_graph(graph.value(),particle_node_registry());check(wire.has_value(),"normal graph serializes");
@@ -31,10 +34,25 @@ int main() {
     request.frame={32,32,32,32,{0,0,32,32},1,1,1,60,0,0,0,1,1};
     request.graph_bytes=wire.value().data();request.graph_byte_count=wire.value().size();
     SfCoreRenderResult output{};output.struct_size=sizeof(output);
-    check(api.render(&request,&output)==SF_CORE_OK&&output.pixels&&output.pixel_byte_count==4096,"ABI8 old particle graph renders");
+    check(api.render(&request,&output)==SF_CORE_OK&&output.pixels&&output.pixel_byte_count==4096,"current ABI9 old particle graph renders");
     std::vector<std::byte> baseline(static_cast<const std::byte*>(output.pixels),static_cast<const std::byte*>(output.pixels)+output.pixel_byte_count);
     api.release_render_result(&output);check(!output.opaque_handle&&!output.pixels,"result releases in owning API generation");
-    // Exactly the old byte span. Sanitized builds catch any accidental tail read.
+    // ABI8 has Model sources but no lighting tail. Keep the allocation exact so
+    // sanitized runs detect any read beyond a legacy caller's actual storage.
+    auto model_prefix=std::make_unique<std::byte[]>(SF_CORE_ABI8_RENDER_REQUEST_SIZE);
+    request.struct_size=SF_CORE_ABI8_RENDER_REQUEST_SIZE;
+    std::memcpy(model_prefix.get(),&request,SF_CORE_ABI8_RENDER_REQUEST_SIZE);
+    auto* old_model=reinterpret_cast<const SfCoreRenderRequest*>(model_prefix.get());
+    check(abi8.render(old_model,&output)==SF_CORE_OK,"ABI8 exact prefix renders without ABI9 lighting storage");
+    check(output.pixel_byte_count==baseline.size()&&std::memcmp(output.pixels,baseline.data(),baseline.size())==0,"ABI8 output stays byte-identical");abi8.release_render_result(&output);
+    SfCoreGpuSceneResult model_gpu{};model_gpu.struct_size=sizeof(model_gpu);
+    check(abi8.prepare_gpu_scene(old_model,&model_gpu)==SF_CORE_OK,"ABI8 exact prefix prepares GPU scene");abi8.release_gpu_scene(&model_gpu);
+    request.light_count=0xffffffffu;request.lights=reinterpret_cast<const SfModelLight*>(static_cast<std::uintptr_t>(1));
+    check(abi8.render(&request,&output)==SF_CORE_OK,"ABI8 size suppresses poisoned ABI9 lighting tail");abi8.release_render_result(&output);
+    request.struct_size=sizeof(request);
+    check(api.render(&request,&output)==SF_CORE_INVALID_REQUEST,"current ABI9 validates its lighting tail");
+    request.light_count=0;request.lights=nullptr;
+    // Exactly the ABI7 byte span. Sanitized builds catch accidental tail reads.
     auto prefix=std::make_unique<std::byte[]>(SF_CORE_ABI7_RENDER_REQUEST_SIZE);
     request.struct_size=SF_CORE_ABI7_RENDER_REQUEST_SIZE;std::memcpy(prefix.get(),&request,SF_CORE_ABI7_RENDER_REQUEST_SIZE);
     auto* old=reinterpret_cast<const SfCoreRenderRequest*>(prefix.get());
@@ -50,7 +68,11 @@ int main() {
     SfModelSource source{};source.struct_size=sizeof(source);source.resource_id[0]=1;
     source.position_count=3;source.triangle_count=1;source.positions=positions;source.triangles=&triangle;
     request.model_source_count=1;request.model_sources=&source;
-    check(api.render(&request,&output)==SF_CORE_OK,"ABI8 validates and copies independent numeric Model source");
+    request.struct_size=SF_CORE_ABI8_RENDER_REQUEST_SIZE;
+    std::memcpy(model_prefix.get(),&request,SF_CORE_ABI8_RENDER_REQUEST_SIZE);
+    check(abi8.render(old_model,&output)==SF_CORE_OK,"ABI8 exact prefix validates and copies numeric Model source");abi8.release_render_result(&output);
+    request.struct_size=sizeof(request);
+    check(api.render(&request,&output)==SF_CORE_OK,"current ABI9 validates and copies independent numeric Model source");
     check(output.pixel_byte_count==baseline.size()&&std::memcmp(output.pixels,baseline.data(),baseline.size())==0,"unused resource does not change an existing primitive graph");api.release_render_result(&output);
     const auto valid_source=source;
     source.struct_size=0;check(api.render(&request,&output)==SF_CORE_INVALID_REQUEST&&!output.pixels,"bad source ABI size rejects");source=valid_source;

@@ -22,8 +22,15 @@ cl.exe @$taskDir\compile.rsp
 exit /b %errorlevel%
 "@
     [IO.File]::WriteAllText((Join-Path $taskRepo "$taskDir\compile.cmd"),$taskBatch,[Text.Encoding]::ASCII)
+    New-Item -ItemType Directory -Path "artifacts\texture-selector-tests\host" -Force | Out-Null
+    $taskHostBatch="artifacts\texture-selector-tests\host\compile.cmd"
+    @('@echo off',('call "{0}" >nul' -f $taskVars),'if errorlevel 1 exit /b %errorlevel%',
+      'cl.exe /nologo /std:c++20 /EHsc /O2 /MT /Iae_plugin /LD /Foartifacts\texture-selector-tests\host\ /Feartifacts\texture-selector-tests\host\StarfieldHost.aex tests\ui_exclusion_module_fixture.cpp ae_plugin\UiExclusionHost.cpp',
+      'exit /b %errorlevel%') | Set-Content -LiteralPath $taskHostBatch -Encoding ASCII
+    & $env:ComSpec /d /c $taskHostBatch
+    if($LASTEXITCODE -ne 0){throw 'Test Host compilation failed.'}
     & $env:ComSpec /d /c "$taskDir\compile.cmd"
     if($LASTEXITCODE -ne 0){throw 'Texture selector fixture compilation failed.'}
-    & (Join-Path $taskRepo "$taskDir\tests.exe")
+    & (Join-Path $taskRepo "$taskDir\tests.exe") (Join-Path $taskRepo "$taskDir\host\StarfieldHost.aex")
     if($LASTEXITCODE -ne 0){throw 'Texture selector fixture failed.'}
 } finally {Pop-Location}

@@ -4,6 +4,7 @@ param(
     [switch]$NodeEffects,
     [switch]$CurrentNodes,
     [switch]$Gpu,
+    [switch]$GpuConcurrent,
     [switch]$EmissionTimeline,
     [switch]$EmissionCache,
     [switch]$NativeSync,
@@ -20,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if($GpuConcurrent){$Gpu=$true}
 if (([int]$RendererControls.IsPresent + [int]$Adapter.IsPresent + [int]$NodeEffects.IsPresent + [int]$CurrentNodes.IsPresent + [int]$Gpu.IsPresent + [int]$EmissionCache.IsPresent + [int]$EmissionTimeline.IsPresent + [int]$NativeSync.IsPresent + [int]$HostBootstrap.IsPresent + [int]$GradientEditor.IsPresent + [int]$ParticleTransform.IsPresent + [int]$TransformTransport.IsPresent + [int]$TransformGraph.IsPresent + [int]$TransformBinding.IsPresent) -gt 1) { throw 'Select only one test scope.' }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path -LiteralPath $MSVCVarsPath)) { throw "vcvars64.bat not found: $MSVCVarsPath" }
@@ -77,9 +79,17 @@ try {
             'ae_plugin\GraphCarrier.cpp', 'ae_plugin\NativeGraphCommit.cpp', 'ae_plugin\GraphParameter.cpp', 'ae_plugin\NativeNodeGraph.cpp',
             'ae_plugin\Parameters.cpp', 'ae_plugin\WorldBridge.cpp', 'ae_plugin\EmitterHistoryCapture.cpp', 'ae_plugin\NativeTemporalCache.cpp', 'ae_plugin\NativeTemporalUI.cpp')
         $sources += 'ae_plugin\MotionBlur.cpp'
+        $sources += @('ae_plugin\MotionLookAtCapture.cpp','ae_plugin\LightCapture.cpp','ae_plugin\MotionLightSources.cpp',
+            'ae_plugin\MotionPointCapture.cpp','ae_plugin\ModelGeometryParameter.cpp','ae_plugin\ModelMirrorParameter.cpp',
+            'ae_plugin\ModelMirrorTransaction.cpp')
     }
     if ($NodeEffects) { $sources = @('tests\node_effect_tests.cpp', 'ae_plugin\NodeEffects.cpp', 'ae_plugin\GpuRender.cpp','ae_plugin\ParticleGradientUI.cpp') }
-    if ($Gpu) { $sources += @('ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\MotionBlur.cpp', 'tests\adapter_capture_stubs.cpp', 'tests\editor_preset_picker_stub.cpp') }
+    if ($Gpu) {
+        $sources += @('ae_plugin\ParticleGradientUI.cpp', 'ae_plugin\MotionBlur.cpp', 'tests\adapter_capture_stubs.cpp', 'tests\editor_preset_picker_stub.cpp',
+            'ae_plugin\TextureResources.cpp','ae_plugin\ModelRenderResources.cpp','ae_plugin\ModelMirrorParameter.cpp',
+            'ae_plugin\ModelGeometryParameter.cpp','ae_plugin\LightCapture.cpp','ae_plugin\MotionLightSources.cpp',
+            'ae_plugin\MotionPointCapture.cpp','ae_plugin\MotionLookAtCapture.cpp','ae_plugin\MotionLightTiming.cpp')
+    }
     if ($GradientEditor) { $sources = @('tests\gradient_editor_tests.cpp','ae_plugin\ParticleGradientUI.cpp') }
     if ($HostBootstrap) { $sources = @('tests\host_bootstrap_tests.cpp','tests\host_bootstrap_stubs.cpp','ae_plugin\UiExclusionHost.cpp') }
     if ($ParticleTransform) { $sources = @('tests\particle_transform_tests.cpp','src\core\ParticleTransform.cpp') }
@@ -111,6 +121,7 @@ try {
             "/I `"$aliasRoot\AdobeSDK\May2023_AfterEffectsSDK\Examples\Util`"")
     }
     if ($Gpu) { $responseLines += @('/DSTARFIELD_NODE_KIND_EMITTER', '/DSTARFIELD_TEST_GPU') }
+    if ($GpuConcurrent) { $responseLines += '/DSTARFIELD_TEST_GPU_CONCURRENT' }
     if ($NodeEffects) { $responseLines += "/DSTARFIELD_NODE_KIND_$($NodeKind.ToUpperInvariant())" }
     if ($NativeSync) { $responseLines += '/DSTARFIELD_NODE_KIND_EMITTER' }
     $responseLines += $sources | ForEach-Object { "`"$aliasRoot\$_`"" }

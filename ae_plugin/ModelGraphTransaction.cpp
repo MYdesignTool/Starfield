@@ -1,4 +1,5 @@
 #include "ModelGraphTransaction.hpp"
+#include "GraphRenderJournal.hpp"
 #include "NodeRecord.hpp"
 #include "starfield/core/ModelResources.hpp"
 #include <algorithm>
@@ -113,6 +114,10 @@ A_Err preflight(const ModelGraphTransactionPlan& plan,ModelGraphTransactionResul
 }
 ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransactionPlan& plan) noexcept {
     ModelGraphTransactionResult result;Cancellation cancel(plan);
+    const auto journal=[&](const char* phase) noexcept {
+        journal_graph_transaction(phase,plan.id.data(),static_cast<unsigned>(result.stage),result.committed,
+            result.error,result.rollback_error,result.asset_rollback_error,result.cleanup_error,result.undo_error);
+    };
     result.error=preflight(plan,result,cancel);if(result.error)return result;
     Suite<AEGP_UtilitySuite6> utility(plan.basic,kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
     Suite<AEGP_EffectSuite4> effects(plan.basic,kAEGPEffectSuite,kAEGPEffectSuiteVersion4);
@@ -121,23 +126,26 @@ ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransa
     result.stage=ModelTransactionStage::undo;result.error=utility.value->AEGP_StartUndoGroup("Starfield: apply graph and Model assets");if(result.error)return result;
     {
         EffectGraphBackup backup(plan.basic,plan.plugin,plan.layer);
-        result.stage=ModelTransactionStage::backup;result.error=backup.prepare(plan.id,plan.desired_ids);
+        result.stage=ModelTransactionStage::backup;journal("backup.begin");result.error=backup.prepare(plan.id,plan.desired_ids);
         if(result.error)result.rollback_error=backup.rollback_error();
-        else {
+        journal("backup.end");
+        if(!result.error) {
             try {
                 result.stage=ModelTransactionStage::prepare;
+                journal("prepare.begin");
                 result.error=cancel.is_cancelled()?PF_Interrupt_CANCEL:plan.prepare(plan.context);
+                journal("prepare.end");
                 if(!result.error){result.stage=ModelTransactionStage::assets;
                     for(std::size_t i=0;i<plan.assets.size();++i){result.asset_index=static_cast<std::int32_t>(i);
                         result.error=cancel.is_cancelled()?PF_Interrupt_CANCEL:write_asset(plan,plan.assets[i],effects.value,streams.value,result);
                         if(result.error)break;}}
                 if(!result.error){result.stage=ModelTransactionStage::commit;
-                    result.error=cancel.is_cancelled()?PF_Interrupt_CANCEL:plan.commit(plan.context);}
+                    journal("commit.begin");result.error=cancel.is_cancelled()?PF_Interrupt_CANCEL:plan.commit(plan.context);journal("commit.end");}
             } catch(const std::bad_alloc&){result.error=PF_Err_OUT_OF_MEMORY;}catch(...){result.error=PF_Err_INTERNAL_STRUCT_DAMAGED;}
-            if(result.error){const auto restored=backup.restore();if(restored)result.rollback_error=restored;}
-            else {result.committed=true;result.stage=ModelTransactionStage::complete;result.asset_index=-1;result.cleanup_error=backup.discard(plan.finalize,plan.context);}
+            if(result.error){journal("restore.begin");const auto restored=backup.restore(plan.finalize,plan.context);if(restored)result.rollback_error=restored;journal("restore.end");}
+            else {result.committed=true;result.stage=ModelTransactionStage::complete;result.asset_index=-1;journal("discard.begin");result.cleanup_error=backup.discard(plan.finalize,plan.context);journal("discard.end");}
         }
     }
-    result.undo_error=utility.value->AEGP_EndUndoGroup();return result;
+    result.undo_error=utility.value->AEGP_EndUndoGroup();journal("complete");return result;
 }
 }

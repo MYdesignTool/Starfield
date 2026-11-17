@@ -5,6 +5,7 @@
 #include "AE_Macros.h"
 #include "GraphCarrier.hpp"
 #include "NativeNodeGraph.hpp"
+#include "EditorDiagnostics.hpp"
 #include "EffectGraphBackup.hpp"
 #include "PluginVersion.h"
 #include "GraphRenderJournal.hpp"
@@ -529,9 +530,8 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     STARFIELD_ADD_HIDDEN_FLOAT("Random Seed", 0.0f, 2147483647.0f, 0.0f, 2147483647.0f, 1.0f, PF_Precision_INTEGER,
                               PF_ValueDisplayFlag_NONE, PF_ParamFlag_SUPERVISE, kSeedDiskId);
 
-    // Control Source defaults to AE Controls (manifest revision 6): a freshly applied
-    // effect must drive the visible controls, not sit in Node Graph mode where the
-    // controls look inert. Node Graph is opt-in through capture or the panel.
+    // New/reset effects render the initial native-node appearance immediately.
+    // Missing parameters in old projects still receive the legacy value (ADR0049).
     AEFX_CLR_STRUCT(def);
     def.param_type = PF_Param_POPUP;
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_USE_VALUE_FOR_OLD_PROJECTS;
@@ -539,7 +539,7 @@ PF_Err setup_parameters(PF_InData* in_data, PF_OutData* out_data) noexcept {
     std::snprintf(def.name, sizeof(def.name), "Control Source");
     def.uu.id = kControlSourceDiskId;
     def.u.pd.num_choices = 2;
-    def.u.pd.dephault = kLegacyControlSource;
+    def.u.pd.dephault = kNodeControlSource;
     def.u.pd.value = kLegacyControlSource;
     def.u.pd.u.namesptr = "AE Controls|Node Graph";
     err = PF_ADD_PARAM(in_data, -1, &def);
@@ -874,7 +874,7 @@ private:
 };
 
 PF_Err graph_error(PF_OutData* out, const core::CoreError& error) noexcept {
-    if (out) std::snprintf(out->return_msg, sizeof(out->return_msg), "Starfield graph: %s", error.detail);
+    if (out) std::snprintf(out->return_msg, sizeof(out->return_msg), "Starfield [%s]: %s",editor_diagnostics::graph_code(error.code),error.detail);
     return error.code == core::ErrorCode::allocation_failed ? PF_Err_OUT_OF_MEMORY : PF_Err_BAD_CALLBACK_PARAM;
 }
 } // namespace
@@ -930,9 +930,27 @@ static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_dat
             if(guard.value.param_type!=PF_Param_FLOAT_SLIDER || !std::isfinite(guard.value.u.fs_d.value) ||
                 (guard.value.u.fs_d.value!=0 && guard.value.u.fs_d.value!=transaction_backup_guard && guard.value.u.fs_d.value!=1))
                 return PF_Err_BAD_CALLBACK_PARAM;
-            if(guard.value.u.fs_d.value!=0) {
+            // PF callbacks can still deliver an earlier guard0 snapshot during
+            // a reentrant UI render. The resident Host already owns this edit;
+            // its existing UI-thread query must also fence alias reads.
+            if(guard.value.u.fs_d.value!=0 || ui_transaction_active() || (graph_mutation_epoch()&1)) {
                 if(out_data)out_data->return_msg[0]=0;
                 return PF_Interrupt_CANCEL;
+            }
+            CheckedParameter ready(in_data);
+            err = ready.checkout(kNodeEffectsReadyId);
+            if (err) return err;
+            if (ready.value.param_type != PF_Param_FLOAT_SLIDER ||
+                (ready.value.u.fs_d.value != 0 && ready.value.u.fs_d.value != 1)) return PF_Err_BAD_CALLBACK_PARAM;
+            bool initial = false;
+            if (ready.value.u.fs_d.value == 0) {
+                CheckedParameter revision(in_data);
+                err = revision.checkout(kGraphRevisionId);
+                if (err) return err;
+                if (revision.value.param_type != PF_Param_FLOAT_SLIDER || !std::isfinite(revision.value.u.fs_d.value) ||
+                    revision.value.u.fs_d.value < 0 || std::floor(revision.value.u.fs_d.value) != revision.value.u.fs_d.value)
+                    return PF_Err_BAD_CALLBACK_PARAM;
+                initial = revision.value.u.fs_d.value == 0;
             }
             CheckedParameter stored(in_data);
             err = stored.checkout(kGraphParameterId);
@@ -940,25 +958,38 @@ static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_dat
             if (stored.value.param_type != PF_Param_ARBITRARY_DATA) return PF_Err_BAD_CALLBACK_PARAM;
             auto decoded = read_graph_parameter(in_data, stored.value.u.arb_d.value);
             if (!decoded.has_value()) return graph_error(out_data, decoded.error());
-            core::Graph sampled = decoded.take_value();
-            A_long failed_binding = -1;
-            const char* failed_stage = "unknown";
-            NativeBindingFailure failure;
-            err = sample_native_node_animation(in_data, sampled, reference_width, reference_height,
-                                               &failed_binding, &failed_stage,nullptr,&failure);
-            if (err) {
-                char node_id[33]{};constexpr char hex[]="0123456789abcdef";
-                for(std::size_t i=0;i<failure.node.value.bytes.size();++i) {
-                    node_id[2*i]=hex[failure.node.value.bytes[i]>>4];
-                    node_id[2*i+1]=hex[failure.node.value.bytes[i]&15];
-                }
-                if (out_data) std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                    "Starfield animation: %s failed (native %d, guard %.0f, stream %ld, error %ld, node %s, parameter %ld, component %ld).",
-                    failed_stage, STARFIELD_VERSION_BUILD, guard.value.u.fs_d.value, static_cast<long>(failed_binding), static_cast<long>(err),
-                    node_id,static_cast<long>(failure.parameter),static_cast<long>(failure.component));
-                return err;
+            if (initial) {
+                // A missing/reset receipt must never replace real saved author data.
+                auto pristine = is_initial_graph_template(decoded.value());
+                if (!pristine.has_value()) return graph_error(out_data, pristine.error());
+                initial = pristine.value();
             }
-            graph = std::make_shared<const core::Graph>(std::move(sampled));
+            if (initial) {
+                CheckedParameter cap(in_data);
+                err = cap.checkout(kMaxParticlesId);
+                if (err) return err;
+                const auto number = cap.value.u.fs_d.value;
+                if (cap.value.param_type != PF_Param_FLOAT_SLIDER || !std::isfinite(number) || number < 0 ||
+                    number > core::kMaxParticleCount || std::floor(number) != number) return PF_Err_BAD_CALLBACK_PARAM;
+                auto startup = initial_node_graph(reference_height > 0 ? reference_height : in_data->height,
+                    static_cast<std::uint32_t>(number));
+                if (!startup.has_value()) return graph_error(out_data, startup.error());
+                graph = std::make_shared<const core::Graph>(startup.take_value());
+            } else {
+                core::Graph sampled = decoded.take_value();
+                A_long failed_binding = -1;
+                const char* failed_stage = "unknown";
+                NativeBindingFailure failure;
+                err = sample_native_node_animation(in_data, sampled, reference_width, reference_height,
+                                                   &failed_binding, &failed_stage,nullptr,&failure);
+                if (err) {
+                    if(out_data)editor_diagnostics::binding_message(out_data->return_msg,sizeof(out_data->return_msg),sampled,
+                        failure.node,static_cast<long>(failure.parameter),static_cast<long>(failure.component),
+                        static_cast<long>(failed_binding),static_cast<long>(err),failed_stage);
+                    return err;
+                }
+                graph = std::make_shared<const core::Graph>(std::move(sampled));
+            }
         } else return PF_Err_BAD_CALLBACK_PARAM;
         {
             // These registered controls are read through callbacks in SmartFX,
@@ -1007,8 +1038,20 @@ static PF_Err checkout_render_graph_impl(PF_InData* in_data, PF_OutData* out_dat
 
 PF_Err checkout_render_graph(PF_InData* in_data,PF_OutData* out_data,std::shared_ptr<const core::Graph>& graph,
     A_long* control_source,A_long reference_width,A_long reference_height) noexcept {
+    const auto before_mutation=graph_mutation_epoch();
     double guard=-1;
-    const auto result=checkout_render_graph_impl(in_data,out_data,graph,control_source,reference_width,reference_height,guard);
+    auto result=checkout_render_graph_impl(in_data,out_data,graph,control_source,reference_width,reference_height,guard);
+    // A host checkout/checkin can reenter UI work after the initial guard read.
+    // Never expose that partial snapshot, including a transient binding error.
+    // Invalid/failed guards and legacy controls do not reach observed guard0.
+    const auto after_mutation=graph_mutation_epoch();
+    if(guard==0 && (ui_transaction_active() || (before_mutation&1) ||
+        (after_mutation&1) || before_mutation!=after_mutation)) {
+        graph.reset();
+        if(control_source)*control_source=-1;
+        if(out_data)out_data->return_msg[0]=0;
+        result=PF_Interrupt_CANCEL;
+    }
     journal_graph_render(in_data,guard,result,result && out_data?out_data->return_msg:"");
     return result;
 }

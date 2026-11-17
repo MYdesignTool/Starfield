@@ -21,6 +21,17 @@ struct EvaluatedGraph {
     std::vector<ParticleModelStyle> model_styles;
 };
 
+// Authoring preflight: shares the renderer's route planners, but never enumerates
+// particles, samples historical frames or resolves host resources. Only a typed
+// connection failure may be projected out by an editor; values/budgets remain errors.
+struct ParticleTopologyValidation {
+    bool ok{};
+    bool connection_error{};
+    CoreError error{};
+};
+[[nodiscard]] ParticleTopologyValidation validate_particle_graph_topology(
+    const Graph&, const Cancellation&) noexcept;
+
 // Pre-render supplies actual authored values at historical times. No host
 // objects or frame-order state cross this boundary.
 class TemporalGraphSampler {
@@ -28,6 +39,10 @@ public:
     virtual ~TemporalGraphSampler() = default;
     [[nodiscard]] virtual Result<GraphNode> node(NodeId, double seconds) = 0;
     [[nodiscard]] virtual Result<double> rate(NodeId, double seconds) = 0;
+    // Certifies the complete node, including caller-owned resource snapshots,
+    // for this evaluation request. The returned value is owned by the caller;
+    // no host lifetime or cross-frame cache crosses this boundary.
+    [[nodiscard]] virtual std::optional<GraphNode> constant_node(NodeId) {return {};}
     // Only metadata can certify constancy/linear interpolation, not equal samples.
     [[nodiscard]] virtual Result<std::optional<EmissionRateProfile>> rate_profile(NodeId) {
         return Result<std::optional<EmissionRateProfile>>::success(std::nullopt);

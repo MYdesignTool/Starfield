@@ -117,6 +117,8 @@ const host={__SFLD_nativeCommandsV1:{version:1,commands:{"Starfield Commit Node 
         if(invalidateCommit)epoch++;
         if(reloadOnCommit){vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;}}}});
 const realm=x=>vm.runInContext("("+JSON.stringify(x)+")",context);
+if(process.env.STARFIELD_DOM_TRACE==="1")context.app.project.file={fsName:"D:/test/trace-project.aep"};
+function traceFailure(){return host.__SFLD_graphTraceV1.failures.find(f=>f.target===token && f.scope===context.app.project.file.fsName);}
 const dialectSource=source=>process.env.STARFIELD_EXTENDSCRIPT_CONDITIONAL_MODEL==="1"?
     require("./extendscript_conditionals.cjs").modelLeftAssociation(source):source;
 const gatewaySource=dialectSource(fs.readFileSync(path.join(root,"jsx/starfield_gateway.jsx"),"utf8"));
@@ -232,7 +234,14 @@ function stage(pair){const {id,desired}=pair;eq(JSON.parse(host.SFLD_writeModelG
     effect.properties.Source.value=2;effect.properties["Mesh Revision"].value=17;
     for(const [i,name] of ["Mesh Min X","Mesh Min Y","Mesh Min Z","Mesh Max X","Mesh Max Y","Mesh Max Z"].entries())effect.properties[name].value=bounds[i];
     return {effect,backupMain,backupNode};}
-let pair=begin(true),copies=stage(pair);eq(host.SFLD_modelTransactionHostCommit(pair.id),"1",host.__SFLD_modelGraphTransactionV1.message);eq(commits,1);eq(arbReads,0);eq(undo,0);
+// The hidden guard is not animated. Its saved pre-expression value owns the
+// transaction even when .value still exposes an older display sample.
+guardDisplay=1;
+let pair=begin(true),copies=stage(pair);
+guardDisplay=0;
+eq(host.SFLD_modelTransactionHostCommit(pair.id),"1",host.__SFLD_modelGraphTransactionV1.message);
+guardDisplay=null;
+eq(commits,1);eq(arbReads,0);eq(undo,0);
 eq(copies.effect.properties["Angle Y"].value,45);eq(copies.effect.properties["Panel Sync Guard"].value,0);
 eq(copy(api.snapshot(api.resolve({pinTarget:true,target:{token}}))).nativeNodes.length,pair.nodes.length);
 eq(host.SFLD_modelTransactionHostResult(pair.id,"1|7|0|0|0|0|0|0|-1"),"1");
@@ -424,8 +433,42 @@ if(hasMotion) {
 }
 const batchBaseline=items.map(e=>({matchName:e.matchName,name:e.name,properties:copy(e.properties)}));
 pair=begin(false);copies=stage(pair);rejectCommit=true;eq(host.SFLD_modelTransactionHostCommit(pair.id),"0");eq(undo,process.env.STARFIELD_DOM_MATERIAL==="1"?6:0);eq(arbReads,0);
+if(process.env.STARFIELD_DOM_TRACE==="1") {
+    const evidence=host.__SFLD_graphTraceV1;
+    ok(evidence && traceFailure());
+    eq(traceFailure().event.stage,"native.commit.receipt");
+    ok(traceFailure().event.detail.includes("saved=-"));
+}
 eq(host.SFLD_modelTransactionHostResult(pair.id,"0|5|512|0|0|0|0|0|-1"),"1");
 eq(JSON.parse(host.SFLD_readModelGraphTransaction(request("readModelGraphTransaction"))).result.ok,false);
+if(process.env.STARFIELD_DOM_TRACE==="1") {
+    const evidence=host.__SFLD_graphTraceV1,first=copy(traceFailure()),held=copy(renderer.properties),commandCount=commands;
+    function busy(){const response=JSON.parse(host.SFLD_syncGraphSnapshot(request("syncGraphSnapshot")));
+        eq(response.ok,false);eq(response.error.code,"node_effect_sync_failed");
+        return response.error.message;}
+    function packet(message){return JSON.parse(message.split(" Last graph trace: ")[1]);}
+    for(let i=0;i<100;i++){const state=packet(busy());eq(state.failure,first);}
+    eq(copy(renderer.properties),held,"diagnostics/busy retries never write author controls or guard");eq(commands,commandCount);
+    for(let i=0;i<1000;i++)api.trace("after-failure",{target:{token}},"x".repeat(10000));
+    eq(evidence.events.length,32);eq(evidence.events[31].detail.length,512);
+    eq(packet(busy()).failure,first,"bounded recent-event eviction cannot discard the first failure trail");
+    ok(JSON.stringify(evidence).length<40000);
+    vm.runInContext(gatewaySource,context);api=host.__SFLD_modelTransactionAPI;
+    eq(packet(busy()).failure,first,"gateway reload retains only plain failure data in the existing engine");
+    Object.defineProperty(host,"__SFLD_graphTraceV1",{configurable:true,get(){throw new Error("diagnostic getter failed");}});
+    ok(busy().includes("Last graph trace unavailable"));eq(copy(renderer.properties),held);eq(commands,commandCount);
+    Object.defineProperty(host,"__SFLD_graphTraceV1",{configurable:true,writable:true,value:evidence});
+    api.trace("other.failure",{target:{token:"p0-c99-l99"}},"unrelated target",true);
+    api.trace("later.failure",{target:{token}},"later failure in original target",true);
+    eq(packet(busy()).failure,first,"another target cannot overwrite the original target's first failure");
+    context.app.project.file={fsName:"D:/test/other-project.aep"};
+    eq(packet(busy()).failure,null,"the same target token in another project cannot inherit the old failure");
+    context.app.project.file=null;
+    api.trace("unsaved.failure",{target:{token}},"unverified project",true);
+    const unverified=packet(busy());eq(unverified.failure,null);eq(unverified.historyOnly,true);ok(unverified.engineHistory);
+    context.app.project.file={fsName:"D:/test/trace-project.aep"};
+    eq(packet(busy()).failure,first);
+}
 eq(staleReads,0,"No cached invalid Property may be used after native backup/add/remove.");
 if(deletionRender){ok(physicalRemovals>0);eq(missingRenderBindings,0,"No render-at-removal may resolve a deleted published source.");}
 if(fullGraph) {
@@ -451,5 +494,25 @@ if(fullGraph) {
     eq(after.nativeNodes.flatMap(n=>n.outgoing).some(e=>ids.includes(e.target)),false,"batch removal leaves no dangling edges");
     eq(staleReads,0,"multi-node removal never reuses an invalidated child Property");
     eq(missingRenderBindings,0,"batch physical removals follow verified publication");
+    if(process.env.STARFIELD_DOM_TRACE==="1") {
+        eq(host.SFLD_modelTransactionHostResult(id,"1|7|0|0|0|516|0|0|-1"),"1");
+        eq(traceFailure().event.stage,"model.result");
+        eq(traceFailure().event.detail,"1|7|0|0|0|516|0|0|-1");
+        eq(api.guardState({pinTarget:true,target:{token}}).value,1,"a known cleanup failure remains guarded");
+    }
+}
+if(process.env.STARFIELD_DOM_TRACE==="1"){
+    // A first synchronization rejection must carry its own phase/evidence,
+    // rather than requiring a later busy attempt to reveal the first failure.
+    api.resolve({pinTarget:true,target:{token}}).properties.guard.setValue(0);
+    rejectCommit=true;
+    const response=JSON.parse(host.SFLD_syncGraphSnapshot(request("syncGraphSnapshot")));
+    eq(response.ok,false);eq(response.error.code,"node_effect_sync_failed");
+    ok(response.error.message.includes("publish native graph"));
+    ok(response.error.message.includes("Last graph trace:"));
+    const evidence=JSON.parse(response.error.message.split(" Last graph trace: ")[1]);
+    eq(evidence.failure.event.stage,"native.commit.receipt");
+    ok(evidence.failure.event.detail.includes("saved=-"));
+    eq(api.guardState({pinTarget:true,target:{token}}).value,0,"successful sync cleanup still releases its own guard");
 }
 console.log(`model_graph_gateway_dom_tests: ${checks} checks passed; effect wrapper identity ${stableEffects?"reused":"fresh"}; ${fullGraph?"Emitter/Particle/Model connections":"Model only"}, fractional layout; native writes simulated, no AE qualification`);

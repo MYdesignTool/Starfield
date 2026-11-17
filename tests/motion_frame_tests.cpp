@@ -6,6 +6,7 @@
 #include "starfield/core/CpuRenderer.hpp"
 #include "starfield/core/SpriteScene.hpp"
 #include "starfield/core/SequenceCodec.hpp"
+#include "starfield/core/ParticleBirth.hpp"
 #include "../src/core/SpriteGeometry.hpp"
 #include <atomic>
 #include <bit>
@@ -134,7 +135,9 @@ void independent_output_routes(){
     auto reordered=split;std::reverse(reordered.nodes.begin(),reordered.nodes.end());std::reverse(reordered.edges.begin(),reordered.edges.end());
     same(combined,evaluate(reordered));Sampler reordered_history(reordered);same(combined,temporal(reordered_history));
 }
+void ordered_force_internal_seeds();
 void ordered_forces(){
+    ordered_force_internal_seeds();
     auto control=base();set(node(control,1),kBirthRate,1.);set(node(control,1),kEmittingMode,std::uint32_t{1});
     auto moved=control;attach(moved,circle(3));const Vec3 gravity{.3,-.2,.1},wind{.1,.05,-.02};
     const auto origin=evaluate(control,{0,1}).particles[0].position;
@@ -182,6 +185,44 @@ void ordered_forces(){
     unsigned count{};for(const auto& p:evaluate(auxiliary_graph).particles)if(p.emitter_id==nid(8)){
         ++count;const auto birth=1-p.age_seconds;const auto parent=evaluate(gravity_last,{static_cast<std::int64_t>(birth*1000+.5),1000});near(p.velocity,parent.particles[0].velocity,"Auxiliary inherits post-Motion Force velocity");
     }check(count>0,"ordered Force Auxiliary children exist");
+}
+void ordered_force_internal_seeds(){
+    const Vec3 gravity{.3,-.2,.1};
+    for(auto author_seed:{std::uint32_t{0},std::uint32_t{1},kMaxSeed})
+    for(auto shift:{std::int32_t{0},std::int32_t{-1},std::numeric_limits<std::int32_t>::min(),std::numeric_limits<std::int32_t>::max()}){
+        auto incoming=base();set(node(incoming,1),kSeed,author_seed);
+        set(node(incoming,1),kBirthRate,1.);set(node(incoming,1),kEmittingMode,std::uint32_t{1});
+        set(node(incoming,2),kParticleSeedShift,shift);attach(incoming,circle(3));
+        auto g=incoming;auto field=force(4,gravity);set(field,kGravityRandom,100.);attach(g,field);
+        const auto before=evaluate(incoming),actual=evaluate(g);Sampler sampled(g);same(actual,temporal(sampled));
+        const auto seed=shifted_particle_seed(author_seed,shift);
+        std::uint64_t salt=0;for(auto byte:nid(4).value.bytes)salt=mix64(salt^byte);
+        salt=static_cast<std::uint32_t>(salt);for(auto byte:nid(1).value.bytes)salt=mix64(salt^byte);
+        check(before.particles.size()==1,"internal seed reference has one birth");
+        auto expected=before.particles[0];const auto age=expected.age_seconds;
+        // One instantaneous birth has ordinal0 while Force is applied. The
+        // authored Particle identity is scoped only after the ordered stages.
+        const auto scale=1-unit_value(seed^static_cast<std::uint32_t>(salt),0,RandomPurpose::force_gravity);
+        expected.position=add(expected.position,{gravity.x*scale*age*age*.5,gravity.y*scale*age*age*.5,gravity.z*scale*age*age*.5});
+        expected.velocity=add(expected.velocity,{gravity.x*scale*age,gravity.y*scale*age,gravity.z*scale*age});
+        same(expected,actual.particles[0]);
+    }
+    auto auxiliary_graph=base();set(node(auxiliary_graph,1),kSeed,std::uint32_t{0});
+    auto emitter=node(auxiliary_graph,1);emitter.id=nid(8);set(emitter,kAuxiliarySource,std::uint32_t{1});set(emitter,kBirthRate,2.);
+    auto child=node(auxiliary_graph,2);child.id=nid(9);set(child,kParticleSeedShift,std::int32_t{-1});
+    auxiliary_graph.nodes.push_back(emitter);auxiliary_graph.nodes.push_back(child);auxiliary_graph.nodes.push_back(circle(10));auxiliary_graph.nodes.push_back(force(11,gravity));
+    auxiliary_graph.edges.push_back({eid(90),nid(2),kParticleParticlesOut,nid(8),kEmitterParents});
+    auxiliary_graph.edges.push_back({eid(91),nid(8),kEmitterParticles,nid(9),kParticleParticlesIn});
+    auxiliary_graph.edges.push_back({eid(92),nid(9),kParticleParticlesOut,nid(10),kMotionParticlesIn});
+    auxiliary_graph.edges.push_back({eid(93),nid(10),kMotionParticlesOut,nid(11),kForceParticlesIn});
+    auxiliary_graph.edges.push_back({eid(94),nid(11),kForceParticlesOut,nid(255),kOutputParticles});
+    Sampler history(auxiliary_graph);const auto children=evaluate(auxiliary_graph);same(children,temporal(history));
+    check(std::any_of(children.particles.begin(),children.particles.end(),[](const auto& p){return p.emitter_id==nid(8);}),"mixed-seed Auxiliary reaches ordered Force");
+    auto invalid=base();set(node(invalid,1),kSeed,std::numeric_limits<std::uint32_t>::max());attach(invalid,circle(3));attach(invalid,force(4,gravity));
+    check(!evaluate_particle_graph(invalid,{1,1},never).has_value(),"public author seed upper bound remains strict");
+    auto excessive=base();set(node(excessive,1),kSeed,std::uint32_t{0});set(node(excessive,2),kParticleSeedShift,std::int32_t{-1});attach(excessive,circle(3));
+    attach(excessive,force(4,{0,kMaxGravityMagnitude,0}));attach(excessive,force(5,{0,kMaxGravityMagnitude,0}));
+    check(!evaluate_particle_graph(excessive,{1,1},never).has_value(),"combined ordered Force bounds still reject with high-bit seed");
 }
 void put(OpaqueBytes& bytes,std::size_t offset,std::uint64_t value,unsigned count){for(unsigned i=0;i<count;++i)bytes[offset+i]=std::byte((value>>(8*i))&255);}
 void snapshots(){auto g=base();attach(g,look(3));attach(g,transform(4,settings()));auto r=evaluate(g);auto bytes=take(encode_evaluated_particles(r,{1,1}));check(std::to_integer<unsigned>(bytes[2])==10,"nonidentity affine snapshot10");

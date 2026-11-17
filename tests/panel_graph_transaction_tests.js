@@ -164,4 +164,33 @@ assert.doesNotThrow(function () {
 assert.strictEqual(malformedBootstrapReply.ok, false);
 assert.ok(malformedBootstrapReply.error);
 
+// A move verifies every saved control, including Motion's nonempty UTF-8 prefix.
+// The native commit may succeed before client-side verification rejects it.
+["", "L", "Lamp", "Lamp 火"].forEach(function (prefix) {
+    var motionGraph = graph();
+    var motion = fixture.node("motion", uuid(4));
+    motion.parameters.find(function (p) { return p.key === "19"; }).value = prefix;
+    motionGraph.nodes.push(motion);
+    var moved = {x:125,y:-75};
+    var moveHarness = createHarness(motionGraph);
+    moveHarness.client.apply({type:"moveNodes",positions:{[uuid(2)]:moved}}, function (response) { reply=response; });
+    assert.strictEqual(reply.ok, true, "a layout commit must confirm the prefix " + JSON.stringify(prefix) + ": " + JSON.stringify(reply.error));
+    assert.strictEqual(reply.snapshot.revision, 9);
+    var savedGraph = codec.fromHex(reply.graphHex);
+    assert.deepStrictEqual(require(panelPath("js/graph_layout.js")).get(savedGraph)[uuid(2)], moved);
+    assert.strictEqual(savedGraph.nodes.find(function (n) { return n.id === uuid(4); })
+        .parameters.find(function (p) { return p.key === "19"; }).value, prefix);
+
+    var changedPrefix = prefix ? prefix.replace(/L/, "l") : "L";
+    var mismatchHarness = createHarness(motionGraph, {submit:function (extra, base) {
+        var changed = codec.fromHex(extra.graphHex);
+        changed.nodes.find(function (n) { return n.id === uuid(4); })
+            .parameters.find(function (p) { return p.key === "19"; }).value = changedPrefix;
+        return {ok:true,snapshot:{initialized:true,revision:base.revision+1,graphHex:codec.toHex(changed)}};
+    }});
+    mismatchHarness.client.apply({type:"moveNodes",positions:{[uuid(2)]:moved}}, function (response) { reply=response; });
+    assert.strictEqual(reply.error.code, "graph_snapshot_unconfirmed", "changed prefixes must still fail confirmation");
+    assert.match(reply.error.message, /motion parameter 19: value differs/);
+});
+
 console.log("Panel graph transaction checks passed.");

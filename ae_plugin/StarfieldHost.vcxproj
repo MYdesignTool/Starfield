@@ -38,6 +38,7 @@
   <ItemGroup>
     <ClCompile Include="StarfieldHost.cpp" />
     <ClCompile Include="WebPanelHost.cpp" />
+    <ClCompile Include="NativeGraphEdit.cpp" />
     <ClCompile Include="UiExclusionHost.cpp" />
     <ClCompile Include="PresetFileHost.cpp" />
     <ClCompile Include="PresetFileChooser.cpp" />

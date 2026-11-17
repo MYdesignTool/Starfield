@@ -3,6 +3,7 @@
 #undef main
 #include "ModelMirrorTransaction.hpp"
 #include "ModelRenderResources.hpp"
+#include "GraphOutputScope.hpp"
 #include "SPBasic.h"
 #include <string>
 
@@ -134,6 +135,32 @@ void capture_resources(PF_InData& data){setup(data);auto graph=resource_graph();
     CHECK(pixels>0);api.release_render_result(&result);
     data.pica_basicP=nullptr;CHECK(refs==0&&suites==0);
 }
+void scoped_layout(PF_InData& data) {
+    setup(data);auto complete=resource_graph();
+    {adapter::ModelMirrorTransaction tx(&data,1,reinterpret_cast<AEGP_EffectRefH>(renderer),reinterpret_cast<AEGP_LayerH>(1));CHECK(tx.install(complete)==0);tx.accept();}
+    const auto dormant=resource_graph(6);complete.nodes.push_back(dormant.nodes.back());
+    // Full recipes sort the parked Model6 before active Model7. Its empty mirror
+    // is deliberately unreadable as a resource; only original slot1 may be used.
+    std::swap(main_values[755],main_values[756]);main_values[1011].one_d=2;
+    const auto work=adapter::graph_output_working_copy(complete);
+    PF_PreRenderCallbacks callbacks{};callbacks.GuidMixInPtr=mix;PF_PreRenderExtra extra{};extra.cb=&callbacks;PF_OutData output{};
+    adapter::ModelRenderResources resources;adapter::MotionExposure motion;
+    const auto before=checkouts;
+    CHECK(adapter::prepare_model_render_resources(&data,&output,&extra,work,motion,64,1,never,resources,&complete)==0 &&
+        resources.sources.size()==1 && resources.sources[0].resource_id[15]==7 && checkouts==before+2 && checkouts==checkins);
+    main_values[1011].one_d=1;
+    CHECK(adapter::prepare_model_render_resources(&data,&output,&extra,work,motion,64,1,never,resources,&complete)==PF_Err_BAD_CALLBACK_PARAM &&
+        resources.sources.empty() && checkouts==checkins);main_values[1011].one_d=2;
+    const auto bytes=core::serialize_graph(work,core::particle_node_registry());CHECK(bytes.has_value());
+    motion.enabled=true;motion.samples={{{24,24},bytes.value(),{}},{{25,24},bytes.value(),{}}};const auto shutter_before=checkouts;
+    CHECK(adapter::prepare_model_render_resources(&data,&output,&extra,work,motion,64,1,never,resources,&complete)==0 &&
+        resources.sources.size()==1 && resources.sources[0].resource_id[15]==7 && checkouts==shutter_before+2 && checkouts==checkins);
+    auto no_model=work;std::erase_if(no_model.nodes,[](const auto& n){return n.type_key==kModelNode;});
+    std::erase_if(no_model.edges,[](const auto& e){return e.source_node==nid(7);});
+    CHECK(adapter::prepare_model_render_resources(nullptr,&output,&extra,no_model,motion,64,1,never,resources,&complete)==0 &&
+        resources.sources.empty() && checkouts==checkins);
+    clear();CHECK(handles.empty() && refs==0 && suites==0 && locks==0);
+}
 }
 int main(){std::setvbuf(stdout,nullptr,_IONBF,0);if(model_controls_fixture_main())return 1;PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;
     utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;PF_InData data{};data.utils=&utils;data.inter.add_param=add;
@@ -141,5 +168,5 @@ int main(){std::setvbuf(stdout,nullptr,_IONBF,0);if(model_controls_fixture_main(
     stream_suite.AEGP_GetNewStreamValue=get_value;stream_suite.AEGP_DisposeStreamValue=dispose_value;stream_suite.AEGP_SetStreamValue=set_value;stream_suite.AEGP_DisposeStream=dispose_stream;
     effect_suite.AEGP_GetLayerNumEffects=num_effects;effect_suite.AEGP_GetLayerEffectByIndex=get_effect;effect_suite.AEGP_GetInstalledKeyFromLayerEffect=effect_key;
     effect_suite.AEGP_GetEffectMatchName=effect_name;effect_suite.AEGP_DisposeEffect=dispose_effect;
-    try{transaction(data);capture_resources(data);std::printf("Model resource bridge: %u checks, %u failures (May2023 SDK/fake host/C ABI pixels)\n",checks,failures);return failures?1:0;}
+    try{transaction(data);capture_resources(data);scoped_layout(data);std::printf("Model resource bridge: %u checks, %u failures (May2023 SDK/fake host/C ABI pixels)\n",checks,failures);return failures?1:0;}
     catch(const std::exception& error){std::printf("FAILED: %s\n",error.what());clear();return 1;}}

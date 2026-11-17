@@ -39,6 +39,46 @@ struct EmissionClock {
     }
 };
 
+struct TemporalEmitterValues {
+    ValidatedSettings settings;
+    static constexpr std::array keys{kEmitChance,kEmitLifeStart,kEmitLifeEnd,kInheritVelocity,kInheritSize,kInheritOpacity,kInheritColor};
+    std::array<std::optional<double>,keys.size()> percentages;
+    bool auxiliary{};
+    double percent(ParameterKey key,double fallback) const {
+        for(std::size_t i=0;i<keys.size();++i)if(keys[i]==key)return percentages[i].value_or(fallback);
+        return fallback;
+    }
+};
+Result<TemporalEmitterValues> read_temporal_emitter(const GraphNode& node) {
+    using V=Result<TemporalEmitterValues>;
+    if(const auto* mode=find_value(node,kEmittingMode);mode && std::get<std::uint32_t>(*mode)>3)
+        return V::failure(ErrorCode::invalid_request,"invalid Emitting mode");
+    TemporalEmitterValues result;
+    for(std::size_t i=0;i<result.keys.size();++i)if(const auto* value=find_value(node,result.keys[i])) {
+        const auto number=std::get<double>(*value);
+        if(!std::isfinite(number) || number<0 || number>100)
+            return V::failure(ErrorCode::invalid_request,"Auxiliary percentage outside 0..100");
+        result.percentages[i]=number/100;
+    }
+    auto settings=read_emitter(node);if(!settings.has_value())return V::failure(settings.error());
+    result.settings=settings.take_value();
+    const auto* source=find_value(node,kAuxiliarySource);
+    result.auxiliary=source && std::get<std::uint32_t>(*source)==1;
+    return V::success(std::move(result));
+}
+
+struct TemporalFrameValues {
+    TemporalFrameValues() {}
+    StaticFrameValues values;
+    evaluation_storage::FrameValue<Result<TemporalEmitterValues>> emitter;
+    evaluation_storage::FrameValue<Settings> own;
+    void clear() noexcept {values.clear();emitter.clear();own.clear();}
+};
+struct OrderedForceFrameValues {
+    OrderedForceFrameValues() {}
+    evaluation_storage::FrameValue<Result<Settings>> sampled;
+    evaluation_storage::FrameValue<Settings> physical,spin;
+};
 class TemporalEvaluator {
     TemporalGraphSampler& sampler;
     const Cancellation& cancel;
@@ -46,6 +86,16 @@ class TemporalEvaluator {
     std::map<NodeId,EmissionClock> clocks;
     std::uint64_t work{};
     double hz{kDefaultTemporalHz};
+    std::map<NodeId,std::optional<GraphNode>> certified_nodes;
+    std::map<NodeId,TemporalEmitterValues> constant_emitters;
+    std::map<NodeId,ParticleValues> constant_particles;
+    std::map<NodeId,ForceValues> constant_forces;
+    std::map<NodeId,CompiledParticleTransform> constant_transforms;
+    // ordered_force does not recurse into evaluate. One request-owned buffer
+    // serves all particles; recursive evaluate calls own separate frame values.
+    std::unique_ptr<OrderedForceFrameValues> ordered_force_values;
+    std::array<std::unique_ptr<TemporalFrameValues>,17> frame_values;
+    std::map<NodeId,TurbulenceValues> constant_turbulence;
     std::map<std::pair<NodeId,double>,ForceValues> force_samples;
     std::map<std::pair<NodeId,double>,CompiledParticleTransform> transform_samples;
     std::map<std::pair<NodeId,double>,TurbulenceValues> turbulence_samples;
@@ -88,38 +138,59 @@ class TemporalEvaluator {
             return Result<GraphNode>::failure(ErrorCode::invalid_request,"historical node identity changed");
         return result;
     }
+    template<class Value,class Reader>
+    Result<Value> compiled_at(const GraphNode& node,double time,std::map<NodeId,Value>& constants,Reader read) {
+        using V=Result<Value>;
+        if(cancel.is_cancelled())return V::failure(ErrorCode::cancelled,"constant compilation cancelled");
+        if(const auto found=constants.find(node.id);found!=constants.end())return V::success(found->second);
+        auto proof=certified_nodes.find(node.id);
+        if(proof==certified_nodes.end())proof=certified_nodes.emplace(node.id,sampler.constant_node(node.id)).first;
+        if(proof->second) {
+            const auto& value=*proof->second;
+            if(value.id!=node.id || value.type_key!=node.type_key || value.schema_version!=node.schema_version)
+                return V::failure(ErrorCode::invalid_request,"certified node identity changed");
+            if(++work>kTemporalWorkLimit)return V::failure(ErrorCode::work_limit_exceeded,"constant compilation work limit");
+            auto result=read(value);
+            if(result.has_value())constants.emplace(node.id,result.value());
+            return result;
+        }
+        auto sampled=at(node,time);if(!sampled.has_value())return V::failure(sampled.error());
+        return read(sampled.value());
+    }
     Result<ForceValues> force_at(const GraphNode& node,double time) {
+        if(const auto found=constant_forces.find(node.id);found!=constant_forces.end())
+            return Result<ForceValues>::success(found->second);
         const auto key=std::make_pair(node.id,time);
         if(auto found=force_samples.find(key);found!=force_samples.end())
             return Result<ForceValues>::success(found->second);
-        auto sampled=at(node,time);
-        if(!sampled.has_value()) return Result<ForceValues>::failure(sampled.error());
-        auto values=read_force(sampled.value());
-        if(values.has_value()) {
+        auto values=compiled_at(node,time,constant_forces,read_force);
+        if(values.has_value() && !constant_forces.contains(node.id)) {
             if(force_samples.size()>=65536) force_samples.clear();
             force_samples.emplace(key,values.value());
         }
         return values;
     }
     Result<CompiledParticleTransform> transform_at(const GraphNode& node,double time) {
+        if(const auto found=constant_transforms.find(node.id);found!=constant_transforms.end())
+            return Result<CompiledParticleTransform>::success(found->second);
         const auto key=std::make_pair(node.id,time);
         if(const auto found=transform_samples.find(key);found!=transform_samples.end())
             return Result<CompiledParticleTransform>::success(found->second);
-        auto sampled=at(node,time);if(!sampled.has_value())return Result<CompiledParticleTransform>::failure(sampled.error());
-        auto values=read_transform(sampled.value());
-        if(values.has_value()) {
+        auto values=compiled_at(node,time,constant_transforms,read_transform);
+        if(values.has_value() && !constant_transforms.contains(node.id)) {
             if(transform_samples.size()>=65536)transform_samples.clear();
             transform_samples.emplace(key,values.value());
         }
         return values;
     }
     Result<TurbulenceValues> turbulence_at(const GraphNode& node,double time) {
+        if(const auto found=constant_turbulence.find(node.id);found!=constant_turbulence.end())
+            return Result<TurbulenceValues>::success(found->second);
         const auto key=std::make_pair(node.id,time);
         if(const auto found=turbulence_samples.find(key);found!=turbulence_samples.end())
             return Result<TurbulenceValues>::success(found->second);
-        auto sampled=at(node,time);if(!sampled.has_value())return Result<TurbulenceValues>::failure(sampled.error());
-        auto values=read_turbulence(sampled.value());
-        if(values.has_value()) {
+        auto values=compiled_at(node,time,constant_turbulence,read_turbulence);
+        if(values.has_value() && !constant_turbulence.contains(node.id)) {
             if(turbulence_samples.size()>=4096)turbulence_samples.clear();
             turbulence_samples.emplace(key,values.value());
         }
@@ -304,13 +375,15 @@ class TemporalEvaluator {
     Result<bool> ordered_force(ParticleInstance& particle,Vec3 origin,std::span<const NodeId> ids,
         double birth,double now,std::uint32_t seed,const std::map<NodeId,const GraphNode*>& nodes) {
         using M=Result<bool>;
+        if(!ordered_force_values)ordered_force_values=std::make_unique<OrderedForceFrameValues>();
+        auto& scratch=*ordered_force_values;
         std::vector<ForceValues> fields;fields.reserve(ids.size());
         const auto settings_at=[&](double time)->Result<Settings>{
             fields.clear();
             for(auto id:ids){auto field=force_at(*nodes.at(id),time);if(!field.has_value())return Result<Settings>::failure(field.error());fields.push_back(field.take_value());}
             return ordered_force_settings(particle,seed,fields);
         };
-        if(now<=birth){auto checked=settings_at(now);if(!checked.has_value())return M::failure(checked.error());return M::success(true);}
+        if(now<=birth){auto& checked=scratch.sampled.replace([&]{return settings_at(now);});if(!checked.has_value())return M::failure(checked.error());return M::success(true);}
         OrderedForceResponse response;Vec3 physical_velocity{};
         double basis_position=0,basis_velocity=1,t=birth;bool has_drag=false;
         while(t<now){
@@ -318,8 +391,9 @@ class TemporalEvaluator {
             if(++work>kTemporalWorkLimit)return M::failure(ErrorCode::work_limit_exceeded,"ordered Force history work limit");
             const auto end=std::min(now,(std::floor(t*hz+1e-8)+1)/hz);
             if(!(end>t))return M::failure(ErrorCode::invalid_time,"ordered Force history did not advance");
-            auto sampled=settings_at((t+end)/2);if(!sampled.has_value())return M::failure(sampled.error());
-            auto physical=sampled.value(),spin=sampled.take_value();
+            auto& sampled=scratch.sampled.replace([&]{return settings_at((t+end)/2);});if(!sampled.has_value())return M::failure(sampled.error());
+            auto& physical=scratch.physical.replace([&]{return sampled.value();});
+            auto& spin=scratch.spin.replace([&]{return sampled.take_value();});
             if(!charge_ordered_force(physical,work,4))return M::failure(ErrorCode::work_limit_exceeded,"ordered Force curve work limit");
             for(auto& force:physical.forces)force.spin_radius=0;
             spin.gravity={};spin.linear_drag=0;for(auto& force:spin.forces){force.gravity={};force.wind={};}
@@ -340,8 +414,8 @@ class TemporalEvaluator {
             if(!motion_circle_detail::bounded(response.displacement)||!motion_circle_detail::bounded(physical_velocity))
                 return M::failure(ErrorCode::invalid_request,"ordered Force history state exceeds bounds");
         }
-        auto endpoint=settings_at(now);if(!endpoint.has_value())return M::failure(endpoint.error());
-        auto spin=endpoint.take_value();spin.gravity={};spin.linear_drag=0;
+        auto& endpoint=scratch.sampled.replace([&]{return settings_at(now);});if(!endpoint.has_value())return M::failure(endpoint.error());
+        auto& spin=scratch.spin.replace([&]{return endpoint.take_value();});spin.gravity={};spin.linear_drag=0;
         for(auto& force:spin.forces){force.gravity={};force.wind={};}
         if(!charge_ordered_force(spin,work))return M::failure(ErrorCode::work_limit_exceeded,"ordered Force endpoint work limit");
         const auto field_velocity=simulate_particle_at_age(spin,particle.age_seconds,particle.id,dimensions).velocity;
@@ -567,6 +641,9 @@ public:
             validation.error.code==GraphErrorCode::internal_failure?ErrorCode::internal_failure:ErrorCode::invalid_request,
             validation.error.detail);
         if(cancel.is_cancelled()) return R::failure(ErrorCode::cancelled,"temporal graph cancelled");
+        if(depth>=frame_values.size())return R::failure(ErrorCode::work_limit_exceeded,"auxiliary history depth limit");
+        auto& frame=frame_values[depth];if(!frame)frame=std::make_unique<TemporalFrameValues>();
+        evaluation_storage::FrameScope frame_scope{*frame};
         std::map<NodeId,const GraphNode*> nodes;
         std::map<NodeId,std::vector<NodeId>> incoming,outgoing,dependencies,dependents;
         ModelValues models;MaterialValues materials;
@@ -578,32 +655,35 @@ public:
                 auto value=read_model(node);if(!value.has_value())return R::failure(value.error());models.emplace(node.id,value.take_value());
             }
             if(node.type_key==kTurbulenceNode) {
-                auto value=read_turbulence(node);if(!value.has_value())return R::failure(value.error());
+                auto& value=frame->values.turbulence.replace([&]{return read_turbulence(node);});if(!value.has_value())return R::failure(value.error());
             }
             if(node.type_key==kMotionNode) {auto mode=read_motion_mode(node);if(!mode.has_value())return R::failure(mode.error());
-                if(mode.value()==1){auto value=read_motion_circle(node);if(!value.has_value())return R::failure(value.error());}
-                else if(mode.value()==2){auto value=read_motion_look_at(node,cancel);if(!value.has_value())return R::failure(value.error());}
+                if(mode.value()==1){auto& value=frame->values.circle.replace([&]{return read_motion_circle(node);});if(!value.has_value())return R::failure(value.error());}
+                else if(mode.value()==2){auto& value=frame->values.look_at.replace([&]{return read_motion_look_at(node,cancel);});if(!value.has_value())return R::failure(value.error());}
                 else if(find_value(node,kMotionPathLightResource)) {
-                    auto settings=read_motion_light_path_settings(node);if(!settings.has_value())return R::failure(settings.error());
-                    auto curve=compile_motion_curve_clock(settings.value().clock.over_life);if(!curve.has_value())return R::failure(curve.error());
+                    auto& settings=frame->values.light_settings.replace([&]{return read_motion_light_path_settings(node);});if(!settings.has_value())return R::failure(settings.error());
+                    auto& curve=frame->values.curve.replace([&]{return compile_motion_curve_clock(settings.value().clock.over_life);});if(!curve.has_value())return R::failure(curve.error());
                     work+=curve.value().segment_count();
                     if(work>kTemporalWorkLimit)return R::failure(ErrorCode::work_limit_exceeded,"Light Path curve work limit");
                     auto resource=read_motion_light_path_resource(node,cancel,work,path_bytes);
                     if(!resource.has_value())return R::failure(resource.error());
-                } else {auto value=read_motion_path_clock(node);if(!value.has_value())return R::failure(value.error());
+                } else {auto& value=frame->values.path.replace([&]{return read_motion_path_clock(node);});if(!value.has_value())return R::failure(value.error());
                     work+=value.value().clock.segment_count();
                     auto points=read_motion_path_points(node,cancel,work);if(!points.has_value())return R::failure(points.error());}}
             if(node.type_key==kParticleNode && (find_value(node,kParticleSeedShift) || find_value(node,kParticleBirthChance))) {
-                auto authored=read_particle(node);if(!authored.has_value())return R::failure(authored.error());
+                auto& authored=frame->values.particle.replace([&]{return read_particle(node);});if(!authored.has_value())return R::failure(authored.error());
             }
             if(node.type_key==kOutputNode) {if(output) return R::failure(ErrorCode::invalid_request,"multiple Outputs");output=&node;}
         }
         if(!output) return R::failure(ErrorCode::invalid_request,"missing Output");
+        const auto parent_references=auxiliary_parent_references(graph);
         for(const auto& edge:graph.edges) {
             const auto model_edge=is_model_graph_edge(edge,*nodes.at(edge.source_node),*nodes.at(edge.destination_node));
             if(!model_edge && !is_particle_graph_edge(*nodes.at(edge.source_node),*nodes.at(edge.destination_node)))
                 return R::failure(ErrorCode::invalid_request,"unsupported temporal edge");
-            dependencies[edge.destination_node].push_back(edge.source_node);dependents[edge.source_node].push_back(edge.destination_node);
+            if(!std::binary_search(parent_references.begin(),parent_references.end(),edge.id)) {
+                dependencies[edge.destination_node].push_back(edge.source_node);dependents[edge.source_node].push_back(edge.destination_node);
+            }
             if(!model_edge) {
                 incoming[edge.destination_node].push_back(edge.source_node);
                 outgoing[edge.source_node].push_back(edge.destination_node);
@@ -625,14 +705,27 @@ public:
         EvaluatedGraph result;
         TextureStyleMap texture_indices;
         CloudStyleMap cloud_indices;
+        // Particle-only metadata needs no host capture on an empty frame.
+        // Direct Model/Material output has no particle birth clock or cap;
+        // retain its existing current-time sampling even when the cap is zero.
+        std::map<NodeId,bool> direct_metadata;
+        std::vector<NodeId> metadata_stack;
+        for(auto source:dependencies[output->id])
+            if(nodes.at(source)->type_key==kModelNode || nodes.at(source)->type_key==kMaterialNode)metadata_stack.push_back(source);
+        while(!metadata_stack.empty()) {
+            if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"direct Model dependency planning cancelled");
+            const auto id=metadata_stack.back();metadata_stack.pop_back();
+            if(direct_metadata[id])continue;direct_metadata[id]=true;
+            for(auto source:dependencies[id])metadata_stack.push_back(source);
+        }
         std::map<NodeId,std::size_t> dependency_degrees;
         std::priority_queue<NodeId,std::vector<NodeId>,std::greater<>> dependency_ready;
         std::size_t active_nodes=0;
         for(const auto& [id,node]:nodes)if(active[id]) {
             ++active_nodes;dependency_degrees[id]=dependencies[id].size();if(!dependency_degrees[id])dependency_ready.push(id);
-            if(node->type_key==kMaterialNode) {auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
+            if(node->type_key==kMaterialNode && ((now>=0 && cap) || direct_metadata[id])) {auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
                 auto value=read_material(sampled.value());if(!value.has_value())return R::failure(value.error());materials.at(id)=value.take_value();}
-            if(node->type_key==kModelNode) {
+            if(node->type_key==kModelNode && ((now>=0 && cap) || direct_metadata[id])) {
                 auto sampled=at(*node,now);if(!sampled.has_value())return R::failure(sampled.error());
                 auto value=read_model(sampled.value());if(!value.has_value())return R::failure(value.error());models.at(id)=value.take_value();
             }
@@ -673,36 +766,31 @@ public:
                         plan_transforms[i]=sampled.take_value();
                     }
                 }
-                if(plan_active[i]){degrees[i]=plan_incoming[i].size();if(!degrees[i])ready.push(i);}
+                if(plan_active[i]){degrees[i]=dependencies[plan_nodes[i]->id].size();if(!degrees[i])ready.push(i);}
             }
             while(!ready.empty()) {
                 if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"Transform temporal topology cancelled");
                 auto index=ready.top();ready.pop();plan_order.push_back(index);
-                for(auto dest:plan_outgoing[index])if(plan_active[dest] && --degrees[dest]==0)ready.push(dest);
+                for(auto dest:dependents[plan_nodes[index]->id]) {auto next=plan_indices.at(dest);if(plan_active[next] && --degrees[next]==0)ready.push(next);}
             }
         }
         if(now<0 || !cap) return finish_model_output(std::move(result),graph,models,model_indices.value());
         std::vector<Branch> branches;
         std::map<NodeId,std::uint64_t> partitions;
-        struct PathDefinition {NodeId terminal{};std::vector<NodeId> nodes;};
+        struct PathDefinition {NodeId terminal{};std::vector<NodeId> nodes;bool joined{};};
         std::map<NodeId,std::vector<PathDefinition>> paths_by_particle;
         auto terminals=incoming[output->id];std::sort(terminals.begin(),terminals.end());
         for(const auto terminal:terminals) {
             if(cancel.is_cancelled())return R::failure(ErrorCode::cancelled,"temporal stream path planning cancelled");
-            std::vector<NodeId> reversed;NodeId current=terminal,particle{};
-            for(std::size_t steps=0;steps<=nodes.size();++steps) {
-                const auto found=nodes.find(current);if(found==nodes.end())break;
-                if(found->second->type_key==kParticleNode){particle=current;break;}
-                reversed.push_back(current);
-                const auto parent=incoming.find(current);
-                if(parent==incoming.end()||parent->second.size()!=1)break;
-                current=parent->second.front();
-            }
-            if(particle.value.is_zero())continue;
-            std::reverse(reversed.begin(),reversed.end());
-            auto& routes=paths_by_particle[particle];
+            const std::vector<NodeId> empty;
+            auto ancestry=collect_stream_ancestors<NodeId>(terminal,{},[&](auto id){return nodes.at(id);},
+                [&](auto id)->const auto&{const auto found=incoming.find(id);return found==incoming.end()?empty:found->second;},
+                result.evaluated_nodes,cancel,work);
+            if(!ancestry.has_value())return R::failure(ancestry.error());auto collected=ancestry.take_value();
+            if(collected.particle.value.is_zero())continue;
+            auto& routes=paths_by_particle[collected.particle];
             if(routes.size()>=kMaxGraphEdges)return R::failure(ErrorCode::work_limit_exceeded,"temporal stream path count exceeds its limit");
-            routes.push_back({terminal,std::move(reversed)});
+            routes.push_back({terminal,std::move(collected.nodes),collected.joined});
         }
         for(const auto& [id,node]:nodes) if(active[id] && node->type_key==kParticleNode) {
             const auto routes=paths_by_particle.find(id);if(routes==paths_by_particle.end())continue;
@@ -718,11 +806,23 @@ public:
                     if(has_motions||has_transforms||has_turbulences) {
                         std::vector<std::vector<std::size_t>> route_incoming(plan_nodes.size()),route_outgoing(plan_nodes.size());
                         auto previous=plan_indices.at(id);
-                        for(const auto route_node:path.nodes) {
+                        if(path.joined) {
+                            // Preserve the real edges at a join; serializing the
+                            // ancestors would hide ambiguous processor frames.
+                            std::set<NodeId> members(path.nodes.begin(),path.nodes.end());members.insert(id);
+                            for(auto route_node:path.nodes) {
+                                const auto next=plan_indices.at(route_node);
+                                for(auto ancestor:incoming[route_node])if(members.contains(ancestor)) {
+                                    const auto parent=plan_indices.at(ancestor);route_outgoing[parent].push_back(next);
+                                    route_incoming[next].push_back(parent);
+                                }
+                            }
+                            previous=plan_indices.at(path.terminal);
+                        } else for(const auto route_node:path.nodes) {
                             const auto next=plan_indices.at(route_node);route_outgoing[previous].push_back(next);
                             route_incoming[next].push_back(previous);previous=next;
-                            if(nodes.at(route_node)->type_key==kForceNode)branch.forces.push_back(nodes.at(route_node));
                         }
+                        for(auto route_node:path.nodes)if(nodes.at(route_node)->type_key==kForceNode)branch.forces.push_back(nodes.at(route_node));
                         const auto output_index=plan_indices.at(output->id);
                         route_outgoing[previous].push_back(output_index);route_incoming[output_index].push_back(previous);
                         if(has_motions||has_turbulences) {
@@ -829,17 +929,9 @@ public:
                     if(slot<branch.stride) break;
                     slot-=branch.stride;continue;
                 }
-                auto emitter_node=at(*branch.emitter,birth);if(!emitter_node.has_value()) return R::failure(emitter_node.error());
-                if(const auto* mode=find_value(emitter_node.value(),kEmittingMode);mode && std::get<std::uint32_t>(*mode)>3)
-                    return R::failure(ErrorCode::invalid_request,"invalid Emitting mode");
-                for(auto key:{kEmitChance,kEmitLifeStart,kEmitLifeEnd,kInheritVelocity,kInheritSize,kInheritOpacity,kInheritColor})
-                    if(const auto* value=find_value(emitter_node.value(),key);value &&
-                       (!std::isfinite(std::get<double>(*value)) || std::get<double>(*value)<0 || std::get<double>(*value)>100))
-                        return R::failure(ErrorCode::invalid_request,"Auxiliary percentage outside 0..100");
-                auto emitter=read_emitter(emitter_node.value());if(!emitter.has_value()) return R::failure(emitter.error());
-                auto particle_node=at(*branch.particle,birth);if(!particle_node.has_value()) return R::failure(particle_node.error());
-                auto sampled_particle=read_particle(particle_node.value());if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
-                auto particle_values=sampled_particle.take_value();
+                auto& emitter=frame->emitter.replace([&]{return compiled_at(*branch.emitter,birth,constant_emitters,read_temporal_emitter);});if(!emitter.has_value()) return R::failure(emitter.error());
+                auto& sampled_particle=frame->values.particle.replace([&]{return compiled_at(*branch.particle,birth,constant_particles,read_particle);});if(!sampled_particle.has_value()) return R::failure(sampled_particle.error());
+                auto&& particle_values=sampled_particle.take_value();
                 if(const auto found=model_indices.value().find(branch.particle->id);found!=model_indices.value().end())particle_values.model_style_index=found->second;
                 if(particle_values.authored_birth!=branch.authored_birth)
                     return R::failure(ErrorCode::invalid_request,"historical birth control membership changed");
@@ -849,17 +941,16 @@ public:
                 if (!retained.has_value()) return R::failure(retained.error());
                 const double life=particle_values.lifetime_seconds,age=std::max(0.0,now-birth);
                 if(age<life) {
-                    auto appearance=particle_values;
-                    Settings settings=emitter.value().value;settings.particle_lifetime_seconds=life;
+                    auto& appearance=frame->values.appearance.replace([&]{return particle_values;});
+                    auto& settings=frame->values.settings.replace([&]{return emitter.value().settings.value;});settings.particle_lifetime_seconds=life;
                     settings.seed=shifted_particle_seed(settings.seed,particle_values.birth.seed_shift);
-                    const auto percent=[&](ParameterKey key,double fallback) {const auto* v=find_value(emitter_node.value(),key);return v?std::get<double>(*v)/100:fallback;};
-                    const auto* mode=find_value(emitter_node.value(),kAuxiliarySource);
-                    const bool auxiliary=mode && std::get<std::uint32_t>(*mode)==1;
+                    const auto percent=[&](ParameterKey key,double fallback) {return emitter.value().percent(key,fallback);};
+                    const bool auxiliary=emitter.value().auxiliary;
                     std::vector<ParticleInstance> parents;
                     if(auxiliary && !incoming[branch.emitter->id].empty()) {
                         Graph prefix;std::map<NodeId,bool> ancestors;stack=incoming[branch.emitter->id];
                         while(!stack.empty()) {auto next=stack.back();stack.pop_back();if(ancestors[next]) continue;ancestors[next]=true;
-                            for(auto source:incoming[next]) stack.push_back(source);}
+                            for(auto source:incoming[next]) if(source!=branch.emitter->id)stack.push_back(source);}
                         for(const auto& [id,n]:nodes) if(ancestors[id] || id==output->id) prefix.nodes.push_back(*n);
                         for(const auto& edge:graph.edges) {
                             if(ancestors[edge.source_node] && ancestors[edge.destination_node]) prefix.edges.push_back(edge);
@@ -872,7 +963,8 @@ public:
                     if(!auxiliary) parents.push_back({});
                     for(const auto& parent:parents) {
                         if(++work>kTemporalWorkLimit) return R::failure(ErrorCode::work_limit_exceeded,"auxiliary history work limit");
-                        auto own=settings;auto looks=appearance;std::uint64_t identity=slot;
+                        auto& own=frame->own.replace([&]{return settings;});
+                        auto& looks=frame->values.inherited.replace([&]{return appearance;});std::uint64_t identity=slot;
                         if(auxiliary) {
                             const double fraction=parent.age_seconds/parent.lifetime_seconds;
                             const double start=percent(kEmitLifeStart,0),end=percent(kEmitLifeEnd,1);

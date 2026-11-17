@@ -25,12 +25,13 @@ constexpr std::size_t kMaxOptionalRecords = 4096;
 
 constexpr std::array<std::uint32_t, 256> make_crc_table() noexcept {
     std::array<std::uint32_t, 256> table{};
-    for (std::uint32_t index = 0; index < table.size(); ++index) {
-        std::uint32_t value = index;
+    std::uint32_t index = 0;
+    for (auto& entry : table) {
+        std::uint32_t value = index++;
         for (unsigned bit = 0; bit < 8; ++bit) {
             value = (value >> 1u) ^ ((0u - (value & 1u)) & 0xedb88320u);
         }
-        table[index] = value;
+        entry = value;
     }
     return table;
 }

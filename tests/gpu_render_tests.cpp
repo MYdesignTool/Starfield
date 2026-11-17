@@ -24,13 +24,22 @@
 #include <cstring>
 #include <map>
 #include <chrono>
+#ifdef STARFIELD_TEST_GPU_CONCURRENT
+#include <atomic>
+#include <thread>
+#endif
 
 PF_Err register_node_graph_sync(PF_InData*) noexcept {return PF_Err_NONE;}
 PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef*[]) noexcept {return PF_Err_NONE;}
+PF_Err update_native_emitter_visibility(PF_InData*,PF_ParamDef*[]) noexcept {return PF_Err_NONE;}
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef*[],const PF_UserChangedParamExtra*,bool) noexcept {return PF_Err_NONE;}
+PF_Err sync_custom_node_graph_bank(PF_InData*,PF_OutData*,const starfield::adapter::node_sync::NativeEdit&) noexcept {return PF_Err_NONE;}
 using namespace starfield;
 static std::shared_ptr<const core::Graph> smart_graph;
 namespace starfield::adapter {
+// This isolated selector fixture substitutes the independent compiler service.
+void invalidate_native_compile_reuse() noexcept {}
+AEGP_PluginID graph_carrier_plugin_id() noexcept {return 1;}
 CoreGeneration::CoreGeneration(void* m,SfCoreApi api,std::uint64_t id,std::wstring p) noexcept:module_(m),api_(api),cache_identity_(id),path_(std::move(p)) {}
 CoreGeneration::~CoreGeneration() noexcept = default;
 CoreLoadResult acquire_core() noexcept {
@@ -177,7 +186,8 @@ SfCoreGpuSceneResult view(const core::SpriteScene& s) {
     SfCoreGpuSceneResult v{};v.struct_size=sizeof(v);v.status=SF_CORE_OK;v.tile_size=16;
     v.region={s.region.left,s.region.top,s.region.right,s.region.bottom};v.tiles_x=s.tiles_x;v.tiles_y=s.tiles_y;
     v.sprite_count=static_cast<unsigned>(s.sprites.size());v.index_count=static_cast<unsigned>(s.indices.size());
-    v.sprites=s.sprites.data();v.tile_offsets=s.offsets.data();v.tile_indices=s.indices.data();return v;
+    v.sprites=s.sprites.data();v.tile_offsets=s.offsets.data();v.tile_indices=s.indices.data();
+    v.cloud_circle_count=static_cast<std::uint32_t>(s.cloud_circles.size());v.cloud_circles=s.cloud_circles.data();return v;
 }
 void test_scene_api() {
     SfCoreApi api{};check(!StarfieldCore_GetApi(3,sizeof(api),&api),"ABI 3 rejected after shared sprite basis addition");
@@ -237,7 +247,7 @@ PF_Err checkout_metadata(PF_ProgPtr,PF_ParamIndex index,A_long id,const PF_Rende
     check(index==0 && (id==0 || (id==1 && req->rect.left==req->rect.right)),"SmartFX main geometry or node input request");
     result->result_rect=req->rect;result->max_result_rect={0,0,64,48};result->ref_width=64;result->ref_height=48;result->par={1,1};return 0;
 }
-PF_Err mix_guid(PF_ProgPtr,A_u_long size,const void*) {check(size==8 || size==16,"immutable Core generation and exposure mixed into cache key");return 0;}
+PF_Err mix_guid(PF_ProgPtr,A_u_long size,const void*) {check(size==8 || size==16 || size==21*sizeof(double),"Core generation, exposure and frame light/camera identity mixed into cache key");return 0;}
 PF_Err checkout_input(PF_ProgPtr,A_long,PF_EffectWorld** value) {++input_checkouts;*value=node_input_world;return 0;}
 PF_Err checkin_input(PF_ProgPtr,A_long) {++input_checkins;return 0;}
 PF_Err checkout_output(PF_ProgPtr,PF_EffectWorld** value) {check(input_checkouts>input_checkins,"input checkout precedes output");*value=smart_world;return 0;}
@@ -251,9 +261,9 @@ void test_smartfx(PF_InData& in,PF_OutData& out,void* gpu_data,PF_EffectWorld& w
     check(adapter::pre_render(&in,&out,&pre)==0 && (pre_output.flags&PF_RenderOutputFlag_GPU_RENDER_POSSIBLE),"SmartFX pre-render prepares and qualifies actual GPU scene");
     const auto timing=adapter::last_pre_render_timings();
     check(timing.valid && timing.complete && timing.seconds==1 && timing.total_ms>=0 &&
-        timing.controls_ms>=0 && timing.history_ms>=0 && timing.scene_ms>=0 &&
-        timing.total_ms>=timing.controls_ms+timing.history_ms+timing.scene_ms,
-        "actual pre-render timing separates controls, history and scene work");
+        timing.controls_ms>=0 && timing.history_ms>=0 && timing.transfer_ms>=0 && timing.resources_ms>=0 && timing.scene_ms>=0 &&
+        timing.total_ms>=timing.controls_ms+timing.history_ms+timing.transfer_ms+timing.resources_ms+timing.scene_ms,
+        "actual pre-render timing separates controls, history, transfer, resources and scene work");
     PF_SmartRenderInput render_input{};render_input.bitdepth=32;render_input.what_gpu=info.device_framework;
     render_input.device_index=7;render_input.gpu_data=gpu_data;render_input.pre_render_data=pre_output.pre_render_data;
     PF_SmartRenderCallbacks render_callbacks{checkout_input,checkin_input,checkout_output};PF_SmartRenderExtra render{&render_input,&render_callbacks};
@@ -335,6 +345,9 @@ void test_copy(PF_InData& in,void* device,PF_EffectWorld& output) {
     check(allocated.size()==2 && pinned_count==0 && suite_count==0,"node copy allocates no staging/device buffers");
     world_views.erase(&input);check(free_device(nullptr,7,input_buffer)==0,"node input released only by test owner");
 }
+#ifdef STARFIELD_TEST_GPU_CONCURRENT
+#include "gpu_driver_concurrency_cases.hpp"
+#endif
 void test_backend(PF_GPU_Framework framework) {
     if(!create_device(framework)) {check(false,"local test GPU device available");return;}
     std::printf("Actual %s driver backend\n",framework==PF_GPU_Framework_CUDA?"CUDA":"OpenCL");
@@ -394,6 +407,9 @@ void test_backend(PF_GPU_Framework framework) {
     test_smartfx(in,out,setup_output.gpu_data,world);
     benchmark(in,out,setup_output.gpu_data);
     test_copy(in,setup_output.gpu_data,world);
+#ifdef STARFIELD_TEST_GPU_CONCURRENT
+    concurrent_driver::run(setup_output.gpu_data);
+#endif
     std::printf("Maximum component difference vs CPU: %.9g\n",max_error);
     check(free_device(nullptr,7,world_buffer)==0,"test output released");world_buffer=nullptr;
     PF_GPUDeviceSetdownInput setdown_input{setup_output.gpu_data,framework,7};PF_GPUDeviceSetdownExtra setdown{&setdown_input};

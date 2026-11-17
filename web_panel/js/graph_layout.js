@@ -149,6 +149,7 @@
             })
         };
         updated.optionalRecords.push(encode(graph, positions));
+        if(graph.canvasOnly)updated.canvasOnly=true;
         return updated;
     }
 

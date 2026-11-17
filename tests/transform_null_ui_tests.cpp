@@ -8,11 +8,14 @@
 #include <cstring>
 #include <string>
 #include <fstream>
-#if defined(STARFIELD_TEXTURE_DISPATCH_TEST)
+#include <Windows.h>
+#if defined(STARFIELD_TEXTURE_DISPATCH_TEST) || defined(STARFIELD_TRANSFORM_DISPATCH_TEST)
 #include "GpuRender.hpp"
 #include "ParticleGradientUI.hpp"
 PF_Err register_node_graph_sync(PF_InData*) noexcept{return PF_Err_NONE;}
 namespace starfield::adapter {
+// This isolated selector fixture substitutes the independent compiler service.
+void invalidate_native_compile_reuse() noexcept {}
 PF_Err gpu_device_setup(PF_InData*,PF_OutData*,PF_GPUDeviceSetupExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 PF_Err gpu_device_setdown(PF_InData*,PF_GPUDeviceSetdownExtra*) noexcept{return PF_Err_BAD_CALLBACK_PARAM;}
 bool gpu_device_matches(const void*,PF_GPU_Framework,A_u_long) noexcept{return false;}
@@ -75,9 +78,17 @@ PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData* out,PF_ParamDef* params[
     if(fail==8){std::snprintf(out->return_msg,sizeof(out->return_msg),"detailed native binding failure");return 516;}
     return 0;
 }
-int main(){
+int main(int argc,char** argv){
+    HMODULE module{};
+    if(argc>1) {
+        module=LoadLibraryA(argv[1]);check(module!=nullptr,"load isolated test Host for inventory exclusion");
+        if(!module)return 1;
+        const auto initialize=reinterpret_cast<void(*)()>(GetProcAddress(module,"SFLD_TestInitialize"));
+        check(initialize!=nullptr,"test Host exports initialization");if(!initialize)return 1;initialize();
+    }
     SPBasicSuite basic{};basic.AcquireSuite=acquire;basic.ReleaseSuite=release;
     PF_InData data{};data.pica_basicP=&basic;data.effect_ref=reinterpret_cast<PF_ProgPtr>(1);data.time_scale=24;
+    data.num_params=starfield::adapter::native_nodes::parameter_count(starfield::adapter::native_nodes::Kind::transform);
     PF_OutData out{};std::array<PF_ParamDef,537> params{};std::array<PF_ParamDef*,537> pointers{};
     for(unsigned i=0;i<params.size();++i)pointers[i]=&params[i];
     params[1].param_type=PF_Param_LAYER;params[guard_index].param_type=PF_Param_FLOAT_SLIDER;
@@ -166,24 +177,40 @@ int main(){
     check(starfield::adapter::create_transform_null(&data,&out,pointers.data())!=0 && !created && !undo_start,
         "resource bound rejects before composition mutation");
     check(!suites && !refs,"preflight rejection releases references");
-    reset();PF_EventExtra event{};event.contextH=reinterpret_cast<PF_ContextH>(1);event.effect_win.index=1;
-    event.effect_win.area=PF_EA_CONTROL;
-    event.effect_win.current_frame.left=0;event.effect_win.current_frame.top=0;
-    event.effect_win.current_frame.right=240;event.effect_win.current_frame.bottom=56;
-    event.e_type=PF_Event_DO_CLICK;
-    event.u.do_click.screen_point.h=159;event.u.do_click.screen_point.v=53;
-    check(starfield::adapter::transform_null_event(&data,&out,pointers.data(),&event)==0 && !created && !event.evt_out_flags,
-        "click outside the button cannot create a layer");
-    event.u.do_click.screen_point.h=10;event.u.do_click.screen_point.v=40;
-    check(starfield::adapter::transform_null_event(&data,&out,pointers.data(),&event)==0 && created==1 &&
-        (event.evt_out_flags&PF_EO_HANDLED_EVENT),"button click is handled and creates exactly one layer");
-    check(!suites && !refs,"event path balances host references");
-    reset();out={};event.evt_out_flags=0;event.u.do_click.screen_point.v=10;
-    check(starfield::adapter::transform_null_event(&data,&out,pointers.data(),&event)==0 && !created && !published && !undo_start,
-          "canceling layer dropdown cannot mutate the graph or create a Null");
-    cancel_menu=false;check(starfield::adapter::transform_null_event(&data,&out,pointers.data(),&event)==0 && !created && published==1 && selection==101,
-          "layer dropdown selects an existing resource without creating another layer");
-    check(!suites && !refs && !names && undo_start==undo_end,"layer inventory and selector release all resources");
+    reset();PF_EventExtra event{};
+#if defined(STARFIELD_TRANSFORM_DISPATCH_TEST)
+    data.inter.add_param=[](PF_ProgPtr,PF_ParamIndex,PF_ParamDef* def)->PF_Err{registered_native.push_back(*def);return 0;};
+    data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo*)->PF_Err{return 0;};
+    check(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&out,nullptr,nullptr,nullptr)==0 && out.num_params==92 && registered_native.size()==91,
+          "Transform registration appends native Create Null without shifting old streams");
+    check(registered_native[0].param_type==PF_Param_LAYER && (registered_native[0].ui_flags==PF_PUI_NONE && registered_native[0].ui_width==0 && registered_native[0].ui_height==0) &&
+          registered_native[90].param_type==PF_Param_BUTTON && registered_native[90].uu.id==1415,
+          "Transform delegates layer selector and button to AE");
+    for(auto type:{PF_Event_DRAW,PF_Event_DO_CLICK,PF_Event_DRAG}) {
+        event={};event.contextH=reinterpret_cast<PF_ContextH>(1);event.effect_win.index=1;event.effect_win.area=PF_EA_CONTROL;event.e_type=type;
+        check(EffectMain(PF_Cmd_EVENT,&data,&out,pointers.data(),nullptr,&event)==0 && !event.evt_out_flags && !created,
+              "ordinary native layer controls never enumerate custom menus or consume events");
+    }
+    PF_UserChangedParamExtra button{};button.param_index=91;
+    check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&out,pointers.data(),nullptr,&button)==0 && created==1 && published==1,
+          "actual native button dispatch performs the guarded create-and-publish transaction");
+    reset();button.param_index=1;expected_selection=77;
+    check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&out,pointers.data(),nullptr,&button)==0 && !created && published==1,
+          "native layer selection reaches ordinary supervised synchronization");
+    reset();data.num_params=0;
+    static int checked_out=0,checked_in=0,checkout_fail=0;
+    data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex i,A_long,A_long,A_u_long,PF_ParamDef* def)->PF_Err{
+        check(i>=2 && i<=90,"empty button delivery checks out only numeric Transform controls and metadata");
+        if(i==checkout_fail)return 516;++checked_out;*def=registered_native[i-1];return 0;};
+    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{++checked_in;return 0;};
+    button.param_index=91;
+    check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&out,nullptr,nullptr,&button)==0 && created==1 && published==1 && checked_out==checked_in,
+          "native button with no delivered parameters recovers saved controls and balances every checkout");
+    reset();checkout_fail=8;
+    check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&data,&out,nullptr,nullptr,&button)==516 && !created && !undo_start && checked_out==checked_in,
+          "failed recovery balances earlier checkouts and cannot mutate the composition");
+    checkout_fail=0;data.num_params=92;
+#endif
     reset();expected_selection=0;
     check(starfield::adapter::set_transform_null_source(&data,&out,pointers.data(),0)==0 && selection==0 && !created && published==1,
           "None selection publishes identity without creating a layer");
@@ -235,10 +262,6 @@ int main(){
               "actual Texture click inventory uses scripting sources for both front and back menus");
         check(!suites && !refs && !script_handles && !script_locks,"script result/error handles and all suites balance");
     }
-    event.effect_win.index=521;event.evt_out_flags=0;event.u.do_click.screen_point.v=10;
-    check(starfield::adapter::texture_layer_event(&data,&out,pointers.data(),&event)==0 &&
-          (event.evt_out_flags&PF_EO_HANDLED_EVENT) && script_calls==3 && !published && !undo_start,
-          "Texture menu click reaches the owner-pinned inventory and cancellation performs no edit");
 #if defined(STARFIELD_TEXTURE_DISPATCH_TEST)
     data.inter.add_param=[](PF_ProgPtr,PF_ParamIndex,PF_ParamDef* def)->PF_Err{registered_native.push_back(*def);return 0;};
     data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* ui)->PF_Err{

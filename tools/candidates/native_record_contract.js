@@ -70,7 +70,7 @@ function createNativeRecordContract() {
                 if(key==="2" && (field.value<0 || field.value>100000))invalid(node,"Noise Amplitude outside supported range");
                 if(key==="3" && (field.value<=0 || field.value>100000))invalid(node,"Noise frequency outside supported range");
                 if(key==="4" && !integer(field.value,1,8))invalid(node,"Noise Levels must be 1..8");
-                if(key==="8" && [0,3,4].indexOf(field.value)<0)invalid(node,"unsupported Turbulence Type");
+                if(key==="8" && field.value!==0 && field.value!==3 && field.value!==4)invalid(node,"unsupported Turbulence Type");
                 if(key==="9" && !integer(field.value,0,3))invalid(node,"invalid Turbulence axis");
                 if((key==="10" || key==="14") && !integer(field.value,0,1))invalid(node,"invalid Turbulence selector");
                 if(key==="11" && (field.value<=0 || field.value>100000000))invalid(node,"invalid Turbulence sphere size");

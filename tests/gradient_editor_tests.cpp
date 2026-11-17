@@ -6,6 +6,7 @@
 #include "ParticleGradientUI.hpp"
 #include "ParticleLayout.hpp"
 #include "NodeRecord.hpp"
+#include "NodeGraphSync.hpp"
 #include "GradientEditorModel.hpp"
 #include "EditorPresetPicker.hpp"
 #include <adobesdk/DrawbotSuite.h>
@@ -43,6 +44,9 @@ std::vector<std::uint8_t> bitmap_pixels;
 int bitmap_width{},bitmap_height{};
 DRAWBOT_PixelLayout bitmap_format{};
 std::function<void()> image_hook;
+std::function<void()> invalidate_hook;
+std::function<void(const starfield::adapter::node_sync::NativeEdit&)> publish_hook;
+std::vector<DRAWBOT_PointF32> curve_path;
 std::ofstream preview;
 DRAWBOT_ColorRGBA preview_color{};
 DRAWBOT_RectF32 preview_rect{};
@@ -63,7 +67,7 @@ void configure() {
         return *value?0:1;
     };
     basic.ReleaseSuite=[](const char*,int32)->SPErr{++releases;return 0;};
-    app.PF_InvalidateRect=[](PF_ContextH,const PF_Rect*)->PF_Err{++invalidations;return 0;};
+    app.PF_InvalidateRect=[](PF_ContextH,const PF_Rect*)->PF_Err{++invalidations;if(invalidate_hook)invalidate_hook();return 0;};
     app.PF_AppColorPickerDialog=[](const A_char*,const PF_PixelFloat*,PF_Boolean monitor,PF_PixelFloat* output)->PF_Err {
         check(monitor!=0,"native picker uses working-space display transform");*output={1,0.2f,0.4f,0.8f};return cancel?PF_Err_BAD_CALLBACK_PARAM:0;
     };
@@ -104,8 +108,8 @@ void configure() {
     };
     supplier.ReleaseObject=[](DRAWBOT_ObjectRef)->SPErr{--objects;return 0;};
     path.AddRect=[](DRAWBOT_PathRef,const DRAWBOT_RectF32* bounds)->SPErr{preview_rect=*bounds;++rectangles;check(bounds->width>0 && bounds->height>0,"positive drawing rectangles");return 0;};
-    path.MoveTo=[](DRAWBOT_PathRef,float,float)->SPErr{return 0;};
-    path.LineTo=[](DRAWBOT_PathRef,float,float)->SPErr{return 0;};
+    path.MoveTo=[](DRAWBOT_PathRef,float x,float y)->SPErr{curve_path.clear();curve_path.push_back({x,y});return 0;};
+    path.LineTo=[](DRAWBOT_PathRef,float x,float y)->SPErr{curve_path.push_back({x,y});return 0;};
     surface.StrokePath=[](DRAWBOT_SurfaceRef,DRAWBOT_PenRef,DRAWBOT_PathRef)->SPErr{return 0;};
     surface.FillPath=[](DRAWBOT_SurfaceRef,DRAWBOT_BrushRef,DRAWBOT_PathRef,DRAWBOT_FillType)->SPErr{
         if(preview.is_open())preview<<"<rect x='"<<preview_rect.left<<"' y='"<<preview_rect.top<<"' width='"<<preview_rect.width<<"' height='"<<preview_rect.height
@@ -126,8 +130,16 @@ PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef* params[]) noexc
     return PF_Err_NONE;
 }
 PF_Err sync_node_graph_parameter(PF_InData*,PF_OutData*,PF_ParamDef* params[],const PF_UserChangedParamExtra* extra,bool bank) noexcept {
-    ++publications;check(bank && (extra->param_index==layout::gradient || extra->param_index==layout::rotation_curve),"entire visual bank publishes atomically");
-    check(params[extra->param_index]->uu.change_flags==PF_ChangeFlag_CHANGED_VALUE,"count carries native undo/change flag");
+    ++publications;check(bank && (extra->param_index==layout::gradient || layout::curve_base(extra->param_index)),"entire visual bank publishes atomically");
+    bool changed=false;
+    const auto span=extra->param_index==layout::gradient?18:layout::curve_span;
+    for(int i=0;i<span;++i)changed|=(params[extra->param_index+i]->uu.change_flags&PF_ChangeFlag_CHANGED_VALUE)!=0;
+    check(changed,"visual bank carries native undo/change flags");
+    return reject?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
+}
+PF_Err sync_custom_node_graph_bank(PF_InData*,PF_OutData*,const starfield::adapter::node_sync::NativeEdit& bank) noexcept {
+    ++publications;check(starfield::adapter::node_sync::valid_custom_bank(bank),"entire visual bank publishes as owned typed values");
+    if(publish_hook)publish_hook(bank);
     return reject?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
 }
 int main() {
@@ -167,7 +179,9 @@ int main() {
     data.num_params=parameter_count;
     for(unsigned i=0;i<params.size();++i)params[i]=&values[i];
     for(int i=0;i<8;++i)values[records::uuid_first_index(records::Kind::particle)+i].param_type=PF_Param_FLOAT_SLIDER;
+    values[records::uuid_first_index(records::Kind::particle)+7].u.fs_d.value=2;
     values[layout::gradient].param_type=PF_Param_FLOAT_SLIDER;values[layout::gradient].u.fs_d.value=2;
+    values[layout::gradient_interpolation].param_type=PF_Param_FLOAT_SLIDER;
     for(int i=0;i<8;++i){values[layout::gradient_first+2*i].param_type=PF_Param_FLOAT_SLIDER;
         values[layout::gradient_first+2*i+1].param_type=PF_Param_COLOR;values[layout::gradient_first+2*i+1].u.cd.value={255,255,255,255};}
     values[layout::gradient_first+2].u.fs_d.value=100;
@@ -260,9 +274,16 @@ int main() {
     for(int i=0;i<layout::curve_span;++i)values[layout::rotation_curve+i].param_type=PF_Param_FLOAT_SLIDER;
     event.e_type=PF_Event_DRAW;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"default zero rotation curve draws without any bitmap");
     const auto curve_click=[&](int x,int y){event.e_type=PF_Event_DO_CLICK;event.u.do_click={};event.u.do_click.screen_point.h=x;event.u.do_click.screen_point.v=y;return particle_rotation_curve_event(&data,&out,params.data(),&event);};
-    auto edits=publications;check(curve_click(118,25)==0 && publications==edits+1 && values[layout::rotation_curve].u.fs_d.value==3,"native rotation adds a point through one bank transaction");
+    const auto curve_release=[&](){event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;return particle_rotation_curve_event(&data,&out,params.data(),&event);};
+    auto edits=publications;check(curve_click(118,25)==0 && event.u.do_click.send_drag && publications==edits,"new point joins its initial gesture without publishing on mouse down");
+    event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.h=140;event.u.do_click.screen_point.v=15;event.u.do_click.last_time=FALSE;
+    check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==edits && values[layout::rotation_curve].u.fs_d.value==0,
+          "newly inserted point moves on the same held gesture without writing host values");
+    check(curve_release()==0 && publications==edits+1 && values[layout::rotation_curve].u.fs_d.value==3,"new point publishes once when its initial gesture finishes");
+    check(std::abs(values[layout::rotation_curve+3].u.fs_d.value-.6)<1e-6 && std::abs(values[layout::rotation_curve+4].u.fs_d.value-270)<1e-6,
+          "first gesture saves the moved new point rather than its original click location");
     check(values[layout::rotation_curve+1].u.fs_d.value==0 && values[layout::rotation_curve+5].u.fs_d.value==1,"rotation curve retains normalized life endpoints");
-    auto rotation_bank=values;reject=true;check(curve_click(65,20)!=0,"failed rotation publication is reported");reject=false;
+    auto rotation_bank=values;reject=true;check(curve_click(65,20)==0 && curve_release()!=0,"failed rotation publication is reported at gesture release");reject=false;
     bool curve_restored=true;for(int i=0;i<layout::curve_span;++i)curve_restored &= values[layout::rotation_curve+i].u.fs_d.value==rotation_bank[layout::rotation_curve+i].u.fs_d.value;
     check(curve_restored,"failed curve addition restores count and every old knot");
     check(curve_click(243,35)==0,"rotation curve Flip publishes atomically");
@@ -270,5 +291,144 @@ int main() {
     check(curve_click(145,100)==0 && values[layout::rotation_curve+4].u.fs_d.value==360,"selected rotation +360 preset is an authored degree curve");
     event.e_type=PF_Event_CLOSE_CONTEXT;check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && objects==0,"rotation close releases UI state");
     starfield::adapter::clear_particle_gradient_ui();check(gets==releases,"SDK suites balanced across curve events");
+    for(const auto base:{layout::size_curve,layout::opacity_curve,layout::rotation_curve}) {
+        starfield::adapter::clear_particle_gradient_ui();
+        event.effect_win.index=base;
+        for(int i=0;i<layout::curve_span;++i){values[base+i]={};values[base+i].param_type=PF_Param_FLOAT_SLIDER;}
+        values[layout::size_over_life].u.fs_d.value=values[layout::opacity_over_life].u.fs_d.value=100;
+        const auto snapshot=values;
+        const auto start=publications;
+        check(curve_click(228,base==layout::rotation_curve?45:5)==0 && event.u.do_click.send_drag,
+              "all three default curves start an endpoint gesture");
+        event.e_type=PF_Event_DRAG;
+        for(int y=10;y<=70;y+=10){event.u.do_click.screen_point.v=y;event.u.do_click.last_time=FALSE;
+            check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && (event.evt_out_flags&PF_EO_UPDATE_NOW),
+                  "intermediate endpoint drag keeps immediate local preview");}
+        check(publications==start,"endpoint drag performs no graph publication before release");
+        bool untouched=true;for(int i=0;i<layout::curve_span;++i)untouched&=values[base+i].u.fs_d.value==snapshot[base+i].u.fs_d.value;
+        check(untouched,"intermediate curve gesture leaves host parameter bank untouched");
+        event.e_type=PF_Event_DRAW;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0,"local curve draft repaints");
+        publish_hook=[&](const starfield::adapter::node_sync::NativeEdit&) {
+            std::vector<PF_ParamDef> old_values(snapshot.begin(),snapshot.end());
+            std::vector<PF_ParamDef*> old_params;for(auto& field:old_values)old_params.push_back(&field);
+            for(unsigned delivery=0;delivery<2;++delivery) {
+                if(delivery)old_values[base].u.fs_d.value=std::numeric_limits<double>::quiet_NaN();
+                auto repaint=event;repaint.e_type=PF_Event_DRAW;PF_OutData repaint_out{};curve_path.clear();
+                check(particle_rotation_curve_event(&data,&repaint_out,old_params.data(),&repaint)==0 && curve_path.size()==221 && std::abs(curve_path.back().y-70)<1e-5,
+                      "publication-time repaint retains desired curve with old or partially updated host bank");
+            }
+        };
+        invalidate_hook=[&](){
+            std::vector<PF_ParamDef> old_values(snapshot.begin(),snapshot.end());
+            std::vector<PF_ParamDef*> old_params;for(auto& field:old_values)old_params.push_back(&field);
+            auto repaint=event;repaint.e_type=PF_Event_DRAW;PF_OutData repaint_out{};curve_path.clear();
+            check(particle_rotation_curve_event(&data,&repaint_out,old_params.data(),&repaint)==0 && curve_path.size()==221 && std::abs(curve_path.back().y-70)<1e-5,
+                  "local invalidation reentry still sees the desired curve before event return");
+        };
+        out={};event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==start+1,
+              "release publishes exactly one complete curve bank");
+        publish_hook={};
+        invalidate_hook={};
+        check(!(event.evt_out_flags&PF_EO_UPDATE_NOW) && (event.evt_out_flags&PF_EO_HANDLED_EVENT),
+              "successful release queues its invalidation until host PF value adoption rather than forcing an immediate draw");
+        // Model the host's event-return order: UPDATE_NOW may paint using the
+        // pre-event array before the changed PF bank is adopted. A normal queued
+        // repaint sees the adopted bank. Execute the real DRAW path in both.
+        if(event.evt_out_flags&PF_EO_UPDATE_NOW) {
+            std::vector<PF_ParamDef> old_values(snapshot.begin(),snapshot.end());
+            std::vector<PF_ParamDef*> old_params;for(auto& field:old_values)old_params.push_back(&field);
+            auto early=event;early.e_type=PF_Event_DRAW;PF_OutData early_out{};curve_path.clear();
+            check(particle_rotation_curve_event(&data,&early_out,old_params.data(),&early)==0,"early host redraw executes the real control painter");
+        }
+        check(curve_path.size()==221 && std::abs(curve_path.back().y-70)<1e-5,
+              "event return does not flash the pre-edit curve before PF adoption");
+        auto settled=event;settled.e_type=PF_Event_DRAW;PF_OutData settled_out{};curve_path.clear();
+        check(particle_rotation_curve_event(&data,&settled_out,params.data(),&settled)==0 && curve_path.size()==221 && std::abs(curve_path.back().y-70)<1e-5,
+              "settled queued redraw uses adopted authored values without a persistent overlay");
+        check(!(out.out_flags&PF_OutFlag_REFRESH_UI) && (out.out_flags&PF_OutFlag_FORCE_RERENDER),
+              "curve commit invalidates its local control without refreshing every host window");
+        const auto expected=base==layout::rotation_curve?-225.0:18.75;
+        check(values[base].u.fs_d.value==2 && std::abs(values[base+4].u.fs_d.value-expected)<1e-9,
+              "release retains exact endpoint value for size, opacity and rotation");
+        auto committed=values;auto commits=publications;
+        check(curve_click(228,70)==0,"committed endpoint can start another gesture");
+        event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==commits,
+              "click and release without movement performs no graph write");
+        check(curve_click(228,70)==0,"cancellable endpoint gesture starts");
+        event.e_type=PF_Event_DRAG;event.u.do_click.last_time=FALSE;event.u.do_click.screen_point.v=20;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0,"draft moves before cancellation");
+        event.e_type=PF_Event_KEYDOWN;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0,"keyboard cancels owned curve draft");
+        event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==commits,
+              "late mouse release after cancellation cannot save the discarded draft");
+        check(curve_click(228,70)==0,"external-edit guard gesture starts");
+        values[base+4].u.fs_d.value=40;
+        event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;event.u.do_click.screen_point.v=20;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==commits && values[base+4].u.fs_d.value==40,
+              "external host edit cancels draft and is not overwritten at release");
+        values=committed;
+        check(curve_click(228,70)==0,"failure rollback gesture starts");
+        event.e_type=PF_Event_DRAG;event.u.do_click.last_time=TRUE;event.u.do_click.screen_point.v=20;reject=true;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)!=0,"failed final curve publication is reported");reject=false;
+        check(event.evt_out_flags&PF_EO_UPDATE_NOW,"failed publication immediately redraws restored authored data");
+        bool bank_restored=true;for(int i=0;i<layout::curve_span;++i)bank_restored&=std::memcmp(&values[base+i],&committed[base+i],sizeof(PF_ParamDef))==0;
+        check(bank_restored,"failed final gesture restores values and original change flags");
+        event.e_type=PF_Event_DRAW;curve_path.clear();
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && curve_path.size()==221 && std::abs(curve_path.back().y-70)<1e-5,
+              "failed publication clears its display preview and immediately redraws the restored curve");
+        for(unsigned mode=1;mode<=3;++mode) {
+            values=committed;values[layout::curve_interpolation(base)].u.fs_d.value=mode;
+            commits=publications;
+            check(curve_click(228,70)==0 && event.u.do_click.send_drag,"Hold, Bezier and Draw each begin a gesture");
+            event.e_type=PF_Event_DRAG;event.u.do_click.last_time=FALSE;event.u.do_click.screen_point.v=25;
+            check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==commits,
+                  "every interpolation mode keeps intermediate edits local");
+            event.u.do_click.last_time=TRUE;
+            check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==commits+1,
+                  "each interpolation mode publishes its final bank exactly once");
+        }
+    }
+    starfield::adapter::clear_particle_gradient_ui();
+    for(const auto base:{layout::size_curve,layout::opacity_curve,layout::rotation_curve}) {
+        event.effect_win.index=base;
+        for(int i=0;i<layout::curve_span;++i){values[base+i]={};values[base+i].param_type=PF_Param_FLOAT_SLIDER;}
+        const auto prior_publications=publications;
+        check(curve_click(118,40)==0 && event.u.do_click.send_drag && publications==prior_publications,
+              "all Particle curves insert a point into the initial held gesture");
+        event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.h=140;event.u.do_click.screen_point.v=25;event.u.do_click.last_time=FALSE;
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && publications==prior_publications && values[base].u.fs_d.value==0,
+              "new Size/Opacity/Rotation point moves immediately without a second click or host write");
+        check(curve_release()==0 && publications==prior_publications+1 && values[base].u.fs_d.value==3 &&
+              std::abs(values[base+3].u.fs_d.value-.6)<1e-6 && std::abs(values[base+4].u.fs_d.value-(base==layout::rotation_curve?180:75))<1e-6,
+              "each inserted-point gesture publishes its final position and value once");
+        // Simulate Undo before another click; no accepted preview survives the
+        // publication call to conceal current authored values.
+        values[base].u.fs_d.value=0;event.e_type=PF_Event_DRAW;curve_path.clear();
+        check(particle_rotation_curve_event(&data,&out,params.data(),&event)==0 && curve_path.size()==221 &&
+              std::abs(curve_path[110].y-(base==layout::rotation_curve?45:5))<1e-5,"post-publication Undo is displayed without a stale overlay");
+    }
+    starfield::adapter::clear_particle_gradient_ui();
+    for(const auto kind:{records::Kind::motion,records::Kind::turbulence}) {
+        const auto base=kind==records::Kind::motion?records::motion_layout::curve:records::turbulence_layout::curve;
+        std::vector<PF_ParamDef> other_values(records::parameter_count(kind));
+        std::vector<PF_ParamDef*> other_params;
+        for(auto& param:other_values){param.param_type=PF_Param_FLOAT_SLIDER;other_params.push_back(&param);}
+        other_values[records::uuid_first_index(kind)+7].u.fs_d.value=static_cast<A_long>(kind)+1;
+        auto other_data=data;other_data.num_params=0;PF_OutData other_out{};
+        PF_EventExtra other_event{};other_event.contextH=reference<PF_ContextH>();other_event.effect_win.index=base;
+        other_event.effect_win.area=PF_EA_CONTROL;other_event.effect_win.current_frame={0,0,310,180};
+        other_event.e_type=PF_Event_DO_CLICK;other_event.u.do_click.screen_point.h=228;other_event.u.do_click.screen_point.v=5;
+        const auto prior_publications=publications;
+        check(particle_rotation_curve_event(&other_data,&other_out,other_params.data(),&other_event,kind==records::Kind::motion,kind==records::Kind::turbulence)==0 && other_event.u.do_click.send_drag,
+              "shared Motion/Turbulence editor can start an owned bank gesture without a USER_CHANGED array count");
+        other_event.e_type=PF_Event_DRAG;other_event.u.do_click.last_time=TRUE;other_event.u.do_click.screen_point.v=65;
+        check(particle_rotation_curve_event(&other_data,&other_out,other_params.data(),&other_event,kind==records::Kind::motion,kind==records::Kind::turbulence)==0 && publications==prior_publications+1 &&
+              other_values[base].u.fs_d.value==2 && other_values[base+4].u.fs_d.value==25,"shared custom editors preserve complete typed bank publication");
+    }
+    starfield::adapter::clear_particle_gradient_ui();
     std::printf("Gradient editor: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

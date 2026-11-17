@@ -5,6 +5,8 @@
 #include <cmath>
 #include <new>
 #include <optional>
+#include <map>
+#include <set>
 #include <string_view>
 #include <utility>
 
@@ -279,6 +281,24 @@ const char* describe(GraphErrorCode code) noexcept {
     return "unknown graph validation error";
 }
 
+std::vector<EdgeId> auxiliary_parent_references(const Graph& graph) {
+    using namespace graph_keys;
+    std::map<NodeId,const GraphNode*> nodes;
+    for(const auto& n:graph.nodes)nodes.emplace(n.id,&n);
+    std::set<std::pair<NodeId,NodeId>> returns;
+    for(const auto& e:graph.edges) {
+        const auto a=nodes.find(e.source_node),p=nodes.find(e.destination_node);
+        if(a==nodes.end() || p==nodes.end() || a->second->type_key!=kEmitterNode || p->second->type_key!=kParticleNode ||
+           e.source_port!=kEmitterParticles || e.destination_port!=kParticleParticlesIn)continue;
+        for(const auto& value:a->second->parameters)if(value.key==kAuxiliarySource)
+            if(const auto* mode=std::get_if<std::uint32_t>(&value.value);mode && *mode==1)returns.emplace(e.source_node,e.destination_node);
+    }
+    std::vector<EdgeId> result;
+    for(const auto& e:graph.edges)if(e.source_port==kParticleParticlesOut && e.destination_port==kEmitterParents &&
+        returns.contains({e.destination_node,e.source_node}))result.push_back(e.id);
+    std::sort(result.begin(),result.end());return result;
+}
+
 GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& registry) noexcept {
     try {
         if (graph.nodes.size() > kMaxGraphNodes || graph.edges.size() > kMaxGraphEdges) {
@@ -387,6 +407,7 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
         edges.reserve(graph.edges.size());
         std::vector<ConnectionRef> connections;
         connections.reserve(graph.edges.size());
+        const auto parent_references=auxiliary_parent_references(graph);
         std::vector<std::vector<std::size_t>> adjacency(nodes.size());
         for (const auto& edge : graph.edges) edges.push_back(&edge);
         std::sort(edges.begin(), edges.end(), [](const GraphEdge* left, const GraphEdge* right) {
@@ -445,7 +466,8 @@ GraphValidationResult validate_graph(const Graph& graph, const NodeRegistry& reg
 
             connections.push_back(ConnectionRef{edge.destination_node, edge.destination_port,
                                                 destination_port->max_connections});
-            if (!is_cycle_breaking_input(*destination_node.descriptor, edge.destination_port)) {
+            if (!is_cycle_breaking_input(*destination_node.descriptor, edge.destination_port) &&
+                !std::binary_search(parent_references.begin(),parent_references.end(),edge.id)) {
                 adjacency[*source_index].push_back(*destination_index);
             }
             if (!add_bounded<std::uint64_t>(72, estimated_bytes)) {

@@ -13,6 +13,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -334,6 +335,51 @@ PF_Err register_node_graph_sync(PF_InData* in_data) noexcept {
 
 AEGP_PluginID node_graph_sync_plugin_id() noexcept {return g_plugin_id.load(std::memory_order_acquire);}
 
+PF_Err update_native_emitter_visibility(PF_InData* data,PF_ParamDef* params[]) noexcept {
+    using namespace starfield::adapter::native_nodes;
+    constexpr A_long source_index=34;
+    constexpr A_long guard_index=sync_guard_index(Kind::emitter);
+    const auto plugin=g_plugin_id.load(std::memory_order_acquire);
+    if(!data || data->num_params!=parameter_count(Kind::emitter) || !data->pica_basicP ||
+       !data->effect_ref || !plugin || !params || !params[source_index] || !params[guard_index] ||
+       params[source_index]->param_type!=PF_Param_FLOAT_SLIDER ||
+       params[guard_index]->param_type!=PF_Param_FLOAT_SLIDER)return PF_Err_NONE;
+    const bool auxiliary=params[source_index]->u.fs_d.value==1;
+    // ExtendScript cannot author dynamically hidden properties. The supervised
+    // guard exposes the bank for the whole transaction, including rollback;
+    // its finally-path release restores the source-specific presentation.
+    const bool hidden=!auxiliary && params[guard_index]->u.fs_d.value==0;
+    SuiteSet suites(data);if(suites.acquire())return PF_Err_NONE;
+    struct VisibilityScope {
+        SuiteSet& suites;
+        const AEGP_DynamicStreamSuite4* dynamic{};
+        AEGP_EffectRefH effect{};
+        ~VisibilityScope() {
+            if(effect)suites.effect->AEGP_DisposeEffect(effect);
+            if(dynamic)suites.basic->ReleaseSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4);
+        }
+    } scope{suites};
+    if(suites.basic->AcquireSuite(kAEGPDynamicStreamSuite,kAEGPDynamicStreamSuiteVersion4,
+       reinterpret_cast<const void**>(&scope.dynamic)) || !scope.dynamic ||
+       !scope.dynamic->AEGP_GetDynamicStreamFlags || !scope.dynamic->AEGP_SetDynamicStreamFlag ||
+       !suites.pf_interface->AEGP_GetNewEffectForEffect ||
+       suites.pf_interface->AEGP_GetNewEffectForEffect(plugin,data->effect_ref,&scope.effect) || !scope.effect)return PF_Err_NONE;
+    // Keep registration, disk IDs and values intact; only the seven Auxiliary
+    // controls (Emit Chance/Life Start/End and four Inherit percentages) differ.
+    for(A_long index=1;index<=26;++index) {
+        const bool shape_control=index==1 || (index>=8 && index<=14);
+        if(!shape_control && index<20)continue;
+        const bool control_hidden=shape_control?(auxiliary && params[guard_index]->u.fs_d.value==0):hidden;
+        AEGP_StreamRefH ref{};
+        if(suites.stream->AEGP_GetNewEffectStreamByIndex(plugin,scope.effect,index,&ref) || !ref)continue;
+        AEGP_DynStreamFlags flags{};
+        if(!scope.dynamic->AEGP_GetDynamicStreamFlags(ref,&flags) && bool(flags&AEGP_DynStreamFlag_HIDDEN)!=control_hidden)
+            (void)scope.dynamic->AEGP_SetDynamicStreamFlag(ref,AEGP_DynStreamFlag_HIDDEN,FALSE,control_hidden?TRUE:FALSE);
+        suites.stream->AEGP_DisposeStream(ref);
+    }
+    return PF_Err_NONE;
+}
+
 PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) noexcept {
     namespace layout=starfield::adapter::native_nodes::particle_layout;
     const auto plugin=g_plugin_id.load(std::memory_order_acquire);
@@ -383,21 +429,41 @@ PF_Err update_native_particle_visibility(PF_InData* data,PF_ParamDef* params[]) 
 static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[],
     const PF_UserChangedParamExtra* extra,bool particle_gradient,
     const starfield::adapter::EffectUiExclusion* owner,
-    const starfield::adapter::motion_prefix::Bank* prefix_previous=nullptr) noexcept {
+    const starfield::adapter::motion_prefix::Bank* prefix_previous=nullptr,
+    const starfield::adapter::node_sync::NativeEdit* custom_bank=nullptr) noexcept {
+    const auto reject=[&](const char* reason,PF_Err error=PF_Err_BAD_CALLBACK_PARAM) {
+        if(custom_bank && out_data)std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
+            "Starfield [SF-T203]: custom bank rejected: %s (kind %ld, parameter %ld, delivered %ld, AE%d).",
+            reason,static_cast<long>(kNodeKind),extra?static_cast<long>(extra->param_index):-1L,
+            in_data?static_cast<long>(in_data->num_params):-1L,static_cast<int>(error));
+        return error;
+    };
+    if(custom_bank && (owner || !particle_gradient || custom_bank->node_kind!=kNodeKind ||
+        !starfield::adapter::node_sync::valid_custom_bank(*custom_bank)))return reject("invalid owned bank");
     const bool prefix_owner=prefix_previous && kNodeKind==7 && extra &&
         extra->param_index==starfield::adapter::native_nodes::motion_layout::path_prefix_length;
     if(owner && (!*owner || !starfield::adapter::ui_transaction_active() ||
         (!prefix_owner && (kNodeKind!=static_cast<std::uint32_t>(starfield::adapter::native_nodes::Kind::model) ||
         !extra || extra->param_index!=starfield::adapter::native_nodes::model_layout::source))))return PF_Err_BAD_CALLBACK_PARAM;
     if(prefix_previous && (!prefix_owner || !owner))return PF_Err_BAD_CALLBACK_PARAM;
-    if(!owner && starfield::adapter::ui_transaction_active())return PF_Err_NONE;
-    const auto deferred=owner?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
-    if (!in_data || !params || !extra || extra->param_index <= 0 ||
-        extra->param_index > kLastParameterIndex) return deferred;
+    // Custom editors have already staged a complete bank in params[]. A silent
+    // deferral would save that bank in AE without publishing the render graph.
+    // Return failure so the editor restores its staged values instead.
+    const auto deferred=(owner || particle_gradient)?PF_Err_BAD_CALLBACK_PARAM:PF_Err_NONE;
+    if(!owner && starfield::adapter::ui_transaction_active())return custom_bank?reject("UI transaction active"):deferred;
+    if (!in_data || (!params && !custom_bank) || !extra || extra->param_index <= 0 ||
+        extra->param_index > kLastParameterIndex) return custom_bank?reject("missing callback context"):deferred;
     // USER_CHANGED_PARAM has a delivered array (unlike COMPLETELY_GENERAL).
     // Never interpret a partial/foreign kind's indices as this node's guard/UUID.
-    if(in_data->num_params!=starfield::adapter::native_nodes::parameter_count(
+    if(!custom_bank && in_data->num_params!=starfield::adapter::native_nodes::parameter_count(
         static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind)))return deferred;
+    if constexpr(kNodeKind==static_cast<std::uint32_t>(starfield::adapter::native_nodes::Kind::emitter)) {
+        if(extra->param_index==kSyncGuardIndex) {
+            const auto error=update_native_emitter_visibility(in_data,params);
+            if(out_data)out_data->out_flags|=PF_OutFlag_REFRESH_UI;
+            return error;
+        }
+    }
     if constexpr(kNodeKind==static_cast<std::uint32_t>(starfield::adapter::native_nodes::Kind::particle)) {
         if(extra->param_index==kSyncGuardIndex) {
             const auto error=update_native_particle_visibility(in_data,params);
@@ -405,13 +471,13 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
             return error;
         }
     }
-    const PF_ParamDef* guard = params[kSyncGuardIndex];
+    const PF_ParamDef* guard = custom_bank?nullptr:params[kSyncGuardIndex];
     if (guard && guard->param_type == PF_Param_FLOAT_SLIDER && guard->u.fs_d.value != 0.0) return deferred;
-    const PF_ParamDef* changed = params[extra->param_index];
-    if (!changed) return deferred;
+    const PF_ParamDef* changed = custom_bank?nullptr:params[extra->param_index];
+    if (!changed && !custom_bank) return deferred;
 
     std::optional<starfield::adapter::EffectUiExclusion> source_scope;
-    if(!owner){source_scope.emplace(true);if(!*source_scope)return PF_Err_BAD_CALLBACK_PARAM;}
+    if(!owner){source_scope.emplace(true);if(!*source_scope)return reject("source UI ownership unavailable");}
 
     try {
         // uu.id is a setup-only union member. During USER_CHANGED_PARAM it
@@ -420,33 +486,35 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
         constexpr auto kind = static_cast<starfield::adapter::native_nodes::Kind>(kNodeKind);
         if (!starfield::adapter::native_nodes::authored_parameter(kind,extra->param_index)) return PF_Err_NONE;
         const AEGP_PluginID plugin_id = g_plugin_id.load(std::memory_order_acquire);
-        if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return PF_Err_BAD_CALLBACK_PARAM;
+        if (plugin_id == 0 || !in_data->pica_basicP || !in_data->effect_ref) return reject("missing host registration/context");
+        const auto service_started=std::chrono::steady_clock::now();
         SuiteSet suites(in_data);
         PF_Err error = suites.acquire();
-        if (error != PF_Err_NONE) return error;
+        if (error != PF_Err_NONE) return reject("host suites",error);
 
         // Only the layer identity is taken from PF. A physical parade edit can
         // leave its old effect/parameter stream binding stale. Resolve a fresh,
         // unique kind+UUID in that layer rather than opening the borrowed effect.
         std::array<std::uint16_t,8> node_id{};
-        if(!read_node_id(params,node_id))return deferred;
+        if(custom_bank)node_id=custom_bank->uuid;
+        else if(!read_node_id(params,node_id))return deferred;
         AEGP_LayerH layer=nullptr;
         error=static_cast<PF_Err>(suites.pf_interface->AEGP_GetEffectLayer(in_data->effect_ref,&layer));
-        if(error || !layer)return error?error:PF_Err_BAD_CALLBACK_PARAM;
+        if(error || !layer)return reject("source layer",error?error:PF_Err_BAD_CALLBACK_PARAM);
         AEGP_EffectRefH source{};
         error=find_current_source(suites,plugin_id,layer,node_id,source);
         if (source) suites.effect->AEGP_DisposeEffect(source);
-        if (error) return error;
-        if (!source) return deferred;
+        if (error) return reject("source lookup",error);
+        if (!source) return custom_bank?reject("source missing, guarded or identity changed"):deferred;
         AEGP_EffectRefH renderer = nullptr;
         bool transaction_active{};
         error = locate_renderer(suites, plugin_id, layer, renderer, transaction_active);
-        if (error != PF_Err_NONE) return error;
+        if (error != PF_Err_NONE) return reject("renderer lookup",error);
         struct RendererRef {
             const AEGP_EffectSuite4* effects; AEGP_EffectRefH value;
             ~RendererRef() { if (value) effects->AEGP_DisposeEffect(value); }
         } renderer_ref{suites.effect, renderer};
-        if (!renderer || transaction_active) return deferred;
+        if (!renderer || transaction_active) return custom_bank?reject("renderer missing or guarded"):deferred;
 
         starfield::adapter::node_sync::NativeEdit edit;
         edit.node_kind = kNodeKind;
@@ -460,12 +528,15 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
                 auto& field=edit.additional_fields[edit.additional_count++];field.index=index;field.value[0]=params[index]->u.fs_d.value;
             }
         }
-        if (!capture_edit(*in_data, *changed, edit)) return PF_Err_BAD_CALLBACK_PARAM;
+        if(custom_bank) {
+            edit.value_kind=custom_bank->value_kind;edit.value=custom_bank->value;
+            edit.additional_count=custom_bank->additional_count;edit.additional_fields=custom_bank->additional_fields;
+        } else if (!capture_edit(*in_data, *changed, edit)) return PF_Err_BAD_CALLBACK_PARAM;
         const bool gradient_bank=starfield::adapter::node_sync::gradient_bank_parameter(edit.node_kind,edit.parameter_index);
         const bool age_bank=starfield::adapter::node_sync::age_bank_parameter(edit.node_kind,edit.parameter_index);
         if(particle_gradient && !gradient_bank && !age_bank)return PF_Err_BAD_CALLBACK_PARAM;
-        if(gradient_bank && !starfield::adapter::node_sync::capture_gradient_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
-        if(age_bank && !starfield::adapter::node_sync::capture_age_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
+        if(!custom_bank && gradient_bank && !starfield::adapter::node_sync::capture_gradient_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
+        if(!custom_bank && age_bank && !starfield::adapter::node_sync::capture_age_bank(params,edit))return PF_Err_BAD_CALLBACK_PARAM;
         namespace layout=starfield::adapter::native_nodes::particle_layout;
         const bool activate_cloud=kNodeKind==1 &&
             ((extra->param_index>=layout::cloud_circles && extra->param_index<=layout::cloud_density) ||
@@ -496,6 +567,14 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
         if (error) edit.stage = starfield::adapter::node_sync::Stage::context;
         else {
             error = starfield::adapter::commit_native_graph_edit(&edit, plugin_id, out_data);
+            starfield::adapter::SourceEditTelemetry observation;
+            observation.kind=edit.node_kind;observation.parameter=static_cast<std::uint32_t>(edit.parameter_index);
+            observation.revision=static_cast<std::uint32_t>(edit.revision);observation.queries=edit.state_queries;
+            observation.reused=edit.reused_nodes;observation.error=error;
+            observation.misses=edit.reuse_misses;observation.source_failure=edit.source_failure;
+            observation.compile_us=edit.compile_us;observation.query_us=edit.query_us;observation.full_read_us=edit.full_read_us;
+            observation.total_us=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-service_started).count());
+            starfield::adapter::record_source_edit(observation);
         }
         if (!error) error = edit.accepted && edit.revision > 0 ? edit.status :
             (edit.status ? edit.status : PF_Err_BAD_CALLBACK_PARAM);
@@ -513,16 +592,16 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
             if (!error) out_data->out_flags |= PF_OutFlag_FORCE_RERENDER;
             else if(edit.stage==starfield::adapter::node_sync::Stage::compile && edit.compile_stage)
                 std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
-                    "Starfield native edit failed: node compile: %s (parameter %ld, effect %ld, stream %ld, error %d).",
+                    "Starfield [SF-T201] native edit failed: node compile: %s (parameter %ld, effect %ld, stream %ld, AE%d).",
                     edit.compile_stage,static_cast<long>(extra->param_index),static_cast<long>(edit.compile_effect_index),
                     static_cast<long>(edit.stream_index),static_cast<int>(error));
             else if(edit.stage==starfield::adapter::node_sync::Stage::animation_bindings && edit.binding_stage)
                 std::snprintf(out_data->return_msg,sizeof(out_data->return_msg),
-                    "Starfield native edit failed: animation binding: %s (parameter %ld, binding %ld, stream %ld, error %d).",
+                    "Starfield [SF-B201] native edit failed: animation binding: %s (parameter %ld, binding %ld, stream %ld, AE%d).",
                     edit.binding_stage,static_cast<long>(extra->param_index),static_cast<long>(edit.binding_parameter),
                     static_cast<long>(edit.stream_index),static_cast<int>(error));
             else std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                "Starfield native edit failed: %s (parameter %ld, stream %ld, error %d).",
+                "Starfield [SF-T299] native edit failed: %s (parameter %ld, stream %ld, AE%d).",
                 starfield::adapter::node_sync::stage_name(edit.stage), static_cast<long>(extra->param_index),
                 static_cast<long>(edit.stream_index), static_cast<int>(error));
         }
@@ -537,6 +616,11 @@ static PF_Err sync_node_graph_parameter_owned(PF_InData* in_data, PF_OutData* ou
 PF_Err sync_node_graph_parameter(PF_InData* in_data,PF_OutData* out_data,PF_ParamDef* params[],
     const PF_UserChangedParamExtra* extra,bool particle_gradient) noexcept {
     return sync_node_graph_parameter_owned(in_data,out_data,params,extra,particle_gradient,nullptr);
+}
+PF_Err sync_custom_node_graph_bank(PF_InData* data,PF_OutData* out,
+    const starfield::adapter::node_sync::NativeEdit& bank) noexcept {
+    PF_UserChangedParamExtra changed{};changed.param_index=bank.parameter_index;
+    return sync_node_graph_parameter_owned(data,out,nullptr,&changed,true,nullptr,nullptr,&bank);
 }
 PF_Err sync_model_import_graph_parameter(PF_InData* in_data,PF_OutData* out_data,PF_ParamDef* params[],
     const PF_UserChangedParamExtra* extra,const starfield::adapter::EffectUiExclusion& owner) noexcept {

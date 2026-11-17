@@ -13,6 +13,8 @@ struct ModelRenderResources {
     std::vector<SfModelSource> sources;
 };
 // PF checkout/checkin only; no sibling effects, AEGP resource queries or file IO.
+// Scoped work graphs retain the complete renderer mirror recipe layout.
 [[nodiscard]] PF_Err prepare_model_render_resources(PF_InData*,PF_OutData*,PF_PreRenderExtra*,
-    const core::Graph&,const MotionExposure&,A_long height,double par,const core::Cancellation&,ModelRenderResources&) noexcept;
+    const core::Graph&,const MotionExposure&,A_long height,double par,const core::Cancellation&,ModelRenderResources&,
+    const core::Graph* resource_layout=nullptr) noexcept;
 }

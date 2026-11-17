@@ -9,7 +9,9 @@ inline bool script_diagnostic_empty(const AEGP_MemorySuite1* memory,AEGP_MemHand
     if(!diagnostic)return true;
     if(!memory || !memory->AEGP_GetMemHandleSize || !memory->AEGP_LockMemHandle || !memory->AEGP_UnlockMemHandle)return false;
     AEGP_MemSize size{};
-    if(memory->AEGP_GetMemHandleSize(diagnostic,&size) || size>8192)return false;
+    // Only the first byte is read. Allocation capacity is not string content:
+    // a large host-owned buffer can still contain an empty diagnostic.
+    if(memory->AEGP_GetMemHandleSize(diagnostic,&size))return false;
     if(!size)return true;
     void* bytes{};
     if(memory->AEGP_LockMemHandle(diagnostic,&bytes))return false;

@@ -172,10 +172,10 @@ Result<CompiledMotionPathTravel> compile_motion_graph_path(const GraphNode& node
     if(storage>kMotionPathRequestBytes-bytes_used)return R::failure(ErrorCode::work_limit_exceeded,"Light Path request storage limit");
     bytes_used+=storage;return compiled;
 }
-Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node,const Cancellation& cancellation) {
+Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node,const Cancellation& cancellation,bool topology_only=false) {
     using R=Result<MotionLookAtSettings>;MotionLookAtSettings s;
     const auto* target_raw=find_value(node,kMotionLookAtTargets);
-    if(target_raw) {
+    if(target_raw && !topology_only) {
         const auto* bytes=std::get_if<OpaqueBytes>(target_raw);
         if(!bytes)return R::failure(ErrorCode::invalid_request,"invalid Look At light targets");
         auto targets=decode_motion_look_at_targets(*bytes,cancellation);
@@ -188,7 +188,7 @@ Result<MotionLookAtSettings> read_motion_look_at(const GraphNode& node,const Can
         const auto* value=std::get_if<Vec3>(raw);
         if(!value||!motion_circle_detail::bounded(*value))return R::failure(ErrorCode::invalid_request,"invalid Look At goal");
         s.goal=*value;
-    } else if(!s.use_nearest_light) {
+    } else if(!s.use_nearest_light && !topology_only) {
         return R::failure(ErrorCode::invalid_request,"missing Look At goal/targets");
     }
     if(const auto* raw=find_value(node,kMotionForward)) {
@@ -255,7 +255,7 @@ Result<bool> apply_circle_state(ParticleInstance& p,const CompiledMotionCircle& 
 Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*>& nodes,
     const std::vector<std::vector<std::size_t>>& incoming,const std::vector<std::vector<std::size_t>>& outgoing,
     const std::vector<bool>& active,const std::vector<std::size_t>& order,std::size_t root,std::size_t output,
-    const Cancellation& cancel,std::uint64_t& work) {
+    const Cancellation& cancel,std::uint64_t& work,bool* connection_error=nullptr) {
     using R=Result<std::vector<NodeId>>;const auto count=nodes.size();
     std::vector<bool> reachable(count),terminal(count);std::vector<std::size_t> stack{root};
     const auto step=[&](){return ++work<=20'000'000;};
@@ -282,8 +282,10 @@ Result<std::vector<NodeId>> plan_motion_chain(const std::vector<const GraphNode*
         if(at==output)context_at[output]=context;
         for(auto next:outgoing[at])if(terminal[next]) {
             if(!step())return R::failure(ErrorCode::work_limit_exceeded,"Motion planning work limit");
-            if(context_at[next]!=count&&context_at[next]!=context)
+            if(context_at[next]!=count&&context_at[next]!=context) {
+                if(connection_error)*connection_error=true;
                 return R::failure(ErrorCode::invalid_request,"cannot merge different Motion chains of one Particle stream");
+            }
             context_at[next]=context;
         }
     }

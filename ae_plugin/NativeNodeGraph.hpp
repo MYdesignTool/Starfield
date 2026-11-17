@@ -3,17 +3,28 @@
 #include "AE_Effect.h"
 #include <memory>
 #include <optional>
+#include <cstdint>
 #include "AE_GeneralPlug.h"
 #include "starfield/core/Graph.hpp"
 
 namespace starfield::adapter {
 
 namespace node_sync { struct NativeEdit; }
+// Optional UI compiler reuse. Lifecycle callbacks only bump an atomic epoch;
+// cache storage contains copied state/bytes, never host handles.
+void invalidate_native_compile_reuse() noexcept;
+void discard_native_compile_reuse(std::uint64_t token) noexcept;
+void accept_native_compile_reuse(PF_InData*,const node_sync::NativeEdit*,PF_ArbitraryH) noexcept;
 
 struct NativeOriginBinding { core::NodeId emitter; A_long x{}, y{}, z{}, rate{}; };
 [[nodiscard]] PF_Err read_native_origin_bindings(const core::Graph&, std::vector<NativeOriginBinding>&) noexcept;
 struct NativeLifetimeBinding { core::NodeId particle; A_long stream{}; };
 [[nodiscard]] PF_Err read_native_lifetime_bindings(const core::Graph&,std::vector<NativeLifetimeBinding>&) noexcept;
+
+// Structural/numeric eligibility only. The caller must separately prove every
+// active input constant before skipping history. Uses the same Output scope as
+// native sampling; wind/spin and complex processors retain temporal semantics.
+[[nodiscard]] bool native_static_history_eligible(const core::Graph&) noexcept;
 
 // Decode once per frame; historical reads copy only the requested raw node.
 class NativeAnimationPlan {
@@ -23,7 +34,9 @@ public:
     NativeAnimationPlan(const NativeAnimationPlan&) = delete;
     NativeAnimationPlan& operator=(const NativeAnimationPlan&) = delete;
     [[nodiscard]] bool valid() const noexcept;
-    void prepare_constants(PF_InData*, bool allow_static_bypass = false) noexcept;
+    // Set only when the input graph has already sampled this frame's aliases.
+    // Proofs still cover all time; this skips duplicate current-frame checkouts.
+    void prepare_constants(PF_InData*, bool reuse_sampled_constants = false) noexcept;
     [[nodiscard]] const core::GraphNode* constant_node(core::NodeId) const noexcept;
     [[nodiscard]] std::optional<double> constant_birth_chance(core::NodeId) const noexcept;
     [[nodiscard]] bool fully_constant() const noexcept;
@@ -39,6 +52,9 @@ private:
 };
 
 // UI-only transaction. Restores changed dependency expressions unless accepted.
+struct NativeClearSnapshot;
+[[nodiscard]] PF_Err capture_native_clear_handoff(PF_InData*,AEGP_EffectRefH,AEGP_LayerH,
+    AEGP_PluginID,const core::Graph&,NativeClearSnapshot&) noexcept;
 class NativeBindingTransaction {
 public:
     // NativeEdit's local PF context has no effect_ref. Borrow its validated UI
@@ -52,7 +68,7 @@ public:
     PF_Err install(const core::Graph&, A_long* failed_stream = nullptr,
                    const char** failed_stage = nullptr, A_long* failed_parameter = nullptr,
                    const core::Graph* previous_graph = nullptr,bool force_refresh=false,
-                   bool rebuild_disabled=false) noexcept;
+                   bool rebuild_disabled=false,const NativeClearSnapshot* clear=nullptr) noexcept;
     // Only after the new graph is saved/read back, before removing old sources.
     // Failure leaves rollback armed; an in-flight old graph sees a finite base.
     PF_Err retire_after_publication(A_long* failed_stream = nullptr,

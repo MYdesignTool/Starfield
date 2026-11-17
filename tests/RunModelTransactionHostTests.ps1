@@ -1,8 +1,9 @@
-param([switch]$Run,[switch]$Sanitize)
+param([switch]$Run,[switch]$Sanitize,[switch]$Analyze)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if(-not $Run){Write-Host 'Report: compile/run explicit Model graph Host transport with May2023 fake suites; add -Run to act.';exit 0}
-$taskDir=if($Sanitize){'artifacts\model-transaction-host-asan-tests'}else{'artifacts\model-transaction-host-tests'}
+if($Analyze -and $Sanitize){throw 'Choose -Analyze or -Sanitize.'}
+$taskDir=if($Analyze){'artifacts\model-transaction-host-analysis-tests'}elseif($Sanitize){'artifacts\model-transaction-host-asan-tests'}else{'artifacts\model-transaction-host-tests'}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 Push-Location -LiteralPath $taskRepo
 try {
@@ -12,6 +13,7 @@ try {
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP',('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'),
         'tests\model_transaction_host_tests.cpp','ae_plugin\ModelTransactionHost.cpp','ae_plugin\UiExclusionHost.cpp')
     $taskLinkArgs=''
+    if($Analyze){$taskArgs+='/analyze'}
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'));$taskLinkArgs="/link /DEBUG /PDB:$taskDir\tests.pdb"}
     [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDir\compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))
     $taskBatch=@"

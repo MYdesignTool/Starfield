@@ -11,6 +11,7 @@ int main(){
     PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;
     utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;
     PF_InData data{};data.utils=&utils;data.inter.add_param=add;PF_OutData out{};
+    data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* ui)->PF_Err {CHECK(ui && ui->events==PF_CustomEFlag_EFFECT);return PF_Err_NONE;};
     try{
         CHECK(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&out,nullptr,nullptr,nullptr)==0);
         constexpr auto parameter_count=adapter::native_nodes::parameter_count(Kind::motion);

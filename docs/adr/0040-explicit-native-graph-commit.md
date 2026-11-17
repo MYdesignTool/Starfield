@@ -1,5 +1,93 @@
 # ADR 0040: explicit native graph command and saved publication
 
+## STB-07: UI reentrant PF snapshots — 2026-10-27
+
+A saved guard1 does not establish that a PF callback delivered that value: an
+already supplied snapshot may still contain0 during a structural UI edit.
+After checking the native render guard, consult the existing resident Host UI
+exclusion before alias reads. Check again after checkout_render_graph_impl has
+returned and all parameter checkins have run: a callback may have entered UI
+work after the first check. With an observed valid guard0 and a still active UI
+scope, discard either a successful partial snapshot or its transient error,
+clear the message and cancel that frame. Invalid/failed guards and legacy
+controls retain their original errors; idle missing bindings remain strict.
+
+This uses the existing current-UI-thread query without changing Host exclusion,
+public IDs/schema or Core ABI. It is not a worker barrier, a cache invalidation
+scheme, or proof against an edit that starts and ends between observations.
+It neither adopts nor clears an existing saved lock. Controlled real-entry
+interleavings reproduce the local hole; the owner's actual AE deletion and
+recovery failure still require host evidence.
+
+Only an explicit RenderJournal build records bounded diagnostic render and
+transaction events in the checkout's artifacts directory. Windows append-only
+access and a single complete-line WriteFile avoid separate DLL CRT seek/write
+races. Diagnostic failure cannot change transaction outcomes. Logging adds I/O
+and cannot establish production performance. No AE/GUI/project actions are
+authorized by this diagnostic contract.
+
+## STB-01: explicit repair of an idle graph with absent native sources — 2026-10-25
+
+Owner's startup error names native107/stream208. Read-only examination of the
+current previously referenced testproject.aep matches node
+7f86fd58ba9f494e80725f518bcf16ec: the saved graph and alias retain Auxiliary
+7f86fd, but the same layer's actual Emitter UUID/value/name inventory contains
+only a638bf,25226c,c13ba2. The source's disappearance operation/version is not
+established. Guard0 with a completed positive receipt previously could not use
+the existing guard1/negative-receipt repair, leaving this state unrecoverable
+through the product's repair action.
+
+Explicit Diagnostics > Repair Selected Graph now also accepts an initialized
+idle renderer (guard0, completed matching receipt; no pending request), still
+requiring resident UI exclusion, one unambiguous renderer and idle known author
+layouts. It duplicates and mutes a full-layer backup in one Undo group, checks
+the original state again, guards and verifiably disables the original renderer.
+It snapshots native UUIDs and connection banks, rejects malformed/duplicate
+identities, and removes only outgoing connections to absent native identities;
+Output and surviving edge identities/order are retained. The changed record
+bank is rewritten under its author guard and each write is read back. Authored
+particle controls, curves, animation and existing source identities stay intact.
+
+The original then uses the existing disabled-rebuild publisher, which strictly
+resolves every new live binding and verifies the saved graph/revision/receipt
+before flags and guard are released. Failure keeps the full backup and guarded
+state, reports the failing stage, and supports one Undo. No missing author node
+is recreated and no invalid source is replaced with zero/stale render values.
+This is an explicit repair action, never an automatic startup/polling mutation.
+Ordinary render/commit active-source checks remain strict. Public IDs, sequence
+schema, Core ABI9 and private repair message layout are unchanged.
+
+The graph-repair fake host's fixed256-value bank was smaller than Motion's
+current metadata indices. It now uses the actual parameter_count with checked
+stream bounds; normal/ASan and per-SDK-failure tests must exercise both repair
+states. Static analysis also requires explicit bounds on the disk-ID validator
+and a wide unsigned intermediate before Motion UTF-8 packing shifts. Neither
+change alters parameter identities or encoded bytes. Actual AE2023 repair,
+Undo/save/reopen and total preparation latency remain host qualification gates.
+
+## PERF-03: bounded continuous additions — 2026-10-25
+
+Owner requests less interruption while adding successive nodes. An initialized
+panel may display independent additions immediately and continue accepting them
+while one native transaction is in flight. UUIDs are allocated once and retained
+through batching and confirmation. At most64 unconfirmed additions are retained;
+each host commit contains at most16 additions, using the latest confirmed target,
+graph revision and record stamp. A batch is one existing native Undo group.
+
+Host writes remain strictly serialized through the existing submitGraph path:
+guard, source registration, graph compilation, binding verification, saved
+receipt and rollback remain mandatory. No new persistent graph schema, parameter
+identity, C ABI or native command is introduced. Other editing operations remain
+exclusive until additions settle. No speculative node is reported as saved.
+
+Only confirmed receipts may rebase the remaining independent additions. A stale
+graph, failed/unknown acknowledgement or cleanup warning stops unsent work and
+requests authoritative refresh; unknown writes are never retried automatically.
+Target changes/navigation discard unsent intent and ignore old UI callbacks,
+without claiming an in-flight native edit has been rolled back. The normal pulse
+reconciles after success, replacing a full panel refresh after every addition.
+Actual AE responsiveness, Undo and save/reopen still require host qualification.
+
 ## M3-20 / native original-layer repair contract — native91, 2026-10-18
 
 Owner rejects repeated external recovery scripts as the product solution.
@@ -432,3 +520,89 @@ is published; stale guards require explicit recovery rather than guessing a targ
   paired deployment/hash checks and one-step rollback.
 - AE23.5x52: first-effect initialization, repeated refresh, graph and Model edits,
   failure recovery, undo/reopen. Offline evidence cannot close this host gate.
+
+## STB-03 deletion recovery barrier — 2026-10-26
+
+All hidden guard decisions, including backup inventory and the full deletion/
+Model transport, use fresh saved pre-expression values at zero. Display .value
+cannot certify ownership across native Effect Parade mutations. A missing saved
+reader is a failure, never permission to reset or take over an unknown guard.
+
+EffectGraphBackup restore physically replaces authors and the renderer. The
+restored renderer must move from backup2 to owned1 after every source has its
+saved name/UUID/control state, then run the existing native final binding refresh
+against the final parade before releasing0. This callback runs for rollback as
+well as successful publication and must not skip restoration on cancellation.
+Failure is a rollback error; retain the guarded state. Failed backup cleanup or
+final refresh after committed publication similarly retains guard1 and reports
+cleanup error without rewriting committed success into an unapplied edit.
+
+No parameter/record/Core ABI change. Old/new real-code failure cases, full native
+backup/transaction failure injection, Motion→Force→Output alias lifecycle, fresh
+saved-vs-display guards, and the complete paired panel/SDK build are required.
+The owner's repeated AE dialogs and remaining guard need live evidence; an offline
+passing deletion fixture does not prove the exact reported failure was reproduced.
+
+## STB-04 provisional publication is not final outcome — 2026-10-26
+
+The script's published state precedes native acknowledgement and cleanup. A
+script result read/diagnostic failure after publication can still make the native
+executor roll back. Client timeout or cancel must report unknown/pending outcome,
+never substitute the published snapshot for a final committed result. Preserve
+the published session until native final notification, including after client
+release or expiry, and reject begin takeover while that outcome is unresolved.
+Final failure remains authoritative even when a provisional success was saved.
+No automatic mutation replay or guard reset. Tests must lose the native commit
+acknowledgement after publication, perform rollback, cancel/expire the client and
+deliver late results in both directions with once-only completion.
+
+## STB-05 incomplete preparation cleanup — 2026-10-26
+
+The same renderer barrier applies when preparation itself fails. SDK duplication
+may return an effect handle with an error; failure of that local erase can leave
+an untracked live duplicate. Preserve the first recovery error and finish the
+remaining marked-backup cleanup, but release the original renderer only if all
+recovery steps succeeded. A later successful delete_backups cannot erase an
+earlier local recovery error. Tests must combine duplication error/partial success
+with real or silent deletion failures, including a one-time local deletion failure
+followed by successful removal of every marked backup. Preserve normal successful
+preparation and existing single-fault recovery; no implicit guard takeover.
+
+## STB-09 ExtendScript compatibility boundaries — 2026-10-28
+
+Explicitly group the deadline-limited unowned-state conjunction in the begin
+busy condition. Reported old-engine AND/OR association must never allow an
+expired executing/applying/published session to lose its native outcome
+destination. This preserves the existing provisional-publication contract and
+modern evaluation/short-circuit behavior; it does not establish the owner's
+AE2023 first binding-failure cause. Test both reported association and modern
+semantics, including late results, terminal replacement and expired transfers.
+
+The shared ES3 native-record factory cannot depend on Array.indexOf supplied by
+other panels. Turbulence's existing 0/3/4 membership uses strict scalar checks,
+identical in its authority source and both embeddings. No global prototype
+patch, accepted-value expansion, contract-version/ID change or guard recovery is
+introduced. Run the actual factory/gateway with indexOf absent as well as normal
+browser tests; syntax-only ES3 parsing does not validate runtime library support.
+
+## STB-10 worker snapshots overlapping structural mutation — 2026-10-28
+
+The UI-only exclusion query remains UI-only. Complete Model graph execution
+additionally owns a private atomic epoch under its existing UI exclusion: odd
+during execution/cleanup, even after RAII release. Only the UI owner may change
+it; workers query no SDK/UI state. Ordinary idle, modal/source scopes, polling and
+node selection never enter this epoch. Keep the fence around executor and final
+notification unwind, without retaining it for later result-delivery retries.
+
+Parameters validates the PF guard before applying the active-epoch check and
+compares epochs around full graph checkout/checkin. A changed/odd epoch cancels
+only the node-control guard0 snapshot, clears partial graph/source/message and
+preserves strict invalid guard or transaction-free binding failures. Do not spin,
+wait for the UI, reset persistent guards or substitute unavailable source values.
+
+This closes a reproduced worker/overlapping-checkout gap, not a claim about the
+owner's first Force failure. It does not protect snapshots first delivered after
+the completed transaction, later resource checkouts or deletions bypassing the
+executor. A short global epoch may conservatively cancel another layer's
+overlapping checkout. Publish the paired Host/renderer; an old or absent Host
+has no new epoch coverage. IDs, saved schemas and Core ABI/math remain unchanged.

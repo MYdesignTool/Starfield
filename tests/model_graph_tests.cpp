@@ -42,11 +42,12 @@ void same_motion(const EvaluatedGraph& a,const EvaluatedGraph& b){check(a.partic
         check(p.position.x==q.position.x&&p.position.y==q.position.y&&p.position.z==q.position.z,"mesh offset does not move logical centers");
         check(p.size_pixels==q.size_pixels&&p.opacity==q.opacity,"Model input retains logical size/opacity");}}
 struct Sampler:TemporalGraphSampler {
-    Graph graph;bool animate_matrix{},animate_pose{},animate_shape{},bad_kind{},bad_identity{},duplicate{},fail_model{};
+    Graph graph;bool animate_matrix{},animate_pose{},animate_shape{},bad_kind{},bad_identity{},duplicate{},fail_model{},fail_material{};unsigned material_samples{};
     std::vector<std::pair<NodeId,double>> model_samples;
     explicit Sampler(Graph g):graph(std::move(g)){}
     Result<GraphNode> node(NodeId id,double seconds)override {
         for(const auto& n:graph.nodes)if(n.id==id){auto copy=n;
+            if(n.type_key==kMaterialNode){++material_samples;if(fail_material)return Result<GraphNode>::failure(ErrorCode::allocation_failed,"fixture material sampling fails");}
             if(n.type_key==kModelNode){model_samples.emplace_back(id,seconds);
                 if(fail_model)return Result<GraphNode>::failure(ErrorCode::allocation_failed,"fixture model sampling fails");
                 if(animate_matrix){auto m=kIdentityModelMatrix;m[12]=seconds;set(copy,kModelLocalMatrix,matrix_bytes(m));}
@@ -103,6 +104,23 @@ void temporal_sampling() {
     Sampler negative(g);negative.fail_model=true;check(take(evaluate_temporal_particle_graph(g,{-1,60},never,{},negative)).particles.empty()&&negative.model_samples.empty(),"negative shutter frame does not sample Models");
     auto zero=g;set(node(zero,3),kParticleCount,std::uint32_t{0});Sampler zero_sampler(zero);zero_sampler.fail_model=true;
     check(take(evaluate_temporal_particle_graph(zero,{1,1},never,{},zero_sampler)).particles.empty()&&zero_sampler.model_samples.empty(),"zero-cap frame does not sample Models");
+    auto material_empty=zero;
+    material_empty.nodes.push_back({nid(300),kMaterialNode,1,{{kMaterialColorSource,std::uint32_t{0}},{kMaterialColor,Vec3{1,1,1}},
+        {kMaterialRoughness,.5},{kMaterialMetallic,0.},{kMaterialOpacity,1.},{kMaterialLights,std::uint32_t{1}}}});
+    material_empty.edges.push_back({eid(98),nid(300),kMaterialOut,nid(100),kModelMaterialIn});
+    Sampler material_zero(material_empty);material_zero.fail_model=material_zero.fail_material=true;
+    check(take(evaluate_temporal_particle_graph(material_empty,{1,1},never,{},material_zero)).particles.empty()&&
+          material_zero.model_samples.empty()&&!material_zero.material_samples,"zero-cap particle frame skips Model and Material sampling");
+    set(node(material_empty,3),kParticleCount,std::uint32_t{64});
+    Sampler material_negative(material_empty);material_negative.fail_model=material_negative.fail_material=true;
+    check(take(evaluate_temporal_particle_graph(material_empty,{-1,60},never,{},material_negative)).particles.empty()&&
+          material_negative.model_samples.empty()&&!material_negative.material_samples,"negative particle frame skips Model and Material sampling");
+    auto direct=material_empty;set(node(direct,3),kParticleCount,std::uint32_t{0});
+    direct.edges.push_back({eid(99),nid(100),kModelGeometryOut,nid(3),kOutputParticles});
+    Sampler direct_sampler(direct);direct_sampler.animate_matrix=true;
+    auto direct_result=take(evaluate_temporal_particle_graph(direct,{1,1},never,{},direct_sampler));
+    check(direct_sampler.model_samples.size()==1&&direct_sampler.material_samples==1&&direct_result.particles.size()==1&&
+          direct_result.model_styles.back().instances[0].model_to_particle[12]==1,"direct Model still samples animation with zero particle cap");
     for(unsigned failure=0;failure<4;++failure){Sampler bad(g);bad.bad_kind=failure==0;bad.bad_identity=failure==1;bad.duplicate=failure==2;bad.fail_model=failure==3;
         rejected(evaluate_temporal_particle_graph(g,{1,1},never,{},bad),failure==3?ErrorCode::allocation_failed:ErrorCode::invalid_request,"sampled Model errors propagate typed");}
     set(node(g,3),kTimeRemapEnabled,std::uint32_t{1});set(node(g,3),kTimeRemapSeconds,2.);Sampler remapped(g);remapped.animate_matrix=true;
@@ -137,7 +155,11 @@ void bounds_and_rendering() {
         rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"invalid local matrices reject");}
     invalid=cube_graph;set(node(invalid,10),kModelRevision,1.);rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"wrong revision kind rejects");
     invalid=cube_graph;invalid.edges.back().destination_port=kParticleParticlesIn;rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"Model cannot enter particle flow port");
-    invalid=cube_graph;invalid.edges.back().destination_node=nid(3);invalid.edges.back().destination_port=kOutputParticles;rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"Model cannot directly feed Output");
+    auto direct=cube_graph;direct.edges.back().destination_node=nid(3);direct.edges.back().destination_port=kOutputParticles;
+    const auto direct_value=evaluate(direct);
+    check(std::count_if(direct_value.particles.begin(),direct_value.particles.end(),[](const auto& p){return p.emitter_id==nid(10)&&p.id==UINT64_MAX;})==1,"Model directly feeds Output without an emitter birth clock");
+    invalid=direct;invalid.edges.back().destination_port=kParticleModelsIn;
+    rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"direct Model rejects an invalid Output port");
     invalid=cube_graph;invalid.edges.push_back({eid(4),nid(10),kModelGeometryOut,nid(2),kParticleModelsIn});rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"duplicate Model connection rejects");
     invalid=cube_graph;set(node(invalid,2),kParticleShape,std::uint32_t{5});rejected(evaluate_particle_graph(invalid,{1,1},never),ErrorCode::invalid_request,"unknown Particle shape still rejects");
     auto many=base();for(unsigned i=0;i<256;++i)attach(many,100+i,2,1000+i);check(evaluate(many).model_styles[0].instances.size()==256,"exact group cap accepted");

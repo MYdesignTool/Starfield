@@ -11,6 +11,7 @@ const results = [];
 for (const suite of fs.readdirSync(__dirname).filter(name => name.endsWith("_tests.js")).sort()) {
     // Child processes do not inherit the parent's --expose-internals option.
     // Syntax/UI suites use the bundled Acorn instead of a vendored dependency.
+    const started = process.hrtime.bigint();
     const result = spawnSync(process.execPath, ["--expose-internals",path.join(__dirname, suite)], {
         cwd: repository, encoding: "utf8", windowsHide: true,
         env: {...process.env,STARFIELD_PANEL_ROOT:process.env.STARFIELD_PANEL_ROOT || path.join(repository,"web_panel")}
@@ -18,7 +19,7 @@ for (const suite of fs.readdirSync(__dirname).filter(name => name.endsWith("_tes
     fs.writeFileSync(path.join(output, suite + ".log"),
         (result.stdout || "") + (result.stderr || "") + (result.error ? String(result.error) : ""));
     const passed = !result.error && result.status === 0;
-    results.push({suite, passed, exitCode: result.status});
+    results.push({suite, passed, exitCode: result.status, durationMs: Number(process.hrtime.bigint() - started) / 1e6});
     console.log(`${passed ? "PASS" : "FAIL"} ${suite}`);
 }
 fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({node: process.version, results}, null, 2) + "\n");

@@ -441,9 +441,7 @@
             var isAuxiliary = kind === "emitter" && emitting && Number(emitting.value) === 1;
             var shape = findParameter(source,"5");
             var node = { id: source.id, kind: kind, type: source.type, label: isAuxiliary ? "Auxiliary" : LABELS[kind],
-                         inputPort: kind === "material" ? "2" : kind === "model" ?
-                            (graph.edges.some(function(edge){return edge.destinationNode===source.id && edge.destinationPort==="2";})?"2":null) :
-                            kind === "emitter" ? (isAuxiliary ? "2" : null) : "1",
+                         inputPort: kind === "material" || kind === "model" || kind === "emitter" ? "2" : "1",
                          modelInputPort: kind === "particle" ? "3" : null,
                          outputPort: kind === "output" ? null : (kind === "emitter" || kind === "model" || kind === "material" ? "1" : "2"),
                          params: [], graphParameters: source.parameters, curves: null,
@@ -490,6 +488,7 @@
                 if (spec && spec.hidden) continue;
                 if(kind==="particle" && graphParameter.key==="1" && node.colorMode!==0) continue;
                 if (kind === "emitter") {
+                    if(isAuxiliary && ["5","19","20","21","10","14","15","16"].indexOf(String(graphParameter.key))>=0)continue;
                     if (Number(graphParameter.key) >= 24 && Number(graphParameter.key) <= 30 && !isAuxiliary) continue;
                     if (["19","20","21"].indexOf(graphParameter.key) >= 0 && (!shape || [1,2].indexOf(Number(shape.value)) < 0)) continue;
                     if (graphParameter.key === "10" && (!shape || Number(shape.value) !== 3)) continue;
@@ -760,7 +759,51 @@
         return copy;
     }
 
-    return { types: TYPE, project: project, samePositions: samePositions,
+    // Presentation only: rejected wires stay in the author graph. Attribute an
+    // error to its source, never to every ancestor or every Output branch.
+    function nodeDiagnostics(graph, issues) {
+        var result={}, nodes={}, edges={}, rejected={};
+        if(!graph)return result;
+        graph.nodes.forEach(function(n){nodes[n.id]=n;});
+        graph.edges.forEach(function(e){edges[e.id]=e;});
+        function add(id,severity,code,message){
+            (result[id] || (result[id]=[])).push({severity:severity,code:code,message:message});
+        }
+        (issues || []).forEach(function(issue){
+            var edge=edges[issue.edge],source=nodes[issue.source],dest=nodes[issue.destination];
+            if(!edge || !source || !dest || edge.sourceNode!==source.id || edge.destinationNode!==dest.id)return;
+            rejected[edge.id]=true;
+            var message=String(issue.message || "This connection cannot be rendered.");
+            if(dest.type===TYPE.output && source.type===TYPE.emitter){
+                var auxiliary=(source.parameters || []).some(function(p){return p.key==="31" && p.value===1;});
+                message=(auxiliary?"Auxiliary":"Emitter")+" cannot connect directly to Output. Add a Particle node between them.";
+            }
+            add(source.id,"error",String(issue.code),message+" This wire is kept on the canvas but is not used for rendering.");
+        });
+        // Resolve Model -> Material* geometry once, including shared branches.
+        // Each node/edge is visited at most once; a Material-only cycle cannot
+        // create geometry, and rejected wires never satisfy the model input.
+        var geometry={},next={},pending=[];
+        graph.nodes.forEach(function(n){if(n.type===TYPE.model){geometry[n.id]=true;pending.push(n.id);}});
+        graph.edges.forEach(function(e){
+            var source=nodes[e.sourceNode],dest=nodes[e.destinationNode];
+            if(!rejected[e.id] && e.sourcePort==="1" && e.destinationPort==="2" && source && dest &&
+                (source.type===TYPE.model || source.type===TYPE.material) && dest.type===TYPE.material)
+                (next[source.id] || (next[source.id]=[])).push(dest.id);
+        });
+        for(var i=0;i<pending.length;i++)(next[pending[i]] || []).forEach(function(id){
+            if(!geometry[id]){geometry[id]=true;pending.push(id);}
+        });
+        graph.nodes.forEach(function(node){
+            if(node.type!==TYPE.particle || !(node.parameters || []).some(function(p){return p.key==="15" && p.value===4;}))return;
+            var connected=graph.edges.some(function(e){return !rejected[e.id] && e.destinationNode===node.id &&
+                e.sourcePort==="1" && e.destinationPort==="3" && geometry[e.sourceNode];});
+            if(!connected)add(node.id,"warning","SF-W101","Particle Shape is Model, but no usable Model is connected. The default cube is used. Connect a Model node to the square model input to choose geometry.");
+        });
+        return result;
+    }
+
+    return { types: TYPE, project: project, samePositions: samePositions, nodeDiagnostics: nodeDiagnostics,
              graphSnapshotChanged: graphSnapshotChanged,
              activeEmitterParameters: activeEmitterParameters,
              countLiveParticles: countLiveParticles, countGraphLiveParticles: countGraphLiveParticles,

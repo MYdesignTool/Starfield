@@ -1,13 +1,13 @@
-param([switch]$Run,[switch]$Bindings,[switch]$MotionCallbacks,[switch]$ModelCallbacks,[switch]$Sanitize)
+param([switch]$Run,[switch]$Bindings,[switch]$MotionCallbacks,[switch]$ModelCallbacks,[switch]$OverLife,[switch]$Sanitize)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-if(-not $Run){Write-Host 'Report: compile/run actual Particle Cloud callback and native binding fixtures. Add -Run to act.';exit 0}
+if(-not $Run){Write-Host 'Report: compile/run Particle callback and native binding fixtures; -OverLife includes the real curve editor/publication/render chain. Add -Run to act.';exit 0}
 $taskExclusion=Join-Path $taskRepo 'artifacts/model-ui-exclusion-tests/paired/StarfieldHost.aex'
 if(-not(Test-Path -LiteralPath $taskExclusion) -or (Get-Item -LiteralPath $taskExclusion).LastWriteTime -lt (Get-Item -LiteralPath (Join-Path $taskRepo 'ae_plugin/UiExclusionHost.cpp')).LastWriteTime) {
     & (Join-Path $PSScriptRoot 'RunModelUiExclusionTests.ps1') -Run
     if(-not $?){throw 'Source callback exclusion fixture failed.'}
 }
-$taskDir=if($ModelCallbacks){'artifacts\model-native-callback-tests'}elseif($MotionCallbacks){'artifacts\motion-native-callback-tests'}elseif($Bindings){'artifacts\cloud-native-binding-tests'}else{'artifacts\cloud-native-sync-tests'}
+$taskDir=if($OverLife){'artifacts\overlife-native-tests'}elseif($ModelCallbacks){'artifacts\model-native-callback-tests'}elseif($MotionCallbacks){'artifacts\motion-native-callback-tests'}elseif($Bindings){'artifacts\cloud-native-binding-tests'}else{'artifacts\cloud-native-sync-tests'}
 if($Sanitize){$taskDir+='-asan'}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 $taskSources=@('tests\native_sync_tests.cpp','tests\camera_capture_tests.cpp','ae_plugin\NodeGraphSync.cpp','ae_plugin\Camera.cpp',
@@ -18,6 +18,7 @@ $taskSources=@('tests\native_sync_tests.cpp','tests\camera_capture_tests.cpp','a
     'ae_plugin\ModelMirrorParameter.cpp','ae_plugin\ModelMirrorTransaction.cpp')
 $taskSources+=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource','MotionGeometry','MotionPathTravel','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene','ModelGeometry','ModelResources','ModelScene')|ForEach-Object {'src\core\'+$_+'.cpp'}
+if($OverLife){$taskSources+=@('ae_plugin\ParticleGradientUI.cpp','tests\editor_preset_picker_stub.cpp')}
 Push-Location -LiteralPath $taskRepo
 try {
     New-Item -ItemType Directory -Path $taskDir -Force | Out-Null
@@ -26,7 +27,8 @@ try {
         '/Iinclude','/Iae_plugin','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers',
         '/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Headers\SP','/IAdobeSDK\May2023_AfterEffectsSDK\Examples\Util',
         ('/Fo'+$taskDir+'\'),('/Fe'+$taskDir+'\tests.exe'))+$taskSources
-    $taskArgs+=if($ModelCallbacks){@('/DSTARFIELD_NODE_KIND_MODEL','/DSTARFIELD_MODEL_CALLBACK_TEST')}elseif($MotionCallbacks){@('/DSTARFIELD_NODE_KIND_MOTION','/DSTARFIELD_MOTION_CALLBACK_TEST')}elseif($Bindings){'/DSTARFIELD_NODE_KIND_EMITTER'}else{@('/DSTARFIELD_NODE_KIND_PARTICLE','/DSTARFIELD_CLOUD_CALLBACK_TEST')}
+    $taskArgs+=if($OverLife){@('/DSTARFIELD_NODE_KIND_PARTICLE','/DSTARFIELD_OVERLIFE_TEST')}elseif($ModelCallbacks){@('/DSTARFIELD_NODE_KIND_MODEL','/DSTARFIELD_MODEL_CALLBACK_TEST')}elseif($MotionCallbacks){@('/DSTARFIELD_NODE_KIND_MOTION','/DSTARFIELD_MOTION_CALLBACK_TEST')}elseif($Bindings){'/DSTARFIELD_NODE_KIND_EMITTER'}else{@('/DSTARFIELD_NODE_KIND_PARTICLE','/DSTARFIELD_CLOUD_CALLBACK_TEST')}
+    if($Bindings){$taskArgs+='/DSTARFIELD_TEST_NATIVE_ALLOCATIONS'}
     if($Sanitize){$taskArgs+=@('/fsanitize=address','/Zi',('/Fd'+$taskDir+'\compiler.pdb'))}
     [IO.File]::WriteAllLines((Join-Path $taskRepo "$taskDir\compile.rsp"),$taskArgs,[Text.UTF8Encoding]::new($false))
     $taskBatch=@"
@@ -40,6 +42,5 @@ exit /b %errorlevel%
 "@
     [IO.File]::WriteAllText((Join-Path $taskRepo "$taskDir\compile.cmd"),$taskBatch,[Text.Encoding]::ASCII)
     & $env:ComSpec /d /c "$taskDir\compile.cmd"
-    if($LASTEXITCODE -ne 0){throw 'Cloud callback fixture compilation failed.'}
-    if($LASTEXITCODE -ne 0){throw "Cloud native fixture failed: $LASTEXITCODE"}
+    if($LASTEXITCODE -ne 0){throw "Native callback compilation or fixture failed: $LASTEXITCODE"}
 } finally {Pop-Location}

@@ -63,9 +63,12 @@ enum class Kind : A_long { emitter=0, particle=1, force=3, transform=4, model=5,
     return connection_first_index(kind) + kMaxOutgoingEdges * kConnectionRecordChunks;
 }
 [[nodiscard]] constexpr A_long sync_guard_index(Kind kind) noexcept { return uuid_first_index(kind) + 8; }
+// Native UI-only action appended after the released Transform metadata bank.
+[[nodiscard]] constexpr A_long transform_create_null_index() noexcept { return sync_guard_index(Kind::transform)+1; }
 [[nodiscard]] constexpr A_long last_parameter_index(Kind kind) noexcept {
     return kind==Kind::particle?particle_layout::birth_enabled:
-        kind==Kind::model?model_layout::author_bounds_last:sync_guard_index(kind);
+        kind==Kind::model?model_layout::author_bounds_last:
+        kind==Kind::transform?transform_create_null_index():sync_guard_index(kind);
 }
 static_assert(sync_guard_index(Kind::particle)+1==particle_layout::transfer);
 static_assert(layout_x_index(Kind::model)==19 && uuid_first_index(Kind::model)==86 && sync_guard_index(Kind::model)==94);
@@ -89,7 +92,7 @@ enum : A_long {
     kTransformPositionXId=1404,kTransformPositionYId=1405,kTransformPositionZId=1406,
     kTransformRotationXId=1407,kTransformRotationYId=1408,kTransformRotationZId=1409,
     kTransformScaleXId=1410,kTransformScaleYId=1411,kTransformScaleZId=1412,
-    kTransformParticlesScaleId=1413,kTransformParticlesOpacityId=1414,
+    kTransformParticlesScaleId=1413,kTransformParticlesOpacityId=1414,kTransformCreateNullId=1415,
     kAuxiliarySourceId = 136,
     kLifeRandomId = 212, kParticleShapeId = 213, kSizeYId = 214,
     kFeatherId = 216, kUpAxisId = 217, kOrientToId = 218,
@@ -189,7 +192,7 @@ enum : A_long {
         kTransformPositionXId,kTransformPositionYId,kTransformPositionZId,
         kTransformRotationXId,kTransformRotationYId,kTransformRotationZId,
         kTransformScaleXId,kTransformScaleYId,kTransformScaleZId,
-        kTransformParticlesScaleId,kTransformParticlesOpacityId,
+        kTransformParticlesScaleId,kTransformParticlesOpacityId,kTransformCreateNullId,
         kEmitterTypeId, kBirthRateId, kSeedId, kEmitterParticleSizeId,
         kOriginXYId, kOriginZId, kVelocityXId, kVelocityYId, kVelocityZId, kDiscSizeId, kSpeedRandomId,
         kEmitterSizeXId, kEmitterSizeYId, kEmitterSizeZId, kEmissionSpeedId,
@@ -216,28 +219,25 @@ enum : A_long {
     };
     std::array<A_long, std::size(fixed) + kMaxOutgoingEdges * kConnectionRecordChunks + 24 + 8*particle_layout::curve_points + model_layout::last+6+material_layout::last+motion_layout::last+turbulence_layout::last> ids{};
     std::size_t count = 0;
-    for (auto id : fixed) ids[count++] = id;
-    for(A_long index=1;index<=model_layout::last;++index)ids[count++]=model_layout::disk_id(index);
+    const auto append=[&](A_long id) {if(count>=ids.size())return false;ids[count++]=id;return true;};
+    for (auto id : fixed) if(!append(id))return false;
+    for(A_long index=1;index<=model_layout::last;++index)if(!append(model_layout::disk_id(index)))return false;
     for(A_long index=model_layout::author_bounds_first;index<=model_layout::author_bounds_last;++index)
-        ids[count++]=model_layout::author_bounds_disk_id(index);
-    for(int i=1;i<=material_layout::last;++i)ids[count++]=material_layout::disk_id(i);
-    for(int i=1;i<=motion_layout::last;++i)ids[count++]=motion_layout::disk_id(i);
-    for(int i=1;i<=turbulence_layout::last;++i)ids[count++]=turbulence_layout::disk_id(i);
+        if(!append(model_layout::author_bounds_disk_id(index)))return false;
+    for(int i=1;i<=material_layout::last;++i)if(!append(material_layout::disk_id(i)))return false;
+    for(int i=1;i<=motion_layout::last;++i)if(!append(motion_layout::disk_id(i)))return false;
+    for(int i=1;i<=turbulence_layout::last;++i)if(!append(turbulence_layout::disk_id(i)))return false;
     for (A_long slot = 0; slot < kMaxOutgoingEdges; ++slot) {
         for (A_long chunk = 0; chunk < kConnectionUuidChunks; ++chunk) {
-            ids[count++] = connection_uuid_id(slot, chunk);
-            ids[count++] = connection_edge_uuid_id(slot, chunk);
+            if(!append(connection_uuid_id(slot, chunk)) || !append(connection_edge_uuid_id(slot, chunk)))return false;
         }
     }
     for (A_long point = 0; point < 8; ++point) {
-        ids[count++]=kColorGradientPositionFirstId+point;
-        ids[count++]=kColorGradientColorFirstId+point;
-        ids[count++] = uuid_id(point);
+        if(!append(kColorGradientPositionFirstId+point) || !append(kColorGradientColorFirstId+point) || !append(uuid_id(point)))return false;
     }
     for(A_long point=0;point<particle_layout::curve_points;++point) {
         for (char bank : {'s', 'o', 'w', 'r'}) {
-            ids[count++] = curve_age_id(bank, point);
-            ids[count++] = curve_value_id(bank, point);
+            if(!append(curve_age_id(bank, point)) || !append(curve_value_id(bank, point)))return false;
         }
     }
     std::array<bool,10000> seen{};

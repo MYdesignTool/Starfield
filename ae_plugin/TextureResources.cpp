@@ -52,7 +52,7 @@ bool host_time(double value,A_u_long scale,A_long& result) {
 
 PF_Err prepare_texture_resources(PF_InData* in,PF_OutData* out,PF_PreRenderExtra* extra,
     const core::Graph& graph,const MotionExposure& motion,A_long height,double par,
-    const core::Cancellation& cancel,TexturePreparation& prepared) noexcept try {
+    const core::Cancellation& cancel,TexturePreparation& prepared,const core::Graph* resource_layout) noexcept try {
     std::set<std::uint32_t> ids;
     for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kParticleNode)
         for(const auto& p:node.parameters)if(p.key==core::graph_keys::kTextureFront || p.key==core::graph_keys::kTextureBack) {
@@ -61,6 +61,18 @@ PF_Err prepare_texture_resources(PF_InData* in,PF_OutData* out,PF_PreRenderExtra
             if(*id)ids.insert(*id);
         }
     if(ids.empty())return PF_Err_NONE;
+    std::set<std::uint32_t> layout_ids=ids;
+    if(resource_layout) {
+        layout_ids.clear();
+        for(const auto& node:resource_layout->nodes)if(node.type_key==core::graph_keys::kParticleNode)
+            for(const auto& p:node.parameters)if(p.key==core::graph_keys::kTextureFront || p.key==core::graph_keys::kTextureBack) {
+                const auto* id=std::get_if<std::uint32_t>(&p.value);
+                if(!id)return failure(out,"invalid renderer texture layout");
+                if(*id)layout_ids.insert(*id);
+            }
+        for(const auto id:ids)if(!layout_ids.contains(id))return failure(out,"active texture missing from renderer layout");
+    }
+    if(layout_ids.size()>kTextureResourceCapacity)return failure(out,"renderer texture layout exceeds capacity");
     if(ids.size()>core::kMaxTextureSources || !in->pica_basicP || !in->time_scale)return failure(out,"resource count/time is invalid");
     Suites suites{in->pica_basicP};if(auto e=suites.acquire();e)return failure(out,"resource suites unavailable",static_cast<PF_Err>(e));
     AEGP_LayerH owner{};AEGP_CompH comp{};A_FpLong fps{};A_Ratio stretch{};
@@ -130,13 +142,15 @@ PF_Err prepare_texture_resources(PF_InData* in,PF_OutData* out,PF_PreRenderExtra
         if(cancel.is_cancelled())return PF_Interrupt_CANCEL;
         const auto found=std::lower_bound(prepared.sources.begin(),prepared.sources.end(),frame.resource_id,
             [](const auto& source,std::uint32_t id){return source.resource_id<id;});
+        if(found==prepared.sources.end() || found->resource_id!=frame.resource_id)return failure(out,"requested texture metadata is missing");
         const auto slot=static_cast<A_long>(found-prepared.sources.begin());
+        const auto renderer_slot=static_cast<A_long>(std::distance(layout_ids.begin(),layout_ids.find(frame.resource_id)));
         A_long time{};if(!host_time(frame.seconds,in->time_scale,time))return failure(out,"requested source time exceeds AE range");
         TextureCheckout checkout{frame,static_cast<A_long>(prepared.checkouts.size()+2),slot,{}};
         PF_RenderRequest request=extra->input->output_request;
         request.rect={0,0,static_cast<A_long>(found->width),static_cast<A_long>(found->height)};
         request.preserve_rgb_of_zero_alpha=TRUE;
-        if(auto result=extra->cb->checkout_layer(in->effect_ref,kTextureResourceFirstIndex+slot,checkout.id,
+        if(auto result=extra->cb->checkout_layer(in->effect_ref,kTextureResourceFirstIndex+renderer_slot,checkout.id,
             &request,time,in->time_step,in->time_scale,&checkout.result);result)return result;
         prepared.checkouts.push_back(checkout);
     }

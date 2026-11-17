@@ -7,6 +7,7 @@
 #include "GraphCarrier.hpp"
 #include "EmitterHistory.hpp"
 #include "SmartRender.hpp"
+#include "PluginVersion.h"
 
 #include "Parameters.hpp"
 #include "starfield/core/SequenceCodec.hpp"
@@ -144,7 +145,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     const auto history=last_native_history_trace();
     if(timing.valid) {
         writer.line("Last prep t%.3f %.1fms%s\n",timing.seconds,timing.total_ms,timing.complete?"":" failed");
-        writer.line("C/H/S %.1f/%.1f/%.1fms\n",timing.controls_ms,timing.history_ms,timing.scene_ms);
+        writer.line("C/H/T/R/S %.1f/%.1f/%.1f/%.1f/%.1fms\n",timing.controls_ms,timing.history_ms,timing.transfer_ms,timing.resources_ms,timing.scene_ms);
     }
     if(history.path!=NativeHistoryPath::unavailable) {
         writer.line("%s %zu/%zu PF%llu R%llu L%llu N%llu/%llu\n",
@@ -155,7 +156,7 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
     }
     const auto setup=last_gpu_setup_timing();const auto ui=last_native_ui_timing();
     const auto metadata=last_native_metadata_trace(); // Before Options can warm/capture again.
-    writer.line("Init %.1fms UI %.1fms I%llu/%llu E%ld W%zu/%zu P%zu\n",setup.max_ms,ui.max_ms,
+    writer.line("Init %.1f UI last/max %.1f/%.1fms I%llu/%llu E%ld W%zu/%zu P%zu\n",setup.max_ms,ui.last_ms,ui.max_ms,
         static_cast<unsigned long long>(ui.idle_refreshes),static_cast<unsigned long long>(ui.idle_calls),
         static_cast<long>(ui.idle_error),metadata.evaluated,metadata.inputs,metadata.proofs);
     A_long control_source = -1;
@@ -173,12 +174,27 @@ PF_Err report_diagnostics(PF_InData* in_data, PF_OutData* out_data) noexcept {
         capture_native_temporal_metadata(in_data,*graph,graph_carrier_plugin_id());
         std::vector<core::NodeId> ids;for(const auto& node:graph->nodes)ids.push_back(node.id);
         const auto certified=validated_native_control_proofs(in_data,ids).size();
-        writer.line("Build 31; proofs %zu\n",certified);
+        if(certified)record_native_temporal_ui_capture(in_data);
+        writer.line("Build %d; proofs %zu\n",STARFIELD_VERSION_BUILD,certified);
         if(certified)out_data->out_flags|=PF_OutFlag_FORCE_RERENDER;
         const auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
         if (!encoded.has_value()) {
             writer.line("SF 0.1.0 graph serialization failed: %s\n", encoded.error().detail);
             return PF_Err_NONE;
+        }
+        // Options has an authored graph, before Smart Pre-Render captures light
+        // tracks. It cannot evaluate the render-only Light Path resource here.
+        for(const auto& node:graph->nodes)if(node.type_key==core::graph_keys::kMotionNode) {
+            bool light_path=false,resource=false;std::uint32_t mode=0;
+            for(const auto& parameter:node.parameters) {
+                light_path |= parameter.key==core::graph_keys::kMotionPathSpeedPercent;
+                resource |= parameter.key==core::graph_keys::kMotionPathLightResource;
+                if(parameter.key==core::graph_keys::kMotionMode)
+                    if(const auto* value=std::get_if<std::uint32_t>(&parameter.value))mode=*value;
+            }
+            if(mode==0 && light_path && !resource) {
+                writer.line("Light Path live count needs render resources\n");return PF_Err_NONE;
+            }
         }
         SfCoreInspectRequest inspect_request{};
         inspect_request.struct_size = sizeof(inspect_request);

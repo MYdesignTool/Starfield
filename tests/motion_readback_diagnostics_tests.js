@@ -4,12 +4,13 @@ const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("nod
 const source=fs.readFileSync(panel("jsx/starfield_gateway.jsx"),"utf8").replace(
     "    function verifyAuthoredMotionModes(authored, saved, layer) {",
     "    $.global.verifyMotion=verifyAuthoredMotionModes;\n    function verifyAuthoredMotionModes(authored, saved, layer) {");
-const host={},context=vm.createContext({$:{global:host},app:{version:"23.5x52 fixture"}});
+const host={},context=vm.createContext({JSON:undefined,$:{global:host},app:{version:"23.5x52 fixture"}});
 vm.runInContext(source,context);assert.equal(typeof host.verifyMotion,"function");
 const id="bd05c9fc81e34a2088e0f6c06c7e62dc",kind="org.starfieldfx.node.motion";
 let reads=0,writes=0,throwSamples=false,duplicate=false,missing=false,sampleMode=1,ordinaryMode=2;
 const controls={};
 function property(name,matchName,value){return {name,matchName,get value(){reads++;return typeof value==="function"?value():value;},
+    valueAtTime(){reads++;return typeof value==="function"?value():value;},
     setValue(){writes++;throw Error("Diagnostic must never write");}};}
 for(let i=0;i<8;i++)controls["Node UUID "+i]=property("Node UUID "+i,"uuid"+i,parseInt(id.slice(i*4,i*4+4),16));
 controls["Panel Sync Guard"]=property("Panel Sync Guard","guard",0);
@@ -46,7 +47,7 @@ result=reject(record(1,"org.starfieldfx.nodes.force"));assert.match(result.messa
 const sample=controls["Motion Type"].valueAtTime;delete controls["Motion Type"].valueAtTime;
 result=reject();assert.match(result.evidence.diskZero,/unavailable/);eq(result.evidence.disk,1);controls["Motion Type"].valueAtTime=sample;
 // Even a diagnostics infrastructure error must preserve the mismatch.
-vm.runInContext("JSON.stringify=function(){throw new Error('diagnostic serialization denied');}",context);
+host.__SFLD_modelTransactionAPI.json.stringify=function(){throw new Error('diagnostic serialization denied');};
 assert.throws(()=>host.verifyMotion([record(1)],[record(0)],layer),/Published Motion Type differs.*Motion readback unavailable/);
 eq(writes,0,"all diagnostics are read-only");
 console.log(`Motion readback diagnostics: ${checks} value checks plus rejection/identity/getter failure controls passed; success path has zero host reads.`);

@@ -6,6 +6,8 @@
 #include "NativeCommandBindings.hpp"
 #include "ScriptDiagnostic.hpp"
 #include "UiExclusionHost.hpp"
+#include "GraphRenderJournal.hpp"
+#include "NativeGraphEdit.hpp"
 #include "AE_GeneralPlugPanels.h"
 #include <windows.h>
 #include <commctrl.h>
@@ -14,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <filesystem>
@@ -37,12 +40,23 @@ constexpr wchar_t window_class[]=L"Starfield.WebView2.Panel.V1";
 SPBasicSuite* basic{};
 AEGP_PluginID plugin{};
 AEGP_Command graph_command{},presets_command{};
+AEGP_Command clear_command{};
+bool clear_lookup_attempted{};
+AEGP_WindowType active_menu_window=AEGP_WindType_NONE;
+HWND effect_menu_focus{},effect_menu_root{};
+bool author_delete_latched{},author_delete_notice{};
+unsigned native_clear_attempts{},native_clear_owned{};
+NativeDeleteResult author_delete_result;
+A_Err clear_registration=A_Err_GENERIC;
+struct ClearObservation {unsigned count{},gate{};HWND local{},gui{},foreground{},graph{};bool del{},back{},control_focus{},focus_events{};};
+ClearObservation clear_observation;
 std::thread::id ui_thread;
 bool stopped{},stepping{},creating_environment{},com_owned{};
 fs::path content_root,profile_root;
 ComPtr<ICoreWebView2Environment> environment;
 struct View;
 std::vector<std::shared_ptr<View>> views;
+std::weak_ptr<View> controller_focus_owner;
 struct Pending {
     std::weak_ptr<View> view;
     std::uint64_t epoch{};
@@ -130,9 +144,47 @@ LRESULT CALLBACK parent_proc(HWND,UINT,WPARAM,LPARAM,UINT_PTR,DWORD_PTR);
 struct View:std::enable_shared_from_this<View> {
     HWND hwnd{},parent{},status{};
     bool presets{},alive=true,subclassed{};
+    bool controller_focused{},focus_events{};
+    HWND controller_focus_root{};
+    EventRegistrationToken got_focus_token{},lost_focus_token{};
     std::uint64_t epoch{},last_request{};
+    wire::GraphInput input;
+    bool delete_latched{},delete_pending{},delete_backspace{};
+    std::uint64_t delete_epoch{},delete_serial{},delete_input_epoch{};
+    std::wstring delete_page;
+    HWND delete_hwnd{},delete_root{};
+    DWORD delete_input_time{};
+    std::chrono::steady_clock::time_point delete_expires;
     ComPtr<ICoreWebView2Controller> controller;
+    ComPtr<ICoreWebView2Controller> focus_controller;
     ComPtr<ICoreWebView2> web;
+    void revoke_controller_focus() noexcept {
+        controller_focused=false;controller_focus_root=nullptr;delete_pending=false;
+        if(controller_focus_owner.lock().get()==this)controller_focus_owner.reset();
+    }
+    void bind_focus_events() {
+        if(!controller || focus_events)return;
+        const auto weak=weak_from_this();
+        const auto got=controller->add_GotFocus(Callback<ICoreWebView2FocusChangedEventHandler>(
+            [weak](ICoreWebView2Controller* sender,IUnknown*)->HRESULT {
+                if(const auto view=weak.lock();view && view->alive && !stopped && std::this_thread::get_id()==ui_thread && view->focus_events && view->controller.Get()==sender && view->focus_controller.Get()==sender) {
+                    if(const auto previous=controller_focus_owner.lock();previous && previous!=view)previous->revoke_controller_focus();
+                    controller_focus_owner=view;view->controller_focused=true;
+                    view->controller_focus_root=view->hwnd?GetAncestor(view->hwnd,GA_ROOT):nullptr;
+                }
+                return S_OK;
+            }).Get(),&got_focus_token);
+        if(FAILED(got))return;
+        const auto lost=controller->add_LostFocus(Callback<ICoreWebView2FocusChangedEventHandler>(
+            [weak](ICoreWebView2Controller* sender,IUnknown*)->HRESULT {
+                if(const auto view=weak.lock();view && view->alive && !stopped && std::this_thread::get_id()==ui_thread && view->focus_events && view->controller.Get()==sender && view->focus_controller.Get()==sender) {
+                    view->revoke_controller_focus();
+                }
+                return S_OK;
+            }).Get(),&lost_focus_token);
+        if(FAILED(lost)){controller->remove_GotFocus(got_focus_token);return;}
+        focus_controller=controller;focus_events=true;
+    }
     std::wstring url()const{return std::wstring(origin)+(presets?L"presets.html":L"index.html");}
     void error(std::wstring_view message) {
         if(!alive || !hwnd)return;
@@ -152,8 +204,10 @@ struct View:std::enable_shared_from_this<View> {
         (void)web->PostWebMessageAsJson(json.c_str());
     }
     void close() noexcept {
-        if(!alive)return;alive=false;++epoch;
+        if(!alive)return;alive=false;++epoch;revoke_controller_focus();
         if(subclassed && parent){RemoveWindowSubclass(parent,parent_proc,reinterpret_cast<UINT_PTR>(this));subclassed=false;}
+        if(focus_events && focus_controller){focus_controller->remove_GotFocus(got_focus_token);focus_controller->remove_LostFocus(lost_focus_token);}
+        focus_events=false;focus_controller.Reset();
         if(controller){controller->Close();web.Reset();controller.Reset();}
     }
     void receive(ICoreWebView2WebMessageReceivedEventArgs* args) {
@@ -163,6 +217,7 @@ struct View:std::enable_shared_from_this<View> {
             FAILED(args->get_WebMessageAsJson(&json.value)) || !json.value)return;
         wire::Message message;
         if(!wire::parse(json.value,message))return;
+        if(presets && (message.kind==L"nativeGraphDelete" || message.kind==L"nativeGraphPatch" || message.kind==L"nativeGraphDiagnostics"))return;
         // The adapter uses monotonically increasing IDs. Duplicate/replayed
         // messages never execute twice, even after the previous reply finished.
         if(message.id.substr(0,3)!=L"wv-")return;
@@ -170,6 +225,16 @@ struct View:std::enable_shared_from_this<View> {
         for(std::size_t i=3;i<message.id.size();++i){const auto c=message.id[i];
             if(c<L'0'||c>L'9'||serial>900719925474099ULL)return;serial=serial*10+unsigned(c-L'0');}
         if(!serial || serial<=last_request)return;last_request=serial;
+        if(message.kind==L"graphInputState") {
+            // Plain bounded metadata only: never execute script or touch AE here.
+            wire::GraphInput next;
+            if(presets || !wire::parse_graph_input(message.script,next))return;
+            if(input.page==next.page && next.epoch<input.epoch)return;
+            if(input.page!=next.page || input.epoch!=next.epoch)delete_pending=false;
+            input=std::move(next);
+            if(!input.down)delete_latched=false;
+            return;
+        }
         const auto size=message.script.size()*sizeof(wchar_t);
         if(requests.size()>=wire::max_requests || size>wire::max_queued_bytes-queued_bytes) {
             reply(message.id,failure(L"host_busy",L"The native panel queue is full; refresh before retrying."));return;
@@ -194,7 +259,7 @@ struct View:std::enable_shared_from_this<View> {
             [weak](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT {try {
                 const auto view=weak.lock();CoString uri;
                 if(!view || !view->alive || FAILED(args->get_Uri(&uri.value)) || !uri.value || uri.value!=view->url())args->put_Cancel(TRUE);
-                else{++view->epoch;view->last_request=0;}return S_OK;
+                else{++view->epoch;view->last_request=0;view->input={};view->delete_pending=false;view->delete_latched=false;}return S_OK;
             }catch(...){args->put_Cancel(TRUE);return S_OK;}}).Get(),&token);
         web->add_FrameNavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>(
             [](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT {args->put_Cancel(TRUE);return S_OK;}).Get(),&token);
@@ -206,13 +271,13 @@ struct View:std::enable_shared_from_this<View> {
             [weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* args)->HRESULT {try{if(const auto view=weak.lock())view->receive(args);return S_OK;}catch(...){return E_FAIL;}}).Get(),&token);
         web->add_ProcessFailed(Callback<ICoreWebView2ProcessFailedEventHandler>(
             [weak](ICoreWebView2*,ICoreWebView2ProcessFailedEventArgs*)->HRESULT {try{if(const auto view=weak.lock()){
-                ++view->epoch;view->error(L"The WebView2 process stopped. Close and reopen this panel; no edit will be retried automatically.");}return S_OK;}catch(...){return E_FAIL;}}).Get(),&token);
+                ++view->epoch;view->focus_events=false;view->revoke_controller_focus();view->error(L"The WebView2 process stopped. Close and reopen this panel; no edit will be retried automatically.");}return S_OK;}catch(...){return E_FAIL;}}).Get(),&token);
         web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>(
             [weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs* args)->HRESULT {try{if(const auto view=weak.lock()){
                 BOOL success{};args->get_IsSuccess(&success);
                 if(success && view->status)ShowWindow(view->status,SW_HIDE);
                 else if(!success)view->error(L"Unable to load the bundled Starfield panel. Restore a verified paired build if reopening does not help.");}return S_OK;}catch(...){return E_FAIL;}}).Get(),&token);
-        const auto bootstrap=L"window.__starfieldWebViewConfig=Object.freeze({root:"+wire::quote(content_root.generic_wstring())+L"});";
+        const auto bootstrap=L"window.__starfieldWebViewConfig=Object.freeze({nativeGraphDelete:true,root:"+wire::quote(content_root.generic_wstring())+L"});";
         const auto result=web->AddScriptToExecuteOnDocumentCreated(bootstrap.c_str(),
             Callback<ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler>(
                 [weak](HRESULT code,LPCWSTR)->HRESULT {try{if(const auto view=weak.lock();view && view->alive && !stopped){
@@ -229,6 +294,7 @@ struct View:std::enable_shared_from_this<View> {
                     const auto view=weak.lock();if(!view || !view->alive || stopped){if(value)value->Close();return S_OK;}
                     if(FAILED(result) || !value){view->error(L"WebView2 controller creation failed. Reopen the panel to retry.");return S_OK;}
                     view->controller=value;
+                    view->bind_focus_events();
                     if(FAILED(value->get_CoreWebView2(&view->web)) || !view->web){view->error(L"WebView2 content initialization failed.");return S_OK;}
                     view->configure();return S_OK;
                 }catch(...){return E_FAIL;}}).Get());
@@ -338,10 +404,134 @@ A_Err command_hook(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,AEG
         if(panels.value)panels.value->AEGP_ToggleVisibility(reinterpret_cast<const A_u_char*>(panel_match));}
     return A_Err_NONE;
 }catch(...){return A_Err_NONE;}
-A_Err menu_hook(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType) noexcept {
+bool foreground_keyboard_focus(HWND,HWND&);
+A_Err menu_hook(AEGP_GlobalRefcon,AEGP_UpdateMenuRefcon,AEGP_WindowType window) noexcept {
+    active_menu_window=window;
+    effect_menu_focus=effect_menu_root=nullptr;
+    if(window==AEGP_WindType_EFFECT){const auto root=GetForegroundWindow();HWND focus{};
+        if(foreground_keyboard_focus(root,focus) && focus!=root &&
+            std::none_of(views.begin(),views.end(),[&](const auto& view){return view->alive && view->hwnd &&
+                (focus==view->hwnd || IsChild(view->hwnd,focus));})){effect_menu_focus=focus;effect_menu_root=root;}}
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
     if(!stopped && commands.value){if(graph_command)commands.value->AEGP_EnableCommand(graph_command);if(presets_command)commands.value->AEGP_EnableCommand(presets_command);}
     return A_Err_NONE;
+}
+bool foreground_keyboard_focus(HWND foreground,HWND& focus) {
+    GUITHREADINFO info{};info.cbSize=sizeof(info);focus=nullptr;
+    // GetFocus sees only this thread's queue. WebView2 input can belong to
+    // another GUI queue: observe its foreground focus without attaching queues.
+    if(!foreground || GetForegroundWindow()!=foreground || !GetGUIThreadInfo(0,&info) ||
+        info.hwndActive!=foreground || (info.flags&(GUI_INMENUMODE|GUI_SYSTEMMENUMODE|GUI_POPUPMENUMODE|GUI_INMOVESIZE)) ||
+        !info.hwndFocus || !IsWindow(info.hwndFocus) || GetAncestor(info.hwndFocus,GA_ROOT)!=foreground ||
+        GetForegroundWindow()!=foreground)return false;
+    focus=info.hwndFocus;return true;
+}
+bool graph_has_keyboard(const View& view) {
+    const auto foreground=GetForegroundWindow();HWND focus{};
+    return view.alive && !view.presets && view.hwnd && IsWindow(view.hwnd) && IsWindowVisible(view.hwnd) &&
+        IsWindowEnabled(view.hwnd) && foreground && GetAncestor(view.hwnd,GA_ROOT)==foreground &&
+        foreground_keyboard_focus(foreground,focus) &&
+        (focus==view.hwnd || IsChild(view.hwnd,focus) ||
+            (focus==foreground && view.focus_events && view.controller_focused && view.controller_focus_root==foreground &&
+                controller_focus_owner.lock().get()==&view && view.controller && view.focus_controller.Get()==view.controller.Get()));
+}
+bool effect_has_keyboard() {
+    HWND focus{};const auto root=GetForegroundWindow();
+    return active_menu_window==AEGP_WindType_EFFECT && effect_menu_focus && effect_menu_root==root &&
+        foreground_keyboard_focus(root,focus) && focus!=root && focus==effect_menu_focus &&
+        std::none_of(views.begin(),views.end(),[&](const auto& view){return view->alive && view->hwnd &&
+            (focus==view->hwnd || IsChild(view->hwnd,focus));});
+}
+bool native_text_has_keyboard() {
+    const auto root=GetForegroundWindow();HWND focus{};
+    if(!foreground_keyboard_focus(root,focus))return false;
+    // AE may keep a whole-effect collection while a native text editor is
+    // active. Let its local Clear run before considering that collection.
+    for(unsigned depth=0;focus && focus!=root && depth<64;++depth,focus=GetParent(focus)) {
+        wchar_t name[256]{};
+        if(GetClassNameW(focus,name,static_cast<int>(std::size(name))) &&
+            (!_wcsicmp(name,L"Edit") || !_wcsnicmp(name,L"RichEdit",8) ||
+             !_wcsicmp(name,L"ComboBox") || !_wcsicmp(name,L"ComboBoxEx32")))return true;
+    }
+    return false;
+}
+bool key_down(int key){return (GetKeyState(key)&0x8000)!=0;}
+A_Err clear_hook(AEGP_GlobalRefcon,AEGP_CommandRefcon,AEGP_Command command,AEGP_HookPriority,A_Boolean already,A_Boolean* handled) noexcept try {
+    if(stopped || !handled || !clear_command || command!=clear_command || std::this_thread::get_id()!=ui_thread)return A_Err_NONE;
+    ClearObservation observation;observation.count=1;observation.gate=1;
+    observation.local=GetFocus();observation.foreground=GetForegroundWindow();
+    (void)foreground_keyboard_focus(observation.foreground,observation.gui);
+    struct Observe {ClearObservation& value;~Observe(){
+        if(!clear_observation.count)clear_observation=value;
+        else if(clear_observation.count<1000)++clear_observation.count;
+    }} observed{observation};
+    if(already)return A_Err_NONE;
+    const bool del=key_down(VK_DELETE),back=key_down(VK_BACK);
+    observation.del=del;observation.back=back;observation.gate=2;
+    if(del==back || key_down(VK_CONTROL) || key_down(VK_MENU) || key_down(VK_SHIFT) || key_down(VK_LWIN) || key_down(VK_RWIN))return A_Err_NONE;
+    observation.gate=3;
+    for(const auto& view:views)if(view->alive && !view->presets && view->hwnd) {
+        observation.graph=view->hwnd;observation.control_focus=view->controller_focused;observation.focus_events=view->focus_events;
+        if(view->focus_events && view->controller_focused)break;
+    }
+    for(const auto& view:views)if(graph_has_keyboard(*view)) {
+        // Consume before AE can remove an Effect Controls selection. A busy or
+        // unavailable graph drops this key; it must never become a delayed edit.
+        *handled=TRUE;
+        observation.gate=4;
+        if(view->delete_latched || view->input.down)return A_Err_NONE;
+        view->delete_latched=true;
+        observation.gate=5;
+        if(stepping || !ui_exclusion_available() || !requests.empty() || view->input.page.empty())return A_Err_NONE;
+        observation.gate=6;
+        LASTINPUTINFO input{sizeof(LASTINPUTINFO),0};if(!GetLastInputInfo(&input))return A_Err_NONE;
+        view->delete_hwnd=view->hwnd;view->delete_root=GetForegroundWindow();view->delete_input_time=input.dwTime;
+        view->delete_page=view->input.page;view->delete_input_epoch=view->input.epoch;
+        view->delete_epoch=view->epoch;view->delete_backspace=back;
+        view->delete_expires=std::chrono::steady_clock::now()+std::chrono::milliseconds(500);
+        view->delete_pending=true;observation.gate=7;return A_Err_NONE;
+    }
+    return A_Err_NONE;
+}catch(...){return A_Err_NONE;}
+std::wstring take_graph_delete(View& view) {
+    if(!key_down(VK_DELETE) && !key_down(VK_BACK))view.delete_latched=false;
+    if(!view.delete_pending)return {};
+    view.delete_pending=false;
+    LASTINPUTINFO input{sizeof(LASTINPUTINFO),0};
+    if(!requests.empty() || std::chrono::steady_clock::now()>=view.delete_expires || !graph_has_keyboard(view) ||
+        view.hwnd!=view.delete_hwnd || GetForegroundWindow()!=view.delete_root ||
+        GetAncestor(view.hwnd,GA_ROOT)!=view.delete_root || !GetLastInputInfo(&input) || input.dwTime!=view.delete_input_time ||
+        view.epoch!=view.delete_epoch || view.input.page!=view.delete_page ||
+        view.input.epoch!=view.delete_input_epoch || view.input.down)return {};
+    return L"{\"channel\":"+wire::quote(wire::channel)+L",\"event\":\"graphDelete\",\"page\":"+wire::quote(view.delete_page)+
+        L",\"inputEpoch\":"+std::to_wstring(view.delete_input_epoch)+L",\"serial\":"+std::to_wstring(++view.delete_serial)+
+        L",\"expires\":"+std::to_wstring(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()+250)+
+        L",\"backspace\":"+(view.delete_backspace?L"true":L"false")+L"}";
+}
+std::wstring script_failure_message(const AEGP_MemorySuite1* memory,AEGP_MemHandle diagnostic,A_Err error) {
+    const auto prefix=L"AE script failed (error "+std::to_wstring(static_cast<long>(error))+L"). ";
+    if(!diagnostic)return prefix+L"No diagnostic text was returned.";
+    if(!memory || !memory->AEGP_GetMemHandleSize || !memory->AEGP_LockMemHandle || !memory->AEGP_UnlockMemHandle)
+        return prefix+L"Diagnostic memory access is unavailable.";
+    AEGP_MemSize size{};
+    if(memory->AEGP_GetMemHandleSize(diagnostic,&size))return prefix+L"Diagnostic size could not be read.";
+    if(!size)return prefix+L"No diagnostic text was returned.";
+    void* pointer{};
+    if(memory->AEGP_LockMemHandle(diagnostic,&pointer))return prefix+L"Diagnostic text could not be locked.";
+    struct Lock {const AEGP_MemorySuite1* memory;AEGP_MemHandle value;~Lock(){memory->AEGP_UnlockMemHandle(value);}} lock{memory,diagnostic};
+    if(!pointer)return prefix+L"Diagnostic text is unavailable.";
+    const auto* bytes=static_cast<const char*>(pointer);
+    if(!*bytes)return prefix+L"No diagnostic text was returned.";
+    const auto limit=std::min<std::size_t>(size,1024);
+    const auto* end=static_cast<const char*>(std::memchr(bytes,0,limit));
+    const auto length=static_cast<int>(end?static_cast<std::size_t>(end-bytes):limit);
+    // Diagnostics are display text, not protocol data. An invalid/truncated
+    // UTF-8 unit must not throw away the original failure or invent success.
+    const auto count=MultiByteToWideChar(CP_UTF8,0,bytes,length,nullptr,0);
+    if(count<=0)return prefix+L"Diagnostic text could not be decoded.";
+    std::wstring text(static_cast<std::size_t>(count),L'\0');
+    if(!MultiByteToWideChar(CP_UTF8,0,bytes,length,text.data(),count))return prefix+L"Diagnostic text could not be decoded.";
+    return prefix+text+(end?L"":L" [truncated]");
 }
 std::wstring execute(std::wstring_view body) {
     Suite<AEGP_UtilitySuite6> utility(kAEGPUtilitySuite,kAEGPUtilitySuiteVersion6);
@@ -362,7 +552,7 @@ std::wstring execute(std::wstring_view body) {
         script_error=utility.value->AEGP_ExecuteScript(plugin,script.c_str(),FALSE,&result,&diagnostic);
     }
     if(script_error ||
-        !script_diagnostic_empty(memory.value,diagnostic))return failure(L"host_script_failed",L"AE rejected the panel script. Refresh before retrying.");
+        !script_diagnostic_empty(memory.value,diagnostic))return failure(L"host_script_failed",script_failure_message(memory.value,diagnostic,script_error));
     if(!result)return L"undefined";
     AEGP_MemSize size{};
     if(memory.value->AEGP_GetMemHandleSize(result,&size) || size>8*1024*1024)return failure(L"size_limit_exceeded",L"AE returned an oversized response.");
@@ -385,17 +575,93 @@ void initialize_web_panel_host(SPBasicSuite* suites,AEGP_PluginID id) noexcept t
     Suite<AEGP_CommandSuite1> commands(kAEGPCommandSuite,kAEGPCommandSuiteVersion1);
     if(!panels.value || !registrations.value || !commands.value)return;
     if(panels.value->AEGP_RegisterCreatePanelHook(id,reinterpret_cast<const A_u_char*>(panel_match),create_panel,nullptr,TRUE))return;
-    if(!commands.value->AEGP_GetUniqueCommand(&graph_command) &&
-        !registrations.value->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,graph_command,command_hook,nullptr))
+    if(!commands.value->AEGP_GetUniqueCommand(&graph_command))
         commands.value->AEGP_InsertMenuCommand(graph_command,panel_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_SORTED);
-    if(!commands.value->AEGP_GetUniqueCommand(&presets_command) &&
-        !registrations.value->AEGP_RegisterCommandHook(id,AEGP_HP_BeforeAE,presets_command,command_hook,nullptr))
+    if(!commands.value->AEGP_GetUniqueCommand(&presets_command))
         commands.value->AEGP_InsertMenuCommand(presets_command,presets_menu,AEGP_Menu_WINDOW,AEGP_MENU_INSERT_SORTED);
     (void)registrations.value->AEGP_RegisterUpdateMenuHook(id,menu_hook,nullptr);
 }catch(...){}
+A_Err dispatch_web_panel_command(AEGP_GlobalRefcon global,AEGP_CommandRefcon refcon,AEGP_Command command,
+    AEGP_HookPriority priority,A_Boolean already,A_Boolean* handled) noexcept {
+    if(stopped || already || !handled || std::this_thread::get_id()!=ui_thread)return A_Err_NONE;
+    if(clear_command && command==clear_command && native_clear_dispatch_active())return A_Err_NONE;
+    if((graph_command && command==graph_command) || (presets_command && command==presets_command))return command_hook(global,refcon,command,priority,already,handled);
+    const auto error=clear_hook(global,refcon,command,priority,already,handled);
+    if(!*handled && clear_command && command==clear_command &&
+        std::none_of(views.begin(),views.end(),[](const auto& view){return graph_has_keyboard(*view);})) {
+        if(native_text_has_keyboard())return error;
+        if(author_delete_latched){*handled=TRUE;return error;}
+        if(native_clear_attempts<1000)++native_clear_attempts;
+        NativeDeleteResult result;
+        // AE chooses its own actual Clear target. A whole native selection only
+        // permits observing that command; it never authorizes choosing/deleting
+        // an effect from root focus or a remembered menu type.
+        if(delete_selected_native_nodes(basic,plugin,result,true,clear_command,handled)){
+            if(native_clear_owned<1000)++native_clear_owned;
+            *handled=TRUE;author_delete_latched=key_down(VK_DELETE)||key_down(VK_BACK);
+            author_delete_result=result;author_delete_notice=true;
+        }
+    }
+    return error;
+}
+void set_web_panel_command_registration(A_Err result) noexcept {clear_registration=result;}
 bool step_web_panel_host() noexcept try {
     if(stopped || stepping || std::this_thread::get_id()!=ui_thread || !ui_exclusion_available())return false;
+    SourceEditTelemetry observation;
+    for(unsigned n=0;n<4 && take_source_edit(observation);++n){
+        char detail[384]{};
+        std::snprintf(detail,sizeof(detail),"Native source edit: kind=%u parameter=%u revision=%u totalUs=%llu compileUs=%llu queryUs=%llu fullNodeReadUs=%llu stateQueries=%u reusedNodes=%u misses=%u sourceFailure=%u.",
+            observation.kind,observation.parameter,observation.revision,static_cast<unsigned long long>(observation.total_us),
+            static_cast<unsigned long long>(observation.compile_us),static_cast<unsigned long long>(observation.query_us),static_cast<unsigned long long>(observation.full_read_us),
+            observation.queries,observation.reused,observation.misses,observation.source_failure);
+        journal_graph_command(0,observation.error,detail);
+    }
     views.erase(std::remove_if(views.begin(),views.end(),[](const auto& view){return !view->alive;}),views.end());
+    if(!key_down(VK_DELETE) && !key_down(VK_BACK))author_delete_latched=false;
+    if(author_delete_notice){author_delete_notice=false;
+        char detail[512]{};const auto& r=author_delete_result;
+        std::snprintf(detail,sizeof(detail),"Native Clear result: stage=%ld, dispatched=%d, unchanged=%d, committed=%d, guarded=%d, unknown=%d, command=%ld, error=%ld, cleanup=%ld, undo=%ld; op=%llu c=%ld l=%ld rev=%ld totalUs=%llu scanUs=%llu captureUs=%llu physicalUs=%llu publishUs=%llu finalBindingsUs=%llu.",
+            long(r.clear_stage),int(r.clear_dispatched),int(r.unchanged),int(r.committed),int(r.guarded),int(r.outcome_unknown),long(r.command_error),long(r.error),long(r.cleanup_error),long(r.undo_error),
+            static_cast<unsigned long long>(r.operation),long(r.comp),long(r.layer),long(r.revision),static_cast<unsigned long long>(r.timing_us.total),
+            static_cast<unsigned long long>(r.timing_us.preflight),static_cast<unsigned long long>(r.timing_us.capture),static_cast<unsigned long long>(r.timing_us.physical),
+            static_cast<unsigned long long>(r.timing_us.publish),static_cast<unsigned long long>(r.timing_us.refresh));
+        journal_graph_command(0,r.error?r.error:r.cleanup_error?r.cleanup_error:r.undo_error,detail);
+        const auto result=native_delete_reply(author_delete_result);
+        for(const auto& view:views)if(view->alive && !view->presets && view->web)
+            (void)view->web->PostWebMessageAsJson((L"{\"channel\":"+wire::quote(wire::channel)+L",\"event\":\"nativeGraphEdited\",\"result\":"+result+L"}").c_str());
+    }
+    if(clear_observation.count) {
+        // Keep the first observation until idle; repeats only increment a capped
+        // count. No file I/O, script or AE suite call occurs in clear_hook.
+        char detail[320]{};const auto observed=clear_observation;clear_observation={};
+        std::snprintf(detail,sizeof(detail),"Panel Clear observed: count=%u, gate=%u, local=%p, gui=%p, foreground=%p, graph=%p, controlFocus=%d, focusEvents=%d, Delete=%d, Backspace=%d, nativeTry=%u, nativeOwned=%u.",
+            observed.count,observed.gate,static_cast<void*>(observed.local),static_cast<void*>(observed.gui),static_cast<void*>(observed.foreground),static_cast<void*>(observed.graph),int(observed.control_focus),int(observed.focus_events),int(observed.del),int(observed.back),native_clear_attempts,native_clear_owned);
+        native_clear_attempts=native_clear_owned=0;
+        journal_graph_command(0,0,detail);
+    }
+    // Resolve the public menu name once, on safe idle, never inside a hook.
+    // No private numeric Clear ID and no change to AE's keyboard preferences.
+    if(!clear_lookup_attempted && host_accepts_panel_work()) {
+        stepping=true;struct Reset {~Reset(){stepping=false;}} reset;
+        HostUiExclusion lookup_scope;if(!lookup_scope)return false;
+        clear_lookup_attempted=true;
+        const auto text=execute(L"String(app.findMenuCommandId('Clear'))");
+        unsigned value{};bool valid=!text.empty() && text.size()<10;
+        for(const auto c:text){if(c<L'0'||c>L'9'){valid=false;break;}value=value*10+unsigned(c-L'0');}
+        if(valid && value && value<=0x7fffffffU)clear_command=static_cast<AEGP_Command>(value);
+        char detail[192]{};
+        std::snprintf(detail,sizeof(detail),"Panel Clear lookup: command=%ld, hookRegistration=%ld; no numeric fallback.",static_cast<long>(clear_command),static_cast<long>(clear_registration));
+        journal_graph_command(0,clear_command?clear_registration:A_Err_GENERIC,detail);
+    }
+    for(const auto& view:views) {
+        if(!view->delete_pending){if(!key_down(VK_DELETE) && !key_down(VK_BACK))view->delete_latched=false;continue;}
+        if(!host_accepts_panel_work()){view->delete_pending=false;continue;}
+        const auto notification=take_graph_delete(*view);
+        if(!notification.empty() && view->web) {
+            journal_graph_command(0,0,"Panel Clear consumed; forwarding bounded graph Delete notification (not a commit receipt).");
+            (void)view->web->PostWebMessageAsJson(notification.c_str());
+        }
+    }
     if(requests.empty())return false;
     stepping=true;struct Stepping {~Stepping(){stepping=false;}} scope;
     const auto view=requests.front().view.lock();
@@ -410,7 +676,38 @@ bool step_web_panel_host() noexcept try {
     std::wstring response=L"{\"ok\":true}";
     try {
         const auto& kind=pending.message.kind;
-        if(kind==L"evalScript")response=execute(pending.message.script);
+        if(kind==L"evalScript" || kind==L"evalScriptKeepGraphFocus"){
+            // Node selection may reveal AE Effect Controls. Keep a graph click's
+            // keyboard owner only when no user input/window/navigation change
+            // intervened. Ordinary scripts and preset views never claim focus.
+            const auto foreground=GetForegroundWindow();HWND focused{};
+            LASTINPUTINFO input{sizeof(LASTINPUTINFO),0};
+            const bool keep=kind==L"evalScriptKeepGraphFocus" && !view->presets && view->hwnd &&
+                foreground && GetAncestor(view->hwnd,GA_ROOT)==foreground &&
+                foreground_keyboard_focus(foreground,focused) &&
+                graph_has_keyboard(*view) &&
+                GetLastInputInfo(&input);
+            struct RestoreFocus {
+                const std::shared_ptr<View>& view;std::uint64_t epoch;HWND hwnd,foreground;DWORD input_time;bool keep;
+                ~RestoreFocus() noexcept {
+                    LASTINPUTINFO current{sizeof(LASTINPUTINFO),0};HWND focused{};
+                    if(keep && view->alive && view->epoch==epoch && view->hwnd==hwnd && hwnd && IsWindow(hwnd) &&
+                        IsWindowVisible(view->hwnd) && IsWindowEnabled(view->hwnd) &&
+                        GetForegroundWindow()==foreground && GetAncestor(hwnd,GA_ROOT)==foreground &&
+                        foreground_keyboard_focus(foreground,focused) &&
+                        GetLastInputInfo(&current) && current.dwTime==input_time &&
+                        !graph_has_keyboard(*view))SetFocus(view->hwnd);
+                }
+            } restore{view,pending.epoch,view->hwnd,foreground,input.dwTime,keep};
+            response=execute(pending.message.script);
+        }
+        else if(kind==L"nativeGraphDelete" || kind==L"nativeGraphPatch" || kind==L"nativeGraphDiagnostics"){
+            const auto queued=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-(pending.expires-std::chrono::seconds(7))).count();
+            char detail[128]{};std::snprintf(detail,sizeof(detail),"Native panel delete dispatch: queueWaitUs=%lld.",static_cast<long long>(queued));
+            journal_graph_command(0,0,detail);
+            HostUiExclusion edit_scope;
+            response=edit_scope?execute_native_delete(basic,plugin,pending.message.script,kind==L"nativeGraphPatch",kind==L"nativeGraphDiagnostics"):failure(L"graph_transaction_busy",L"Another native edit is active. No graph operation was executed.");
+        }
         else if(kind==L"undo" || kind==L"redo")response=execute(kind==L"undo"?L"app.executeCommand(16); 'ok'":L"app.executeCommand(2035); 'ok'");
         else if(kind==L"openPresets")open_presets();
         else if(kind==L"close"){

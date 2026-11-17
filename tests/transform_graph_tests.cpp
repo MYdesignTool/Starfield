@@ -8,6 +8,7 @@
 #include <functional>
 #include <iostream>
 #include <stdexcept>
+#include <source_location>
 using namespace starfield::core;
 using namespace starfield::core::graph_keys;
 namespace {
@@ -46,8 +47,9 @@ EvaluatedGraph evaluate(const Graph& graph,RationalTime time={1,1}) {
     auto result=evaluate_particle_graph(graph,time,never);if(!result.has_value())throw std::runtime_error(result.error().detail);
     ++checks;return result.take_value();
 }
-const ParticleInstance& slot(const EvaluatedGraph& graph,std::uint64_t id) {
+const ParticleInstance& slot(const EvaluatedGraph& graph,std::uint64_t id,const std::source_location location=std::source_location::current()) {
     const auto found=std::find_if(graph.particles.begin(),graph.particles.end(),[&](const auto& p){return p.id==id;});
+    if(found==graph.particles.end())throw std::runtime_error("particle identity missing at line "+std::to_string(location.line()));
     check(found!=graph.particles.end(),"particle identity missing");return *found;
 }
 struct Sampler final:TemporalGraphSampler {
@@ -127,7 +129,11 @@ void animation_and_modes() {
     near(slot(repeated,0).position,slot(animated,0).position,"animated Transform depends on frame order");
     check(later.sprite_bases.size()==1,"animated branch matrix sharing");
     changed=base();splice(changed,NodeId{uuid(3)},transform_node(4,pose),14);set(node(changed,kEmitterNode),kEmittingMode,std::uint32_t{1});
-    const auto once=evaluate(changed);check(once.particles.size()==1 && slot(once,0).age_seconds==1,"Once Transform path");
+    auto once_source=base();set(node(once_source,kEmitterNode),kEmittingMode,std::uint32_t{1});
+    const auto once_baseline=evaluate(once_source),once=evaluate(changed);
+    check(once.particles.size()==1 && once_baseline.particles.size()==1 && once.particles[0].age_seconds==1 &&
+          once.particles[0].id==once_baseline.particles[0].id,"Once Transform preserves authored birth identity and age");
+    near(once.particles[0].position,transform.value().position(once_baseline.particles[0].position),"Once Transform maps the birth particle");
     set(node(changed,kEmitterNode),kEmittingMode,std::uint32_t{0});
     set(node(changed,kParticleNode),kLifeRandom,50.);const auto random_life=evaluate(changed);
     check(!random_life.particles.empty() && random_life.sprite_bases.size()==1,"random-life Transform path");
@@ -211,9 +217,14 @@ void branches_and_origins() {
     auto force=node(graph,kForceNode);force.id=NodeId{uuid(6)};set(force,kGravity,Vec3{2,0,0});graph.nodes.push_back(force);
     graph.edges.push_back({EdgeId{uuid(15)},NodeId{uuid(2)},kParticleParticlesOut,force.id,kForceParticlesIn});
     graph.edges.push_back({EdgeId{uuid(16)},force.id,kForceParticlesOut,NodeId{uuid(4)},kTransformParticlesIn});
-    const auto parallel=evaluate(graph);near(slot(parallel,0).position,Vec3{.4,2.2,0},"parallel forces merge once before Transform");
-    near(slot(parallel,0).velocity,Vec3{1,3,0},"parallel forces velocity");check(parallel.sprite_bases.size()==1,"parallel path duplicated basis");
-    Sampler sampler;sampler.graph=graph;near(slot(temporal(sampler),0).position,slot(parallel,0).position,"temporal parallel forces merge once");
+    const auto parallel=evaluate(graph);
+    check(!parallel.particles.empty(),"parallel Force population");
+    const auto oldest=std::max_element(parallel.particles.begin(),parallel.particles.end(),[](const auto& a,const auto& b){return a.age_seconds<b.age_seconds;});
+    near(oldest->age_seconds,1,"parallel Force source birth age");
+    const auto identity=oldest->id;
+    near(slot(parallel,identity).position,Vec3{.4,2.2,0},"parallel forces merge once before Transform");
+    near(slot(parallel,identity).velocity,Vec3{1,3,0},"parallel forces velocity");check(parallel.sprite_bases.size()==1,"parallel path duplicated basis");
+    Sampler sampler;sampler.graph=graph;near(slot(temporal(sampler),identity).position,slot(parallel,identity).position,"temporal parallel forces merge once");
     // A separate particle stream may use its own frame at the shared Output.
     graph=base();splice(graph,NodeId{uuid(3)},transform_node(4,t),14);
     auto emitter=node(graph,kEmitterNode);emitter.id=NodeId{uuid(5)};
@@ -226,7 +237,7 @@ void branches_and_origins() {
     const auto streams=evaluate(graph);check(streams.particles.size()==4 && streams.sprite_bases.size()==2,"independent Particle frames at Output");
     for(const auto& p:streams.particles) {
         check(p.sprite_basis_index>0 && p.sprite_basis_index<=2,"stream matrix index");
-        if(p.id==0)near(p.position,p.emitter_id==NodeId{uuid(1)}?Vec3{.4,1.2,0}:Vec3{.2,-1.2,0},"stream Transform leaked across branch");
+        if(p.age_seconds==1)near(p.position,p.emitter_id==NodeId{uuid(1)}?Vec3{.4,1.2,0}:Vec3{.2,-1.2,0},"stream Transform leaked across branch");
     }
     sampler.graph=graph;const auto sampled=temporal(sampler);check(sampled.particles.size()==4 && sampled.sprite_bases.size()==2,"temporal independent Particle frames");
     struct Origins final:EmitterOriginSampler {
@@ -238,6 +249,94 @@ void branches_and_origins() {
     check(baseline.has_value() && transformed.has_value(),"origin history Transform evaluation");
     const auto compiled=compile_particle_transform(t);
     for(const auto& p:baseline.value().particles)near(slot(transformed.value(),p.id).position,compiled.value().position(p.position),"birth origin delta mapped through Transform");
+}
+Graph force_diamond() {
+    auto graph=base();ParticleTransformSettings t;t.rotation_degrees.z=90;
+    splice(graph,NodeId{uuid(3)},transform_node(4,t),14);
+    auto force=node(graph,kForceNode);force.id=NodeId{uuid(6)};set(force,kGravity,Vec3{2,0,0});graph.nodes.push_back(force);
+    force.id=NodeId{uuid(7)};set(force,kGravity,Vec3{0,3,0});graph.nodes.push_back(force);
+    for(auto& edge:graph.edges)if(edge.source_node==NodeId{uuid(3)}&&edge.destination_node==NodeId{uuid(4)})edge.destination_node=NodeId{uuid(6)};
+    graph.edges.push_back({EdgeId{uuid(15)},NodeId{uuid(3)},kForceParticlesOut,NodeId{uuid(7)},kForceParticlesIn});
+    graph.edges.push_back({EdgeId{uuid(16)},NodeId{uuid(6)},kForceParticlesOut,NodeId{uuid(4)},kTransformParticlesIn});
+    graph.edges.push_back({EdgeId{uuid(17)},NodeId{uuid(7)},kForceParticlesOut,NodeId{uuid(4)},kTransformParticlesIn});
+    return graph;
+}
+void same_population(const EvaluatedGraph& a,const EvaluatedGraph& b) {
+    check(!a.particles.empty()&&a.particles.size()==b.particles.size(),"joined route preserves population");
+    for(const auto& p:a.particles){const auto& q=slot(b,p.id);
+        check(p.emitter_id==q.emitter_id&&p.age_seconds==q.age_seconds,"joined route preserves birth identity/time");
+        near(p.position,q.position,"joined route position");near(p.velocity,q.velocity,"joined route velocity");
+        near(p.size_pixels,q.size_pixels,"joined route size");near(p.opacity,q.opacity,"joined route opacity");}
+}
+void joined_force_routes() {
+    auto joined=force_diamond(),serial=joined;
+    for(auto& edge:serial.edges)if(edge.id==EdgeId{uuid(15)})edge.source_node=NodeId{uuid(6)};
+    serial.edges.erase(std::remove_if(serial.edges.begin(),serial.edges.end(),[](const auto& e){return e.id==EdgeId{uuid(16)};}),serial.edges.end());
+    const auto expected=evaluate(serial),merged=evaluate(joined);same_population(expected,merged);
+    const auto oldest=std::max_element(merged.particles.begin(),merged.particles.end(),[](const auto& a,const auto& b){return a.age_seconds<b.age_seconds;});
+    near(oldest->position,Vec3{-1.1,2.2,0},"shared Force ancestor contributes once");
+    near(oldest->velocity,Vec3{-2,3,0},"merged Force analytic velocity");
+    Sampler sampler;sampler.graph=joined;same_population(expected,temporal(sampler));
+    auto permuted=joined;std::reverse(permuted.nodes.begin(),permuted.nodes.end());std::reverse(permuted.edges.begin(),permuted.edges.end());
+    same_population(expected,evaluate(permuted));sampler.graph=permuted;same_population(expected,temporal(sampler));
+    auto force_only=joined,serial_force=serial;
+    for(auto* graph:{&force_only,&serial_force})for(auto& n:graph->nodes)if(n.type_key==kTransformNode){auto replacement=node(*graph,kForceNode);replacement.id=n.id;set(replacement,kGravity,Vec3{0,0,1});n=std::move(replacement);}
+    same_population(evaluate(serial_force),evaluate(force_only));sampler.graph=force_only;same_population(evaluate(serial_force),temporal(sampler));
+    // A separate Output inlet remains an independent render stream, even when
+    // it shares ancestors with the joined inlet.
+    auto fanout=joined;fanout.edges.push_back({EdgeId{uuid(18)},NodeId{uuid(6)},kForceParticlesOut,NodeId{uuid(255)},kOutputParticles});
+    const auto split=evaluate(fanout);check(split.particles.size()==2*merged.particles.size(),"joined inlet does not absorb independent Output fanout");
+    sampler.graph=fanout;same_population(split,temporal(sampler));
+    const auto reject=[&](const Graph& graph){const auto a=evaluate_particle_graph(graph,{1,1},never);
+        check(!a.has_value()&&a.error().code==ErrorCode::invalid_request,"ambiguous joined stream rejects statically");
+        sampler.graph=graph;const auto b=evaluate_temporal_particle_graph(graph,{1,1},never,{},sampler);
+        check(!b.has_value()&&b.error().code==ErrorCode::invalid_request,"ambiguous joined stream rejects temporally");};
+    auto different=joined;auto other=node(different,kParticleNode);other.id=NodeId{uuid(8)};different.nodes.push_back(other);
+    for(auto& edge:different.edges)if(edge.id==EdgeId{uuid(13)})edge.source_node=other.id;
+    different.edges.push_back({EdgeId{uuid(19)},NodeId{uuid(1)},kEmitterParticles,other.id,kParticleParticlesIn});reject(different);
+    auto unstyled=joined;for(auto& edge:unstyled.edges)if(edge.id==EdgeId{uuid(13)}){edge.source_node=NodeId{uuid(1)};edge.source_port=kEmitterParticles;}reject(unstyled);
+    auto bypass=joined;bypass.nodes.push_back(transform_node(8));
+    for(auto& edge:bypass.edges)if(edge.id==EdgeId{uuid(16)})edge.destination_node=NodeId{uuid(8)};
+    bypass.edges.push_back({EdgeId{uuid(18)},NodeId{uuid(8)},kTransformParticlesOut,NodeId{uuid(4)},kTransformParticlesIn});reject(bypass);
+    for(bool turbulence:{false,true}) {
+        const auto processor=turbulence?GraphNode{NodeId{uuid(8)},kTurbulenceNode,1,{{kTurbulenceOrigin,Vec3{}},{kTurbulenceAmplitude,.1},
+            {kTurbulenceFrequency,1.},{kTurbulenceLevels,std::uint32_t{1}},{kTurbulenceEvolutionSpeed,.2},{kTurbulenceOffset,Vec3{.31,-.27,.13}}}}:
+            GraphNode{NodeId{uuid(8)},kMotionNode,1,{{kMotionMode,std::uint32_t{1}},{kMotionOrigin,Vec3{}},{kMotionAxis,Vec3{0,0,1}},{kMotionAngularRate,.7}}};
+        auto common=joined,common_serial=serial;
+        splice(common,NodeId{uuid(4)},processor,18);splice(common_serial,NodeId{uuid(4)},processor,18);
+        same_population(evaluate(common_serial),evaluate(common));sampler.graph=common;same_population(evaluate(common_serial),temporal(sampler));
+        auto ordered_fork=joined;splice(ordered_fork,NodeId{uuid(2)},processor,18);reject(ordered_fork);
+        auto divergent=joined;divergent.nodes.push_back(processor);
+        for(auto& edge:divergent.edges)if(edge.id==EdgeId{uuid(16)})edge.destination_node=processor.id;
+        divergent.edges.push_back({EdgeId{uuid(18)},processor.id,PortKey{2},NodeId{uuid(4)},kTransformParticlesIn});reject(divergent);
+    }
+    // Exercise the same prefix through Auxiliary's recursive parent graph.
+    const auto auxiliary_graph=[](Graph graph){auto emitter=node(graph,kEmitterNode);emitter.id=NodeId{uuid(8)};set(emitter,kAuxiliarySource,std::uint32_t{1});set(emitter,kEmitterOrigin,Vec3{});
+        auto particle=node(graph,kParticleNode);particle.id=NodeId{uuid(9)};graph.nodes.push_back(emitter);graph.nodes.push_back(particle);
+        for(auto& e:graph.edges)if(e.source_node==NodeId{uuid(4)}){e.destination_node=emitter.id;e.destination_port=kEmitterParents;}
+        graph.edges.push_back({EdgeId{uuid(18)},emitter.id,kEmitterParticles,particle.id,kParticleParticlesIn});
+        graph.edges.push_back({EdgeId{uuid(19)},particle.id,kParticleParticlesOut,NodeId{uuid(255)},kOutputParticles});return graph;};
+    const auto auxiliary=auxiliary_graph(joined),auxiliary_serial=auxiliary_graph(serial);
+    same_population(evaluate(auxiliary_serial),evaluate(auxiliary));sampler.graph=auxiliary;same_population(evaluate(auxiliary_serial),temporal(sampler));
+    // Twelve diamonds represent 4096 paths but only 36 unique modifier nodes.
+    // They must stay within normal request budgets and never duplicate births.
+    auto layered=base();ParticleTransformSettings t;t.rotation_degrees.z=90;splice(layered,NodeId{uuid(3)},transform_node(4,t),14);
+    layered.edges.erase(std::remove_if(layered.edges.begin(),layered.edges.end(),[](const auto& e){return e.source_node==NodeId{uuid(3)};}),layered.edges.end());
+    auto prototype=node(layered,kForceNode);NodeId previous=prototype.id;
+    unsigned char edge_id=40;
+    for(unsigned char layer=0;layer<12;++layer){const auto left=static_cast<unsigned char>(10+3*layer),right=static_cast<unsigned char>(left+1),merge=static_cast<unsigned char>(left+2);
+        for(auto id:{left,right,merge}){auto force=prototype;force.id=NodeId{uuid(id)};set(force,kGravity,id==left?Vec3{.01,0,0}:id==right?Vec3{0,.02,0}:Vec3{});layered.nodes.push_back(force);}
+        for(auto id:{left,right}){layered.edges.push_back({EdgeId{uuid(edge_id++)},previous,kForceParticlesOut,NodeId{uuid(id)},kForceParticlesIn});
+            layered.edges.push_back({EdgeId{uuid(edge_id++)},NodeId{uuid(id)},kForceParticlesOut,NodeId{uuid(merge)},kForceParticlesIn});}
+        previous=NodeId{uuid(merge)};}
+    layered.edges.push_back({EdgeId{uuid(edge_id)},previous,kForceParticlesOut,NodeId{uuid(4)},kTransformParticlesIn});
+    const auto many=evaluate(layered);check(many.particles.size()==expected.particles.size(),"many shared diamonds do not multiply the population");
+    const auto first=std::max_element(many.particles.begin(),many.particles.end(),[](const auto& a,const auto& b){return a.age_seconds<b.age_seconds;});
+    near(first->position,Vec3{.28,1.26,0},"bounded DAG accumulates each unique Force once");
+    sampler.graph=layered;same_population(many,temporal(sampler));
+    struct Stop final:Cancellation {mutable unsigned polls{};bool is_cancelled()const noexcept override{return ++polls>16;}} static_stop,temporal_stop;
+    const auto stopped=evaluate_particle_graph(layered,{1,1},static_stop);check(!stopped.has_value()&&stopped.error().code==ErrorCode::cancelled,"joined static planning cooperatively cancels");
+    const auto timed_stop=evaluate_temporal_particle_graph(layered,{1,1},temporal_stop,{},sampler);check(!timed_stop.has_value()&&timed_stop.error().code==ErrorCode::cancelled,"joined temporal planning cooperatively cancels");
 }
 void live_pixels() {
     auto graph=base();set(node(graph,kEmitterNode),kVelocity,Vec3{});set(node(graph,kForceNode),kGravity,Vec3{});
@@ -267,9 +366,11 @@ void invalid_and_inherited() {
     check(!evaluate_particle_graph(graph,{1,1},never).has_value(),"projective inherited matrix accepted");
     graph=base();splice(graph,NodeId{uuid(3)},transform_node(4),14);
     graph.edges.push_back({EdgeId{uuid(19)},NodeId{uuid(3)},kForceParticlesOut,NodeId{uuid(255)},kOutputParticles});
-    const auto ambiguous=evaluate_particle_graph(graph,{1,1},never);
-    check(!ambiguous.has_value() && ambiguous.error().code==ErrorCode::invalid_request,"Transform bypass silently merged");
-    Sampler sampled;sampled.graph=graph;check(!evaluate_temporal_particle_graph(graph,{1,1},never,{},sampled).has_value(),"temporal Transform bypass silently merged");
+    const auto independent=evaluate(graph);
+    check(independent.particles.size()==2*evaluate(base()).particles.size(),"different Output inlets retain independent streams");
+    for(std::size_t i=0;i<independent.particles.size();++i)for(std::size_t j=i+1;j<independent.particles.size();++j)
+        check(independent.particles[i].id!=independent.particles[j].id,"independent Output routes have unique identities");
+    Sampler sampled;sampled.graph=graph;same_population(independent,temporal(sampled));
     graph=base();auto parked=transform_node(4);set(parked,kTransformParticleOpacity,101.);graph.nodes.push_back(parked);
     check(!evaluate_particle_graph(graph,{1,1},never).has_value(),"parked Transform bounds ignored");
     sampled.graph=graph;check(!evaluate_temporal_particle_graph(graph,{1,1},never,{},sampled).has_value(),"temporal parked Transform bounds ignored");
@@ -307,6 +408,6 @@ void invalid_and_inherited() {
     check(!changed_schema.has_value() && changed_schema.error().code==ErrorCode::invalid_request,"sampled Transform schema mismatch accepted");
 }
 }
-int main(){try{force_order_and_roundtrip();superposition();animation_and_modes();composed_frames_and_orientation();auxiliary();branches_and_origins();live_pixels();invalid_and_inherited();
+int main(){try{force_order_and_roundtrip();superposition();animation_and_modes();composed_frames_and_orientation();auxiliary();branches_and_origins();joined_force_routes();live_pixels();invalid_and_inherited();
     std::cout<<"Transform graph: "<<checks<<" checks passed\n";return 0;
 }catch(const std::exception& error){std::cerr<<"Transform graph failed after "<<checks<<" checks: "<<error.what()<<'\n';return 1;}}

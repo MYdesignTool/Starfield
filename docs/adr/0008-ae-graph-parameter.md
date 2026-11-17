@@ -2,6 +2,7 @@
 
 - Status: accepted implementation contract for G-04; host qualification pending.
 - Date: 2026-09-27.
+- New-effect Control Source default superseded by [ADR0049](0049-new-effect-initial-render.md) on 2026-11-16; persisted old modes and this storage contract remain.
 - Supersedes the sequence-data ownership assumption in the initial architecture.
 
 ## Storage and undo

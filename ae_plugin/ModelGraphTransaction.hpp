@@ -24,7 +24,9 @@ struct ModelGraphTransactionPlan {
     // commit means its native graph receipt and resulting snapshot were checked.
     A_Err (*prepare)(void*){};
     A_Err (*commit)(void*){};
-    // After all backup removals and before renderer guard release; no script.
+    // After all parade mutations, on either commit or rollback, before the
+    // owned renderer guard is released. Must not depend on commit succeeding;
+    // no script and no cancellation short-circuit during restoration.
     A_Err (*finalize)(void*){};
     std::int32_t (*is_cancelled)(void*) noexcept {};
 };

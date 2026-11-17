@@ -4,6 +4,9 @@
 #include "starfield/core/Graph.hpp"
 
 namespace starfield::adapter {
+struct NativeClearSnapshot;
+[[nodiscard]] PF_Err capture_panel_clear(PF_InData*,AEGP_EffectRefH,AEGP_LayerH,
+    AEGP_PluginID,NativeClearSnapshot&) noexcept;
 
 // Local helper shared by CEP supervised commits and native node publication.
 [[nodiscard]] PF_Err write_graph_snapshot(PF_InData* in_data, PF_ParamDef* params[],
@@ -17,7 +20,8 @@ namespace starfield::adapter {
 // Explicit UI command: compile saved node streams, atomically publish and
 // verify graph plus nonce. Does not rely on USER_CHANGED_PARAM delivery.
 [[nodiscard]] PF_Err commit_panel_graph(PF_InData*, AEGP_EffectRefH,
-    AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*,bool rebuild_disabled=false) noexcept;
+    AEGP_LayerH, A_long nonce, AEGP_PluginID, PF_OutData*,bool rebuild_disabled=false,
+    const NativeClearSnapshot* clear=nullptr) noexcept;
 
 // Final parade only, guard1 held. Reacquires aliases, reinstalls and verifies
 // source dependencies without republishing graph/nonce or reading stale aliases.

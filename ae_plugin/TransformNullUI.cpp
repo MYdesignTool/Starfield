@@ -4,7 +4,7 @@
 #include "TextureLayerInventory.hpp"
 #include "UiExclusionClient.hpp"
 #include "AE_EffectCBSuites.h"
-#include "adobesdk/DrawbotSuite.h"
+#include "AE_EffectCB.h"
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -21,58 +21,7 @@ template<class T> struct Suite {
     const T* operator->()const{return value;}
     explicit operator bool()const{return value!=nullptr;}
 };
-struct Button {
-    A_long x,y,width,height{21};
-    explicit Button(const PF_EffectWindowInfo& info,bool selector=false):x(info.current_frame.left+2),
-        y(info.current_frame.top+(selector?3:30)),
-        width(std::clamp<A_long>(info.current_frame.right-x-2,0,selector?230:114)){}
-    bool hit(A_long h,A_long v)const {return width>=40 && h>=x && h<x+width && v>=y && v<y+height;}
-};
-PF_Err draw_button(PF_InData* data,PF_EventExtra* event) {
-    Suite<PF_EffectCustomUISuite2> ui(data->pica_basicP,kPFEffectCustomUISuite,kPFEffectCustomUISuiteVersion2);
-    Suite<DRAWBOT_DrawbotSuite1> bot(data->pica_basicP,kDRAWBOT_DrawSuite,kDRAWBOT_DrawSuite_Version1);
-    Suite<DRAWBOT_SupplierSuite1> supplier(data->pica_basicP,kDRAWBOT_SupplierSuite,kDRAWBOT_SupplierSuite_Version1);
-    Suite<DRAWBOT_SurfaceSuite1> surface(data->pica_basicP,kDRAWBOT_SurfaceSuite,kDRAWBOT_SurfaceSuite_Version1);
-    Suite<DRAWBOT_PathSuite1> paths(data->pica_basicP,kDRAWBOT_PathSuite,kDRAWBOT_PathSuite_Version1);
-    if(!ui || !bot || !supplier || !surface || !paths)return PF_Err_BAD_CALLBACK_PARAM;
-    DRAWBOT_DrawRef ref{};DRAWBOT_SupplierRef source{};DRAWBOT_SurfaceRef target{};
-    auto error=ui->PF_GetDrawingReference(event->contextH,&ref);
-    if(!error)error=bot->GetSupplier(ref,&source);
-    if(!error)error=bot->GetSurface(ref,&target);
-    if(error || !source || !target)return error?static_cast<PF_Err>(error):PF_Err_BAD_CALLBACK_PARAM;
-    std::vector<TransformLayerChoice> choices;AEGP_LayerIDVal selected{};
-    error=read_transform_layers(data,choices,selected,false,event->effect_win.index);if(error)return static_cast<PF_Err>(error);
-    std::u16string label=u"Missing layer";
-    for(const auto& choice:choices)if(choice.id==selected){label=choice.name;break;}
-    for(bool selector:{true,false}) {
-    if(!selector && event->effect_win.index!=1)continue;
-    const Button b(event->effect_win,selector);
-    if(b.width<40)continue;
-    for(unsigned border=0;border<2 && !error;++border) {
-        const DRAWBOT_ColorRGBA color=border?DRAWBOT_ColorRGBA{.22f,.22f,.23f,1}:DRAWBOT_ColorRGBA{.43f,.43f,.45f,1};
-        const DRAWBOT_RectF32 bounds{float(b.x+border),float(b.y+border),float(b.width-2*border),float(b.height-2*border)};
-        DRAWBOT_BrushRef brush{};DRAWBOT_PathRef path{};
-        error=supplier->NewBrush(source,&color,&brush);
-        if(!error)error=supplier->NewPath(source,&path);
-        if(!error)error=paths->AddRect(path,&bounds);
-        if(!error)error=surface->FillPath(target,brush,path,kDRAWBOT_FillType_EvenOdd);
-        if(path)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(path));
-        if(brush)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(brush));
-    }
-    DRAWBOT_FontRef font{};DRAWBOT_BrushRef brush{};const DRAWBOT_ColorRGBA color{.9f,.9f,.9f,1};
-    if(!error)error=supplier->NewDefaultFont(source,11,&font);
-    if(!error)error=supplier->NewBrush(source,&color,&brush);
-    const DRAWBOT_PointF32 at{float(b.x+7),float(b.y+14)};
-    if(!error)error=surface->DrawString(target,brush,font,reinterpret_cast<const DRAWBOT_UTF16Char*>(selector?label.c_str():u"Create Null"),
-        &at,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_End,float(b.width-(selector?28:12)));
-    const DRAWBOT_PointF32 arrow{float(b.x+b.width-18),float(b.y+14)};
-    if(!error && selector)error=surface->DrawString(target,brush,font,reinterpret_cast<const DRAWBOT_UTF16Char*>(u"\u25be"),
-        &arrow,kDRAWBOT_TextAlignment_Left,kDRAWBOT_TextTruncation_None,14);
-    if(brush)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(brush));
-    if(font)supplier->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(font));
-    }
-    return static_cast<PF_Err>(error);
-}
+
 }
 
 PF_Err read_transform_layers(PF_InData* data,std::vector<TransformLayerChoice>& choices,
@@ -277,45 +226,31 @@ PF_Err change_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params
 } catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
 PF_Err create_transform_null(PF_InData* data,PF_OutData* out,PF_ParamDef* params[]) noexcept {
-    return change_transform_null(data,out,params,nullptr);
+    constexpr auto count=native_nodes::parameter_count(native_nodes::Kind::transform);
+    constexpr auto guard=native_nodes::sync_guard_index(native_nodes::Kind::transform);
+    if(!data || !out)return PF_Err_BAD_CALLBACK_PARAM;
+    if(data->num_params==count && params)return change_transform_null(data,out,params,nullptr);
+    // AE can deliver native buttons without params[] (as with Model Import).
+    // Recover the saved numeric controls/metadata; never checkout/render a Layer.
+    if(!data->inter.checkout_param || !data->inter.checkin_param)return PF_Err_INVALID_CALLBACK;
+    std::array<PF_ParamDef,count> owned{};std::array<PF_ParamDef*,count> delivered{};
+    for(A_long i=0;i<count;++i)delivered[i]=&owned[i];
+    owned[1].param_type=PF_Param_LAYER;
+    struct Checkins {
+        PF_InData* data;decltype(owned)& values;A_long last=1;
+        ~Checkins(){for(A_long i=2;i<=last;++i)(void)PF_CHECKIN_PARAM(data,&values[i]);}
+    } checkins{data,owned};
+    for(A_long i=2;i<=guard;++i) {
+        const auto error=PF_CHECKOUT_PARAM(data,i,data->current_time,data->time_step,
+            data->time_scale?data->time_scale:1,&owned[i]);
+        if(error)return error;checkins.last=i;
+    }
+    auto recovered=*data;recovered.num_params=count;
+    return change_transform_null(&recovered,out,delivered.data(),nullptr);
 }
 PF_Err set_transform_null_source(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],AEGP_LayerIDVal id) noexcept {
     if(id<0)return PF_Err_BAD_CALLBACK_PARAM;
     return change_transform_null(data,out,params,&id);
 }
 
-PF_Err transform_null_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
-    if(!event || !data || !out || !event->contextH || event->effect_win.index!=1 || event->effect_win.area!=PF_EA_CONTROL)
-        return PF_Err_NONE;
-    PF_Err error=PF_Err_NONE;
-    if(event->e_type==PF_Event_DRAW)error=draw_button(data,event);
-    else if(event->e_type==PF_Event_DO_CLICK) {
-        const auto point=event->u.do_click.screen_point;
-        if(Button(event->effect_win,true).hit(point.h,point.v)) {
-            std::vector<TransformLayerChoice> choices;AEGP_LayerIDVal current{},selected{};
-            error=read_transform_layers(data,choices,current);
-            if(!error && choose_transform_layer(data,choices,current,selected))
-                error=set_transform_null_source(data,out,params,selected);
-        } else if(Button(event->effect_win).hit(point.h,point.v))error=create_transform_null(data,out,params);
-        else return PF_Err_NONE;
-    }
-    else return PF_Err_NONE;
-    event->evt_out_flags|=PF_EO_HANDLED_EVENT;return error;
-}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
-PF_Err texture_layer_event(PF_InData* data,PF_OutData* out,PF_ParamDef* params[],PF_EventExtra* event) noexcept try {
-    if(!event || !data || !out || !event->contextH || event->effect_win.area!=PF_EA_CONTROL ||
-        (event->effect_win.index!=native_nodes::particle_layout::texture_front &&
-         event->effect_win.index!=native_nodes::particle_layout::texture_back))return PF_Err_NONE;
-    PF_Err error{};
-    if(event->e_type==PF_Event_DRAW)error=draw_button(data,event);
-    else if(event->e_type==PF_Event_DO_CLICK) {
-        const auto point=event->u.do_click.screen_point;
-        if(!Button(event->effect_win,true).hit(point.h,point.v))return PF_Err_NONE;
-        std::vector<TransformLayerChoice> choices;AEGP_LayerIDVal current{},selected{};
-        error=read_transform_layers(data,choices,current,true,event->effect_win.index);
-        if(!error && choose_transform_layer(data,choices,current,selected))
-            error=change_transform_null(data,out,params,&selected,event->effect_win.index);
-    } else return PF_Err_NONE;
-    event->evt_out_flags|=PF_EO_HANDLED_EVENT;return error;
-}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }

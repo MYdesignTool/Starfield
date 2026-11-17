@@ -47,15 +47,17 @@ foreach ($taskEntry in $taskRecord.files) {
     $taskEntries += [pscustomobject]@{target=$taskTarget;saved=$taskSaved;retained=$taskRetained;oldHash=$taskEntry.oldHash;existed=$taskExisted;present=$taskPresent}
 }
 if (-not $taskEntries.Count) { throw 'Paired panel snapshot is empty.' }
+# Reporting must validate the same retention precondition as the action. An
+# existing candidate file must never produce a misleading successful preflight.
+foreach ($taskEntry in $taskEntries) {
+    if (Test-Path -LiteralPath $taskEntry.retained) { throw "Candidate retention path already exists: $($taskEntry.retained)" }
+}
 Write-Host "Restore previous bundle through Deploy-TestBuild.ps1 and $($taskEntries.Count) verified panel source files."
 Write-Host "Keep candidate panel sources under $taskCandidateRoot"
 Write-Host "Source folder after restore: $taskRestoreDirectory (legacy manifest prefixes remain compatible)."
 if (-not $Restore) { Write-Host 'Read-only report. Add -Restore for the explicit action.'; exit 0 }
 if (Get-Process AfterFX,AfterFX_64 -ErrorAction SilentlyContinue) { throw 'Close AE before restoring a paired build.' }
 # Retain every candidate source before the first source is overwritten.
-foreach ($taskEntry in $taskEntries) {
-    if (Test-Path -LiteralPath $taskEntry.retained) { throw "Candidate retention path already exists: $($taskEntry.retained)" }
-}
 foreach ($taskEntry in $taskEntries) {
     if(-not $taskEntry.present){continue}
     New-Item -ItemType Directory -Path (Split-Path -Parent $taskEntry.retained) -Force | Out-Null

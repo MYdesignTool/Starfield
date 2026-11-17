@@ -508,3 +508,70 @@ relative attachment, subsequent motion, undo and reopen remain owner gates.
 2026-10-08 owner follow-up: “确认没问题” accepts the preceding native51/CEP51
 deletion and relative attachment correction. This does not establish broader
 undo/reopen, all parent/affine cases or shutter qualification.
+
+## GOV-01B route reconvergence correction — 2026-10-19
+
+Owner approved the minimum-scope repair. A distinct inlet edge into Output is
+an independent render route; it is not a modifier-node reconvergence. Preserve
+those populations and their route identities, including transformed/bypass
+inlets. The old fixture rejecting that independent fan-out is superseded.
+
+Within one inlet's upstream modifier DAG, collect each ancestor once and stop
+at Particle. All paths must share that Particle identity. Reuse the existing
+Transform-chain and Motion/Turbulence context checks; reject different Particle
+roots, bypassed/divergent Transform chains, or divergent ordered processor
+chains with invalid_request instead of dropping the route. Parallel prefix
+Forces in the same frame merge once, including shared Force ancestors. Keep the
+linear path and existing integration unchanged.
+
+Static and temporal evaluation share a private ancestry collector, while
+retaining their existing numeric evaluators and frame planners. Preserve actual
+DAG edges in temporal planning rather than serializing sibling processors.
+Traversal charges the existing request work budget and cooperatively cancels;
+no new public API, parameter, ID, wire format, ABI, Render.hpp or host transaction
+boundary. Regression covers analytic Force sums, shared ancestors, permutation,
+Force-only and ordered suffixes, independent Output fan-out, ambiguous inputs,
+Auxiliary parent evaluation and repeated diamonds with bounded work. Offline
+results do not qualify AE host behavior. Evidence: artifacts/gov-01b-20261019/.
+
+## P-09 native Layer and Create Null controls — 2026-10-23
+
+Owner requests AE-native ordinary selectors. Supersedes the native50 custom
+two-row selector: native104 restores PF_LAYER without PF_PUI_CONTROL. A separate
+PF_Param_BUTTON (disk1415, runtime91) appends after the unchanged guard90 and
+UUID82..89; num_params becomes92. Old physical controls1..90 and disk IDs retain
+their types, defaults, identities and values; saved graph/schema, synthetic
+bindings and Core ABI9 do not change. No parameter insertion or renumbering.
+AE loads old projects using existing disk IDs and adds a momentary UI action
+with no authored graph value or migration payload. Older builds ignore the
+new action; keep a project copy for rollback and qualify reopen in AE2023.
+The button appears after existing visible controls to preserve old indices.
+
+USER_CHANGED_PARAM handles91 before graph synchronization, then reuses the
+existing guarded Create Null/relative binding transaction and failure rollback.
+For AE's empty/partial button delivery, recover numeric streams2..90 with
+balanced PF checkout/checkin; never checkout a source layer's rendered pixels.
+All ordinary native selections use the existing supervised callback; no custom
+click/menu/drag handler intercepts them. Selector/title locator events remain
+separate. Actual button layout, native layer pick, animation, undo and saved
+project reopening require owner AE2023 tests; offline checks cannot close them.
+
+## P-09 native title takeover correction — 2026-10-23
+
+Owner AE screenshots confirm native104 hides the Shape/Transform selectors.
+Removing PF_PUI_CONTROL alone was insufficient: add_checked_parameter still
+injected PF_PUI_TOPIC and custom dimensions for the locator. In AE a native
+popup/layer's inline value belongs to the title row. Supersede the earlier
+claim that the title locator is independent of the native selector.
+
+native105 removes implicit topic/dimension injection and its title-event route
+for all ordinary node parameters. Match the existing Particle Color/Up Axis/
+texture-layer controls: native selectors have PF_PUI_NONE and zero dimensions.
+Do not paint a native row's name/value or add another custom row to compensate.
+The cosmetic locator line is suspended; existing Host reveal/session queries
+remain. Explicit curve/gradient/text editors are unchanged. No new ID, count,
+parameter type, saved graph/schema or ABI change relative to104.
+
+The stricter actual-module audit fails six selector registrations in104 before
+the fix. Passing the corrected audit/build is not AE display qualification;
+owner screenshots establish104 failure, and105 still requires host verification.

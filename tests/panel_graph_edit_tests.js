@@ -216,18 +216,19 @@ assert.throws(function () {
 
 var deleted = edits.apply(original, { type: "deleteNodes", nodeIds: [forceId] }, idFactory);
 assert.strictEqual(deleted.nodes.length, 3);
-assert.strictEqual(deleted.edges.length, 1);
+assert.strictEqual(deleted.edges.length, 2);
+assert.ok(deleted.edges.some(edge=>edge.sourceNode===particleId && edge.destinationNode===outputId),"delete bridges its neighbors");
 assert.strictEqual(Object.prototype.hasOwnProperty.call(layout.get(deleted), forceId), false,
                    "deleting a node removes its saved position");
 
-assert.throws(function () {
+assert.doesNotThrow(function () {
     edits.apply(original, { type: "connect", from: original.nodes[0].id, to: forceId }, idFactory);
-}, /Emitter must connect directly to a Particle node/i);
+}, "unsupported pair stays an author wire");
 assert.throws(function () {
     edits.apply(original, { type: "deleteNodes", nodeIds: [outputId] }, idFactory);
 }, /required Output node/i);
-assert.throws(function () {
+assert.doesNotThrow(function () {
     edits.apply(original, { type: "connect", from: forceId, to: particleId }, idFactory);
-}, /Particle node input accepts an Emitter directly/i);
+}, "cyclic author wire is retained");
 
 console.log("Panel graph edit planner checks passed.");

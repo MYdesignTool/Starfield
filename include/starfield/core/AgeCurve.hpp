@@ -55,6 +55,10 @@ inline constexpr std::size_t kAgeCurvePointBytes = 16;
     if (age <= curve.points[0].age) return curve.points[0].value;
     std::size_t low=1,high=curve.count-1;
     while(low<high) {const auto middle=(low+high)/2;if(age>curve.points[middle].age)low=middle+1;else high=middle;}
+    // Make the binary search's index bounds explicit before both array reads.
+    // Valid curves always satisfy this; malformed inputs retain the fallback.
+    if(low==0 || low>=curve.count || low>=curve.points.size())
+        return linear_start+(linear_end-linear_start)*age;
     const auto i=low;
     const auto& right=curve.points[i];const auto& left=curve.points[i-1];
         if (age <= right.age) {

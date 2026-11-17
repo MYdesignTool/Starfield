@@ -42,9 +42,12 @@
                 if(!response || !response.ok || response.transactionId!==id){error(response);return;}
                 started=true;schedule(upload,0);
             });
+            function pending(code,message){var response=failure(code,message);
+                if(published)response.diagnostics={notificationPending:true};return response;}
             function expired(){if(clock()<=deadline)return false;
-                if(published){published.diagnostics=published.diagnostics || {};published.diagnostics.notificationPending=true;}
-                end(published || failure(queued?"model_transaction_outcome_unknown":"model_transaction_timeout",
+                // JSX publication precedes native acknowledgement and cleanup.
+                // A failed acknowledgement can still restore the prior graph.
+                end(pending(queued?"model_transaction_outcome_unknown":"model_transaction_timeout",
                     queued?"Model transaction did not return its final result (state="+lastState+"). "+lastMessage+" Refresh the graph before retrying.":"Model transaction upload timed out."));return true;}
             function upload(){if(finished || expired())return;
                 if(index===meshes.length){
@@ -70,7 +73,7 @@
                     schedule(read,250);
                 });
             }
-            return {cancel:function(){end(published || failure(queued?"model_transaction_cancel_pending":"cancelled",
+            return {cancel:function(){end(pending(queued?"model_transaction_cancel_pending":"cancelled",
                 queued?"Cancellation requested; refresh the graph to confirm the outcome.":"Model graph transaction cancelled."));}};
         }
         return {apply:apply};

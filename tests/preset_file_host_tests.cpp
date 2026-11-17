@@ -17,6 +17,7 @@ AEGP_UtilitySuite6 utility{};AEGP_MemorySuite1 memory{};SPBasicSuite basic{};
 struct Memory {std::string text;};
 std::string descriptor,completion,missing_suite;
 std::u16string selected;
+std::size_t diagnostic_capacity=1;
 int script_fault{},memory_fault{};
 bool available{},owner_ok{},current{},stop_in_modal{},queue_in_modal{},throw_in_modal{},lost_ack{};
 PresetFileChoice choice{};
@@ -24,7 +25,7 @@ AEGP_MemHandle mem(std::string text){++handles;return reinterpret_cast<AEGP_MemH
 void no_owned(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(depth==0);}
 void reset(){stop_preset_file_host();no_owned();initialize_ui_exclusion();initialize_preset_file_host(&basic,7);
     descriptor=std::string(id)+"|1";selected=u"D:/\u6d4b\u8bd5/'safe$().sfldpreset";completion.clear();missing_suite.clear();
-    script_fault=memory_fault=0;available=owner_ok=current=true;stop_in_modal=queue_in_modal=throw_in_modal=lost_ack=false;
+    script_fault=memory_fault=0;diagnostic_capacity=1;available=owner_ok=current=true;stop_in_modal=queue_in_modal=throw_in_modal=lost_ack=false;
     choice=PresetFileChoice::selected;scripts=choosers=completions=0;}
 void run(){queue_preset_file_dialog();(void)step_preset_file_host();no_owned();CHECK(ui_exclusion_available());}
 LRESULT CALLBACK pump(HWND window,UINT message,WPARAM w,LPARAM l){
@@ -44,7 +45,7 @@ void initialize(){
         else CHECK(false);
         --depth;if(script_fault==stage || stage==3 && lost_ack){*error=mem("error");*result=mem("ignored");return 512;}
         if(memory_fault==1)reply=std::string(129,'x');
-        if(memory_fault!=2)reply+='\0';*result=mem(reply);*error=mem(std::string(1,'\0'));return 0;
+        if(memory_fault!=2)reply+='\0';*result=mem(reply);*error=mem(std::string(diagnostic_capacity,'\0'));return 0;
     };
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle handle)->A_Err{delete reinterpret_cast<Memory*>(handle);CHECK(handles>0);--handles;return 0;};
     memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle handle,AEGP_MemSize* out)->A_Err{*out=static_cast<AEGP_MemSize>(reinterpret_cast<Memory*>(handle)->text.size());return memory_fault==3?512:0;};
@@ -73,6 +74,7 @@ PresetFileChoice choose_preset_file(std::uintptr_t owner,bool save,std::u16strin
 int main(){initialize();reset();CHECK(!step_preset_file_host());CHECK(scripts==0);
     run();CHECK(choosers==1);CHECK(completions==1);CHECK(completion.find("00270073006100660065")!=std::string::npos);CHECK(completion.find("$()")==std::string::npos);
     const auto saved=completion;queue_preset_file_dialog();CHECK(!step_preset_file_host());CHECK(choosers==1);CHECK(completion==saved);no_owned();
+    reset();diagnostic_capacity=65536;run();CHECK(choosers==1 && completions==1);
     reset();descriptor=std::string(id)+"|2";selected=u"D:/save.sfldpreset";run();CHECK(choosers==1);CHECK(completions==1);
     for(auto c:{PresetFileChoice::cancelled,PresetFileChoice::failed}){reset();choice=c;run();CHECK(completions==1);CHECK(completion.find(c==PresetFileChoice::cancelled?",'',1":",'',2")!=std::string::npos);}
     reset();current=false;run();CHECK(choosers==1);CHECK(completions==0);

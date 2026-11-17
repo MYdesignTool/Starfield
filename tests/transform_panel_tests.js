@@ -16,7 +16,7 @@ equal(transform.type,edits.types.transform);equal(transform.schemaVersion,1);equ
 graph=edits.apply(graph,{type:"disconnect",from:graph.nodes[2].id,to:graph.nodes[3].id});
 graph=edits.apply(graph,{type:"connect",from:graph.nodes[2].id,to:transform.id},next);
 graph=edits.apply(graph,{type:"connect",from:transform.id,to:graph.nodes[3].id},next);
-ok(edits.canConnect(graph,transform.id,graph.nodes[1].id,"2","1")===false); // Would form a cycle.
+ok(edits.canConnect(graph,transform.id,graph.nodes[1].id,"2","1")); // Cycle retained; Core supplies its warning.
 const geometry={width:1920,height:1080,pixelAspect:2},resources=[{id:77,name:"Null <one>"},{id:88,name:"Null two"}];
 function projected(g=graph){return view.project(g,null,geometry,resources).nodes.find(n=>n.id===transform.id);}
 let node=projected();

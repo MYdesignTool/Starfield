@@ -205,6 +205,37 @@ core::Result<core::Graph> graph_from_controls(const core::Settings& settings) {
         core::EdgeId{emitter_to_particle}, core::EdgeId{particle_to_force}, core::EdgeId{force_to_output});
 }
 
+core::Result<bool> is_initial_graph_template(const core::Graph& graph) {
+    if (!graph.optional_records.empty()) return core::Result<bool>::success(false);
+    const auto original = graph_from_controls(core::Settings{});
+    if (!original.has_value()) return core::Result<bool>::failure(original.error());
+    const auto expected = core::serialize_graph(original.value(), core::particle_node_registry());
+    const auto actual = core::serialize_graph(graph, core::particle_node_registry());
+    if (!expected.has_value() || !actual.has_value()) return core::Result<bool>::failure(
+        core::ErrorCode::invalid_request,"initial graph template could not be checked");
+    return core::Result<bool>::success(expected.value() == actual.value());
+}
+
+core::Result<core::Graph> initial_node_graph(A_long layer_height, std::uint32_t max_particles) {
+    if (layer_height <= 0) return core::Result<core::Graph>::failure(core::ErrorCode::invalid_request,
+        "initial node graph requires a positive layer height");
+    core::Settings initial;
+    initial.particle_count = max_particles;
+    initial.birth_rate = 100;
+    initial.seed = 1000;
+    initial.velocity = {};
+    initial.velocity_spread = 0;
+    initial.emission_speed = 100.0 / layer_height;
+    // Graph-scoped identities also used by the gateway's empty first bootstrap.
+    core::Uuid128 emitter{{0x81,0xcb,0x8b,0xb1,0xf3,0x20,0x41,0x14,0x98,0xf5,0xd2,0x5b,0x54,0x91,0x2c,0x01}};
+    auto particle = emitter; particle.bytes[15] = 3;
+    auto first = emitter; first.bytes[15] = 6;
+    auto second = emitter; second.bytes[15] = 7;
+    core::Uuid128 output{}; output.bytes[15] = 0xff;
+    return core::make_emitter_particle_output_graph(initial,core::NodeId{emitter},core::NodeId{particle},
+        core::NodeId{output},core::EdgeId{first},core::EdgeId{second});
+}
+
 core::Result<core::Graph> read_graph_parameter(PF_InData* data, PF_ArbitraryH handle) {
     const LockedBytes value(data, handle);
     if (!value.valid()) return core::Result<core::Graph>::failure(core::ErrorCode::invalid_request, "graph parameter handle is invalid");

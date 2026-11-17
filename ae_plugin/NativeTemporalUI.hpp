@@ -11,6 +11,9 @@ struct NativeUITiming {std::uint64_t calls{},refreshes{},sequence_refreshes{},id
 // GLOBAL_SETUP runs on AE's main thread. No source handles or PF references are
 // passed from worker callbacks into this UI reader.
 void initialize_native_temporal_ui() noexcept;
+// Remember a successful UI-side capture after lazy dependencies have settled.
+// Scheduling only: render independently validates publication or alias proofs.
+void record_native_temporal_ui_capture(PF_InData*) noexcept;
 [[nodiscard]] PF_Err register_native_temporal_ui(PF_InData*) noexcept;
 void refresh_native_temporal_ui(PF_InData*,PF_ParamDef*[],const PF_EventExtra*,AEGP_PluginID) noexcept;
 // Invoked synchronously by the General AEGP on the main UI thread after loading.

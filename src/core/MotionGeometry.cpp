@@ -38,12 +38,14 @@ std::array<double,9> rotation(Vec3 a,double radians) noexcept {
 Vec3 transform(const std::array<double,9>& m,Vec3 value) noexcept {
     return {m[0]*value.x+m[1]*value.y+m[2]*value.z,m[3]*value.x+m[4]*value.y+m[5]*value.z,m[6]*value.x+m[7]*value.y+m[8]*value.z};
 }
-Vec3 spline(std::span<const Vec3> controls,std::span<const double> knots,unsigned degree,double t) noexcept {
+std::optional<Vec3> spline(std::span<const Vec3> controls,std::span<const double> knots,unsigned degree,double t) noexcept {
+    std::array<Vec3,4> work{};
+    if(degree>=work.size() || controls.size()<=degree || knots.size()!=controls.size()+degree+1 ||
+       !std::isfinite(t) || t<0 || t>1)return {};
     if(controls.size()==1)return controls.front();
     const auto last=controls.size()-1;
     const auto span=t<=0?static_cast<std::size_t>(degree):t>=1?last:
         std::clamp(static_cast<std::size_t>(std::upper_bound(knots.begin(),knots.end(),t)-knots.begin()-1),static_cast<std::size_t>(degree),last);
-    std::array<Vec3,4> work{};
     for(unsigned j=0;j<=degree;++j)work[j]=controls[span-degree+j];
     for(unsigned r=1;r<=degree;++r)for(unsigned j=degree;j>=r;--j){
         const auto index=span-degree+j;
@@ -51,6 +53,7 @@ Vec3 spline(std::span<const Vec3> controls,std::span<const double> knots,unsigne
         const auto weight=denominator>0?(t-knots[index])/denominator:0;
         work[j]=interpolate(work[j-1],work[j],weight);
     }
+    if(degree>=work.size())return {};
     return work[degree];
 }
 } // namespace
@@ -105,15 +108,18 @@ Result<Vec3> CompiledMotionPath::position_at_distance(double value) const noexce
     const auto parameter=parameter_at_distance(value);
     if(parameter==0)return R::success(origin_);
     if(parameter==1)return R::success(end_);
-    return R::success(add(origin_,spline(controls_,knots_,degree_,parameter)));
+    const auto point=spline(controls_,knots_,degree_,parameter);
+    if(!point)return R::failure(ErrorCode::invalid_request,"invalid Motion spline storage");
+    return R::success(add(origin_,*point));
 }
 Result<Vec3> CompiledMotionPath::tangent_at_distance(double value) const noexcept {
     using R=Result<Vec3>;
     if(controls_.empty() || !std::isfinite(value))return R::failure(ErrorCode::invalid_request,"invalid Motion path or distance");
     if(derivative_controls_.empty())return R::success({});
     const auto derivative=spline(derivative_controls_,derivative_knots_,degree_-1,parameter_at_distance(value));
-    const auto magnitude=norm(derivative);
-    return R::success(magnitude>0?unit(derivative):Vec3{});
+    if(!derivative)return R::failure(ErrorCode::invalid_request,"invalid Motion spline storage");
+    const auto magnitude=norm(*derivative);
+    return R::success(magnitude>0?unit(*derivative):Vec3{});
 }
 Result<CompiledMotionPath> compile_motion_path(std::span<const Vec3> points,const Cancellation& cancellation) noexcept {
     using R=Result<CompiledMotionPath>;
@@ -186,7 +192,8 @@ Result<CompiledMotionPath> compile_motion_path(std::span<const Vec3> points,cons
             const auto a=spline(path.controls_,path.knots_,path.degree_,begin),b=spline(path.controls_,path.knots_,path.degree_,end);
             const auto start=spline(path.derivative_controls_,path.derivative_knots_,path.degree_-1,begin);
             const auto finish=spline(path.derivative_controls_,path.derivative_knots_,path.degree_-1,end);
-            const std::array<Vec3,4> curve{a,add(a,scale(start,(end-begin)/3)),subtract(b,scale(finish,(end-begin)/3)),b};
+            if(!a || !b || !start || !finish)return R::failure(ErrorCode::invalid_request,"invalid Motion spline storage");
+            const std::array<Vec3,4> curve{*a,add(*a,scale(*start,(end-begin)/3)),subtract(*b,scale(*finish,(end-begin)/3)),*b};
             if(!subdivide(subdivide,begin,end,curve,0))return R::failure(*error);
         }
         return R::success(std::move(path));

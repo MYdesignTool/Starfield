@@ -1,5 +1,6 @@
 "use strict";
-// Narrow compatibility check/model for ExtendScript conditional association.
+// Narrow compatibility check/model for reported ExtendScript conditional and
+// mixed logical operator association. Parentheses are authoritative boundaries.
 // This is not an ExtendScript engine or evidence of actual host execution.
 const parser=require("internal/deps/acorn/acorn/dist/acorn");
 const options={ecmaVersion:3,allowReserved:"never",preserveParens:true,locations:true};
@@ -15,8 +16,30 @@ function ungrouped(source){
     }
     visit(parser.parse(source,options));return result;
 }
+function ungroupedLogical(source){
+    const result=[];
+    function visit(node){
+        // Modern JS binds && before ||. With equal precedence/left association,
+        // only an ungrouped && on an OR's right changes the evaluation tree.
+        if(node.type==="LogicalExpression" && node.operator==="||" &&
+            node.right.type==="LogicalExpression" && node.right.operator==="&&")result.push(node);
+        children(node).forEach(visit);
+    }
+    visit(parser.parse(source,options));return result;
+}
 function modelLeftAssociation(source){
     function render(node){
+        if(node.type==="LogicalExpression"){
+            const operands=[],operators=[];
+            function flatten(part){
+                if(part.type!=="LogicalExpression"){operands.push(part);return;}
+                flatten(part.left);operators.push(part.operator);flatten(part.right);
+            }
+            flatten(node);
+            let result=render(operands[0]);
+            for(let i=0;i<operators.length;i++)result="("+result+" "+operators[i]+" "+render(operands[i+1])+")";
+            return result;
+        }
         if(node.type==="ConditionalExpression" && node.consequent.type==="ConditionalExpression")
             throw Error("Ungrouped true branch is unsupported by ExtendScript");
         if(node.type==="ConditionalExpression" && node.alternate.type==="ConditionalExpression"){
@@ -33,4 +56,4 @@ function modelLeftAssociation(source){
     }
     return render(parser.parse(source,options));
 }
-module.exports={ungrouped,modelLeftAssociation};
+module.exports={ungrouped,ungroupedLogical,modelLeftAssociation};

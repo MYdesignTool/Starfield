@@ -23,9 +23,11 @@ bool same_bounds(const core::ModelBounds& a,const core::ModelBounds& b) noexcept
 }
 PF_Err prepare_model_render_resources(PF_InData* data,PF_OutData* output,PF_PreRenderExtra* extra,
     const core::Graph& graph,const MotionExposure& motion,A_long height,double par,const core::Cancellation& cancel,
-    ModelRenderResources& prepared) noexcept try {
-    prepared={};auto recipes=model_mirror_recipes(graph);if(!recipes.has_value())return core_failure(output,recipes.error());
-    if(recipes.value().empty())return PF_Err_NONE;
+    ModelRenderResources& prepared,const core::Graph* resource_layout) noexcept try {
+    prepared={};auto active_recipes=model_mirror_recipes(graph);if(!active_recipes.has_value())return core_failure(output,active_recipes.error());
+    if(active_recipes.value().empty())return PF_Err_NONE;
+    auto recipes=resource_layout?model_mirror_recipes(*resource_layout):std::move(active_recipes);
+    if(!recipes.has_value())return core_failure(output,recipes.error());
     if(!data||!data->time_scale)return failure(output,"invalid renderer clock");
     std::set<core::ModelResourceId> requested;
     const auto plan=[&](const core::Graph& scene,core::RationalTime time)->PF_Err {

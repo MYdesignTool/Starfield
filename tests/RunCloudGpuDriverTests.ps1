@@ -55,6 +55,7 @@ auto r=request(shape,camera);r.frame.alpha_mode=alpha;
 #include "EmitterHistory.hpp"
 #include "EditorPresetPicker.hpp"
 namespace starfield::adapter {
+void invalidate_native_compile_reuse() noexcept {}
 PF_Err capture_motion_particles(PF_InData*,PF_OutData*,const core::Graph&,A_long,A_long,std::span<const MotionLookAtTargetResources>,
     std::span<const core::RationalTime>,const core::Cancellation&,std::vector<CapturedParticleFrame>&) noexcept {return PF_Err_BAD_CALLBACK_PARAM;}
 bool choose_curve_preset(PF_InData*,core::AgeCurve&) noexcept {return false;}

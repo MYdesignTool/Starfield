@@ -1,6 +1,6 @@
-param([ValidateSet('All','Panel','Cpp','Scripts')][string]$Group = 'All')
+param([ValidateSet('All','Panel','Cpp','Scripts','NativeRegression')][string]$Group = 'All')
 
-# All current test scopes; no builds/deployment through the live dist Junction.
+# Registered offline test scopes; no builds/deployment through the live dist Junction.
 $ErrorActionPreference = 'Stop'
 $taskRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskOutput = Join-Path $taskRepo 'artifacts\all-tests'
@@ -9,6 +9,7 @@ $taskResults = [Collections.Generic.List[object]]::new()
 
 function Invoke-Test([string]$taskName, [string]$taskCommand, [string[]]$taskArguments) {
     $taskLog = Join-Path $taskOutput ($taskName + '.log')
+    $taskTimer = [Diagnostics.Stopwatch]::StartNew()
     $taskPriorPreference = $ErrorActionPreference
     try {
         # Windows PowerShell converts native stderr into ErrorRecords. A failed
@@ -16,8 +17,8 @@ function Invoke-Test([string]$taskName, [string]$taskCommand, [string[]]$taskArg
         $ErrorActionPreference = 'Continue'
         & $taskCommand @taskArguments *> $taskLog
         $taskExitCode = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $taskPriorPreference }
-    $taskResults.Add([pscustomobject]@{suite=$taskName;passed=($taskExitCode -eq 0);exitCode=$taskExitCode;
+    } finally { $taskTimer.Stop(); $ErrorActionPreference = $taskPriorPreference }
+    $taskResults.Add([pscustomobject]@{suite=$taskName;passed=($taskExitCode -eq 0);exitCode=$taskExitCode;durationMs=$taskTimer.Elapsed.TotalMilliseconds;
         log=('artifacts/all-tests/' + $taskName + '.log')})
     $taskLabel = if ($taskExitCode -eq 0) { 'PASS' } else { 'FAIL' }
     Write-Host "$taskLabel $taskName"
@@ -40,6 +41,17 @@ try {
         foreach ($taskKind in @('Emitter','Particle','Force','Transform')) {
             Invoke-Test "NodeEffects-$taskKind" 'powershell' @('-NoProfile','-ExecutionPolicy','Bypass',
                 '-File','tests/RunCoreTests.ps1','-NodeEffects','-NodeKind',$taskKind)
+        }
+    }
+    if ($Group -in @('All','Cpp','NativeRegression')) {
+        Invoke-Test 'ParticleOverLife' 'powershell' @('-NoProfile','-ExecutionPolicy','Bypass',
+            '-File','tests/RunCloudNativeSyncTests.ps1','-Run','-OverLife')
+        # These runners default to report-only; -Run is required. AliasHandoff
+        # produces the seven-kind graph consumed by DeletionRenderLifecycle.
+        foreach ($taskRunner in @('MotionNativeBinding','TurbulenceGraph','ModelGraph',
+            'ModelTransport','MaterialNativeBinding','AliasHandoff','DeletionRenderLifecycle','HostCommandRouter')) {
+            Invoke-Test $taskRunner 'powershell' @('-NoProfile','-ExecutionPolicy','Bypass',
+                '-File',('tests/Run' + $taskRunner + 'Tests.ps1'),'-Run')
         }
     }
     if ($Group -in @('All','Scripts')) {

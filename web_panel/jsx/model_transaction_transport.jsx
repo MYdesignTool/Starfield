@@ -3,10 +3,11 @@
 (function(){
     var host=typeof $!=="undefined" && $.global?$.global:this,api=host.__SFLD_modelTransactionAPI;
     if(!api)throw new Error("Load the paired Model gateway before its transaction transport.");
+    var JSON=api.json;
     function currentAPI(build){
         var current=host.__SFLD_modelTransactionAPI;
         if(!current || typeof current.gatewayBuild!=="string" || current.gatewayBuild!==build ||
-            current.recordContractId!=="native-control-contract-1" || typeof current.recordSchema!=="function")
+            current.recordContractId!=="native-control-contract-1" || typeof current.recordSchema!=="function" || typeof current.guardState!=="function")
             throw new Error("Model gateway generation changed (expected "+build+", actual "+
                 (current?String(current.gatewayBuild):"missing")+", record contract="+
                 (current?String(current.recordContractId):"missing")+"). Reload the Starfield panel.");
@@ -23,7 +24,8 @@
     function uuid(value){return typeof value==="string" && /^[0-9a-f]{32}$/.test(value) && !/^0{32}$/.test(value) && value!==OUTPUT;}
     function now(){return (new Date()).getTime();}
     function plain(value){return JSON.parse(JSON.stringify(value));}
-    function failure(session,message,code){session.message=String(message);session.failureCode=code || "model_transaction_failed";session.state="failed";session.assets=[];}
+    function trace(s,stage,detail,failed){try{if(typeof api.trace==="function")api.trace("model."+stage,s.request,detail,failed);}catch(ignored){}}
+    function failure(session,message,code){trace(session,"failed",message,true);session.message=String(message);session.failureCode=code || "model_transaction_failed";session.state="failed";session.assets=[];}
     function session(id){var value=host[KEY];if(!value || value.version!==1 || value.id!==id)return null;
         var time=now(),progress=typeof value.lastProgress==="number"?value.lastProgress:value.expires-5*60*1000;
         if(time>value.expires && value.state!=="complete" && value.state!=="published" && value.state!=="executing" && value.state!=="applying")failure(value,"Model graph transaction expired.");
@@ -36,7 +38,9 @@
         if(s.cancelled || now()>s.expires)throw new Error("Model graph transaction cancelled or expired.");
         currentAPI(s.request.gatewayBuild);
         var resolved=api.resolve(s.request);if(resolved.error)throw new Error(resolved.error.message);
-        if(Number(resolved.properties.guard.value)!==guard)throw new Error("The renderer is busy or its guard changed.");
+        // Same saved, pre-expression stream as ordinary graph transactions.
+        // .value can retain a display sample across native parade mutations.
+        if(api.guardState(s.request).value!==guard)throw new Error("The renderer is busy or its guard changed.");
         if(typeof resolved.target.layer.time==="number" && resolved.target.layer.time!==s.time)throw new Error("The target time changed during Model transfer.");
         if(base){var snapshot=api.snapshot(resolved);
             if(!snapshot.initialized || snapshot.revision<s.request.baseGraphRevision || snapshot.recordStamp!==s.request.baseRecordStamp)
@@ -162,7 +166,10 @@
     host.SFLD_beginModelGraphTransaction=function(text){try{
         var request=parse(text,"beginModelGraphTransaction"),old=host[KEY];
         if(old && old.version===1){old=session(old.id);
-            if(old.state==="executing" || old.state==="applying" || old.state!=="complete" && old.state!=="failed" && now()<=old.expires)
+            // ExtendScript has reported mixed &&/|| precedence differences.
+            // An owned native outcome remains protected regardless of expiry.
+            if(old.state==="executing" || old.state==="applying" || old.state==="published" ||
+                (old.state!=="complete" && old.state!=="failed" && now()<=old.expires))
                 return api.fail("model_transaction_busy","Another Model graph transaction is running (state="+old.state+")."+
                     (old.message?" Last error: "+String(old.message).substr(0,1000):"")+
                     (old.notificationError?" Notification: "+String(old.notificationError).substr(0,1000):""));}
@@ -178,7 +185,7 @@
         target(s,0,true);
         var command=(typeof host.SFLD_nativeCommandId==="function"?host.SFLD_nativeCommandId("Starfield Apply Model Graph Transaction"):app.findMenuCommandId("Starfield Apply Model Graph Transaction"));
         if(!command)return api.fail("model_transaction_unavailable","Model graph edits require the paired Starfield Host build.");
-        host[KEY]=s;return api.reply({ok:true,transactionId:s.id,state:s.state});
+        host[KEY]=s;trace(s,"accepted","id="+s.id+", nodes="+s.request.nodeManifest.length+", assets="+s.assets.length);return api.reply({ok:true,transactionId:s.id,state:s.state});
     }catch(error){return api.fail("invalid_model_transaction",error.toString());}};
     host.SFLD_writeModelGraphAssetPage=function(text){try{
         var pair=matching(text,"writeModelGraphAssetPage"),s=pair.s,r=pair.request;
@@ -197,7 +204,7 @@
         if(s.state!=="uploading")throw new Error("Model graph request is already queued or finished.");target(s,0,true);
         for(var i=0;i<s.assets.length;i++)if(s.assets[i].pages.length!==Math.ceil(s.assets[i].bytes*2/PAGE))throw new Error("Incomplete Model upload.");
         var command=(typeof host.SFLD_nativeCommandId==="function"?host.SFLD_nativeCommandId("Starfield Apply Model Graph Transaction"):app.findMenuCommandId("Starfield Apply Model Graph Transaction"));if(!command)throw new Error("Paired Model Host command is unavailable.");
-        s.state="queued";s.lastProgress=now();app.executeCommand(command);return api.reply({ok:true,transactionId:s.id,state:s.state});
+        s.state="queued";s.lastProgress=now();trace(s,"queued","command="+command);app.executeCommand(command);return api.reply({ok:true,transactionId:s.id,state:s.state});
     }catch(error){if(typeof s!=="undefined" && s && (s.state==="uploading" || s.state==="queued"))failure(s,error.toString());return api.fail("model_transaction_queue_failed",error.toString());}};
     host.SFLD_modelTransactionHostRequest=function(){var s=host[KEY];if(!s || !session(s.id) || s.state!=="queued")return "0";
         try{target(s,0,true);var parts=/^p([0-9]+)-c([0-9]+)-l([0-9]+)$/.exec(s.request.target.token);
@@ -214,24 +221,26 @@
     host.SFLD_modelTransactionHostPage=function(id,index,page){var s=session(id);if(!s || s.state!=="receiving" || !integer(index,0,s.assets.length-1))return "0";
         var a=s.assets[index];return integer(page,0,a.pages.length-1)?a.pages[page]:"0";};
     host.SFLD_modelTransactionHostBegin=function(id){var s=session(id);if(!s || s.state!=="receiving")return "0";
-        try{target(s,0,true);s.state="executing";return "1";}catch(error){failure(s,error.toString());return "0";}};
+        try{target(s,0,true);s.state="executing";trace(s,"executing","id="+s.id);return "1";}catch(error){failure(s,error.toString());return "0";}};
     host.SFLD_modelTransactionHostPrepare=function(id){var s=session(id);if(!s || s.state!=="executing")return "0";
         var step="resolve guarded target";
         try{var resolved=target(s,1,true);s.beforeRevision=Number(resolved.properties.revision.value);s.state="applying";
+            trace(s,"prepare.begin","revision="+s.beforeRevision);
             step="read previous nodes";
             var previous=api.snapshot(resolved).nativeNodes;
             step="ensure node effects";
             api.ensure(resolved.target.layer,s.request.nodeManifest,true,previous,true);
             step="retire previous node effects";
             s.removedNodes=api.removed(previous,s.request.nodeManifest);
+            trace(s,"prepare.retire","count="+s.removedNodes.length+", ids="+s.removedNodes.slice(0,8).join(","));
             api.retire(resolved.target.layer,s.removedNodes);
             step="read prepared nodes";
             var fresh=target(s,1,false),prepared=api.snapshot(fresh);
-            s.preparedNodes=plain(prepared.nativeNodes);s.preparedRenderer=plain(prepared.renderer);return "1";
-        }catch(error){s.message="Model prepare / "+step+": "+error.toString();return "0";}};
+            s.preparedNodes=plain(prepared.nativeNodes);s.preparedRenderer=plain(prepared.renderer);trace(s,"prepare.end","");return "1";
+        }catch(error){s.message="Model prepare / "+step+": "+error.toString();trace(s,"prepare.failed",s.message,true);return "0";}};
     host.SFLD_modelTransactionHostCommit=function(id){var s=session(id);if(!s || s.state!=="applying")return "0";
         var step="read prepared snapshot";
-        try{var resolved=target(s,1,false),before=api.snapshot(resolved);
+        try{var resolved=target(s,1,false),before=api.snapshot(resolved);trace(s,"commit.begin","revision="+before.revision);
             if(before.revision!==s.beforeRevision)throw new Error("Graph revision changed while applying Model assets.");
             step="verify prepared records";
             records(s.preparedNodes,before.nativeNodes,true);renderer(s.preparedRenderer,before.renderer);
@@ -240,6 +249,7 @@
             step="write renderer parameters";
             var fresh=target(s,1,false);api.writeRenderer(fresh,s.request.rendererManifest);
             step="publish native graph";
+            trace(s,"commit.publish","");
             var nonce=api.nonce(fresh.properties.commit,fresh.properties.receipt),receipt=api.trigger(fresh,"Starfield: apply Model graph",s.request.requestId,nonce,false);
             if(!receipt.ok)throw new Error(receipt.error && receipt.error.message || "Native graph commit failed.");
             step="read published snapshot";
@@ -249,10 +259,11 @@
             step="verify published records";
             records(s.request.nodeManifest,updated.nativeNodes,false);renderer(s.request.rendererManifest,updated.renderer);
             step="remove retired node effects";
+            trace(s,"commit.remove","count="+(s.removedNodes || []).length);
             api.remove(fresh.target.layer,s.removedNodes || []);
             s.result={ok:true,committed:true,operation:"submitGraph",target:{token:fresh.token},snapshot:updated,nonce:receipt.nonce};
-            s.state="published";s.assets=[];return "1";
-        }catch(error){s.message="Model commit / "+step+": "+error.toString();return "0";}};
+            s.state="published";s.assets=[];trace(s,"published","nonce="+receipt.nonce);return "1";
+        }catch(error){s.message="Model commit / "+step+": "+error.toString();trace(s,"commit.failed",s.message,true);return "0";}};
     host.SFLD_modelTransactionHostResult=function(id,wire){var s=session(id);if(!s)return "2";
         if(typeof wire!=="string" || wire.length>128 || !/^-?[0-9]+(\|-?[0-9]+){8}$/.test(wire)){
             s.notificationError="Invalid native Model result encoding (kind="+typeof wire+").";return "0";}
@@ -265,6 +276,7 @@
         var committed=numbers[0]===1;
         if(committed && (!s.result || !s.result.committed))return "0";
         s.diagnostics={stage:numbers[1],error:numbers[2],rollbackError:numbers[3],assetRollbackError:numbers[4],cleanupError:numbers[5],undoError:numbers[6],assetError:numbers[7],assetIndex:numbers[8]};
+        trace(s,"result",wire,!committed || numbers[3]!==0 || numbers[4]!==0 || numbers[5]!==0 || numbers[6]!==0);
         if(!committed)s.result={ok:false,committed:false,error:{code:"graph_commit_failed",message:(s.message || "Native Model graph transaction failed.")+" (stage "+numbers[1]+", error "+numbers[2]+", rollback "+numbers[3]+", asset rollback "+numbers[4]+")"}};
         s.result.diagnostics=s.diagnostics;s.nativeOutcome=wire;s.notificationError="";s.state="complete";s.assets=[];return "1";};
     host.SFLD_readModelGraphTransaction=function(text){try{var s=matching(text,"readModelGraphTransaction").s;
@@ -273,6 +285,10 @@
         return api.reply({ok:true,transactionId:s.id,state:s.state,message:s.message || "",notificationError:s.notificationError || ""});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
     host.SFLD_releaseModelGraphTransaction=function(text){try{var s=matching(text,"releaseModelGraphTransaction").s;
-        if(s.state==="executing" || s.state==="applying")s.cancelled=true;else host[KEY]=null;return api.reply({ok:true});
+        if(s.state==="executing" || s.state==="applying")s.cancelled=true;
+        // Publication can still be rolled back if native acknowledgement fails.
+        // Keep this destination until the native executor delivers its outcome.
+        else if(s.state==="published")s.clientReleased=true;
+        else host[KEY]=null;return api.reply({ok:true});
     }catch(error){return api.fail("model_transaction_missing",error.toString());}};
 }());

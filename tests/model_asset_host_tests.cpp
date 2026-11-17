@@ -23,6 +23,7 @@ bool available=true,continue_ack=true,wrong_uuid{},duplicate{},multiple_renderer
     generic_error{},unacknowledged{},bad_payload_size{},sink_overflow{},script_error{},unterminated{},big_result{},wrong_type{};
 bool backup_renderer{},backup_model{};double renderer_guard{},model_guard{};
 std::size_t payload_size=70001;
+std::size_t diagnostic_capacity=1;
 int reject_page=-1;
 unsigned begins{},finishes{};
 struct Memory {std::string text;bool locked{};};
@@ -39,7 +40,7 @@ std::string arguments(const std::string& body,const char* name){const std::strin
 void no_owned(){CHECK(suites==0);CHECK(refs==0);CHECK(values==0);CHECK(handles==0);CHECK(locks==0);}
 void reset(){stop_model_asset_host();no_owned();initialize_ui_exclusion();initialize_model_asset_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|"+uuid+"|1|17";
-    root_id=101;missing_suite.clear();received.clear();failed.clear();payload_size=70001;reject_page=-1;
+    root_id=101;missing_suite.clear();received.clear();failed.clear();payload_size=70001;diagnostic_capacity=1;reject_page=-1;
     available=continue_ack=true;wrong_uuid=duplicate=multiple_renderers=wrong_project=wrong_comp=wrong_layer=false;
     generic_error=unacknowledged=bad_payload_size=sink_overflow=script_error=unterminated=big_result=wrong_type=false;
     backup_renderer=backup_model=false;renderer_guard=model_guard=0;
@@ -67,7 +68,7 @@ void initialize(){
         else CHECK(false);
         if(big_result)reply=std::string(2048,'x');
         if(!unterminated)reply.push_back(0);
-        *out=mem(reply);*error=mem(std::string(1,'\0'));return 0;
+        *out=mem(reply);*error=mem(std::string(diagnostic_capacity,'\0'));return 0;
     };
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle h)->A_Err{auto* m=reinterpret_cast<Memory*>(h);CHECK(!m->locked);delete m;CHECK(handles>0);--handles;return 0;};
     memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle h,AEGP_MemSize* out)->A_Err{*out=static_cast<AEGP_MemSize>(reinterpret_cast<Memory*>(h)->text.size());return 0;};
@@ -126,6 +127,7 @@ int main(){initialize();reset();CHECK(!step_model_asset_host());CHECK(script_cal
     drain();CHECK(generic_calls==1 && begins==1 && finishes==1 && chunk_calls==3);CHECK(received.size()==payload_size*2);
     constexpr char hex[]="0123456789abcdef";for(std::size_t i=0;i<payload_size;++i){CHECK(received[i*2]==hex[(i&255)>>4]);CHECK(received[i*2+1]==hex[i&15]);}
     CHECK(!step_model_asset_host());CHECK(generic_calls==1);
+    reset();diagnostic_capacity=65536;drain();CHECK(generic_calls==1 && begins==1 && finishes==1 && received.size()==payload_size*2);
     reset();root_id=0;request_line=std::string(transfer)+"|0|202|303|"+uuid+"|1|17";
     drain();CHECK(generic_calls==1&&begins==1&&finishes==1);
     reset();root_id=0;wrong_project=true;request_line=std::string(transfer)+"|0|202|303|"+uuid+"|1|17";

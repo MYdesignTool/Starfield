@@ -1,5 +1,8 @@
 #include "NodeEffects.hpp"
 #include "NativeNodeGraph.hpp"
+#include "NativeClearRequest.hpp"
+#include "NativeRetiredAlias.hpp"
+#include "NativeSourceState.hpp"
 #include "NativeTemporalCache.hpp"
 #include "NativeTemporalUI.hpp"
 #include "UiExclusionClient.hpp"
@@ -19,6 +22,11 @@
 #include "starfield/core/ColorGradient.hpp"
 #include "GradientEditorModel.hpp"
 #include "ParticleLayout.hpp"
+#include "ParticleGradientUI.hpp"
+#if defined(STARFIELD_OVERLIFE_TEST)
+#include "../artifacts/generated/EditorPresetCatalog.hpp"
+namespace starfield::adapter { extern int overlife_preset_index; }
+#endif
 #include "TransformBinding.hpp"
 #include "MotionBlur.hpp"
 #include "starfield/core/CpuRenderer.hpp"
@@ -26,6 +34,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -35,6 +44,20 @@
 #include <vector>
 #include <thread>
 #include <functional>
+#include <new>
+
+#if defined(STARFIELD_TEST_NATIVE_ALLOCATIONS)
+namespace {thread_local long long native_fail_allocation_after=-1;thread_local bool native_allocation_failed{};}
+_Use_decl_annotations_ void* operator new(std::size_t size) {
+    if(native_fail_allocation_after>=0 && native_fail_allocation_after--==0){native_allocation_failed=true;throw std::bad_alloc{};}
+    if(auto* p=std::malloc(size?size:1))return p;throw std::bad_alloc{};
+}
+_Use_decl_annotations_ void* operator new[](std::size_t size){return ::operator new(size);}
+void operator delete(void* p)noexcept{std::free(p);}
+void operator delete[](void* p)noexcept{std::free(p);}
+void operator delete(void* p,std::size_t)noexcept{std::free(p);}
+void operator delete[](void* p,std::size_t)noexcept{std::free(p);}
+#endif
 
 int run_camera_capture_tests();
 namespace {
@@ -120,19 +143,36 @@ AEGP_MemorySuite1 memory{};
 PF_ParamUtilsSuite3 param_utils{};
 AEGP_KeyframeSuite5 keyframes{};
 bool temporal_metadata_enabled{}, metadata_rate_keys{}, metadata_life_keys{}, metadata_bezier{}, metadata_life_expression{}, metadata_chance_expression{};unsigned metadata_epoch{};
+unsigned metadata_whole_queries{},metadata_whole_fail_at{};bool metadata_whole_change_at_finish{};
+std::uint64_t metadata_state_queries{};
 std::array<std::u16string, kNativeBindingCapacity> expressions;
 std::array<A_Boolean, kNativeBindingCapacity> expression_enabled{};
 bool lazy_dependencies{};
 std::array<bool,kNativeBindingCapacity> dependencies_evaluated{};
 std::array<unsigned,kNativeBindingCapacity> dependency_generations{};
 A_long nonfinite_alias=-1, unresolved_alias=-1, stale_dependency_alias=-1,stale_retirement_alias=-1;
+int ignore_retired_text=-1,partial_retired_text=-1,enable_retired_text=-1,corrupt_retired_base=-1,ignore_retired_disable=-1;
+int retired_readback_slot=-1,retired_readback_mode{};bool retired_readback_armed{};
+AEGP_MemHandle null_retired_lock{};
 unsigned absent_source_uuid{};
+bool external_force_removed{};
 A_long fail_expression = -1;
 unsigned expression_clear_count{};
 bool disable_next_expression{};
 AEGP_LayerSuite9 layers{};
 AEGP_ItemSuite9 items{};
 PF_InData renderer_data{};
+AEGP_ProjSuite6 source_projects{};
+bool source_probe_environment{},source_probe_supported=true,source_probe_null{},source_probe_wrong_context{},source_probe_state_error{},source_probe_compare_error{};
+bool source_probe_empty_project{};
+bool source_probe_sdk_different{};
+bool source_probe_delay{},source_probe_delay_read{};
+bool source_probe_reorder{};
+std::u16string source_probe_project=u"D:\\test.aep";
+std::array<unsigned,9> source_identity_epochs{};
+unsigned source_probe_calls{},source_probe_nonce{},source_probe_comparisons{};
+std::array<unsigned,9> source_epochs{},source_reads{};
+int source_change_during_read=-1;
 A_Err acquire(const char* name, int32, const void** out) {
     ++suite_requests;
     if (std::strstr(name,"AEGP")) ++aegp_suite_requests;
@@ -144,6 +184,7 @@ A_Err acquire(const char* name, int32, const void** out) {
     else if (!std::strcmp(name, kAEGPLayerSuite)) *out = &layers;
     else if (!std::strcmp(name, kAEGPItemSuite)) *out = &items;
     else if (!std::strcmp(name, kAEGPMemorySuite)) *out = &memory;
+    else if (source_probe_environment && !std::strcmp(name,kAEGPProjSuite)) *out=&source_projects;
     else if (temporal_metadata_enabled && !std::strcmp(name,kPFParamUtilsSuite)) *out=&param_utils;
     else if (temporal_metadata_enabled && !std::strcmp(name,kAEGPKeyframeSuite)) *out=&keyframes;
     else return 1;
@@ -182,6 +223,150 @@ node_sync::NativeEdit edit(std::uint32_t kind, A_long index, double value) {
 PF_Err direct_edit(node_sync::NativeEdit& request) {
     PF_OutData output{}; return commit_native_graph_edit(&request, 701, &output);
 }
+PF_Err source_probe_generic(AEGP_PluginID plugin,AEGP_EffectRefH ref,const A_Time*,PF_Cmd command,void* message) {
+    if(!source_probe_environment || !message || command!=PF_Cmd_COMPLETELY_GENERAL ||
+       *static_cast<const std::uint32_t*>(message)!=0x53535031 || !effect_index(ref)) {
+        ++calls;check(false,"renderer/unknown cross-effect generic calls remain forbidden");return PF_Err_BAD_CALLBACK_PARAM;
+    }
+    ++source_probe_calls;check(plugin==701,"source probe uses registered adapter ID");
+    if(source_probe_delay)std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    auto& request=*static_cast<NativeSourceStateRequest*>(message);
+    if(!source_probe_supported)return PF_Err_NONE;
+    PF_ParamUtilsSuite3 source_utils{};
+    source_utils.PF_GetCurrentState=[](PF_ProgPtr context,PF_ParamIndex index,const A_Time* start,const A_Time* duration,PF_State* state)->PF_Err {
+        check(index==PF_ParamIndex_CHECK_ALL_EXCEPT_LAYER_PARAMS && !start && !duration,"source state covers all numeric author times");
+        if(source_probe_state_error)return PF_Err_BAD_CALLBACK_PARAM;
+        const auto id=effect_index(reinterpret_cast<AEGP_EffectRefH>(context));
+        *state={};std::memcpy(state,&source_epochs[id],sizeof(unsigned));
+        // Opaque tokens can differ bytewise while the SDK considers them equal.
+        const auto noise=source_probe_sdk_different?0:++source_probe_nonce;std::memcpy(reinterpret_cast<char*>(state)+sizeof(unsigned),&noise,sizeof(noise));return PF_Err_NONE;
+    };
+    source_utils.PF_AreStatesIdentical=[](PF_ProgPtr,const PF_State* a,const PF_State* b,A_Boolean* same)->PF_Err {
+        ++source_probe_comparisons;if(source_probe_compare_error)return PF_Err_BAD_CALLBACK_PARAM;
+        unsigned av{},bv{};std::memcpy(&av,a,sizeof(av));std::memcpy(&bv,b,sizeof(bv));*same=!source_probe_sdk_different && av==bv;return PF_Err_NONE;
+    };
+    // The real source handler must verify its own PF context through PFInterface.
+    SPBasicSuite proxy=*renderer_data.pica_basicP;
+    static const PF_ParamUtilsSuite3* active_source_utils{};active_source_utils=&source_utils;
+    proxy.AcquireSuite=[](const char* name,int32 version,const void** out)->SPErr {
+        if(!std::strcmp(name,kPFParamUtilsSuite)){*out=active_source_utils;++acquisitions;return 0;}
+        return acquire(name,version,out);
+    };
+    auto data=renderer_data;data.pica_basicP=&proxy;
+    data.effect_ref=source_probe_wrong_context?renderer_data.effect_ref:reinterpret_cast<PF_ProgPtr>(ref);
+    const auto result=read_native_source_state(source_probe_null?nullptr:&data,request.kind,request);
+    check(result==PF_Err_NONE,"optional source proof failure stays silent");return result;
+}
+void compiler_reuse_tests() {
+    const auto before_handles=handles.size();
+    auto saved=std::make_unique<decltype(fixtures)>();*saved=fixtures;
+    (*saved)[0].values[kGraphParameterId].arbH=reinterpret_cast<AEGP_ArbBlockVal>(clone(reinterpret_cast<PF_Handle>(fixtures[0].values[kGraphParameterId].arbH)));
+    const auto old_expressions=std::make_unique<decltype(expressions)>(expressions);
+    const auto old_enabled=expression_enabled;
+    fixtures[0].values[kGraphRevisionId].one_d=1000;
+    source_probe_environment=true;invalidate_native_compile_reuse();
+    struct ProbeResult {std::uint32_t reused_nodes{},state_queries{};std::uint64_t query_us{},full_read_us{};};
+    const auto run=[](std::uint32_t kind=1,int index=5,double value=21) {
+        EffectUiExclusion owner(true);check(bool(owner),"compiler proof owns actual resident source exclusion");
+        // NativeEdit contains a large delivered curve bank. Keep this matrix's
+        // many temporary results off the already instrumented main stack.
+        auto request=std::unique_ptr<node_sync::NativeEdit>(new node_sync::NativeEdit(edit(kind,index,value)));
+        const auto result=direct_edit(*request);
+        check(request->compile_us>=request->query_us && request->compile_us>=request->full_read_us,
+            "query and full-node read timing are contained within compilation");
+        check(result==0 && request->accepted,"proof optimization preserves successful native edit");return ProbeResult{request->reused_nodes,request->state_queries,request->query_us,request->full_read_us};
+    };
+    auto cold=run();check(cold.reused_nodes==0 && cold.state_queries==4,"cold edit brackets two unchanged authors");
+    source_reads={};auto warm=run();
+    check(warm.reused_nodes==2 && warm.state_queries==2,"warm Particle edit reuses Emitter and Force by SDK state");
+    const auto warm_reads=source_reads;
+    source_probe_delay=source_probe_delay_read=true;const auto observed=run();source_probe_delay=source_probe_delay_read=false;
+    check(observed.query_us>=2000 && observed.full_read_us>=1000,"timers independently capture expensive source queries and full target reads");
+    invalidate_native_compile_reuse();source_reads={};cold=run();
+    check(cold.reused_nodes==0 && source_reads[1]>warm_reads[1] && source_reads[3]>warm_reads[3] && source_reads[2]==warm_reads[2],
+        "reuse removes unrelated parameter reads and retains target reads");
+    std::printf("compiler reuse reads: cold %u/%u/%u/%u, warm %u/%u/%u/%u; queries cold %u warm %u\n",
+        source_reads[0],source_reads[1],source_reads[2],source_reads[3],warm_reads[0],warm_reads[1],warm_reads[2],warm_reads[3],cold.state_queries,warm.state_queries);
+    ++source_epochs[1];fixtures[1].values[3].one_d=177;
+    auto changed=run();check(changed.reused_nodes==1,"external Emitter parameter change forces only that author's raw read");
+    check(std::get<double>(parameter(saved_graph(),core::graph_keys::kEmitterNode,core::graph_keys::kBirthRate))==177,
+        "external source edit reaches the published graph");
+    check(run().reused_nodes==2,"fresh external source proof is retained after publication");
+    ++source_identity_epochs[1];check(run().reused_nodes==1,"fresh stream identity prevents proof reuse on replacement");
+    check(run().reused_nodes==2,"replacement identity is proven by a new complete read");
+    source_probe_reorder=true;check(run().reused_nodes==2,"effect reorder uses UUID/unique stream rather than parade index");
+    source_probe_reorder=false;check(run().reused_nodes==2,"reordered raw records stay paired with source UUID");
+    {
+        EffectUiExclusion owner(true);uuid(3,records::uuid_first_index(records::Kind::force),1);
+        auto duplicate=edit(1,5,21);check(direct_edit(duplicate)!=0 && !duplicate.accepted,"duplicate source identity is still rejected before publication with a warm cache");
+        uuid(3,records::uuid_first_index(records::Kind::force),4);
+    }
+    check(run().reused_nodes==2,"rejected duplicate candidate does not replace accepted proof");
+    check(run(3,1,1080).reused_nodes==1,"switching edit target fully reads the previously edited Particle");
+    check(run(3,1,1080).reused_nodes==2,"repeated Force edit can reuse proven zero-resource Particle");
+    fixtures[2].values[records::particle_layout::texture_front].layer_id=77;
+    check(run(3,1,1080).reused_nodes==1,"new texture layer prevents Particle numeric-only reuse even with identical SDK state");
+    check(run(3,1,1080).reused_nodes==1,"nonzero texture reference remains on complete resource path");
+    fixtures[2].values[records::particle_layout::texture_front].layer_id=0;
+    check(run(3,1,1080).reused_nodes==1,"texture removal cannot reuse a record containing an old resource");
+    check(run(3,1,1080).reused_nodes==2,"zero-resource Particle can reenter reuse only after fresh publication");
+    for(int mode=0;mode<4;++mode) {
+        {EffectUiExclusion owner(true);auto request=edit(3,1,1080);
+        if(mode==0)request.time=1;if(mode==1)request.width=1921;if(mode==2)request.pixel_aspect={2,1};if(mode==3)request.time_scale=25;
+        check(direct_edit(request)==0 && request.accepted && request.reused_nodes==0,"frame/geometry/PAR/scale change falls back without reusing prior raw data");}
+        check(run(3,1,1080).reused_nodes==0,"returning context cannot resurrect historical cache entry");
+    }
+    std::thread invalidator([]{invalidate_native_compile_reuse();});invalidator.join();
+    check(run().reused_nodes==0,"worker lifecycle invalidation is atomic and drops UI proofs");
+    source_change_during_read=1;invalidate_native_compile_reuse();run();
+    check(run().reused_nodes==1,"state mutation during full source read cannot acquire a proof");
+    check(run().reused_nodes==2,"stable second read establishes missing proof");
+    source_probe_sdk_different=true;
+    check(run().reused_nodes==0 && run().reused_nodes==0,"byte-identical PF tokens cannot override SDK different result");
+    source_probe_sdk_different=false;check(run().reused_nodes==0 && run().reused_nodes==2,"SDK stable result must reestablish bracketing proofs after unstable reads");
+    source_probe_project=u"D:\\other.aep";check(run().reused_nodes==0,"new project path cannot use previous project receipts");
+    source_probe_project=u"D:\\test.aep";check(run().reused_nodes==0,"project return cannot resurrect earlier project receipts");
+    check(run().reused_nodes==2,"stable current project can warm again");
+    {
+        const auto module=GetModuleHandleW(L"StarfieldHost.aex");
+        const auto begin=std::bit_cast<std::uint64_t(*)() noexcept>(GetProcAddress(module,"SFLD_BeginGraphMutationV1"));
+        const auto end=std::bit_cast<void(*)(std::uint64_t) noexcept>(GetProcAddress(module,"SFLD_EndGraphMutationV1"));
+        EffectUiExclusion owner;const auto mutation=begin();check(mutation!=0,"physical mutation advances resident epoch");end(mutation);
+    }
+    check(run().reused_nodes==0 && run().reused_nodes==2,"physical mutation invalidates prior raw receipts before warming again");
+    {
+        EffectUiExclusion owner(true);auto rejected=edit(1,5,31);fail_set=kGraphParameterId;
+        check(direct_edit(rejected)!=0 && !rejected.accepted,"failed publication remains failed with reuse enabled");
+    }
+    check(run().reused_nodes==2,"failed candidate does not replace the last accepted proof/bytes");
+    auto historic=clone(reinterpret_cast<PF_Handle>(fixtures[0].values[kGraphParameterId].arbH));
+    run(3,1,1080);
+    dispose(reinterpret_cast<PF_Handle>(fixtures[0].values[kGraphParameterId].arbH));
+    fixtures[0].values[kGraphParameterId].arbH=reinterpret_cast<AEGP_ArbBlockVal>(historic);
+    check(run().reused_nodes==0,"restored historical graph bytes do not match latest accepted publication");
+    for(int failure=0;failure<5;++failure) {
+        invalidate_native_compile_reuse();source_probe_supported=failure!=0;source_probe_null=failure==1;
+        source_probe_wrong_context=failure==2;source_probe_state_error=failure==3;source_probe_compare_error=failure==4;
+        auto fallback=run();check(fallback.reused_nodes==0,"unsupported/null/wrong-PF/error probe retains full compiler");
+        const auto queries=source_probe_calls;check(run().state_queries==0 && source_probe_calls==queries,"unavailable source proof is negatively cached until lifecycle reset");
+        source_probe_supported=true;source_probe_null=source_probe_wrong_context=source_probe_state_error=source_probe_compare_error=false;
+    }
+    invalidate_native_compile_reuse();source_probe_empty_project=true;
+    check(run().state_queries==0 && run().reused_nodes==0,"unsaved project takes original compiler without source probes");source_probe_empty_project=false;
+    invalidate_native_compile_reuse();check(run().reused_nodes==0 && run().reused_nodes==2,"valid context resumes after lifecycle reset");
+    {
+        auto data=renderer_data;data.effect_ref=reinterpret_cast<PF_ProgPtr>(effect_ref(1));
+        NativeSourceStateRequest request;request.plugin=701;request.kind=0;request.identity_stream=-1;
+        EffectUiExclusion owner(true);
+        check(read_native_source_state(&data,0,request)==0 && request.acknowledged && !request.supported,"source stream identity mismatch is silent and unsupported");
+        request={};request.plugin=701;request.kind=1;
+        check(read_native_source_state(&data,0,request)==0 && !request.supported,"source-kind mismatch cannot prove another node");
+    }
+    source_probe_environment=false;invalidate_native_compile_reuse();
+    dispose(reinterpret_cast<PF_Handle>(fixtures[0].values[kGraphParameterId].arbH));fixtures=std::move(*saved);
+    expressions=*old_expressions;expression_enabled=old_enabled;
+    check(source_probe_comparisons>0 && live_refs==0 && acquisitions==0 && handles.size()==before_handles,"proof contexts retain no SDK references or PF handles");
+}
 void save_transform_expressions(const char* path) {
     std::ofstream output(path);output<<"[";bool first=true;unsigned count=0;
     for(std::size_t slot=0;slot<expressions.size();++slot) {
@@ -209,7 +394,7 @@ double evaluated_binding(A_long index, A_long time) {
     if(index==stale_dependency_alias)return kNativeBindingUnavailable;
     if(index==stale_retirement_alias)return kNativeBindingUnavailable;
     const auto& expr = expressions[index-kNativeBindingFirstIndex];
-    if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex]) return fixtures[0].values[index].one_d;
+    if (expr.empty() || !expression_enabled[index-kNativeBindingFirstIndex] || native_retired_alias::owns(expr)) return fixtures[0].values[index].one_d;
     if(expr==u"0")return 0; // A valid authored constant, including handoff reads.
     const auto identity=[&](unsigned value) {
         const auto number=[](unsigned n){const auto s=std::to_string(n);return std::u16string(s.begin(),s.end());};
@@ -282,8 +467,55 @@ void final_retirement_test(const core::Graph& prior,PF_InData& render_data,PF_Ou
     check(sample_native_node_animation(&render_data,old,1920,1080)==PF_Err_BAD_CALLBACK_PARAM,"adversarial old frame retains retired dependency");
     const auto base=renderer.values[kNativeBindingFirstIndex].one_d;
     check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0 && stale_retirement_alias==-1 &&
-        renderer.values[kNativeBindingFirstIndex].one_d==base && expressions[0].empty() && !expression_enabled[0],"final refresh restamps retirement with exact handoff");
+        renderer.values[kNativeBindingFirstIndex].one_d==base && native_retired_alias::owns(expressions[0]) && !expression_enabled[0],"final refresh restamps retirement with exact handoff");
     old=prior;check(sample_native_node_animation(&render_data,old,1920,1080)==0,"old frame reads finite final retirement handoffs");
+}
+void retirement_marker_matrix_tests() {
+    const auto original_text=std::make_unique<decltype(expressions)>(expressions);
+    const auto original_enabled=expression_enabled;
+    const auto original_values=std::make_unique<decltype(fixtures[0].values)>(fixtures[0].values);
+    const A_long slot=kNativeBindingCapacity-1,index=kNativeBindingFirstIndex+slot;
+    auto restore=[&]{expressions=*original_text;expression_enabled=original_enabled;fixtures[0].values=*original_values;
+        ignore_retired_text=partial_retired_text=enable_retired_text=corrupt_retired_base=ignore_retired_disable=-1;
+        retired_readback_slot=-1;retired_readback_mode=0;retired_readback_armed=false;null_retired_lock=nullptr;};
+    auto run=[&]{fixtures[0].values[kGraphSyncGuardId].one_d=1;PF_OutData output{};
+        return refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output);};
+    for(double base:{0.0,7.25})for(auto before:{std::u16string_view{},native_retired_alias::a,native_retired_alias::b}) {
+        restore();expressions[slot]=before;expression_enabled[slot]=FALSE;fixtures[0].values[index].one_d=base;
+        check(run()==0 && expressions[slot]==native_retired_alias::next(before) && !expression_enabled[slot] &&
+            fixtures[0].values[index].one_d==base,"zero/nonzero retirement uses a different checked source-free marker");
+        const auto first=expressions[slot];
+        check(run()==0 && expressions[slot]!=first && native_retired_alias::owns(expressions[slot]) &&
+            fixtures[0].values[index].one_d==base,"repeated final refresh changes text without changing exact handoff");
+    }
+    for(int failure=0;failure<9;++failure) {
+        restore();expressions[slot]=native_retired_alias::a;expression_enabled[slot]=FALSE;fixtures[0].values[index].one_d=0;
+        const auto expected=std::make_unique<decltype(expressions)>(expressions);
+        if(failure==0)ignore_retired_text=slot;
+        if(failure==1)partial_retired_text=slot;
+        if(failure==2)corrupt_retired_base=slot;
+        if(failure==3){enable_retired_text=slot;ignore_retired_disable=slot;}
+        if(failure==4)fail_expression=slot;
+        if(failure>=5){retired_readback_slot=slot;retired_readback_mode=failure-4;retired_readback_armed=false;}
+        check(run()!=0,"silent/partial/base corruption/ignored disabling/reported marker failure rejects");
+        check(expressions==*expected && expression_enabled==original_enabled && fixtures[0].values[index].one_d==0,
+            "failed retirement restores exact earlier text, state and zero base");
+    }
+    restore();enable_retired_text=slot;
+    check(run()==0 && native_retired_alias::owns(expressions[slot]) && !expression_enabled[slot],
+        "host auto-enabling marker is explicitly disabled and checked");
+    restore();expressions[slot]=u"user text";fixtures[0].values[index].one_d=4;
+    check(run()==0 && expressions[slot]==u"user text" && fixtures[0].values[index].one_d==4,
+        "final refresh does not claim foreign nonempty expression text");
+    restore();{
+        NativeBindingTransaction tx(&renderer_data,701,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1));
+        const auto graph=saved_graph();check(tx.install(graph,nullptr,nullptr,nullptr,nullptr,true)==0,"capability fixture installs first");
+        const auto prior=std::make_unique<decltype(expressions)>(expressions);
+        const auto get_size=memory.AEGP_GetMemHandleSize;memory.AEGP_GetMemHandleSize=nullptr;
+        const auto rejected=tx.retire_after_publication();memory.AEGP_GetMemHandleSize=get_size;
+        check(rejected!=0 && expressions==*prior,"lost required readback capability rejects retirement before mutation");
+    }
+    restore();check(live_refs==0 && acquisitions==0,"retirement matrix releases all borrowed suites and streams");
 }
 void saved_output_scope_test(const char* path) {
     // Optional owner fixture stays in ignored artifacts; no project data ships.
@@ -407,6 +639,47 @@ void saved_missing_model_test(const char* path) {
         stream==237 && failure.node==samples.model && failure.parameter==5 && failure.component==0,
         "actual saved active Model reproduces stream237 instead of supplying a numeric fallback");
 }
+void saved_missing_auxiliary_test(const char* path) {
+    std::ifstream input(path,std::ios::binary);const std::vector<char> raw((std::istreambuf_iterator<char>(input)),{});
+    core::OpaqueBytes bytes;for(auto c:raw)bytes.push_back(static_cast<std::byte>(static_cast<unsigned char>(c)));
+    auto decoded=core::deserialize_graph(bytes,core::particle_node_registry());
+    check(decoded.has_value(),"current saved Auxiliary startup graph decodes with CRC");if(!decoded.has_value())return;
+    auto graph=decoded.take_value();core::NodeId absent{};
+    constexpr std::array<std::uint8_t,16> identity{0x7f,0x86,0xfd,0x58,0xba,0x9f,0x49,0x4e,0x80,0x72,0x5f,0x51,0x8b,0xcf,0x16,0xec};absent.value.bytes=identity;
+    struct Samples {std::array<double,kNativeBindingCapacity> values{};std::array<bool,kNativeBindingCapacity> missing{};unsigned missing_reads{};} samples;
+    for(const auto& record:graph.optional_records) {
+        if(record.size()<12 || record[0]!=std::byte{2} || record[1]!=std::byte{0x80})continue;
+        std::size_t at=8;const auto read=[&](unsigned n){std::uint64_t v{};for(unsigned i=0;i<n;++i)v|=std::uint64_t(std::to_integer<unsigned char>(record.at(at++)))<<(8*i);return v;};
+        const auto count=read(4);
+        for(std::uint64_t n=0;n<count;++n){core::NodeId id;for(auto& b:id.value.bytes)b=static_cast<std::uint8_t>(read(1));
+            (void)read(2);const auto fields=read(2);
+            for(std::uint64_t f=0;f<fields;++f){(void)read(2);const auto type=read(2),slot=read(2);(void)read(2);
+                const unsigned components=type==0?1:type==1?2:3;
+                for(unsigned c=0;c<3;++c){const double value=std::bit_cast<double>(read(8));
+                    if(slot!=0xffff && c<components){samples.values.at(slot+c)=value;samples.missing.at(slot+c)=id==absent;}}
+            }
+        }
+        check(at==record.size(),"current saved Auxiliary binding record consumed exactly");
+    }
+    auto data=renderer_data;data.effect_ref=reinterpret_cast<PF_ProgPtr>(&samples);data.num_params=0;
+    data.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+        auto& values=*reinterpret_cast<Samples*>(ref);const auto slot=index-kNativeBindingFirstIndex;
+        *out={};out->param_type=PF_Param_FLOAT_SLIDER;if(values.missing.at(slot))++values.missing_reads;
+        out->u.fs_d.value=values.missing.at(slot)?kNativeBindingUnavailable:values.values.at(slot);return 0;};
+    data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+    A_long stream=-1;NativeBindingFailure failure;
+    check(sample_native_node_animation(&data,graph,1920,1080,&stream,nullptr,nullptr,&failure)==PF_Err_BAD_CALLBACK_PARAM &&
+        stream==208 && failure.node==absent && failure.parameter==1 && failure.component==0,
+        "actual current saved graph reproduces exact startup stream208 rather than inventing values");
+    const auto original_nodes=graph.nodes.size(),original_edges=graph.edges.size();
+    std::erase_if(graph.nodes,[&](const auto& n){return n.id==absent;});
+    std::erase_if(graph.edges,[&](const auto& e){return e.source_node==absent || e.destination_node==absent;});
+    check(graph.nodes.size()+1==original_nodes && graph.edges.size()+2==original_edges && core::validate_graph(graph,core::particle_node_registry()).ok(),
+        "actual inventory reconstruction removes only the missing Auxiliary and two dangling links");
+    samples.missing_reads=0;
+    check(sample_native_node_animation(&data,graph,1920,1080)==0 && !samples.missing_reads,
+        "reconstructed current saved graph samples every surviving source and never reads absent stream208");
+}
 __declspec(noinline) void repair_publication_failure_test(PF_OutData& output) {
     auto& main=fixtures[0];
     const auto baseline_text_storage=std::make_unique<decltype(expressions)>(expressions);const auto& baseline_text=*baseline_text_storage;const auto baseline_enabled=expression_enabled;
@@ -470,6 +743,91 @@ __declspec(noinline) void seven_kind_publication_tests() {
             "seven-kind native graph publishes actual bindings");
         auto prior=saved_graph();check(prior.nodes.size()==8,"all seven author kinds and Output saved");
         final_refresh_test(prior,output);
+        // Owner topology: Motion -> Force -> Output. Delete just Force,
+        // preserving parked Motion and its upstream authors, then sample both
+        // a previously checked-out graph and the newly published graph.
+        connection(2,records::Kind::particle,8,12);
+        fixtures[4].values[records::connection_count_index(records::Kind::transform)].one_d=0;
+        connection(8,records::Kind::motion,4,18);
+        connection(3,records::Kind::force,255,19);
+        main.values[kGraphEditCommitId].one_d=987660;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987660,701,&output)==0,
+            "Motion Force Output baseline publishes");
+        const auto force_prior=saved_graph();
+        // The former fixture inherited Force -> Transform with parked Transform,
+        // so its alleged Motion -> Force -> Output removal was not Output-active.
+        check(std::any_of(force_prior.edges.begin(),force_prior.edges.end(),[](const auto& e){return e.source_node.value.bytes.back()==4 && e.destination_node.value.bytes.back()==255;}),
+            "Force deletion baseline really reaches Output");
+        {
+            auto clear=std::make_unique<NativeClearSnapshot>();
+            clear->revision=static_cast<A_long>(main.values[kGraphRevisionId].one_d);
+            clear->high=static_cast<A_long>(main.values[kGraphChecksumHighId].one_d);clear->low=static_cast<A_long>(main.values[kGraphChecksumLowId].one_d);
+            clear->selected_count=1;clear->selected[0].value.bytes.back()=4;
+            const auto saved_time=renderer_data.current_time;renderer_data.current_time=0;main.values[kGraphSyncGuardId].one_d=0;
+            check(capture_panel_clear(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,*clear)==0 && clear->captured,
+                "Clear captures complete old active finite handoffs while all authors are alive");
+            check(std::count(clear->present.begin(),clear->present.end(),true)>10,"Clear capture includes surviving old aliases, not just Force");
+            main.values[kGraphSyncGuardId].one_d=1;external_force_removed=true;absent_source_uuid=4;
+            fixtures[8].values[records::connection_count_index(records::Kind::motion)].one_d=0;
+            clear->removed_count=1;clear->removed[0]=clear->selected[0];main.values[kGraphEditCommitId].one_d=987670;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987670,701,&output)!=0,
+                "ordinary post-physical-delete publication reproduces unavailable old handoff");
+            const auto first_slot=static_cast<std::size_t>(std::find(clear->present.begin(),clear->present.end(),true)-clear->present.begin());
+            for(unsigned invalid=0;invalid<7;++invalid){auto rejected=std::make_unique<NativeClearSnapshot>(*clear);
+                if(invalid==0)++rejected->revision;
+                if(invalid==1)rejected->owners[first_slot]={};
+                if(invalid==2)rejected->values[first_slot]=kNativeBindingUnavailable;
+                if(invalid==3)rejected->present[first_slot]=false;
+                if(invalid==4)++rejected->time.value;
+                if(invalid==5)rejected->removed[0]={};
+                if(invalid==6)nonfinite_alias=kNativeBindingFirstIndex;
+                check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987670,701,&output,false,rejected.get())!=0,
+                    "Clear rejects stale stamp, wrong slot owner, unavailable value, missing slot, wrong time/UUID or invalid NEW live binding");
+                nonfinite_alias=-1;
+            }
+            external_force_removed=false;fixtures[3].values[records::sync_guard_index(records::Kind::force)].one_d=transaction_removal_guard;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987670,701,&output,false,clear.get())!=0,
+                "Clear proof rejects a physically present guard3 source");
+            fixtures[3].values[records::sync_guard_index(records::Kind::force)].one_d=0;external_force_removed=true;
+            stale_dependency_alias=kNativeBindingFirstIndex;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987670,701,&output,false,clear.get())==0 && stale_dependency_alias==-1,
+                "same-operation capture permits certified Clear publication and rebuilds stale surviving dependencies");
+            check(saved_graph().nodes.size()+1==force_prior.nodes.size(),"Clear publication removes exactly the observed Force");
+            check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0,
+                "physical Clear final refresh validates all new live bindings");
+            external_force_removed=false;absent_source_uuid=0;connection(8,records::Kind::motion,4,18);
+            main.values[kGraphEditCommitId].one_d=987671;
+            check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987671,701,&output)==0,
+                "source restoration rebuilds original topology without reusing the Clear proof");
+            renderer_data.current_time=saved_time;
+        }
+        fixtures[8].values[records::connection_count_index(records::Kind::motion)].one_d=0;
+        fixtures[3].values[records::sync_guard_index(records::Kind::force)].one_d=transaction_removal_guard;
+        main.values[kGraphEditCommitId].one_d=987661;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987661,701,&output)==0,
+            "Force deletion publishes before physical removal");
+        absent_source_uuid=4;
+        auto force_render=renderer_data;force_render.num_params=0;
+        force_render.inter.checkout_param=[](PF_ProgPtr,A_long index,A_long time,A_long,A_u_long,PF_ParamDef* p)->PF_Err {
+            p->param_type=PF_Param_FLOAT_SLIDER;p->u.fs_d.value=evaluated_binding(index,time);return 0;
+        };
+        force_render.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+        auto checked_out=force_prior,after_force=saved_graph();
+        check(sample_native_node_animation(&force_render,checked_out,1920,1080)==0,
+            "deleted Force leaves finite handoffs for in-flight old graph");
+        check(sample_native_node_animation(&force_render,after_force,1920,1080)==0,
+            "disconnected Motion graph needs no deleted Force binding");
+        check(refresh_panel_graph_bindings(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),701,&output)==0,
+            "surviving Motion bindings refresh after Force removal");
+        absent_source_uuid=0;
+        fixtures[3].values[records::sync_guard_index(records::Kind::force)].one_d=0;
+        connection(2,records::Kind::particle,4,12);
+        connection(4,records::Kind::transform,8,14);
+        connection(8,records::Kind::motion,255,18);
+        main.values[kGraphEditCommitId].one_d=987662;
+        check(commit_panel_graph(&renderer_data,effect_ref(0),reinterpret_cast<AEGP_LayerH>(1),987662,701,&output)==0,
+            "Force regression restores independent baseline for remaining tests");
+        prior=saved_graph();
         const auto lifecycle_bytes=core::serialize_graph(prior,core::particle_node_registry());
         check(lifecycle_bytes.has_value(),"seven-kind lifecycle graph serializes");
         std::ofstream lifecycle_file("artifacts/seven-kind-native-graph.bin",std::ios::binary);
@@ -521,8 +879,8 @@ int main(int argc,char** argv) {
     renderer_data.utils = &utils; renderer_data.width = 1920; renderer_data.height = 1080;
     renderer_data.pixel_aspect_ratio = {1, 1}; renderer_data.time_scale = 24;
     renderer_data.num_params = kTotalEffectParameterCount + 1;
-    if(argc>1)saved_output_scope_test(argv[1]);
-    if(argc>2)saved_missing_model_test(argv[2]);
+    if(argc>2 && !std::strcmp(argv[1],"--missing-auxiliary"))saved_missing_auxiliary_test(argv[2]);
+    else {if(argc>1)saved_output_scope_test(argv[1]);if(argc>2)saved_missing_model_test(argv[2]);}
     renderer_data.inter.add_param = add_param;
     fixtures[0].name = "org.starfieldfx.particle"; fixtures[0].params.resize(1);
     PF_OutData setup{}; check(setup_parameters(&renderer_data, &setup) == 0, "renderer setup succeeds");
@@ -595,9 +953,9 @@ int main(int argc,char** argv) {
     pf.AEGP_GetNewEffectForEffect = [](AEGP_PluginID, PF_ProgPtr source, AEGP_EffectRefH* ref)->A_Err {
         *ref = reinterpret_cast<AEGP_EffectRefH>(source); return 0;
     };
-    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = panel_output_only?1:all_kinds_present?9:model_present?7:transform_present?5:4; return 0; };
+    effect.AEGP_GetLayerNumEffects = [](AEGP_LayerH, A_long* count)->A_Err { *count = (panel_output_only?1:all_kinds_present?9:model_present?7:transform_present?5:4)-(external_force_removed?1:0); return 0; };
     effect.AEGP_GetEffectFlags=[](AEGP_EffectRefH,AEGP_EffectFlags* flags)->A_Err{*flags=renderer_flags;return 0;};
-    effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err { *ref = effect_ref(i); return 0; };
+    effect.AEGP_GetLayerEffectByIndex = [](AEGP_PluginID, AEGP_LayerH, A_long i, AEGP_EffectRefH* ref)->A_Err {if(source_probe_reorder && (i==1 || i==3))i=4-i;*ref = effect_ref(external_force_removed && i>=3?i+1:i); return 0; };
     effect.AEGP_GetInstalledKeyFromLayerEffect = [](AEGP_EffectRefH ref, AEGP_InstalledEffectKey* key)->A_Err { *key = static_cast<AEGP_InstalledEffectKey>(effect_index(ref)); return 0; };
     effect.AEGP_GetEffectMatchName = [](AEGP_InstalledEffectKey key, A_char* name)->A_Err { std::strcpy(name, fixtures[key].name); return 0; };
     effect.AEGP_DisposeEffect = [](AEGP_EffectRefH ref)->A_Err {
@@ -612,15 +970,19 @@ int main(int argc,char** argv) {
         check(!std::strcmp(match,"ADBE Effect Parade"),"literal binding opens effect parade");
         ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{0,-2});return 0;};
     dynamic.AEGP_GetNewStreamRefByIndex=[](AEGP_PluginID,AEGP_StreamRefH,A_long index,AEGP_StreamRefH* out)->A_Err {
-        ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{static_cast<std::size_t>(index),-1});return 0;};
+        if(source_probe_reorder && (index==1 || index==3))index=4-index;
+        ++live_refs;*out=reinterpret_cast<AEGP_StreamRefH>(new Ref{static_cast<std::size_t>(external_force_removed && index>=3?index+1:index),-1});return 0;};
     stream.AEGP_GetStreamName=[](AEGP_PluginID,AEGP_StreamRefH ref,A_Boolean,AEGP_MemHandle* out)->A_Err {
         const auto& fixture=fixtures[reinterpret_cast<Ref*>(ref)->effect];std::u16string text=fixture.display_name;
         if(text.empty())for(const auto* name=fixture.name;*name;++name)text+=static_cast<char16_t>(*name);
         *out=reinterpret_cast<AEGP_MemHandle>(new std::u16string(text));return 0;};
-    effect.AEGP_EffectCallGeneric = [](AEGP_PluginID, AEGP_EffectRefH, const A_Time*, PF_Cmd, void*)->A_Err {
-        ++calls; check(false, "cross-effect generic calls are forbidden in native edits");
-        return PF_Err_BAD_CALLBACK_PARAM;
-    };
+    effect.AEGP_EffectCallGeneric = source_probe_generic;
+    source_projects.AEGP_GetProjectByIndex=[](A_long index,AEGP_ProjectH* out)->A_Err {
+        check(index==0,"cache scopes the current project");*out=reinterpret_cast<AEGP_ProjectH>(1);return 0;};
+    source_projects.AEGP_GetProjectPath=[](AEGP_ProjectH,AEGP_MemHandle* out)->A_Err {
+        *out=reinterpret_cast<AEGP_MemHandle>(new std::u16string(source_probe_empty_project?u"":source_probe_project));return 0;};
+    stream.AEGP_GetUniqueStreamID=[](AEGP_StreamRefH ref,A_long* out)->A_Err {
+        const auto& key=*reinterpret_cast<Ref*>(ref);*out=static_cast<A_long>(source_identity_epochs[key.effect]*100000+key.effect*10000+key.index+1);return 0;};
     stream.AEGP_GetNewEffectStreamByIndex = [](AEGP_PluginID, AEGP_EffectRefH ref, A_long index, AEGP_StreamRefH* out)->A_Err {
         ++opened_streams;
         if(effect_index(ref)==4 && index>=15 && index<=26)++synthetic_native_reads;
@@ -645,6 +1007,8 @@ int main(int argc,char** argv) {
     stream.AEGP_GetNewStreamValue = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_LTimeMode, const A_Time* time, A_Boolean pre_expression, AEGP_StreamValue2* out)->A_Err {
         if(stale_motion_ref(ref))return PF_Err_BAD_CALLBACK_PARAM;
         auto& key = *reinterpret_cast<Ref*>(ref);
+        if(source_probe_delay_read && key.effect==2 && key.index==2 && !pre_expression)std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        if(source_probe_environment){++source_reads[key.effect];if(static_cast<int>(key.effect)==source_change_during_read && key.index==3){++source_epochs[key.effect];source_change_during_read=-1;}}
         if (!key.effect && key.index == fail_read) { fail_read = -1; return PF_Err_BAD_CALLBACK_PARAM; }
         if (!key.effect && !pre_expression && key.index == fail_evaluated_read) {
             fail_evaluated_read=-1;return PF_Err_BAD_CALLBACK_PARAM;
@@ -701,12 +1065,24 @@ int main(int argc,char** argv) {
     stream.AEGP_DisposeStream = [](AEGP_StreamRefH ref)->A_Err { --live_refs; delete reinterpret_cast<Ref*>(ref); return 0; };
     stream.AEGP_GetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean* enabled)->A_Err {
         auto* key=reinterpret_cast<Ref*>(ref);
+        if(!key->effect && key->index-kNativeBindingFirstIndex==retired_readback_slot && retired_readback_armed && retired_readback_mode==4) {
+            retired_readback_armed=false;retired_readback_slot=-1;return PF_Err_OUT_OF_MEMORY;
+        }
         *enabled = key->effect ? FALSE : expression_enabled[key->index - kNativeBindingFirstIndex]; return 0;
     };
     stream.AEGP_GetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, AEGP_MemHandle* result)->A_Err {
-        *result = reinterpret_cast<AEGP_MemHandle>(new std::u16string(expressions[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex])); return 0;
+        const auto slot=reinterpret_cast<Ref*>(ref)->index-kNativeBindingFirstIndex;
+        const bool injected=slot==retired_readback_slot && retired_readback_armed && retired_readback_mode!=4;
+        if(injected){retired_readback_armed=false;retired_readback_slot=-1;
+            if(retired_readback_mode==1){*result=nullptr;return PF_Err_OUT_OF_MEMORY;}
+            if(retired_readback_mode==2){*result=reinterpret_cast<AEGP_MemHandle>(new std::u16string(u"x"));return 0;}
+        }
+        *result = reinterpret_cast<AEGP_MemHandle>(new std::u16string(expressions[slot]));
+        if(injected && retired_readback_mode==3)null_retired_lock=*result;
+        return 0;
     };
     memory.AEGP_LockMemHandle = [](AEGP_MemHandle ref, void** result)->A_Err {
+        if(ref==null_retired_lock && ref){null_retired_lock=nullptr;*result=nullptr;return 0;}
         *result = const_cast<char16_t*>(reinterpret_cast<std::u16string*>(ref)->c_str()); return 0;
     };
     memory.AEGP_GetMemHandleSize=[](AEGP_MemHandle ref,AEGP_MemSize* size)->A_Err {
@@ -716,16 +1092,26 @@ int main(int argc,char** argv) {
     stream.AEGP_SetExpression = [](AEGP_PluginID, AEGP_StreamRefH ref, const A_UTF16Char* text)->A_Err {
         auto index = reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex;
         if (index == fail_expression) {fail_expression = -1; return PF_Err_BAD_CALLBACK_PARAM;}
+        const std::u16string_view incoming(reinterpret_cast<const char16_t*>(text));
+        if(native_retired_alias::owns(incoming) && index==ignore_retired_text){ignore_retired_text=-1;return 0;}
         if(!*text)++expression_clear_count;
         const bool text_changed=expressions[index]!=reinterpret_cast<const char16_t*>(text);
         expressions[index] = reinterpret_cast<const char16_t*>(text);
+        if(native_retired_alias::owns(incoming)) {
+            if(index==retired_readback_slot)retired_readback_armed=true;
+            if(index==partial_retired_text){partial_retired_text=-1;return PF_Err_OUT_OF_MEMORY;}
+            if(index==enable_retired_text){enable_retired_text=-1;expression_enabled[index]=TRUE;}
+            if(index==corrupt_retired_base){corrupt_retired_base=-1;fixtures[0].values[kNativeBindingFirstIndex+index].one_d+=1;}
+        }
         if(*text && index+kNativeBindingFirstIndex==stale_dependency_alias)stale_dependency_alias=-1;
         if(text_changed && index+kNativeBindingFirstIndex==stale_retirement_alias)stale_retirement_alias=-1;
         sample_after_alias_mutation(); return 0;
     };
     stream.AEGP_SetExpressionState = [](AEGP_PluginID, AEGP_StreamRefH ref, A_Boolean enabled)->A_Err {
         if(enabled && disable_next_expression) { enabled=FALSE;disable_next_expression=false; }
-        expression_enabled[reinterpret_cast<Ref*>(ref)->index - kNativeBindingFirstIndex] = enabled;
+        const auto index=reinterpret_cast<Ref*>(ref)->index-kNativeBindingFirstIndex;
+        if(!enabled && index==ignore_retired_disable && native_retired_alias::owns(expressions[index])){ignore_retired_disable=-1;return 0;}
+        expression_enabled[index] = enabled;
         sample_after_alias_mutation();return 0;
     };
     check(register_node_graph_sync(&renderer_data) == 0, "node adapter registers its own AEGP ID");
@@ -733,6 +1119,54 @@ int main(int argc,char** argv) {
     check(source_scope_module!=nullptr,"source callback fixture loads the paired resident exclusion");
     const auto source_scope_initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(source_scope_module,"SFLD_TestInitialize"));
     check(source_scope_initialize!=nullptr,"source callback fixture initializes the UI thread explicitly");source_scope_initialize();
+    {
+        // Compile actual native records, then compare every encoded particle with
+        // the render-only startup projection. This catches parameter AND UUID drift.
+        const auto saved_emitter=emitter, saved_particle=particle;
+        const auto saved_cap=main.params[kMaxParticlesId].u.fs_d.value;
+        external_force_removed=true;
+        emitter.values[3].one_d=100;emitter.values[27].one_d=1000;
+        emitter.values[28].one_d=10;emitter.values[29].one_d=100;
+        emitter.values[11].one_d=.05;emitter.values[15].one_d=2;
+        const auto write_uuid=[](Fixture& fixture,A_long first,core::Uuid128 id){
+            for(unsigned i=0;i<8;++i)fixture.values[first+i].one_d=(unsigned(id.bytes[2*i])<<8)|id.bytes[2*i+1];
+        };
+        std::vector<PF_ParamDef*> pointers(main.params.size());
+        for(std::size_t i=0;i<pointers.size();++i)pointers[i]=&main.params[i];
+        for(const A_long height:{720,1080,2160})for(const std::uint32_t cap:{0u,7u,1000000u}){
+            renderer_data.height=height;emitter.values[4].two_d={960,double(height)/2};
+            main.params[kMaxParticlesId].u.fs_d.value=cap;
+            auto initial=initial_node_graph(height,cap);check(initial.has_value(),"startup projection builds");
+            if(!initial.has_value())continue;
+            const auto& a=initial.value();
+            write_uuid(emitter,records::uuid_first_index(records::Kind::emitter),a.nodes[0].id.value);
+            write_uuid(particle,records::uuid_first_index(records::Kind::particle),a.nodes[1].id.value);
+            write_uuid(emitter,records::connection_uuid_index(records::Kind::emitter,0,0),a.nodes[1].id.value);
+            write_uuid(particle,records::connection_uuid_index(records::Kind::particle,0,0),a.nodes[2].id.value);
+            write_uuid(emitter,records::connection_edge_uuid_index(records::Kind::emitter,0,0),a.edges[0].id.value);
+            write_uuid(particle,records::connection_edge_uuid_index(records::Kind::particle,0,0),a.edges[1].id.value);
+            core::Graph published;bool found=false;
+            const auto result=compile_native_node_graph(&renderer_data,pointers.data(),published,found,701);
+            check(result==0 && found && published.nodes.size()==3,"actual compiler produces the initial three-node graph");
+            if(result)continue;
+            for(const auto frame:{0,1,12,24,48,144}){
+                const core::RationalTime time{frame,24};
+                const auto before=core::evaluate_particle_graph(a,time,core::NeverCancelled{},{double(height),1});
+                const auto after=core::evaluate_particle_graph(published,time,core::NeverCancelled{},{double(height),1});
+                check(before.has_value() && after.has_value(),"both startup and native graphs evaluate");
+                if(before.has_value() && after.has_value()){
+                    const auto lhs=core::encode_evaluated_particles(before.value(),time);
+                    const auto rhs=core::encode_evaluated_particles(after.value(),time);
+                    check(lhs.has_value() && rhs.has_value() && lhs.value()==rhs.value(),
+                        "first render and actual native compilation preserve every particle identity/position/appearance byte");
+                }
+            }
+        }
+        emitter=saved_emitter;particle=saved_particle;renderer_data.height=1080;
+        main.params[kMaxParticlesId].u.fs_d.value=saved_cap;external_force_removed=false;
+        check(!initial_node_graph(0,100).has_value(),"invalid startup geometry is rejected");
+        check(!initial_node_graph(1080,core::kMaxParticleCount+1).has_value(),"invalid startup cap is rejected");
+    }
 #if defined(STARFIELD_MODEL_CALLBACK_TEST)
     {
         namespace ml=records::model_layout;
@@ -999,6 +1433,76 @@ int main(int argc,char** argv) {
     }
 #endif
     {
+        // Use the real Emitter visibility implementation and AEGP callbacks.
+        // Hidden controls must remain writable during guarded preset/rollback batches.
+        dynamic_enabled=true;
+        visibility_flags.fill(0);
+        dynamic.AEGP_GetDynamicStreamFlags=[](AEGP_StreamRefH ref,AEGP_DynStreamFlags* flags)->A_Err {
+            const auto& key=*reinterpret_cast<Ref*>(ref);
+            check(key.effect==1 && (key.index==1 || (key.index>=8 && key.index<=14) || (key.index>=20 && key.index<=26)),"Emitter visibility touches only its own source controls");
+            *flags=visibility_flags[key.index];return 0;
+        };
+        dynamic.AEGP_SetDynamicStreamFlag=[](AEGP_StreamRefH ref,AEGP_DynStreamFlags flag,A_Boolean undoable,A_Boolean hidden)->A_Err {
+            check(flag==AEGP_DynStreamFlag_HIDDEN && !undoable,"Emitter visibility changes only non-undoable HIDDEN flags");
+            auto& flags=visibility_flags[reinterpret_cast<Ref*>(ref)->index];
+            flags=hidden?flags|flag:flags&~flag;++visibility_sets;return 0;
+        };
+        const auto original_pf=pf.AEGP_GetNewEffectForEffect;
+        pf.AEGP_GetNewEffectForEffect=[](AEGP_PluginID,PF_ProgPtr,AEGP_EffectRefH* ref)->A_Err{*ref=effect_ref(1);return 0;};
+        std::array<PF_ParamDef,records::parameter_count(records::Kind::emitter)> ui_values{};
+        std::array<PF_ParamDef*,ui_values.size()> ui_params{};
+        for(unsigned i=0;i<ui_values.size();++i) {ui_params[i]=&ui_values[i];ui_values[i].param_type=PF_Param_FLOAT_SLIDER;}
+        constexpr auto guard=records::sync_guard_index(records::Kind::emitter);
+        auto emitter_ui_data=renderer_data;emitter_ui_data.num_params=static_cast<A_long>(ui_params.size());
+        const auto all_hidden=[](bool hidden) {
+            for(A_long i=20;i<=26;++i)if(bool(visibility_flags[i]&AEGP_DynStreamFlag_HIDDEN)!=hidden)return false;
+            return true;
+        };
+        const int before_writes=sets;
+        const auto original_values=ui_values;
+        check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && all_hidden(true),
+            "ordinary Emitter hides chance, parent-life window and all four inheritance controls");
+        check(std::memcmp(ui_values.data(),original_values.data(),sizeof(ui_values))==0,"visibility preserves all authored parameter bytes");
+        const int previous_sets=visibility_sets;
+        check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && visibility_sets==previous_sets,
+            "repeated Emitter UI refresh performs no redundant setter calls");
+        for(A_long timing=1;timing<=4;++timing) {
+            ui_values[2].param_type=PF_Param_POPUP;ui_values[2].u.pd.value=timing;
+            ui_values[34].u.fs_d.value=1;
+            check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && all_hidden(false),
+                "Auxiliary exposes the whole bank independently of Emitting timing");
+            ui_values[34].u.fs_d.value=0;
+            check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && all_hidden(true),
+                "ordinary Emitter stays distinct for every Emitting timing mode");
+        }
+#if defined(STARFIELD_NODE_KIND_EMITTER)
+        PF_UserChangedParamExtra changed{};changed.param_index=guard;
+        PF_OutData ui_output{};
+        ui_values[guard].u.fs_d.value=1;
+        check(sync_node_graph_parameter(&emitter_ui_data,&ui_output,ui_params.data(),&changed)==0 && all_hidden(false) &&
+            (ui_output.out_flags&PF_OutFlag_REFRESH_UI),"actual supervised guard opens hidden controls before preset writes");
+        ui_values[guard].u.fs_d.value=0;
+        check(sync_node_graph_parameter(&emitter_ui_data,&ui_output,ui_params.data(),&changed)==0 && all_hidden(true),
+            "actual supervised guard release restores Emitter visibility without graph publication");
+#endif
+        ui_values[guard].u.fs_d.value=starfield::adapter::transaction_backup_guard;
+        check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && all_hidden(false),
+            "backup rollback guard also exposes the Auxiliary bank");
+        ui_values[guard].u.fs_d.value=0;
+        check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && all_hidden(true),
+            "rollback finally release restores Emitter visibility");
+        auto partial=emitter_ui_data;partial.num_params=0;
+        const auto before_requests=suite_requests;
+        check(update_native_emitter_visibility(&partial,ui_params.data())==0 && suite_requests==before_requests,
+            "partial delivery never indexes Emitter source or guard");
+        dynamic_unavailable=true;
+        check(update_native_emitter_visibility(&emitter_ui_data,ui_params.data())==0 && acquisitions==0,
+            "optional Emitter visibility suite failure releases acquired suites and permits effect loading");
+        check(sets==before_writes && acquisitions==0 && live_refs==0,"Emitter UI visibility writes no values or graph and releases every resource");
+        dynamic_unavailable=false;dynamic_enabled=false;pf.AEGP_GetNewEffectForEffect=original_pf;
+        visibility_flags.fill(0);
+    }
+    {
         namespace layout=records::particle_layout;
         dynamic_enabled=true;
         dynamic.AEGP_GetDynamicStreamFlags=[](AEGP_StreamRefH ref,AEGP_DynStreamFlags* flags)->A_Err {
@@ -1043,6 +1547,132 @@ int main(int argc,char** argv) {
         dynamic_unavailable=false;
     }
     check(graph_carrier_plugin_id() == 0, "renderer registration is absent in native edit fixture");
+#if defined(STARFIELD_OVERLIFE_TEST)
+    {
+        namespace layout=records::particle_layout;using namespace core::graph_keys;
+        PF_InData particle_data=renderer_data;particle_data.effect_ref=reinterpret_cast<PF_ProgPtr>(3);
+        particle_data.num_params=static_cast<A_long>(particle.params.size());
+        std::vector<PF_ParamDef*> pp;for(auto& p:particle.params)pp.push_back(&p);
+        particle.params[layout::size_over_life].u.fs_d.value=particle.params[layout::opacity_over_life].u.fs_d.value=100;
+        for(const auto base:{layout::size_curve,layout::opacity_curve,layout::rotation_curve}) {
+            PF_EventExtra event{};PF_OutData curve_out{};
+            event.contextH=reinterpret_cast<PF_ContextH>(1);event.effect_win.index=base;event.effect_win.area=PF_EA_CONTROL;
+            event.effect_win.current_frame={0,0,310,180};
+            event.e_type=PF_Event_DO_CLICK;event.u.do_click.screen_point.h=228;
+            event.u.do_click.screen_point.v=base==layout::rotation_curve?45:5;
+            check(particle_rotation_curve_event(&particle_data,&curve_out,pp.data(),&event)==0 && event.u.do_click.send_drag,
+                  "real Over Life editor begins a default endpoint gesture");
+            event.e_type=PF_Event_DRAG;event.u.do_click.screen_point.v=65;event.u.do_click.last_time=TRUE;
+            const auto before=main.values[kGraphRevisionId].one_d;
+            check(particle_rotation_curve_event(&particle_data,&curve_out,pp.data(),&event)==0 && main.values[kGraphRevisionId].one_d==before+1,
+                  "real editor and native sync publish one acknowledged revision");
+            auto graph=saved_graph();
+            const auto key=base==layout::size_curve?kSizeOverLifeCurve:base==layout::opacity_curve?kOpacityOverLifeCurve:kRotationOverLife;
+            core::AgeCurve curve{};
+            check(core::decode_age_curve(std::get<core::OpaqueBytes>(parameter(graph,kParticleNode,key)),curve,
+                  base==layout::rotation_curve?-32768:0,base==layout::rotation_curve?32768:100) && curve.count==2 &&
+                  std::abs(curve.points[1].value-(base==layout::rotation_curve?-180:25))<1e-9,
+                  "published graph contains exact complete edited curve before source streams settle");
+            // AE owns saving the source bank after the PF event returns.
+            for(int i=0;i<layout::curve_span;++i)particle.values[base+i].one_d=particle.params[base+i].u.fs_d.value;
+            auto frame_data=renderer_data;frame_data.num_params=0;frame_data.current_time=0;
+            frame_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long time,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+                *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=evaluated_binding(index,time);return 0;};
+            frame_data.inter.checkin_param=[](PF_ProgPtr,PF_ParamDef*)->PF_Err{return 0;};
+            const auto curve_bytes=std::get<core::OpaqueBytes>(parameter(graph,kParticleNode,key));
+            check(sample_native_node_animation(&frame_data,graph,1920,1080)==0 &&
+                  std::get<core::OpaqueBytes>(parameter(graph,kParticleNode,key))==curve_bytes,
+                  "SmartFX-style current-frame sampling retains the exact constant Over Life bank");
+            core::NeverCancelled never;
+            auto scene=core::evaluate_particle_graph(graph,{1,1},never);
+            check(scene.has_value() && !scene.value().particles.empty(),"published Over Life graph evaluates surviving particles");
+            if(scene.has_value())for(const auto& p:scene.value().particles) {
+                const double age=p.age_seconds/p.lifetime_seconds;
+                const auto expected=core::evaluate_age_curve(curve,age,100,100);
+                check(std::abs((base==layout::size_curve?p.size_pixels:base==layout::opacity_curve?p.opacity:p.rotation_degrees.z)-
+                      (base==layout::size_curve?10*expected/100:base==layout::opacity_curve?expected/100:expected))<1e-8,
+                      "edited curve reaches actual particle size, opacity or rotation");
+            }
+        }
+        for(const auto delivered:{0,1,static_cast<int>(particle.params.size())})
+        for(const auto base:{layout::size_curve,layout::opacity_curve,layout::rotation_curve}) {
+            particle_data.num_params=delivered;
+            for(unsigned preset=0;preset<std::size(editor_presets::curves);++preset) {
+                overlife_preset_index=static_cast<int>(preset);
+                PF_EventExtra event{};PF_OutData preset_out{};
+                event.contextH=reinterpret_cast<PF_ContextH>(1);event.effect_win.index=base;event.effect_win.area=PF_EA_CONTROL;
+                event.effect_win.current_frame={0,0,310,180};event.e_type=PF_Event_DO_CLICK;
+                event.u.do_click.screen_point.h=145;event.u.do_click.screen_point.v=100;
+                const auto error=particle_rotation_curve_event(&particle_data,&preset_out,pp.data(),&event);
+                check(error==0,"every production Over Life preset applies through actual UI/native boundary for each delivered count");
+                auto preset_graph=saved_graph();
+                const auto key=base==layout::size_curve?kSizeOverLifeCurve:base==layout::opacity_curve?kOpacityOverLifeCurve:kRotationOverLife;
+                check(std::get<core::OpaqueBytes>(parameter(preset_graph,kParticleNode,key))==core::encode_age_curve(editor_presets::curves[preset].value),
+                      "production preset reaches render graph exactly, including dense Draw and interpolation");
+                check(particle_data.num_params==delivered,"custom editor does not fabricate PF delivered array count");
+                for(int i=0;i<layout::curve_span;++i)particle.values[base+i].one_d=particle.params[base+i].u.fs_d.value;
+            }
+        }
+        overlife_preset_index=-1;particle_data.num_params=static_cast<A_long>(particle.params.size());
+        {
+            auto bank=edit(1,layout::size_curve,particle.params[layout::size_curve].u.fs_d.value);
+            check(node_sync::capture_age_bank(pp.data(),bank) && node_sync::valid_custom_bank(bank),"complete custom bank captures its own identity and typed values");
+            const auto revision=main.values[kGraphRevisionId].one_d;const auto writes=sets;
+            const auto suite_before=suite_requests;
+            for(unsigned variant=0;variant<4;++variant) {
+                auto invalid=bank;
+                if(variant==0)--invalid.additional_count;
+                if(variant==1)invalid.uuid={};
+                if(variant==2)invalid.node_kind=3;
+                if(variant==3)invalid.additional_fields[1].index=layout::opacity_curve;
+                PF_OutData invalid_out{};
+                check(sync_custom_node_graph_bank(&particle_data,&invalid_out,invalid)!=0 && std::strstr(invalid_out.return_msg,"invalid owned bank"),
+                      "truncated, identity-less, foreign-kind and mixed-bank custom requests fail closed");
+            }
+            check(suite_requests==suite_before && sets==writes,"malformed owned banks reject before host reads or writes");
+            auto missing=bank;missing.uuid[7]=333;PF_OutData missing_out{};
+            check(sync_custom_node_graph_bank(&particle_data,&missing_out,missing)!=0 && std::strstr(missing_out.return_msg,"identity changed"),
+                  "owned bank must match a live host source identity");
+            {
+                EffectUiExclusion busy;PF_OutData busy_out{};
+                check(bool(busy) && sync_custom_node_graph_bank(&particle_data,&busy_out,bank)!=0 && std::strstr(busy_out.return_msg,"UI transaction active"),
+                      "custom bank cannot bypass an existing UI transaction");
+            }
+            main.values[kGraphSyncGuardId].one_d=1;PF_OutData guarded_out{};
+            check(sync_custom_node_graph_bank(&particle_data,&guarded_out,bank)!=0 && std::strstr(guarded_out.return_msg,"renderer missing or guarded"),
+                  "custom bank honors authoritative renderer guard");
+            main.values[kGraphSyncGuardId].one_d=0;
+            check(main.values[kGraphRevisionId].one_d==revision && sets==writes,"all rejected owned requests preserve exact graph revision and host values");
+        }
+        // A custom editor must never save PF changes when the graph was not
+        // published. Reproduce the old successful-no-op under the source guard.
+        for(const auto base:{layout::size_curve,layout::opacity_curve,layout::rotation_curve}) {
+            PF_EventExtra event{};PF_OutData curve_out{};
+            event.contextH=reinterpret_cast<PF_ContextH>(1);event.effect_win.index=base;event.effect_win.area=PF_EA_CONTROL;
+            event.effect_win.current_frame={0,0,310,180};event.e_type=PF_Event_DO_CLICK;
+            event.u.do_click.screen_point.h=145;event.u.do_click.screen_point.v=100;overlife_preset_index=0;
+            const auto before=particle.params;const auto revision=main.values[kGraphRevisionId].one_d;
+            particle.params[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=1;
+            particle.values[records::sync_guard_index(records::Kind::particle)].one_d=1;
+            check(particle_rotation_curve_event(&particle_data,&curve_out,pp.data(),&event)!=0 &&
+                  main.values[kGraphRevisionId].one_d==revision,"guarded curve edit is rejected rather than acknowledged without publication");
+            bool restored=true;for(int i=0;i<layout::curve_span;++i)restored&=
+                std::memcmp(&particle.params[base+i],&before[base+i],sizeof(PF_ParamDef))==0;
+            check(restored && std::strstr(curve_out.return_msg,"SF-T203"),"unpublished curve restores full PF bank and reports a concrete error");
+            particle.params[records::sync_guard_index(records::Kind::particle)].u.fs_d.value=0;
+            particle.values[records::sync_guard_index(records::Kind::particle)].one_d=0;
+        }
+        check(acquisitions==0 && live_refs==0,"Over Life pipeline releases SDK suites and references");
+        clear_particle_gradient_ui();
+        dispose(reinterpret_cast<PF_Handle>(main.values[kGraphParameterId].arbH));
+        for(auto& p:main.params)if(p.param_type==PF_Param_ARBITRARY_DATA) {
+            if(handles.contains(p.u.arb_d.value))dispose(p.u.arb_d.value);
+            if(handles.contains(p.u.arb_d.dephault))dispose(p.u.arb_d.dephault);
+        }
+        check(handles.empty(),"Over Life pipeline releases every graph handle");
+        std::printf("Over Life pipeline: %d checks, %d failures\n",checks,failures);return failures?1:0;
+    }
+#endif
 #if defined(STARFIELD_CLOUD_CALLBACK_TEST)
     {
         namespace layout=records::particle_layout;using namespace core::graph_keys;
@@ -1359,6 +1989,8 @@ int main(int argc,char** argv) {
     auto animated_graph = saved_graph();
     check(std::count_if(expressions.begin(), expressions.end(), [](const auto& text) { return !text.empty(); }) == 79,
           "all emitter particle force scalar and vector/color components have bindings");
+    retirement_marker_matrix_tests();
+    compiler_reuse_tests();
     const auto expression_baseline_storage=std::make_unique<decltype(expressions)>(expressions);const auto& expression_baseline=*expression_baseline_storage;
     {
         std::ofstream generated("artifacts/native-animation-expressions.json");
@@ -1407,6 +2039,7 @@ int main(int argc,char** argv) {
             *output=fixtures[0].params.at(index);
             if(index==kGraphParameterId) output->u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(fixtures[0].values[index].arbH);
             if(index==kControlSourceId) output->u.pd.value=static_cast<A_long>(fixtures[0].values[index].one_d);
+            if(index==kGraphRevisionId || index==kNodeEffectsReadyId) output->u.fs_d.value=fixtures[0].values[index].one_d;
             return 0;
         }
         *output = {}; output->param_type=PF_Param_FLOAT_SLIDER;
@@ -1419,6 +2052,140 @@ int main(int argc,char** argv) {
     auto smartfx_graph = animated_graph;
     check(sample_native_node_animation(&renderer_data,smartfx_graph,1920,1080)==0,
           "SmartFX samples registered animation streams without a delivered parameter array");
+    {
+        // A saved UI guard cannot update an already delivered PF snapshot.
+        // Exercise the full render entry, not just the alias sampler, while the
+        // actual resident Host seam owns a structural transaction.
+        auto module=LoadLibraryW(L"artifacts\\model-ui-exclusion-tests\\paired\\StarfieldHost.aex");
+        check(module!=nullptr,"render snapshot fixture loads actual Host exclusion module");
+        if(module) {
+            const auto initialize=std::bit_cast<void(*)() noexcept>(GetProcAddress(module,"SFLD_TestInitialize"));
+            const auto begin=std::bit_cast<std::uint64_t(*)() noexcept>(GetProcAddress(module,"SFLD_BeginUiExclusionV1"));
+            const auto end=std::bit_cast<void(*)(std::uint64_t) noexcept>(GetProcAddress(module,"SFLD_EndUiExclusionV1"));
+            check(initialize && begin && end,"render snapshot fixture resolves Host exclusion exports");
+            if(initialize && begin && end) {
+                initialize();
+                PF_ArbitraryH old_graph{};
+                check(create_graph_parameter(&renderer_data,animated_graph,&old_graph)==0,"old active graph fixture is owned");
+                const auto saved_graph_value=main.values[kGraphParameterId].arbH;
+                main.values[kGraphParameterId].arbH=reinterpret_cast<AEGP_ArbBlockVal>(old_graph);
+                static auto snapshot_checkout=renderer_data.inter.checkout_param;
+                static auto snapshot_checkin=renderer_data.inter.checkin_param;
+                static unsigned outstanding{},alias_reads{};
+                auto snapshot=renderer_data;
+                snapshot.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long time,A_long step,A_u_long scale,PF_ParamDef* out)->PF_Err {
+                    const auto error=snapshot_checkout(ref,index,time,step,scale,out);
+                    if(!error) {
+                        ++outstanding;
+                        if(index==kGraphSyncGuardId) {out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=0;}
+                        if(index>=kNativeBindingFirstIndex && index<kNativeBindingFirstIndex+kNativeBindingCapacity)++alias_reads;
+                    }
+                    return error;
+                };
+                snapshot.inter.checkin_param=[](PF_ProgPtr ref,PF_ParamDef* value)->PF_Err {
+                    check(outstanding>0,"render snapshot checks in only owned parameters");--outstanding;
+                    return snapshot_checkin(ref,value);
+                };
+                remember_native_control_proofs(&snapshot,{});
+                absent_source_uuid=4;
+                std::shared_ptr<const core::Graph> result;PF_OutData diagnostic{};A_long source=-1;
+                check(checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080)==PF_Err_BAD_CALLBACK_PARAM &&
+                    !result && std::strstr(diagnostic.return_msg,"binding unavailable") && alias_reads>0 && outstanding==0,
+                    "idle full render preserves a real missing Force binding failure");
+                const auto saved_guard=main.values[kGraphSyncGuardId].one_d;
+                main.values[kGraphSyncGuardId].one_d=1; // Live saved state; snapshot callback still delivers0.
+                const auto token=begin();check(token && ui_transaction_active(),"structural transaction owns actual resident exclusion");
+                {
+                    PF_Err worker_error{};
+                    std::thread worker([&]{worker_error=checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080);});worker.join();
+                    check(worker_error==PF_Err_BAD_CALLBACK_PARAM && std::strstr(diagnostic.return_msg,"binding unavailable"),
+                        "ordinary UI exclusion alone does not fence worker renders or hide missing bindings");
+                }
+                const auto begin_graph=std::bit_cast<std::uint64_t(*)() noexcept>(GetProcAddress(module,"SFLD_BeginGraphMutationV1"));
+                const auto end_graph=std::bit_cast<void(*)(std::uint64_t) noexcept>(GetProcAddress(module,"SFLD_EndGraphMutationV1"));
+                const auto mutation=begin_graph?begin_graph():0;
+                if(begin_graph)check(mutation && end_graph,"explicit graph mutation is owned by the UI executor");
+                {
+                    PF_Err worker_error{};bool worker_ui=true;
+                    std::thread worker([&]{worker_ui=ui_transaction_active();
+                        worker_error=checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080);});worker.join();
+                    check(!worker_ui && worker_error==PF_Interrupt_CANCEL && !result && source==-1 &&
+                        !diagnostic.return_msg[0] && outstanding==0,
+                        "worker stale guard0 cancels during owned structural mutation without relying on UI thread identity");
+                }
+                if(mutation && end_graph)end_graph(mutation);
+                alias_reads=0;std::strcpy(diagnostic.return_msg,"previous frame failure");
+                check(checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080)==PF_Interrupt_CANCEL &&
+                    !result && source==-1 && !diagnostic.return_msg[0] && alias_reads==0 && outstanding==0,
+                    "stale guard0 full render cancels before aliases inside structural transaction");
+                end(token);check(!ui_transaction_active(),"render cancellation does not retain transaction ownership");
+                alias_reads=0;
+                check(checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080)==PF_Err_BAD_CALLBACK_PARAM &&
+                    !result && std::strstr(diagnostic.return_msg,"binding unavailable") && alias_reads>0 && outstanding==0,
+                    "transaction release cannot hide a persistent missing binding");
+                {
+                    static auto late_checkout=snapshot.inter.checkout_param;
+                    static auto late_checkin=snapshot.inter.checkin_param;
+                    static auto late_begin=begin;
+                    static std::uint64_t late_token{};
+                    static PF_ParamIndex late_index{};
+                    static bool enter_on_checkin{};
+                    snapshot.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long time,A_long step,A_u_long scale,PF_ParamDef* out)->PF_Err {
+                        const auto error=late_checkout(ref,index,time,step,scale,out);
+                        if(!error && !enter_on_checkin && index==late_index && !late_token)late_token=late_begin();
+                        return error;
+                    };
+                    snapshot.inter.checkin_param=[](PF_ProgPtr ref,PF_ParamDef* value)->PF_Err {
+                        const auto error=late_checkin(ref,value);
+                        if(enter_on_checkin && !late_token)late_token=late_begin();
+                        return error;
+                    };
+                    for(bool missing:{true,false})for(bool checkin_entry:{false,true}) {
+                        absent_source_uuid=missing?4:0;enter_on_checkin=checkin_entry;
+                        for(A_long index:{A_long{kGraphParameterId},kNativeBindingFirstIndex}) {
+                            late_index=index;alias_reads=0;source=999;
+                            const auto error=checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080);
+                            check(late_token && ui_transaction_active() && error==PF_Interrupt_CANCEL && !result &&
+                                source==-1 && !diagnostic.return_msg[0] && outstanding==0,
+                                "late checkout/checkin transaction cancels both complete and failed snapshots");
+                            end(late_token);late_token=0;
+                        }
+                    }
+                    snapshot.inter.checkout_param=late_checkout;snapshot.inter.checkin_param=late_checkin;
+                }
+                if(begin_graph && end_graph){
+                    static auto settled_checkout=snapshot.inter.checkout_param;
+                    static auto settled_begin=begin;
+                    static auto settled_end=end;
+                    static auto mutation_begin=begin_graph;
+                    static auto mutation_end=end_graph;
+                    static PF_ParamIndex mutation_index{};
+                    static bool modified{};
+                    snapshot.inter.checkout_param=[](PF_ProgPtr ref,PF_ParamIndex index,A_long time,A_long step,A_u_long scale,PF_ParamDef* out)->PF_Err {
+                        const auto error=settled_checkout(ref,index,time,step,scale,out);
+                        if(!error && !modified && index==mutation_index){
+                            modified=true;const auto owner=settled_begin(),mutation=mutation_begin();
+                            check(owner && mutation,"checkout fixture runs a complete owned structural mutation");
+                            mutation_end(mutation);settled_end(owner);
+                        }return error;
+                    };
+                    for(bool missing:{true,false})for(A_long index:{A_long{kGraphParameterId},kNativeBindingFirstIndex}){
+                        absent_source_uuid=missing?4:0;mutation_index=index;modified=false;
+                        remember_native_control_proofs(&snapshot,{});
+                        const auto error=checkout_render_graph(&snapshot,&diagnostic,result,&source,1920,1080);
+                        check(modified && !ui_transaction_active() && !(graph_mutation_epoch()&1) &&
+                            error==PF_Interrupt_CANCEL && !result && source==-1 && !diagnostic.return_msg[0] && outstanding==0,
+                            "a completed mutation during checkout cancels both valid and failed snapshots");
+                    }
+                    snapshot.inter.checkout_param=settled_checkout;
+                }
+                main.values[kGraphSyncGuardId].one_d=saved_guard;absent_source_uuid=0;
+                main.values[kGraphParameterId].arbH=saved_graph_value;
+                dispose(old_graph);
+            }
+            check(FreeLibrary(module)!=0,"render snapshot fixture releases its Host module");
+        }
+    }
     {
         using namespace core::graph_keys;
         auto orphan=animated_graph;core::NodeId particle_id{},output_id{};
@@ -1620,6 +2387,12 @@ int main(int argc,char** argv) {
     // tokens for the owned aliases. No AEGP suite is queried in render preparation.
     temporal_metadata_enabled=true;
     param_utils.PF_GetCurrentState=[](PF_ProgPtr,PF_ParamIndex index,const A_Time* start,const A_Time* duration,PF_State* state)->PF_Err {
+        ++metadata_state_queries;
+        if(index==PF_ParamIndex_CHECK_ALL) {
+            ++metadata_whole_queries;
+            if(metadata_whole_fail_at && metadata_whole_queries==metadata_whole_fail_at)return PF_Err_BAD_CALLBACK_PARAM;
+            if(metadata_whole_change_at_finish && metadata_whole_queries==2)++metadata_epoch;
+        }
         check(!start && !duration,"native proof covers all time");*state={};std::memcpy(state,&metadata_epoch,sizeof(metadata_epoch));
         unsigned generation{};
         if(index>=kNativeBindingFirstIndex && index<kNativeBindingFirstIndex+kNativeBindingCapacity)
@@ -1664,6 +2437,12 @@ int main(int argc,char** argv) {
         const auto trace=last_native_metadata_trace();
         check(trace.error==0 && trace.inputs==baseline_trace.inputs && trace.evaluated==trace.inputs,
             "idle metadata ignores disconnected absent sources and completes instead of retrying forever");
+        const auto parked_records=parked_force.optional_records.size();PF_OutData parked_output{};
+        check(capture_emitter_origin_history(&renderer_data,&parked_output,parked_force,1920,1080,core::NeverCancelled{})==0 &&
+            last_native_history_trace().path==NativeHistoryPath::static_graph &&
+            last_native_history_trace().checkouts==0 && last_native_history_trace().node_queries==0 &&
+            parked_force.optional_records.size()==parked_records,
+            "PERF-02 parked absent Force does not force history traversal or frozen particle encoding");
         absent_source_uuid=0;
     }
     auto proofs=validated_native_control_proofs(&renderer_data);
@@ -1671,6 +2450,133 @@ int main(int argc,char** argv) {
     NativeAnimationPlan constant_plan(static_graph,1920,1080,1);constant_plan.prepare_constants(&renderer_data);
     check(constant_plan.fully_constant(),"native plan verifies static controls once per frame");
     check(constant_plan.constant_node(particle_id)!=nullptr,"constant particle node is converted once per frame");
+    {
+        const auto previous_checkout=renderer_data.inter.checkout_param;
+        const auto previous_time=renderer_data.current_time;
+        static unsigned value_cache_checkouts{};
+        renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* output)->PF_Err {
+            ++value_cache_checkouts;*output={};output->param_type=PF_Param_FLOAT_SLIDER;
+            output->u.fs_d.value=evaluated_binding(index,0);return 0;
+        };
+        renderer_data.current_time=0;++metadata_epoch;
+        auto reference=static_graph;
+        check(sample_native_node_animation(&renderer_data,reference,1920,1080)==0 && value_cache_checkouts>0,
+            "PERF-06 missing numeric publication retains actual alias checkout");
+        capture_native_temporal_metadata(&renderer_data,static_graph,1);
+        const auto published=validated_native_control_proofs(&renderer_data);
+        check(!published.empty() && std::all_of(published.begin(),published.end(),[](const auto& proof){return proof.constant && proof.constant_value && std::isfinite(*proof.constant_value);}),
+            "PERF-06 UI publishes actual finite alias values only for certified constants");
+        metadata_state_queries=0;
+        check(validated_native_control_proofs(&renderer_data).size()==published.size() && metadata_state_queries==1,
+            "PERF-07 actual UI capture certifies a complete receipt and stable preparation queries it once");
+        value_cache_checkouts=0;
+        for(A_long frame:{0,24,120}) {
+            auto callback=renderer_data;callback.current_time=frame;callback.effect_ref=reinterpret_cast<PF_ProgPtr>(0x667788);
+            auto cached=static_graph;
+            const auto a=core::serialize_graph(reference,core::particle_node_registry());
+            const auto b_error=sample_native_node_animation(&callback,cached,1920,1080);
+            const auto b=core::serialize_graph(cached,core::particle_node_registry());
+            check(b_error==0 && a.has_value() && b.has_value() && a.value()==b.value(),
+                "PERF-06 certified values preserve the complete current-frame graph across time and callback references");
+        }
+        check(value_cache_checkouts==0,"PERF-06 unchanged certified frames perform no numeric alias checkout");
+        NativeAnimationPlan numeric_plan(static_graph,1920,1080,1);numeric_plan.prepare_constants(&renderer_data);
+        check(numeric_plan.fully_constant() && numeric_plan.checkout_count()==0,
+            "PERF-06 history hoists the same owned certified values without duplicate checkout");
+        const auto life=std::find_if(published.begin(),published.end(),[](const auto& proof){return proof.stream==fixture_life_stream;});
+        check(life!=published.end(),"PERF-06 fixture has a certified Life alias");
+        if(life!=published.end()) {
+            const auto life_offset=static_cast<std::size_t>(life-published.begin());
+            for(const auto invalid_value:{std::optional<double>{},std::optional<double>{std::numeric_limits<double>::quiet_NaN()},std::optional<double>{kNativeBindingUnavailable}}) {
+                auto altered=published;altered[life_offset].constant_value=invalid_value;
+                remember_native_control_proofs(&renderer_data,std::move(altered));value_cache_checkouts=0;
+                auto sampled=static_graph;
+                check(sample_native_node_animation(&renderer_data,sampled,1920,1080)==0 && value_cache_checkouts==1,
+                    "PERF-06 absent/nonfinite/unavailable cached number falls back to exactly its real alias");
+            }
+            auto altered=published;altered[life_offset].node.value.bytes[0]^=0x80;
+            remember_native_control_proofs(&renderer_data,std::move(altered));value_cache_checkouts=0;auto sampled=static_graph;
+            check(sample_native_node_animation(&renderer_data,sampled,1920,1080)==0 && value_cache_checkouts==1,
+                "PERF-06 cached number from another UUID cannot fill the same slot");
+        }
+        remember_native_control_proofs(&renderer_data,published);++metadata_epoch;value_cache_checkouts=0;
+        auto invalidated=static_graph;
+        check(sample_native_node_animation(&renderer_data,invalidated,1920,1080)==0 && value_cache_checkouts==published.size(),
+            "PERF-06 dependency change invalidates every old number and restores checkout");
+        for(const auto fail_at:{1u,2u}) {
+            metadata_whole_queries=0;metadata_whole_fail_at=fail_at;++metadata_epoch;
+            capture_native_temporal_metadata(&renderer_data,static_graph,1);
+            metadata_whole_fail_at=0;metadata_state_queries=0;
+            check(validated_native_control_proofs(&renderer_data).size()==published.size() && metadata_state_queries==published.size(),
+                "PERF-07 failed outer before/after query publishes only individually validated proofs");
+        }
+        metadata_whole_queries=0;metadata_whole_change_at_finish=true;++metadata_epoch;
+        capture_native_temporal_metadata(&renderer_data,static_graph,1);metadata_whole_change_at_finish=false;
+        check(validated_native_control_proofs(&renderer_data).empty(),
+            "PERF-07 change after individual certification cannot attach a newer whole receipt to stale values");
+        capture_native_temporal_metadata(&renderer_data,static_graph,1);
+        static decltype(stream.AEGP_GetNewStreamValue) real_alias_read{};
+        static unsigned numeric_read_mode{},life_reads{};
+        real_alias_read=stream.AEGP_GetNewStreamValue;
+        stream.AEGP_GetNewStreamValue=[](AEGP_PluginID id,AEGP_StreamRefH ref,AEGP_LTimeMode mode,const A_Time* time,A_Boolean pre,AEGP_StreamValue2* out)->A_Err {
+            const auto& key=*reinterpret_cast<Ref*>(ref);
+            const bool guarded=!key.effect && !pre && key.index==fixture_life_stream && ++life_reads==2;
+            if(guarded && numeric_read_mode==2)return PF_Err_BAD_CALLBACK_PARAM;
+            const auto result=real_alias_read(id,ref,mode,time,pre,out);
+            if(!result && guarded) {
+                if(numeric_read_mode==1)++metadata_epoch;
+                if(numeric_read_mode==3)out->val.one_d=std::numeric_limits<double>::quiet_NaN();
+                if(numeric_read_mode==4)out->val.one_d=kNativeBindingUnavailable;
+            }
+            return result;
+        };
+        for(unsigned mode:{1u,2u,3u,4u}) {
+            numeric_read_mode=mode;life_reads=0;++metadata_epoch;
+            capture_native_temporal_metadata(&renderer_data,static_graph,1);
+            const auto guarded=validated_native_control_proofs(&renderer_data);
+            check(life_reads==2 && std::none_of(guarded.begin(),guarded.end(),[](const auto& proof){return proof.stream==fixture_life_stream;}),
+                "PERF-06 changed dependency/read failure/NaN/unavailable inside the state pair cannot publish the earlier warm value");
+        }
+        stream.AEGP_GetNewStreamValue=real_alias_read;
+        auto unavailable=static_graph;A_long unavailable_stream=-1;const char* unavailable_stage=nullptr;
+        unresolved_alias=fixture_life_stream;
+        check(sample_native_node_animation(&renderer_data,unavailable,1920,1080,&unavailable_stream,&unavailable_stage)==PF_Err_BAD_CALLBACK_PARAM &&
+            unavailable_stream==fixture_life_stream && unavailable_stage && std::strcmp(unavailable_stage,"binding unavailable")==0,
+            "PERF-06 failed value publication retains the actual missing-binding error instead of serving the previous value");
+        unresolved_alias=-1;
+        renderer_data.inter.checkout_param=previous_checkout;renderer_data.current_time=previous_time;
+        capture_native_temporal_metadata(&renderer_data,static_graph,1);constant_plan.prepare_constants(&renderer_data);
+    }
+#if defined(STARFIELD_TEST_NATIVE_ALLOCATIONS)
+    {
+        const auto old_life=particle.values[2].one_d;const auto frame_checkout=renderer_data.inter.checkout_param;
+        static double aliased_life;aliased_life=old_life;
+        // The older deterministic fixture hard-codes Life=2 at t0. This case
+        // changes both the actual author value and its owned checkout value.
+        renderer_data.inter.checkout_param=[](PF_ProgPtr,PF_ParamIndex index,A_long,A_long,A_u_long,PF_ParamDef* out)->PF_Err {
+            *out={};out->param_type=PF_Param_FLOAT_SLIDER;out->u.fs_d.value=index==fixture_life_stream?aliased_life:evaluated_binding(index,0);return 0;
+        };
+        NativeAnimationPlan reused(static_graph,1920,1080,1);reused.prepare_constants(&renderer_data);
+        check(reused.fully_constant(),"allocation regression starts with a fully hoisted plan");
+        reused.prepare_constants(nullptr);
+        check(!reused.fully_constant() && reused.proofs().empty() && !reused.constant_node(particle_id),
+            "invalid new preparation context clears previous certificates before returning");
+        reused.prepare_constants(&renderer_data);
+        particle.values[2].one_d=old_life+1;aliased_life=old_life+1;++metadata_epoch;
+        native_allocation_failed=false;native_fail_allocation_after=0;
+        reused.prepare_constants(&renderer_data);native_fail_allocation_after=-1;
+        check(native_allocation_failed && !reused.fully_constant() && reused.proofs().empty() && !reused.constant_node(particle_id),
+            "allocation failure before new proof lookup cannot retain an old certificate");
+        core::GraphNode changed;check(reused.sample(&renderer_data,particle_id,changed)==0,
+            "failed optimization retains actual owned-alias historical sampling");
+        const auto life=std::find_if(changed.parameters.begin(),changed.parameters.end(),[](const auto& p){return p.key==core::graph_keys::kParticleLifetimeSeconds;});
+        check(life!=changed.parameters.end() && std::get<double>(life->value)==old_life+1,
+            "changed Life after failed reprepare is read from AE rather than the previous hoisted raw value");
+        particle.values[2].one_d=old_life;renderer_data.inter.checkout_param=frame_checkout;
+        capture_native_temporal_metadata(&renderer_data,static_graph,1);
+        constant_plan.prepare_constants(&renderer_data);
+    }
+#endif
     const auto constant_checkouts=constant_plan.checkout_count();
     for(A_long t:{1,2,2400}) {
         auto sample_data=renderer_data;sample_data.current_time=t;core::GraphNode sample;
@@ -1696,6 +2602,10 @@ int main(int argc,char** argv) {
         "static current-frame graph performs no duplicate hoisting or birth history reads");
     check(aegp_suite_requests==certified_render_suites,"certified render preparation still acquires no AEGP suites");
     auto complex_graph=animated_graph;renderer_data.current_time=48;
+    const auto complex_saved_spin=fixtures[3].values[6].one_d;
+    fixtures[3].values[6].one_d=10;
+    check(sample_native_node_animation(&renderer_data,complex_graph,1920,1080)==0,
+        "constant Spin fixture samples current native values before temporal capture");
     capture_native_temporal_metadata(&renderer_data,complex_graph,1);
     PF_OutData complex_output{};
     check(capture_emitter_origin_history(&renderer_data,&complex_output,complex_graph,1920,1080,core::NeverCancelled{})==0,
@@ -1703,8 +2613,111 @@ int main(int argc,char** argv) {
     const auto complex_trace=last_native_history_trace();
     check(complex_trace.path==NativeHistoryPath::temporal && complex_trace.node_queries>0 &&
         complex_trace.node_samples==0 && complex_trace.constant_node_hits==complex_trace.node_queries &&
-        complex_trace.checkouts==complex_trace.inputs,
-        "distinct births reuse constant Emitter/Particle/Force without node conversions or historical checkouts");
+        complex_trace.checkouts==0 && complex_trace.node_queries<=complex_graph.nodes.size(),
+        "certified temporal processors compile each constant once with no duplicate current/historical checkouts");
+    fixtures[3].values[6].one_d=complex_saved_spin;
+    {
+        const auto saved_force=fixtures[3].values;const auto saved_rate=emitter.values[3].one_d;
+        fixtures[3].values[1].one_d=540;fixtures[3].values[2].one_d=37;fixtures[3].values[10].one_d=.4;
+        for(A_long i:{3,4,5,6})fixtures[3].values[i].one_d=0;
+        emitter.values[3].one_d=100;
+        // These direct fixture assignments represent an authored dependency
+        // change. Real AE changes PF_State; the fake must do so as well.
+        ++metadata_epoch;
+        auto force_fast=animated_graph;
+        check(sample_native_node_animation(&renderer_data,force_fast,1920,1080)==0,"PERF-02 current Force values sampled before proof reuse");
+        check(native_static_history_eligible(force_fast),"PERF-02 constant gravity/random/drag has a closed-form history equivalent");
+        auto branched_force=force_fast;
+        auto extra_force=*std::find_if(branched_force.nodes.begin(),branched_force.nodes.end(),[](const auto& n){return n.type_key==core::graph_keys::kForceNode;});
+        extra_force.id.value.bytes[0]^=0x80;branched_force.nodes.push_back(extra_force);
+        auto branch_edge=branched_force.edges.front();branch_edge.id.value.bytes[0]^=0x80;
+        branch_edge.source_node=particle_id;branch_edge.source_port=core::graph_keys::kParticleParticlesOut;
+        branch_edge.destination_node=extra_force.id;branch_edge.destination_port=core::graph_keys::kForceParticlesIn;branched_force.edges.push_back(branch_edge);
+        branch_edge.id.value.bytes[0]^=0x40;branch_edge.source_node=extra_force.id;branch_edge.source_port=core::graph_keys::kForceParticlesOut;
+        branch_edge.destination_node=output_id;branch_edge.destination_port=core::graph_keys::kOutputParticles;branched_force.edges.push_back(branch_edge);
+        check(!native_static_history_eligible(branched_force),"PERF-02 parallel Force routes keep their existing temporal identity semantics");
+        const auto change_force=[](core::Graph& graph,core::ParameterKey key,core::ParameterValue value) {
+            for(auto& n:graph.nodes)if(n.type_key==core::graph_keys::kForceNode)for(auto& p:n.parameters)if(p.key==key)p.value=value;
+        };
+        for(const auto wind:{core::Vec3{1,0,0},core::Vec3{0,-1,0},core::Vec3{0,0,1}}) {
+            auto changed_force=force_fast;change_force(changed_force,core::graph_keys::kWind,wind);
+            check(!native_static_history_eligible(changed_force),"PERF-02 active Wind on every axis retains temporal integration");
+        }
+        auto spinning=force_fast;change_force(spinning,core::graph_keys::kSpin,1.0);
+        check(!native_static_history_eligible(spinning),"PERF-02 active Spin retains temporal integration");
+        for(const char* type:{core::graph_keys::kTransformNode,core::graph_keys::kMotionNode,core::graph_keys::kTurbulenceNode,
+                             core::graph_keys::kModelNode,core::graph_keys::kMaterialNode}) {
+            auto unsupported=force_fast;
+            for(auto& n:unsupported.nodes)if(n.type_key==core::graph_keys::kForceNode)n.type_key=type;
+            check(!native_static_history_eligible(unsupported),"PERF-02 complex active processor retains historical path");
+        }
+        for(const auto mode:{1u,2u,3u}) {
+            auto timed=force_fast;
+            for(auto& n:timed.nodes)if(n.type_key==core::graph_keys::kEmitterNode)
+                for(auto& p:n.parameters)if(p.key==core::graph_keys::kEmittingMode)p.value=mode;
+            check(!native_static_history_eligible(timed),"PERF-02 nondefault emission retains historical birth semantics");
+        }
+        auto random_life=force_fast;
+        for(auto& n:random_life.nodes)if(n.type_key==core::graph_keys::kParticleNode)
+            for(auto& p:n.parameters)if(p.key==core::graph_keys::kLifeRandom)p.value=10.;
+        check(!native_static_history_eligible(random_life),"PERF-02 random Life retains historical survivor selection");
+        capture_native_temporal_metadata(&renderer_data,force_fast,1);
+        const auto uncaptured=force_fast;
+        const auto force_records=force_fast.optional_records.size();PF_OutData force_output{};
+        check(capture_emitter_origin_history(&renderer_data,&force_output,force_fast,1920,1080,core::NeverCancelled{})==0 &&
+            last_native_history_trace().path==NativeHistoryPath::static_graph &&
+            last_native_history_trace().checkouts==0 && last_native_history_trace().node_queries==0 &&
+            force_fast.optional_records.size()==force_records,
+            "PERF-02 certified constant gravity/random/drag skips history and duplicate parameter reads");
+        const core::RationalTime force_time{renderer_data.current_time,renderer_data.time_scale};
+        const auto fast_particles=core::evaluate_particle_graph(force_fast,force_time,core::NeverCancelled{}, {1080,1});
+        ++metadata_epoch;
+        auto historical=uncaptured;PF_OutData historical_output{};
+        check(capture_emitter_origin_history(&renderer_data,&historical_output,historical,1920,1080,core::NeverCancelled{})==0 &&
+            last_native_history_trace().path==NativeHistoryPath::temporal && last_native_history_trace().checkouts>0,
+            "PERF-02 invalidated proof uses actual historical sampling instead of assuming constancy");
+        const auto historical_particles=core::evaluate_particle_graph(historical,force_time,core::NeverCancelled{}, {1080,1});
+        check(fast_particles.has_value() && historical_particles.has_value(),"PERF-02 both captured routes evaluate successfully");
+        if(fast_particles.has_value() && historical_particles.has_value()) {
+            auto a=fast_particles.value().particles,b=historical_particles.value().particles;
+            const auto order=[](const auto& x,const auto& y){return x.id<y.id;};
+            std::sort(a.begin(),a.end(),order);std::sort(b.begin(),b.end(),order);
+            check(a.size()==b.size() && !a.empty(),"PERF-02 gravity/drag paths preserve survivors");
+            const auto close_value=[](double x,double y){return std::abs(x-y)<1e-10*std::max({1.,std::abs(x),std::abs(y)});};
+            for(std::size_t i=0;i<std::min(a.size(),b.size());++i) {
+                check(a[i].id==b[i].id && a[i].emitter_id==b[i].emitter_id &&
+                    close_value(a[i].position.x,b[i].position.x) && close_value(a[i].position.y,b[i].position.y) && close_value(a[i].position.z,b[i].position.z) &&
+                    close_value(a[i].velocity.x,b[i].velocity.x) && close_value(a[i].velocity.y,b[i].velocity.y) && close_value(a[i].velocity.z,b[i].velocity.z) &&
+                    close_value(a[i].size_pixels,b[i].size_pixels) && close_value(a[i].opacity,b[i].opacity) &&
+                    close_value(a[i].age_seconds,b[i].age_seconds) && close_value(a[i].lifetime_seconds,b[i].lifetime_seconds) &&
+                    close_value(a[i].color.x,b[i].color.x) && close_value(a[i].color.y,b[i].color.y) && close_value(a[i].color.z,b[i].color.z) &&
+                    close_value(a[i].rotation_degrees.x,b[i].rotation_degrees.x) && close_value(a[i].rotation_degrees.y,b[i].rotation_degrees.y) &&
+                    close_value(a[i].rotation_degrees.z,b[i].rotation_degrees.z),
+                    "PERF-02 actual fast/reference captures preserve identity, position, velocity and appearance");
+            }
+        }
+        if(std::getenv("STARFIELD_TEST_PREP_BENCHMARK"))for(unsigned population:{30000u,50000u}) {
+            emitter.values[3].one_d=population/2.;++metadata_epoch;
+            auto prepared=uncaptured;
+            check(sample_native_node_animation(&renderer_data,prepared,1920,1080)==0,"PERF-02 benchmark samples current native inputs");
+            capture_native_temporal_metadata(&renderer_data,prepared,1);
+            for(unsigned repeat=0;repeat<3;++repeat) {
+                auto frame=prepared;PF_OutData frame_output{};
+                const auto benchmark_start=std::chrono::steady_clock::now();
+                check(capture_emitter_origin_history(&renderer_data,&frame_output,frame,1920,1080,core::NeverCancelled{})==0,
+                    "PERF-02 benchmark capture succeeds");
+                const auto trace=last_native_history_trace();
+                const auto evaluated=core::evaluate_particle_graph(frame,force_time,core::NeverCancelled{}, {1080,1});
+                const double capture_and_evaluate_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-benchmark_start).count();
+                check(evaluated.has_value() && evaluated.value().particles.size()==population,"PERF-02 benchmark preserves full population");
+                std::printf("PERF02_PREP,%u,%u,%.6f,%s,%llu,%llu\n",population,repeat,trace.milliseconds,
+                    trace.path==NativeHistoryPath::static_graph?"static":"temporal",
+                    static_cast<unsigned long long>(trace.checkouts),static_cast<unsigned long long>(trace.node_queries));
+                std::printf("PERF02_CAPTURE_EVAL,%u,%u,%.6f\n",population,repeat,capture_and_evaluate_ms);
+            }
+        }
+        fixtures[3].values=saved_force;emitter.values[3].one_d=saved_rate;
+    }
     ++metadata_epoch;check(validated_native_control_proofs(&renderer_data).empty(),"edited alias cannot reuse constant metadata");
     constant_plan.prepare_constants(&renderer_data);
     check(!constant_plan.fully_constant() && !constant_plan.constant_node(particle_id),
@@ -1829,6 +2842,26 @@ int main(int argc,char** argv) {
     const auto warmed=last_native_metadata_trace();
     check(warmed.inputs>0 && warmed.evaluated==warmed.inputs && warmed.proofs>0 && !warmed.error,
         "cold setup evaluates all active aliases before publishing dependency proofs");
+    const auto warmed_suites=aegp_suite_requests;const auto warmed_states=metadata_state_queries;
+    for(unsigned repeat=0;repeat<8;++repeat) {
+        const auto again=idle_bootstrap();
+        check(!again.error && !again.refreshed && again.proofs>0,
+            "first successful post-warm idle capture deduplicates every unchanged follow-up");
+    }
+    refresh_native_temporal_ui(&sequence_data,ui_params.data(),&ui_event,1);
+    check(aegp_suite_requests==warmed_suites,"idle and DRAW share post-warm stamp without repeated alias evaluations");
+    check(metadata_state_queries-warmed_states==9,"unchanged idle/DRAW needs one global state query each, no per-alias sweep");
+    auto another_callback=sequence_data;another_callback.effect_ref=reinterpret_cast<PF_ProgPtr>(0x554433);
+    NativeBootstrapRequest callback_request;refresh_native_temporal_idle(&another_callback,1,callback_request);
+    check(callback_request.proofs>0 && !callback_request.refreshed && aegp_suite_requests==warmed_suites,
+        "equivalent host dependency state deduplicates across nonpersistent callback references");
+    const auto publication=native_control_proof_publication(&sequence_data);
+    check(publication.id && native_control_proof_publication_available(publication.id),"successful capture has a bounded publication identity");
+    remember_native_control_proofs(&sequence_data,{});
+    check(!native_control_proof_publication_available(publication.id),"removed publication cannot keep a warm scheduling stamp valid");
+    const auto recaptured=idle_bootstrap();
+    check(recaptured.refreshed && recaptured.proofs>0 && !recaptured.error,
+        "evicted proof publication rewarms even when authored dependency state is unchanged");
     auto cold_render=sequence_data;cold_render.inter=sequence_inter;
     NativeAnimationPlan cold_plan(static_graph,1920,1080,1);cold_plan.prepare_constants(&cold_render);
     check(cold_plan.fully_constant() && !validated_native_control_proofs(&cold_render).empty(),

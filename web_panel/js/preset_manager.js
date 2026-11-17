@@ -6,11 +6,21 @@
     // Keep the page and the reason visible when a dependency did not load.
     var missing=["StarfieldPresets","StarfieldGraphCodec","StarfieldNativeGraphSnapshot","StarfieldGraphTransactions","StarfieldModelAssets","StarfieldPresetFiles"].filter(function(name){return !window[name];});
     if(missing.length){el.status.className="error";el.status.textContent="Preset interface could not load: "+missing.join(", ")+". Close and reopen Starfield Presets.";return;}
-    var cep=window.__adobe_cep__,gatewayBuild="native-presets-101",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
+    var cep=window.__adobe_cep__,gatewayBuild="native-presets-124",readyToken="org.starfieldfx.panel/1/"+gatewayBuild;
     function literal(value){return JSON.stringify(value).replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");}
     function status(message,error){el.status.textContent=message;el.status.className=error?"error":"";}
     function pending(value){busy=value;el.add.disabled=el.replace.disabled=value || !selected || !targetToken;el.save.disabled=value || !targetToken;el.refresh.disabled=el.import.disabled=value;el.home.disabled=el.all.disabled=el.search.disabled=value;el.up.disabled=value || (!category && !el.search.value.trim());}
     function host(script,callback){if(!cep || !cep.evalScript){callback(null);return;}cep.evalScript(script,callback);}
+    // Embedded in AE: errors must remain serializable before the gateway loads.
+    function gatewayLoadFailure(message, build) {
+        function escaped(value) {
+            return '"' + String(value).replace(/[\\"\x00-\x1f\u2028\u2029\ud800-\udfff]/g, function (character) {
+                return "\\u" + ("0000" + character.charCodeAt(0).toString(16)).slice(-4);
+            }) + '"';
+        }
+        return '{"protocol":"org.starfieldfx.panel","version":1,"gatewayBuild":' + escaped(build) +
+            ',"ok":false,"error":{"code":"gateway_load_failed","message":' + escaped(message) + '}}';
+    }
     function call(operation,fields,callback){
             var root=cep && cep.getSystemPath?cep.getSystemPath("extension"):null;
             if(!root){callback({ok:false,error:{code:"gateway_missing",message:"The extension path is unavailable."}});return;}
@@ -28,7 +38,7 @@
                 (fileOperation?"if(typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/preset_file_transport.jsx")+"));}":"")+
                 (modelOperation?"if(typeof SFLD_modelTransactionReady!=='function' || SFLD_modelTransactionReady()!=="+literal(gatewayBuild)+
                     " || typeof SFLD_"+operation+"!=='function'){$.evalFile(new File("+literal(root.replace(/\\/g,"/")+"/jsx/model_transaction_transport.jsx")+"));}":"")+
-                "return SFLD_"+operation+"("+literal(JSON.stringify(request))+");}catch(e){return JSON.stringify({protocol:'org.starfieldfx.panel',version:1,gatewayBuild:"+literal(gatewayBuild)+",ok:false,error:{code:'gateway_load_failed',message:e.toString()}});}}())";
+                "return SFLD_"+operation+"("+literal(JSON.stringify(request))+");}catch(e){return ("+gatewayLoadFailure.toString()+")(String(e),"+literal(gatewayBuild)+");}}())";
             host(script,function(raw){if(settled)return;settled=true;if(timer)clearTimeout(timer);try{var response=JSON.parse(raw);if(!response || response.protocol!=="org.starfieldfx.panel" || response.version!==1 || response.gatewayBuild!==gatewayBuild)throw new Error("Unsupported host response or gateway generation.");callback(response);}catch(error){callback({ok:false,error:{code:"bad_response",message:"Invalid reply from After Effects: "+error.message}});}});
     }
     var client=window.StarfieldGraphTransactions.create({call:call,codec:codec,edits:{apply:presets.apply},loadModelModules:function(callback){

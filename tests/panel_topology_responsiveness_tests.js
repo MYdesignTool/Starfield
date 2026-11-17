@@ -85,7 +85,8 @@ for(const hidden of [false,true]) {
     const context=vm.createContext({window:{StarfieldGraphView:view,StarfieldGraphCodec:codec},state,nodePositions:{},
         lastFullRefreshAt:0,lastPulseStamp:null,refreshEpoch:0,refreshInFlight:false,startupRetryTimer:null,startupRetryAttempt:0,
         failedGraphInitializations:{},resolvedTarget:false,retainedError:false,latestFrameStatusResponse:null,
-        elements:{banner,targetLine:{},modeLine:{},revisionLine:{},resolutionLine:{}},nodePalette:{refresh(){}},
+        diagnosticEpoch:0,canvasHydrationSerial:0,canvasHydrating:false,canvasEditIntents:[],warningReceipt:"old",nativeNodeIssues:[{edge:"old"}],nodeWarnings:{old:["old"]},hideNodeDiagnosticTooltip(){},
+        elements:{banner,targetLine:{},modeLine:{},revisionLine:{},resolutionLine:{}},nodePalette:{refresh(){}},graphAdditionQueue:null,editQueue:null,requestNodeDiagnostics(){},scheduleNodeDiagnostics(){},
         canvasInteractionActive(){return false;},resetViewForTarget(){},syncTargetLock(){},updateFrameStatus(){},
         applyProjectNodeLayout(){return false;},render(){renders++;},
         showError(c,m){banner.className="error";banner.textContent=c+": "+m;},clearBanner(){banner.className="banner";banner.textContent="";},
@@ -96,6 +97,8 @@ for(const hidden of [false,true]) {
     check(state.nodes.length===0 && state.edges.length===0 && !state.graph && !state.topologyReady,
         "failed fresh bootstrap shows no legacy Force chain");
     check(banner.textContent.includes("node_effect_sync_failed") && renders===1,"original bootstrap error stays visible with empty canvas");
+    check(context.nativeNodeIssues.length===0 && context.warningReceipt===null && context.diagnosticEpoch===1,
+        "target change clears old diagnostics even when the edit queue is unavailable");
     response.controlSource="Node Graph";nextSnapshot={ok:true,snapshot};context.refresh(false,false);
     check(state.topologyReady && state.nodes.length===3 && state.graph && banner.textContent==="","later success adopts canonical graph and clears error");
     const savedGraph=state.graph,savedNodes=state.nodes,savedRenders=renders;

@@ -2,7 +2,7 @@ param([switch]$Run,[switch]$Sanitize)
 $ErrorActionPreference='Stop'
 $taskRepo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $taskDir=if($Sanitize){'artifacts\model-transport-asan-tests'}else{'artifacts\model-transport-tests'}
-if(-not $Run){Write-Host 'Report: build/run Model ABI8 and exact ABI7-prefix fixture with MSVC /MT. Add -Run to act.';exit 0}
+if(-not $Run){Write-Host 'Report: build/run current Model ABI9 and exact ABI8/ABI7-prefix fixtures with MSVC /MT. Add -Run to act.';exit 0}
 $taskVars='C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat'
 $taskSources=@('Time','Render','SequenceCodec','Settings','Geometry','Graph','GraphConstruction','GraphEvaluation','TurbulenceNoise','MotionLightPathClock','MotionLightPathResource','MotionGeometry','MotionPathTravel','EmitterHistory',
     'Random','ParticleSimulation','ParticleTransform','ParticleTexture','PluginApi','CpuRenderer','SpriteScene',

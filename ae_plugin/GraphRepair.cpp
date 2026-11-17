@@ -8,11 +8,24 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <array>
+#include <set>
 #include <utility>
+#include <vector>
 
 namespace starfield::adapter {
 namespace {
 constexpr A_Err bad=PF_Err_BAD_CALLBACK_PARAM;
+bool native_kind(const char* match,native_nodes::Kind& result) {
+    for(auto kind:{native_nodes::Kind::emitter,native_nodes::Kind::particle,native_nodes::Kind::force,native_nodes::Kind::transform,
+        native_nodes::Kind::model,native_nodes::Kind::material,native_nodes::Kind::motion,native_nodes::Kind::turbulence}) {
+        const char* suffix=kind==native_nodes::Kind::emitter?"emitter":kind==native_nodes::Kind::particle?"particle":
+            kind==native_nodes::Kind::force?"force":kind==native_nodes::Kind::transform?"transform":kind==native_nodes::Kind::model?"model":
+            kind==native_nodes::Kind::material?"material":kind==native_nodes::Kind::motion?"motion":"turbulence";
+        if(!std::strncmp(match,"org.starfieldfx.node.",21) && !std::strcmp(match+21,suffix)){result=kind;return true;}
+    }
+    return false;
+}
 template<class T>struct Suite {
     SPBasicSuite* basic;const char* name;A_long version;const T* value{};
     Suite(SPBasicSuite* b,const char* n,A_long v):basic(b),name(n),version(v){basic->AcquireSuite(name,version,reinterpret_cast<const void**>(&value));}
@@ -34,6 +47,63 @@ struct Repair {
         if(!std::isfinite(observed) || (write && observed!=value))return bad;value=observed;return 0;
     }
     A_Err put(A_long index,double value){return scalar(renderer,index,value,true);}
+    // Explicit repair only. Native effects are the authored inventory. A deleted
+    // effect cannot leave a live destination in a surviving source's connection
+    // bank. Snapshot all metadata first, then compact only those dangling links.
+    A_Err reconcile_missing_links(AEGP_LayerH owner) {
+        using Words=std::array<std::uint16_t,8>;
+        struct Source {A_long index{};native_nodes::Kind kind{};Words uuid{};std::vector<std::array<double,16>> edges;};
+        std::vector<Source> sources;std::set<Words> live;
+        Words output{};output.back()=255;live.insert(output);
+        A_long count{};auto error=effects->AEGP_GetLayerNumEffects(owner,&count);
+        if(error || count<1 || count>4224)return error?error:bad;
+        for(A_long i=0;i<count;++i) {
+            AEGP_EffectRefH fx{};error=effects->AEGP_GetLayerEffectByIndex(id,owner,i,&fx);
+            struct Ref {const AEGP_EffectSuite4* s;AEGP_EffectRefH r;~Ref(){if(r)s->AEGP_DisposeEffect(r);}} ref{effects,fx};
+            if(error || !fx)return error?error:bad;
+            AEGP_InstalledEffectKey key{};char match[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+            error=effects->AEGP_GetInstalledKeyFromLayerEffect(fx,&key);if(!error)error=effects->AEGP_GetEffectMatchName(key,match);if(error)return error;
+            if(std::strncmp(match,"org.starfieldfx.node.",21))continue;
+            Source source;source.index=i;if(!native_kind(match,source.kind))return bad;
+            for(A_long word=0;word<8;++word) {
+                double value{};error=scalar(fx,native_nodes::uuid_first_index(source.kind)+word,value);
+                if(error || value<0 || value>65535 || std::floor(value)!=value)return error?error:bad;
+                source.uuid[word]=static_cast<std::uint16_t>(value);
+            }
+            if(source.uuid==Words{} || !live.insert(source.uuid).second)return bad;
+            double length{};error=scalar(fx,native_nodes::connection_count_index(source.kind),length);
+            if(error || length<0 || length>native_nodes::kMaxOutgoingEdges || std::floor(length)!=length)return error?error:bad;
+            for(A_long slot=0;slot<static_cast<A_long>(length);++slot) {
+                std::array<double,16> edge{};
+                for(A_long word=0;word<16;++word) {
+                    error=scalar(fx,native_nodes::connection_first_index(source.kind)+slot*16+word,edge[word]);
+                    if(error || edge[word]<0 || edge[word]>65535 || std::floor(edge[word])!=edge[word])return error?error:bad;
+                }
+                bool target=false,identity=false;for(unsigned word=0;word<8;++word){target|=edge[word]!=0;identity|=edge[word+8]!=0;}
+                if(!target || !identity)return bad;
+                source.edges.push_back(edge);
+            }
+            sources.push_back(std::move(source));
+        }
+        for(const auto& source:sources) {
+            auto kept=source.edges;
+            std::erase_if(kept,[&](const auto& edge){Words target{};for(unsigned i=0;i<8;++i)target[i]=static_cast<std::uint16_t>(edge[i]);return !live.contains(target);});
+            if(kept.size()==source.edges.size())continue;
+            AEGP_EffectRefH fx{};error=effects->AEGP_GetLayerEffectByIndex(id,owner,source.index,&fx);
+            struct Ref {const AEGP_EffectSuite4* s;AEGP_EffectRefH r;~Ref(){if(r)s->AEGP_DisposeEffect(r);}} ref{effects,fx};
+            if(error || !fx)return error?error:bad;
+            // Effect handles are reacquired after the full-layer backup. Guard
+            // supervision while the fixed-size connection record is rewritten.
+            double value=1;error=scalar(fx,native_nodes::sync_guard_index(source.kind),value,true);if(error)return error;
+            for(A_long slot=0;slot<static_cast<A_long>(source.edges.size());++slot)for(A_long word=0;word<16;++word) {
+                value=slot<static_cast<A_long>(kept.size())?kept[slot][word]:0;
+                error=scalar(fx,native_nodes::connection_first_index(source.kind)+slot*16+word,value,true);if(error)return error;
+            }
+            value=double(kept.size());error=scalar(fx,native_nodes::connection_count_index(source.kind),value,true);if(error)return error;
+            value=0;error=scalar(fx,native_nodes::sync_guard_index(source.kind),value,true);if(error)return error;
+        }
+        return 0;
+    }
     A_Err locate(AEGP_LayerH layer,bool idle_authors){
         close();A_long count{};auto error=effects->AEGP_GetLayerNumEffects(layer,&count);
         if(error || count<1 || count>4224)return error?error:bad;
@@ -46,14 +116,7 @@ struct Repair {
             if(!idle_authors)continue;
             // Unknown Starfield node layouts are never repaired by guessing.
             if(std::strncmp(match,"org.starfieldfx.node.",21))continue;
-            A_long guard=-1;
-            for(auto kind:{native_nodes::Kind::emitter,native_nodes::Kind::particle,native_nodes::Kind::force,native_nodes::Kind::transform,
-                native_nodes::Kind::model,native_nodes::Kind::material,native_nodes::Kind::motion,native_nodes::Kind::turbulence}) {
-                const char* suffix=kind==native_nodes::Kind::emitter?"emitter":kind==native_nodes::Kind::particle?"particle":
-                    kind==native_nodes::Kind::force?"force":kind==native_nodes::Kind::transform?"transform":kind==native_nodes::Kind::model?"model":
-                    kind==native_nodes::Kind::material?"material":kind==native_nodes::Kind::motion?"motion":"turbulence";
-                if(!std::strcmp(match+21,suffix))guard=native_nodes::sync_guard_index(kind);
-            }
+            native_nodes::Kind kind{};const A_long guard=native_kind(match,kind)?native_nodes::sync_guard_index(kind):-1;
             double value{};if(guard<0)return bad;error=scalar(fx,guard,value);if(error || value!=0)return error?error:bad;
         }
         return renderer?0:bad;
@@ -79,7 +142,9 @@ PF_Err repair_selected_graph(PF_InData* data,GraphRepairRequest& request,PF_OutD
     if((error=tx.scalar(tx.renderer,kGraphSyncGuardId,guard)) || (error=tx.scalar(tx.renderer,kGraphEditCommitId,nonce)) ||
        (error=tx.scalar(tx.renderer,kGraphEditReceiptId,receipt)) || (error=tx.scalar(tx.renderer,kNodeEffectsReadyId,ready)) ||
        (error=tx.scalar(tx.renderer,kGraphRevisionId,revision)))return report(error);
-    if(guard!=1 || ready!=1 || nonce<1 || nonce>1000000 || std::floor(nonce)!=nonce || receipt!=-nonce)return report(bad);
+    const bool failed=guard==1 && nonce>=1 && receipt==-nonce;
+    const bool idle=guard==0 && receipt==nonce;
+    if((!failed && !idle) || ready!=1 || nonce<0 || nonce>1000000 || std::floor(nonce)!=nonce)return report(bad);
     AEGP_EffectFlags flags{};error=effects.value->AEGP_GetEffectFlags(tx.renderer,&flags);if(error)return report(error);
     tx.close();stage="start undo";error=utility.value->AEGP_StartUndoGroup("Starfield: repair selected graph");if(error)return report(error);
     struct Undo{const AEGP_UtilitySuite6* s;bool open{true};~Undo(){if(open)s->AEGP_EndUndoGroup();}} undo{utility.value};
@@ -95,15 +160,17 @@ PF_Err repair_selected_graph(PF_InData* data,GraphRepairRequest& request,PF_OutD
     if(error)return report(error);
     stage="revalidate original";error=tx.locate(request.layer,true);
     double observed{};
-    for(const auto [index,expected]:{std::pair<A_long,double>{kGraphSyncGuardId,1},{kGraphEditCommitId,nonce},
+    for(const auto [index,expected]:{std::pair<A_long,double>{kGraphSyncGuardId,guard},{kGraphEditCommitId,nonce},
         {kGraphEditReceiptId,receipt},{kNodeEffectsReadyId,1},{kGraphRevisionId,revision}}){
         if(!error)error=tx.scalar(tx.renderer,index,observed);if(!error && observed!=expected)error=bad;
     }
     if(error)return report(error);
+    stage="guard original renderer";error=tx.put(kGraphSyncGuardId,1);if(error)return report(error);
     stage="disable original renderer";
     error=effects.value->AEGP_SetEffectFlags(tx.renderer,AEGP_EffectFlags_ACTIVE,AEGP_EffectFlags_NONE);
     AEGP_EffectFlags disabled{};if(!error)error=effects.value->AEGP_GetEffectFlags(tx.renderer,&disabled);
     if(!error && (disabled&AEGP_EffectFlags_ACTIVE))error=bad;
+    if(!error){stage="remove absent native destinations";error=tx.reconcile_missing_links(request.layer);}
     const auto next=static_cast<A_long>(nonce==1000000?1:nonce+1);
     if(!error){stage="publish derived graph";error=tx.put(kGraphEditCommitId,next);}
     if(!error)error=commit_panel_graph(data,tx.renderer,request.layer,next,request.plugin,output,true);

@@ -45,7 +45,9 @@ EmitterShape emitter_shape_from_index(std::uint32_t index) noexcept {
 }
 
 ValidatedSettings validate_settings(Settings settings) {
-    ValidatedSettings result{settings, {}};
+    // The by-value argument already owns its containers. Transfer them into
+    // the result instead of cloning Force lists a second time per validation.
+    ValidatedSettings result{std::move(settings), {}};
     auto& value = result.value;
     auto& notices = result.notices;
 

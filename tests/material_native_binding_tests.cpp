@@ -70,6 +70,7 @@ void compile_material_model(PF_InData& data){
 }
 int main(){PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lock_handle=lock;utils.host_unlock_handle=unlock;utils.host_dispose_handle=dispose;utils.host_get_handle_size=size_of;
     PF_InData data{};data.utils=&utils;data.inter.add_param=add;
+    data.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo* ui)->PF_Err {CHECK(ui && ui->events==PF_CustomEFlag_EFFECT);return PF_Err_NONE;};
     try{
         PF_OutData out{};CHECK(EffectMain(PF_Cmd_PARAMS_SETUP,&data,&out,nullptr,nullptr,nullptr)==0);
         CHECK(out.num_params==83&&registered.size()==82);print_native_node_catalog("material",registered);
@@ -81,6 +82,13 @@ int main(){PF_UtilCallbacks utils{};utils.host_new_handle=allocate;utils.host_lo
         edit.parameter_index=2;edit.value_kind=adapter::node_sync::ValueKind::scalar;CHECK(!adapter::node_sync::valid_edit(edit));
         core::Graph graph;graph.nodes.push_back({nid(3),kMaterialNode,1,{{kMaterialColorSource,std::uint32_t{0}},{kMaterialColor,core::Vec3{1,1,1}},
             {kMaterialRoughness,.5},{kMaterialMetallic,0.},{kMaterialOpacity,1.},{kMaterialLights,std::uint32_t{1}}}});
+        // Playback templates retain only nodes reachable from Output. Exercise
+        // the real Model -> Material -> Output path rather than a parked node.
+        graph.nodes.push_back({nid(4),kModelNode,1,{}});
+        graph.nodes.push_back({nid(255),kOutputNode,4,{{kParticleCount,std::uint32_t{100}}}});
+        graph.edges.push_back({{nid(1).value},nid(4),kModelGeometryOut,nid(3),kMaterialGeometryIn});
+        graph.edges.push_back({{nid(2).value},nid(3),kMaterialOut,nid(255),kOutputParticles});
+        CHECK(core::validate_graph(graph,core::particle_node_registry()).ok());
         core::OpaqueBytes bytes;append(bytes,0x8002,2);append(bytes,8,2);append(bytes,0,4);append(bytes,1,4);
         for(auto b:nid(3).value.bytes)append(bytes,b,1);append(bytes,6,2);append(bytes,6,2);
         unsigned slot=0;for(unsigned i=1;i<=6;++i){append(bytes,i,2);append(bytes,i==2?3:0,2);append(bytes,slot,2);append(bytes,0,2);

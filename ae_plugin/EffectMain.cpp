@@ -6,17 +6,23 @@
 #include "AE_EffectCB.h"
 #include "AE_Macros.h"
 #include "entry.h"
+#include <cstring>
 
 #include "Diagnostics.hpp"
 #include "GraphCarrier.hpp"
 #include "GraphCommitRequest.hpp"
+#include "NativeClearRequest.hpp"
+#include "UiExclusionClient.hpp"
+#include "GraphRenderJournal.hpp"
 #include "GraphRepairRequest.hpp"
 #include "GraphBindingRefreshRequest.hpp"
+#include "GraphDiagnosticsRequest.hpp"
 #include "NativeGraphCommit.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
 #include "PluginFlags.h"
 #include "PluginVersion.h"
+#include "MfrQualification.hpp"
 #include "SmartRender.hpp"
 #include "GpuRender.hpp"
 #include "NativeTemporalUI.hpp"
@@ -41,7 +47,11 @@ static_assert(STARFIELD_OUT_FLAGS2 == (PF_OutFlag2_REVEALS_ZERO_ALPHA | PF_OutFl
                                        PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG |
                                        PF_OutFlag2_I_MIX_GUID_DEPENDENCIES | PF_OutFlag2_I_USE_3D_CAMERA |
                                        PF_OutFlag2_I_USE_3D_LIGHTS |
-                                       PF_OutFlag2_AUTOMATIC_WIDE_TIME_INPUT | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32),
+                                       PF_OutFlag2_AUTOMATIC_WIDE_TIME_INPUT | PF_OutFlag2_SUPPORTS_GPU_RENDER_F32
+#if defined(STARFIELD_MFR_QUALIFICATION)
+                                       | PF_OutFlag2_SUPPORTS_THREADED_RENDERING
+#endif
+                                       ),
               "PiPL AE_Effect_Global_OutFlags_2 must match the runtime declaration");
 
 namespace {
@@ -139,6 +149,23 @@ PF_Err dispatch(PF_Cmd cmd,
             // Options explicitly reloads the selected core and reports diagnostics.
             return starfield::adapter::report_diagnostics(in_data, out_data);
         case PF_Cmd_COMPLETELY_GENERAL:
+            if(extra && *static_cast<const std::uint32_t*>(extra)==0x53464431) {
+                auto& request=*static_cast<starfield::adapter::GraphDiagnosticsRequest*>(extra);
+                if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_NONE;
+                request.acknowledged=1;request.status=starfield::adapter::read_graph_diagnostics(in_data,request);
+                return PF_Err_NONE; // A stale/unsupported background read must not raise an AE dialog.
+            }
+            if(extra && (*static_cast<const std::uint32_t*>(extra)==0x53464331 || *static_cast<const std::uint32_t*>(extra)==0x53464332)) {
+                auto& request=*static_cast<starfield::adapter::NativeClearRequest*>(extra);
+                if(request.bytes!=sizeof(request) || request.version!=1 || !request.snapshot || !starfield::adapter::ui_transaction_active())return PF_Err_BAD_CALLBACK_PARAM;
+                if(request.magic==0x53464332 && (!(request.snapshot->epoch&1) ||
+                    request.snapshot->epoch!=starfield::adapter::graph_mutation_epoch()))return PF_Err_BAD_CALLBACK_PARAM;
+                request.acknowledged=1;
+                request.status=request.magic==0x53464331?
+                    starfield::adapter::capture_panel_clear(in_data,request.renderer,request.layer,request.plugin,*request.snapshot):
+                    starfield::adapter::commit_panel_graph(in_data,request.renderer,request.layer,request.nonce,request.plugin,out_data,false,request.snapshot);
+                return request.status;
+            }
             if(extra && *static_cast<const std::uint32_t*>(extra)==0x53465232) {
                 auto& request=*static_cast<starfield::adapter::GraphRepairRequest*>(extra);
                 if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;
@@ -155,8 +182,12 @@ PF_Err dispatch(PF_Cmd cmd,
                 auto& request=*static_cast<starfield::adapter::GraphCommitRequest*>(extra);
                 if(request.bytes!=sizeof(request) || request.version!=1)return PF_Err_BAD_CALLBACK_PARAM;
                 request.acknowledged=1;
-                return request.status=starfield::adapter::commit_panel_graph(in_data,request.renderer,
+                request.status=starfield::adapter::commit_panel_graph(in_data,request.renderer,
                     request.layer,request.nonce,request.plugin,out_data);
+                if(request.status)starfield::adapter::journal_graph_command(request.nonce,request.status,
+                    out_data && std::strncmp(out_data->return_msg,"Starfield graph command failed:",sizeof("Starfield graph command failed:")-1)==0?
+                        out_data->return_msg:"Graph command rejected without a current stage diagnostic.");
+                return request.status;
             }
             if(extra)starfield::adapter::refresh_native_temporal_idle(in_data,
                 starfield::adapter::graph_carrier_plugin_id(),
@@ -182,6 +213,7 @@ extern "C" DllExport PF_Err EffectMain(PF_Cmd cmd,
                             PF_ParamDef* params[],
                             PF_LayerDef* output,
                             void* extra) {
+    starfield::adapter::MfrQualificationScope qualification(in_data,cmd,"main");
     try {
         return dispatch(cmd, in_data, out_data, params, output, extra);
     } catch (PF_Err error) {

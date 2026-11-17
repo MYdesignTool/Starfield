@@ -10,7 +10,9 @@ struct Choice { const char16_t* label; std::uint32_t native; bool enabled; };
 inline constexpr std::array<Choice,6> choices{{
     {u"Circle",1,true},{u"Rectangle",2,true},{u"Cloud",3,true},
     {u"Texture",4,true},{u"Face",5,false},{u"Model",6,true}}};
-inline constexpr const char* popup_names="Circle|Rectangle|Cloud|Texture|Face|Model";
+// AE documents "(-" as an unselectable separator. Reserve unsupported Face5
+// without an inert menu item or renumbering existing Model6 (ADR0038/P-09).
+inline constexpr const char* popup_names="Circle|Rectangle|Cloud|Texture|(-|Model";
 inline bool native_to_core(double native,std::uint32_t& core) noexcept {
     if(!std::isfinite(native) || std::floor(native)!=native)return false;
     if(native>=1 && native<=4){core=static_cast<std::uint32_t>(native)-1;return true;}

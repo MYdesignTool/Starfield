@@ -45,6 +45,6 @@ for(const [key,value,type] of [["1",3,3],["13",3,3],["5",101,4],["4",1e8,4],["14
     const bad=codec.fromHex(codec.toHex(g));bad.nodes[2].parameters.find(p=>p.key===key).value=value;
     checks++;assert.throws(()=>edits.nativeRecordSchema(bad.nodes[2]),e=>e.code==="invalid_native_node_record");}
 eq(codec.toHex(codec.fromHex(codec.toHex(g))),codec.toHex(g));
-g=edits.apply(g,{type:"deleteNodes",nodeIds:[motion.id]},next);eq(g.edges.length,1);
+g=edits.apply(g,{type:"deleteNodes",nodeIds:[motion.id]},next);eq(g.edges.length,2);
 eq((fs.readFileSync(path.resolve(root,"index.html"),"utf8").match(/data-node-type="motion"/g)||[]).length,2);
 console.log(`Motion panel: ${checks} checks passed; Circle/Light Path/Look At modes, UTF-8 prefix, ports, units, origins, curve persistence and removal`);

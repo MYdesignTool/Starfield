@@ -2,6 +2,9 @@
 #include "UiExclusionHost.hpp"
 extern "C" __declspec(dllexport) void SFLD_TestInitialize() noexcept {starfield::adapter::initialize_ui_exclusion();}
 extern "C" __declspec(dllexport) void SFLD_TestStop() noexcept {starfield::adapter::stop_ui_exclusion();}
+extern "C" __declspec(dllexport) bool SFLD_TestTakeSourceEdit(starfield::adapter::SourceEditTelemetry* value) noexcept {
+    return value && starfield::adapter::take_source_edit(*value);
+}
 #else
 extern "C" __declspec(dllexport) void SFLD_TestMismatchedHost() noexcept {}
 #endif

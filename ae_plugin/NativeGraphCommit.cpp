@@ -1,4 +1,6 @@
 #include "NativeGraphCommit.hpp"
+#include "NativeClearRequest.hpp"
+#include "GraphDiagnosticsRequest.hpp"
 #include "NativeNodeGraph.hpp"
 #include "GraphParameter.hpp"
 #include "Parameters.hpp"
@@ -19,6 +21,31 @@
 #include <vector>
 
 namespace starfield::adapter {
+PF_Err read_graph_diagnostics(PF_InData* data,GraphDiagnosticsRequest& request) noexcept try {
+    if(!data || !data->utils || !data->pica_basicP || !request.renderer || !request.plugin || request.revision<1 ||
+        !ui_transaction_active())return PF_Err_BAD_CALLBACK_PARAM;
+    const AEGP_StreamSuite6* streams{};
+    auto e=data->pica_basicP->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
+    if(e || !streams)return static_cast<PF_Err>(e?e:PF_Err_BAD_CALLBACK_PARAM);
+    struct Suite{SPBasicSuite* b;~Suite(){b->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} suite{data->pica_basicP};
+    const A_Time time{0,1};core::Graph graph;
+    for(const auto index:std::array<A_long,5>{kGraphSyncGuardId,kGraphRevisionId,kGraphChecksumHighId,kGraphChecksumLowId,kGraphParameterId}) {
+        AEGP_StreamRefH ref{};e=streams->AEGP_GetNewEffectStreamByIndex(request.plugin,request.renderer,index,&ref);
+        struct Ref{const AEGP_StreamSuite6* s;AEGP_StreamRefH r;~Ref(){if(r)s->AEGP_DisposeStream(r);}} owned{streams,ref};
+        AEGP_StreamType type{};if(!e && ref)e=streams->AEGP_GetStreamType(ref,&type);
+        if(e || !ref || type!=(index==kGraphParameterId?AEGP_StreamType_ARB:AEGP_StreamType_OneD))return static_cast<PF_Err>(e?e:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_StreamValue2 value{};e=streams->AEGP_GetNewStreamValue(request.plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);if(e)return static_cast<PF_Err>(e);
+        struct Value{const AEGP_StreamSuite6* s;AEGP_StreamValue2* v;~Value(){s->AEGP_DisposeStreamValue(v);}} held{streams,&value};
+        if(index==kGraphParameterId){auto saved=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));if(!saved.has_value())return PF_Err_BAD_CALLBACK_PARAM;graph=saved.take_value();}
+        else {const double expected=index==kGraphSyncGuardId?0:index==kGraphRevisionId?request.revision:index==kGraphChecksumHighId?request.checksum>>16:request.checksum&65535;
+            if(value.val.one_d!=expected)return PF_Err_BAD_CALLBACK_PARAM;}
+    }
+    auto encoded=core::serialize_graph(graph,core::particle_node_registry());if(!encoded.has_value() || encoded.value().size()<28)return PF_Err_BAD_CALLBACK_PARAM;
+    std::uint32_t checksum=0;for(unsigned i=0;i<4;++i)checksum|=std::to_integer<std::uint32_t>(encoded.value()[24+i])<<(8*i);
+    if(checksum!=request.checksum)return PF_Err_BAD_CALLBACK_PARAM;
+    std::vector<graph_projection::Issue> issues;if(!graph_projection::read(graph,issues))return PF_Err_BAD_CALLBACK_PARAM;
+    request.count=static_cast<std::uint32_t>(issues.size());std::copy(issues.begin(),issues.end(),request.issues.begin());return PF_Err_NONE;
+}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 namespace {
 constexpr PF_FpLong kMaxRevision = 16777215.0;
 void set_numeric(PF_ParamDef* params[], A_long index, PF_FpLong value) noexcept {
@@ -61,9 +88,13 @@ PF_Err write_graph_snapshot(PF_InData* data, PF_ParamDef* params[], const core::
 }
 
 static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID plugin_id,
-                               PF_OutData* output, PF_InData* panel_data = nullptr, A_long nonce = 0,bool rebuild_disabled=false) noexcept {
+                               PF_OutData* output, PF_InData* panel_data = nullptr, A_long nonce = 0,bool rebuild_disabled=false,
+                               const NativeClearSnapshot* clear=nullptr) noexcept {
     if (!edit) return PF_Err_BAD_CALLBACK_PARAM;
     edit->accepted = false; edit->revision = 0; edit->status = PF_Err_BAD_CALLBACK_PARAM;
+    edit->compile_reuse_token=0;edit->reused_nodes=edit->state_queries=0;
+    edit->reuse_misses=edit->source_failure=0;edit->compile_us=edit->query_us=edit->full_read_us=0;
+    struct ReuseCandidate {node_sync::NativeEdit* edit;~ReuseCandidate(){discard_native_compile_reuse(edit->compile_reuse_token);}} reuse_candidate{edit};
     edit->stage = node_sync::Stage::context; edit->stream_index = -1;
     if (!edit->handles || !edit->basic || (!panel_data && !node_sync::valid_edit(*edit)) ||
         !edit->renderer || !edit->layer || edit->width <= 0 || edit->height <= 0 ||
@@ -187,6 +218,21 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             AEGP_LTimeMode_LayerTime,&time,TRUE,&publish.old[saved_graph_slot]);
         if(ae_error)return edit->status=static_cast<PF_Err>(ae_error);
         publish.read[saved_graph_slot]=true;
+        if(clear) {
+            if(!panel_data || rebuild_disabled || !clear->captured)return edit->status=PF_Err_BAD_CALLBACK_PARAM;
+            for(const auto [index,expected]:{std::pair{kGraphRevisionId,clear->revision},
+                std::pair{kGraphChecksumHighId,clear->high},std::pair{kGraphChecksumLowId,clear->low}}) {
+                AEGP_StreamRefH ref{};ae_error=publish.streams->AEGP_GetNewEffectStreamByIndex(plugin_id,publish.renderer,index,&ref);
+                struct Ref{const AEGP_StreamSuite6* s;AEGP_StreamRefH r;~Ref(){if(r)s->AEGP_DisposeStream(r);}} owned{publish.streams,ref};
+                AEGP_StreamType type{};if(!ae_error && ref)ae_error=publish.streams->AEGP_GetStreamType(ref,&type);
+                if(!ae_error && (!ref || type!=AEGP_StreamType_OneD))ae_error=PF_Err_BAD_CALLBACK_PARAM;
+                AEGP_StreamValue2 value{};if(!ae_error) {
+                    ae_error=publish.streams->AEGP_GetNewStreamValue(plugin_id,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+                    if(!ae_error){if(value.val.one_d!=expected)ae_error=PF_Err_BAD_CALLBACK_PARAM;publish.streams->AEGP_DisposeStreamValue(&value);}
+                }
+                if(ae_error)return edit->status=static_cast<PF_Err>(ae_error);
+            }
+        }
         scratch[kGraphParameterId].param_type=PF_Param_ARBITRARY_DATA;
         scratch[kGraphParameterId].u.arb_d.value=reinterpret_cast<PF_ArbitraryH>(publish.old[saved_graph_slot].val.arbH);
         MotionAuthorTransaction motion_authors(data,plugin_id);
@@ -218,7 +264,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             previous_graph=saved.take_value();
         }
         error = bindings.install(graph, &edit->stream_index, &edit->binding_stage, &edit->binding_parameter,
-            previous_graph?&*previous_graph:nullptr,false,rebuild_disabled);
+            previous_graph?&*previous_graph:nullptr,false,rebuild_disabled,clear);
         if (error) return edit->status = error;
         // These are integer receipts, not authored node values. Revision <= 2^24-1,
         // source == 2 and both CRC halves <= 65535 survive PF_FpShort exactly.
@@ -329,6 +375,7 @@ static PF_Err commit_graph_streams(node_sync::NativeEdit* edit, AEGP_PluginID pl
             return edit->status = rollback_failed ? PF_Err_INTERNAL_STRUCT_DAMAGED : static_cast<PF_Err>(ae_error);
         }
         bindings.accept();
+        accept_native_compile_reuse(data,edit,publish.graph);
         // Metadata is optional. The next idle owns a settled effect parade;
         // reentrant UI reads must not run inside a structural transaction.
         if(panel_data && !ui_transaction_active())capture_native_temporal_metadata(data,graph,plugin_id);
@@ -392,8 +439,41 @@ PF_Err refresh_panel_graph_bindings(PF_InData* data,AEGP_EffectRefH renderer,AEG
     } catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
 
+PF_Err capture_panel_clear(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
+    AEGP_PluginID plugin,NativeClearSnapshot& snapshot) noexcept try {
+    snapshot.captured=false;
+    if(!data || !data->pica_basicP || !data->utils || !renderer || !layer || !plugin ||
+        snapshot.revision<1 || snapshot.high<0 || snapshot.high>65535 || snapshot.low<0 || snapshot.low>65535)return PF_Err_BAD_CALLBACK_PARAM;
+    const AEGP_StreamSuite6* streams{};const AEGP_LayerSuite9* layers{};
+    auto e=data->pica_basicP->AcquireSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6,reinterpret_cast<const void**>(&streams));
+    struct Release{SPBasicSuite* b;const AEGP_StreamSuite6*& s;const AEGP_LayerSuite9*& l;
+        ~Release(){if(l)b->ReleaseSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);if(s)b->ReleaseSuite(kAEGPStreamSuite,kAEGPStreamSuiteVersion6);}} release{data->pica_basicP,streams,layers};
+    if(!e)e=data->pica_basicP->AcquireSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9,reinterpret_cast<const void**>(&layers));
+    if(e || !streams || !layers)return static_cast<PF_Err>(e?e:PF_Err_BAD_CALLBACK_PARAM);
+    A_Time time{};e=layers->AEGP_GetLayerCurrentTime(layer,AEGP_LTimeMode_LayerTime,&time);
+    if(e || time.scale<=0)return static_cast<PF_Err>(e?e:PF_Err_BAD_CALLBACK_PARAM);
+    core::Graph graph;
+    for(const A_long index:std::array<A_long,7>{kGraphSyncGuardId,kNodeEffectsReadyId,kControlSourceId,kGraphRevisionId,kGraphChecksumHighId,kGraphChecksumLowId,kGraphParameterId}) {
+        AEGP_StreamRefH ref{};e=streams->AEGP_GetNewEffectStreamByIndex(plugin,renderer,index,&ref);
+        struct Ref{const AEGP_StreamSuite6* s;AEGP_StreamRefH r;~Ref(){if(r)s->AEGP_DisposeStream(r);}} owned{streams,ref};
+        AEGP_StreamType type{};if(!e && ref)e=streams->AEGP_GetStreamType(ref,&type);
+        if(e || !ref || type!=(index==kGraphParameterId?AEGP_StreamType_ARB:AEGP_StreamType_OneD))return static_cast<PF_Err>(e?e:PF_Err_BAD_CALLBACK_PARAM);
+        AEGP_StreamValue2 value{};e=streams->AEGP_GetNewStreamValue(plugin,ref,AEGP_LTimeMode_LayerTime,&time,TRUE,&value);
+        if(e)return static_cast<PF_Err>(e);
+        struct Value{const AEGP_StreamSuite6* s;AEGP_StreamValue2* v;~Value(){s->AEGP_DisposeStreamValue(v);}} held{streams,&value};
+        if(index==kGraphParameterId){auto decoded=read_graph_parameter(data,reinterpret_cast<PF_ArbitraryH>(value.val.arbH));
+            if(!decoded.has_value())return PF_Err_BAD_CALLBACK_PARAM;graph=decoded.take_value();}
+        else {const double expected=index==kGraphSyncGuardId?0:index==kNodeEffectsReadyId?1:index==kControlSourceId?kNodeControlSource:
+            index==kGraphRevisionId?snapshot.revision:index==kGraphChecksumHighId?snapshot.high:snapshot.low;
+            if(value.val.one_d!=expected)return PF_Err_BAD_CALLBACK_PARAM;}
+    }
+    auto context=*data;context.current_time=time.value;context.time_scale=time.scale;
+    return capture_native_clear_handoff(&context,renderer,layer,plugin,graph,snapshot);
+}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
 PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
-                         A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output,bool rebuild_disabled) noexcept {
+                         A_long nonce,AEGP_PluginID plugin_id,PF_OutData* output,bool rebuild_disabled,
+                         const NativeClearSnapshot* clear) noexcept {
     if(!data || !data->utils || !data->pica_basicP || !renderer || !layer || !plugin_id ||
         nonce<1 || nonce>1000000)return PF_Err_BAD_CALLBACK_PARAM;
     node_sync::NativeEdit context;
@@ -419,7 +499,7 @@ PF_Err commit_panel_graph(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH l
         if(layers)context.basic->ReleaseSuite(kAEGPLayerSuite,kAEGPLayerSuiteVersion9);
         if(error)return static_cast<PF_Err>(error);
     }
-    const auto error=commit_graph_streams(&context,plugin_id,output,data,nonce,rebuild_disabled);
+    const auto error=commit_graph_streams(&context,plugin_id,output,data,nonce,rebuild_disabled,clear);
     if(error && output && context.stage==node_sync::Stage::compile && context.compile_stage)
         std::snprintf(output->return_msg,sizeof(output->return_msg),
             "Starfield graph command failed: node compile: %s, effect %ld, stream %ld (error %d).",

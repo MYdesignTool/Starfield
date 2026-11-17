@@ -19,6 +19,7 @@ constexpr char transfer[]="0123456789abcdef0123456789abcdef",node[]="fedcba98765
 std::string request_line,descriptor_line,result_line,missing_suite;
 A_long root_id=101;
 std::vector<std::size_t> lengths;
+std::size_t diagnostic_capacity=1;
 bool available{},continue_ok{},prepare_ok{},commit_ok{},script_error{},unterminated{},oversize{},reenter{},
     bad_project{},bad_comp{},bad_layer{},change_after_prepare{},bad_hex{},short_page{},stop_in_prepare{},committed_warning{},unique_assets{},lost_request{},lost_claim{},lost_begin{};
 unsigned script_depth{};
@@ -29,13 +30,13 @@ AEGP_ItemSuite9 items{};AEGP_CompSuite11 comps{};AEGP_LayerSuite9 layers{};AEGP_
 unsigned final_refreshes{},refresh_refs{};
 template<class T>T opaque(std::uintptr_t value){return reinterpret_cast<T>(value);}
 AEGP_MemHandle mem(std::string text){++handles;return reinterpret_cast<AEGP_MemHandle>(new Memory{std::move(text)});}
-void clean(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(script_depth==0);CHECK(refresh_refs==0);}
+void clean(){CHECK(suites==0);CHECK(handles==0);CHECK(locks==0);CHECK(script_depth==0);CHECK(refresh_refs==0);CHECK(!(SFLD_GraphMutationEpochV1()&1));}
 std::string arguments(const std::string& body,const char* name){const std::string marker=std::string(name)+"(";
     const auto start=body.find(marker),end=body.rfind("):'0')");CHECK(start!=std::string::npos && end!=std::string::npos);
     return body.substr(start+marker.size(),end-start-marker.size());}
 void reset(){stop_model_transaction_host();clean();initialize_ui_exclusion();initialize_model_transaction_host(&basic,7);
     request_line=std::string(transfer)+"|101|202|303|1|"+node+",000000000000000000000000000000ff";
-    root_id=101;lengths={70001};descriptor_line.clear();result_line.clear();missing_suite.clear();
+    root_id=101;lengths={70001};diagnostic_capacity=1;descriptor_line.clear();result_line.clear();missing_suite.clear();
     available=continue_ok=prepare_ok=commit_ok=true;
     script_error=unterminated=oversize=reenter=bad_project=bad_comp=bad_layer=change_after_prepare=bad_hex=short_page=stop_in_prepare=committed_warning=unique_assets=false;
     lost_request=lost_claim=lost_begin=false;script_calls=executor_calls=prepares=commits=results=pages=claims=requests=0;
@@ -72,7 +73,7 @@ void initialize(){
         else CHECK(false);
         if(oversize)reply=std::string(65537,'x');
         if(!unterminated)reply.push_back(0);
-        *out=mem(reply);*error=mem(fault?std::string("error\0",6):std::string(1,'\0'));
+        *out=mem(reply);*error=mem(fault?std::string("error\0",6):std::string(diagnostic_capacity,'\0'));
         CHECK(--script_depth==0);return fault?512:0;
     };
     memory.AEGP_FreeMemHandle=[](AEGP_MemHandle value)->A_Err{auto* m=reinterpret_cast<Memory*>(value);CHECK(!m->locked);delete m;CHECK(handles-- >0);return 0;};
@@ -111,6 +112,7 @@ void initialize(){
 namespace starfield::adapter {
 // Transport seam only; the actual whole-graph executor has a separate suite.
 ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransactionPlan& plan) noexcept {
+    CHECK(SFLD_GraphMutationEpochV1()&1);
     ++executor_calls;CHECK(plan.basic==&basic && plan.plugin==7 && plan.layer==opaque<AEGP_LayerH>(3));
     CHECK(plan.time.value==12 && plan.time.scale==24);CHECK(plan.desired_ids.size()==2);CHECK(plan.assets.size()==lengths.size());
     CHECK(suites==0 && handles==0 && locks==0);auto script_before=script_calls;CHECK(!plan.is_cancelled(plan.context));CHECK(script_calls==script_before);
@@ -127,13 +129,26 @@ ModelGraphTransactionResult apply_model_graph_transaction(const ModelGraphTransa
 }
 int main(){initialize();reset();CHECK(!step_model_transaction_host());CHECK(script_calls==0);
     CHECK(script_diagnostic_empty(&memory,nullptr));
-    for(const auto& diagnostic:{std::string{},std::string(1,'\0'),std::string("error\0",6),std::string("x"),std::string("invalid"),std::string(8193,'\0')}){
-        auto handle=mem(diagnostic);CHECK(script_diagnostic_empty(&memory,handle)==(diagnostic.empty() || (diagnostic.size()<=8192 && diagnostic.front()==0)));
+    auto padded_empty=std::string(65536,'x');padded_empty.front()=0;
+    for(const auto& diagnostic:{std::string{},std::string(1,'\0'),std::string("error\0",6),std::string("x"),std::string("invalid"),std::string(8193,'\0'),padded_empty,std::string(65536,'x')}){
+        auto handle=mem(diagnostic);CHECK(script_diagnostic_empty(&memory,handle)==(diagnostic.empty() || diagnostic.front()==0));
         memory.AEGP_FreeMemHandle(handle);clean();}
+    {
+        auto handle=mem(std::string(1,'\0'));auto failing=memory;
+        failing.AEGP_GetMemHandleSize=nullptr;CHECK(!script_diagnostic_empty(&failing,handle));
+        failing=memory;failing.AEGP_GetMemHandleSize=[](AEGP_MemHandle,AEGP_MemSize*)->A_Err{return 1;};CHECK(!script_diagnostic_empty(&failing,handle));
+        failing=memory;failing.AEGP_LockMemHandle=[](AEGP_MemHandle,void**)->A_Err{return 1;};CHECK(!script_diagnostic_empty(&failing,handle));
+        failing=memory;failing.AEGP_LockMemHandle=[](AEGP_MemHandle h,void** out)->A_Err{auto* m=reinterpret_cast<Memory*>(h);m->locked=true;++locks;*out=nullptr;return 0;};
+        CHECK(!script_diagnostic_empty(&failing,handle));CHECK(!locks);
+        failing=memory;failing.AEGP_UnlockMemHandle=[](AEGP_MemHandle h)->A_Err{auto* m=reinterpret_cast<Memory*>(h);m->locked=false;--locks;return 1;};
+        CHECK(!script_diagnostic_empty(&failing,handle));CHECK(!locks);memory.AEGP_FreeMemHandle(handle);clean();
+    }
     {HostUiExclusion modal;CHECK(modal);queue_model_graph_transaction();
         CHECK(step_model_transaction_host());CHECK(script_calls==0 && executor_calls==0);}
     drain();CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && pages==3);CHECK(result_line.find(",'1|7|0|0|0|0|0|0|-1'")!=std::string::npos);
     CHECK(claims==1 && requests==1);
+    reset();diagnostic_capacity=65536;drain();
+    CHECK(executor_calls==1 && prepares==1 && commits==1 && results==1 && result_line.find(",'1|7|0|0|0|0|0|0|-1'")!=std::string::npos);
     reset();root_id=0;lengths.clear();request_line=std::string(transfer)+"|0|202|303|0|"+node+",000000000000000000000000000000ff";
     drain();CHECK(executor_calls==1 && claims==1 && prepares==1 && commits==1 && results==1 && pages==0);
     reset();lost_request=true;drain();CHECK(requests==2 && claims==1 && executor_calls==1 && commits==1 && results==1);

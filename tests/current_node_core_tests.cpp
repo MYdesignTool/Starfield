@@ -60,8 +60,35 @@ void test_auxiliary() {
     auto capped=evaluate_particle_graph(graph,{5,4},never); check(capped.has_value() && capped.value().particles.size()==2,"Output cap includes auxiliary births");
     set(graph.nodes[3],kEmitLifeStart,90.0);set(graph.nodes[3],kEmitLifeEnd,10.0);
     check(!evaluate_particle_graph(graph,{5,4},never).has_value(),"reversed parent life interval rejects");
-    graph=auxiliary_graph();graph.edges.push_back({EdgeId{uuid(15)},NodeId{uuid(5)},kParticleParticlesOut,NodeId{uuid(4)},kEmitterParents});
+    graph=auxiliary_graph();graph.edges.push_back({EdgeId{uuid(15)},NodeId{uuid(5)},kParticleParticlesOut,NodeId{uuid(1)},kEmitterParents});
     check(!validate_graph(graph,particle_node_registry()).ok(),"auxiliary feedback cycle rejects");
+
+    // The owner-confirmed reciprocal link shares appearance, never descendants.
+    auto shared=auxiliary_graph();
+    shared.nodes.erase(shared.nodes.begin()+4);
+    shared.edges[2].destination_node=NodeId{uuid(2)};
+    shared.edges[3].source_node=NodeId{uuid(2)};
+    auto separate=auxiliary_graph();
+    set(separate.nodes[4],kParticleLifetimeSeconds,1.1);
+    separate.edges.push_back({EdgeId{uuid(16)},NodeId{uuid(2)},kParticleParticlesOut,NodeId{uuid(255)},kOutputParticles});
+    check(validate_graph(shared,particle_node_registry()).ok(),"direct reciprocal Auxiliary shares Particle appearance");
+    for(auto time:{RationalTime{5,4},RationalTime{2,1},RationalTime{1,2}}) {
+        auto actual=evaluate_particle_graph(shared,time,never),expected=evaluate_particle_graph(separate,time,never);
+        check(actual.has_value() && expected.has_value(),"shared appearance graph renders through real evaluator");
+        if(actual.has_value() && expected.has_value()) {
+            check(actual.value().particles.size()==expected.value().particles.size(),"shared appearance emits exactly one child generation");
+            for(std::size_t i=0;i<std::min(actual.value().particles.size(),expected.value().particles.size());++i)
+                check(actual.value().particles[i].position.x==expected.value().particles[i].position.x &&
+                    actual.value().particles[i].emitter_id==expected.value().particles[i].emitter_id,"shared appearance preserves parent and child origins");
+        }
+    }
+    auto saved=serialize_graph(shared,particle_node_registry());
+    check(saved.has_value() && deserialize_graph(saved.value(),particle_node_registry()).has_value(),"reciprocal appearance graph codec round trip");
+    set(shared.nodes[1],kLifeRandom,10.0);
+    set(separate.nodes[1],kLifeRandom,10.0);set(separate.nodes[4],kLifeRandom,10.0);
+    auto temporal=evaluate_particle_graph(shared,{5,4},never),temporal_expected=evaluate_particle_graph(separate,{5,4},never);
+    check(temporal.has_value() && temporal_expected.has_value(),"shared appearance evaluates historical/random-life births");
+    if(temporal.has_value() && temporal_expected.has_value())check(temporal.value().particles.size()==temporal_expected.value().particles.size(),"history reuses appearance without recursive offspring");
 }
 double centroid(const RenderOutput& output) {
     double sum=0,weight=0;

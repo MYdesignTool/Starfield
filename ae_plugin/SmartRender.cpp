@@ -16,6 +16,7 @@
 #include "MotionLightTiming.hpp"
 #include "MotionPointCapture.hpp"
 #include "GraphCarrier.hpp"
+#include "GraphOutputScope.hpp"
 
 #include "starfield/core/SequenceCodec.hpp"
 #include "starfield/core/MotionLookAtTargets.hpp"
@@ -586,7 +587,17 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         // pre-render reports an error. (PF_PreRenderCallbacks has no checkin callback.)
         return graph_err;
     }
-    core::Graph frame_graph=*graph;
+    if(!graph)return PF_Err_BAD_CALLBACK_PARAM;
+    // Descriptor/identity/edge validation still covers parked author records.
+    // Only the callback-local work graph drops nodes that cannot feed Output.
+    const auto validation=core::validate_graph(*graph,core::particle_node_registry());
+    if(!validation.ok()) {
+        report_core_failure(out_data,validation.error.detail);
+        return validation.error.code==core::GraphErrorCode::allocation_failed?
+            PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM;
+    }
+    const auto resource_layout=graph; // Full renderer slot layout, never renumbered.
+    core::Graph frame_graph=graph_output_working_copy(*graph);
     HostCancellation history_cancel(in_data);
     const auto history_start=PreparationTimer::Clock::now();
     auto units_height=input_result.ref_height>0?input_result.ref_height:in_data->height;
@@ -603,6 +614,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         input_result.ref_width,input_result.ref_height,history_cancel);
     timer.value.history_ms=PreparationTimer::elapsed(history_start);
     if(history_error) return history_error;
+    const auto transfer_start=PreparationTimer::Clock::now();
     graph=std::make_shared<const core::Graph>(std::move(frame_graph));
     auto encoded = core::serialize_graph(*graph, core::particle_node_registry());
     if (!encoded.has_value()) {
@@ -610,6 +622,8 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         return encoded.error().code == core::SequenceErrorCode::allocation_failed
             ? PF_Err_OUT_OF_MEMORY : PF_Err_BAD_CALLBACK_PARAM;
     }
+    timer.value.transfer_ms=PreparationTimer::elapsed(transfer_start);
+    const auto resources_start=PreparationTimer::Clock::now();
     const auto loaded = acquire_core();
     if (!loaded) {
         report_core_failure(out_data, loaded.error.c_str());
@@ -629,10 +643,9 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
     // be produced; it never exceeds the request (RETURNS_EXTRA_PIXELS stays unset).
     const PF_LRect result = intersect_lrect(request.rect, layer_rect);
 
-    auto state = std::unique_ptr<PreRenderState>(new (std::nothrow) PreRenderState{});
-    if (!state) {
-        return PF_Err_OUT_OF_MEMORY;
-    }
+    // The callback's outer bad_alloc handler owns the identical OOM return.
+    // Keep allocation and ownership together, including constructor failure.
+    auto state = std::make_unique<PreRenderState>();
     state->motion=std::move(motion);
     state->graph_bytes = encoded.take_value();
     state->time=in_data->current_time;state->step=in_data->time_step;state->scale=in_data->time_scale;
@@ -662,9 +675,9 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
                                                      &generation_identity);
     if (cache_err != PF_Err_NONE) return cache_err;
     if(const auto error=prepare_texture_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
-        double(state->par.num)/state->par.den,history_cancel,state->textures);error)return error;
+        double(state->par.num)/state->par.den,history_cancel,state->textures,resource_layout.get());error)return error;
     if(const auto error=prepare_model_render_resources(in_data,out_data,extra,*graph,state->motion,state->ref_height,
-        double(state->par.num)/state->par.den,history_cancel,state->models);error)return error;
+        double(state->par.num)/state->par.den,history_cancel,state->models,resource_layout.get());error)return error;
     const bool materials=std::any_of(graph->nodes.begin(),graph->nodes.end(),[](const auto& n){return n.type_key==core::graph_keys::kMaterialNode;});
     if(const auto error=capture_lights(in_data,graph_carrier_plugin_id(),materials,state->lights);error)return error;
     const auto mix_lights=[&](const LightStaging& lights)->PF_Err {
@@ -696,6 +709,7 @@ PF_Err pre_render(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderExtra* e
         if(const auto error=extra->cb->GuidMixInPtr(in_data->effect_ref,sizeof(key),key);error)return error;
     }
 
+    timer.value.resources_ms=PreparationTimer::elapsed(resources_start);
     bool prefer_gpu=true;
     for(const auto& node:graph->nodes) if(node.type_key==core::graph_keys::kOutputNode)
         for(const auto& p:node.parameters) if(p.key==core::graph_keys::kAcceleration)

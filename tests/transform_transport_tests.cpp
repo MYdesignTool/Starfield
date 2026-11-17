@@ -77,7 +77,10 @@ void codec() {
     const auto reject=[&](std::size_t at,std::uint64_t value,unsigned count) {
         auto bad=bytes;put(bad,at,value,count);check(!decode_evaluated_particles(bad,{1,1}).has_value(),"malformed table/header accepted");
     };
-    reject(2,5,2);reject(4,bytes.size()-1,4);reject(24,kMaxGraphNodes+1,4);
+    // Snapshot5 is a supported historical format with the same basis layout.
+    auto snapshot5=bytes;put(snapshot5,2,5,2);
+    check(decode_evaluated_particles(snapshot5,{1,1}).has_value(),"snapshot5 Transform basis remains readable");
+    reject(2,0xffff,2);reject(4,bytes.size()-1,4);reject(24,kMaxGraphNodes+1,4);
     reject(28,kMaxParticleCount+1,4);reject(32,kMaxParticleSpriteBases+1,4);reject(36,1,4);
     reject(bytes.size()-4,3,4);reject(56,std::bit_cast<std::uint64_t>(1e13),8);
     reject(56,std::bit_cast<std::uint64_t>(std::numeric_limits<double>::quiet_NaN()),8);
@@ -249,7 +252,7 @@ void motion() {
 }
 void abi() {
     SfCoreApi api{};check(StarfieldCore_GetApi(3,sizeof(api),&api)==0,"ABI3 must not accept Transform transport");
-    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1 && api.abi_version==4,"paired ABI4 unavailable");
+    check(StarfieldCore_GetApi(SF_CORE_ABI_VERSION,sizeof(api),&api)==1 && api.abi_version==SF_CORE_ABI_VERSION,"current ABI unavailable for Transform transport");
     auto r=request();EvaluatedGraph graph;graph.sprite_bases={shear};
     graph.particles={particle()};graph.particles[0].sprite_basis_index=1;freeze(r,graph);
     const auto bytes=serialize_graph(*r.graph,particle_node_registry());check(bytes.has_value(),"ABI graph serialization");

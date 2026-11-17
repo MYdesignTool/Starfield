@@ -8,12 +8,17 @@ param(
     [switch]$NoDistPublish,
     [switch]$IncludeModelCandidate,
     [switch]$RenderJournal,
+    [switch]$MfrQualification,
     [string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'),
     [string]$NvrtcPath = 'artifacts\gpu-build\nvrtc-12.4.127\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll',
     [string]$MSBuildPath = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe'
 )
 
 $ErrorActionPreference = 'Stop'
+if($MfrQualification -and ($CoreOnly -or -not $NoRuntimePublish -or -not $NoDistPublish -or -not $RenderJournal -or $ArtifactLabel -notlike '*-mfr-qualification')) {
+    throw 'MfrQualification requires full NoRuntimePublish/NoDistPublish, RenderJournal and an isolated *-mfr-qualification ArtifactLabel.'
+}
+if(-not $MfrQualification -and $ArtifactLabel -like '*-mfr-qualification'){throw 'Reserved qualification label requires -MfrQualification.'}
 if($IncludeModelCandidate -and (-not $NoDistPublish -or -not $NoRuntimePublish -or $CoreOnly)) {
     throw 'IncludeModelCandidate requires a full unpublished build with -NoDistPublish -NoRuntimePublish.'
 }
@@ -145,7 +150,9 @@ $adapterInputs = @(
     'ae_plugin\ModelGraphTransaction.hpp', 'ae_plugin\ModelGraphTransaction.cpp',
     'ae_plugin\ModelTransactionHost.hpp', 'ae_plugin\ModelTransactionHost.cpp',
     'ae_plugin\StarfieldHostPiPL.r', 'ae_plugin\StarfieldHost.vcxproj',
-    'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NodeRecord.hpp',
+    'ae_plugin\NativeNodeGraph.cpp', 'ae_plugin\NativeNodeGraph.hpp', 'ae_plugin\NativeRetiredAlias.hpp', 'ae_plugin\NativeSourceState.hpp', 'ae_plugin\SourceEditTelemetry.hpp', 'ae_plugin\NodeRecord.hpp',
+    'ae_plugin\GraphProjection.hpp', 'ae_plugin\GraphDiagnosticsRequest.hpp', 'ae_plugin\EditorDiagnostics.hpp',
+    'ae_plugin\GraphOutputScope.hpp',
     'ae_plugin\TransformLayout.hpp', 'ae_plugin\TransformBinding.hpp',
     'ae_plugin\Parameters.cpp', 'ae_plugin\Parameters.hpp',
     'ae_plugin\SmartRender.cpp', 'ae_plugin\SmartRender.hpp',
@@ -163,7 +170,7 @@ $adapterInputs = @(
     'ae_plugin\EditorPresetPicker.cpp', 'ae_plugin\EditorPresetPicker.hpp',
     'schema\editor-presets.json', 'tools\Generate-EditorPresets.ps1',
     'ae_plugin\NodeEffects.cpp', 'ae_plugin\NodeEffects.hpp', 'ae_plugin\NodeGraphSync.cpp',
-    'ae_plugin\ParticleShape.hpp', 'ae_plugin\ParticleShapeUI.hpp', 'ae_plugin\ParticleShapeUI.cpp', 'ae_plugin\ParticleShapePicker.cpp',
+    'ae_plugin\ParticleShape.hpp',
     'ae_plugin\NodeGraphSync.hpp', 'ae_plugin\EffectReveal.hpp', 'ae_plugin\NodeEffect.vcxproj',
     'ae_plugin\NodeEmitterPiPL.r', 'ae_plugin\NodeParticlePiPL.r', 'ae_plugin\NodeForcePiPL.r',
     'ae_plugin\NodeTransformPiPL.r',
@@ -175,6 +182,7 @@ $adapterInputs = @(
     'include\starfield\core\EmitterHistory.hpp',
     'include\starfield\core\EmissionTimeline.hpp',
     'include\starfield\core\ColorGradient.hpp', 'src\core\TemporalEvaluation.hpp', 'src\core\TransformEvaluation.hpp',
+    'src\core\EvaluationStorage.hpp',
     'include\starfield\core\ParticleSimulation.hpp', 'src\core\TurbulenceEvaluation.hpp',
     'include\starfield\core\ParticleTransform.hpp',
     'include\starfield\core\ParticleCloud.hpp',
@@ -269,6 +277,7 @@ try {
     $coreProjectPath = Join-Path $drive 'ae_plugin\StarfieldCore.vcxproj'
     $coreArguments = @($coreProjectPath, '/t:Build', '/m', "/p:Configuration=$Configuration", "/p:Platform=$Platform")
     $arguments = @($projectPath, '/t:Build', '/m', "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath")
+    if($MfrQualification){$arguments+='/p:STARFIELD_MFR_QUALIFICATION=true'}
     if ($ArtifactLabel) {
         $artifactRoot = Join-Path $drive "artifacts\plugin\$ArtifactLabel"
         $outputDir = Join-Path $artifactRoot "$Platform\$Configuration"
@@ -306,6 +315,7 @@ try {
             "/p:STARFIELD_AE_SDK_ROOT=$aliasSdkPath", "/p:OutDir=$nodeOutputDir/", "/p:IntDir=$nodeIntermediateDir/",
             '/v:minimal'
         )
+        if($MfrQualification){$nodeArguments+='/p:STARFIELD_MFR_QUALIFICATION=true'}
         & $MSBuildPath @nodeArguments
         if ($LASTEXITCODE -ne 0) { throw "$nodeKind node effect MSBuild failed with exit code $LASTEXITCODE" }
     }
@@ -315,6 +325,8 @@ try {
     & $MSBuildPath @hostArguments
     if ($LASTEXITCODE -ne 0) { throw "General AEGP MSBuild failed with exit code $LASTEXITCODE" }
     [IO.File]::WriteAllText($fingerprintPath, $adapterFingerprint, [Text.Encoding]::ASCII)
+    [ordered]@{nativeBuild=$taskSourceNativeBuild;artifactLabel=$ArtifactLabel;mfrQualification=[bool]$MfrQualification;renderJournal=[bool]$RenderJournal;hostQualified=$false} |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputDir 'build-configuration.json') -Encoding UTF8
     }
 
     # Runtime publication is last: a failed build must leave the currently

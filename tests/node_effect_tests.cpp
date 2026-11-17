@@ -18,10 +18,16 @@
 // Actual node EffectMain; only the independent graph-sync callback is replaced.
 PF_Err register_node_graph_sync(PF_InData*) noexcept { return PF_Err_NONE; }
 PF_Err update_native_particle_visibility(PF_InData*,PF_ParamDef*[]) noexcept {return PF_Err_NONE;}
+int emitter_visibility_updates=0;
+PF_Err update_native_emitter_visibility(PF_InData*,PF_ParamDef*[]) noexcept {++emitter_visibility_updates;return PF_Err_NONE;}
 PF_Err sync_node_graph_parameter(PF_InData*, PF_OutData*, PF_ParamDef*[],
                                  const PF_UserChangedParamExtra*,bool) noexcept { return PF_Err_NONE; }
+PF_Err sync_custom_node_graph_bank(PF_InData*,PF_OutData*,const starfield::adapter::node_sync::NativeEdit&) noexcept {return PF_Err_NONE;}
 namespace starfield::adapter {
-PF_Err transform_null_event(PF_InData*,PF_OutData*,PF_ParamDef*[],PF_EventExtra*) noexcept {return PF_Err_NONE;}
+// This isolated selector fixture substitutes the independent compiler service.
+void invalidate_native_compile_reuse() noexcept {}
+int create_null_calls=0;
+PF_Err create_transform_null(PF_InData*,PF_OutData*,PF_ParamDef*[]) noexcept {++create_null_calls;return PF_Err_NONE;}
 PF_Err particle_shape_event(PF_InData*,PF_OutData*,PF_ParamDef*[],PF_EventExtra*) noexcept {return PF_Err_NONE;}
 bool choose_curve_preset(PF_InData*,starfield::core::AgeCurve&) noexcept {return false;}
 bool choose_gradient_preset(PF_InData*,starfield::core::ColorGradient&) noexcept {return false;}
@@ -34,6 +40,12 @@ void check(bool result, const char* description) {
     if (!result) { ++failures; std::printf("FAILED: %s\n", description); }
 }
 std::vector<PF_ParamDef> registered;
+int effect_ui_registrations=0;
+PF_Err register_effect_ui(PF_ProgPtr,PF_CustomUIInfo* info) {
+    ++effect_ui_registrations;
+    check(info && info->events==PF_CustomEFlag_EFFECT,"custom parameter UI registers Effect-window events");
+    return PF_Err_NONE;
+}
 PF_Err add_parameter(PF_ProgPtr, PF_ParamIndex, PF_ParamDef* value) {
     registered.push_back(*value); return PF_Err_NONE;
 }
@@ -79,6 +91,7 @@ SPErr acquire(const char* name, int32 version, const void** suite) {
     *suite = &transform; return acquire_error;
 }
 SPErr release(const char*, int32) { ++releases; return kSPNoError; }
+
 }
 
 int main() {
@@ -94,27 +107,33 @@ int main() {
 #endif
     PF_InData host{}; PF_OutData out{};
     host.inter.add_param = add_parameter;
+    host.inter.register_ui = register_effect_ui;
     check(EffectMain(PF_Cmd_GLOBAL_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "global setup succeeds");
     check(out.out_flags2 == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS2:STARFIELD_NODE_OUT_FLAGS2),
           "float awareness always advertises implemented SmartFX");
-    check(out.out_flags == (kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
+    check(out.out_flags == (kind==Kind::emitter?STARFIELD_EMITTER_OUT_FLAGS:kind==Kind::particle?STARFIELD_PARTICLE_OUT_FLAGS:
         kind==Kind::transform?STARFIELD_TRANSFORM_OUT_FLAGS:STARFIELD_NODE_OUT_FLAGS), "node remains internal/menu-hidden with declared UI capabilities");
     check(EffectMain(PF_Cmd_PARAMS_SETUP, &host, &out, nullptr, nullptr, nullptr) == 0, "node controls register");
+    check(effect_ui_registrations==1,"a node advertising custom parameter UI must register it exactly once");
     check(out.num_params == parameter_count(kind) && registered.size() + 1 == static_cast<std::size_t>(out.num_params),
           "registered node count matches shared native stream layout");
     print_native_node_catalog(kind==Kind::emitter?"emitter":kind==Kind::particle?"particle":kind==Kind::force?"force":"transform",registered);
+    check(EffectMain(PF_Cmd_UPDATE_PARAMS_UI,&host,&out,nullptr,nullptr,nullptr)==0 &&
+          emitter_visibility_updates==(kind==Kind::emitter?1:0),"Emitter update selector refreshes source-specific visibility only");
     bool dimensions_valid=true,hidden_valid=true;A_long registered_index=0;
     for(const auto& def:registered) {
         ++registered_index;
         const bool custom=bool(def.ui_flags&(PF_PUI_CONTROL|PF_PUI_TOPIC));
-        const bool compact_control=(kind==Kind::transform || kind==Kind::particle) && registered_index==1;
-        dimensions_valid &= compact_control?(def.ui_width==240 && def.ui_height==(kind==Kind::particle?26:56) && bool(def.ui_flags&PF_PUI_CONTROL)):
-            custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
-        if(registered_index>base_parameter_count(kind) && (kind!=Kind::particle || registered_index<particle_layout::transfer))hidden_valid &=
+        check(!(def.ui_flags&PF_PUI_TOPIC),"native parameter titles are never replaced for a locator line");
+        dimensions_valid &= custom?(def.ui_width==300 && def.ui_height==178):(def.ui_width==0 && def.ui_height==0);
+        if(registered_index>base_parameter_count(kind) && (kind!=Kind::particle || registered_index<particle_layout::transfer) &&
+           !(kind==Kind::transform && registered_index==transform_create_null_index()))hidden_valid &=
             bool(def.ui_flags&PF_PUI_NO_ECW_UI) && bool(def.ui_flags&PF_PUI_INVISIBLE) && def.ui_width==0 && def.ui_height==0;
     }
     check(dimensions_valid,"only declared custom controls have nonstandard dimensions");
     check(hidden_valid,"all internal node metadata retains hidden flags and zero dimensions");
+    for(const auto& def:registered)if(def.param_type==PF_Param_POPUP || def.param_type==PF_Param_LAYER)
+        check(def.ui_flags==PF_PUI_NONE && def.ui_width==0 && def.ui_height==0,"ordinary popup and layer rows match the existing fully native controls");
     if(kind==Kind::emitter) for(A_long index:{12,13,14})
         check(registered[index-1].param_type==PF_Param_ANGLE &&
             (registered[index-1].flags & PF_ParamFlag_CANNOT_TIME_VARY)==0 &&
@@ -169,6 +188,15 @@ int main() {
         check(registered[0].param_type==PF_Param_LAYER && registered[0].u.ld.dephault==PF_LayerDefault_NONE &&
             (registered[0].flags & PF_ParamFlag_CANNOT_TIME_VARY),"inherited layer is a constant resource selector");
         check(registered[1].param_type==PF_Param_POINT,"Anchor XY uses a native point");
+        check(sync_guard_index(kind)==90 && uuid_first_index(kind)==82 && transform_create_null_index()==91 && parameter_count(kind)==92,
+            "native button appends without shifting Transform controls or metadata");
+        const auto& button=registered[transform_create_null_index()-1];
+        check(button.param_type==PF_Param_BUTTON && button.uu.id==1415 && button.ui_flags==PF_PUI_NONE &&
+              (button.flags&PF_ParamFlag_SUPERVISE) && !authored_parameter(kind,transform_create_null_index()),
+            "Create Null is an AE native action without a graph value");
+        PF_UserChangedParamExtra click{};click.param_index=transform_create_null_index();
+        check(EffectMain(PF_Cmd_USER_CHANGED_PARAM,&host,&out,nullptr,nullptr,&click)==0 &&
+              starfield::adapter::create_null_calls==1,"native button dispatch reaches the existing Null transaction");
         for(A_long i=6;i<9;++i)check(registered[i].param_type==PF_Param_ANGLE &&
             (registered[i].flags & PF_ParamFlag_START_COLLAPSED),"Transform rotations animate and default collapsed");
         for(A_long i=9;i<14;++i)check(registered[i].u.fs_d.value==100,"Transform scale and opacity default to 100 percent");
@@ -258,6 +286,21 @@ int main() {
     check(run() == 0 && copies == old_copies, "empty output does not request a copy");
     check(EffectMain(PF_Cmd_SMART_RENDER, &host, &out, nullptr, nullptr, nullptr) == PF_Err_BAD_CALLBACK_PARAM,
           "missing SmartFX callbacks rejected");
+    {
+        std::vector<PF_ParamDef*> delivered(registered.size()+1);
+        PF_ParamDef input{};delivered[0]=&input;
+        for(std::size_t i=0;i<registered.size();++i)delivered[i+1]=&registered[i];
+        host.num_params=static_cast<A_long>(delivered.size());
+        // A title draw for the original locator anchor must remain host-owned.
+        PF_EventExtra event{};event.e_type=PF_Event_DRAW;
+        event.effect_win.index=kind==Kind::emitter?2:1;event.effect_win.area=PF_EA_PARAM_TITLE;
+        event.contextH=reinterpret_cast<PF_ContextH>(1);host.pica_basicP=nullptr;
+        check(EffectMain(PF_Cmd_EVENT,&host,&out,delivered.data(),nullptr,&event)==0 && !event.evt_out_flags,
+              "native title painting is never consumed by the former locator");
+    }
+    host.inter.register_ui=[](PF_ProgPtr,PF_CustomUIInfo*)->PF_Err{return PF_Err_OUT_OF_MEMORY;};
+    check(EffectMain(PF_Cmd_PARAMS_SETUP,&host,&out,nullptr,nullptr,nullptr)==PF_Err_OUT_OF_MEMORY,
+        "custom UI registration failure propagates before host constructs controls");
     std::printf("Node kind %d: %d checks, %d failures\n", static_cast<int>(kind), checks, failures);
     return failures ? 1 : 0;
 }

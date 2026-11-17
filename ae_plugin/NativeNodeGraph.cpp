@@ -1,7 +1,14 @@
 #include "AEConfig.h"
 #include "NativeNodeGraph.hpp"
+#include "GraphProjection.hpp"
+#include "NativeClearRequest.hpp"
+#include "NativeRetiredAlias.hpp"
+#include "NativeSourceState.hpp"
+#include <atomic>
+#include <chrono>
 #include "NativeTemporalCache.hpp"
 #include "GraphParameter.hpp"
+#include "GraphOutputScope.hpp"
 
 #include "AE_EffectCB.h"
 #include "AE_GeneralPlug.h"
@@ -66,28 +73,19 @@ struct RawField {
 struct RawNode {
     core::NodeId id{};
     Kind kind{};
-    std::array<RawField, particle_layout::birth_enabled+1> fields{};
+    // Each kind owns only its existing numeric layout. A Force must not copy
+    // Particle's dense26KB curve bank on every parse/history sample.
+    std::vector<RawField> fields;
     std::u16string source_name; // UI binding only; never serialized
     std::string motion_prefix; // Graph-owned constant; never serialized in the numeric binding record
+    RawNode()=default;
+    explicit RawNode(Kind type):kind(type),fields(static_cast<std::size_t>(native_nodes::binding_field_count(type))+1) {}
 };
 
 // Match Core's Output ancestor scope, including geometry/material dependencies.
 // Parked nodes retain their saved values but cannot block an unrelated frame.
 std::set<core::NodeId> output_ancestors(const core::Graph& graph) {
-    std::map<core::NodeId,std::vector<core::NodeId>> dependencies;
-    for(const auto& edge:graph.edges)dependencies[edge.destination_node].push_back(edge.source_node);
-    std::set<core::NodeId> active;
-    std::vector<core::NodeId> pending;
-    for(const auto& node:graph.nodes)if(node.type_key==core::graph_keys::kOutputNode) {
-        active.insert(node.id);pending.push_back(node.id);
-    }
-    while(!pending.empty()) {
-        const auto id=pending.back();pending.pop_back();
-        const auto found=dependencies.find(id);
-        if(found==dependencies.end())continue;
-        for(const auto source:found->second)if(active.insert(source).second)pending.push_back(source);
-    }
-    return active;
+    return graph_output_ancestors(graph);
 }
 void retain_output_bindings(const core::Graph& graph,std::vector<RawNode>& nodes) {
     const auto active=output_ancestors(graph);
@@ -643,6 +641,7 @@ bool read_binding_record(const core::Graph& graph, std::vector<RawNode>& nodes) 
             std::uint64_t kind{}, fields{};
             if (!read(2, kind) || (kind > 8 || kind == 2 || (kind==5 && version<7) || (kind==6 && version<8) || (kind==7 && version<9) || (kind==8 && version<kTurbulenceBindingRecordVersion)) || !read(2, fields)) return false;
             node.kind = static_cast<Kind>(kind);
+            node.fields.resize(static_cast<std::size_t>(native_nodes::binding_field_count(node.kind))+1);
             // Dense Draw banks have 64 age/value pairs. Their constant fields
             // belong in the record but do not consume animation alias slots.
             // Keep writer/reader bounds tied to the current per-kind layout,
@@ -1340,6 +1339,101 @@ core::PortKey destination_port(Kind kind) noexcept {
 
 } // namespace
 
+bool native_static_history_eligible(const core::Graph& graph) noexcept try {
+    using namespace core::graph_keys;
+    if(std::count_if(graph.nodes.begin(),graph.nodes.end(),[](const auto& n){return n.type_key==kOutputNode;})!=1)return false;
+    const auto active=output_ancestors(graph);
+    bool has_force=false;
+    for(const auto& node:graph.nodes) {
+        if(!active.contains(node.id))continue;
+        if(node.type_key==kEmitterNode) {
+            for(const auto& p:node.parameters)if(p.key==kEmittingMode || p.key==kAuxiliarySource) {
+                const auto* value=std::get_if<std::uint32_t>(&p.value);
+                if(!value || *value!=0)return false;
+            }
+        } else if(node.type_key==kParticleNode) {
+            for(const auto& p:node.parameters)if(p.key==kLifeRandom) {
+                const auto* value=std::get_if<double>(&p.value);
+                if(!value || *value!=0)return false;
+            }
+        } else if(node.type_key==kForceNode) {
+            has_force=true;
+            // Constant gravity (including stable random attenuation) and scalar
+            // drag have the same closed-form solution as the temporal lattice.
+            // Wind's age envelope and spin displacement use different analytic
+            // vs midpoint rules, so even constant controls keep exact history.
+            for(const auto& p:node.parameters) {
+                if(p.key==kSpin) {
+                    const auto* value=std::get_if<double>(&p.value);
+                    if(!value || *value!=0)return false;
+                } else if(p.key==kWind) {
+                    const auto* value=std::get_if<core::Vec3>(&p.value);
+                    if(!value || value->x!=0 || value->y!=0 || value->z!=0)return false;
+                }
+            }
+        } else if(node.type_key!=kOutputNode)return false;
+    }
+    if(has_force) {
+        // Independent Output routes can preserve different Force/particle
+        // identities in the two evaluators. Qualify only a single linear
+        // Emitter -> Particle -> Force(s) -> Output chain in this first pass.
+        std::map<core::NodeId,std::pair<unsigned,unsigned>> degrees;
+        for(const auto& edge:graph.edges)if(active.contains(edge.source_node) && active.contains(edge.destination_node)) {
+            ++degrees[edge.source_node].second;++degrees[edge.destination_node].first;
+        }
+        unsigned emitters=0,particles=0;
+        for(const auto& node:graph.nodes)if(active.contains(node.id)) {
+            const auto [incoming,outgoing]=degrees[node.id];
+            if(node.type_key==kEmitterNode) {
+                if(incoming || outgoing!=1)return false;
+                ++emitters;
+            } else if(node.type_key==kOutputNode) {
+                if(incoming!=1 || outgoing)return false;
+            } else {
+                if(incoming!=1 || outgoing!=1)return false;
+                if(node.type_key==kParticleNode) {
+                    ++particles;
+                    for(const auto& edge:graph.edges)if(edge.destination_node==node.id) {
+                        const auto source=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==edge.source_node;});
+                        if(source==graph.nodes.end() || source->type_key!=kEmitterNode)return false;
+                    }
+                }
+            }
+        }
+        if(emitters!=1 || particles!=1)return false;
+    }
+    return true;
+} catch(...) {return false;}
+
+namespace {
+using ConstantValueIndex=std::array<const NativeControlProof*,kNativeBindingCapacity>;
+ConstantValueIndex constant_value_index(std::span<const NativeControlProof> proofs) noexcept {
+    ConstantValueIndex result{};
+    for(const auto& proof:proofs) {
+        if(proof.stream<kNativeBindingFirstIndex)continue;
+        const auto slot=proof.stream-kNativeBindingFirstIndex;
+        if(slot<0 || slot>=kNativeBindingCapacity || !proof.constant || !proof.constant_value ||
+           !std::isfinite(*proof.constant_value) || *proof.constant_value==kNativeBindingUnavailable)continue;
+        if(!result[slot])result[slot]=&proof;
+    }
+    return result;
+}
+std::optional<double> constant_alias_value(const ConstantValueIndex& values,core::NodeId node,A_long stream) noexcept {
+    if(stream<kNativeBindingFirstIndex)return {};
+    const auto slot=stream-kNativeBindingFirstIndex;
+    if(slot<0 || slot>=kNativeBindingCapacity)return {};
+    const auto* proof=values[slot];
+    return proof && proof->node==node?proof->constant_value:std::nullopt;
+}
+std::vector<NativeControlProof> current_constant_values(PF_InData* data,std::span<const RawNode> nodes,
+                                                       const core::NodeId* filter) noexcept try {
+    std::vector<core::NodeId> ids;ids.reserve(nodes.size());
+    for(const auto& node:nodes)if(!filter || node.id==*filter)ids.push_back(node.id);
+    if(ids.empty())return {};
+    return validated_native_control_proofs(data,ids);
+} catch(...) {return {};}
+}
+
 struct NativeAnimationPlan::Impl {
     std::vector<RawNode> nodes;
     std::map<core::NodeId, core::GraphNode> templates;
@@ -1350,6 +1444,11 @@ struct NativeAnimationPlan::Impl {
     bool all_constant{};
     std::size_t input_count{},constant_count{};
     std::uint64_t checkout_count{};
+    void clear_constants() noexcept {
+        constant_nodes.clear();proofs.clear();all_constant=false;
+        input_count=constant_count=0;
+        for(auto& node:nodes)for(auto& field:node.fields)field.constant.fill(false);
+    }
     Impl(const core::Graph& graph,A_long width,A_long height,double aspect)
         :units{double(std::max<A_long>(width,1)),double(std::max<A_long>(height,1)),aspect} {
         decoded=std::isfinite(aspect) && aspect>0 && read_binding_record(graph,nodes);
@@ -1390,21 +1489,36 @@ std::optional<double> NativeAnimationPlan::constant_birth_chance(core::NodeId id
     if(field.present && (field.slot<0 || field.constant[0]))return field.value[0];
     return {};
 }
-void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_bypass) noexcept try {
-    if(!valid() || !data) return;
-    impl_->constant_nodes.clear();
+void NativeAnimationPlan::prepare_constants(PF_InData* data,bool reuse_sampled_constants) noexcept try {
+    if(!valid())return;
+    // Clear before the first allocation/SDK access. A failed new preparation
+    // must never reuse hoisted values/proofs from an earlier dependency state.
+    impl_->clear_constants();
+    if(!data)return;
     std::vector<core::NodeId> ids;for(const auto& [id,node]:impl_->templates)ids.push_back(id);
     impl_->proofs=validated_native_control_proofs(data,ids);
+    const auto constant_values=constant_value_index(impl_->proofs);
+    std::set<std::pair<core::NodeId,A_long>> constant_inputs;
+    bool indexed=false;
+    try {
+        for(const auto& proof:impl_->proofs)if(proof.constant)constant_inputs.emplace(proof.node,proof.stream);
+        indexed=true;
+    } catch(const std::bad_alloc&) {constant_inputs.clear();}
+    const auto certified=[&](core::NodeId id,A_long stream) {
+        if(indexed)return constant_inputs.contains({id,stream});
+        return std::any_of(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==id && p.stream==stream && p.constant;});
+    };
     // The caller's graph already contains current-frame owned-alias values.
-    // A simple, completely certified graph needs no second set of checkouts.
-    // Partially certified and complex graphs still hoist raw historical inputs.
-    if(allow_static_bypass) {
+    // A completely certified graph needs no second set of checkouts, even when
+    // processors require temporal integration. Partially certified graphs still
+    // hoist raw historical inputs; disk binding values may be stale.
+    if(reuse_sampled_constants) {
         std::size_t inputs=0,constants=0;
         for(const auto& node:impl_->nodes)if(impl_->templates.contains(node.id))
             for(const auto& field:node.fields)if(field.present && field.slot>=0)
                 for(A_long c=0;c<component_count(field.type);++c) {
                     ++inputs;const auto stream=kNativeBindingFirstIndex+field.slot+c;
-                    if(std::any_of(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==node.id && p.stream==stream && p.constant;}))++constants;
+                    if(certified(node.id,stream))++constants;
                 }
         if(inputs && inputs==constants) {
             impl_->input_count=inputs;impl_->constant_count=constants;impl_->all_constant=true;
@@ -1419,8 +1533,10 @@ void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_by
         for(A_long c=0;c<component_count(field.type);++c) {
             ++impl_->input_count;field.constant[c]=false;
             const auto stream=kNativeBindingFirstIndex+field.slot+c;
-            const auto found=std::find_if(impl_->proofs.begin(),impl_->proofs.end(),[&](const auto& p){return p.node==node.id && p.stream==stream && p.constant;});
-            if(found==impl_->proofs.end()) {impl_->all_constant=false;continue;}
+            if(!certified(node.id,stream)) {impl_->all_constant=false;continue;}
+            if(const auto value=constant_alias_value(constant_values,node.id,stream)) {
+                field.value[c]=*value;field.constant[c]=true;++impl_->constant_count;continue;
+            }
             PF_ParamDef value{};
             ++impl_->checkout_count;
             const auto error=PF_CHECKOUT_PARAM(data,stream,data->current_time,data->time_step,data->time_scale,&value);
@@ -1445,7 +1561,7 @@ void NativeAnimationPlan::prepare_constants(PF_InData* data,bool allow_static_by
         core::GraphNode value;
         if(sample(data,node.id,value)==PF_Err_NONE)impl_->constant_nodes.emplace(node.id,std::move(value));
     }
-} catch(...) {if(impl_)impl_->all_constant=false;}
+} catch(...) {if(impl_)impl_->clear_constants();}
 PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNode& output,
                                   A_long* failed_stream) const noexcept {
     if(failed_stream) *failed_stream=-1;
@@ -1507,6 +1623,114 @@ PF_Err NativeAnimationPlan::sample(PF_InData* data,core::NodeId id,core::GraphNo
       catch(...) {return PF_Err_INTERNAL_STRUCT_DAMAGED;}
 }
 
+namespace {
+std::atomic_uint64_t compile_lifecycle{1};
+struct CompileTimer {
+    std::uint64_t* value;std::chrono::steady_clock::time_point started{std::chrono::steady_clock::now()};
+    ~CompileTimer(){if(value)*value+=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-started).count());}
+};
+struct SourceProof {core::NodeId id;Kind kind{};std::int32_t stream{};PF_State state{};};
+struct CompileScope {
+    std::u16string project;std::int32_t renderer{};std::uint64_t epoch{},life{};
+    A_long width{},height{},time{};A_u_long scale{};PF_RationalScale aspect{};
+    bool operator==(const CompileScope& rhs)const noexcept {
+        return project==rhs.project && renderer==rhs.renderer && epoch==rhs.epoch && life==rhs.life &&
+            width==rhs.width && height==rhs.height && time==rhs.time && scale==rhs.scale &&
+            aspect.num==rhs.aspect.num && aspect.den==rhs.aspect.den;
+    }
+};
+struct CompileEntry {CompileScope scope;std::vector<std::byte> bytes;std::vector<SourceProof> proofs;};
+struct CompileCandidate {CompileScope scope;std::vector<SourceProof> proofs;std::uint64_t token{};};
+thread_local std::vector<CompileEntry> compile_entries;
+thread_local std::optional<CompileCandidate> compile_candidate;
+thread_local std::uint64_t observed_compile_life{},compile_token{};
+thread_local std::u16string observed_compile_project;
+thread_local bool source_query_available=true;
+thread_local std::uint32_t source_query_failure{};
+bool reusable_kind(Kind k)noexcept{return k==Kind::emitter || k==Kind::particle || k==Kind::force || k==Kind::turbulence;}
+template<class T>struct CompileSuite {
+    SPBasicSuite* basic;const char* name;A_long version;const T* value{};
+    CompileSuite(SPBasicSuite* b,const char* n,A_long v):basic(b),name(n),version(v){b->AcquireSuite(n,v,reinterpret_cast<const void**>(&value));}
+    ~CompileSuite(){if(value)basic->ReleaseSuite(name,version);}
+};
+bool compile_project(SPBasicSuite* basic,std::u16string& path) {
+    CompileSuite<AEGP_ProjSuite6> projects(basic,kAEGPProjSuite,kAEGPProjSuiteVersion6);
+    CompileSuite<AEGP_MemorySuite1> memory(basic,kAEGPMemorySuite,kAEGPMemorySuiteVersion1);
+    AEGP_ProjectH project{};AEGP_MemHandle handle{};
+    if(!projects.value || !memory.value || projects.value->AEGP_GetProjectByIndex(0,&project) || !project ||
+       projects.value->AEGP_GetProjectPath(project,&handle))return false;
+    struct Path {const AEGP_MemorySuite1* memory;AEGP_MemHandle handle;bool locked{};
+        ~Path(){if(locked)memory->AEGP_UnlockMemHandle(handle);if(handle)memory->AEGP_FreeMemHandle(handle);}} owned{memory.value,handle};
+    AEGP_MemSize bytes{};if(!handle || memory.value->AEGP_GetMemHandleSize(handle,&bytes) || bytes<2 || bytes>8194 || bytes%2)return false;
+    void* raw{};if(memory.value->AEGP_LockMemHandle(handle,&raw))return false;owned.locked=true;if(!raw)return false;
+    const auto* begin=static_cast<const char16_t*>(raw);const auto* end=std::find(begin,begin+bytes/2,char16_t{});
+    if(end==begin || end==begin+bytes/2)return false;path.assign(begin,end);return true;
+}
+bool compile_bytes(PF_InData* data,PF_ArbitraryH handle,std::vector<std::byte>& bytes) {
+    if(!handle || !data || !data->utils)return false;
+    const auto size=data->utils->host_get_handle_size(handle);if(!size || size>1024*1024)return false;
+    const auto* raw=static_cast<const std::byte*>(data->utils->host_lock_handle(handle));if(!raw)return false;
+    struct Lock {PF_InData* data;PF_ArbitraryH handle;~Lock(){data->utils->host_unlock_handle(handle);}} lock{data,handle};
+    bytes.assign(raw,raw+size);return true;
+}
+bool unique_compile_stream(SuiteSet& suites,AEGP_PluginID plugin,AEGP_EffectRefH effect,A_long index,std::int32_t& id) {
+    if(!suites.stream->AEGP_GetUniqueStreamID)return false;
+    AEGP_StreamRefH raw{};if(suites.stream->AEGP_GetNewEffectStreamByIndex(plugin,effect,index,&raw) || !raw)return false;
+    StreamRef owned(suites.stream,raw);return !suites.stream->AEGP_GetUniqueStreamID(raw,&id);
+}
+const CompileEntry* begin_compile_reuse(PF_InData* data,PF_ParamDef* params[],SuiteSet& suites,AEGP_PluginID plugin,const node_sync::NativeEdit* edit) noexcept try {
+    compile_candidate.reset();if(edit){edit->compile_reuse_token=0;edit->reused_nodes=edit->state_queries=0;}
+    if(!edit)return nullptr;
+    if(edit->records_only || !reusable_kind(static_cast<Kind>(edit->node_kind))){edit->reuse_misses|=reuse_kind;return nullptr;}
+    if(!source_ui_transaction_active()){edit->reuse_misses|=reuse_inactive;return nullptr;}
+    const auto life=compile_lifecycle.load(std::memory_order_acquire);
+    if(life!=observed_compile_life){compile_entries.clear();observed_compile_project.clear();observed_compile_life=life;source_query_available=true;source_query_failure=0;}
+    if(!source_query_available){edit->reuse_misses|=reuse_capability;edit->source_failure=source_query_failure;return nullptr;}
+    if(!edit->renderer || !suites.effect->AEGP_EffectCallGeneric || (graph_mutation_epoch()&1)){edit->reuse_misses|=reuse_context;return nullptr;}
+    CompileScope scope;scope.life=life;scope.epoch=graph_mutation_epoch();scope.width=data->width;scope.height=data->height;
+    scope.time=data->current_time;scope.scale=data->time_scale;scope.aspect=data->pixel_aspect_ratio;
+    if(!compile_project(data->pica_basicP,scope.project)){edit->reuse_misses|=reuse_project;compile_entries.clear();observed_compile_project.clear();return nullptr;}
+    if(scope.project!=observed_compile_project){compile_entries.clear();observed_compile_project=scope.project;}
+    if(!unique_compile_stream(suites,plugin,edit->renderer,kGraphParameterId,scope.renderer)){edit->reuse_misses|=reuse_identity;return nullptr;}
+    std::vector<std::byte> bytes;if(!params[kGraphParameterId] || !compile_bytes(data,params[kGraphParameterId]->u.arb_d.value,bytes)){edit->reuse_misses|=reuse_context;return nullptr;}
+    if(++compile_token==0)++compile_token;
+    compile_candidate=CompileCandidate{std::move(scope),{},compile_token};edit->compile_reuse_token=compile_token;
+    compile_candidate->proofs.reserve(core::kMaxGraphNodes);
+    for(const auto& entry:compile_entries)if(entry.scope==compile_candidate->scope && entry.bytes==bytes)return &entry;
+    edit->reuse_misses|=reuse_cold;
+    return nullptr;
+}catch(...){compile_candidate.reset();if(edit)edit->compile_reuse_token=0;return nullptr;}
+bool query_compile_source(SuiteSet& suites,AEGP_PluginID plugin,AEGP_EffectRefH effect,Kind kind,std::int32_t identity,const PF_State* previous,
+    PF_State& current,bool& same,const node_sync::NativeEdit* edit) noexcept {
+    if(!compile_candidate || !source_query_available || compile_candidate->scope.life!=compile_lifecycle.load(std::memory_order_acquire))return false;
+    NativeSourceStateRequest request;request.kind=static_cast<std::uint32_t>(kind);request.plugin=plugin;request.identity_stream=identity;
+    if(previous){request.compare=1;request.previous=*previous;}
+    const A_Time time{edit->time,static_cast<A_u_long>(edit->time_scale)};++edit->state_queries;
+    A_Err error{};{CompileTimer timer{&edit->query_us};error=suites.effect->AEGP_EffectCallGeneric(plugin,effect,&time,PF_Cmd_COMPLETELY_GENERAL,&request);}
+    if(error || request.acknowledged!=1 || request.supported!=1){
+        source_query_failure=error?11:request.reason?request.reason:10;edit->source_failure=source_query_failure;
+        edit->reuse_misses|=reuse_query_failed;source_query_available=false;compile_candidate.reset();return false;}
+    current=request.current;same=request.same==1;return true;
+}
+}
+void invalidate_native_compile_reuse() noexcept {compile_lifecycle.fetch_add(1,std::memory_order_release);}
+void discard_native_compile_reuse(std::uint64_t token) noexcept {if(token && compile_candidate && compile_candidate->token==token)compile_candidate.reset();}
+void accept_native_compile_reuse(PF_InData* data,const node_sync::NativeEdit* edit,PF_ArbitraryH graph) noexcept try {
+    if(!edit || !edit->compile_reuse_token || !compile_candidate || compile_candidate->token!=edit->compile_reuse_token)return;
+    auto candidate=std::move(*compile_candidate);compile_candidate.reset();
+    if(!source_ui_transaction_active() || candidate.scope.life!=compile_lifecycle.load(std::memory_order_acquire) ||
+       candidate.scope.epoch!=graph_mutation_epoch() || candidate.scope.width!=data->width || candidate.scope.height!=data->height ||
+       candidate.scope.time!=data->current_time || candidate.scope.scale!=data->time_scale ||
+       candidate.scope.aspect.num!=data->pixel_aspect_ratio.num || candidate.scope.aspect.den!=data->pixel_aspect_ratio.den)return;
+    std::vector<std::byte> bytes;if(!compile_bytes(data,graph,bytes))return;
+    compile_entries.erase(std::remove_if(compile_entries.begin(),compile_entries.end(),[&](const auto& entry){
+        return entry.scope.renderer==candidate.scope.renderer && entry.scope.project==candidate.scope.project;}),compile_entries.end());
+    if(compile_entries.size()>=16)compile_entries.erase(compile_entries.begin());
+    // Keep the states that bracketed the original reads. Never capture newer
+    // state here and attach it to an older parameter record.
+    compile_entries.push_back({std::move(candidate.scope),std::move(bytes),std::move(candidate.proofs)});
+}catch(...){compile_candidate.reset();}
+
 PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                                  core::Graph& graph, bool& found_node_effects, AEGP_PluginID plugin_id,
                                  const node_sync::NativeEdit* edit) noexcept {
@@ -1515,6 +1739,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
     if (!in_data || !params || !in_data->pica_basicP || (!in_data->effect_ref && !(edit && edit->layer))) return PF_Err_BAD_CALLBACK_PARAM;
     if (edit && !edit->records_only && !node_sync::valid_edit(*edit)) return PF_Err_BAD_CALLBACK_PARAM;
     if (plugin_id == 0) return PF_Err_BAD_CALLBACK_PARAM;
+    CompileTimer compilation{edit?&edit->compile_us:nullptr};
 
     const auto stage = [&](const char* name) noexcept { if(edit)edit->compile_stage=name; };
     if(edit)edit->compile_effect_index=-1;
@@ -1550,6 +1775,7 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
             if(!saved.has_value() || !read_binding_record(saved.value(),previous_nodes))return PF_Err_BAD_CALLBACK_PARAM;
         }
         std::vector<Connection> connections;
+        const auto* reusable=begin_compile_reuse(in_data,params,suites,plugin_id,edit);
         std::vector<LayoutEntry> layout_entries;
         graph.nodes.reserve(static_cast<std::size_t>(effect_count) + 1u);
         connections.reserve(static_cast<std::size_t>(effect_count) * 2u);
@@ -1600,14 +1826,49 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     suites.edited_effect = effect.value;
                 }
             }
-            RawNode raw; raw.id = core::NodeId{uuid}; raw.kind = kind;
+            RawNode raw{kind}; raw.id = core::NodeId{uuid};
             suites.previous_node=nullptr;
             for(const auto& old:previous_nodes)if(old.id==raw.id && old.kind==raw.kind){suites.previous_node=&old;break;}
             suites.recording = &raw;
             core::GraphNode node{core::NodeId{uuid}, type_key, schema_version, {}};
             stage("node parameters");
-            if (!read_node_parameters(suites, plugin_id, effect.value, kind, time, units, node))
-                return PF_Err_BAD_CALLBACK_PARAM;
+            bool reused=false,has_before=false;PF_State before{};bool same=false;std::int32_t source_stream{};
+            const bool proof_eligible=compile_candidate && edit && !suites.edited_effect && transaction_guard==0 && reusable_kind(kind);
+            if(proof_eligible && unique_compile_stream(suites,plugin_id,effect.value,native_nodes::uuid_first_index(kind),source_stream)) {
+                const SourceProof* prior=nullptr;
+                if(reusable)for(const auto& proof:reusable->proofs)if(proof.id==raw.id && proof.kind==kind && proof.stream==source_stream){prior=&proof;break;}
+                has_before=query_compile_source(suites,plugin_id,effect.value,kind,source_stream,prior?&prior->state:nullptr,before,same,edit);
+                if(!prior)edit->reuse_misses|=reuse_cold;
+                else if(has_before && !same)edit->reuse_misses|=reuse_state_changed;
+                bool no_texture=true;
+                if(has_before && same && kind==Kind::particle) {
+                    suites.recording=nullptr;std::uint32_t front{},back{};
+                    if(!read_layer_resource(suites,plugin_id,effect.value,time,front,particle_layout::texture_front) ||
+                       !read_layer_resource(suites,plugin_id,effect.value,time,back,particle_layout::texture_back))return PF_Err_BAD_CALLBACK_PARAM;
+                    const auto* old=suites.previous_node;
+                    no_texture=!front && !back && old && old->fields.size()>particle_layout::texture_back &&
+                        old->fields[particle_layout::texture_front].present && old->fields[particle_layout::texture_front].value[0]==0 &&
+                        old->fields[particle_layout::texture_back].present && old->fields[particle_layout::texture_back].value[0]==0;
+                    if(!no_texture)edit->reuse_misses|=reuse_resource;
+                    suites.recording=&raw;
+                }
+                if(has_before && same && prior && no_texture && suites.previous_node && compile_candidate &&
+                   compile_candidate->scope.life==compile_lifecycle.load(std::memory_order_acquire) && compile_candidate->scope.epoch==graph_mutation_epoch()) {
+                    raw=*suites.previous_node;SuiteSet playback(nullptr);playback.playback=&raw;
+                    if(!read_node_parameters(playback,0,nullptr,kind,time,units,node))return PF_Err_BAD_CALLBACK_PARAM;
+                    reused=true;++edit->reused_nodes;compile_candidate->proofs.push_back(*prior);
+                }
+            }
+            if(!reused) {
+                bool read{};{CompileTimer timer{edit?&edit->full_read_us:nullptr};read=read_node_parameters(suites,plugin_id,effect.value,kind,time,units,node);}
+                if(!read)return PF_Err_BAD_CALLBACK_PARAM;
+                if(has_before) {
+                    PF_State after{};bool stable=false;
+                    if(query_compile_source(suites,plugin_id,effect.value,kind,source_stream,&before,after,stable,edit) && stable)
+                        compile_candidate->proofs.push_back({raw.id,kind,source_stream,before});
+                    else if(compile_candidate)edit->reuse_misses|=reuse_unstable;
+                }
+            }
             suites.recording = nullptr; raw_nodes.push_back(std::move(raw));
             double layout_x = 0.0;
             double layout_y = 0.0;
@@ -1690,6 +1951,12 @@ PF_Err compile_native_node_graph(PF_InData* in_data, PF_ParamDef* params[],
                     core::graph_keys::kParticleModelsIn : destination_port(destination_kind)) : core::PortKey{1}});
         }
 
+        stage("topology projection");
+        const core::NeverCancelled topology_cancel;
+        auto projection=graph_projection::project(graph,topology_cancel);
+        if(!projection.has_value())return projection.error().code==core::ErrorCode::allocation_failed?PF_Err_OUT_OF_MEMORY:PF_Err_BAD_CALLBACK_PARAM;
+        auto projected=projection.take_value();graph=std::move(projected.graph);
+        if(!projected.issues.empty())graph.optional_records.push_back(graph_projection::record(projected.issues));
         stage("graph validation");
         const auto validation = core::validate_graph(graph, core::particle_node_registry());
         if (validation.ok()) {
@@ -1780,30 +2047,62 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
                                                         const char** failed_stage) noexcept {
     auto& tx=*impl_;
     const auto stage=[&](const char* value){if(failed_stage)*failed_stage=value;};
+    if(tx.force_refresh && (!tx.memory || !tx.memory->AEGP_GetMemHandleSize)) {
+        stage("retirement marker readback capability");return PF_Err_BAD_CALLBACK_PARAM;
+    }
     for(auto& change:tx.changes)if(change.retired && !change.changed) {
         if(failed_stream)*failed_stream=change.index;
         change.changed=true; // Include partially failed writes in rollback.
-        AEGP_StreamValue2 value{};value.streamH=change.ref;value.val.one_d=change.handoff_value;
-        stage("write retired alias handoff");
-        auto error=tx.suites.stream->AEGP_SetStreamValue(tx.id,change.ref,&value);
-        if(error)return static_cast<PF_Err>(error);
-        stage("disable retired expression");
-        error=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
-        if(error)return static_cast<PF_Err>(error);
-        stage("clear retired expression");
-        if(tx.force_refresh) {
-            // Make an actual text transition even when retirement previously
-            // left empty/disabled text. A same-text write has no invalidation
-            // guarantee. This temporary expression stays disabled and owns no
-            // source dependency; its final state is still empty/disabled.
-            error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u"value;"));
+        const bool marker=tx.force_refresh;
+        A_Err error{};
+        if(!marker || change.enabled || change.previous_value!=change.handoff_value) {
+            AEGP_StreamValue2 value{};value.streamH=change.ref;value.val.one_d=change.handoff_value;
+            stage("write retired alias handoff");
+            error=tx.suites.stream->AEGP_SetStreamValue(tx.id,change.ref,&value);
             if(error)return static_cast<PF_Err>(error);
         }
-        error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
-        if(error)return static_cast<PF_Err>(error);
+        if(!marker || change.enabled) {
+            stage("disable retired expression");
+            error=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
+            if(error)return static_cast<PF_Err>(error);
+        }
+        stage("clear retired expression");
+        if(marker) {
+            const auto desired=native_retired_alias::next(change.previous);
+            stage("write retired dependency marker");
+            error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,
+                reinterpret_cast<const A_UTF16Char*>(desired.data()));
+            if(error)return static_cast<PF_Err>(error);
+            stage("verify retired dependency marker");
+            AEGP_MemHandle text{};
+            error=tx.suites.stream->AEGP_GetExpression(tx.id,change.ref,&text);
+            struct Text {
+                const AEGP_MemorySuite1* memory;AEGP_MemHandle handle{};bool locked{};
+                ~Text(){if(locked)memory->AEGP_UnlockMemHandle(handle);if(handle)memory->AEGP_FreeMemHandle(handle);}
+            } owned{tx.memory,text};
+            if(error || !text)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_MemSize bytes{};error=tx.memory->AEGP_GetMemHandleSize(text,&bytes);
+            const auto needed=(desired.size()+1)*sizeof(char16_t);
+            if(error || bytes<needed)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+            void* raw{};error=tx.memory->AEGP_LockMemHandle(text,&raw);owned.locked=!error;
+            if(error || !raw)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
+            const auto* saved=static_cast<const char16_t*>(raw);
+            if(saved[desired.size()] || std::memcmp(saved,desired.data(),desired.size()*sizeof(char16_t)))
+                return PF_Err_BAD_CALLBACK_PARAM;
+        }
+        if(!marker) {
+            error=tx.suites.stream->AEGP_SetExpression(tx.id,change.ref,reinterpret_cast<const A_UTF16Char*>(u""));
+            if(error)return static_cast<PF_Err>(error);
+        }
         A_Boolean enabled=TRUE;
         stage("verify retired expression disabled");
         error=tx.suites.stream->AEGP_GetExpressionState(tx.id,change.ref,&enabled);
+        if(error)return static_cast<PF_Err>(error);
+        if(marker && enabled) {
+            stage("disable enabled retirement marker");
+            error=tx.suites.stream->AEGP_SetExpressionState(tx.id,change.ref,FALSE);
+            if(!error)error=tx.suites.stream->AEGP_GetExpressionState(tx.id,change.ref,&enabled);
+        }
         if(error || enabled)return static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);
         AEGP_StreamValue2 observed{};const A_Time time{tx.data->current_time,tx.data->time_scale};
         stage("verify finite retired alias handoff");
@@ -1811,15 +2110,49 @@ PF_Err NativeBindingTransaction::retire_after_publication(A_long* failed_stream,
         if(error)return static_cast<PF_Err>(error);
         const auto number=observed.val.one_d;
         const auto disposed=tx.suites.stream->AEGP_DisposeStreamValue(&observed);
-        if(disposed || !std::isfinite(number) || number==kNativeBindingUnavailable)
+        if(disposed || !std::isfinite(number) || number==kNativeBindingUnavailable || (marker && number!=change.handoff_value))
             return static_cast<PF_Err>(disposed?disposed:PF_Err_BAD_CALLBACK_PARAM);
     }
     stage("retired aliases detached");return PF_Err_NONE;
 }
 
+PF_Err capture_native_clear_handoff(PF_InData* data,AEGP_EffectRefH renderer,AEGP_LayerH layer,
+    AEGP_PluginID plugin,const core::Graph& graph,NativeClearSnapshot& snapshot) noexcept try {
+    snapshot.captured=false;snapshot.present.fill(false);
+    if(!data || !renderer || !layer || !plugin || !snapshot.selected_count || snapshot.selected_count>63 ||
+        snapshot.removed_count || data->time_scale<=0)return PF_Err_BAD_CALLBACK_PARAM;
+    std::vector<RawNode> nodes;if(!read_binding_record(graph,nodes))return PF_Err_BAD_CALLBACK_PARAM;
+    for(std::uint32_t i=0;i<snapshot.selected_count;++i) {
+        if(snapshot.selected[i]==core::NodeId{} ||
+            std::find(snapshot.selected.begin(),snapshot.selected.begin()+i,snapshot.selected[i])!=snapshot.selected.begin()+i ||
+            std::none_of(nodes.begin(),nodes.end(),[&](const auto& n){return n.id==snapshot.selected[i];}))return PF_Err_BAD_CALLBACK_PARAM;
+    }
+    SuiteSet suites(data);auto e=suites.acquire();if(e)return e;
+    const AEGP_MemorySuite1* memory{};
+    auto ae=suites.basic->AcquireSuite(kAEGPMemorySuite,kAEGPMemorySuiteVersion1,reinterpret_cast<const void**>(&memory));
+    if(ae || !memory)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+    struct Release{SPBasicSuite* b;~Release(){b->ReleaseSuite(kAEGPMemorySuite,kAEGPMemorySuiteVersion1);}} release{suites.basic};
+    if((e=resolve_binding_sources(suites,plugin,layer,memory,nodes)))return e;
+    const auto active=output_ancestors(graph);snapshot.time={data->current_time,data->time_scale};
+    for(const auto& node:nodes)if(active.contains(node.id))for(const auto& field:node.fields)if(field.present && field.slot>=0)
+        for(A_long c=0;c<component_count(field.type);++c) {
+            const auto slot=field.slot+c;if(snapshot.present[slot])return PF_Err_BAD_CALLBACK_PARAM;
+            AEGP_StreamRefH raw{};ae=suites.stream->AEGP_GetNewEffectStreamByIndex(plugin,renderer,kNativeBindingFirstIndex+slot,&raw);
+            StreamRef owned(suites.stream,raw);if(ae || !raw)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamType type{};ae=suites.stream->AEGP_GetStreamType(raw,&type);
+            if(ae || type!=AEGP_StreamType_OneD)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            AEGP_StreamValue2 value{};ae=suites.stream->AEGP_GetNewStreamValue(plugin,raw,AEGP_LTimeMode_LayerTime,&snapshot.time,FALSE,&value);
+            if(ae)return static_cast<PF_Err>(ae);const auto number=value.val.one_d;suites.stream->AEGP_DisposeStreamValue(&value);
+            if(!std::isfinite(number) || number==kNativeBindingUnavailable)return PF_Err_BAD_CALLBACK_PARAM;
+            snapshot.owners[slot]=node.id;snapshot.values[slot]=number;snapshot.present[slot]=true;
+        }
+    snapshot.captured=true;return PF_Err_NONE;
+}catch(const std::bad_alloc&){return PF_Err_OUT_OF_MEMORY;}catch(...){return PF_Err_INTERNAL_STRUCT_DAMAGED;}
+
 PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* failed_stream,
                                         const char** failed_stage, A_long* failed_parameter,
-                                        const core::Graph* previous_graph,bool force_refresh,bool rebuild_disabled) noexcept {
+                                        const core::Graph* previous_graph,bool force_refresh,bool rebuild_disabled,
+                                        const NativeClearSnapshot* clear) noexcept {
     if (failed_stream) *failed_stream = -1;
     if (failed_parameter) *failed_parameter = -1;
     const auto stage = [&](const char* value) { if (failed_stage) *failed_stage = value; };
@@ -1830,6 +2163,22 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         if (!read_binding_record(graph, nodes)) return PF_Err_BAD_CALLBACK_PARAM;
         std::vector<RawNode> previous_nodes;
         if(previous_graph && !read_binding_record(*previous_graph,previous_nodes))return PF_Err_BAD_CALLBACK_PARAM;
+        if(clear) {
+            if(!previous_graph || force_refresh || rebuild_disabled || !clear->captured || !clear->selected_count ||
+                clear->selected_count>63 || !clear->removed_count || clear->removed_count>clear->selected_count ||
+                clear->time.scale<=0 || !impl_->data || impl_->data->time_scale<=0 ||
+                std::int64_t(clear->time.value)*impl_->data->time_scale!=std::int64_t(impl_->data->current_time)*clear->time.scale)return PF_Err_BAD_CALLBACK_PARAM;
+            for(std::uint32_t i=0;i<clear->removed_count;++i)if(clear->removed[i]==core::NodeId{} ||
+                std::find(clear->removed.begin(),clear->removed.begin()+i,clear->removed[i])!=clear->removed.begin()+i ||
+                std::find(clear->selected.begin(),clear->selected.begin()+clear->selected_count,clear->removed[i])==clear->selected.begin()+clear->selected_count ||
+                std::none_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& n){return n.id==clear->removed[i];}))return PF_Err_BAD_CALLBACK_PARAM;
+            for(const auto& old:previous_nodes) {
+                const bool removed=std::find(clear->removed.begin(),clear->removed.begin()+clear->removed_count,old.id)!=clear->removed.begin()+clear->removed_count;
+                const auto found=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.id==old.id && n.kind==old.kind;});
+                if(removed!=(found==nodes.end()))return PF_Err_BAD_CALLBACK_PARAM;
+            }
+            for(const auto& n:nodes)if(std::none_of(previous_nodes.begin(),previous_nodes.end(),[&](const auto& old){return old.id==n.id && old.kind==n.kind;}))return PF_Err_BAD_CALLBACK_PARAM;
+        }
         // Appending a source preserves every existing literal name/UUID binding.
         // Removing/retyping a source still forces dependency rebuilding.
         const bool sources_removed=previous_graph &&
@@ -1840,6 +2189,23 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         tx.force_refresh=force_refresh;
         stage("acquire binding suites");
         auto error = tx.suites.acquire(); if (error) return error;
+        if(clear) {
+            // A guard3/hidden/backup source still exists. A supplied proof may
+            // retire only UUIDs actually absent after this operation's AE Clear.
+            if(!tx.owner_layer)return PF_Err_BAD_CALLBACK_PARAM;A_long count{};
+            auto ae=tx.suites.effect->AEGP_GetLayerNumEffects(tx.owner_layer,&count);
+            if(ae || count<1 || count>4096)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+            const A_Time time{tx.data->current_time,tx.data->time_scale};
+            for(A_long i=0;i<count;++i){AEGP_EffectRefH raw{};ae=tx.suites.effect->AEGP_GetLayerEffectByIndex(tx.id,tx.owner_layer,i,&raw);
+                EffectRef owned(tx.suites.effect,raw);if(ae || !raw)return static_cast<PF_Err>(ae?ae:PF_Err_BAD_CALLBACK_PARAM);
+                AEGP_InstalledEffectKey key{};char label[AEGP_MAX_EFFECT_MATCH_NAME_SIZE]{};
+                ae=tx.suites.effect->AEGP_GetInstalledKeyFromLayerEffect(raw,&key);if(!ae)ae=tx.suites.effect->AEGP_GetEffectMatchName(key,label);
+                if(ae)return static_cast<PF_Err>(ae);Kind kind{};const char* type{};std::uint16_t schema{};
+                if(!decode_node_kind(label,kind,type,schema))continue;core::Uuid128 uuid{};
+                if(!read_uuid(tx.suites,tx.id,raw,native_nodes::uuid_first_index(kind),time,uuid))return PF_Err_BAD_CALLBACK_PARAM;
+                if(std::find(clear->removed.begin(),clear->removed.begin()+clear->removed_count,core::NodeId{uuid})!=clear->removed.begin()+clear->removed_count)return PF_Err_BAD_CALLBACK_PARAM;
+            }
+        }
         A_Err ae = tx.suites.basic->AcquireSuite(kAEGPMemorySuite, kAEGPMemorySuiteVersion1,
             reinterpret_cast<const void**>(&tx.memory));
         if (ae) return static_cast<PF_Err>(ae);
@@ -1938,10 +2304,11 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
         std::vector<Alias> aliases;
         std::array<bool,kNativeBindingCapacity> occupied{};
         std::array<bool,kNativeBindingCapacity> previously_required{};
+        std::array<core::NodeId,kNativeBindingCapacity> previous_owners{};
         const auto previous_active=previous_graph?output_ancestors(*previous_graph):std::set<core::NodeId>{};
         for(const auto& node:previous_nodes)if(previous_active.contains(node.id))for(const auto& field:node.fields)
             if(field.present && field.slot>=0)for(A_long c=0;c<component_count(field.type);++c)
-                previously_required[field.slot+c]=true;
+                {previously_required[field.slot+c]=true;previous_owners[field.slot+c]=node.id;}
         for(const auto& node:nodes)for(A_long index=1;index<static_cast<A_long>(node.fields.size());++index){
             const auto& field=node.fields[index];if(!field.present || field.slot<0)continue;
             for(A_long component=0;component<component_count(field.type);++component){
@@ -2036,7 +2403,10 @@ PF_Err NativeBindingTransaction::install(const core::Graph& graph, A_long* faile
                 change.previous_value = previous.val.one_d;
                 tx.suites.stream->AEGP_DisposeStreamValue(&previous);
                 change.handoff_value=alias.source_value;
-                if(previously_required[alias.slot] && !rebuild_disabled) {
+                if(previously_required[alias.slot] && clear) {
+                    if(!clear->present[alias.slot] || clear->owners[alias.slot]!=previous_owners[alias.slot])return PF_Err_BAD_CALLBACK_PARAM;
+                    change.handoff_value=clear->values[alias.slot];
+                } else if(previously_required[alias.slot] && !rebuild_disabled) {
                     // The old Output graph consumes this span. Its evaluated source,
                     // rather than the normally sentinel base, must survive the
                     // temporary expression gap. Do not repair invalid bindings
@@ -2161,12 +2531,22 @@ PF_Err sample_native_node_animation(PF_InData* data, core::Graph& graph, A_long 
             double(std::max<A_long>(height > 0 ? height : data->height, 1)),
             data->pixel_aspect_ratio.den ? double(data->pixel_aspect_ratio.num) / data->pixel_aspect_ratio.den : 1.0};
         SuiteSet reader(nullptr); // No AEGP acquisition, even during destruction.
+        // Retain owned values for this request. UUID/stream and complete host
+        // dependency-state comparisons happen before any cached value is used.
+        // A cache miss, failed validation/allocation or dynamic source retains
+        // the original checkout/checkin path and its strict failures.
+        const auto proofs=current_constant_values(data,nodes,node_filter);
+        const auto constant_values=constant_value_index(proofs);
         for (auto& raw : nodes) {
             if(node_filter && raw.id!=*node_filter) continue;
             for (A_long index=1;index<static_cast<A_long>(raw.fields.size());++index) {
                 auto& field=raw.fields[index];if(!field.present || field.slot<0)continue;
                 for (A_long component = 0; component < component_count(field.type); ++component) {
                     if(failure)*failure={raw.id,index,component};
+                    if(const auto value=constant_alias_value(constant_values,raw.id,
+                        kNativeBindingFirstIndex+field.slot+component)) {
+                        field.value[component]=*value;continue;
+                    }
                     PF_ParamDef sampled{};
                     if (failed_stream) *failed_stream = kNativeBindingFirstIndex + field.slot + component;
                     stage("parameter checkout");
@@ -2291,28 +2671,36 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
     EffectRef renderer(suites.effect,raw_renderer);
     std::array<bool,kNativeBindingCapacity> evaluated{};
     const A_Time warm_time=data->time_scale?A_Time{data->current_time,data->time_scale}:A_Time{0,1};
+    const auto owned_alias_value=[&](A_long stream_index)->std::optional<double> {
+        AEGP_StreamRefH raw{};
+        auto read_error=suites.stream->AEGP_GetNewEffectStreamByIndex(id,raw_renderer,stream_index,&raw);
+        if(read_error || !raw){trace.value.error=static_cast<PF_Err>(read_error?read_error:PF_Err_BAD_CALLBACK_PARAM);return {};}
+        StreamRef stream(suites.stream,raw);AEGP_StreamType type{};A_Boolean enabled=FALSE;
+        read_error=suites.stream->AEGP_GetStreamType(raw,&type);
+        if(!read_error && type==AEGP_StreamType_OneD)read_error=suites.stream->AEGP_GetExpressionState(id,raw,&enabled);
+        if(read_error || type!=AEGP_StreamType_OneD || !enabled){trace.value.error=static_cast<PF_Err>(read_error?read_error:PF_Err_BAD_CALLBACK_PARAM);return {};}
+        AEGP_StreamValue2 value{};
+        read_error=suites.stream->AEGP_GetNewStreamValue(id,raw,AEGP_LTimeMode_LayerTime,&warm_time,FALSE,&value);
+        if(read_error){trace.value.error=static_cast<PF_Err>(read_error);return {};}
+        const double number=value.val.one_d;suites.stream->AEGP_DisposeStreamValue(&value);
+        if(!std::isfinite(number) || number==kNativeBindingUnavailable){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;return {};}
+        return number;
+    };
     for(const auto& node:nodes) for(const auto& field:node.fields) {
         if(!field.present || field.slot<0)continue;
         for(A_long c=0;c<component_count(field.type);++c) {
             ++trace.value.inputs;
             const auto slot=field.slot+c;
             if(slot<0 || slot>=kNativeBindingCapacity){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
-            AEGP_StreamRefH raw{};
-            error=suites.stream->AEGP_GetNewEffectStreamByIndex(id,raw_renderer,kNativeBindingFirstIndex+slot,&raw);
-            if(error || !raw){trace.value.error=static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);continue;}
-            StreamRef stream(suites.stream,raw);AEGP_StreamType type{};A_Boolean enabled=FALSE;
-            error=suites.stream->AEGP_GetStreamType(raw,&type);
-            if(!error && type==AEGP_StreamType_OneD)error=suites.stream->AEGP_GetExpressionState(id,raw,&enabled);
-            if(error || type!=AEGP_StreamType_OneD || !enabled){trace.value.error=static_cast<PF_Err>(error?error:PF_Err_BAD_CALLBACK_PARAM);continue;}
-            AEGP_StreamValue2 value{};
-            error=suites.stream->AEGP_GetNewStreamValue(id,raw,AEGP_LTimeMode_LayerTime,&warm_time,FALSE,&value);
-            if(error){trace.value.error=static_cast<PF_Err>(error);continue;}
-            const double number=value.val.one_d;
-            suites.stream->AEGP_DisposeStreamValue(&value);
-            if(!std::isfinite(number) || number==kNativeBindingUnavailable){trace.value.error=PF_Err_BAD_CALLBACK_PARAM;continue;}
+            if(!owned_alias_value(kNativeBindingFirstIndex+slot))continue;
             evaluated[slot]=true;++trace.value.evaluated;
         }
     }
+    // Unlike the UI scheduling stamp, this receipt includes referenced layers
+    // and brackets the ENTIRE capture. A post-capture stamp alone cannot prove
+    // that earlier individually certified values survived later SDK reads.
+    PF_State whole_before{};
+    const bool whole_started=!extra.utils->PF_GetCurrentState(data->effect_ref,PF_ParamIndex_CHECK_ALL,nullptr,nullptr,&whole_before);
     std::vector<NativeControlProof> result;
     for(A_long i=0;i<count;++i) {
         AEGP_EffectRefH ref{};if(suites.effect->AEGP_GetLayerEffectByIndex(id,layer,i,&ref) || !ref)return;
@@ -2340,10 +2728,14 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
                 // selected layer can animate through its ancestors even when
                 // the Transform controls have no keys; retain exact sampling.
                 if(!identity_resource)continue;
+                // This second, normally warm read is inside the state pair.
+                // The initial warm pass alone cannot certify its numeric value.
+                const auto constant_value=owned_alias_value(first);
+                if(!constant_value)continue;
                 PF_State after{};A_Boolean same=FALSE;
                 if(!extra.utils->PF_GetCurrentState(data->effect_ref,first,nullptr,nullptr,&after) &&
                    !extra.utils->PF_AreStatesIdentical(data->effect_ref,&before[0],&after,&same) && same)
-                    result.push_back(NativeControlProof{node->id,first,after,true,{},{}});
+                    result.push_back(NativeControlProof{node->id,first,after,true,{},{},constant_value});
                 continue;
             }
             AEGP_StreamRefH raw{};if(suites.stream->AEGP_GetNewEffectStreamByIndex(id,ref,index,&raw) || !raw)continue;
@@ -2383,10 +2775,15 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
             }
             if(!constant && !profile)continue;
             for(A_long c=0;c<component_count(field.type);++c) {
+                std::optional<double> constant_value;
+                if(constant) {
+                    constant_value=owned_alias_value(first+c);
+                    if(!constant_value)continue;
+                }
                 PF_State after{};A_Boolean same=FALSE;
                 if(extra.utils->PF_GetCurrentState(data->effect_ref,first+c,nullptr,nullptr,&after) ||
                     extra.utils->PF_AreStatesIdentical(data->effect_ref,&before[c],&after,&same) || !same)continue;
-                NativeControlProof proof{node->id,first+c,after,constant,{},{}};
+                NativeControlProof proof{node->id,first+c,after,constant,{},{},constant_value};
                 if(profile && kind==Kind::emitter)proof.rate=profile;
                 if(profile && kind==Kind::particle) {
                     double maximum=profile->constant;for(const auto& p:profile->keys)maximum=std::max(maximum,p.value);
@@ -2397,6 +2794,11 @@ void capture_native_temporal_metadata(PF_InData* data,const core::Graph& graph,A
         }
     }
     trace.value.proofs=result.size();
+    PF_State whole_after{};A_Boolean whole_same=FALSE;
+    if(whole_started && !extra.utils->PF_GetCurrentState(data->effect_ref,PF_ParamIndex_CHECK_ALL,nullptr,nullptr,&whole_after) &&
+       !extra.utils->PF_AreStatesIdentical(data->effect_ref,&whole_before,&whole_after,&whole_same) && whole_same) {
+        remember_native_control_proofs(data,std::move(result),whole_after);return;
+    }
     remember_native_control_proofs(data,std::move(result));
 } catch(...) {}
 } // namespace starfield::adapter

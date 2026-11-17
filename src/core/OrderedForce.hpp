@@ -7,15 +7,20 @@ Result<Settings> ordered_force_settings(const ParticleInstance& p,std::uint32_t 
     std::span<const ForceValues> fields) {
     Settings settings;settings.velocity={};settings.velocity_spread=0;
     settings.emitter_origin={};settings.emitter_shape=EmitterShape::point;
-    settings.seed=seed;settings.particle_lifetime_seconds=p.lifetime_seconds;
+    settings.particle_lifetime_seconds=p.lifetime_seconds;
     settings.forces.reserve(fields.size());
     for(const auto& field:fields){
         settings.gravity.x+=field.gravity.x;settings.gravity.y+=field.gravity.y;settings.gravity.z+=field.gravity.z;
         settings.linear_drag+=field.linear_drag;
         settings.forces.push_back(motion_for_emitter(field.motion,p.emitter_id));
     }
+    // This seed was derived after public emitter validation (Particle shift or
+    // Auxiliary mixing) and deliberately spans all32 bits. Validate physical
+    // controls with the valid default author seed, then restore the exact RNG
+    // seed; public limits and every physical notice stay strict.
     auto checked=validate_settings(settings);
     if(!checked.notices.empty())return Result<Settings>::failure(ErrorCode::invalid_request,"ordered Force values exceed bounds");
+    checked.value.seed=seed;
     return Result<Settings>::success(std::move(checked.value));
 }
 bool charge_ordered_force(const Settings& settings,std::uint64_t& work,unsigned queries=1) noexcept {
